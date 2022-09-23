@@ -1,0 +1,146 @@
+use crate::{
+    ast::{
+        Boundary, BoundaryConstraints, Constraint, Expr, AirDef,
+        Identifier, Source, SourceSection, TraceCols, TraceColsGrp,
+        TraceColsGrpType, TransitionConstraints
+    }, error::{Error, ParseError::InvalidInt}, lexer::Token
+};
+use std::str::FromStr;
+use lalrpop_util::ParseError;
+
+grammar;
+
+// AST NODE
+// ================================================================================================
+
+pub Source: Source = {
+    SourceSection* => Source(<>)
+}
+
+SourceSection: SourceSection = {
+    AirDef => SourceSection::AirDef(<>),
+    BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
+    TraceCols => SourceSection::TraceCols(<>),
+    TransitionConstraints => SourceSection::TransitionConstraints(<>),
+}
+
+// AIR DEF
+// ================================================================================================
+
+AirDef: AirDef = {
+    "def" <f: Identifier> => AirDef { name: f }
+}
+
+// TRACE COLUMNS
+// ================================================================================================
+
+TraceCols: TraceCols = {
+    "trace_columns" ":" <cols: TraceColsGrp+> => TraceCols { cols }
+}
+
+TraceColsGrp: TraceColsGrp = {
+    "main" ":" "[" <e: CommaElems<Expr1>> "]" => TraceColsGrp {
+        cols_grp_type: TraceColsGrpType::MainTraceCols,
+        cols: e,
+    } 
+}
+
+// BOUNDARY CONSTRAINTS
+// ================================================================================================
+
+BoundaryConstraints: BoundaryConstraints = {
+    "boundary_constraints" ":" <boundary_constraints: Constraint+> =>
+        BoundaryConstraints { boundary_constraints }
+}
+
+Boundary: Boundary = {
+    "first" => Boundary::First,
+    "last" => Boundary::Last
+}
+
+// TRANSITION CONSTRAINTS
+// ================================================================================================
+
+TransitionConstraints: TransitionConstraints = {
+    "transition_constraints" ":" <transition_constraints: Constraint+> =>
+        TransitionConstraints { transition_constraints }
+}
+
+// EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST)
+// ================================================================================================
+
+Expr: Expr = {
+    Expr3
+}
+
+Expr3: Expr = {
+    <lexpr: Expr2> "=" <rexpr: Expr2> => Expr::Equal(Box::new(lexpr), Box::new(rexpr)),
+    Expr2
+}
+
+Expr2: Expr = {
+    <lexpr: Expr1> "+" <rexpr: Expr1> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: Expr1> "-" <rexpr: Expr1> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
+    Expr1
+}
+
+Expr1: Expr = {
+    <s: Identifier> "." <boundary: Boundary> => Expr::Boundary(s, boundary),
+    <n: Num> => Expr::Int(Token::Number(n.to_string())),
+    <s: Identifier> => Expr::Variable(s),
+}
+
+// ATOMS
+// ================================================================================================
+
+Constraint: Constraint = {
+    "enf" <expr: Expr> => Constraint { expr }
+}
+
+CommaElems<T>: Vec<T> = {
+    <e:T> <v:("," <T>)*> => {
+        let mut v = v;
+        v.insert(0, e);
+        v
+    }
+}
+
+Identifier: Identifier = {
+    <n:identifier> => Identifier{ name: n.to_string() }
+}
+
+Num: u64 = {
+    r"[0-9]+" =>? u64::from_str(&<>)
+        .map_err(|_| ParseError::User {
+            error: Error::ParseError(InvalidInt(format!("Int too big : {}", <>).to_string()))
+        })
+}
+
+// LEXER
+// ================================================================================================
+
+extern {
+    type Error = Error;
+    type Location = usize;
+
+    enum Token {
+        "def" => Token::Def,
+        "trace_columns" => Token::TraceColumnns,
+        "main" => Token::Main,
+        "boundary_constraints" => Token::BoundaryConstraints,
+        "first" => Token::First,
+        "last" => Token::Last,
+        "transition_constraints" => Token::TransitionConstraints,
+        "enf" => Token::Enf,
+        "=" => Token::Equal,
+        "+" => Token::Plus,
+        "-" => Token::Minus,
+        ":" => Token::Colon,
+        "," => Token::Comma,
+        "[" => Token::Lsqb,
+        "]" => Token::Rsqb,
+        "." => Token::Dot,
+        identifier => Token::Ident(<String>),
+        r"[0-9]+" => Token::Number(<String>),
+    }
+}
