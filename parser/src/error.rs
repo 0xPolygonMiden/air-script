@@ -9,4 +9,5 @@ pub enum Error {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParseError {
     InvalidInt(String),
+    InvalidTraceCols(String),
 }

@@ -1,9 +1,8 @@
 use crate::{
     ast::{
-        Boundary, BoundaryConstraints, Constraint, Expr, AirDef,
-        Identifier, Source, SourceSection, TraceCols, TraceColsGrp,
-        TraceColsGrpType, TransitionConstraints
-    }, error::{Error, ParseError::InvalidInt}, lexer::Token
+        Boundary, BoundaryConstraints, BoundaryConstraint, TransitionConstraint, Expr, AirDef,
+        Identifier, Source, SourceSection, TraceCols, TransitionConstraints
+    }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols}}, lexer::Token
 };
 use std::str::FromStr;
 use lalrpop_util::ParseError;
@@ -19,8 +18,8 @@ pub Source: Source = {
 
 SourceSection: SourceSection = {
     AirDef => SourceSection::AirDef(<>),
-    BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
     TraceCols => SourceSection::TraceCols(<>),
+    BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
     TransitionConstraints => SourceSection::TransitionConstraints(<>),
 }
 
@@ -35,22 +34,36 @@ AirDef: AirDef = {
 // ================================================================================================
 
 TraceCols: TraceCols = {
-    "trace_columns" ":" <cols: TraceColsGrp+> => TraceCols { cols }
+    "trace_columns" ":" <main_cols: MainCols?> <aux_cols: AuxCols?> =>? match (main_cols, aux_cols)
+    {
+        (Some(main_cols), Some(aux_cols)) => Ok(TraceCols { main_cols, aux_cols }),
+        (Some(main_cols), None) => Ok(TraceCols { main_cols, aux_cols: vec![] }),
+        (None, Some(aux_cols)) => Ok(TraceCols { main_cols: vec![], aux_cols }),
+        (None, None) => Err(ParseError::User {
+            error: Error::ParseError(InvalidTraceCols("Trace Columns cannot be empty".to_string()))
+        })
+    } 
 }
 
-TraceColsGrp: TraceColsGrp = {
-    "main" ":" "[" <e: CommaElems<Expr1>> "]" => TraceColsGrp {
-        cols_grp_type: TraceColsGrpType::MainTraceCols,
-        cols: e,
-    } 
+MainCols: Vec<Identifier> = {
+    "main" ":" "[" <main_cols: CommaElems<Identifier>> "]" => main_cols,
+}
+
+AuxCols: Vec<Identifier> = {
+    "aux" ":" "[" <aux_cols: CommaElems<Identifier>> "]" => aux_cols,
 }
 
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
 BoundaryConstraints: BoundaryConstraints = {
-    "boundary_constraints" ":" <boundary_constraints: Constraint+> =>
+    "boundary_constraints" ":" <boundary_constraints: BoundaryConstraint+> =>
         BoundaryConstraints { boundary_constraints }
+}
+
+BoundaryConstraint: BoundaryConstraint = {
+    "enf" <column: Identifier> "." <boundary: Boundary> "=" <value: Expr> =>
+        BoundaryConstraint { column, boundary, value }
 }
 
 Boundary: Boundary = {
@@ -62,40 +75,34 @@ Boundary: Boundary = {
 // ================================================================================================
 
 TransitionConstraints: TransitionConstraints = {
-    "transition_constraints" ":" <transition_constraints: Constraint+> =>
+    "transition_constraints" ":" <transition_constraints: TransitionConstraint+> =>
         TransitionConstraints { transition_constraints }
+}
+
+TransitionConstraint: TransitionConstraint = {
+    "enf" <lhs: Expr> "=" <rhs: Expr> => TransitionConstraint { lhs, rhs }
 }
 
 // EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST)
 // ================================================================================================
 
 Expr: Expr = {
-    Expr3
+    ArithmeticExpr
 }
 
-Expr3: Expr = {
-    <lexpr: Expr2> "=" <rexpr: Expr2> => Expr::Equal(Box::new(lexpr), Box::new(rexpr)),
-    Expr2
+ArithmeticExpr: Expr = {
+    <lexpr: AtomExpr> "+" <rexpr: AtomExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: AtomExpr> "-" <rexpr: AtomExpr> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
+    AtomExpr
 }
 
-Expr2: Expr = {
-    <lexpr: Expr1> "+" <rexpr: Expr1> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: Expr1> "-" <rexpr: Expr1> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
-    Expr1
-}
-
-Expr1: Expr = {
-    <s: Identifier> "." <boundary: Boundary> => Expr::Boundary(s, boundary),
+AtomExpr: Expr = {
     <n: Num> => Expr::Int(Token::Number(n.to_string())),
     <s: Identifier> => Expr::Variable(s),
 }
 
 // ATOMS
 // ================================================================================================
-
-Constraint: Constraint = {
-    "enf" <expr: Expr> => Constraint { expr }
-}
 
 CommaElems<T>: Vec<T> = {
     <e:T> <v:("," <T>)*> => {
@@ -124,9 +131,12 @@ extern {
     type Location = usize;
 
     enum Token {
+        identifier => Token::Ident(<String>),
+        r"[0-9]+" => Token::Number(<String>),
         "def" => Token::Def,
         "trace_columns" => Token::TraceColumnns,
         "main" => Token::Main,
+        "aux" => Token::Aux,
         "boundary_constraints" => Token::BoundaryConstraints,
         "first" => Token::First,
         "last" => Token::Last,
@@ -140,7 +150,5 @@ extern {
         "[" => Token::Lsqb,
         "]" => Token::Rsqb,
         "." => Token::Dot,
-        identifier => Token::Ident(<String>),
-        r"[0-9]+" => Token::Number(<String>),
     }
 }

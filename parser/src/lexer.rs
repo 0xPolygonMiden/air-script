@@ -29,6 +29,10 @@ pub enum Token {
     #[token("main")]
     Main,
 
+    /// Used to declare aux trace columns.
+    #[token("aux")]
+    Aux,
+
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Marks the beginning of boundary constraints section in the constraints file.

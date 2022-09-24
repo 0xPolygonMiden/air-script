@@ -1,10 +1,13 @@
 use crate::{
     ast::{
-        AirDef, Boundary, BoundaryConstraints, Constraint, Expr, Identifier, Source, SourceSection,
-        TraceCols, TraceColsGrp, TraceColsGrpType, TransitionConstraints,
+        AirDef, Boundary, BoundaryConstraint, BoundaryConstraints, Expr, Identifier, Source,
+        SourceSection, TraceCols, TransitionConstraint, TransitionConstraints,
     },
     build_parse_test,
-    error::{Error, ParseError::InvalidInt},
+    error::{
+        Error,
+        ParseError::{InvalidInt, InvalidTraceCols},
+    },
     lexer::Token,
     tests::ParseTest,
 };
@@ -19,22 +22,61 @@ fn trace_columns() {
     trace_columns:
         main: [clk, fmp, ctx]";
     let expected = Source(vec![SourceSection::TraceCols(TraceCols {
-        cols: vec![TraceColsGrp {
-            cols_grp_type: TraceColsGrpType::MainTraceCols,
-            cols: vec![
-                Expr::Variable(Identifier {
-                    name: "clk".to_string(),
-                }),
-                Expr::Variable(Identifier {
-                    name: "fmp".to_string(),
-                }),
-                Expr::Variable(Identifier {
-                    name: "ctx".to_string(),
-                }),
-            ],
-        }],
+        main_cols: vec![
+            Identifier {
+                name: "clk".to_string(),
+            },
+            Identifier {
+                name: "fmp".to_string(),
+            },
+            Identifier {
+                name: "ctx".to_string(),
+            },
+        ],
+        aux_cols: vec![],
     })]);
     build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn trace_columns_main_and_aux() {
+    let source = "
+    trace_columns:
+        main: [clk, fmp, ctx]
+        aux: [rc_bus, ch_bus]";
+    let expected = Source(vec![SourceSection::TraceCols(TraceCols {
+        main_cols: vec![
+            Identifier {
+                name: "clk".to_string(),
+            },
+            Identifier {
+                name: "fmp".to_string(),
+            },
+            Identifier {
+                name: "ctx".to_string(),
+            },
+        ],
+        aux_cols: vec![
+            Identifier {
+                name: "rc_bus".to_string(),
+            },
+            Identifier {
+                name: "ch_bus".to_string(),
+            },
+        ],
+    })]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn empty_trace_columns_error() {
+    let source = "
+    trace_columns:";
+    // Trace columns cannot be empty
+    let error = Error::ParseError(InvalidTraceCols(
+        "Trace Columns cannot be empty".to_string(),
+    ));
+    build_parse_test!(source).expect_error(error);
 }
 
 #[test]
@@ -44,22 +86,27 @@ fn transition_constraints() {
         enf clk' = clk + 1";
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
-            transition_constraints: vec![Constraint {
-                expr: Expr::Equal(
+            transition_constraints: vec![TransitionConstraint {
+                lhs: Expr::Variable(Identifier {
+                    name: "clk'".to_string(),
+                }),
+                rhs: Expr::Add(
                     Box::new(Expr::Variable(Identifier {
-                        name: "clk'".to_string(),
+                        name: "clk".to_string(),
                     })),
-                    Box::new(Expr::Add(
-                        Box::new(Expr::Variable(Identifier {
-                            name: "clk".to_string(),
-                        })),
-                        Box::new(Expr::Int(Token::Number("1".to_string()))),
-                    )),
+                    Box::new(Expr::Int(Token::Number("1".to_string()))),
                 ),
             }],
         },
     )]);
     build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn transition_constraints_invalid() {
+    let source = "transition_constraints:
+        enf clk' = clk = 1";
+    build_parse_test!(source).expect_unrecognized_token();
 }
 
 #[test]
@@ -71,31 +118,27 @@ fn multiple_transition_constraints() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![
-                Constraint {
-                    expr: Expr::Equal(
+                TransitionConstraint {
+                    lhs: Expr::Variable(Identifier {
+                        name: "clk'".to_string(),
+                    }),
+                    rhs: Expr::Add(
+                        Box::new(Expr::Variable(Identifier {
+                            name: "clk".to_string(),
+                        })),
+                        Box::new(Expr::Int(Token::Number("1".to_string()))),
+                    ),
+                },
+                TransitionConstraint {
+                    lhs: Expr::Subtract(
                         Box::new(Expr::Variable(Identifier {
                             name: "clk'".to_string(),
                         })),
-                        Box::new(Expr::Add(
-                            Box::new(Expr::Variable(Identifier {
-                                name: "clk".to_string(),
-                            })),
-                            Box::new(Expr::Int(Token::Number("1".to_string()))),
-                        )),
+                        Box::new(Expr::Variable(Identifier {
+                            name: "clk".to_string(),
+                        })),
                     ),
-                },
-                Constraint {
-                    expr: Expr::Equal(
-                        Box::new(Expr::Subtract(
-                            Box::new(Expr::Variable(Identifier {
-                                name: "clk'".to_string(),
-                            })),
-                            Box::new(Expr::Variable(Identifier {
-                                name: "clk".to_string(),
-                            })),
-                        )),
-                        Box::new(Expr::Int(Token::Number("1".to_string()))),
-                    ),
+                    rhs: Expr::Int(Token::Number("1".to_string())),
                 },
             ],
         },
@@ -110,16 +153,12 @@ fn boundary_constraints() {
         enf clk.first = 0";
     let expected = Source(vec![SourceSection::BoundaryConstraints(
         BoundaryConstraints {
-            boundary_constraints: vec![Constraint {
-                expr: Expr::Equal(
-                    Box::new(Expr::Boundary(
-                        Identifier {
-                            name: "clk".to_string(),
-                        },
-                        Boundary::First,
-                    )),
-                    Box::new(Expr::Int(Token::Number("0".to_string()))),
-                ),
+            boundary_constraints: vec![BoundaryConstraint {
+                column: Identifier {
+                    name: "clk".to_string(),
+                },
+                boundary: Boundary::First,
+                value: Expr::Int(Token::Number("0".to_string())),
             }],
         },
     )]);
@@ -135,27 +174,19 @@ fn multiple_boundary_constraints() {
     let expected = Source(vec![SourceSection::BoundaryConstraints(
         BoundaryConstraints {
             boundary_constraints: vec![
-                Constraint {
-                    expr: Expr::Equal(
-                        Box::new(Expr::Boundary(
-                            Identifier {
-                                name: "clk".to_string(),
-                            },
-                            Boundary::First,
-                        )),
-                        Box::new(Expr::Int(Token::Number("0".to_string()))),
-                    ),
+                BoundaryConstraint {
+                    column: Identifier {
+                        name: "clk".to_string(),
+                    },
+                    boundary: Boundary::First,
+                    value: Expr::Int(Token::Number("0".to_string())),
                 },
-                Constraint {
-                    expr: Expr::Equal(
-                        Box::new(Expr::Boundary(
-                            Identifier {
-                                name: "clk".to_string(),
-                            },
-                            Boundary::Last,
-                        )),
-                        Box::new(Expr::Int(Token::Number("1".to_string()))),
-                    ),
+                BoundaryConstraint {
+                    column: Identifier {
+                        name: "clk".to_string(),
+                    },
+                    boundary: Boundary::Last,
+                    value: Expr::Int(Token::Number("1".to_string())),
                 },
             ],
         },
@@ -179,54 +210,44 @@ fn full_air_file() {
         // trace_columns:
         //     main: [clk, fmp, ctx]
         SourceSection::TraceCols(TraceCols {
-            cols: vec![TraceColsGrp {
-                cols_grp_type: TraceColsGrpType::MainTraceCols,
-                // [clk, fmp, ctx]
-                cols: vec![
-                    Expr::Variable(Identifier {
-                        name: "clk".to_string(),
-                    }),
-                    Expr::Variable(Identifier {
-                        name: "fmp".to_string(),
-                    }),
-                    Expr::Variable(Identifier {
-                        name: "ctx".to_string(),
-                    }),
-                ],
-            }],
+            main_cols: vec![
+                Identifier {
+                    name: "clk".to_string(),
+                },
+                Identifier {
+                    name: "fmp".to_string(),
+                },
+                Identifier {
+                    name: "ctx".to_string(),
+                },
+            ],
+            aux_cols: vec![],
         }),
         // transition_constraints:
         //     enf clk' = clk + 1
         SourceSection::TransitionConstraints(TransitionConstraints {
-            transition_constraints: vec![Constraint {
+            transition_constraints: vec![TransitionConstraint {
                 // clk' = clk + 1
-                expr: Expr::Equal(
+                lhs: Expr::Variable(Identifier {
+                    name: "clk'".to_string(),
+                }),
+                rhs: Expr::Add(
                     Box::new(Expr::Variable(Identifier {
-                        name: "clk'".to_string(),
+                        name: "clk".to_string(),
                     })),
-                    Box::new(Expr::Add(
-                        Box::new(Expr::Variable(Identifier {
-                            name: "clk".to_string(),
-                        })),
-                        Box::new(Expr::Int(Token::Number("1".to_string()))),
-                    )),
+                    Box::new(Expr::Int(Token::Number("1".to_string()))),
                 ),
             }],
         }),
         // boundary_constraints:
         //     enf clk.first = 0
         SourceSection::BoundaryConstraints(BoundaryConstraints {
-            boundary_constraints: vec![Constraint {
-                // enf clk.first = 0
-                expr: Expr::Equal(
-                    Box::new(Expr::Boundary(
-                        Identifier {
-                            name: "clk".to_string(),
-                        },
-                        Boundary::First,
-                    )),
-                    Box::new(Expr::Int(Token::Number("0".to_string()))),
-                ),
+            boundary_constraints: vec![BoundaryConstraint {
+                column: Identifier {
+                    name: "clk".to_string(),
+                },
+                boundary: Boundary::First,
+                value: Expr::Int(Token::Number("0".to_string())),
             }],
         }),
     ]);

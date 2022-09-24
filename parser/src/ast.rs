@@ -40,34 +40,25 @@ pub struct AirDef {
     pub name: Identifier,
 }
 
-/// [TraceCols] contains the trace columns representing columns of the execution trace.
-/// TraceCols is made up of TraceColsGrp which represents groups of columns of a specific type.
-#[derive(Debug, PartialEq)]
-pub struct TraceCols {
-    pub cols: Vec<TraceColsGrp>,
-}
-
-/// [TraceColsGrp] represents a group of columns of a specfic type.
-/// There are two types of groups:
-/// - MainTraceCols
-/// - AuxiliaryTraceCols
-#[derive(Debug, PartialEq)]
-pub struct TraceColsGrp {
-    pub cols_grp_type: TraceColsGrpType,
-    pub cols: Vec<Expr>,
-}
-
-/// Describes the type of trace columns group.
+/// [TraceCols] contains the main and auxiliary trace columns of the execution trace.
 #[derive(Debug, Eq, PartialEq)]
-pub enum TraceColsGrpType {
-    MainTraceCols,
-    AuxiliaryTraceCols,
+pub struct TraceCols {
+    pub main_cols: Vec<Identifier>,
+    pub aux_cols: Vec<Identifier>,
 }
 
-/// Stores the boundary constraints to be enforced to the trace column values.
+/// Stores the boundary constraints to be enforced on the trace column values.
 #[derive(Debug, PartialEq)]
 pub struct BoundaryConstraints {
-    pub boundary_constraints: Vec<Constraint>,
+    pub boundary_constraints: Vec<BoundaryConstraint>,
+}
+
+/// Stores the expression corresponding to the boundary constraint.
+#[derive(Debug, PartialEq)]
+pub struct BoundaryConstraint {
+    pub column: Identifier,
+    pub boundary: Boundary,
+    pub value: Expr,
 }
 
 /// Describes the type of boundary in the boundary constraint.
@@ -77,25 +68,24 @@ pub enum Boundary {
     Last,
 }
 
-/// Stores the transition constraints to be enforced to the trace column values.
+/// Stores the transition constraints to be enforced on the trace column values.
 #[derive(Debug, PartialEq)]
 pub struct TransitionConstraints {
-    pub transition_constraints: Vec<Constraint>,
+    pub transition_constraints: Vec<TransitionConstraint>,
 }
 
-/// Stores the expression corresponding to the transition or boundary constraint.
+/// Stores the expression corresponding to the transition constraint.
 #[derive(Debug, PartialEq)]
-pub struct Constraint {
-    pub expr: Expr,
+pub struct TransitionConstraint {
+    pub lhs: Expr,
+    pub rhs: Expr,
 }
 
-/// Arithmetic expressions representing transition or boundary constraint.
+/// Arithmetic expressions for constraint evaluation.
 #[derive(Debug, PartialEq)]
 pub enum Expr {
     Add(Box<Expr>, Box<Expr>),
     Subtract(Box<Expr>, Box<Expr>),
-    Equal(Box<Expr>, Box<Expr>),
-    Boundary(Identifier, Boundary),
     Variable(Identifier),
     Int(Token),
 }
