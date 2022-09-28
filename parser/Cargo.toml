@@ -1,0 +1,12 @@
+[package]
+name = "parser"
+version = "0.0.1"
+edition = "2021"
+
+[build-dependencies]
+lalrpop = "0.19.7"
+
+[dependencies]
+lalrpop-util = { version = "0.19.7" }
+regex = "1"
+logos = "0.12.0"
