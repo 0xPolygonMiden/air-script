@@ -264,10 +264,10 @@ fn error_invalid_int() {
         "
     transition_constraints:
         enf clk' = clk + {}",
-        num.to_string()
+        num
     );
     // Integers can only be of type u64.
-    let error = Error::ParseError(InvalidInt(format!("Int too big : {}", num.to_string())));
+    let error = Error::ParseError(InvalidInt(format!("Int too big : {}", num)));
     build_parse_test!(source.as_str()).expect_error(error);
 }
 
