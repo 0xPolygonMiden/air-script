@@ -4,3 +4,9 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
+parser = { package = "parser", path = "../parser", version = "0.0.1" }
+ir = { package = "ir", path = "../ir", version = "0.0.1" }
+codegen-winter = { package = "codegen-winter", path = "../codegen-winter", version = "0.1.0" }
+structopt = "0.3.26"
+env_logger = "0.9"
+log = { version = "0.4", default-features = false }
