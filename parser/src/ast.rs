@@ -91,7 +91,7 @@ pub struct TransitionConstraints {
 }
 
 /// Stores the expression corresponding to the transition constraint.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TransitionConstraint {
     lhs: Expr,
     rhs: Expr,
