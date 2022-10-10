@@ -147,6 +147,32 @@ fn multiple_transition_constraints() {
 }
 
 #[test]
+fn multi_arithmetic_ops() {
+    let source = "
+    transition_constraints:
+        enf clk' - clk - 1 = 0";
+    let expected = Source(vec![SourceSection::TransitionConstraints(
+        TransitionConstraints {
+            transition_constraints: vec![TransitionConstraint {
+                lhs: Expr::Subtract(
+                    Box::new(Expr::Subtract(
+                        Box::new(Expr::Variable(Identifier {
+                            name: "clk'".to_string(),
+                        })),
+                        Box::new(Expr::Variable(Identifier {
+                            name: "clk".to_string(),
+                        })),
+                    )),
+                    Box::new(Expr::Constant(Felt::new(1))),
+                ),
+                rhs: Expr::Constant(Felt::new(0)),
+            }],
+        },
+    )]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
 fn boundary_constraints() {
     let source = "
     boundary_constraints:

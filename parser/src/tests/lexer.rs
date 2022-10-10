@@ -24,6 +24,22 @@ fn keywords_with_identifiers() {
 }
 
 #[test]
+fn multi_arithmetic_ops() {
+    let source = "enf clk' - clk - 1 = 0";
+    let tokens = vec![
+        Token::Enf,
+        Token::Ident("clk'".to_string()),
+        Token::Minus,
+        Token::Ident("clk".to_string()),
+        Token::Minus,
+        Token::Number("1".to_string()),
+        Token::Equal,
+        Token::Number("0".to_string()),
+    ];
+    build_parse_test!(source).expect_valid_tokenization(tokens);
+}
+
+#[test]
 fn boundary_constraints() {
     let source = "enf clk.first = 0";
     let tokens = vec![

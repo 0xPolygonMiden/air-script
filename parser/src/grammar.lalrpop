@@ -91,8 +91,8 @@ Expr: Expr = {
 }
 
 ArithmeticExpr: Expr = {
-    <lexpr: AtomExpr> "+" <rexpr: AtomExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: AtomExpr> "-" <rexpr: AtomExpr> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: ArithmeticExpr> "+" <rexpr: AtomExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: ArithmeticExpr> "-" <rexpr: AtomExpr> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
     AtomExpr
 }
 
