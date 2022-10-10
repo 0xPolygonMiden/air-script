@@ -7,8 +7,8 @@ pub enum Token {
     // PRIMITIVES
     // --------------------------------------------------------------------------------------------
     /// Identifiers should start with alphabet followed by one or more alpha numeric characters
-    /// or an underscore which can be optionally followed by "'" to indicate next row of the column.
-    #[regex("[a-zA-Z][a-zA-Z0-9_]*'?", |tok| tok.slice().to_string())]
+    /// or an underscore.
+    #[regex("[a-zA-Z][a-zA-Z0-9_]*", |tok| tok.slice().to_string())]
     Ident(String),
 
     /// Integers should only contain numeric characters.
@@ -52,6 +52,10 @@ pub enum Token {
     /// Marks the beginning of transition constraints section in the constraints file.
     #[token("transition_constraints")]
     TransitionConstraints,
+
+    /// A modifier for identifiers used to indicate the next row.
+    #[token("'")]
+    Next,
 
     // GENERAL KEYWORDS
     // --------------------------------------------------------------------------------------------

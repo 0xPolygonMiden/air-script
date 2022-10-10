@@ -87,8 +87,8 @@ fn transition_constraints() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint {
-                lhs: Expr::Variable(Identifier {
-                    name: "clk'".to_string(),
+                lhs: Expr::Next(Identifier {
+                    name: "clk".to_string(),
                 }),
                 rhs: Expr::Add(
                     Box::new(Expr::Variable(Identifier {
@@ -119,8 +119,8 @@ fn multiple_transition_constraints() {
         TransitionConstraints {
             transition_constraints: vec![
                 TransitionConstraint {
-                    lhs: Expr::Variable(Identifier {
-                        name: "clk'".to_string(),
+                    lhs: Expr::Next(Identifier {
+                        name: "clk".to_string(),
                     }),
                     rhs: Expr::Add(
                         Box::new(Expr::Variable(Identifier {
@@ -131,8 +131,8 @@ fn multiple_transition_constraints() {
                 },
                 TransitionConstraint {
                     lhs: Expr::Subtract(
-                        Box::new(Expr::Variable(Identifier {
-                            name: "clk'".to_string(),
+                        Box::new(Expr::Next(Identifier {
+                            name: "clk".to_string(),
                         })),
                         Box::new(Expr::Variable(Identifier {
                             name: "clk".to_string(),
@@ -156,16 +156,16 @@ fn multi_arithmetic_ops() {
             transition_constraints: vec![TransitionConstraint {
                 lhs: Expr::Subtract(
                     Box::new(Expr::Subtract(
-                        Box::new(Expr::Variable(Identifier {
-                            name: "clk'".to_string(),
+                        Box::new(Expr::Next(Identifier {
+                            name: "clk".to_string(),
                         })),
                         Box::new(Expr::Variable(Identifier {
                             name: "clk".to_string(),
                         })),
                     )),
-                    Box::new(Expr::Constant(Felt::new(1))),
+                    Box::new(Expr::Int(Token::Number("1".to_string()))),
                 ),
-                rhs: Expr::Constant(Felt::new(0)),
+                rhs: Expr::Int(Token::Number("0".to_string())),
             }],
         },
     )]);
@@ -254,8 +254,8 @@ fn full_air_file() {
         SourceSection::TransitionConstraints(TransitionConstraints {
             transition_constraints: vec![TransitionConstraint {
                 // clk' = clk + 1
-                lhs: Expr::Variable(Identifier {
-                    name: "clk'".to_string(),
+                lhs: Expr::Next(Identifier {
+                    name: "clk".to_string(),
                 }),
                 rhs: Expr::Add(
                     Box::new(Expr::Variable(Identifier {
@@ -316,5 +316,13 @@ fn error_identifier_starting_with_int() {
     let source = "
     transition_constraints:
         enf 1clk' = clk + 1";
+    build_parse_test!(source).expect_unrecognized_token();
+}
+
+#[test]
+fn error_invalid_next_usage() {
+    let source = "
+    transition_constraints:
+        enf clk'' = clk + 1";
     build_parse_test!(source).expect_unrecognized_token();
 }

@@ -87,12 +87,13 @@ TransitionConstraint: TransitionConstraint = {
 // ================================================================================================
 
 Expr: Expr = {
-    ArithmeticExpr
+    <lexpr: Expr> "+" <rexpr: NextExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: Expr> "-" <rexpr: NextExpr> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
+    NextExpr
 }
 
-ArithmeticExpr: Expr = {
-    <lexpr: ArithmeticExpr> "+" <rexpr: AtomExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: ArithmeticExpr> "-" <rexpr: AtomExpr> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
+NextExpr: Expr = {
+    <s: Identifier> "'" => Expr::Next(s),
     AtomExpr
 }
 
@@ -111,7 +112,6 @@ CommaElems<T>: Vec<T> = {
         v
     }
 }
-
 Identifier: Identifier = {
     <n:identifier> => Identifier{ name: n.to_string() }
 }
@@ -142,6 +142,7 @@ extern {
         "last" => Token::Last,
         "transition_constraints" => Token::TransitionConstraints,
         "enf" => Token::Enf,
+        "'" => Token::Next,
         "=" => Token::Equal,
         "+" => Token::Plus,
         "-" => Token::Minus,

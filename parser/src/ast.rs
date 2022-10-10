@@ -84,8 +84,9 @@ pub struct TransitionConstraint {
 /// Arithmetic expressions for constraint evaluation.
 #[derive(Debug, PartialEq)]
 pub enum Expr {
+    Int(Token),
+    Variable(Identifier),
+    Next(Identifier),
     Add(Box<Expr>, Box<Expr>),
     Subtract(Box<Expr>, Box<Expr>),
-    Variable(Identifier),
-    Int(Token),
 }
