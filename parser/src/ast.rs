@@ -1,4 +1,3 @@
-use crate::lexer::Token;
 use std::fmt;
 
 /// [Identifier] is used to represent variable names.
@@ -84,7 +83,7 @@ pub struct TransitionConstraint {
 /// Arithmetic expressions for constraint evaluation.
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-    Int(Token),
+    Constant(u64),
     Variable(Identifier),
     Next(Identifier),
     Add(Box<Expr>, Box<Expr>),

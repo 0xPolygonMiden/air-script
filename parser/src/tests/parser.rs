@@ -8,7 +8,6 @@ use crate::{
         Error,
         ParseError::{InvalidInt, InvalidTraceCols},
     },
-    lexer::Token,
     tests::ParseTest,
 };
 use std::fs;
@@ -94,7 +93,7 @@ fn transition_constraints() {
                     Box::new(Expr::Variable(Identifier {
                         name: "clk".to_string(),
                     })),
-                    Box::new(Expr::Int(Token::Number("1".to_string()))),
+                    Box::new(Expr::Constant(1)),
                 ),
             }],
         },
@@ -126,7 +125,7 @@ fn multiple_transition_constraints() {
                         Box::new(Expr::Variable(Identifier {
                             name: "clk".to_string(),
                         })),
-                        Box::new(Expr::Int(Token::Number("1".to_string()))),
+                        Box::new(Expr::Constant(1)),
                     ),
                 },
                 TransitionConstraint {
@@ -138,7 +137,7 @@ fn multiple_transition_constraints() {
                             name: "clk".to_string(),
                         })),
                     ),
-                    rhs: Expr::Int(Token::Number("1".to_string())),
+                    rhs: Expr::Constant(1),
                 },
             ],
         },
@@ -163,9 +162,9 @@ fn multi_arithmetic_ops() {
                             name: "clk".to_string(),
                         })),
                     )),
-                    Box::new(Expr::Int(Token::Number("1".to_string()))),
+                    Box::new(Expr::Constant(1)),
                 ),
-                rhs: Expr::Int(Token::Number("0".to_string())),
+                rhs: Expr::Constant(0),
             }],
         },
     )]);
@@ -184,7 +183,7 @@ fn boundary_constraints() {
                     name: "clk".to_string(),
                 },
                 boundary: Boundary::First,
-                value: Expr::Int(Token::Number("0".to_string())),
+                value: Expr::Constant(0),
             }],
         },
     )]);
@@ -205,14 +204,14 @@ fn multiple_boundary_constraints() {
                         name: "clk".to_string(),
                     },
                     boundary: Boundary::First,
-                    value: Expr::Int(Token::Number("0".to_string())),
+                    value: Expr::Constant(0),
                 },
                 BoundaryConstraint {
                     column: Identifier {
                         name: "clk".to_string(),
                     },
                     boundary: Boundary::Last,
-                    value: Expr::Int(Token::Number("1".to_string())),
+                    value: Expr::Constant(1),
                 },
             ],
         },
@@ -261,7 +260,7 @@ fn full_air_file() {
                     Box::new(Expr::Variable(Identifier {
                         name: "clk".to_string(),
                     })),
-                    Box::new(Expr::Int(Token::Number("1".to_string()))),
+                    Box::new(Expr::Constant(1)),
                 ),
             }],
         }),
@@ -273,7 +272,7 @@ fn full_air_file() {
                     name: "clk".to_string(),
                 },
                 boundary: Boundary::First,
-                value: Expr::Int(Token::Number("0".to_string())),
+                value: Expr::Constant(0),
             }],
         }),
     ]);

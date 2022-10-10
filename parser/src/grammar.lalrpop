@@ -98,7 +98,7 @@ NextExpr: Expr = {
 }
 
 AtomExpr: Expr = {
-    <n: Num> => Expr::Int(Token::Number(n.to_string())),
+    <n: Num> => Expr::Constant(n),
     <s: Identifier> => Expr::Variable(s),
 }
 
