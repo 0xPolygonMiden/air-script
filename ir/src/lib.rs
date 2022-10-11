@@ -8,7 +8,8 @@ pub mod boundary_constraints;
 use boundary_constraints::BoundaryConstraints;
 
 pub mod transition_constraints;
-use transition_constraints::{AlgebraicGraph, NodeIndex, TransitionConstraints};
+pub use transition_constraints::NodeIndex;
+use transition_constraints::{AlgebraicGraph, TransitionConstraints};
 
 mod error;
 use error::SemanticError;
