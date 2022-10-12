@@ -1,5 +1,5 @@
 use crate::{
-    ast::{AirDef, Identifier, Source, SourceSection},
+    ast::{Identifier, Source, SourceSection},
     build_parse_test,
     error::Error,
     lexer::Token,
@@ -144,11 +144,9 @@ fn simple_comment() {
 #[test]
 fn inline_comment() {
     let source = "def SystemAir # Simple Comment";
-    let expected = Source(vec![SourceSection::AirDef(AirDef {
-        name: Identifier {
-            name: "SystemAir".to_string(),
-        },
-    })]);
+    let expected = Source(vec![SourceSection::AirDef(Identifier(
+        "SystemAir".to_string(),
+    ))]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -157,10 +155,8 @@ fn multiline_comments() {
     let source = "# Comment line 1
     # Comment line 2
     def SystemAir";
-    let expected = Source(vec![SourceSection::AirDef(AirDef {
-        name: Identifier {
-            name: "SystemAir".to_string(),
-        },
-    })]);
+    let expected = Source(vec![SourceSection::AirDef(Identifier(
+        "SystemAir".to_string(),
+    ))]);
     build_parse_test!(source).expect_ast(expected);
 }

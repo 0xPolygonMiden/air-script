@@ -1,6 +1,6 @@
 use crate::{
     ast::{
-        Boundary, BoundaryConstraints, BoundaryConstraint, TransitionConstraint, Expr, AirDef,
+        Boundary, BoundaryConstraints, BoundaryConstraint, TransitionConstraint, Expr,
         Identifier, Source, SourceSection, TraceCols, TransitionConstraints
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols}}, lexer::Token
 };
@@ -26,8 +26,8 @@ SourceSection: SourceSection = {
 // AIR DEF
 // ================================================================================================
 
-AirDef: AirDef = {
-    "def" <f: Identifier> => AirDef { name: f }
+AirDef: Identifier = {
+    "def" <f: Identifier> => f
 }
 
 // TRACE COLUMNS
@@ -63,7 +63,7 @@ BoundaryConstraints: BoundaryConstraints = {
 
 BoundaryConstraint: BoundaryConstraint = {
     "enf" <column: Identifier> "." <boundary: Boundary> "=" <value: Expr> =>
-        BoundaryConstraint { column, boundary, value }
+        BoundaryConstraint::new(column, boundary, value)
 }
 
 Boundary: Boundary = {
@@ -80,7 +80,7 @@ TransitionConstraints: TransitionConstraints = {
 }
 
 TransitionConstraint: TransitionConstraint = {
-    "enf" <lhs: Expr> "=" <rhs: Expr> => TransitionConstraint { lhs, rhs }
+    "enf" <lhs: Expr> "=" <rhs: Expr> => TransitionConstraint::new(lhs, rhs)
 }
 
 // EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST)
@@ -113,7 +113,7 @@ CommaElems<T>: Vec<T> = {
     }
 }
 Identifier: Identifier = {
-    <n:identifier> => Identifier{ name: n.to_string() }
+    <n:identifier> => Identifier(n.to_string())
 }
 
 Num: u64 = {
