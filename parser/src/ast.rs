@@ -1,17 +1,7 @@
-use crate::lexer::Token;
 use std::fmt;
 
-/// [Identifier] is used to represent variable names.
-#[derive(Debug, Eq, PartialEq)]
-pub struct Identifier {
-    pub name: String,
-}
-
-impl fmt::Display for Identifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name)
-    }
-}
+// AST
+// ================================================================================================
 
 /// [Source] is the root node of the AST representing the AIR constraints file.
 #[derive(Debug, PartialEq)]
@@ -28,17 +18,14 @@ pub struct Source(pub Vec<SourceSection>);
 ///   in the TraceCols section.
 #[derive(Debug, PartialEq)]
 pub enum SourceSection {
-    AirDef(AirDef),
+    AirDef(Identifier),
     TraceCols(TraceCols),
     BoundaryConstraints(BoundaryConstraints),
     TransitionConstraints(TransitionConstraints),
 }
 
-/// Name of the air constraints module.
-#[derive(Debug, Eq, PartialEq)]
-pub struct AirDef {
-    pub name: Identifier,
-}
+// TRACE
+// ================================================================================================
 
 /// [TraceCols] contains the main and auxiliary trace columns of the execution trace.
 #[derive(Debug, Eq, PartialEq)]
@@ -46,6 +33,9 @@ pub struct TraceCols {
     pub main_cols: Vec<Identifier>,
     pub aux_cols: Vec<Identifier>,
 }
+
+// BOUNDARY CONSTRAINTS
+// ================================================================================================
 
 /// Stores the boundary constraints to be enforced on the trace column values.
 #[derive(Debug, PartialEq)]
@@ -56,17 +46,43 @@ pub struct BoundaryConstraints {
 /// Stores the expression corresponding to the boundary constraint.
 #[derive(Debug, PartialEq)]
 pub struct BoundaryConstraint {
-    pub column: Identifier,
-    pub boundary: Boundary,
-    pub value: Expr,
+    column: Identifier,
+    boundary: Boundary,
+    value: Expr,
+}
+
+impl BoundaryConstraint {
+    pub fn new(column: Identifier, boundary: Boundary, value: Expr) -> Self {
+        Self {
+            column,
+            boundary,
+            value,
+        }
+    }
+
+    pub fn column(&self) -> &str {
+        &self.column.0
+    }
+
+    pub fn boundary(&self) -> Boundary {
+        self.boundary
+    }
+
+    /// Returns a clone of the constraint's value expression.
+    pub fn value(&self) -> Expr {
+        self.value.clone()
+    }
 }
 
 /// Describes the type of boundary in the boundary constraint.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, Copy, Clone, PartialEq)]
 pub enum Boundary {
     First,
     Last,
 }
+
+// TRANSITION CONSTRAINTS
+// ================================================================================================
 
 /// Stores the transition constraints to be enforced on the trace column values.
 #[derive(Debug, PartialEq)]
@@ -77,15 +93,38 @@ pub struct TransitionConstraints {
 /// Stores the expression corresponding to the transition constraint.
 #[derive(Debug, PartialEq)]
 pub struct TransitionConstraint {
-    pub lhs: Expr,
-    pub rhs: Expr,
+    lhs: Expr,
+    rhs: Expr,
+}
+
+impl TransitionConstraint {
+    pub fn new(lhs: Expr, rhs: Expr) -> Self {
+        Self { lhs, rhs }
+    }
+
+    /// Clones the left and right internal expressions and creates a single new expression that
+    /// represents the transition constraint when it is equal to zero.
+    pub fn expr(&self) -> Expr {
+        Expr::Subtract(Box::new(self.lhs.clone()), Box::new(self.rhs.clone()))
+    }
 }
 
 /// Arithmetic expressions for constraint evaluation.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
+    Constant(u64),
+    Variable(Identifier),
+    Next(Identifier),
     Add(Box<Expr>, Box<Expr>),
     Subtract(Box<Expr>, Box<Expr>),
-    Variable(Identifier),
-    Int(Token),
+}
+
+/// [Identifier] is used to represent variable names.
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone)]
+pub struct Identifier(pub String);
+
+impl fmt::Display for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.0)
+    }
 }

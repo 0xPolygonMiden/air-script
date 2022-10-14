@@ -1,5 +1,5 @@
 use crate::{
-    ast::{AirDef, Identifier, Source, SourceSection},
+    ast::{Identifier, Source, SourceSection},
     build_parse_test,
     error::Error,
     lexer::Token,
@@ -14,11 +14,29 @@ fn keywords_with_identifiers() {
     let source = "enf clk' = clk + 1";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk'".to_string()),
+        Token::Ident("clk".to_string()),
+        Token::Next,
         Token::Equal,
         Token::Ident("clk".to_string()),
         Token::Plus,
         Token::Number("1".to_string()),
+    ];
+    build_parse_test!(source).expect_valid_tokenization(tokens);
+}
+
+#[test]
+fn multi_arithmetic_ops() {
+    let source = "enf clk' - clk - 1 = 0";
+    let tokens = vec![
+        Token::Enf,
+        Token::Ident("clk".to_string()),
+        Token::Next,
+        Token::Minus,
+        Token::Ident("clk".to_string()),
+        Token::Minus,
+        Token::Number("1".to_string()),
+        Token::Equal,
+        Token::Number("0".to_string()),
     ];
     build_parse_test!(source).expect_valid_tokenization(tokens);
 }
@@ -43,7 +61,8 @@ fn number_and_ident_without_space() {
     let tokens = vec![
         Token::Enf,
         Token::Number("1".to_string()),
-        Token::Ident("clk'".to_string()),
+        Token::Ident("clk".to_string()),
+        Token::Next,
         Token::Equal,
         Token::Ident("clk".to_string()),
         Token::Plus,
@@ -57,7 +76,8 @@ fn keyword_and_ident_without_space() {
     let source = "enfclk' = clkdef + 1";
     let tokens = vec![
         // enfclk' is considered as an identifier by logos
-        Token::Ident("enfclk'".to_string()),
+        Token::Ident("enfclk".to_string()),
+        Token::Next,
         Token::Equal,
         // clkdef is considered as an identifier by logos
         Token::Ident("clkdef".to_string()),
@@ -67,17 +87,25 @@ fn keyword_and_ident_without_space() {
     build_parse_test!(source).expect_valid_tokenization(tokens);
 }
 
+#[test]
+fn valid_tokenization_next_token() {
+    let source = "enf clk'' = clk + 1";
+    let tokens = vec![
+        Token::Enf,
+        Token::Ident("clk".to_string()),
+        Token::Next,
+        // This is a parsing error, not a scanning error.
+        Token::Next,
+        Token::Equal,
+        Token::Ident("clk".to_string()),
+        Token::Plus,
+        Token::Number("1".to_string()),
+    ];
+    build_parse_test!(source).expect_valid_tokenization(tokens);
+}
+
 // SCAN ERRORS
 // ================================================================================================
-
-#[test]
-fn error_invalid_token() {
-    let source = "enf clk'' = clk + 1";
-    // Only one "'" is allowed at the end of identifier to indicate next row of the column.
-    // Should fail if more than one "'" is present in an identifier
-    let error = Error::ScanError(8..9);
-    build_parse_test!(source).expect_error(error);
-}
 
 #[test]
 fn error_identifier_with_invalid_characters() {
@@ -116,11 +144,9 @@ fn simple_comment() {
 #[test]
 fn inline_comment() {
     let source = "def SystemAir # Simple Comment";
-    let expected = Source(vec![SourceSection::AirDef(AirDef {
-        name: Identifier {
-            name: "SystemAir".to_string(),
-        },
-    })]);
+    let expected = Source(vec![SourceSection::AirDef(Identifier(
+        "SystemAir".to_string(),
+    ))]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -129,10 +155,8 @@ fn multiline_comments() {
     let source = "# Comment line 1
     # Comment line 2
     def SystemAir";
-    let expected = Source(vec![SourceSection::AirDef(AirDef {
-        name: Identifier {
-            name: "SystemAir".to_string(),
-        },
-    })]);
+    let expected = Source(vec![SourceSection::AirDef(Identifier(
+        "SystemAir".to_string(),
+    ))]);
     build_parse_test!(source).expect_ast(expected);
 }

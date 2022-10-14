@@ -1,6 +1,6 @@
 use crate::{
     ast::{
-        Boundary, BoundaryConstraints, BoundaryConstraint, TransitionConstraint, Expr, AirDef,
+        Boundary, BoundaryConstraints, BoundaryConstraint, TransitionConstraint, Expr,
         Identifier, Source, SourceSection, TraceCols, TransitionConstraints
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols}}, lexer::Token
 };
@@ -26,8 +26,8 @@ SourceSection: SourceSection = {
 // AIR DEF
 // ================================================================================================
 
-AirDef: AirDef = {
-    "def" <f: Identifier> => AirDef { name: f }
+AirDef: Identifier = {
+    "def" <f: Identifier> => f
 }
 
 // TRACE COLUMNS
@@ -63,7 +63,7 @@ BoundaryConstraints: BoundaryConstraints = {
 
 BoundaryConstraint: BoundaryConstraint = {
     "enf" <column: Identifier> "." <boundary: Boundary> "=" <value: Expr> =>
-        BoundaryConstraint { column, boundary, value }
+        BoundaryConstraint::new(column, boundary, value)
 }
 
 Boundary: Boundary = {
@@ -80,24 +80,25 @@ TransitionConstraints: TransitionConstraints = {
 }
 
 TransitionConstraint: TransitionConstraint = {
-    "enf" <lhs: Expr> "=" <rhs: Expr> => TransitionConstraint { lhs, rhs }
+    "enf" <lhs: Expr> "=" <rhs: Expr> => TransitionConstraint::new(lhs, rhs)
 }
 
 // EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST)
 // ================================================================================================
 
 Expr: Expr = {
-    ArithmeticExpr
+    <lexpr: Expr> "+" <rexpr: NextExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: Expr> "-" <rexpr: NextExpr> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
+    NextExpr
 }
 
-ArithmeticExpr: Expr = {
-    <lexpr: AtomExpr> "+" <rexpr: AtomExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: AtomExpr> "-" <rexpr: AtomExpr> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
+NextExpr: Expr = {
+    <s: Identifier> "'" => Expr::Next(s),
     AtomExpr
 }
 
 AtomExpr: Expr = {
-    <n: Num> => Expr::Int(Token::Number(n.to_string())),
+    <n: Num> => Expr::Constant(n),
     <s: Identifier> => Expr::Variable(s),
 }
 
@@ -111,9 +112,8 @@ CommaElems<T>: Vec<T> = {
         v
     }
 }
-
 Identifier: Identifier = {
-    <n:identifier> => Identifier{ name: n.to_string() }
+    <n:identifier> => Identifier(n.to_string())
 }
 
 Num: u64 = {
@@ -142,6 +142,7 @@ extern {
         "last" => Token::Last,
         "transition_constraints" => Token::TransitionConstraints,
         "enf" => Token::Enf,
+        "'" => Token::Next,
         "=" => Token::Equal,
         "+" => Token::Plus,
         "-" => Token::Minus,

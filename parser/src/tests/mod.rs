@@ -67,7 +67,7 @@ impl ParseTest {
         while tokens.next_if(|token| token.is_ok()).is_some() {}
         let err = tokens.next();
         if err.is_some() {
-            assert_eq!(err.unwrap().err().expect("No scan error"), error);
+            assert_eq!(err.unwrap().expect_err("No scan error"), error);
         } else {
             let source_parsed = grammar::SourceParser::new().parse(lex);
             let expected_error = Err(ParseError::User { error });
