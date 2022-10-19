@@ -1,0 +1,7 @@
+[package]
+name = "ir"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+parser = { package = "parser", path = "../parser", version = "0.0.1" }
