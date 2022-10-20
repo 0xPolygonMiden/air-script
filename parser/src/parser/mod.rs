@@ -1,4 +1,5 @@
-lalrpop_mod!(pub grammar);
+#![allow(clippy::all)]
+lalrpop_mod!(grammar, "/parser/grammar.rs");
 
 pub use grammar::SourceParser;
 
