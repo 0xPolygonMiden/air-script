@@ -1,4 +1,4 @@
-lalrpop_mod!(pub grammar);
+lalrpop_mod!(grammar, "/parser/grammar.rs");
 
 pub use grammar::SourceParser;
 
