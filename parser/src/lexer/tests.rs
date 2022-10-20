@@ -1,10 +1,29 @@
 use crate::{
-    ast::{Identifier, Source, SourceSection},
-    build_parse_test,
     error::Error,
-    lexer::Token,
-    tests::ParseTest,
+    lexer::{Lexer, Token},
 };
+
+// TEST HELPERS
+// ================================================================================================
+
+fn expect_valid_tokenization(source: &str, expected_tokens: Vec<Token>) {
+    let tokens: Vec<Token> = Lexer::new(source).collect();
+    assert_eq!(tokens, expected_tokens);
+}
+
+/// Checks that source is valid and asserts that appropriate error is returned if there
+/// is a problem while scanning the source.
+fn expect_error(source: &str, error: Error) {
+    let mut tokens = Lexer::new(source)
+        .spanned()
+        .map(Token::to_spanned)
+        .peekable();
+
+    while tokens.next_if(|token| token.is_ok()).is_some() {}
+    let err = tokens.next();
+
+    assert_eq!(err.unwrap().expect_err("No scan error"), error);
+}
 
 // VALID TOKENIZATION
 // ================================================================================================
@@ -21,7 +40,7 @@ fn keywords_with_identifiers() {
         Token::Plus,
         Token::Number("1".to_string()),
     ];
-    build_parse_test!(source).expect_valid_tokenization(tokens);
+    expect_valid_tokenization(source, tokens);
 }
 
 #[test]
@@ -38,7 +57,7 @@ fn multi_arithmetic_ops() {
         Token::Equal,
         Token::Number("0".to_string()),
     ];
-    build_parse_test!(source).expect_valid_tokenization(tokens);
+    expect_valid_tokenization(source, tokens);
 }
 
 #[test]
@@ -52,7 +71,7 @@ fn boundary_constraints() {
         Token::Equal,
         Token::Number("0".to_string()),
     ];
-    build_parse_test!(source).expect_valid_tokenization(tokens);
+    expect_valid_tokenization(source, tokens);
 }
 
 #[test]
@@ -68,7 +87,7 @@ fn number_and_ident_without_space() {
         Token::Plus,
         Token::Number("1".to_string()),
     ];
-    build_parse_test!(source).expect_valid_tokenization(tokens);
+    expect_valid_tokenization(source, tokens);
 }
 
 #[test]
@@ -84,7 +103,7 @@ fn keyword_and_ident_without_space() {
         Token::Plus,
         Token::Number("1".to_string()),
     ];
-    build_parse_test!(source).expect_valid_tokenization(tokens);
+    expect_valid_tokenization(source, tokens);
 }
 
 #[test]
@@ -101,7 +120,7 @@ fn valid_tokenization_next_token() {
         Token::Plus,
         Token::Number("1".to_string()),
     ];
-    build_parse_test!(source).expect_valid_tokenization(tokens);
+    expect_valid_tokenization(source, tokens);
 }
 
 // SCAN ERRORS
@@ -112,7 +131,7 @@ fn error_identifier_with_invalid_characters() {
     let source = "enf clk@' = clk + 1";
     // "@" is not in the allowed characters.
     let expected = Error::ScanError(7..8);
-    build_parse_test!(source).expect_error(expected);
+    expect_error(source, expected);
 }
 
 #[test]
@@ -120,7 +139,7 @@ fn return_first_invalid_character_error() {
     let source = "enf clk@' = clk@ + 1";
     // "@" is not in the allowed characters.
     let expected = Error::ScanError(7..8);
-    build_parse_test!(source).expect_error(expected);
+    expect_error(source, expected);
 }
 
 #[test]
@@ -128,35 +147,5 @@ fn error_invalid_symbol() {
     let source = "enf clk' = clk / 1";
     // "/" is not a valid token.
     let expected = Error::ScanError(15..16);
-    build_parse_test!(source).expect_error(expected);
-}
-
-// COMMENTS
-// ================================================================================================
-
-#[test]
-fn simple_comment() {
-    let source = "# Simple Comment";
-    let expected = Source(vec![]);
-    build_parse_test!(source).expect_ast(expected);
-}
-
-#[test]
-fn inline_comment() {
-    let source = "def SystemAir # Simple Comment";
-    let expected = Source(vec![SourceSection::AirDef(Identifier(
-        "SystemAir".to_string(),
-    ))]);
-    build_parse_test!(source).expect_ast(expected);
-}
-
-#[test]
-fn multiline_comments() {
-    let source = "# Comment line 1
-    # Comment line 2
-    def SystemAir";
-    let expected = Source(vec![SourceSection::AirDef(Identifier(
-        "SystemAir".to_string(),
-    ))]);
-    build_parse_test!(source).expect_ast(expected);
+    expect_error(source, expected);
 }

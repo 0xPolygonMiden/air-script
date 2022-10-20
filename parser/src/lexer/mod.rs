@@ -1,6 +1,12 @@
 use crate::error::Error;
 use core::ops::Range;
+
 pub use logos::{Lexer, Logos};
+
+#[cfg(test)]
+mod tests;
+
+pub type Span = Range<usize>;
 
 #[derive(Logos, Clone, Eq, Debug, PartialEq)]
 pub enum Token {
@@ -104,8 +110,6 @@ pub enum Token {
     #[regex(r"#.*\n?", logos::skip)]
     Error,
 }
-
-pub type Span = Range<usize>;
 
 impl Token {
     /// Convert logos tokens to tokens accepted by lalrpop.

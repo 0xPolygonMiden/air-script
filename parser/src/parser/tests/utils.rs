@@ -1,14 +1,11 @@
 use lalrpop_util::ParseError;
 
+use super::SourceParser;
 use crate::{
     ast::Source,
     error::Error,
-    grammar,
     lexer::{Lexer, Token},
 };
-
-mod lexer;
-mod parser;
 
 // TEST HANDLER
 // ================================================================================================
@@ -49,30 +46,16 @@ impl ParseTest {
     // TEST METHODS
     // --------------------------------------------------------------------------------------------
 
-    pub fn expect_valid_tokenization(&self, expected_tokens: Vec<Token>) {
-        let tokens: Vec<Token> = Lexer::new(self.source.as_str()).collect();
-        assert_eq!(tokens, expected_tokens);
-    }
-
     /// Checks that source is valid and asserts that appropriate error is returned if there
-    /// is a problem while scanning or parsing the source.
+    /// is a problem while parsing the source.
     pub fn expect_error(&self, error: Error) {
         let lex = Lexer::new(self.source.as_str())
             .spanned()
             .map(Token::to_spanned);
-        let mut tokens = Lexer::new(self.source.as_str())
-            .spanned()
-            .map(Token::to_spanned)
-            .peekable();
-        while tokens.next_if(|token| token.is_ok()).is_some() {}
-        let err = tokens.next();
-        if err.is_some() {
-            assert_eq!(err.unwrap().expect_err("No scan error"), error);
-        } else {
-            let source_parsed = grammar::SourceParser::new().parse(lex);
-            let expected_error = Err(ParseError::User { error });
-            assert_eq!(source_parsed, expected_error);
-        }
+
+        let source_parsed = SourceParser::new().parse(lex);
+        let expected_error = Err(ParseError::User { error });
+        assert_eq!(source_parsed, expected_error);
     }
 
     /// If an unrecognized token is present in the source string, return UnrecognizedToken error.
@@ -80,7 +63,7 @@ impl ParseTest {
         let lex = Lexer::new(self.source.as_str())
             .spanned()
             .map(Token::to_spanned);
-        let source_parsed = grammar::SourceParser::new().parse(lex);
+        let source_parsed = SourceParser::new().parse(lex);
         assert!(matches!(
             source_parsed,
             Err(ParseError::UnrecognizedToken { .. })
@@ -93,7 +76,7 @@ impl ParseTest {
         let lex = Lexer::new(self.source.as_str())
             .spanned()
             .map(Token::to_spanned);
-        let source_parsed = grammar::SourceParser::new().parse(lex).unwrap();
+        let source_parsed = SourceParser::new().parse(lex).unwrap();
         assert_eq!(source_parsed, expected);
     }
 }

@@ -1,3 +1,4 @@
+use super::SourceParser;
 use crate::{
     ast::{
         Boundary, BoundaryConstraint, BoundaryConstraints, Expr, Identifier, Source, SourceSection,
@@ -8,9 +9,11 @@ use crate::{
         Error,
         ParseError::{InvalidInt, InvalidTraceCols},
     },
-    tests::ParseTest,
 };
 use std::fs;
+
+mod utils;
+use utils::ParseTest;
 
 // SECTIONS
 // ================================================================================================
@@ -223,6 +226,36 @@ fn full_air_file() {
         }),
     ]);
     build_parse_test!(source.as_str()).expect_ast(expected);
+}
+
+// COMMENTS
+// ================================================================================================
+
+#[test]
+fn simple_comment() {
+    let source = "# Simple Comment";
+    let expected = Source(vec![]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn inline_comment() {
+    let source = "def SystemAir # Simple Comment";
+    let expected = Source(vec![SourceSection::AirDef(Identifier(
+        "SystemAir".to_string(),
+    ))]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn multiline_comments() {
+    let source = "# Comment line 1
+    # Comment line 2
+    def SystemAir";
+    let expected = Source(vec![SourceSection::AirDef(Identifier(
+        "SystemAir".to_string(),
+    ))]);
+    build_parse_test!(source).expect_ast(expected);
 }
 
 // PARSE ERRORS

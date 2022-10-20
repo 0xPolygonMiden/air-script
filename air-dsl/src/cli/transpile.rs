@@ -3,10 +3,7 @@ use structopt::StructOpt;
 
 use codegen_winter::CodeGenerator;
 use ir::AirIR;
-use parser::{
-    grammar::SourceParser,
-    lexer::{Lexer, Token},
-};
+use parser::parse;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -53,9 +50,13 @@ impl TranspileCmd {
             )
         })?;
 
-        // scan and parse the input file to the internal representation
-        let lex = Lexer::new(source.as_str()).spanned().map(Token::to_spanned);
-        let parsed = SourceParser::new().parse(lex).unwrap();
+        // parse the input file to the internal representation
+        let parsed = parse(source.as_str());
+        if let Err(err) = parsed {
+            return Err(format!("{:?}", err));
+        }
+        let parsed = parsed.unwrap();
+
         let ir = AirIR::from_source(&parsed);
         if let Err(err) = ir {
             return Err(format!("{:?}", err));
