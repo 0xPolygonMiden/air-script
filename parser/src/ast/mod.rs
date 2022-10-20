@@ -40,15 +40,8 @@ pub struct TraceCols {
     pub aux_cols: Vec<Identifier>,
 }
 
-/// Arithmetic expressions for constraint evaluation.
-#[derive(Debug, PartialEq, Clone)]
-pub enum Expr {
-    Constant(u64),
-    Variable(Identifier),
-    Next(Identifier),
-    Add(Box<Expr>, Box<Expr>),
-    Subtract(Box<Expr>, Box<Expr>),
-}
+// SHARED ATOMIC TYPES
+// ================================================================================================
 
 /// [Identifier] is used to represent variable names.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone)]

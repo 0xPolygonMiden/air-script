@@ -1,6 +1,6 @@
 use super::TraceColumns;
 use crate::error::SemanticError;
-use parser::ast::{self, Expr, Identifier};
+use parser::ast::{self, Identifier, TransitionExpr};
 
 // ALGEBRAIC GRAPH
 // ================================================================================================
@@ -51,31 +51,31 @@ impl AlgebraicGraph {
     /// recursively to reuse existing matching nodes.
     pub(super) fn insert_expr(
         &mut self,
-        expr: ast::Expr,
+        expr: ast::TransitionExpr,
         trace_columns: &TraceColumns,
     ) -> Result<NodeIndex, SemanticError> {
         match expr {
-            Expr::Constant(value) => Ok(self.insert_op(Operation::Constant(value))),
-            Expr::Next(Identifier(ident)) => {
+            TransitionExpr::Constant(value) => Ok(self.insert_op(Operation::Constant(value))),
+            TransitionExpr::Next(Identifier(ident)) => {
                 let index = trace_columns.get_column_index(&ident)?;
                 // insert the next row column node.
                 Ok(self.insert_op(Operation::MainTraceNextRow(index)))
             }
-            Expr::Variable(Identifier(ident)) => {
+            TransitionExpr::Variable(Identifier(ident)) => {
                 // since variable definitions are not possible yet, the identifier must match one of
                 // the declared trace columns.
                 let index = trace_columns.get_column_index(&ident)?;
                 // insert the current row column node.
                 Ok(self.insert_op(Operation::MainTraceCurrentRow(index)))
             }
-            Expr::Add(lhs, rhs) => {
+            TransitionExpr::Add(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(*lhs, trace_columns)?;
                 let rhs = self.insert_expr(*rhs, trace_columns)?;
                 // add the expression.
                 Ok(self.insert_op(Operation::Add(lhs, rhs)))
             }
-            Expr::Subtract(lhs, rhs) => {
+            TransitionExpr::Subtract(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(*lhs, trace_columns)?;
                 let rhs = self.insert_expr(*rhs, trace_columns)?;

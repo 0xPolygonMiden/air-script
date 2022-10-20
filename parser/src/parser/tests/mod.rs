@@ -42,10 +42,10 @@ fn full_air_file() {
         SourceSection::TransitionConstraints(TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
                 // clk' = clk + 1
-                Expr::Next(Identifier("clk".to_string())),
-                Expr::Add(
-                    Box::new(Expr::Variable(Identifier("clk".to_string()))),
-                    Box::new(Expr::Constant(1)),
+                TransitionExpr::Next(Identifier("clk".to_string())),
+                TransitionExpr::Add(
+                    Box::new(TransitionExpr::Variable(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Constant(1)),
                 ),
             )],
         }),
@@ -55,7 +55,7 @@ fn full_air_file() {
             boundary_constraints: vec![BoundaryConstraint::new(
                 Identifier("clk".to_string()),
                 Boundary::First,
-                Expr::Constant(0),
+                BoundaryExpr::Constant(0),
             )],
         }),
     ]);

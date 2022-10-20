@@ -1,6 +1,6 @@
 use super::{AirIR, Impl};
 
-use ir::Expr;
+use ir::BoundaryExpr;
 
 // HELPERS TO GENERATE THE WINTERFELL BOUNDARY CONSTRAINT METHODS
 // ================================================================================================
@@ -52,7 +52,7 @@ trait Codegen {
     fn to_string(&self) -> String;
 }
 
-impl Codegen for Expr {
+impl Codegen for BoundaryExpr {
     fn to_string(&self) -> String {
         match self {
             Self::Constant(value) => format!("Felt::new({})", value),
@@ -61,9 +61,6 @@ impl Codegen for Expr {
             }
             Self::Subtract(lhs, rhs) => {
                 format!("{} - {}", lhs.to_string(), rhs.to_string())
-            }
-            _ => {
-                unimplemented!("unreachable code")
             }
         }
     }

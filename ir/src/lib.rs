@@ -1,5 +1,5 @@
 use parser::ast;
-pub use parser::ast::{Expr, Identifier};
+pub use parser::ast::{BoundaryExpr, Identifier};
 
 mod trace_columns;
 use trace_columns::TraceColumns;
@@ -85,11 +85,11 @@ impl AirIR {
         self.main_boundary_constraints.len()
     }
 
-    pub fn main_first_boundary_constraints(&self) -> Vec<&Expr> {
+    pub fn main_first_boundary_constraints(&self) -> Vec<&BoundaryExpr> {
         self.main_boundary_constraints.first()
     }
 
-    pub fn main_last_boundary_constraints(&self) -> Vec<&Expr> {
+    pub fn main_last_boundary_constraints(&self) -> Vec<&BoundaryExpr> {
         self.main_boundary_constraints.last()
     }
 

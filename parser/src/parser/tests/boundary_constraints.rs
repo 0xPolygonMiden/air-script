@@ -1,6 +1,6 @@
 use super::{
-    build_parse_test, Boundary, BoundaryConstraint, BoundaryConstraints, Expr, Identifier, Source,
-    SourceSection,
+    build_parse_test, Boundary, BoundaryConstraint, BoundaryConstraints, BoundaryExpr, Identifier,
+    Source, SourceSection,
 };
 
 // SECTIONS
@@ -16,7 +16,7 @@ fn boundary_constraints() {
             boundary_constraints: vec![BoundaryConstraint::new(
                 Identifier("clk".to_string()),
                 Boundary::First,
-                Expr::Constant(0),
+                BoundaryExpr::Constant(0),
             )],
         },
     )]);
@@ -35,12 +35,12 @@ fn multiple_boundary_constraints() {
                 BoundaryConstraint::new(
                     Identifier("clk".to_string()),
                     Boundary::First,
-                    Expr::Constant(0),
+                    BoundaryExpr::Constant(0),
                 ),
                 BoundaryConstraint::new(
                     Identifier("clk".to_string()),
                     Boundary::Last,
-                    Expr::Constant(1),
+                    BoundaryExpr::Constant(1),
                 ),
             ],
         },

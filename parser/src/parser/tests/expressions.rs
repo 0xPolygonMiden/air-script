@@ -1,6 +1,6 @@
 use super::{
-    build_parse_test, Expr, Identifier, Source, SourceSection, TransitionConstraint,
-    TransitionConstraints,
+    build_parse_test, Identifier, Source, SourceSection, TransitionConstraint,
+    TransitionConstraints, TransitionExpr,
 };
 
 // SECTIONS
@@ -15,14 +15,14 @@ fn multi_arithmetic_ops() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Subtract(
-                    Box::new(Expr::Subtract(
-                        Box::new(Expr::Next(Identifier("clk".to_string()))),
-                        Box::new(Expr::Variable(Identifier("clk".to_string()))),
+                TransitionExpr::Subtract(
+                    Box::new(TransitionExpr::Subtract(
+                        Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Variable(Identifier("clk".to_string()))),
                     )),
-                    Box::new(Expr::Constant(1)),
+                    Box::new(TransitionExpr::Constant(1)),
                 ),
-                Expr::Constant(0),
+                TransitionExpr::Constant(0),
             )],
         },
     )]);
