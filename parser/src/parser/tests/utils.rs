@@ -17,7 +17,7 @@ use crate::{
 #[macro_export]
 macro_rules! build_parse_test {
     ($source:expr) => {{
-        ParseTest::new($source)
+        $crate::parser::tests::utils::ParseTest::new($source)
     }};
 }
 
