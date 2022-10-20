@@ -110,15 +110,7 @@ impl AirIR {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::{
-        grammar::SourceParser,
-        lexer::{Lexer, Token},
-    };
-
-    fn get_parsed(source: &str) -> ast::Source {
-        let lex = Lexer::new(source).spanned().map(Token::to_spanned);
-        SourceParser::new().parse(lex).unwrap()
-    }
+    use parser::parse;
 
     #[test]
     fn boundary_constraints() {
@@ -129,7 +121,7 @@ mod tests {
             enf clk.first = 0
             enf clk.last = 1";
 
-        let parsed = get_parsed(source);
+        let parsed = parse(source).expect("Parsing failed");
 
         let result = AirIR::from_source(&parsed);
         assert!(result.is_ok());
@@ -142,7 +134,7 @@ mod tests {
             enf clk.first = 0
             enf clk.last = 1";
 
-        let parsed = get_parsed(source);
+        let parsed = parse(source).expect("Parsing failed");
 
         let result = AirIR::from_source(&parsed);
         assert!(result.is_err());
@@ -157,7 +149,7 @@ mod tests {
             enf clk.first = 0
             enf clk.first = 1";
 
-        let parsed = get_parsed(source);
+        let parsed = parse(source).expect("Parsing failed");
         let result = AirIR::from_source(&parsed);
 
         assert!(result.is_err());
@@ -172,7 +164,7 @@ mod tests {
             enf clk.last = 0
             enf clk.last = 1";
 
-        let parsed = get_parsed(source);
+        let parsed = parse(source).expect("Parsing failed");
 
         assert!(AirIR::from_source(&parsed).is_err());
     }
@@ -185,7 +177,7 @@ mod tests {
         transition_constraints:
             enf clk' = clk + 1";
 
-        let parsed = get_parsed(source);
+        let parsed = parse(source).expect("Parsing failed");
 
         let result = AirIR::from_source(&parsed);
         assert!(result.is_ok());
@@ -197,7 +189,7 @@ mod tests {
         transition_constraints:
             enf clk' = clk + 1";
 
-        let parsed = get_parsed(source);
+        let parsed = parse(source).expect("Parsing failed");
 
         let result = AirIR::from_source(&parsed);
         assert!(result.is_err());
