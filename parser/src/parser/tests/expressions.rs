@@ -1,6 +1,6 @@
 use super::{
-    build_parse_test, Expr, Identifier, Source, SourceSection, TransitionConstraint,
-    TransitionConstraints,
+    build_parse_test, Identifier, Source, SourceSection, TransitionConstraint,
+    TransitionConstraints, TransitionExpr,
 };
 
 // EXPRESSIONS
@@ -15,11 +15,11 @@ fn single_addition() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Add(
-                    Box::new(Expr::Next(Identifier("clk".to_string()))),
-                    Box::new(Expr::Var(Identifier("clk".to_string()))),
+                TransitionExpr::Add(
+                    Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
                 ),
-                Expr::Const(0),
+                TransitionExpr::Const(0),
             )],
         },
     )]);
@@ -35,14 +35,14 @@ fn multi_addition() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Add(
-                    Box::new(Expr::Add(
-                        Box::new(Expr::Next(Identifier("clk".to_string()))),
-                        Box::new(Expr::Var(Identifier("clk".to_string()))),
+                TransitionExpr::Add(
+                    Box::new(TransitionExpr::Add(
+                        Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
                     )),
-                    Box::new(Expr::Const(2)),
+                    Box::new(TransitionExpr::Const(2)),
                 ),
-                Expr::Const(0),
+                TransitionExpr::Const(0),
             )],
         },
     )]);
@@ -58,11 +58,11 @@ fn single_subtraction() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Sub(
-                    Box::new(Expr::Next(Identifier("clk".to_string()))),
-                    Box::new(Expr::Var(Identifier("clk".to_string()))),
+                TransitionExpr::Sub(
+                    Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
                 ),
-                Expr::Const(0),
+                TransitionExpr::Const(0),
             )],
         },
     )]);
@@ -78,14 +78,14 @@ fn multi_subtraction() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Sub(
-                    Box::new(Expr::Sub(
-                        Box::new(Expr::Next(Identifier("clk".to_string()))),
-                        Box::new(Expr::Var(Identifier("clk".to_string()))),
+                TransitionExpr::Sub(
+                    Box::new(TransitionExpr::Sub(
+                        Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
                     )),
-                    Box::new(Expr::Const(1)),
+                    Box::new(TransitionExpr::Const(1)),
                 ),
-                Expr::Const(0),
+                TransitionExpr::Const(0),
             )],
         },
     )]);
@@ -101,11 +101,11 @@ fn single_multiplication() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Mul(
-                    Box::new(Expr::Next(Identifier("clk".to_string()))),
-                    Box::new(Expr::Var(Identifier("clk".to_string()))),
+                TransitionExpr::Mul(
+                    Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
                 ),
-                Expr::Const(0),
+                TransitionExpr::Const(0),
             )],
         },
     )]);
@@ -121,14 +121,34 @@ fn multi_multiplication() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Mul(
-                    Box::new(Expr::Mul(
-                        Box::new(Expr::Next(Identifier("clk".to_string()))),
-                        Box::new(Expr::Var(Identifier("clk".to_string()))),
+                TransitionExpr::Mul(
+                    Box::new(TransitionExpr::Mul(
+                        Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
                     )),
-                    Box::new(Expr::Const(2)),
+                    Box::new(TransitionExpr::Const(2)),
                 ),
-                Expr::Const(0),
+                TransitionExpr::Const(0),
+            )],
+        },
+    )]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn unit_with_parens() {
+    // the operation must be put into a source section, or parsing will fail
+    let source = "
+    transition_constraints:
+        enf (2) + 1 = 3";
+    let expected = Source(vec![SourceSection::TransitionConstraints(
+        TransitionConstraints {
+            transition_constraints: vec![TransitionConstraint::new(
+                TransitionExpr::Add(
+                    Box::new(TransitionExpr::Const(2)),
+                    Box::new(TransitionExpr::Const(1)),
+                ),
+                TransitionExpr::Const(3),
             )],
         },
     )]);
@@ -144,14 +164,14 @@ fn ops_with_parens() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Mul(
-                    Box::new(Expr::Add(
-                        Box::new(Expr::Next(Identifier("clk".to_string()))),
-                        Box::new(Expr::Var(Identifier("clk".to_string()))),
+                TransitionExpr::Mul(
+                    Box::new(TransitionExpr::Add(
+                        Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
                     )),
-                    Box::new(Expr::Const(2)),
+                    Box::new(TransitionExpr::Const(2)),
                 ),
-                Expr::Const(4),
+                TransitionExpr::Const(4),
             )],
         },
     )]);
@@ -167,8 +187,11 @@ fn single_exponentiation() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Exp(Box::new(Expr::Next(Identifier("clk".to_string()))), 2),
-                Expr::Const(1),
+                TransitionExpr::Exp(
+                    Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                    2,
+                ),
+                TransitionExpr::Const(1),
             )],
         },
     )]);
@@ -211,17 +234,17 @@ fn multi_arithmetic_ops_same_precedence() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Add(
-                    Box::new(Expr::Sub(
-                        Box::new(Expr::Sub(
-                            Box::new(Expr::Next(Identifier("clk".to_string()))),
-                            Box::new(Expr::Var(Identifier("clk".to_string()))),
+                TransitionExpr::Add(
+                    Box::new(TransitionExpr::Sub(
+                        Box::new(TransitionExpr::Sub(
+                            Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                            Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
                         )),
-                        Box::new(Expr::Const(2)),
+                        Box::new(TransitionExpr::Const(2)),
                     )),
-                    Box::new(Expr::Const(1)),
+                    Box::new(TransitionExpr::Const(1)),
                 ),
-                Expr::Const(0),
+                TransitionExpr::Const(0),
             )],
         },
     )]);
@@ -242,20 +265,20 @@ fn multi_arithmetic_ops_different_precedence() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Sub(
-                    Box::new(Expr::Sub(
-                        Box::new(Expr::Exp(
-                            Box::new(Expr::Next(Identifier("clk".to_string()))),
+                TransitionExpr::Sub(
+                    Box::new(TransitionExpr::Sub(
+                        Box::new(TransitionExpr::Exp(
+                            Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
                             2,
                         )),
-                        Box::new(Expr::Mul(
-                            Box::new(Expr::Var(Identifier("clk".to_string()))),
-                            Box::new(Expr::Const(2)),
+                        Box::new(TransitionExpr::Mul(
+                            Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                            Box::new(TransitionExpr::Const(2)),
                         )),
                     )),
-                    Box::new(Expr::Const(1)),
+                    Box::new(TransitionExpr::Const(1)),
                 ),
-                Expr::Const(0),
+                TransitionExpr::Const(0),
             )],
         },
     )]);
@@ -277,20 +300,20 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Sub(
-                    Box::new(Expr::Next(Identifier("clk".to_string()))),
-                    Box::new(Expr::Mul(
-                        Box::new(Expr::Exp(
-                            Box::new(Expr::Var(Identifier("clk".to_string()))),
+                TransitionExpr::Sub(
+                    Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Mul(
+                        Box::new(TransitionExpr::Exp(
+                            Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
                             2,
                         )),
-                        Box::new(Expr::Sub(
-                            Box::new(Expr::Const(2)),
-                            Box::new(Expr::Const(1)),
+                        Box::new(TransitionExpr::Sub(
+                            Box::new(TransitionExpr::Const(2)),
+                            Box::new(TransitionExpr::Const(1)),
                         )),
                     )),
                 ),
-                Expr::Const(0),
+                TransitionExpr::Const(0),
             )],
         },
     )]);

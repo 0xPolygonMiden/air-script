@@ -1,7 +1,6 @@
-use std::collections::BTreeMap;
-
-use super::{Expr, Identifier, SemanticError, TraceColumns};
+use super::{BoundaryExpr, SemanticError, TraceColumns};
 use parser::ast;
+use std::collections::BTreeMap;
 
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
@@ -14,10 +13,10 @@ use parser::ast;
 pub(crate) struct BoundaryConstraints {
     /// The boundary constraints to be applied at the first row of the trace, with the trace column
     /// index as the key, and the expression as the value.
-    first: BTreeMap<usize, Expr>,
+    first: BTreeMap<usize, BoundaryExpr>,
     /// The boundary constraints to be applied at the last row of the trace, with the trace column
     /// index as the key, and the expression as the value.
-    last: BTreeMap<usize, Expr>,
+    last: BTreeMap<usize, BoundaryExpr>,
 }
 
 impl BoundaryConstraints {
@@ -29,12 +28,12 @@ impl BoundaryConstraints {
     }
 
     /// Returns all of the boundary constraints for the first row of the trace.
-    pub fn first(&self) -> Vec<&Expr> {
+    pub fn first(&self) -> Vec<&BoundaryExpr> {
         self.first.values().collect()
     }
 
     /// Returns all of the boundary constraints for the final row of the trace.
-    pub fn last(&self) -> Vec<&Expr> {
+    pub fn last(&self) -> Vec<&BoundaryExpr> {
         self.last.values().collect()
     }
 
@@ -52,15 +51,6 @@ impl BoundaryConstraints {
     ) -> Result<(), SemanticError> {
         let col_idx = trace_columns.get_column_index(constraint.column())?;
         let value = constraint.value();
-
-        if let Expr::Next(Identifier(ident)) | Expr::Var(Identifier(ident)) = value {
-            // since variable definitions are not possible yet, all parsed identifiers can be
-            // assumed to reference trace columns
-            return Err(SemanticError::InvalidIdentifier(format!(
-                "Column identifier '{}' referenced in boundary constraint",
-                ident
-            )));
-        }
 
         // add the constraint to the specified boundary
         match constraint.boundary() {

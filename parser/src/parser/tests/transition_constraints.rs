@@ -1,6 +1,6 @@
 use super::{
-    build_parse_test, Expr, Identifier, Source, SourceSection, TransitionConstraint,
-    TransitionConstraints,
+    build_parse_test, Identifier, Source, SourceSection, TransitionConstraint,
+    TransitionConstraints, TransitionExpr,
 };
 
 // SECTIONS
@@ -14,10 +14,10 @@ fn transition_constraints() {
     let expected = Source(vec![SourceSection::TransitionConstraints(
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
-                Expr::Next(Identifier("clk".to_string())),
-                Expr::Add(
-                    Box::new(Expr::Var(Identifier("clk".to_string()))),
-                    Box::new(Expr::Const(1)),
+                TransitionExpr::Next(Identifier("clk".to_string())),
+                TransitionExpr::Add(
+                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Const(1)),
                 ),
             )],
         },
@@ -42,18 +42,18 @@ fn multiple_transition_constraints() {
         TransitionConstraints {
             transition_constraints: vec![
                 TransitionConstraint::new(
-                    Expr::Next(Identifier("clk".to_string())),
-                    Expr::Add(
-                        Box::new(Expr::Var(Identifier("clk".to_string()))),
-                        Box::new(Expr::Const(1)),
+                    TransitionExpr::Next(Identifier("clk".to_string())),
+                    TransitionExpr::Add(
+                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Const(1)),
                     ),
                 ),
                 TransitionConstraint::new(
-                    Expr::Sub(
-                        Box::new(Expr::Next(Identifier("clk".to_string()))),
-                        Box::new(Expr::Var(Identifier("clk".to_string()))),
+                    TransitionExpr::Sub(
+                        Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
                     ),
-                    Expr::Const(1),
+                    TransitionExpr::Const(1),
                 ),
             ],
         },

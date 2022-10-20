@@ -1,7 +1,6 @@
 use crate::{
     ast::{
-        Boundary, BoundaryConstraints, BoundaryConstraint, TransitionConstraint, Expr,
-        Identifier, Source, SourceSection, TraceCols, TransitionConstraints
+        Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryExpr, Identifier, Source, SourceSection,TransitionConstraint, TransitionConstraints, TransitionExpr, TraceCols,
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols}}, lexer::Token
 };
 use std::str::FromStr;
@@ -62,13 +61,32 @@ BoundaryConstraints: BoundaryConstraints = {
 }
 
 BoundaryConstraint: BoundaryConstraint = {
-    "enf" <column: Identifier> "." <boundary: Boundary> "=" <value: Expr> =>
+    "enf" <column: Identifier> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
         BoundaryConstraint::new(column, boundary, value)
 }
 
 Boundary: Boundary = {
     "first" => Boundary::First,
     "last" => Boundary::Last
+}
+
+// --- BOUNDARY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
+
+BoundaryExpr: BoundaryExpr = {
+    <lexpr: BoundaryExpr> "+" <rexpr: BoundaryFactor> => BoundaryExpr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: BoundaryExpr> "-" <rexpr: BoundaryFactor> => BoundaryExpr::Sub(Box::new(lexpr), Box::new(rexpr)),
+    BoundaryFactor
+}
+
+BoundaryFactor: BoundaryExpr = {
+    <lexpr: BoundaryFactor> "*" <rexpr: BoundaryAtom> => BoundaryExpr::Mul(Box::new(lexpr), Box::new(rexpr)),
+    BoundaryAtom
+}
+
+BoundaryAtom: BoundaryExpr = {
+    "(" <BoundaryExpr> ")",
+    <lexpr: BoundaryAtom> "^" <num: Num> => BoundaryExpr::Exp(Box::new(lexpr), num),
+    <n: Num> => BoundaryExpr::Const(n),
 }
 
 // TRANSITION CONSTRAINTS
@@ -80,41 +98,28 @@ TransitionConstraints: TransitionConstraints = {
 }
 
 TransitionConstraint: TransitionConstraint = {
-    "enf" <lhs: Expr> "=" <rhs: Expr> => TransitionConstraint::new(lhs, rhs)
+    "enf" <lhs: TransitionExpr> "=" <rhs: TransitionExpr> => TransitionConstraint::new(lhs, rhs)
 }
 
-// EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST)
-// ================================================================================================
+// --- TRANSITION CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
 
-Expr: Expr = {
-    <lexpr: Expr> "+" <rexpr: FactorExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: Expr> "-" <rexpr: FactorExpr> => Expr::Sub(Box::new(lexpr), Box::new(rexpr)),
-    FactorExpr
+TransitionExpr: TransitionExpr = {
+    <lexpr: TransitionExpr> "+" <rexpr: TransitionFactor> => TransitionExpr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: TransitionExpr> "-" <rexpr: TransitionFactor> => TransitionExpr::Sub(Box::new(lexpr), Box::new(rexpr)),
+    TransitionFactor
 }
 
-FactorExpr: Expr = {
-    <lexpr: FactorExpr> "*" <rexpr: ExpExpr> => Expr::Mul(Box::new(lexpr), Box::new(rexpr)),
-    ExpExpr
+TransitionFactor: TransitionExpr = {
+    <lexpr: TransitionFactor> "*" <rexpr: TransitionAtom> => TransitionExpr::Mul(Box::new(lexpr), Box::new(rexpr)),
+    TransitionAtom
 }
 
-ExpExpr: Expr = {
-    <lexpr: ExpExpr> "^" <num: Num> => Expr::Exp(Box::new(lexpr), num),
-    ParenExpr
-}
-
-ParenExpr: Expr = {
-    "(" <Expr> ")",
-    NextExpr
-}
-
-NextExpr: Expr = {
-    <s: Identifier> "'" => Expr::Next(s),
-    AtomExpr
-}
-
-AtomExpr: Expr = {
-    <n: Num> => Expr::Const(n),
-    <s: Identifier> => Expr::Var(s),
+TransitionAtom: TransitionExpr = {
+    "(" <TransitionExpr> ")",
+    <lexpr: TransitionAtom> "^" <num: Num> => TransitionExpr::Exp(Box::new(lexpr), num),
+    <n: Num> => TransitionExpr::Const(n),
+    <s: Identifier> => TransitionExpr::Var(s),
+    <s: Identifier> "'" => TransitionExpr::Next(s),
 }
 
 // ATOMS
