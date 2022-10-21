@@ -1,6 +1,6 @@
 use super::{build_parse_test, Error, Identifier, ParseError, Source, SourceSection, TraceCols};
 
-// SECTIONS
+// TRACE COLUMNS
 // ================================================================================================
 
 #[test]

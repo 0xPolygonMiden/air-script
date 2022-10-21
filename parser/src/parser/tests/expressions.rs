@@ -3,7 +3,7 @@ use super::{
     TransitionConstraints, TransitionExpr,
 };
 
-// SECTIONS
+// EXPRESSIONS
 // ================================================================================================
 
 #[test]
