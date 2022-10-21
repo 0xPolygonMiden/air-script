@@ -1,6 +1,7 @@
 use super::{build_parse_test, Error, ParseError};
 
-// PARSE ERRORS
+// TODO: clean up this test file
+// IDENTIFIERS
 // ================================================================================================
 
 #[test]
