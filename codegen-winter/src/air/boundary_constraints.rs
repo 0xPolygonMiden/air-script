@@ -1,4 +1,4 @@
-use super::{AirIR, Impl};
+use super::{AirIR, Codegen, Impl};
 
 use ir::BoundaryExpr;
 
@@ -49,10 +49,6 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
 // ================================================================================================
 
 /// Code generation trait for generating Rust code strings from boundary constraint expressions.
-trait Codegen {
-    fn to_string(&self) -> String;
-}
-
 impl Codegen for BoundaryExpr {
     fn to_string(&self) -> String {
         match self {

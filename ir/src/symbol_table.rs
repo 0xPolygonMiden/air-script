@@ -1,6 +1,6 @@
+use super::{BTreeMap, SemanticError, MIN_CYCLE_LENGTH};
+use parser::ast::{Identifier, PeriodicColumn, PublicInput};
 use std::fmt::Display;
-
-use super::{BTreeMap, SemanticError};
 
 #[derive(Debug, Copy, Clone)]
 pub(super) enum IdentifierType {
@@ -36,7 +36,7 @@ pub(super) struct SymbolTable {
 
     /// A map of the Air's periodic columns using the index of the column within the declared
     /// periodic columns as the key and the vector of periodic values as the value
-    periodic_columns: BTreeMap<usize, Vec<u64>>,
+    periodic_columns: Vec<Vec<u64>>,
 }
 
 impl SymbolTable {
@@ -58,52 +58,59 @@ impl SymbolTable {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    /// Add a new main trace column by its name and index in the main execution trace.
-    pub(super) fn insert_main_trace_column(
+    /// TODO Add a new main trace column by its name and index in the main execution trace.
+    pub(super) fn insert_main_trace_columns(
         &mut self,
-        ident_name: &str,
-        index: usize,
+        columns: &[Identifier],
     ) -> Result<(), SemanticError> {
-        self.insert_symbol(ident_name, IdentifierType::MainTraceColumn(index))
+        for (idx, Identifier(name)) in columns.iter().enumerate() {
+            self.insert_symbol(name, IdentifierType::MainTraceColumn(idx))?;
+        }
+
+        Ok(())
     }
 
-    /// Add a new auxiliary trace column by its name and index in the auxiliary execution trace.
-    pub(super) fn insert_aux_trace_column(
+    /// TODO Add a new auxiliary trace column by its name and index in the auxiliary execution trace.
+    pub(super) fn insert_aux_trace_columns(
         &mut self,
-        ident_name: &str,
-        index: usize,
+        columns: &[Identifier],
     ) -> Result<(), SemanticError> {
-        self.insert_symbol(ident_name, IdentifierType::AuxTraceColumn(index))
+        for (idx, Identifier(name)) in columns.iter().enumerate() {
+            self.insert_symbol(name, IdentifierType::AuxTraceColumn(idx))?;
+        }
+
+        Ok(())
     }
 
     /// Adds a new public input by its name and size.
-    pub(super) fn insert_public_input(
+    pub(super) fn insert_public_inputs(
         &mut self,
-        ident_name: &str,
-        size: usize,
+        public_inputs: &[PublicInput],
     ) -> Result<(), SemanticError> {
-        self.insert_symbol(ident_name, IdentifierType::PublicInput(size))
-    }
-
-    /// Adds a new periodic column by its name and periodic values.
-    ///
-    /// TODO: should we enforce a maximum length on periodic columns
-    pub(super) fn insert_periodic_column(
-        &mut self,
-        ident_name: &str,
-        index: usize,
-        values: &[u64],
-    ) -> Result<(), SemanticError> {
-        if !values.len().is_power_of_two() {
-            return Err(SemanticError::InvalidPeriodicColumn(format!(
-                "length of periodic column {} is not a power of 2",
-                ident_name
-            )));
+        for input in public_inputs.iter() {
+            self.insert_symbol(input.name(), IdentifierType::PublicInput(input.size()))?;
         }
 
-        self.insert_symbol(ident_name, IdentifierType::PeriodicColumn(index))?;
-        self.periodic_columns.insert(index, values.to_vec());
         Ok(())
+    }
+
+    /// TODO
+    pub(super) fn insert_periodic_columns(
+        &mut self,
+        columns: &[PeriodicColumn],
+    ) -> Result<(), SemanticError> {
+        for (index, column) in columns.iter().enumerate() {
+            validate_cycles(column)?;
+
+            self.insert_symbol(column.name(), IdentifierType::PeriodicColumn(index))?;
+            self.periodic_columns.push(column.values().to_vec());
+        }
+
+        Ok(())
+    }
+
+    pub(super) fn into_periodic_columns(self) -> Vec<Vec<u64>> {
+        self.periodic_columns
     }
 
     // --- ACCESSORS ------------------------------------------------------------------------------
@@ -147,4 +154,25 @@ impl SymbolTable {
             )))
         }
     }
+}
+
+pub(super) fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
+    let name = column.name();
+    let cycle = column.values().len();
+
+    if !cycle.is_power_of_two() {
+        return Err(SemanticError::InvalidPeriodicColumn(format!(
+            "cycle length must be a power of two, but was {} for cycle {}",
+            cycle, name
+        )));
+    }
+
+    if cycle < MIN_CYCLE_LENGTH {
+        return Err(SemanticError::InvalidPeriodicColumn(format!(
+            "cycle length must be at least {}, but was {} for cycle {}",
+            MIN_CYCLE_LENGTH, cycle, name
+        )));
+    }
+
+    Ok(())
 }

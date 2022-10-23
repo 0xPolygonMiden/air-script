@@ -24,7 +24,7 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
     evaluate_transition.line("let next = frame.next();");
 
     // output the constraints.
-    let graph = ir.main_transition_graph();
+    let graph = ir.transition_graph();
     for (idx, constraint) in ir.main_transition_constraints().iter().enumerate() {
         evaluate_transition.line(format!(
             "result[{}] = {};",

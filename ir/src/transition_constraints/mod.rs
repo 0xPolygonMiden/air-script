@@ -1,8 +1,16 @@
 use super::{SemanticError, SymbolTable};
 use parser::ast;
 
+mod degree;
+pub use degree::TransitionConstraintDegree;
+
 mod graph;
 pub use graph::{AlgebraicGraph, NodeIndex, Operation};
+
+// CONSTANTS
+// ================================================================================================
+
+pub const MIN_CYCLE_LENGTH: usize = 2;
 
 // TRANSITION CONSTRAINTS
 // ================================================================================================
@@ -31,10 +39,10 @@ impl TransitionConstraints {
     // --- PUBLIC ACCESSORS -----------------------------------------------------------------------
 
     /// Returns a vector of the degrees of the transition contraints.
-    pub fn main_degrees(&self) -> Vec<u8> {
+    pub fn main_degrees(&self, cycle_lens: &[usize]) -> Vec<TransitionConstraintDegree> {
         self.main_constraints
             .iter()
-            .map(|entry_index| self.graph.degree(entry_index))
+            .map(|entry_index| self.graph.degree(cycle_lens, entry_index))
             .collect()
     }
 
@@ -46,10 +54,10 @@ impl TransitionConstraints {
     }
 
     /// Returns a vector of the degrees of the transition contraints.
-    pub fn aux_degrees(&self) -> Vec<u8> {
+    pub fn aux_degrees(&self, cycle_lens: &[usize]) -> Vec<TransitionConstraintDegree> {
         self.aux_constraints
             .iter()
-            .map(|entry_index| self.graph.degree(entry_index))
+            .map(|entry_index| self.graph.degree(cycle_lens, entry_index))
             .collect()
     }
 
@@ -81,7 +89,7 @@ impl TransitionConstraints {
         // add it to the transition constraints graph and get its entry index.
         let (constraint_type, entry_index) = self.graph.insert_expr(symbol_table, expr)?;
 
-        // add the transition constraint.
+        // add the transition constraint to the appropriate set of constraints.
         match constraint_type {
             ConstraintType::Main => self.main_constraints.push(entry_index),
             ConstraintType::Auxiliary => self.aux_constraints.push(entry_index),
