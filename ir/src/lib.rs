@@ -10,8 +10,8 @@ pub mod boundary_constraints;
 use boundary_constraints::BoundaryConstraints;
 
 pub mod transition_constraints;
-pub use transition_constraints::NodeIndex;
-use transition_constraints::{AlgebraicGraph, TransitionConstraints};
+use transition_constraints::{AlgebraicGraph, TransitionConstraints, MIN_CYCLE_LENGTH};
+pub use transition_constraints::{NodeIndex, TransitionConstraintDegree};
 
 mod error;
 use error::SemanticError;
@@ -22,6 +22,7 @@ use error::SemanticError;
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
+    periodic_columns: Vec<Vec<u64>>,
     boundary_constraints: BoundaryConstraints,
     transition_constraints: TransitionConstraints,
 }
@@ -35,41 +36,34 @@ impl AirIR {
         // set a default name.
         let mut air_name = "CustomAir";
 
-        // process the declarations of identifiers first, using a single symbol table to enforece
+        // process the declarations of identifiers first, using a single symbol table to enforce
         // uniqueness.
         let mut symbol_table = SymbolTable::default();
         for section in source {
             match section {
                 ast::SourceSection::AirDef(Identifier(air_def)) => {
+                    // update the name of the air.
                     air_name = air_def;
                 }
                 ast::SourceSection::TraceCols(columns) => {
                     // process & validate the main trace columns
-                    for (idx, Identifier(name)) in columns.main_cols.iter().enumerate() {
-                        symbol_table.insert_main_trace_column(name, idx)?;
-                    }
+                    symbol_table.insert_main_trace_columns(&columns.main_cols)?;
                     // process & validate the auxiliary trace columns
-                    for (idx, Identifier(name)) in columns.aux_cols.iter().enumerate() {
-                        symbol_table.insert_aux_trace_column(name, idx)?;
-                    }
+                    symbol_table.insert_aux_trace_columns(&columns.aux_cols)?;
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
                     // process & validate the public inputs
-                    for input in inputs.iter() {
-                        symbol_table.insert_public_input(input.name(), input.size())?;
-                    }
+                    symbol_table.insert_public_inputs(inputs)?;
                 }
                 ast::SourceSection::PeriodicColumns(columns) => {
                     // process & validate the periodic columns
-                    for (idx, column) in columns.iter().enumerate() {
-                        symbol_table.insert_periodic_column(column.name(), idx, column.values())?;
-                    }
+                    symbol_table.insert_periodic_columns(columns)?;
                 }
                 _ => {}
             }
         }
 
-        // then process the constraints.
+        // then process the constraints & validate them against the symbol table.
         let mut boundary_constraints = BoundaryConstraints::default();
         let mut transition_constraints = TransitionConstraints::default();
         for section in source {
@@ -90,6 +84,7 @@ impl AirIR {
 
         Ok(Self {
             air_name: air_name.to_string(),
+            periodic_columns: symbol_table.into_periodic_columns(),
             boundary_constraints,
             transition_constraints,
         })
@@ -99,6 +94,13 @@ impl AirIR {
 
     pub fn air_name(&self) -> &str {
         &self.air_name
+    }
+
+    pub fn periodic_cycle_lens(&self) -> Vec<usize> {
+        self.periodic_columns
+            .iter()
+            .map(|values| values.len())
+            .collect()
     }
 
     // --- PUBLIC ACCESSORS FOR BOUNDARY CONSTRAINTS ----------------------------------------------
@@ -129,16 +131,18 @@ impl AirIR {
 
     // --- PUBLIC ACCESSORS FOR TRANSITION CONSTRAINTS --------------------------------------------
 
-    pub fn main_degrees(&self) -> Vec<u8> {
-        self.transition_constraints.main_degrees()
+    pub fn main_degrees(&self) -> Vec<TransitionConstraintDegree> {
+        self.transition_constraints
+            .main_degrees(&self.periodic_cycle_lens())
     }
 
     pub fn main_transition_constraints(&self) -> &[NodeIndex] {
         self.transition_constraints.main_constraints()
     }
 
-    pub fn aux_degrees(&self) -> Vec<u8> {
-        self.transition_constraints.aux_degrees()
+    pub fn aux_degrees(&self) -> Vec<TransitionConstraintDegree> {
+        self.transition_constraints
+            .aux_degrees(&self.periodic_cycle_lens())
     }
 
     pub fn aux_transition_constraints(&self) -> &[NodeIndex] {

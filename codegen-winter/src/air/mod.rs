@@ -1,4 +1,5 @@
 use super::{AirIR, Impl, Scope};
+use ir::TransitionConstraintDegree;
 
 mod boundary_constraints;
 use boundary_constraints::add_fn_get_assertions;
@@ -74,7 +75,7 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
     // define the transition constraint degrees of the main trace `main_degrees`.
     let mut main_degrees: Vec<String> = Vec::new();
     for degree in ir.main_degrees().iter() {
-        main_degrees.push(format!("TransitionConstraintDegree::new({})", degree));
+        main_degrees.push(degree.to_string());
     }
     new.line(format!(
         "let main_degrees = vec![{}];",
@@ -109,4 +110,32 @@ let context = AirContext::new_multi_segment(
 
     // return initialized Self.
     new.line("Self { context }");
+}
+
+// RUST STRING GENERATION
+// ================================================================================================
+
+/// Code generation trait for generating Rust code strings from boundary constraint expressions.
+pub trait Codegen {
+    fn to_string(&self) -> String;
+}
+
+impl Codegen for TransitionConstraintDegree {
+    fn to_string(&self) -> String {
+        if self.cycles().is_empty() {
+            format!("TransitionConstraintDegree::new({})", self.base())
+        } else {
+            let cycles = self
+                .cycles()
+                .iter()
+                .map(|cycle_len| cycle_len.to_string())
+                .collect::<Vec<String>>()
+                .join(", ");
+            format!(
+                "TransitionConstraintDegree::with_cycles({}, [{}])",
+                self.base(),
+                cycles
+            )
+        }
+    }
 }

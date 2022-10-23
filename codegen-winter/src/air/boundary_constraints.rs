@@ -1,4 +1,4 @@
-use super::{AirIR, Impl};
+use super::{AirIR, Codegen, Impl};
 use ir::BoundaryExpr;
 
 // HELPERS TO GENERATE THE WINTERFELL BOUNDARY CONSTRAINT METHODS
@@ -48,10 +48,6 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
 // ================================================================================================
 
 /// Code generation trait for generating Rust code strings from boundary constraint expressions.
-trait Codegen {
-    fn to_string(&self) -> String;
-}
-
 impl Codegen for BoundaryExpr {
     // TODO: Only add parentheses in Add/Sub/Mul/Exp if the expression is an arithmetic operation.
     fn to_string(&self) -> String {
