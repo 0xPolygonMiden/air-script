@@ -60,6 +60,9 @@ impl Codegen for Operation {
             Operation::MainTraceNextRow(col_idx) => {
                 format!("next[{}]", col_idx)
             }
+            Operation::PeriodicColumn(col_idx) => {
+                format!("periodic_values[{}]", col_idx)
+            }
             Operation::Neg(idx) => {
                 let str = idx.to_string(graph);
                 format!("- ({})", str)
