@@ -11,7 +11,7 @@ use parser::ast;
 /// sorted into maps by the boundary. This also simplifies ensuring that there are no conflicting
 /// constraints sharing a boundary and column index.
 #[derive(Default, Debug)]
-pub(crate) struct BoundaryConstraints {
+pub struct BoundaryConstraints {
     /// The boundary constraints to be applied at the first row of the trace, with the trace column
     /// index as the key, and the expression as the value.
     first: BTreeMap<usize, Expr>,
@@ -21,6 +21,11 @@ pub(crate) struct BoundaryConstraints {
 }
 
 impl BoundaryConstraints {
+    // --- CONSTRUCTOR ----------------------------------------------------------------------------
+    pub fn new(first: BTreeMap<usize, Expr>, last: BTreeMap<usize, Expr>) -> Self {
+        BoundaryConstraints { first, last }
+    }
+
     // --- ACCESSORS ------------------------------------------------------------------------------
 
     /// Returns the total number of boundary constraints

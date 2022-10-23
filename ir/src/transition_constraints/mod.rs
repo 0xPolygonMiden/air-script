@@ -9,7 +9,7 @@ pub use graph::{AlgebraicGraph, NodeIndex, Operation};
 // ================================================================================================
 
 #[derive(Default, Debug)]
-pub(super) struct TransitionConstraints {
+pub struct TransitionConstraints {
     /// The indices of the entry nodes for each of the transition constraints in the graph.
     constraints: Vec<NodeIndex>,
 

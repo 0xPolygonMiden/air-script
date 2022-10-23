@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 codegen = "0.2.0"
 ir = {package = "ir", path="../ir", version="0.0.1" }
+parser = { package = "parser", path = "../parser", version = "0.0.1" }

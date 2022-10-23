@@ -7,6 +7,9 @@ use imports::add_imports;
 mod air;
 use air::add_air;
 
+#[cfg(test)]
+mod tests;
+
 // GENERATE RUST CODE FOR WINTERFELL AIR
 // ================================================================================================
 

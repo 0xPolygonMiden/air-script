@@ -5,11 +5,11 @@ mod trace_columns;
 use trace_columns::TraceColumns;
 
 pub mod boundary_constraints;
-use boundary_constraints::BoundaryConstraints;
+pub use boundary_constraints::BoundaryConstraints;
 
 pub mod transition_constraints;
-pub use transition_constraints::NodeIndex;
-use transition_constraints::{AlgebraicGraph, TransitionConstraints};
+pub use transition_constraints::{NodeIndex, TransitionConstraints};
+use transition_constraints::AlgebraicGraph;
 
 mod error;
 use error::SemanticError;
@@ -76,6 +76,18 @@ impl AirIR {
         })
     }
 
+    pub fn new(
+        air_name: String,
+        main_boundary_constraints: BoundaryConstraints,
+        main_transition_constraints: TransitionConstraints,
+    ) -> Self {
+        AirIR {
+            air_name,
+            main_boundary_constraints,
+            main_transition_constraints,
+        }
+    }
+
     // --- PUBLIC ACCESSORS -----------------------------------------------------------------------
     pub fn air_name(&self) -> &str {
         &self.air_name
@@ -108,7 +120,7 @@ impl AirIR {
 
 // TODO: add checks for the correctness of the AirIR that is built.
 #[cfg(test)]
-mod tests {
+mod tests_ir {
     use super::*;
     use parser::parse;
 
@@ -124,6 +136,7 @@ mod tests {
         let parsed = parse(source).expect("Parsing failed");
 
         let result = AirIR::from_source(&parsed);
+        println!("{:?}", result);
         assert!(result.is_ok());
     }
 
