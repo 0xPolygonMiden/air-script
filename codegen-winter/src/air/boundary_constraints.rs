@@ -29,9 +29,10 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
     // add the constraints for the last boundary.
     let last_constraints = ir.main_last_boundary_constraints();
     if !last_constraints.is_empty() {
+        get_assertions.line("let last_step = self.last_step();");
         for (col_idx, constraint) in last_constraints.iter().enumerate() {
             let assertion = format!(
-                "result.push(Assertion::single({}, 0, {}));",
+                "result.push(Assertion::single({}, last_step, {}));",
                 col_idx,
                 constraint.to_string()
             );
