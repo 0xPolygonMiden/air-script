@@ -2,7 +2,7 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryExpr}, 
         transition_constraints::{TransitionConstraint, TransitionConstraints, TransitionExpr},
-        Identifier, Source, SourceSection, TraceCols, PublicInput
+        Identifier, Source, SourceSection, TraceCols, PublicInput, PeriodicColumn
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols}}, lexer::Token
 };
 use std::str::FromStr;
@@ -21,6 +21,7 @@ SourceSection: SourceSection = {
     AirDef => SourceSection::AirDef(<>),
     TraceCols => SourceSection::TraceCols(<>),
     PublicInputs => SourceSection::PublicInputs(<>),
+    PeriodicColumns => SourceSection::PeriodicColumns(<>),
     BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
     TransitionConstraints => SourceSection::TransitionConstraints(<>),
 }
@@ -66,6 +67,18 @@ PublicInputs: Vec<PublicInput> = {
 
 PublicInput: PublicInput = {
     <name: Identifier> ":" "[" <size: Num_u64> "]" => PublicInput::new(name, size),
+}
+
+// PERIODIC COLUMNS
+// ================================================================================================
+
+// Periodic columns are not required, and there is no limit to the number that can be provided.
+PeriodicColumns: Vec<PeriodicColumn> = {
+    "periodic_columns" ":" <periodic_columns: PeriodicColumn*> => periodic_columns
+}
+
+PeriodicColumn: PeriodicColumn = {
+    <name: Identifier> ":" "[" <values: CommaElems<Num_u64>> "]" => PeriodicColumn::new(name, values),
 }
 
 // BOUNDARY CONSTRAINTS
@@ -175,6 +188,7 @@ extern {
         "main" => Token::Main,
         "aux" => Token::Aux,
         "public_inputs" => Token::PublicInputs,
+        "periodic_columns" => Token::PeriodicColumns,
         "boundary_constraints" => Token::BoundaryConstraints,
         "first" => Token::First,
         "last" => Token::Last,

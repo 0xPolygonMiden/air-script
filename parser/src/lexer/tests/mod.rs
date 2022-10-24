@@ -6,6 +6,7 @@ use crate::{
 mod boundary_constraints;
 mod expressions;
 mod identifiers;
+mod periodic_columns;
 mod pub_inputs;
 
 // TEST HELPERS
