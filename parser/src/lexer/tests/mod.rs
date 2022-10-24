@@ -48,6 +48,18 @@ fn keywords_with_identifiers() {
 }
 
 #[test]
+fn random_values() {
+    let source = "$rand[0]";
+    let tokens = vec![
+        Token::Rand,
+        Token::Lsqb,
+        Token::Number("0".to_string()),
+        Token::Rsqb,
+    ];
+    expect_valid_tokenization(source, tokens);
+}
+
+#[test]
 fn multi_arithmetic_ops() {
     let source = "enf clk' - clk - 1 = 0";
     let tokens = vec![

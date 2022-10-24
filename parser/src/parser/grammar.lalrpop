@@ -136,6 +136,7 @@ TransitionAtom: TransitionExpr = {
     <n: Num_u64> => TransitionExpr::Constant(n),
     <s: Identifier> => TransitionExpr::Variable(s),
     <s: Identifier> "'" => TransitionExpr::Next(s),
+    "$rand" "[" <n: Num_u64> "]" => TransitionExpr::RandomValue(n as usize)
 }
 
 // ATOMS
@@ -179,6 +180,7 @@ extern {
         "first" => Token::First,
         "last" => Token::Last,
         "transition_constraints" => Token::TransitionConstraints,
+        "$rand" => Token::Rand,
         "enf" => Token::Enf,
         "'" => Token::Next,
         "=" => Token::Equal,
