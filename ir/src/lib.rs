@@ -18,12 +18,12 @@ use error::SemanticError;
 
 /// Internal representation of an AIR.
 ///
-/// TODO: random values and auxiliary trace constraints
+/// TODO: docs
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
     boundary_constraints: BoundaryConstraints,
-    main_transition_constraints: TransitionConstraints,
+    transition_constraints: TransitionConstraints,
 }
 
 impl AirIR {
@@ -71,7 +71,7 @@ impl AirIR {
 
         // then process the constraints.
         let mut boundary_constraints = BoundaryConstraints::default();
-        let mut main_transition_constraints = TransitionConstraints::default();
+        let mut transition_constraints = TransitionConstraints::default();
         for section in source {
             match section {
                 ast::SourceSection::BoundaryConstraints(constraints) => {
@@ -81,7 +81,7 @@ impl AirIR {
                 }
                 ast::SourceSection::TransitionConstraints(constraints) => {
                     for constraint in constraints.transition_constraints.iter() {
-                        main_transition_constraints.insert(&symbol_table, constraint)?;
+                        transition_constraints.insert(&symbol_table, constraint)?;
                     }
                 }
                 _ => {}
@@ -91,7 +91,7 @@ impl AirIR {
         Ok(Self {
             air_name: air_name.to_string(),
             boundary_constraints,
-            main_transition_constraints,
+            transition_constraints,
         })
     }
 
@@ -130,15 +130,23 @@ impl AirIR {
     // --- PUBLIC ACCESSORS FOR TRANSITION CONSTRAINTS --------------------------------------------
 
     pub fn main_degrees(&self) -> Vec<u8> {
-        self.main_transition_constraints.degrees()
+        self.transition_constraints.main_degrees()
     }
 
-    pub fn main_transition_constraints(&self) -> &[NodeIndex] {
-        self.main_transition_constraints.constraints()
+    pub fn transition_constraints(&self) -> &[NodeIndex] {
+        self.transition_constraints.main_constraints()
     }
 
-    pub fn main_transition_graph(&self) -> &AlgebraicGraph {
-        self.main_transition_constraints.graph()
+    pub fn transition_graph(&self) -> &AlgebraicGraph {
+        self.transition_constraints.graph()
+    }
+
+    pub fn aux_degrees(&self) -> Vec<u8> {
+        self.transition_constraints.aux_degrees()
+    }
+
+    pub fn aux_transition_constraints(&self) -> &[NodeIndex] {
+        self.transition_constraints.aux_constraints()
     }
 }
 
