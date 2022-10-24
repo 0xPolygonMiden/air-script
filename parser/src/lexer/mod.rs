@@ -43,6 +43,10 @@ pub enum Token {
     #[token("public_inputs")]
     PublicInputs,
 
+    /// Keyword to declare the periodic columns declaration section for the AIR.
+    #[token("periodic_columns")]
+    PeriodicColumns,
+
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Marks the beginning of boundary constraints section in the constraints file.

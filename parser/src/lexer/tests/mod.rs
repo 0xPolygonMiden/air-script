@@ -4,6 +4,7 @@ use crate::{
 };
 
 mod boundary_constraints;
+mod periodic_columns;
 mod pub_inputs;
 
 // TEST HELPERS
