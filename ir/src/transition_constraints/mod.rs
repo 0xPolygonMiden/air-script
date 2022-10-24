@@ -1,5 +1,4 @@
-use super::TraceColumns;
-use crate::error::SemanticError;
+use super::{SemanticError, SymbolTable};
 use parser::ast;
 
 mod graph;
@@ -47,13 +46,13 @@ impl TransitionConstraints {
     /// existing nodes). The index of its entry node is then saved in the constraints array.
     pub(super) fn insert(
         &mut self,
+        symbol_table: &SymbolTable,
         constraint: &ast::TransitionConstraint,
-        trace_columns: &TraceColumns,
     ) -> Result<(), SemanticError> {
         let expr = constraint.expr();
 
         // add it to the transition constraints graph and get its entry index.
-        let entry_index = self.graph.insert_expr(expr, trace_columns)?;
+        let entry_index = self.graph.insert_expr(symbol_table, expr)?;
 
         // add the transition constraint.
         self.constraints.push(entry_index);

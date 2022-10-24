@@ -1,6 +1,6 @@
-use super::TraceColumns;
-use crate::error::SemanticError;
-use parser::ast::{self, Identifier, TransitionExpr};
+use super::{SemanticError, SymbolTable};
+use crate::symbol_table::IdentifierType;
+use parser::ast::{Identifier, TransitionExpr};
 
 // ALGEBRAIC GRAPH
 // ================================================================================================
@@ -37,7 +37,12 @@ impl AlgebraicGraph {
         match self.node(index).op() {
             Operation::Const(_)
             | Operation::MainTraceCurrentRow(_)
-            | Operation::MainTraceNextRow(_) => 1_u8,
+            | Operation::MainTraceNextRow(_)
+            // TODO: check on degree calculation for auxiliary trace rows
+            | Operation::AuxTraceCurrentRow(_)
+            | Operation::AuxTraceNextRow(_) 
+            // TODO: check the calculation of degree for periodic columns
+            | Operation::PeriodicColumn(_) => 1_u8,
             Operation::Neg(index) => self.degree(index),
             Operation::Add(lhs, rhs) => std::cmp::max(self.degree(lhs), self.degree(rhs)),
             Operation::Mul(lhs, rhs) => self.degree(lhs) + self.degree(rhs),
@@ -51,34 +56,26 @@ impl AlgebraicGraph {
     /// recursively to reuse existing matching nodes.
     pub(super) fn insert_expr(
         &mut self,
-        expr: ast::TransitionExpr,
-        trace_columns: &TraceColumns,
+        symbol_table: &SymbolTable,
+        expr: TransitionExpr,
     ) -> Result<NodeIndex, SemanticError> {
         match expr {
             TransitionExpr::Const(value) => Ok(self.insert_op(Operation::Const(value))),
-            TransitionExpr::Next(Identifier(ident)) => {
-                let index = trace_columns.get_column_index(&ident)?;
-                // insert the next row column node.
-                Ok(self.insert_op(Operation::MainTraceNextRow(index)))
-            }
+            TransitionExpr::Next(Identifier(ident)) => self.insert_next(symbol_table, &ident),
             TransitionExpr::Var(Identifier(ident)) => {
-                // since variable definitions are not possible yet, the identifier must match one of
-                // the declared trace columns.
-                let index = trace_columns.get_column_index(&ident)?;
-                // insert the current row column node.
-                Ok(self.insert_op(Operation::MainTraceCurrentRow(index)))
+                self.insert_variable(symbol_table, &ident)
             }
             TransitionExpr::Add(lhs, rhs) => {
                 // add both subexpressions.
-                let lhs = self.insert_expr(*lhs, trace_columns)?;
-                let rhs = self.insert_expr(*rhs, trace_columns)?;
+                let lhs = self.insert_expr(symbol_table, *lhs)?;
+                let rhs = self.insert_expr(symbol_table, *rhs)?;
                 // add the expression.
                 Ok(self.insert_op(Operation::Add(lhs, rhs)))
             }
             TransitionExpr::Sub(lhs, rhs) => {
                 // add both subexpressions.
-                let lhs = self.insert_expr(*lhs, trace_columns)?;
-                let rhs = self.insert_expr(*rhs, trace_columns)?;
+                let lhs = self.insert_expr(symbol_table, *lhs)?;
+                let rhs = self.insert_expr(symbol_table, *rhs)?;
                 // negate the right hand side.
                 let rhs = self.insert_op(Operation::Neg(rhs));
                 // add the expression.
@@ -86,20 +83,66 @@ impl AlgebraicGraph {
             }
             TransitionExpr::Mul(lhs, rhs) => {
                 // add both subexpressions.
-                let lhs = self.insert_expr(*lhs, trace_columns)?;
-                let rhs = self.insert_expr(*rhs, trace_columns)?;
+                let lhs = self.insert_expr(symbol_table,*lhs)?;
+                let rhs = self.insert_expr(symbol_table,*rhs)?;
                 // add the expression.
                 Ok(self.insert_op(Operation::Mul(lhs, rhs)))
             }
             TransitionExpr::Exp(lhs, rhs) => {
                 // add base subexpression.
-                let lhs = self.insert_expr(*lhs, trace_columns)?;
+                let lhs = self.insert_expr(symbol_table,*lhs)?;
                 // add exponent subexpression.
                 Ok(self.insert_op(Operation::Exp(lhs, rhs as usize)))
             }
             _ => {
                 todo!()
             }
+        }
+    }
+
+    fn insert_next(
+        &mut self,
+        symbol_table: &SymbolTable,
+        ident: &str,
+    ) -> Result<NodeIndex, SemanticError> {
+        let col_type = symbol_table.get_type(ident)?;
+
+        // a "next" variable expression always references an execution trace columns
+        match col_type {
+            IdentifierType::MainTraceColumn(index) => {
+                Ok(self.insert_op(Operation::MainTraceNextRow(index)))
+            }
+            IdentifierType::AuxTraceColumn(index) => Ok(self.insert_op(Operation::AuxTraceNextRow(index))),
+            _ => Err(SemanticError::InvalidUsage(format!(
+                "Identifier {} was declared as a {} not as a trace column",
+                ident, col_type
+            ))),
+        }
+    }
+
+    fn insert_variable(
+        &mut self,
+        symbol_table: &SymbolTable,
+        ident: &str,
+    ) -> Result<NodeIndex, SemanticError> {
+        let col_type = symbol_table.get_type(ident)?;
+
+        // since variable definitions are not possible yet, the identifier must match one of
+        // the declared trace columns or one of the declared periodic columns.
+        match col_type {
+            IdentifierType::MainTraceColumn(index) => {
+                Ok(self.insert_op(Operation::MainTraceCurrentRow(index)))
+            }
+            IdentifierType::AuxTraceColumn(index) => {
+                Ok(self.insert_op(Operation::AuxTraceCurrentRow(index)))
+            }
+            IdentifierType::PeriodicColumn(index) => {
+                Ok(self.insert_op(Operation::PeriodicColumn(index)))
+            }
+            _ => Err(SemanticError::InvalidUsage(format!(
+                "Identifier {} was declared as a {} not as a trace column",
+                ident, col_type
+            ))),
         }
     }
 
@@ -141,12 +184,22 @@ impl Node {
 #[derive(Debug, Eq, PartialEq)]
 pub enum Operation {
     Const(u64),
-    /// An identifier for a specific column in the current row in the main trace. The inner value is
-    /// the index of the column within the trace.
+    /// An identifier for a for a cell in the specified column in the current row in the main trace. 
+    /// The inner value is the index of the column within the trace.
     MainTraceCurrentRow(usize),
-    /// An identifier for a specific column in the next row in the main trace. The inner value is
-    /// the index of the column within the trace.
+    /// An identifier for a cell in the specified column in the next row in the main trace. The 
+    /// inner value is the index of the column within the trace.
     MainTraceNextRow(usize),
+    /// An identifier for a cell in the specified column in the current row in the auxiliary trace. 
+    /// The inner value is the index of the column within the trace.
+    AuxTraceCurrentRow(usize),
+    /// An identifier for a cell in the specified column in the next row in the auxiliary trace. The
+    /// inner value is the index of the column within the trace.
+    AuxTraceNextRow(usize),
+    /// An identifier for a periodic value from a specified periodic column. The inner value is the
+    /// index of the periodic column within the declared periodic columns. The periodic value made 
+    /// available from the specified column is based on the current row of the trace.
+    PeriodicColumn(usize),
     /// Negation operation applied to the node with the specified index.
     Neg(NodeIndex),
     /// Addition operation applied to the nodes with the specified indices.

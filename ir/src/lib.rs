@@ -1,12 +1,10 @@
-use parser::ast;
-pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
 use std::collections::BTreeMap;
 
-mod trace_columns;
-use trace_columns::TraceColumns;
+use parser::ast;
+pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
 
-mod pub_inputs;
-use pub_inputs::PublicInputs;
+mod symbol_table;
+use symbol_table::{IdentifierType, SymbolTable};
 
 pub mod boundary_constraints;
 use boundary_constraints::BoundaryConstraints;
@@ -20,11 +18,11 @@ use error::SemanticError;
 
 /// Internal representation of an AIR.
 ///
-/// TODO: periodic columns, random values, and auxiliary trace constraints
+/// TODO: random values and auxiliary trace constraints
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
-    main_boundary_constraints: BoundaryConstraints,
+    boundary_constraints: BoundaryConstraints,
     main_transition_constraints: TransitionConstraints,
 }
 
@@ -37,48 +35,53 @@ impl AirIR {
         // set a default name.
         let mut air_name = "CustomAir";
 
-        // process the declarations first.
-        let mut trace_columns = TraceColumns::default();
-        let mut pub_inputs = PublicInputs::default();
+        // process the declarations of identifiers first, using a single symbol table to enforece
+        // uniqueness.
+        let mut symbol_table = SymbolTable::default();
         for section in source {
-            // TODO: each of these sections should only exist once in the AST
             match section {
                 ast::SourceSection::AirDef(Identifier(air_def)) => {
                     air_name = air_def;
                 }
                 ast::SourceSection::TraceCols(columns) => {
+                    // process & validate the main trace columns
                     for (idx, Identifier(name)) in columns.main_cols.iter().enumerate() {
-                        trace_columns.insert(name, idx)?;
+                        symbol_table.insert_main_trace_column(name, idx)?;
+                    }
+                    // process & validate the auxiliary trace columns
+                    for (idx, Identifier(name)) in columns.aux_cols.iter().enumerate() {
+                        symbol_table.insert_aux_trace_column(name, idx)?;
                     }
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
+                    // process & validate the public inputs
                     for input in inputs.iter() {
-                        pub_inputs.insert(input.name(), input.size())?;
+                        symbol_table.insert_public_input(input.name(), input.size())?;
+                    }
+                }
+                ast::SourceSection::PeriodicColumns(columns) => {
+                    // process & validate the periodic columns
+                    for (idx, column) in columns.iter().enumerate() {
+                        symbol_table.insert_periodic_column(column.name(), idx, column.values())?;
                     }
                 }
                 _ => {}
             }
         }
 
-        // TODO: validate no duplicate declarations (trace columns / public inputs)
-
         // then process the constraints.
-        let mut main_boundary_constraints = BoundaryConstraints::default();
+        let mut boundary_constraints = BoundaryConstraints::default();
         let mut main_transition_constraints = TransitionConstraints::default();
         for section in source {
             match section {
                 ast::SourceSection::BoundaryConstraints(constraints) => {
                     for constraint in constraints.boundary_constraints.iter() {
-                        main_boundary_constraints.insert(
-                            constraint,
-                            &trace_columns,
-                            &pub_inputs,
-                        )?;
+                        boundary_constraints.insert(&symbol_table, constraint)?;
                     }
                 }
                 ast::SourceSection::TransitionConstraints(constraints) => {
                     for constraint in constraints.transition_constraints.iter() {
-                        main_transition_constraints.insert(constraint, &trace_columns)?;
+                        main_transition_constraints.insert(&symbol_table, constraint)?;
                     }
                 }
                 _ => {}
@@ -87,27 +90,44 @@ impl AirIR {
 
         Ok(Self {
             air_name: air_name.to_string(),
-            main_boundary_constraints,
+            boundary_constraints,
             main_transition_constraints,
         })
     }
 
     // --- PUBLIC ACCESSORS -----------------------------------------------------------------------
+
     pub fn air_name(&self) -> &str {
         &self.air_name
     }
 
+    // --- PUBLIC ACCESSORS FOR BOUNDARY CONSTRAINTS ----------------------------------------------
+
     pub fn num_main_assertions(&self) -> usize {
-        self.main_boundary_constraints.len()
+        self.boundary_constraints.main_len()
     }
 
     pub fn main_first_boundary_constraints(&self) -> Vec<&BoundaryExpr> {
-        self.main_boundary_constraints.first()
+        self.boundary_constraints.main_first()
     }
 
     pub fn main_last_boundary_constraints(&self) -> Vec<&BoundaryExpr> {
-        self.main_boundary_constraints.last()
+        self.boundary_constraints.main_last()
     }
+
+    pub fn num_aux_assertions(&self) -> usize {
+        self.boundary_constraints.aux_len()
+    }
+
+    pub fn aux_first_boundary_constraints(&self) -> Vec<&BoundaryExpr> {
+        self.boundary_constraints.aux_first()
+    }
+
+    pub fn aux_last_boundary_constraints(&self) -> Vec<&BoundaryExpr> {
+        self.boundary_constraints.aux_last()
+    }
+
+    // --- PUBLIC ACCESSORS FOR TRANSITION CONSTRAINTS --------------------------------------------
 
     pub fn main_degrees(&self) -> Vec<u8> {
         self.main_transition_constraints.degrees()
