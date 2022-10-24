@@ -1,0 +1,15 @@
+def AuxTraceAir
+
+trace_columns:
+    aux: [p0, p1]
+  
+boundary_constraints:
+    enf p0.first = 1
+    enf p0.last = 1
+
+    enf p1.first = 1
+    enf p1.last = 1
+  
+transition_constraints:
+    enf p0' = p0 + $rand[0]
+    enf p1 = p1' + $rand[1]

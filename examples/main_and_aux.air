@@ -1,0 +1,23 @@
+def MainAndAuxAir
+
+trace_columns:
+    main: [a, b, c]
+    aux: [p0, p1]
+  
+boundary_constraints:
+    enf a.first = 1
+    enf b.first = 1
+
+    enf p0.first = 1
+    enf p0.last = 1
+
+    enf p1.first = 1
+    enf p1.last = 1
+  
+transition_constraints:
+    enf a' = b + c
+    enf b' = c + a'
+    enf c = a + b
+
+    enf p0' = p0 + a + $rand[0] + b + $rand[1]
+    enf p1 = p1' + c + $rand[0]
