@@ -24,12 +24,15 @@ impl TraceColumns {
     }
 
     /// Returns the index in the trace of the column with the specified name.
+    ///
+    /// # Errors
+    /// Returns an error if the column name identifier is not recognized as a valid trace column.
     pub(crate) fn get_column_index(&self, name: &str) -> Result<usize, SemanticError> {
         if let Some(&index) = self.columns.get(name) {
             Ok(index)
         } else {
-            Err(SemanticError::UndefinedIdentifier(format!(
-                "{} has not been declared",
+            Err(SemanticError::InvalidIdentifier(format!(
+                "Trace column {} was not declared",
                 name,
             )))
         }

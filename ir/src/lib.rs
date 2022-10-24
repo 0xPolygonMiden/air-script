@@ -1,8 +1,11 @@
 use parser::ast;
-pub use parser::ast::{BoundaryExpr, Identifier};
+pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
 
 mod trace_columns;
 use trace_columns::TraceColumns;
+
+mod pub_inputs;
+use pub_inputs::PublicInputs;
 
 pub mod boundary_constraints;
 use boundary_constraints::BoundaryConstraints;
@@ -16,7 +19,7 @@ use error::SemanticError;
 
 /// Internal representation of an AIR.
 ///
-/// TODO: periodic columns, public inputs, random values, and auxiliary trace constraints
+/// TODO: periodic columns, random values, and auxiliary trace constraints
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
@@ -33,8 +36,9 @@ impl AirIR {
         // set a default name.
         let mut air_name = "CustomAir";
 
-        // process the trace columns first.
+        // process the declarations first.
         let mut trace_columns = TraceColumns::default();
+        let mut pub_inputs = PublicInputs::default();
         for section in source {
             // TODO: each of these sections should only exist once in the AST
             match section {
@@ -46,9 +50,16 @@ impl AirIR {
                         trace_columns.insert(name, idx)?;
                     }
                 }
+                ast::SourceSection::PublicInputs(inputs) => {
+                    for input in inputs.iter() {
+                        pub_inputs.insert(input.name(), input.size())?;
+                    }
+                }
                 _ => {}
             }
         }
+
+        // TODO: validate no duplicate declarations (trace columns / public inputs)
 
         // then process the constraints.
         let mut main_boundary_constraints = BoundaryConstraints::default();
@@ -57,7 +68,11 @@ impl AirIR {
             match section {
                 ast::SourceSection::BoundaryConstraints(constraints) => {
                     for constraint in constraints.boundary_constraints.iter() {
-                        main_boundary_constraints.insert(constraint, &trace_columns)?;
+                        main_boundary_constraints.insert(
+                            constraint,
+                            &trace_columns,
+                            &pub_inputs,
+                        )?;
                     }
                 }
                 ast::SourceSection::TransitionConstraints(constraints) => {
