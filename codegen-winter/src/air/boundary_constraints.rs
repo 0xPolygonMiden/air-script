@@ -57,6 +57,7 @@ impl Codegen for BoundaryExpr {
     fn to_string(&self) -> String {
         match self {
             Self::Constant(value) => format!("Felt::new({})", value),
+            Self::PublicInput(name, index) => format!("{}[{}]", name, index),
             Self::Add(lhs, rhs) => {
                 format!("{} + {}", lhs.to_string(), rhs.to_string())
             }
