@@ -97,6 +97,9 @@ impl AlgebraicGraph {
                 // add exponent subexpression.
                 Ok(self.insert_op(Operation::Exp(lhs, rhs as usize)))
             }
+            _ => {
+                todo!()
+            }
         }
     }
 

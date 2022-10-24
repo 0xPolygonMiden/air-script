@@ -71,6 +71,10 @@ pub enum Token {
     #[token("'")]
     Next,
 
+    /// A reserved keyword for accessing random values provided by the verifier.
+    #[token("$rand")]
+    Rand,
+
     // GENERAL KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Keyword to signify that a constraint needs to be enforced

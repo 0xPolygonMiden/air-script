@@ -80,6 +80,25 @@ fn transition_constraint_with_periodic_col() {
     build_parse_test!(source).expect_ast(expected);
 }
 
+#[test]
+fn transition_constraint_with_random_value() {
+    let source = "
+    transition_constraints:
+        enf a + $rand[1] = 0";
+    let expected = Source(vec![SourceSection::TransitionConstraints(
+        TransitionConstraints {
+            transition_constraints: vec![TransitionConstraint::new(
+                TransitionExpr::Add(
+                    Box::new(TransitionExpr::Var(Identifier("a".to_string()))),
+                    Box::new(TransitionExpr::Rand(1)),
+                ),
+                TransitionExpr::Const(0),
+            )],
+        },
+    )]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
 // UNRECOGNIZED TOKEN ERRORS
 // ================================================================================================
 

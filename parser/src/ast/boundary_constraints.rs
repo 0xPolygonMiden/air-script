@@ -64,6 +64,9 @@ pub enum BoundaryExpr {
     /// Reference to a public input element, identified by the name of a public input array and the
     /// index of the cell.
     PubInput(Identifier, usize),
+    /// Represents a random value provided by the verifier. The inner value is the index of this
+    /// random value in the array of all random values.
+    Rand(usize),
     Add(Box<BoundaryExpr>, Box<BoundaryExpr>),
     Sub(Box<BoundaryExpr>, Box<BoundaryExpr>),
     Mul(Box<BoundaryExpr>, Box<BoundaryExpr>),

@@ -115,6 +115,7 @@ BoundaryFactor: BoundaryExpr = {
 BoundaryAtom: BoundaryExpr = {
     "(" <BoundaryExpr> ")",
     <lexpr: BoundaryAtom> "^" <num: Num_u64> => BoundaryExpr::Exp(Box::new(lexpr), num),
+    "$rand" "[" <n: Num_u64> "]" => BoundaryExpr::Rand(n as usize),
     <n: Num_u64> => BoundaryExpr::Const(n),
     <ident: Identifier> "[" <index: Num_u64> "]" => BoundaryExpr::PubInput(ident, index as usize)
 }
@@ -147,9 +148,10 @@ TransitionFactor: TransitionExpr = {
 TransitionAtom: TransitionExpr = {
     "(" <TransitionExpr> ")",
     <lexpr: TransitionAtom> "^" <num: Num_u64> => TransitionExpr::Exp(Box::new(lexpr), num),
+    "$rand" "[" <n: Num_u64> "]" => TransitionExpr::Rand(n as usize),
     <n: Num_u64> => TransitionExpr::Const(n),
     <s: Identifier> => TransitionExpr::Var(s),
-    <s: Identifier> "'" => TransitionExpr::Next(s),
+    <s: Identifier> "'" => TransitionExpr::Next(s)
 }
 
 // ATOMS
@@ -193,6 +195,7 @@ extern {
         "first" => Token::First,
         "last" => Token::Last,
         "transition_constraints" => Token::TransitionConstraints,
+        "$rand" => Token::Rand,
         "enf" => Token::Enf,
         "'" => Token::Next,
         "=" => Token::Equal,
