@@ -39,6 +39,10 @@ pub enum Token {
     #[token("aux")]
     Aux,
 
+    /// Keyword to declare the public inputs declaration section for the AIR.
+    #[token("public_inputs")]
+    PublicInputs,
+
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Marks the beginning of boundary constraints section in the constraints file.

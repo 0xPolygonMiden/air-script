@@ -9,6 +9,7 @@ use std::fs;
 mod utils;
 
 mod boundary_constraints;
+mod pub_inputs;
 mod sections;
 mod trace_columns;
 mod transition_constraints;

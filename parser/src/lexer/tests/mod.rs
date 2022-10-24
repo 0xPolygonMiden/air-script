@@ -1,12 +1,12 @@
-mod constraints;
-mod expressions;
-mod identifiers;
-mod keywords;
-
 use crate::{
     error::Error,
     lexer::{Lexer, Token},
 };
+
+mod boundary_constraints;
+mod expressions;
+mod identifiers;
+mod pub_inputs;
 
 // TEST HELPERS
 // ================================================================================================
