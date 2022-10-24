@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::{BoundaryExpr, Identifier, PublicInputs, SemanticError, TraceColumns};
+use super::{BoundaryExpr, Identifier, IdentifierType, SemanticError, SymbolTable};
 use parser::ast;
 
 // BOUNDARY CONSTRAINTS
@@ -12,30 +12,51 @@ use parser::ast;
 /// constraints sharing a boundary and column index.
 #[derive(Default, Debug)]
 pub(crate) struct BoundaryConstraints {
-    /// The boundary constraints to be applied at the first row of the trace, with the trace column
-    /// index as the key, and the expression as the value.
-    first: BTreeMap<usize, BoundaryExpr>,
-    /// The boundary constraints to be applied at the last row of the trace, with the trace column
-    /// index as the key, and the expression as the value.
-    last: BTreeMap<usize, BoundaryExpr>,
+    /// The boundary constraints to be applied at the first row of the main trace, with the trace
+    /// column index as the key, and the expression as the value.
+    main_first: BTreeMap<usize, BoundaryExpr>,
+    /// The boundary constraints to be applied at the last row of the main trace, with the trace
+    /// column index as the key, and the expression as the value.
+    main_last: BTreeMap<usize, BoundaryExpr>,
+    /// The boundary constraints to be applied at the first row of the aux trace, with the trace
+    /// column index as the key, and the expression as the value.
+    aux_first: BTreeMap<usize, BoundaryExpr>,
+    /// The boundary constraints to be applied at the last row of the aux trace, with the trace
+    /// column index as the key, and the expression as the value.
+    aux_last: BTreeMap<usize, BoundaryExpr>,
 }
 
 impl BoundaryConstraints {
     // --- ACCESSORS ------------------------------------------------------------------------------
 
-    /// Returns the total number of boundary constraints
-    pub fn len(&self) -> usize {
-        self.first.len() + self.last.len()
+    /// Returns the total number of boundary constraints for the main trace.
+    pub fn main_len(&self) -> usize {
+        self.main_first.len() + self.main_last.len()
     }
 
-    /// Returns all of the boundary constraints for the first row of the trace.
-    pub fn first(&self) -> Vec<&BoundaryExpr> {
-        self.first.values().collect()
+    /// Returns all of the boundary constraints for the first row of the main trace.
+    pub fn main_first(&self) -> Vec<&BoundaryExpr> {
+        self.main_first.values().collect()
     }
 
-    /// Returns all of the boundary constraints for the final row of the trace.
-    pub fn last(&self) -> Vec<&BoundaryExpr> {
-        self.last.values().collect()
+    /// Returns all of the boundary constraints for the final row of the main trace.
+    pub fn main_last(&self) -> Vec<&BoundaryExpr> {
+        self.main_last.values().collect()
+    }
+
+    /// Returns the total number of boundary constraints for the aux trace.
+    pub fn aux_len(&self) -> usize {
+        self.aux_first.len() + self.aux_last.len()
+    }
+
+    /// Returns all of the boundary constraints for the first row of the aux trace.
+    pub fn aux_first(&self) -> Vec<&BoundaryExpr> {
+        self.aux_first.values().collect()
+    }
+
+    /// Returns all of the boundary constraints for the final row of the aux trace.
+    pub fn aux_last(&self) -> Vec<&BoundaryExpr> {
+        self.aux_last.values().collect()
     }
 
     // --- MUTATORS -------------------------------------------------------------------------------
@@ -45,56 +66,51 @@ impl BoundaryConstraints {
     ///
     /// # Errors
     /// Returns an error if:
-    /// - The column specified for the boundary constraint has not been declared.
+    /// - The identifier specified for the boundary constraint column has not been declared or has
+    ///   been declared with the wrong type.
     /// - The constraint expression is contains invalid public input references.
     /// - A boundary constraint has already been declared for the specified column and boundary.
     pub(super) fn insert(
         &mut self,
+        symbol_table: &SymbolTable,
         constraint: &ast::BoundaryConstraint,
-        trace_columns: &TraceColumns,
-        pub_inputs: &PublicInputs,
     ) -> Result<(), SemanticError> {
-        let (trace_col_idx, expr) = validate_constraint(constraint, trace_columns, pub_inputs)?;
+        // validate the expression
+        let expr = constraint.value();
+        validate_expression(symbol_table, &expr)?;
 
-        // add the constraint to the specified boundary
-        match constraint.boundary() {
-            ast::Boundary::First => {
-                if self.first.insert(trace_col_idx, expr).is_some() {
-                    return Err(SemanticError::RedefinedBoundary(format!(
-                        "Boundary constraint redefined for {} at first step",
-                        constraint.column()
-                    )));
-                }
+        // add the constraint to the specified boundary for the specified trace
+        let col_type = symbol_table.get_type(constraint.column())?;
+        let result = match col_type {
+            IdentifierType::MainTraceColumn(col_idx) => match constraint.boundary() {
+                ast::Boundary::First => self.main_first.insert(col_idx, expr),
+                ast::Boundary::Last => self.main_last.insert(col_idx, expr),
+            },
+            IdentifierType::AuxTraceColumn(col_idx) => match constraint.boundary() {
+                ast::Boundary::First => self.aux_first.insert(col_idx, expr),
+                ast::Boundary::Last => self.aux_last.insert(col_idx, expr),
+            },
+            _ => {
+                return Err(SemanticError::InvalidUsage(format!(
+                    "Identifier {} was declared as a {}, not as a trace column",
+                    constraint.column(),
+                    col_type
+                )));
             }
-            ast::Boundary::Last => {
-                if self.last.insert(trace_col_idx, expr).is_some() {
-                    return Err(SemanticError::RedefinedBoundary(format!(
-                        "Boundary constraint redefined for {} at last step",
-                        constraint.column()
-                    )));
-                }
-            }
+        };
+
+        // raise an error if multiple constraints were applied to the same boundary
+        if result.is_some() {
+            return Err(SemanticError::TooManyConstraints(format!(
+                "A boundary constraint was already defined for {} '{}' at the {}",
+                col_type,
+                constraint.column(),
+                constraint.boundary()
+            )));
         }
 
         Ok(())
     }
-}
-
-/// Validates the specified constraint against the provided set of trace columns and public inputs.
-///
-/// # Errors
-/// Returns an error if the constraint is specified against a column that hasn't been declared or if
-/// the constraint's expression is invalid.
-fn validate_constraint(
-    constraint: &ast::BoundaryConstraint,
-    trace_columns: &TraceColumns,
-    pub_inputs: &PublicInputs,
-) -> Result<(usize, BoundaryExpr), SemanticError> {
-    let col_idx = trace_columns.get_column_index(constraint.column())?;
-    let value = constraint.value();
-    validate_expression(&value, pub_inputs)?;
-
-    Ok((col_idx, value))
 }
 
 /// Recursively validates the BoundaryExpression.
@@ -103,19 +119,17 @@ fn validate_constraint(
 /// Returns an error if the expression includes a reference to a public input that hasn't been
 /// declared or to an invalid index in an existing public input.
 fn validate_expression(
+    symbol_table: &SymbolTable,
     expr: &ast::BoundaryExpr,
-    pub_inputs: &PublicInputs,
 ) -> Result<(), SemanticError> {
     match expr {
         BoundaryExpr::PublicInput(Identifier(name), index) => {
-            pub_inputs.validate_input(name, *index)?;
+            symbol_table.validate_public_input(name, *index)
         }
         BoundaryExpr::Add(lhs, rhs) | BoundaryExpr::Subtract(lhs, rhs) => {
-            validate_expression(lhs, pub_inputs)?;
-            validate_expression(rhs, pub_inputs)?;
+            validate_expression(symbol_table, lhs)?;
+            validate_expression(symbol_table, rhs)
         }
-        _ => {}
-    };
-
-    Ok(())
+        _ => Ok(()),
+    }
 }
