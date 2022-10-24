@@ -3,6 +3,9 @@ use crate::{
     lexer::{Lexer, Token},
 };
 
+mod boundary_constraints;
+mod pub_inputs;
+
 // TEST HELPERS
 // ================================================================================================
 
@@ -54,20 +57,6 @@ fn multi_arithmetic_ops() {
         Token::Ident("clk".to_string()),
         Token::Minus,
         Token::Number("1".to_string()),
-        Token::Equal,
-        Token::Number("0".to_string()),
-    ];
-    expect_valid_tokenization(source, tokens);
-}
-
-#[test]
-fn boundary_constraints() {
-    let source = "enf clk.first = 0";
-    let tokens = vec![
-        Token::Enf,
-        Token::Ident("clk".to_string()),
-        Token::Dot,
-        Token::First,
         Token::Equal,
         Token::Number("0".to_string()),
     ];

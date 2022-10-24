@@ -1,5 +1,8 @@
 use std::fmt;
 
+pub mod pub_inputs;
+pub use pub_inputs::PublicInput;
+
 pub mod boundary_constraints;
 pub use boundary_constraints::*;
 
@@ -14,9 +17,11 @@ pub use transition_constraints::*;
 pub struct Source(pub Vec<SourceSection>);
 
 /// Source is divided into SourceSections.
-/// There are 4 types of Source Sections:
+/// There are 5 types of Source Sections:
 /// - AirDef: Name of the air constraints module.
 /// - TraceCols: Trace Columns representing columns of the execution trace.
+/// - PublicInputs: Public inputs are each represented by a fixed-size array. They are not required,
+///   and there is no limit to the number of public inputs that can be specified.
 /// - BoundaryConstraints: Boundary Constraints to be enforced on the boundaries of columns defined
 ///   in the TraceCols section. Currently there are two types of boundaries, First and Last
 ///   representing the first and last rows of the column.
@@ -26,6 +31,7 @@ pub struct Source(pub Vec<SourceSection>);
 pub enum SourceSection {
     AirDef(Identifier),
     TraceCols(TraceCols),
+    PublicInputs(Vec<PublicInput>),
     BoundaryConstraints(BoundaryConstraints),
     TransitionConstraints(TransitionConstraints),
 }
