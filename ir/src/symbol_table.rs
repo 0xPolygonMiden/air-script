@@ -38,7 +38,11 @@ pub(super) struct SymbolTable {
 }
 
 impl SymbolTable {
-    /// TODO
+    /// Adds a declared identifier to the symbol table using the identifier as the key and the
+    /// type the identifier represents as the value.
+    ///
+    /// # Errors
+    /// It returns an error if the identifier already existed in the table.
     fn insert_symbol(
         &mut self,
         ident_name: &str,
@@ -56,7 +60,7 @@ impl SymbolTable {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    /// TODO Add a new main trace column by its name and index in the main execution trace.
+    /// Add all main trace columns by their identifiers and indices in the main execution trace.
     pub(super) fn insert_main_trace_columns(
         &mut self,
         columns: &[Identifier],
@@ -68,7 +72,8 @@ impl SymbolTable {
         Ok(())
     }
 
-    /// TODO Add a new auxiliary trace column by its name and index in the auxiliary execution trace.
+    /// Adds all auxiliary trace columns by their identifier names and indices in the auxiliary
+    /// execution trace.
     pub(super) fn insert_aux_trace_columns(
         &mut self,
         columns: &[Identifier],
@@ -80,7 +85,7 @@ impl SymbolTable {
         Ok(())
     }
 
-    /// Adds a new public input by its name and size.
+    /// Adds all public inputs by their identifier names and array length.
     pub(super) fn insert_public_inputs(
         &mut self,
         public_inputs: &[PublicInput],
@@ -92,7 +97,10 @@ impl SymbolTable {
         Ok(())
     }
 
-    /// TODO
+    /// Adds all periodic columns by their identifier names and their indices in the array of all
+    /// periodic columns
+    ///
+    /// TODO: Add the cycle length to the symbol table as well to simplify degree calculation.
     pub(super) fn insert_periodic_columns(
         &mut self,
         columns: &[PeriodicColumn],
@@ -113,6 +121,10 @@ impl SymbolTable {
 
     // --- ACCESSORS ------------------------------------------------------------------------------
 
+    /// Returns the type associated with the specified identifier name.
+    ///
+    /// # Errors
+    /// Returns an error if the identifier was not in the symbol table.
     pub(super) fn get_type(&self, name: &str) -> Result<IdentifierType, SemanticError> {
         if let Some(ident_type) = self.identifiers.get(name) {
             Ok(*ident_type)
@@ -154,6 +166,7 @@ impl SymbolTable {
     }
 }
 
+/// Validates the cycle length of the specified periodic column.
 pub(super) fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
     let name = column.name();
     let cycle = column.values().len();

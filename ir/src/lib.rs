@@ -1,7 +1,6 @@
-use std::collections::BTreeMap;
-
 use parser::ast;
 pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
+use std::collections::BTreeMap;
 
 mod symbol_table;
 use symbol_table::{IdentifierType, SymbolTable};

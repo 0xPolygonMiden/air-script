@@ -49,7 +49,11 @@ impl AlgebraicGraph {
         }
     }
 
-    /// TODO
+    /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.
+    ///
+    /// TODO: there is a bug with the handling of the cycle degrees. This can be addressed during
+    /// the refactor of the symbol table to include the cycle_len of the periodic column as part of
+    /// the `PeriodicColumn` variant of the `IdentifierType`
     fn accumulate_degree(&self, index: &NodeIndex) -> (usize, Vec<usize>) {
         // recursively walk the subgraph and compute the degree from the operation and child nodes
         match self.node(index).op() {
