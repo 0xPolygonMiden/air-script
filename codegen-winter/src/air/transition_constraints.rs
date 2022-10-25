@@ -24,7 +24,7 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
     evaluate_transition.line("let next = frame.next();");
 
     // output the constraints.
-    let graph = ir.main_transition_graph();
+    let graph = ir.transition_graph();
     for (idx, constraint) in ir.main_transition_constraints().iter().enumerate() {
         evaluate_transition.line(format!(
             "result[{}] = {};",
@@ -54,14 +54,17 @@ impl Codegen for Operation {
     fn to_string(&self, graph: &AlgebraicGraph) -> String {
         match self {
             Operation::Const(value) => format!("E::from({})", value),
-            Operation::MainTraceCurrentRow(col_idx) => {
+            Operation::MainTraceCurrentRow(col_idx) | Operation::AuxTraceCurrentRow(col_idx) => {
                 format!("current[{}]", col_idx)
             }
-            Operation::MainTraceNextRow(col_idx) => {
+            Operation::MainTraceNextRow(col_idx) | Operation::AuxTraceNextRow(col_idx) => {
                 format!("next[{}]", col_idx)
             }
             Operation::PeriodicColumn(col_idx) => {
                 format!("periodic_values[{}]", col_idx)
+            }
+            Operation::RandomValue(idx) => {
+                format!("aux_rand_elements[{}]", idx)
             }
             Operation::Neg(idx) => {
                 let str = idx.to_string(graph);
