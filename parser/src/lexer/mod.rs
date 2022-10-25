@@ -81,6 +81,9 @@ pub enum Token {
     #[token("-")]
     Minus,
 
+    #[token("*")]
+    Multiply,
+
     // DELIMITERS
     // --------------------------------------------------------------------------------------------
     /// Used as a delimiter for section and sub section headings.

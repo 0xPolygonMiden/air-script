@@ -194,4 +194,17 @@ mod tests {
         let result = AirIR::from_source(&parsed);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn op_mul() {
+        let source = "
+        trace_columns:
+            main: [clk]
+        transition_constraints:
+            enf clk' * clk = 1";
+        let parsed = parse(source).expect("Parsing failed");
+
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_ok());
+    }
 }

@@ -50,44 +50,40 @@ impl Codegen for NodeIndex {
 }
 
 impl Codegen for Operation {
+    // TODO: Only add parentheses in Add and Mul if the expression is an arithmetic operation.
     fn to_string(&self, graph: &AlgebraicGraph) -> String {
-        let mut strings = vec![];
-
         match self {
-            Operation::Constant(value) => strings.push(format!("E::from({})", value)),
+            Operation::Constant(value) => format!("E::from({})", value),
             Operation::MainTraceCurrentRow(col_idx) => {
-                strings.push(format!("current[{}]", col_idx));
+                format!("current[{}]", col_idx)
             }
             Operation::MainTraceNextRow(col_idx) => {
-                strings.push(format!("next[{}]", col_idx));
+                format!("next[{}]", col_idx)
             }
             Operation::Neg(idx) => {
-                strings.push(String::from("-"));
                 let str = idx.to_string(graph);
-                strings.push(str);
+                format!("- ({})", str)
             }
             Operation::Add(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
-                strings.push(lhs);
 
                 // output Add followed by Neg as "-"
-                let r_idx = if let Operation::Neg(n_idx) = graph.node(r_idx).op() {
-                    strings.push(String::from("-"));
-                    n_idx
+                let rhs = if let Operation::Neg(n_idx) = graph.node(r_idx).op() {
+                    format!("- ({})", n_idx.to_string(graph))
                 } else {
-                    strings.push(String::from("+"));
-                    r_idx
+                    format!("+ {}", r_idx.to_string(graph))
                 };
-
+                format!("{} {}", lhs, rhs)
+            }
+            Operation::Mul(l_idx, r_idx) => {
+                let lhs = l_idx.to_string(graph);
                 let rhs = r_idx.to_string(graph);
-
-                strings.push(rhs);
+                format!("({}) * ({})", lhs, rhs)
             }
             _ => {
-                // TODO: Mul, Exp
+                unimplemented!()
+                // TODO: Exp
             }
         }
-
-        strings.join("")
     }
 }
