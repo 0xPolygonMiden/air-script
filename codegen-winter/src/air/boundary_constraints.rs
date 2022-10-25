@@ -62,6 +62,9 @@ impl Codegen for Expr {
             Self::Subtract(lhs, rhs) => {
                 format!("{} - {}", lhs.to_string(), rhs.to_string())
             }
+            Self::Multiply(lhs, rhs) => {
+                format!("{} * {}", lhs.to_string(), rhs.to_string())
+            }
             _ => {
                 unimplemented!("unreachable code")
             }
