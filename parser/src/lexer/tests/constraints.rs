@@ -13,7 +13,7 @@ fn boundary_constraints() {
         Token::Dot,
         Token::First,
         Token::Equal,
-        Token::Number("0".to_string()),
+        Token::Num("0".to_string()),
     ];
     expect_valid_tokenization(source, tokens);
 }

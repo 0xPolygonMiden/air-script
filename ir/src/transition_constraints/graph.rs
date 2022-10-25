@@ -35,7 +35,7 @@ impl AlgebraicGraph {
     pub fn degree(&self, index: &NodeIndex) -> u8 {
         // recursively walk the subgraph and compute the degree from the operation and child nodes
         match self.node(index).op() {
-            Operation::Constant(_)
+            Operation::Const(_)
             | Operation::MainTraceCurrentRow(_)
             | Operation::MainTraceNextRow(_) => 1_u8,
             Operation::Neg(index) => self.degree(index),
@@ -55,13 +55,13 @@ impl AlgebraicGraph {
         trace_columns: &TraceColumns,
     ) -> Result<NodeIndex, SemanticError> {
         match expr {
-            Expr::Constant(value) => Ok(self.insert_op(Operation::Constant(value))),
+            Expr::Const(value) => Ok(self.insert_op(Operation::Const(value))),
             Expr::Next(Identifier(ident)) => {
                 let index = trace_columns.get_column_index(&ident)?;
                 // insert the next row column node.
                 Ok(self.insert_op(Operation::MainTraceNextRow(index)))
             }
-            Expr::Variable(Identifier(ident)) => {
+            Expr::Var(Identifier(ident)) => {
                 // since variable definitions are not possible yet, the identifier must match one of
                 // the declared trace columns.
                 let index = trace_columns.get_column_index(&ident)?;
@@ -75,7 +75,7 @@ impl AlgebraicGraph {
                 // add the expression.
                 Ok(self.insert_op(Operation::Add(lhs, rhs)))
             }
-            Expr::Subtract(lhs, rhs) => {
+            Expr::Sub(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(*lhs, trace_columns)?;
                 let rhs = self.insert_expr(*rhs, trace_columns)?;
@@ -84,12 +84,18 @@ impl AlgebraicGraph {
                 // add the expression.
                 Ok(self.insert_op(Operation::Add(lhs, rhs)))
             }
-            Expr::Multiply(lhs, rhs) => {
+            Expr::Mul(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(*lhs, trace_columns)?;
                 let rhs = self.insert_expr(*rhs, trace_columns)?;
                 // add the expression.
                 Ok(self.insert_op(Operation::Mul(lhs, rhs)))
+            }
+            Expr::Exp(lhs, rhs) => {
+                // add base subexpression.
+                let lhs = self.insert_expr(*lhs, trace_columns)?;
+                // add exponent subexpression.
+                Ok(self.insert_op(Operation::Exp(lhs, rhs as usize)))
             }
         }
     }
@@ -131,7 +137,7 @@ impl Node {
 /// A transition constraint operation or value reference.
 #[derive(Debug, Eq, PartialEq)]
 pub enum Operation {
-    Constant(u64),
+    Const(u64),
     /// An identifier for a specific column in the current row in the main trace. The inner value is
     /// the index of the column within the trace.
     MainTraceCurrentRow(usize),
@@ -143,10 +149,8 @@ pub enum Operation {
     /// Addition operation applied to the nodes with the specified indices.
     Add(NodeIndex, NodeIndex),
     /// Multiplication operation applied to the nodes with the specified indices.
-    #[allow(dead_code)]
     Mul(NodeIndex, NodeIndex),
     /// Exponentiation operation applied to the node with the specified index, using the provided
     /// value as the power.
-    #[allow(dead_code)]
     Exp(NodeIndex, usize),
 }

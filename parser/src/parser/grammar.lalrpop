@@ -88,12 +88,17 @@ TransitionConstraint: TransitionConstraint = {
 
 Expr: Expr = {
     <lexpr: Expr> "+" <rexpr: FactorExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: Expr> "-" <rexpr: FactorExpr> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: Expr> "-" <rexpr: FactorExpr> => Expr::Sub(Box::new(lexpr), Box::new(rexpr)),
     FactorExpr
 }
 
 FactorExpr: Expr = {
-    <lexpr: FactorExpr> "*" <rexpr: NextExpr> => Expr::Multiply(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: FactorExpr> "*" <rexpr: ExpExpr> => Expr::Mul(Box::new(lexpr), Box::new(rexpr)),
+    ExpExpr
+}
+
+ExpExpr: Expr = {
+    <lexpr: ExpExpr> "^" <num: Num> => Expr::Exp(Box::new(lexpr), num),
     NextExpr
 }
 
@@ -103,8 +108,8 @@ NextExpr: Expr = {
 }
 
 AtomExpr: Expr = {
-    <n: Num> => Expr::Constant(n),
-    <s: Identifier> => Expr::Variable(s),
+    <n: Num> => Expr::Const(n),
+    <s: Identifier> => Expr::Var(s),
 }
 
 // ATOMS
@@ -137,7 +142,7 @@ extern {
 
     enum Token {
         identifier => Token::Ident(<String>),
-        r"[0-9]+" => Token::Number(<String>),
+        r"[0-9]+" => Token::Num(<String>),
         "def" => Token::Def,
         "trace_columns" => Token::TraceColumnns,
         "main" => Token::Main,
@@ -151,7 +156,8 @@ extern {
         "=" => Token::Equal,
         "+" => Token::Plus,
         "-" => Token::Minus,
-        "*" => Token::Multiply,
+        "*" => Token::Mul,
+        "^" => Token::Exp,
         ":" => Token::Colon,
         "," => Token::Comma,
         "[" => Token::Lsqb,
