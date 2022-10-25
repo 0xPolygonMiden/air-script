@@ -184,6 +184,20 @@ mod tests {
     }
 
     #[test]
+    fn transition_constraints_using_parens() {
+        let source = "
+        trace_columns:
+            main: [clk]
+        transition_constraints:
+            enf clk' = (clk + 1)";
+
+        let parsed = parse(source).expect("Parsing failed");
+
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_ok());
+    }
+
+    #[test]
     fn err_tc_column_undeclared() {
         let source = "
         transition_constraints:

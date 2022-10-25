@@ -105,6 +105,12 @@ pub enum Token {
     #[token(".")]
     Dot,
 
+    #[token("(")]
+    Lparen,
+
+    #[token(")")]
+    Rparen,
+
     // UNDEFINED TOKENS AND TOKENS TO IGNORE
     // --------------------------------------------------------------------------------------------
     /// Error is returned on encountering unrecognized tokens.

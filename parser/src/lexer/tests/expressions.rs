@@ -73,3 +73,43 @@ fn exp_op() {
     ];
     expect_valid_tokenization(source, tokens);
 }
+
+#[test]
+fn ops_with_parens() {
+    let source = "enf clk' - (clk + 1) = 0";
+    let tokens = vec![
+        Token::Enf,
+        Token::Ident("clk".to_string()),
+        Token::Next,
+        Token::Minus,
+        Token::Lparen,
+        Token::Ident("clk".to_string()),
+        Token::Plus,
+        Token::Num("1".to_string()),
+        Token::Rparen,
+        Token::Equal,
+        Token::Num("0".to_string()),
+    ];
+    expect_valid_tokenization(source, tokens);
+}
+
+#[test]
+fn ops_without_matching_closing_parens() {
+    // This doesn't throw an error while scanning but while parsing.
+    let source = "enf (clk' - (clk + 1) = 0";
+    let tokens = vec![
+        Token::Enf,
+        Token::Lparen,
+        Token::Ident("clk".to_string()),
+        Token::Next,
+        Token::Minus,
+        Token::Lparen,
+        Token::Ident("clk".to_string()),
+        Token::Plus,
+        Token::Num("1".to_string()),
+        Token::Rparen,
+        Token::Equal,
+        Token::Num("0".to_string()),
+    ];
+    expect_valid_tokenization(source, tokens);
+}

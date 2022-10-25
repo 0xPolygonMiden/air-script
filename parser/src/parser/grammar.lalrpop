@@ -99,6 +99,11 @@ FactorExpr: Expr = {
 
 ExpExpr: Expr = {
     <lexpr: ExpExpr> "^" <num: Num> => Expr::Exp(Box::new(lexpr), num),
+    ParenExpr
+}
+
+ParenExpr: Expr = {
+    "(" <Expr> ")",
     NextExpr
 }
 
@@ -162,6 +167,8 @@ extern {
         "," => Token::Comma,
         "[" => Token::Lsqb,
         "]" => Token::Rsqb,
+        "(" => Token::Lparen,
+        ")" => Token::Rparen,
         "." => Token::Dot,
     }
 }
