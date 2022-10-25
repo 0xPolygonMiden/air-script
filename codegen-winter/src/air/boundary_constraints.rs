@@ -55,15 +55,18 @@ trait Codegen {
 impl Codegen for Expr {
     fn to_string(&self) -> String {
         match self {
-            Self::Constant(value) => format!("Felt::new({})", value),
+            Self::Const(value) => format!("Felt::new({})", value),
             Self::Add(lhs, rhs) => {
                 format!("{} + {}", lhs.to_string(), rhs.to_string())
             }
-            Self::Subtract(lhs, rhs) => {
+            Self::Sub(lhs, rhs) => {
                 format!("{} - {}", lhs.to_string(), rhs.to_string())
             }
-            Self::Multiply(lhs, rhs) => {
+            Self::Mul(lhs, rhs) => {
                 format!("{} * {}", lhs.to_string(), rhs.to_string())
+            }
+            Self::Exp(lhs, rhs) => {
+                format!("({}).exp({})", lhs.to_string(), rhs)
             }
             _ => {
                 unimplemented!("unreachable code")

@@ -53,7 +53,7 @@ impl Codegen for Operation {
     // TODO: Only add parentheses in Add and Mul if the expression is an arithmetic operation.
     fn to_string(&self, graph: &AlgebraicGraph) -> String {
         match self {
-            Operation::Constant(value) => format!("E::from({})", value),
+            Operation::Const(value) => format!("E::from({})", value),
             Operation::MainTraceCurrentRow(col_idx) => {
                 format!("current[{}]", col_idx)
             }
@@ -80,9 +80,9 @@ impl Codegen for Operation {
                 let rhs = r_idx.to_string(graph);
                 format!("({}) * ({})", lhs, rhs)
             }
-            _ => {
-                unimplemented!()
-                // TODO: Exp
+            Operation::Exp(l_idx, r_idx) => {
+                let lhs = l_idx.to_string(graph);
+                format!("({}).exp({})", lhs, r_idx)
             }
         }
     }
