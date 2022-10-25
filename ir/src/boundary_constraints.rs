@@ -53,7 +53,7 @@ impl BoundaryConstraints {
         let col_idx = trace_columns.get_column_index(constraint.column())?;
         let value = constraint.value();
 
-        if let Expr::Next(Identifier(ident)) | Expr::Variable(Identifier(ident)) = value {
+        if let Expr::Next(Identifier(ident)) | Expr::Var(Identifier(ident)) = value {
             // since variable definitions are not possible yet, all parsed identifiers can be
             // assumed to reference trace columns
             return Err(SemanticError::InvalidIdentifier(format!(
