@@ -69,6 +69,9 @@ impl Codegen for BoundaryExpr {
             Self::Exp(lhs, rhs) => {
                 format!("({}).exp({})", lhs.to_string(), rhs)
             }
+            _ => {
+                todo!()
+            }
         }
     }
 }

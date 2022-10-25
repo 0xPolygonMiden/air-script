@@ -39,6 +39,14 @@ pub enum Token {
     #[token("aux")]
     Aux,
 
+    /// Keyword to declare the public inputs declaration section for the AIR.
+    #[token("public_inputs")]
+    PublicInputs,
+
+    /// Keyword to declare the periodic columns declaration section for the AIR.
+    #[token("periodic_columns")]
+    PeriodicColumns,
+
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Marks the beginning of boundary constraints section in the constraints file.
@@ -62,6 +70,10 @@ pub enum Token {
     /// A modifier for identifiers used to indicate the next row.
     #[token("'")]
     Next,
+
+    /// A reserved keyword for accessing random values provided by the verifier.
+    #[token("$rand")]
+    Rand,
 
     // GENERAL KEYWORDS
     // --------------------------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 use crate::{
     ast::{
-        Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryExpr, Identifier, Source, SourceSection,TransitionConstraint, TransitionConstraints, TransitionExpr, TraceCols,
+        boundary_constraints::{Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryExpr}, 
+        transition_constraints::{TransitionConstraint, TransitionConstraints, TransitionExpr},
+        Identifier, Source, SourceSection, TraceCols, PublicInput, PeriodicColumn
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols}}, lexer::Token
 };
 use std::str::FromStr;
@@ -18,6 +20,8 @@ pub Source: Source = {
 SourceSection: SourceSection = {
     AirDef => SourceSection::AirDef(<>),
     TraceCols => SourceSection::TraceCols(<>),
+    PublicInputs => SourceSection::PublicInputs(<>),
+    PeriodicColumns => SourceSection::PeriodicColumns(<>),
     BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
     TransitionConstraints => SourceSection::TransitionConstraints(<>),
 }
@@ -50,6 +54,31 @@ MainCols: Vec<Identifier> = {
 
 AuxCols: Vec<Identifier> = {
     "aux" ":" "[" <aux_cols: CommaElems<Identifier>> "]" => aux_cols,
+}
+
+
+// PUBLIC INPUTS
+// ================================================================================================
+
+// At least one public input is required.
+PublicInputs: Vec<PublicInput> = {
+    "public_inputs" ":" <pub_inputs: PublicInput+> => pub_inputs
+}
+
+PublicInput: PublicInput = {
+    <name: Identifier> ":" "[" <size: Num_u64> "]" => PublicInput::new(name, size),
+}
+
+// PERIODIC COLUMNS
+// ================================================================================================
+
+// Periodic columns are not required, and there is no limit to the number that can be provided.
+PeriodicColumns: Vec<PeriodicColumn> = {
+    "periodic_columns" ":" <periodic_columns: PeriodicColumn*> => periodic_columns
+}
+
+PeriodicColumn: PeriodicColumn = {
+    <name: Identifier> ":" "[" <values: CommaElems<Num_u64>> "]" => PeriodicColumn::new(name, values),
 }
 
 // BOUNDARY CONSTRAINTS
@@ -85,8 +114,10 @@ BoundaryFactor: BoundaryExpr = {
 
 BoundaryAtom: BoundaryExpr = {
     "(" <BoundaryExpr> ")",
-    <lexpr: BoundaryAtom> "^" <num: Num> => BoundaryExpr::Exp(Box::new(lexpr), num),
-    <n: Num> => BoundaryExpr::Const(n),
+    <lexpr: BoundaryAtom> "^" <num: Num_u64> => BoundaryExpr::Exp(Box::new(lexpr), num),
+    "$rand" "[" <n: Num_u64> "]" => BoundaryExpr::Rand(n as usize),
+    <n: Num_u64> => BoundaryExpr::Const(n),
+    <ident: Identifier> "[" <index: Num_u64> "]" => BoundaryExpr::PubInput(ident, index as usize)
 }
 
 // TRANSITION CONSTRAINTS
@@ -116,10 +147,11 @@ TransitionFactor: TransitionExpr = {
 
 TransitionAtom: TransitionExpr = {
     "(" <TransitionExpr> ")",
-    <lexpr: TransitionAtom> "^" <num: Num> => TransitionExpr::Exp(Box::new(lexpr), num),
-    <n: Num> => TransitionExpr::Const(n),
+    <lexpr: TransitionAtom> "^" <num: Num_u64> => TransitionExpr::Exp(Box::new(lexpr), num),
+    "$rand" "[" <n: Num_u64> "]" => TransitionExpr::Rand(n as usize),
+    <n: Num_u64> => TransitionExpr::Const(n),
     <s: Identifier> => TransitionExpr::Var(s),
-    <s: Identifier> "'" => TransitionExpr::Next(s),
+    <s: Identifier> "'" => TransitionExpr::Next(s)
 }
 
 // ATOMS
@@ -136,7 +168,7 @@ Identifier: Identifier = {
     <n:identifier> => Identifier(n.to_string())
 }
 
-Num: u64 = {
+Num_u64: u64 = {
     r"[0-9]+" =>? u64::from_str(&<>)
         .map_err(|_| ParseError::User {
             error: Error::ParseError(InvalidInt(format!("Int too big : {}", <>).to_string()))
@@ -157,10 +189,13 @@ extern {
         "trace_columns" => Token::TraceColumnns,
         "main" => Token::Main,
         "aux" => Token::Aux,
+        "public_inputs" => Token::PublicInputs,
+        "periodic_columns" => Token::PeriodicColumns,
         "boundary_constraints" => Token::BoundaryConstraints,
         "first" => Token::First,
         "last" => Token::Last,
         "transition_constraints" => Token::TransitionConstraints,
+        "$rand" => Token::Rand,
         "enf" => Token::Enf,
         "'" => Token::Next,
         "=" => Token::Equal,

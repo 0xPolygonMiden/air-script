@@ -34,6 +34,9 @@ pub enum TransitionExpr {
     Const(u64),
     Var(Identifier),
     Next(Identifier),
+    /// Represents a random value provided by the verifier. The inner value is the index of this
+    /// random value in the array of all random values.
+    Rand(usize),
     Add(Box<TransitionExpr>, Box<TransitionExpr>),
     Sub(Box<TransitionExpr>, Box<TransitionExpr>),
     Mul(Box<TransitionExpr>, Box<TransitionExpr>),

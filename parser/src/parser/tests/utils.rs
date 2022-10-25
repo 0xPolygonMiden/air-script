@@ -43,6 +43,14 @@ impl ParseTest {
         }
     }
 
+    pub fn parse(&self) -> Result<Source, lalrpop_util::ParseError<usize, Token, Error>> {
+        let lex = Lexer::new(self.source.as_str())
+            .spanned()
+            .map(Token::to_spanned);
+
+        SourceParser::new().parse(lex)
+    }
+
     // TEST METHODS
     // --------------------------------------------------------------------------------------------
 
