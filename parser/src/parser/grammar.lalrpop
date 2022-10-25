@@ -87,8 +87,13 @@ TransitionConstraint: TransitionConstraint = {
 // ================================================================================================
 
 Expr: Expr = {
-    <lexpr: Expr> "+" <rexpr: NextExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: Expr> "-" <rexpr: NextExpr> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: Expr> "+" <rexpr: FactorExpr> => Expr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: Expr> "-" <rexpr: FactorExpr> => Expr::Subtract(Box::new(lexpr), Box::new(rexpr)),
+    FactorExpr
+}
+
+FactorExpr: Expr = {
+    <lexpr: FactorExpr> "*" <rexpr: NextExpr> => Expr::Multiply(Box::new(lexpr), Box::new(rexpr)),
     NextExpr
 }
 
@@ -146,6 +151,7 @@ extern {
         "=" => Token::Equal,
         "+" => Token::Plus,
         "-" => Token::Minus,
+        "*" => Token::Multiply,
         ":" => Token::Colon,
         "," => Token::Comma,
         "[" => Token::Lsqb,

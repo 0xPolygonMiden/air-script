@@ -48,6 +48,7 @@ pub enum Expr {
     Next(Identifier),
     Add(Box<Expr>, Box<Expr>),
     Subtract(Box<Expr>, Box<Expr>),
+    Multiply(Box<Expr>, Box<Expr>),
 }
 
 /// [Identifier] is used to represent variable names.
