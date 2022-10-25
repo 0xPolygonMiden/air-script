@@ -1,4 +1,4 @@
-use super::{Expr, Identifier};
+use super::Identifier;
 
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
@@ -14,11 +14,11 @@ pub struct BoundaryConstraints {
 pub struct BoundaryConstraint {
     column: Identifier,
     boundary: Boundary,
-    value: Expr,
+    value: BoundaryExpr,
 }
 
 impl BoundaryConstraint {
-    pub fn new(column: Identifier, boundary: Boundary, value: Expr) -> Self {
+    pub fn new(column: Identifier, boundary: Boundary, value: BoundaryExpr) -> Self {
         Self {
             column,
             boundary,
@@ -35,7 +35,7 @@ impl BoundaryConstraint {
     }
 
     /// Returns a clone of the constraint's value expression.
-    pub fn value(&self) -> Expr {
+    pub fn value(&self) -> BoundaryExpr {
         self.value.clone()
     }
 }
@@ -45,4 +45,14 @@ impl BoundaryConstraint {
 pub enum Boundary {
     First,
     Last,
+}
+
+/// Arithmetic expressions for evaluation of boundary constraints.
+#[derive(Debug, PartialEq, Clone)]
+pub enum BoundaryExpr {
+    Const(u64),
+    Add(Box<BoundaryExpr>, Box<BoundaryExpr>),
+    Sub(Box<BoundaryExpr>, Box<BoundaryExpr>),
+    Mul(Box<BoundaryExpr>, Box<BoundaryExpr>),
+    Exp(Box<BoundaryExpr>, u64),
 }
