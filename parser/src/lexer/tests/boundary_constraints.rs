@@ -1,5 +1,8 @@
 use super::{expect_valid_tokenization, Token};
 
+// BOUNDARY CONSTRAINTS VALID TOKENIZATION
+// ================================================================================================
+
 #[test]
 fn first_boundary_constant() {
     let source = "enf clk.first = 0";

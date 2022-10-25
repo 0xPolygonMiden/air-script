@@ -1,7 +1,7 @@
 use super::expect_valid_tokenization;
 use crate::lexer::Token;
 
-// VALID TOKENIZATION
+// EXPRESSIONS VALID TOKENIZATION
 // ================================================================================================
 
 #[test]
