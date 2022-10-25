@@ -50,6 +50,7 @@ impl Codegen for NodeIndex {
 }
 
 impl Codegen for Operation {
+    // TODO: Only add parentheses in Add and Mul if the expression is an arithmetic operation.
     fn to_string(&self, graph: &AlgebraicGraph) -> String {
         match self {
             Operation::Constant(value) => format!("E::from({})", value),
@@ -61,23 +62,23 @@ impl Codegen for Operation {
             }
             Operation::Neg(idx) => {
                 let str = idx.to_string(graph);
-                format!("-{}", str)
+                format!("- ({})", str)
             }
             Operation::Add(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
 
                 // output Add followed by Neg as "-"
                 let rhs = if let Operation::Neg(n_idx) = graph.node(r_idx).op() {
-                    format!("-{}", n_idx.to_string(graph))
+                    format!("- ({})", n_idx.to_string(graph))
                 } else {
-                    format!("+{}", r_idx.to_string(graph))
+                    format!("+ {}", r_idx.to_string(graph))
                 };
-                format!("{}{}", lhs, rhs)
+                format!("{} {}", lhs, rhs)
             }
             Operation::Mul(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
                 let rhs = r_idx.to_string(graph);
-                format!("{}*{}", lhs, rhs)
+                format!("({}) * ({})", lhs, rhs)
             }
             _ => {
                 unimplemented!()
