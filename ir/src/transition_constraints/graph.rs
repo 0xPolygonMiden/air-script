@@ -84,6 +84,13 @@ impl AlgebraicGraph {
                 // add the expression.
                 Ok(self.insert_op(Operation::Add(lhs, rhs)))
             }
+            Expr::Multiply(lhs, rhs) => {
+                // add both subexpressions.
+                let lhs = self.insert_expr(*lhs, trace_columns)?;
+                let rhs = self.insert_expr(*rhs, trace_columns)?;
+                // add the expression.
+                Ok(self.insert_op(Operation::Mul(lhs, rhs)))
+            }
         }
     }
 
