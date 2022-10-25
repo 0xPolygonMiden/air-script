@@ -16,8 +16,8 @@ fn transition_constraints() {
             transition_constraints: vec![TransitionConstraint::new(
                 Expr::Next(Identifier("clk".to_string())),
                 Expr::Add(
-                    Box::new(Expr::Variable(Identifier("clk".to_string()))),
-                    Box::new(Expr::Constant(1)),
+                    Box::new(Expr::Var(Identifier("clk".to_string()))),
+                    Box::new(Expr::Const(1)),
                 ),
             )],
         },
@@ -44,16 +44,16 @@ fn multiple_transition_constraints() {
                 TransitionConstraint::new(
                     Expr::Next(Identifier("clk".to_string())),
                     Expr::Add(
-                        Box::new(Expr::Variable(Identifier("clk".to_string()))),
-                        Box::new(Expr::Constant(1)),
+                        Box::new(Expr::Var(Identifier("clk".to_string()))),
+                        Box::new(Expr::Const(1)),
                     ),
                 ),
                 TransitionConstraint::new(
-                    Expr::Subtract(
+                    Expr::Sub(
                         Box::new(Expr::Next(Identifier("clk".to_string()))),
-                        Box::new(Expr::Variable(Identifier("clk".to_string()))),
+                        Box::new(Expr::Var(Identifier("clk".to_string()))),
                     ),
-                    Expr::Constant(1),
+                    Expr::Const(1),
                 ),
             ],
         },

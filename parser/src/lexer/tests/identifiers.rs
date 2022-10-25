@@ -14,7 +14,7 @@ fn keywords_with_identifiers() {
         Token::Equal,
         Token::Ident("clk".to_string()),
         Token::Plus,
-        Token::Number("1".to_string()),
+        Token::Num("1".to_string()),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -30,7 +30,7 @@ fn keyword_and_identifier_without_space() {
         // clkdef is considered as an identifier by logos
         Token::Ident("clkdef".to_string()),
         Token::Plus,
-        Token::Number("1".to_string()),
+        Token::Num("1".to_string()),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -40,13 +40,13 @@ fn number_and_identier_without_space() {
     let source = "enf 1clk' = clk + 1";
     let tokens = vec![
         Token::Enf,
-        Token::Number("1".to_string()),
+        Token::Num("1".to_string()),
         Token::Ident("clk".to_string()),
         Token::Next,
         Token::Equal,
         Token::Ident("clk".to_string()),
         Token::Plus,
-        Token::Number("1".to_string()),
+        Token::Num("1".to_string()),
     ];
     expect_valid_tokenization(source, tokens);
 }

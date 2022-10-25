@@ -19,7 +19,7 @@ pub enum Token {
 
     /// Integers should only contain numeric characters.
     #[regex(r"[0-9]+", |tok| tok.slice().to_string())]
-    Number(String),
+    Num(String),
 
     // DECLARATION KEYWORDS
     // --------------------------------------------------------------------------------------------
@@ -82,7 +82,10 @@ pub enum Token {
     Minus,
 
     #[token("*")]
-    Multiply,
+    Mul,
+
+    #[token("^")]
+    Exp,
 
     // DELIMITERS
     // --------------------------------------------------------------------------------------------

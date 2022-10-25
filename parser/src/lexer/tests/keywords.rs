@@ -16,7 +16,7 @@ fn valid_tokenization_next_token() {
         Token::Equal,
         Token::Ident("clk".to_string()),
         Token::Plus,
-        Token::Number("1".to_string()),
+        Token::Num("1".to_string()),
     ];
     expect_valid_tokenization(source, tokens);
 }

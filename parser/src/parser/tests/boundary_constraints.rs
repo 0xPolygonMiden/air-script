@@ -16,7 +16,7 @@ fn boundary_constraints() {
             boundary_constraints: vec![BoundaryConstraint::new(
                 Identifier("clk".to_string()),
                 Boundary::First,
-                Expr::Constant(0),
+                Expr::Const(0),
             )],
         },
     )]);
@@ -35,12 +35,12 @@ fn multiple_boundary_constraints() {
                 BoundaryConstraint::new(
                     Identifier("clk".to_string()),
                     Boundary::First,
-                    Expr::Constant(0),
+                    Expr::Const(0),
                 ),
                 BoundaryConstraint::new(
                     Identifier("clk".to_string()),
                     Boundary::Last,
-                    Expr::Constant(1),
+                    Expr::Const(1),
                 ),
             ],
         },

@@ -24,6 +24,6 @@ impl TransitionConstraint {
     /// Clones the left and right internal expressions and creates a single new expression that
     /// represents the transition constraint when it is equal to zero.
     pub fn expr(&self) -> Expr {
-        Expr::Subtract(Box::new(self.lhs.clone()), Box::new(self.rhs.clone()))
+        Expr::Sub(Box::new(self.lhs.clone()), Box::new(self.rhs.clone()))
     }
 }
