@@ -21,6 +21,7 @@ use error::SemanticError;
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
+    public_inputs: Vec<(String, usize)>,
     periodic_columns: Vec<Vec<u64>>,
     boundary_constraints: BoundaryConstraints,
     transition_constraints: TransitionConstraints,
@@ -81,9 +82,12 @@ impl AirIR {
             }
         }
 
+        let (public_inputs, periodic_columns) = symbol_table.into_declarations();
+
         Ok(Self {
             air_name: air_name.to_string(),
-            periodic_columns: symbol_table.into_periodic_columns(),
+            public_inputs,
+            periodic_columns,
             boundary_constraints,
             transition_constraints,
         })
@@ -100,6 +104,10 @@ impl AirIR {
             .iter()
             .map(|values| values.len())
             .collect()
+    }
+
+    pub fn public_inputs(&self) -> &Vec<(String, usize)> {
+        &self.public_inputs
     }
 
     // --- PUBLIC ACCESSORS FOR BOUNDARY CONSTRAINTS ----------------------------------------------

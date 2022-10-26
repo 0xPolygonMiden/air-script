@@ -13,6 +13,6 @@ pub(super) fn add_imports(scope: &mut Scope) {
     scope.import("winter_air::Assertion", "Assertion");
     scope.import("winter_air::AirContext", "AirContext");
     scope.import("winter_air::Air", "Air");
-
+    scope.import("winter_air", "AuxTraceRandElements");
     scope.import("winter_utils::collections::Vec", "Vec");
 }

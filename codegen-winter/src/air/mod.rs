@@ -2,10 +2,13 @@ use super::{AirIR, Impl, Scope};
 use ir::TransitionConstraintDegree;
 
 mod boundary_constraints;
-use boundary_constraints::add_fn_get_assertions;
+use boundary_constraints::{add_fn_get_assertions, add_fn_get_aux_assertions};
 
 mod transition_constraints;
-use transition_constraints::add_fn_evaluate_transition;
+use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_transition};
+
+mod public_inputs;
+use public_inputs::add_public_inputs_struct;
 
 // HELPERS TO GENERATE AN IMPLEMENTATION OF THE WINTERFELL AIR TRAIT
 // ================================================================================================
@@ -13,22 +16,30 @@ use transition_constraints::add_fn_evaluate_transition;
 /// Updates the provided scope with a new Air struct and Winterfell Air trait implementation
 /// which are equivalent the provided AirIR.
 pub(super) fn add_air(scope: &mut Scope, ir: &AirIR) {
+    // add the Public Inputs struct and its base implementation.
+    add_public_inputs_struct(scope, ir);
+
     let name = ir.air_name();
 
     // add the Air struct and its base implementation.
-    add_air_struct(scope, name);
+    add_air_struct(scope, ir, name);
 
     // add Winterfell Air trait implementation for the provided AirIR.
     add_air_trait(scope, ir, name);
 }
 
 /// Updates the provided scope with a custom Air struct.
-fn add_air_struct(scope: &mut Scope, name: &str) {
+fn add_air_struct(scope: &mut Scope, ir: &AirIR, name: &str) {
     // define the custom Air struct.
-    scope
+    let air_struct = scope
         .new_struct(name)
         .vis("pub")
         .field("context", "AirContext<Felt>");
+
+    // add public inputs
+    for (pub_input, pub_input_size) in ir.public_inputs() {
+        air_struct.field(pub_input, format!("[Felt; {}]", pub_input_size));
+    }
 
     // add the custom Air implementation block
     let base_impl = scope.new_impl(name);
@@ -59,7 +70,9 @@ fn add_air_trait(scope: &mut Scope, ir: &AirIR, name: &str) {
     // add the method implementations required by the AIR trait.
     add_fn_new(air_impl, ir);
     add_fn_get_assertions(air_impl, ir);
+    add_fn_get_aux_assertions(air_impl, ir);
     add_fn_evaluate_transition(air_impl, ir);
+    add_fn_evaluate_aux_transition(air_impl, ir);
 }
 
 /// Adds an implementation of the "new" method to the referenced Air implementation based on the
@@ -69,13 +82,14 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
     let new = impl_ref
         .new_fn("new")
         .arg("trace_info", "TraceInfo")
+        .arg("public_inputs", "PublicInputs")
         .arg("options", "WinterProofOptions")
         .ret("Self");
 
     // define the transition constraint degrees of the main trace `main_degrees`.
     let mut main_degrees: Vec<String> = Vec::new();
     for degree in ir.main_degrees().iter() {
-        main_degrees.push(degree.to_string());
+        main_degrees.push(degree.to_string(false));
     }
     new.line(format!(
         "let main_degrees = vec![{}];",
@@ -108,8 +122,13 @@ let context = AirContext::new_multi_segment(
 
     new.line(context);
 
+    // get public inputs
+    let mut pub_inputs = Vec::new();
+    for (pub_input, _) in ir.public_inputs() {
+        pub_inputs.push(format!("{}: public_inputs.{}", pub_input, pub_input));
+    }
     // return initialized Self.
-    new.line("Self { context }");
+    new.line(format!("Self {{ context, {} }}", pub_inputs.join(", ")));
 }
 
 // RUST STRING GENERATION
@@ -117,11 +136,11 @@ let context = AirContext::new_multi_segment(
 
 /// Code generation trait for generating Rust code strings from boundary constraint expressions.
 pub trait Codegen {
-    fn to_string(&self) -> String;
+    fn to_string(&self, is_aux_constraint: bool) -> String;
 }
 
 impl Codegen for TransitionConstraintDegree {
-    fn to_string(&self) -> String {
+    fn to_string(&self, _is_aux_constraint: bool) -> String {
         if self.cycles().is_empty() {
             format!("TransitionConstraintDegree::new({})", self.base())
         } else {
