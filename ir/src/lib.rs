@@ -108,11 +108,11 @@ impl AirIR {
         self.boundary_constraints.main_len()
     }
 
-    pub fn main_first_boundary_constraints(&self) -> Vec<&BoundaryExpr> {
+    pub fn main_first_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
         self.boundary_constraints.main_first()
     }
 
-    pub fn main_last_boundary_constraints(&self) -> Vec<&BoundaryExpr> {
+    pub fn main_last_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
         self.boundary_constraints.main_last()
     }
 
@@ -120,11 +120,11 @@ impl AirIR {
         self.boundary_constraints.aux_len()
     }
 
-    pub fn aux_first_boundary_constraints(&self) -> Vec<&BoundaryExpr> {
+    pub fn aux_first_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
         self.boundary_constraints.aux_first()
     }
 
-    pub fn aux_last_boundary_constraints(&self) -> Vec<&BoundaryExpr> {
+    pub fn aux_last_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
         self.boundary_constraints.aux_last()
     }
 

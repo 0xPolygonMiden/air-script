@@ -33,13 +33,13 @@ impl BoundaryConstraints {
     }
 
     /// Returns all of the boundary constraints for the first row of the main trace.
-    pub fn main_first(&self) -> Vec<&BoundaryExpr> {
-        self.main_first.values().collect()
+    pub fn main_first(&self) -> Vec<(usize, &BoundaryExpr)> {
+        self.main_first.iter().map(|(k, v)| (*k, v)).collect()
     }
 
     /// Returns all of the boundary constraints for the final row of the main trace.
-    pub fn main_last(&self) -> Vec<&BoundaryExpr> {
-        self.main_last.values().collect()
+    pub fn main_last(&self) -> Vec<(usize, &BoundaryExpr)> {
+        self.main_last.iter().map(|(k, v)| (*k, v)).collect()
     }
 
     /// Returns the total number of boundary constraints for the aux trace.
@@ -48,13 +48,13 @@ impl BoundaryConstraints {
     }
 
     /// Returns all of the boundary constraints for the first row of the aux trace.
-    pub fn aux_first(&self) -> Vec<&BoundaryExpr> {
-        self.aux_first.values().collect()
+    pub fn aux_first(&self) -> Vec<(usize, &BoundaryExpr)> {
+        self.aux_first.iter().map(|(k, v)| (*k, v)).collect()
     }
 
     /// Returns all of the boundary constraints for the final row of the aux trace.
-    pub fn aux_last(&self) -> Vec<&BoundaryExpr> {
-        self.aux_last.values().collect()
+    pub fn aux_last(&self) -> Vec<(usize, &BoundaryExpr)> {
+        self.aux_last.iter().map(|(k, v)| (*k, v)).collect()
     }
 
     // --- MUTATORS -------------------------------------------------------------------------------

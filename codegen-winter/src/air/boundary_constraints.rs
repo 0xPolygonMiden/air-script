@@ -17,7 +17,7 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
     get_assertions.line("let mut result = Vec::new();");
 
     // add the constraints for the first boundary
-    for (col_idx, constraint) in ir.main_first_boundary_constraints().iter().enumerate() {
+    for (col_idx, constraint) in ir.main_first_boundary_constraints() {
         let assertion = format!(
             "result.push(Assertion::single({}, 0, {}));",
             col_idx,
@@ -30,7 +30,7 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
     let last_constraints = ir.main_last_boundary_constraints();
     if !last_constraints.is_empty() {
         get_assertions.line("let last_step = self.last_step();");
-        for (col_idx, constraint) in last_constraints.iter().enumerate() {
+        for (col_idx, constraint) in last_constraints {
             let assertion = format!(
                 "result.push(Assertion::single({}, last_step, {}));",
                 col_idx,
