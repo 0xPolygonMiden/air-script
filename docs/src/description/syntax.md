@@ -19,9 +19,9 @@ AirScript defines the following keywords:
   - `aux`: used to declare the auxiliary execution trace
 - `transition_constraints`: used to declare the [source section](./structure.md) where the [transition constraints are described](./constraints.md#transition_constraints).
 
-## Built-ins
+## Built-in variables
 
-Built-in values are identified by the starting character `$`.
+Built-in variables are identified by the starting character `$`.
 
 ### $rand
 
