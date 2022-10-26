@@ -1,7 +1,9 @@
 #[derive(Debug)]
 pub enum SemanticError {
     InvalidIdentifier(String),
-    RedefinedBoundary(String),
-    DuplicateTraceColumn(String),
-    UndefinedIdentifier(String),
+    DuplicateIdentifier(String),
+    InvalidUsage(String),
+    IndexOutOfRange(String),
+    TooManyConstraints(String),
+    InvalidPeriodicColumn(String),
 }
