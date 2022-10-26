@@ -1,4 +1,4 @@
-use parser::ast::{self};
+use parser::ast;
 pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
 use std::collections::BTreeMap;
 

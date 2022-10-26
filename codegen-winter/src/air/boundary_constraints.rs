@@ -21,20 +21,21 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
         let assertion = format!(
             "result.push(Assertion::single({}, 0, {}));",
             col_idx,
-            constraint.to_string()
+            constraint.to_string(false)
         );
         get_assertions.line(assertion);
     }
 
     // add the constraints for the last boundary.
     let last_constraints = ir.main_last_boundary_constraints();
+
     if !last_constraints.is_empty() {
         get_assertions.line("let last_step = self.last_step();");
         for (col_idx, constraint) in last_constraints {
             let assertion = format!(
                 "result.push(Assertion::single({}, last_step, {}));",
                 col_idx,
-                constraint.to_string()
+                constraint.to_string(false)
             );
             get_assertions.line(assertion);
         }
@@ -44,30 +45,91 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
     get_assertions.line("result");
 }
 
+/// Adds an implementation of the "get_aux_assertions" method to the referenced Air implementation
+/// based on the data in the provided AirIR.
+pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
+    // define the function
+    let get_aux_assertions = impl_ref
+        .generic("E: FieldElement<BaseField = Self::BaseField>")
+        .new_fn("get_aux_assertions")
+        .arg_ref_self()
+        .arg("aux_rand_elements", "&AuxTraceRandElements<E>")
+        .ret("Vec<Assertion<E>>");
+
+    // declare the result vector to be returned.
+    get_aux_assertions.line("let mut result = Vec::new();");
+
+    // add the constraints for the auxiliary columns for the first boundary.
+    for (col_idx, constraint) in ir.aux_first_boundary_constraints() {
+        let assertion = format!(
+            "result.push(Assertion::single({}, 0, {}));",
+            col_idx,
+            constraint.to_string(true)
+        );
+        get_aux_assertions.line(assertion);
+    }
+
+    let last_aux_constraints = ir.aux_last_boundary_constraints();
+
+    if !last_aux_constraints.is_empty() {
+        get_aux_assertions.line("let last_step = self.last_step();");
+        // add the constraints for the auxiliary columns for the last boundary.
+        for (col_idx, constraint) in last_aux_constraints {
+            let assertion = format!(
+                "result.push(Assertion::single({}, last_step, {}));",
+                col_idx,
+                constraint.to_string(true)
+            );
+            get_aux_assertions.line(assertion);
+        }
+    }
+
+    // return the result
+    get_aux_assertions.line("result");
+}
+
 // RUST STRING GENERATION
 // ================================================================================================
 
 /// Code generation trait for generating Rust code strings from boundary constraint expressions.
 impl Codegen for BoundaryExpr {
     // TODO: Only add parentheses in Add/Sub/Mul/Exp if the expression is an arithmetic operation.
-    fn to_string(&self) -> String {
+    fn to_string(&self, is_aux_constraint: bool) -> String {
         match self {
-            Self::Const(_value) => todo!(),
-            Self::PubInput(name, index) => format!("{}[{}]", name, index),
+            Self::Const(value) => {
+                if is_aux_constraint {
+                    format!("E::from({})", value)
+                } else {
+                    format!("Felt::from({})", value)
+                }
+            }
+            Self::PubInput(name, index) => format!("self.{}[{}]", name, index),
             Self::Rand(index) => {
                 format!("aux_rand_elements[{}]", index)
             }
             Self::Add(lhs, rhs) => {
-                format!("({}) + ({})", lhs.to_string(), rhs.to_string())
+                format!(
+                    "({}) + ({})",
+                    lhs.to_string(is_aux_constraint),
+                    rhs.to_string(is_aux_constraint)
+                )
             }
             Self::Sub(lhs, rhs) => {
-                format!("({}) - ({})", lhs.to_string(), rhs.to_string())
+                format!(
+                    "({}) - ({})",
+                    lhs.to_string(is_aux_constraint),
+                    rhs.to_string(is_aux_constraint)
+                )
             }
             Self::Mul(lhs, rhs) => {
-                format!("({}) * ({})", lhs.to_string(), rhs.to_string())
+                format!(
+                    "({}) * ({})",
+                    lhs.to_string(is_aux_constraint),
+                    rhs.to_string(is_aux_constraint)
+                )
             }
             Self::Exp(lhs, rhs) => {
-                format!("({}).exp({})", lhs.to_string(), rhs)
+                format!("({}).exp({})", lhs.to_string(is_aux_constraint), rhs)
             }
         }
     }

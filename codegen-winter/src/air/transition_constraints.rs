@@ -34,6 +34,36 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
     }
 }
 
+/// Adds an implementation of the "evaluate_aux_transition" method to the referenced Air implementation
+/// based on the data in the provided AirIR.
+pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
+    // define the function.
+    let evaluate_aux_transition = impl_ref
+        .new_fn("evaluate_aux_transition")
+        .generic("E: FieldElement<BaseField = Felt> + ExtensionOf<F>")
+        .generic("F: FieldElement<BaseField = Felt>")
+        .arg_ref_self()
+        .arg("main_frame", "&EvaluationFrame<F>")
+        .arg("aux_frame", "&EvaluationFrame<E>")
+        .arg("_periodic_values", "&[F]")
+        .arg("aux_rand_elements", "&AuxTraceRandElements<E>")
+        .arg("result", "&mut [E]");
+
+    // declare current and next trace row arrays.
+    evaluate_aux_transition.line("let current = frame.current();");
+    evaluate_aux_transition.line("let next = frame.next();");
+
+    // output the constraints.
+    let graph = ir.transition_graph();
+    for (idx, constraint) in ir.aux_transition_constraints().iter().enumerate() {
+        evaluate_aux_transition.line(format!(
+            "result[{}] = {};",
+            idx,
+            constraint.to_string(graph)
+        ));
+    }
+}
+
 // RUST STRING GENERATION
 // ================================================================================================
 
