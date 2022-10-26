@@ -35,6 +35,9 @@ pub(super) struct SymbolTable {
     /// A map of the Air's periodic columns using the index of the column within the declared
     /// periodic columns as the key and the vector of periodic values as the value
     periodic_columns: Vec<Vec<u64>>,
+    /// A vector of public inputs with each value as a tuple of input identifier and it's array
+    /// size.
+    public_inputs: Vec<(String, usize)>,
 }
 
 impl SymbolTable {
@@ -92,6 +95,8 @@ impl SymbolTable {
     ) -> Result<(), SemanticError> {
         for input in public_inputs.iter() {
             self.insert_symbol(input.name(), IdentifierType::PublicInput(input.size()))?;
+            self.public_inputs
+                .push((input.name().to_string(), input.size()));
         }
 
         Ok(())
@@ -115,8 +120,8 @@ impl SymbolTable {
         Ok(())
     }
 
-    pub(super) fn into_periodic_columns(self) -> Vec<Vec<u64>> {
-        self.periodic_columns
+    pub(super) fn into_declarations(self) -> (Vec<(String, usize)>, Vec<Vec<u64>>) {
+        (self.public_inputs, self.periodic_columns)
     }
 
     // --- ACCESSORS ------------------------------------------------------------------------------
