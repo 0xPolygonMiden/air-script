@@ -15,14 +15,17 @@ pub use transition_constraints::{NodeIndex, TransitionConstraintDegree};
 mod error;
 use error::SemanticError;
 
+pub type PublicInputs = Vec<(String, usize)>;
+pub type PeriodicColumns = Vec<Vec<u64>>;
+
 /// Internal representation of an AIR.
 ///
 /// TODO: docs
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
-    public_inputs: Vec<(String, usize)>,
-    periodic_columns: Vec<Vec<u64>>,
+    public_inputs: PublicInputs,
+    periodic_columns: PeriodicColumns,
     boundary_constraints: BoundaryConstraints,
     transition_constraints: TransitionConstraints,
 }
@@ -106,7 +109,7 @@ impl AirIR {
             .collect()
     }
 
-    pub fn public_inputs(&self) -> &Vec<(String, usize)> {
+    pub fn public_inputs(&self) -> &PublicInputs {
         &self.public_inputs
     }
 
@@ -158,6 +161,10 @@ impl AirIR {
 
     pub fn transition_graph(&self) -> &AlgebraicGraph {
         self.transition_constraints.graph()
+    }
+
+    pub fn periodic_columns(&self) -> &PeriodicColumns {
+        &self.periodic_columns
     }
 }
 

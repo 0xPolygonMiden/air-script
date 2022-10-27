@@ -1,14 +1,17 @@
 use super::{AirIR, Impl, Scope};
 use ir::TransitionConstraintDegree;
 
+mod public_inputs;
+use public_inputs::add_public_inputs_struct;
+
+mod periodic_columns;
+use periodic_columns::add_fn_get_periodic_column_values;
+
 mod boundary_constraints;
 use boundary_constraints::{add_fn_get_assertions, add_fn_get_aux_assertions};
 
 mod transition_constraints;
 use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_transition};
-
-mod public_inputs;
-use public_inputs::add_public_inputs_struct;
 
 // HELPERS TO GENERATE AN IMPLEMENTATION OF THE WINTERFELL AIR TRAIT
 // ================================================================================================
@@ -71,6 +74,7 @@ fn add_air_trait(scope: &mut Scope, ir: &AirIR, name: &str) {
     add_fn_new(air_impl, ir);
     add_fn_get_assertions(air_impl, ir);
     add_fn_get_aux_assertions(air_impl, ir);
+    add_fn_get_periodic_column_values(air_impl, ir);
     add_fn_evaluate_transition(air_impl, ir);
     add_fn_evaluate_aux_transition(air_impl, ir);
 }

@@ -1,4 +1,4 @@
-use super::{BTreeMap, SemanticError, MIN_CYCLE_LENGTH};
+use super::{BTreeMap, PeriodicColumns, PublicInputs, SemanticError, MIN_CYCLE_LENGTH};
 use parser::ast::{Identifier, PeriodicColumn, PublicInput};
 use std::fmt::Display;
 
@@ -34,10 +34,11 @@ pub(super) struct SymbolTable {
 
     /// A map of the Air's periodic columns using the index of the column within the declared
     /// periodic columns as the key and the vector of periodic values as the value
-    periodic_columns: Vec<Vec<u64>>,
+    periodic_columns: PeriodicColumns,
+
     /// A vector of public inputs with each value as a tuple of input identifier and it's array
     /// size.
-    public_inputs: Vec<(String, usize)>,
+    public_inputs: PublicInputs,
 }
 
 impl SymbolTable {
@@ -120,7 +121,7 @@ impl SymbolTable {
         Ok(())
     }
 
-    pub(super) fn into_declarations(self) -> (Vec<(String, usize)>, Vec<Vec<u64>>) {
+    pub(super) fn into_declarations(self) -> (PublicInputs, PeriodicColumns) {
         (self.public_inputs, self.periodic_columns)
     }
 
