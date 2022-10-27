@@ -49,6 +49,7 @@ fn add_air_struct(scope: &mut Scope, ir: &AirIR, name: &str) {
     // add a simple method to get the last step.
     base_impl
         .new_fn("last_step")
+        .arg_ref_self()
         .vis("pub")
         .ret("usize")
         .line("self.trace_length() - self.context().num_transition_exemptions()");
@@ -61,7 +62,8 @@ fn add_air_trait(scope: &mut Scope, ir: &AirIR, name: &str) {
     let air_impl = scope
         .new_impl(name)
         .impl_trait("Air")
-        .associate_type("BaseField", "Felt");
+        .associate_type("BaseField", "Felt")
+        .associate_type("PublicInputs", "PublicInputs");
 
     // add default function "context".
     let fn_context = air_impl
@@ -72,10 +74,15 @@ fn add_air_trait(scope: &mut Scope, ir: &AirIR, name: &str) {
 
     // add the method implementations required by the AIR trait.
     add_fn_new(air_impl, ir);
-    add_fn_get_assertions(air_impl, ir);
-    add_fn_get_aux_assertions(air_impl, ir);
+
     add_fn_get_periodic_column_values(air_impl, ir);
+
+    add_fn_get_assertions(air_impl, ir);
+
+    add_fn_get_aux_assertions(air_impl, ir);
+
     add_fn_evaluate_transition(air_impl, ir);
+
     add_fn_evaluate_aux_transition(air_impl, ir);
 }
 
@@ -97,7 +104,7 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
     }
     new.line(format!(
         "let main_degrees = vec![{}];",
-        main_degrees.join(",")
+        main_degrees.join(", ")
     ));
 
     // define the transition constraint degrees of the aux trace `aux_degrees`.
@@ -155,7 +162,7 @@ impl Codegen for TransitionConstraintDegree {
                 .collect::<Vec<String>>()
                 .join(", ");
             format!(
-                "TransitionConstraintDegree::with_cycles({}, [{}])",
+                "TransitionConstraintDegree::with_cycles({}, vec![{}])",
                 self.base(),
                 cycles
             )
