@@ -93,7 +93,6 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
 
 /// Code generation trait for generating Rust code strings from boundary constraint expressions.
 impl Codegen for BoundaryExpr {
-    // TODO: Only add parentheses in Add/Sub/Mul/Exp if the expression is an arithmetic operation.
     fn to_string(&self, is_aux_constraint: bool) -> String {
         match self {
             Self::Const(value) => {
@@ -109,28 +108,48 @@ impl Codegen for BoundaryExpr {
             }
             Self::Add(lhs, rhs) => {
                 format!(
-                    "({}) + ({})",
+                    "{} + {}",
                     lhs.to_string(is_aux_constraint),
                     rhs.to_string(is_aux_constraint)
                 )
             }
             Self::Sub(lhs, rhs) => {
-                format!(
-                    "({}) - ({})",
-                    lhs.to_string(is_aux_constraint),
+                let rhs = if is_arithmetic_expr(rhs) {
+                    format!("({})", rhs.to_string(is_aux_constraint))
+                } else {
                     rhs.to_string(is_aux_constraint)
-                )
+                };
+                format!("{} - {}", lhs.to_string(is_aux_constraint), rhs)
             }
             Self::Mul(lhs, rhs) => {
-                format!(
-                    "({}) * ({})",
-                    lhs.to_string(is_aux_constraint),
+                let lhs = if is_arithmetic_expr(lhs) {
+                    format!("({})", lhs.to_string(is_aux_constraint))
+                } else {
+                    lhs.to_string(is_aux_constraint)
+                };
+                let rhs = if is_arithmetic_expr(rhs) {
+                    format!("({})", rhs.to_string(is_aux_constraint))
+                } else {
                     rhs.to_string(is_aux_constraint)
-                )
+                };
+                format!("{} * {}", lhs, rhs)
             }
             Self::Exp(lhs, rhs) => {
-                format!("({}).exp({})", lhs.to_string(is_aux_constraint), rhs)
+                let lhs = if is_arithmetic_expr(lhs) {
+                    format!("({})", lhs.to_string(is_aux_constraint))
+                } else {
+                    lhs.to_string(is_aux_constraint)
+                };
+                format!("{}.exp({})", lhs, rhs)
             }
         }
     }
+}
+
+/// Checks whether the boundary expression is an arithmetic operation.
+fn is_arithmetic_expr(boundary_expr: &BoundaryExpr) -> bool {
+    matches!(
+        boundary_expr,
+        BoundaryExpr::Add(_, _) | BoundaryExpr::Sub(_, _) | BoundaryExpr::Mul(_, _)
+    )
 }
