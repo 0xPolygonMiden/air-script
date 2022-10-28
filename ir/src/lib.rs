@@ -87,6 +87,8 @@ impl AirIR {
 
         let (public_inputs, periodic_columns) = symbol_table.into_declarations();
 
+        // validate sections
+        validate_boundary_constraints(&boundary_constraints)?;
         validate_transition_constraints(&transition_constraints)?;
 
         Ok(Self {
@@ -172,6 +174,23 @@ impl AirIR {
 
 // === HELPERS ====================================================================================
 
+/// Returns an error if a boundary constraints section is not defined.
+fn validate_boundary_constraints(
+    boundary_constraints: &BoundaryConstraints,
+) -> Result<(), SemanticError> {
+    if boundary_constraints.main_first().is_empty()
+        && boundary_constraints.main_last().is_empty()
+        && boundary_constraints.aux_first().is_empty()
+        && boundary_constraints.aux_last().is_empty()
+    {
+        return Err(SemanticError::MissingSection(
+            "Boundary Constraints Section is missing".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Returns an error if a transition constraints section is not defined.
 fn validate_transition_constraints(
     transition_constraints: &TransitionConstraints,
 ) -> Result<(), SemanticError> {
@@ -222,6 +241,30 @@ mod tests {
     }
 
     #[test]
+    fn err_bc_empty_or_omitted() {
+        // if boundary constraints are empty, an error should be returned at parser level.
+        let source = "
+        trace_columns:
+            main: [clk]
+        boundary_constraints:
+        transition_constraints:
+            enf clk' = clk + 1";
+
+        assert!(parse(source).is_err());
+
+        // if boundary constraints are omitted, an error should be returned at IR level.
+        let source = "
+        trace_columns:
+            main: [clk]
+        transition_constraints:
+            enf clk' = clk + 1";
+
+        let parsed = parse(source).expect("Parsing failed");
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn err_bc_duplicate_first() {
         let source = "
         trace_columns:
@@ -255,6 +298,8 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        boundary_constraints:
+            enf clk.first = 0
         transition_constraints:
             enf clk' = clk + 1";
 
@@ -269,6 +314,8 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        boundary_constraints:
+            enf clk.first = 0
         transition_constraints:
             enf clk' = (clk + 1)";
 
@@ -319,6 +366,8 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        boundary_constraints:
+            enf clk.first = 0
         transition_constraints:
             enf clk' * clk = 1";
         let parsed = parse(source).expect("Parsing failed");
@@ -332,6 +381,8 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        boundary_constraints:
+            enf clk.first = 0
         transition_constraints:
             enf clk'^2 - clk = 1";
         let parsed = parse(source).expect("Parsing failed");
