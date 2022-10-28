@@ -87,6 +87,8 @@ impl AirIR {
 
         let (public_inputs, periodic_columns) = symbol_table.into_declarations();
 
+        validate_transition_constraints(&transition_constraints)?;
+
         Ok(Self {
             air_name: air_name.to_string(),
             public_inputs,
@@ -168,6 +170,21 @@ impl AirIR {
     }
 }
 
+// === HELPERS ====================================================================================
+
+fn validate_transition_constraints(
+    transition_constraints: &TransitionConstraints,
+) -> Result<(), SemanticError> {
+    if transition_constraints.main_constraints().is_empty()
+        && transition_constraints.aux_constraints().is_empty()
+    {
+        return Err(SemanticError::MissingSection(
+            "Transition Constraints Section is missing".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 // TODO: add checks for the correctness of the AirIR that is built.
 #[cfg(test)]
 mod tests {
@@ -179,6 +196,8 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        transition_constraints:
+            enf clk' = clk + 1
         boundary_constraints:
             enf clk.first = 0
             enf clk.last = 1";
@@ -257,6 +276,30 @@ mod tests {
 
         let result = AirIR::from_source(&parsed);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn err_tc_empty_or_omitted() {
+        // if transition constraints are empty, an error should be returned at parser level.
+        let source = "
+        trace_columns:
+            main: [clk]
+        transition_constraints:
+        boundary_constraints:
+            enf clk.first = 0";
+
+        assert!(parse(source).is_err());
+
+        // if transition constraints are omitted, an error should be returned at IR level.
+        let source = "
+        trace_columns:
+            main: [clk]
+        boundary_constraints:
+            enf clk.first = 0";
+
+        let parsed = parse(source).expect("Parsing failed");
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
     }
 
     #[test]
