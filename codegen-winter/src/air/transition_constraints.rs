@@ -91,7 +91,7 @@ impl Codegen for Operation {
             Operation::MainTraceNextRow(col_idx) | Operation::AuxTraceNextRow(col_idx) => {
                 format!("next[{}]", col_idx)
             }
-            Operation::PeriodicColumn(col_idx) => {
+            Operation::PeriodicColumn(col_idx, _) => {
                 format!("periodic_values[{}]", col_idx)
             }
             Operation::RandomValue(idx) => {
