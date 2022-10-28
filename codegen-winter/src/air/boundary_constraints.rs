@@ -50,8 +50,8 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
 pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
     // define the function
     let get_aux_assertions = impl_ref
-        .generic("E: FieldElement<BaseField = Self::BaseField>")
         .new_fn("get_aux_assertions")
+        .generic("E: FieldElement<BaseField = Felt>")
         .arg_ref_self()
         .arg("aux_rand_elements", "&AuxTraceRandElements<E>")
         .ret("Vec<Assertion<E>>");
@@ -98,14 +98,14 @@ impl Codegen for BoundaryExpr {
         match self {
             Self::Const(value) => {
                 if is_aux_constraint {
-                    format!("E::from({})", value)
+                    format!("E::from({}_u64)", value)
                 } else {
-                    format!("Felt::from({})", value)
+                    format!("Felt::new({})", value)
                 }
             }
             Self::PubInput(name, index) => format!("self.{}[{}]", name, index),
             Self::Rand(index) => {
-                format!("aux_rand_elements[{}]", index)
+                format!("aux_rand_elements.get_segment_elements(0)[{}]", index)
             }
             Self::Add(lhs, rhs) => {
                 format!(
