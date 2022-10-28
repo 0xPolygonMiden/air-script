@@ -1,0 +1,8 @@
+def BinaryAir
+
+trace_columns:
+    main: [a, b]
+
+transition_constraints:
+    enf a^2 - a = 0
+    enf b^2 - b = 0

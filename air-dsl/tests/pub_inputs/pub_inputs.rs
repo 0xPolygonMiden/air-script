@@ -1,0 +1,102 @@
+use winter_air::{Air, AirContext, Assertion, AuxTraceRandElements, EvaluationFrame, ProofOptions as WinterProofOptions, TransitionConstraintDegree, TraceInfo};
+use winter_math::{fields, ExtensionOf, FieldElement};
+use winter_utils::{collections, ByteWriter, Serializable};
+
+pub struct PublicInputs {
+    program_hash: [Felt; 4],
+    stack_inputs: [Felt; 4],
+    stack_outputs: [Felt; 20],
+    overflow_addrs: [Felt; 4],
+}
+
+impl PublicInputs {
+    pub fn new(program_hash: [Felt; 4], stack_inputs: [Felt; 4], stack_outputs: [Felt; 20], overflow_addrs: [Felt; 4]) -> Self {
+        Self { program_hash, stack_inputs, stack_outputs, overflow_addrs }
+    }
+}
+
+impl Serializable for PublicInputs {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write(self.program_hash.as_slice());
+        target.write(self.stack_inputs.as_slice());
+        target.write(self.stack_outputs.as_slice());
+        target.write(self.overflow_addrs.as_slice());
+    }
+}
+
+pub struct PubInputsAir {
+    context: AirContext<Felt>,
+    program_hash: [Felt; 4],
+    stack_inputs: [Felt; 4],
+    stack_outputs: [Felt; 20],
+    overflow_addrs: [Felt; 4],
+}
+
+impl PubInputsAir {
+    pub fn last_step(&self) -> usize {
+        self.trace_length() - self.context().num_transition_exemptions()
+    }
+}
+
+impl Air for PubInputsAir {
+    type BaseField = Felt;
+    type PublicInputs = PublicInputs;
+
+    fn context(&self) -> &AirContext<Felt> {
+        &self.context
+    }
+
+    fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
+        let main_degrees = vec![];
+        let aux_degrees = Vec::new();
+        let num_main_assertions = 8;
+        let num_aux_assertions = 0;
+
+        let context = AirContext::new_multi_segment(
+            trace_info,
+            main_degrees,
+            aux_degrees,
+            num_main_assertions,
+            num_aux_assertions,
+            options,
+        )
+        .set_num_transition_exemptions(2);
+        Self { context, program_hash: public_inputs.program_hash, stack_inputs: public_inputs.stack_inputs, stack_outputs: public_inputs.stack_outputs, overflow_addrs: public_inputs.overflow_addrs }
+    }
+
+    fn get_periodic_column_values(&self) -> Vec<Vec<Felt>> {
+        vec![]
+    }
+
+    fn get_assertions(&self) -> Vec<Assertion<Felt>> {
+        let mut result = Vec::new();
+        result.push(Assertion::single(0, 0, self.stack_inputs[0]));
+        result.push(Assertion::single(1, 0, self.stack_inputs[1]));
+        result.push(Assertion::single(2, 0, self.stack_inputs[2]));
+        result.push(Assertion::single(3, 0, self.stack_inputs[3]));
+        let last_step = self.last_step();
+        result.push(Assertion::single(0, last_step, self.stack_outputs[0]));
+        result.push(Assertion::single(1, last_step, self.stack_outputs[1]));
+        result.push(Assertion::single(2, last_step, self.stack_outputs[2]));
+        result.push(Assertion::single(3, last_step, self.stack_outputs[3]));
+        result
+    }
+
+    fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxTraceRandElements<E>) -> Vec<Assertion<E>> {
+        let mut result = Vec::new();
+        result
+    }
+
+    fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
+        let current = frame.current();
+        let next = frame.next();
+    }
+
+    fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
+    where F: FieldElement<BaseField = Felt>,
+          E: FieldElement<BaseField = Felt> + ExtensionOf<F>,
+    {
+        let current = aux_frame.current();
+        let next = aux_frame.next();
+    }
+}
