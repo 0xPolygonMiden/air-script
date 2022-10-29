@@ -39,10 +39,10 @@ impl TransitionConstraints {
     // --- PUBLIC ACCESSORS -----------------------------------------------------------------------
 
     /// Returns a vector of the degrees of the transition constraints.
-    pub fn main_degrees(&self, cycle_lens: &[usize]) -> Vec<TransitionConstraintDegree> {
+    pub fn main_degrees(&self) -> Vec<TransitionConstraintDegree> {
         self.main_constraints
             .iter()
-            .map(|entry_index| self.graph.degree(cycle_lens, entry_index))
+            .map(|entry_index| self.graph.degree(entry_index))
             .collect()
     }
 
@@ -54,10 +54,10 @@ impl TransitionConstraints {
     }
 
     /// Returns a vector of the degrees of the transition constraints.
-    pub fn aux_degrees(&self, cycle_lens: &[usize]) -> Vec<TransitionConstraintDegree> {
+    pub fn aux_degrees(&self) -> Vec<TransitionConstraintDegree> {
         self.aux_constraints
             .iter()
-            .map(|entry_index| self.graph.degree(cycle_lens, entry_index))
+            .map(|entry_index| self.graph.degree(entry_index))
             .collect()
     }
 

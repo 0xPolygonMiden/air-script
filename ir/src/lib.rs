@@ -102,15 +102,12 @@ impl AirIR {
         &self.air_name
     }
 
-    pub fn periodic_cycle_lens(&self) -> Vec<usize> {
-        self.periodic_columns
-            .iter()
-            .map(|values| values.len())
-            .collect()
-    }
-
     pub fn public_inputs(&self) -> &PublicInputs {
         &self.public_inputs
+    }
+
+    pub fn periodic_columns(&self) -> &PeriodicColumns {
+        &self.periodic_columns
     }
 
     // --- PUBLIC ACCESSORS FOR BOUNDARY CONSTRAINTS ----------------------------------------------
@@ -142,8 +139,7 @@ impl AirIR {
     // --- PUBLIC ACCESSORS FOR TRANSITION CONSTRAINTS --------------------------------------------
 
     pub fn main_degrees(&self) -> Vec<TransitionConstraintDegree> {
-        self.transition_constraints
-            .main_degrees(&self.periodic_cycle_lens())
+        self.transition_constraints.main_degrees()
     }
 
     pub fn main_transition_constraints(&self) -> &[NodeIndex] {
@@ -151,8 +147,7 @@ impl AirIR {
     }
 
     pub fn aux_degrees(&self) -> Vec<TransitionConstraintDegree> {
-        self.transition_constraints
-            .aux_degrees(&self.periodic_cycle_lens())
+        self.transition_constraints.aux_degrees()
     }
 
     pub fn aux_transition_constraints(&self) -> &[NodeIndex] {
@@ -161,10 +156,6 @@ impl AirIR {
 
     pub fn transition_graph(&self) -> &AlgebraicGraph {
         self.transition_constraints.graph()
-    }
-
-    pub fn periodic_columns(&self) -> &PeriodicColumns {
-        &self.periodic_columns
     }
 }
 

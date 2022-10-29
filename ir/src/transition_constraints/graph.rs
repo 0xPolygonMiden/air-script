@@ -1,4 +1,6 @@
-use super::{degree::TransitionConstraintDegree, ConstraintType, SemanticError, SymbolTable};
+use super::{
+    super::BTreeMap, degree::TransitionConstraintDegree, ConstraintType, SemanticError, SymbolTable,
+};
 use crate::symbol_table::IdentifierType;
 use parser::ast::{Identifier, TransitionExpr};
 
@@ -32,56 +34,44 @@ impl AlgebraicGraph {
     }
 
     /// Returns the degree of the subgraph which has the specified node as its tip.
-    pub fn degree(&self, cycle_lens: &[usize], index: &NodeIndex) -> TransitionConstraintDegree {
-        let (base, mut periodic_columns) = self.accumulate_degree(index);
+    pub fn degree(&self, index: &NodeIndex) -> TransitionConstraintDegree {
+        let mut cycles: BTreeMap<usize, usize> = BTreeMap::new();
+        let base = self.accumulate_degree(&mut cycles, index);
 
-        if periodic_columns.is_empty() {
+        if cycles.is_empty() {
             TransitionConstraintDegree::new(base)
         } else {
-            periodic_columns.sort();
-            periodic_columns.dedup();
-            let mut cycles = Vec::with_capacity(periodic_columns.len());
-            for index in periodic_columns.iter() {
-                cycles.push(cycle_lens[*index]);
-            }
-
-            TransitionConstraintDegree::with_cycles(base, cycles)
+            TransitionConstraintDegree::with_cycles(base, cycles.values().cloned().collect())
         }
     }
 
     /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.
-    ///
-    /// TODO: there is a bug with the handling of the cycle degrees. This can be addressed during
-    /// the refactor of the symbol table to include the cycle_len of the periodic column as part of
-    /// the `PeriodicColumn` variant of the `IdentifierType`
-    fn accumulate_degree(&self, index: &NodeIndex) -> (usize, Vec<usize>) {
+    fn accumulate_degree(&self, cycles: &mut BTreeMap<usize, usize>, index: &NodeIndex) -> usize {
         // recursively walk the subgraph and compute the degree from the operation and child nodes
         match self.node(index).op() {
-            Operation::Const(_) | Operation::RandomValue(_) => (0, vec![]),
+            Operation::Const(_) | Operation::RandomValue(_) => 0,
             Operation::MainTraceCurrentRow(_)
             | Operation::MainTraceNextRow(_)
             | Operation::AuxTraceCurrentRow(_)
-            | Operation::AuxTraceNextRow(_) => (1, vec![]),
-            Operation::PeriodicColumn(index) => (0, vec![*index]),
-            Operation::Neg(index) => self.accumulate_degree(index),
+            | Operation::AuxTraceNextRow(_) => 1,
+            Operation::PeriodicColumn(index, cycle_len) => {
+                cycles.insert(*index, *cycle_len);
+                0
+            }
+            Operation::Neg(index) => self.accumulate_degree(cycles, index),
             Operation::Add(lhs, rhs) => {
-                let (lhs_base, mut columns) = self.accumulate_degree(lhs);
-                let (rhs_base, mut rhs_columns) = self.accumulate_degree(rhs);
-                let base = lhs_base.max(rhs_base);
-                columns.append(&mut rhs_columns);
-                (base, columns)
+                let lhs_base = self.accumulate_degree(cycles, lhs);
+                let rhs_base = self.accumulate_degree(cycles, rhs);
+                lhs_base.max(rhs_base)
             }
             Operation::Mul(lhs, rhs) => {
-                let (lhs_base, mut columns) = self.accumulate_degree(lhs);
-                let (rhs_base, mut rhs_columns) = self.accumulate_degree(rhs);
-                let base = lhs_base + rhs_base;
-                columns.append(&mut rhs_columns);
-                (base, columns)
+                let lhs_base = self.accumulate_degree(cycles, lhs);
+                let rhs_base = self.accumulate_degree(cycles, rhs);
+                lhs_base + rhs_base
             }
             Operation::Exp(lhs, rhs) => {
-                let (lhs_base, columns) = self.accumulate_degree(lhs);
-                let base = lhs_base * rhs;
-                (base, columns)
+                let lhs_base = self.accumulate_degree(cycles, lhs);
+                lhs_base * rhs
             }
         }
     }
@@ -195,10 +185,10 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::AuxTraceCurrentRow(index));
                 Ok((constraint_type, node_index))
             }
-            IdentifierType::PeriodicColumn(index) => {
+            IdentifierType::PeriodicColumn(index, cycle_len) => {
                 // constraint target defaults to Main trace.
                 let constraint_type = ConstraintType::Main;
-                let node_index = self.insert_op(Operation::PeriodicColumn(index));
+                let node_index = self.insert_op(Operation::PeriodicColumn(index, cycle_len));
                 Ok((constraint_type, node_index))
             }
             _ => Err(SemanticError::InvalidUsage(format!(
@@ -266,10 +256,11 @@ pub enum Operation {
     /// An identifier for a cell in the specified column in the next row in the auxiliary trace. The
     /// inner value is the index of the column within the trace.
     AuxTraceNextRow(usize),
-    /// An identifier for a periodic value from a specified periodic column. The inner value is the
-    /// index of the periodic column within the declared periodic columns. The periodic value made
-    /// available from the specified column is based on the current row of the trace.
-    PeriodicColumn(usize),
+    /// An identifier for a periodic value from a specified periodic column. The first inner value
+    /// is the index of the periodic column within the declared periodic columns. The second inner
+    /// value is the length of the column's periodic cycle. The periodic value made available from
+    /// the specified column is based on the current row of the trace.
+    PeriodicColumn(usize, usize),
     /// A random value provided by the verifier. The inner value is the index of this random value
     /// in the array of all random values.
     RandomValue(usize),

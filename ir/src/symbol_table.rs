@@ -10,15 +10,16 @@ pub(super) enum IdentifierType {
     AuxTraceColumn(usize),
     /// an identifier for a public input, containing the size of the public input array
     PublicInput(usize),
-    /// an identifier for a periodic column, containing its index out of all periodic columns
-    PeriodicColumn(usize),
+    /// an identifier for a periodic column, containing its index out of all periodic columns and
+    /// its cycle length in that order.
+    PeriodicColumn(usize, usize),
 }
 
 impl Display for IdentifierType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::PublicInput(_) => write!(f, "PublicInput"),
-            Self::PeriodicColumn(_) => write!(f, "PeriodicColumn"),
+            Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
             Self::MainTraceColumn(_) => write!(f, "MainTraceColumn"),
             Self::AuxTraceColumn(_) => write!(f, "AuxTraceColumn"),
         }
@@ -103,19 +104,21 @@ impl SymbolTable {
         Ok(())
     }
 
-    /// Adds all periodic columns by their identifier names and their indices in the array of all
-    /// periodic columns
-    ///
-    /// TODO: Add the cycle length to the symbol table as well to simplify degree calculation.
+    /// Adds all periodic columns by their identifier names, their indices in the array of all
+    /// periodic columns, and the lengths of their periodic cycles.
     pub(super) fn insert_periodic_columns(
         &mut self,
         columns: &[PeriodicColumn],
     ) -> Result<(), SemanticError> {
         for (index, column) in columns.iter().enumerate() {
             validate_cycles(column)?;
+            let values = column.values().to_vec();
 
-            self.insert_symbol(column.name(), IdentifierType::PeriodicColumn(index))?;
-            self.periodic_columns.push(column.values().to_vec());
+            self.insert_symbol(
+                column.name(),
+                IdentifierType::PeriodicColumn(index, values.len()),
+            )?;
+            self.periodic_columns.push(values);
         }
 
         Ok(())
