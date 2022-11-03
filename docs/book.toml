@@ -4,3 +4,6 @@ language = "en"
 multilingual = false
 src = "src"
 title = "Polygon Miden's Air DSL"
+
+[output.linkcheck]
+warning-policy = "ignore"
