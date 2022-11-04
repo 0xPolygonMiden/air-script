@@ -4,7 +4,7 @@
 use super::Identifier;
 
 /// Stores a constant's name and value. There are three types of constants:
-/// - Scalar: 1, 2, 3
+/// - Scalar: 123
 /// - Vector: \[1, 2, 3\]
 /// - Matrix: \[\[1, 2, 3\], \[4, 5, 6\]\]
 #[derive(Debug, PartialEq, Eq)]
@@ -21,7 +21,7 @@ impl Constant {
 }
 
 /// Type of constant. Constants can be of 3 types:
-/// - Scalar: 1, 2, 3
+/// - Scalar: 123
 /// - Vector: \[1, 2, 3\]
 /// - Matrix: \[\[1, 2, 3\], \[4, 5, 6\]\]
 #[derive(Debug, PartialEq, Eq)]

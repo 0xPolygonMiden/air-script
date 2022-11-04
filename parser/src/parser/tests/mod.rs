@@ -16,6 +16,7 @@ mod trace_columns;
 mod transition_constraints;
 
 mod comments;
+mod constants;
 mod expressions;
 mod identifiers;
 
