@@ -2,6 +2,7 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryExpr}, 
         transition_constraints::{TransitionConstraint, TransitionConstraints, TransitionExpr},
+        constants::{Constant, ConstantType},
         Identifier, Source, SourceSection, TraceCols, PublicInput, PeriodicColumn
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols}}, lexer::Token
 };
@@ -19,6 +20,7 @@ pub Source: Source = {
 
 SourceSection: SourceSection = {
     AirDef => SourceSection::AirDef(<>),
+    Constants => SourceSection::Constants(<>),
     TraceCols => SourceSection::TraceCols(<>),
     PublicInputs => SourceSection::PublicInputs(<>),
     PeriodicColumns => SourceSection::PeriodicColumns(<>),
@@ -58,6 +60,22 @@ AuxCols: Vec<Identifier> = {
     "aux" ":" "[" <aux_cols: CommaElems<Identifier>> "]" => aux_cols,
 }
 
+// CONSTANTS
+// ================================================================================================
+
+// Constants section is optional but cannot be empty. Atleast one constant is required.
+Constants: Vec<Constant> = {
+    "constants" ":" <constants: Constant+> => constants
+}
+
+Constant: Constant = {
+    <name: Identifier> ":" <scalar_value: Num_u64> => 
+        Constant::new(name, ConstantType::Scalar(scalar_value)),
+    <name: Identifier> ":" "[" <vector_value: CommaElems<Num_u64>> "]" =>
+        Constant::new(name, ConstantType::Vector(vector_value)),
+    <name: Identifier> ":" "[" <matrix_value: CommaElems<Vector<Num_u64>>> "]" =>
+        Constant::new(name, ConstantType::Matrix(matrix_value)),
+}
 
 // PUBLIC INPUTS
 // ================================================================================================
@@ -166,6 +184,15 @@ CommaElems<T>: Vec<T> = {
         v
     }
 }
+
+Vector<T>: Vec<T> = {
+    "[" <e:T> <v:("," <T>)*> "]" => {
+        let mut v = v;
+        v.insert(0, e);
+        v
+    }
+}
+
 Identifier: Identifier = {
     <n:identifier> => Identifier(n.to_string())
 }
@@ -189,6 +216,7 @@ extern {
         r"[0-9]+" => Token::Num(<String>),
         "def" => Token::Def,
         "trace_columns" => Token::TraceColumnns,
+        "constants" => Token::Constants,
         "main" => Token::Main,
         "aux" => Token::Aux,
         "public_inputs" => Token::PublicInputs,

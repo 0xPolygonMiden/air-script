@@ -1,5 +1,8 @@
 use std::fmt;
 
+pub mod constants;
+use constants::Constant;
+
 pub mod pub_inputs;
 pub use pub_inputs::PublicInput;
 
@@ -36,6 +39,7 @@ pub struct Source(pub Vec<SourceSection>);
 #[derive(Debug, PartialEq)]
 pub enum SourceSection {
     AirDef(Identifier),
+    Constants(Vec<Constant>),
     TraceCols(TraceCols),
     PublicInputs(Vec<PublicInput>),
     PeriodicColumns(Vec<PeriodicColumn>),
