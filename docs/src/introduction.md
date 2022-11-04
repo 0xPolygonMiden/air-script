@@ -1,10 +1,10 @@
 # Introduction
 
-Polygon Miden's Air DSL is designed to make it simple to describe AIR constraints and generate efficient and accurate code in the required target language.
+Polygon Miden's AirScript is designed to make it simple to describe AIR constraints and generate efficient and accurate code in the required target language.
 
 ## Current Version
 
-Currently, the Air DSL is on version 0.1, which supports a simple syntax for describing air constraints and generation of Rust code targeting the [Winterfell prover](https://github.com/novifinancial/winterfell).
+Currently, the AirScript is on version 0.1, which supports a simple syntax for describing air constraints and generation of Rust code targeting the [Winterfell prover](https://github.com/novifinancial/winterfell).
 
 The simplified version of the language is based on [this discussion](https://github.com/maticnetwork/miden/discussions/254), but only includes the following:
 
@@ -18,7 +18,7 @@ The language will be specified in detail in the rest of this book.
 
 ### CLI
 
-There is a command-line interface available for transpiling Air DSL files to Rust. There are also several example `.air` files written in the Air DSL which can be found in the `examples/` directory.
+There is a command-line interface available for transpiling AirScript files to Rust. There are also several example `.air` files written in the AirScript which can be found in the `examples/` directory.
 
 To use the CLI, first run:
 
@@ -26,16 +26,16 @@ To use the CLI, first run:
 cargo build --release
 ```
 
-Then, run the `air-dsl` target with the `transpile` option and specify your input file with `-i`. For example:
+Then, run the `air-script` target with the `transpile` option and specify your input file with `-i`. For example:
 
 ```
-./target/release/air-dsl transpile -i examples/system.air
+./target/release/air-script transpile -i examples/system.air
 ```
 
 You can use the `help` option to see other available options.
 
 ```
-./target/release/air-dsl transpile --help
+./target/release/air-script transpile --help
 ```
 
 ## Future Work

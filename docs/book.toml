@@ -3,4 +3,4 @@ authors = ["grjte"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Polygon Miden's Air DSL"
+title = "Polygon Miden's AirScript"

@@ -1,8 +1,8 @@
 # Parser
 
-This crate contains the parser for AIR DSL.
+This crate contains the parser for AirScript.
 
-The purpose of the parser is to parse the constraints written in human friendly AIR DSL language into an AST (Abstract Syntax Tree).
+The purpose of the parser is to parse the constraints written in human friendly AirScript language into an AST (Abstract Syntax Tree).
 
 ## Generating AST
 

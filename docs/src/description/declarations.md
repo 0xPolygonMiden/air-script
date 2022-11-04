@@ -6,7 +6,7 @@ A `trace_columns` section contains declarations for `main` trace columns or `aux
 
 The `main` and `aux` declarations define the shape of the main and auxiliary execution traces respectively and declare identifiers which can be used to refer to each of the columns in that trace.
 
-**A `trace_columns` section with a `main` declaration is required for an Air DSL to be valid.** The `aux` declaration is optional.
+**A `trace_columns` section with a `main` declaration is required for an AirScript to be valid.** The `aux` declaration is optional.
 
 The following is a valid `trace_columns` block:
 

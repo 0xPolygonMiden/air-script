@@ -1,4 +1,4 @@
-name: Air DSL book
+name: AirScript book
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
           command: install
           args: mdbook-linkcheck
 
-      - name: Build miden book
+      - name: Build AirScript book
         run: mdbook build docs/
 
       - name: Deploy to GitHub Pages

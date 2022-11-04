@@ -4,4 +4,4 @@
 - [File structure](./structure.md)
 - [Type declarations](./declarations.md)
 - [Constraint descriptions](./constraints.md)
-- [Air DSL example](./example.md)
+- [AirScript example](./example.md)
