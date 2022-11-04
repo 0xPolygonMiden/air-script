@@ -1,10 +1,10 @@
 # File Structure
 
-An Air DSL file consists of a name definition and several source sections which contain declarations and constraints. The declarations describe the shape of the execution trace to which constraints are applied and the public inputs, and periodic columns that are used for computing those constraints. The constraints describe boundary and transition constraints which must hold for an execution trace and set of public inputs in order for them to be valid (i.e. in order for a valid proof to be generated or verification to pass).
+An AIR Script file consists of a name definition and several source sections which contain declarations and constraints. The declarations describe the shape of the execution trace to which constraints are applied and the public inputs, and periodic columns that are used for computing those constraints. The constraints describe boundary and transition constraints which must hold for an execution trace and set of public inputs in order for them to be valid (i.e. in order for a valid proof to be generated or verification to pass).
 
 ## Air name definition
 
-An Air DSL file starts with a definition of the name of the Air module, such as:
+An AirScript file starts with a definition of the name of the Air module, such as:
 
 ```
 def ExampleAir

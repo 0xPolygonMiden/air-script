@@ -5,7 +5,7 @@ mod cli;
 
 /// Root CLI struct
 #[derive(StructOpt, Debug)]
-#[structopt(name = "AirDsl", about = "AirDsl CLI")]
+#[structopt(name = "AirScript", about = "AirScript CLI")]
 pub struct Cli {
     #[structopt(subcommand)]
     action: Actions,

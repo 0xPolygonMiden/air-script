@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "air-dsl",
+  "air-script",
   "parser",
   "ir",
   "codegen-winter"

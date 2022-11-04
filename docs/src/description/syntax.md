@@ -1,13 +1,13 @@
 # Reserved keywords and basic types
 
-This page specifies the basic syntax, types, and keywords of the Air DSL.
+This page specifies the basic syntax, types, and keywords of the AirScript.
 
 ## Keywords
 
-Air DSL defines the following keywords:
+AirScript defines the following keywords:
 
 - `$rand`: used to [access random values](#accessors) provided by the verifier.
-- `def`: used to [define the name](./structure.md) of an Air DSL module.
+- `def`: used to [define the name](./structure.md) of an AirScript module.
 - `boundary_constraints`: used to declare the [source section](./structure.md) where the [boundary constraints are described](./constraints.md#boundary_constraints).
   - `first`: used to access the value of a trace column at the first row of the trace. _It may only be used when defining boundary constraints._
   - `last`: used to access the value of a trace column at the last row of the trace. _It may only be used when defining boundary constraints._

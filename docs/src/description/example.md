@@ -1,6 +1,6 @@
-# Example AIR in Air DSL
+# Example AIR in AirScript
 
-This is an example Air definition in Air DSL that includes all existing Air DSL syntax. It is intended to be syntactically demonstrative rather than meaningful.
+This is an example Air definition in AirScript that includes all existing AirScript syntax. It is intended to be syntactically demonstrative rather than meaningful.
 
 ```
 def ExampleAir

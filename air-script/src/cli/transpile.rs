@@ -8,7 +8,7 @@ use parser::parse;
 #[derive(StructOpt, Debug)]
 #[structopt(
     name = "Transpile",
-    about = "Transpile AIR DSL source code to Rust targeting Winterfell"
+    about = "Transpile AirScript source code to Rust targeting Winterfell"
 )]
 pub struct TranspileCmd {
     /// Path to input file
