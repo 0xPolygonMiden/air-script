@@ -4,12 +4,6 @@ use std::fmt::Display;
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
-/// Stores the boundary constraints to be enforced on the trace column values.
-#[derive(Debug, PartialEq)]
-pub struct BoundaryConstraints {
-    pub boundary_constraints: Vec<BoundaryConstraint>,
-}
-
 /// Stores the expression corresponding to the boundary constraint.
 #[derive(Debug, PartialEq)]
 pub struct BoundaryConstraint {

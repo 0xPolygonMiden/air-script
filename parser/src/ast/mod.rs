@@ -39,8 +39,8 @@ pub enum SourceSection {
     TraceCols(TraceCols),
     PublicInputs(Vec<PublicInput>),
     PeriodicColumns(Vec<PeriodicColumn>),
-    BoundaryConstraints(BoundaryConstraints),
-    TransitionConstraints(TransitionConstraints),
+    BoundaryConstraints(Vec<BoundaryConstraint>),
+    TransitionConstraints(Vec<TransitionConstraint>),
 }
 
 // TRACE

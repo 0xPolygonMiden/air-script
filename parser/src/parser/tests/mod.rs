@@ -41,25 +41,21 @@ fn full_air_file() {
         }),
         // transition_constraints:
         //     enf clk' = clk + 1
-        SourceSection::TransitionConstraints(TransitionConstraints {
-            transition_constraints: vec![TransitionConstraint::new(
-                // clk' = clk + 1
-                TransitionExpr::Next(Identifier("clk".to_string())),
-                TransitionExpr::Add(
-                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
-                    Box::new(TransitionExpr::Const(1)),
-                ),
-            )],
-        }),
+        SourceSection::TransitionConstraints(vec![TransitionConstraint::new(
+            // clk' = clk + 1
+            TransitionExpr::Next(Identifier("clk".to_string())),
+            TransitionExpr::Add(
+                Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                Box::new(TransitionExpr::Const(1)),
+            ),
+        )]),
         // boundary_constraints:
         //     enf clk.first = 0
-        SourceSection::BoundaryConstraints(BoundaryConstraints {
-            boundary_constraints: vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
-                Boundary::First,
-                BoundaryExpr::Const(0),
-            )],
-        }),
+        SourceSection::BoundaryConstraints(vec![BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::First,
+            BoundaryExpr::Const(0),
+        )]),
     ]);
     build_parse_test!(source.as_str()).expect_ast(expected);
 }

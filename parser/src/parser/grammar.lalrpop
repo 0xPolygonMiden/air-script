@@ -1,8 +1,8 @@
 use crate::{
     ast::{
-        boundary_constraints::{Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryExpr}, 
-        transition_constraints::{TransitionConstraint, TransitionConstraints, TransitionExpr},
-        Identifier, Source, SourceSection, TraceCols, PublicInput, PeriodicColumn
+        boundary_constraints::{Boundary, BoundaryConstraint, BoundaryExpr}, 
+        transition_constraints::{TransitionConstraint, TransitionExpr}, Identifier, Source,
+        SourceSection, TraceCols, PublicInput, PeriodicColumn
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols}}, lexer::Token
 };
 use std::str::FromStr;
@@ -84,9 +84,8 @@ PeriodicColumn: PeriodicColumn = {
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
-BoundaryConstraints: BoundaryConstraints = {
-    "boundary_constraints" ":" <boundary_constraints: BoundaryConstraint+> =>
-        BoundaryConstraints { boundary_constraints }
+BoundaryConstraints: Vec<BoundaryConstraint> = {
+    "boundary_constraints" ":" <boundary_constraints: BoundaryConstraint+> => boundary_constraints
 }
 
 BoundaryConstraint: BoundaryConstraint = {
@@ -123,9 +122,9 @@ BoundaryAtom: BoundaryExpr = {
 // TRANSITION CONSTRAINTS
 // ================================================================================================
 
-TransitionConstraints: TransitionConstraints = {
-    "transition_constraints" ":" <transition_constraints: TransitionConstraint+> =>
-        TransitionConstraints { transition_constraints }
+TransitionConstraints: Vec<TransitionConstraint> = {
+    "transition_constraints" ":" <transition_constraints: TransitionConstraint+> => 
+        transition_constraints
 }
 
 TransitionConstraint: TransitionConstraint = {

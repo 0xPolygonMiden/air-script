@@ -3,12 +3,6 @@ use super::Identifier;
 // TRANSITION CONSTRAINTS
 // ================================================================================================
 
-/// Stores the transition constraints to be enforced on the trace column values.
-#[derive(Debug, PartialEq)]
-pub struct TransitionConstraints {
-    pub transition_constraints: Vec<TransitionConstraint>,
-}
-
 /// Stores the expression corresponding to the transition constraint.
 #[derive(Debug, PartialEq, Clone)]
 pub struct TransitionConstraint {
