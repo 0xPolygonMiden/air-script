@@ -1,6 +1,6 @@
 # Reserved keywords and basic types
 
-This page specifies the basic syntax, types, and keywords of the AirScript.
+This page specifies the basic syntax, types, and keywords of AirScript.
 
 ## Keywords
 
@@ -8,16 +8,16 @@ AirScript defines the following keywords:
 
 - `$rand`: used to access random values provided by the verifier.
 - `def`: used to [define the name](./structure.md) of an AirScript module.
-- `boundary_constraints`: used to declare the [source section](./structure.md) where the [boundary constraints are described](./constraints.md#boundary_constraints).
+- `boundary_constraints`: used to declare the [source section](./structure.md#source-sections) where the [boundary constraints are described](./constraints.md#boundary_constraints).
   - `first`: used to access the value of a trace column at the first row of the trace. _It may only be used when defining boundary constraints._
   - `last`: used to access the value of a trace column at the last row of the trace. _It may only be used when defining boundary constraints._
 - `enf`: used to describe a single [constraint](./constraints.md).
-- `public_inputs`: used to declare the [source section](./structure.md) where the [public inputs are declared](./declarations.md). _They may only be referenced when defining boundary constraints._
-- `periodic_columns`: used to declare the [source section](./structure.md) where the [periodic columns are declared](./declarations.md). _They may only be referenced when defining transition constraints._
-- `trace_columns`: used to declare the [source section](./structure.md) where the [execution trace is described](./declarations.md).
-  - `main`: used to declare the main execution trace
-  - `aux`: used to declare the auxiliary execution trace
-- `transition_constraints`: used to declare the [source section](./structure.md) where the [transition constraints are described](./constraints.md#transition_constraints).
+- `public_inputs`: used to declare the [source section](./structure.md#source-sections) where the [public inputs are declared](./declarations.md). _They may only be referenced when defining boundary constraints._
+- `periodic_columns`: used to declare the [source section](./structure.md#source-sections) where the [periodic columns are declared](./declarations.md). _They may only be referenced when defining transition constraints._
+- `trace_columns`: used to declare the [source section](./structure.md#source-sections) where the [execution trace is described](./declarations.md).
+  - `main`: used to declare the main execution trace.
+  - `aux`: used to declare the auxiliary execution trace.
+- `transition_constraints`: used to declare the [source section](./structure.md#source-sections) where the [transition constraints are described](./constraints.md#transition_constraints).
 
 ## Built-in variables
 
@@ -33,7 +33,7 @@ Random values may only be accessed within source sections for constraints, i.e. 
 
 ## Delimiters and special characters
 
-- `:` is used as a delimiter when declaring [source sections](./primitives.md) and [types](./declarations.md)
+- `:` is used as a delimiter when declaring [source sections](./structure.md#source-sections) and [types](./declarations.md)
 - `.` is used to access a boundary on a trace column, e.g. `a.first` or `a.last`
 - `[` and `]` are used for defining arrays in [type declarations](./declarations.md) and for indexing in [constraint descriptions](./constraints.md)
 - `,` is used as a delimiter for defining arrays in [type declarations](./declarations.md)
