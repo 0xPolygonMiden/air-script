@@ -4,7 +4,7 @@ Polygon Miden's AirScript is designed to make it simple to describe AIR constrai
 
 ## Current Version
 
-Currently, the AirScript is on version 0.1, which supports a simple syntax for describing air constraints and generation of Rust code targeting the [Winterfell prover](https://github.com/novifinancial/winterfell).
+Currently, AirScript is on version 0.1, which supports a simple syntax for describing air constraints and generation of Rust code targeting the [Winterfell prover](https://github.com/novifinancial/winterfell).
 
 The simplified version of the language is based on [this discussion](https://github.com/maticnetwork/miden/discussions/254), but only includes the following:
 
@@ -18,7 +18,7 @@ The language will be specified in detail in the rest of this book.
 
 ### CLI
 
-There is a command-line interface available for transpiling AirScript files to Rust. There are also several example `.air` files written in the AirScript which can be found in the `examples/` directory.
+There is a command-line interface available for transpiling AirScript files to Rust. There are also several example `.air` files written in AirScript which can be found in the `examples/` directory.
 
 To use the CLI, first run:
 
