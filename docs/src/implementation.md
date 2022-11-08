@@ -46,4 +46,4 @@ Currently, the checks in the IR are very minimal and cover the following simple 
 
 ## Winterfell Codegen
 
-The `codegen-winter` crate provides a code generator for a Rust implementation of the [Winterfell prover's](https://github.com/novifinancial/winterfell) `Air` trait from an instance of an AirScript `IR`.
+The `codegen/winterfell` crate provides a code generator for a Rust implementation of the [Winterfell prover's](https://github.com/novifinancial/winterfell) `Air` trait from an instance of an AirScript `IR`.

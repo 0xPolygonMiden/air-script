@@ -1,0 +1,8 @@
+[package]
+name = "air-codegen-winter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+codegen = "0.2.0"
+ir = {package = "air-ir", path="../../ir", version="0.1.0" }

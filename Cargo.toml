@@ -3,5 +3,5 @@ members = [
   "air-script",
   "parser",
   "ir",
-  "codegen-winter"
+  "codegen/winterfell"
 ]
