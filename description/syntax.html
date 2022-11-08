@@ -1,0 +1,278 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Syntax overview - AirScript by Polygon Miden</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html" class="active"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.5.</strong> AirScript Example</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">AirScript by Polygon Miden</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
+<h1 id="reserved-keywords-and-basic-types"><a class="header" href="#reserved-keywords-and-basic-types">Reserved keywords and basic types</a></h1>
+<p>This page specifies the basic syntax, types, and keywords of AirScript.</p>
+<h2 id="keywords"><a class="header" href="#keywords">Keywords</a></h2>
+<p>AirScript defines the following keywords:</p>
+<ul>
+<li><code>rand</code>: used to access random values provided by the verifier.</li>
+<li><code>def</code>: used to <a href="./structure.html">define the name</a> of an AirScript module.</li>
+<li><code>boundary_constraints</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./constraints.html#boundary_constraints">boundary constraints are described</a>.
+<ul>
+<li><code>first</code>: used to access the value of a trace column at the first row of the trace. <em>It may only be used when defining boundary constraints.</em></li>
+<li><code>last</code>: used to access the value of a trace column at the last row of the trace. <em>It may only be used when defining boundary constraints.</em></li>
+</ul>
+</li>
+<li><code>enf</code>: used to describe a single <a href="./constraints.html">constraint</a>.</li>
+<li><code>public_inputs</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./declarations.html">public inputs are declared</a>. <em>They may only be referenced when defining boundary constraints.</em></li>
+<li><code>periodic_columns</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./declarations.html">periodic columns are declared</a>. <em>They may only be referenced when defining transition constraints.</em></li>
+<li><code>trace_columns</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./declarations.html">execution trace is described</a>.
+<ul>
+<li><code>main</code>: used to declare the main execution trace.</li>
+<li><code>aux</code>: used to declare the auxiliary execution trace.</li>
+</ul>
+</li>
+<li><code>transition_constraints</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./constraints.html#transition_constraints">transition constraints are described</a>.</li>
+</ul>
+<h2 id="built-in-variables"><a class="header" href="#built-in-variables">Built-in variables</a></h2>
+<p>Built-in variables are identified by the starting character ``.</p>
+<h3 id="randcurrentlytheonlybuiltinisrand-which-is-used-to-get-random-values-provided-by-the-verifier"><a class="header" href="#randcurrentlytheonlybuiltinisrand-which-is-used-to-get-random-values-provided-by-the-verifier"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8888799999999999em;vertical-align:-0.19444em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">an</span><span class="mord mathnormal">d</span><span class="mord mathnormal" style="margin-right:0.07153em;">C</span><span class="mord mathnormal">u</span><span class="mord mathnormal">rre</span><span class="mord mathnormal">n</span><span class="mord mathnormal" style="margin-right:0.01968em;">tl</span><span class="mord mathnormal" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.16666666666666666em;"></span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord mathnormal">eo</span><span class="mord mathnormal">n</span><span class="mord mathnormal" style="margin-right:0.01968em;">l</span><span class="mord mathnormal" style="margin-right:0.03588em;">y</span><span class="mord mathnormal">b</span><span class="mord mathnormal">u</span><span class="mord mathnormal">i</span><span class="mord mathnormal">lt</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:0.69444em;vertical-align:0em;"></span><span class="mord mathnormal">ini</span><span class="mord mathnormal">s</span><span class="mord">‘</span></span></span></span>rand`, which is used to get random values provided by the verifier.</a></h3>
+<p>These random values may be accessed by using the indexing operator on <code>&lt;span class=&quot;katex&quot;&gt;&lt;span class=&quot;katex-html&quot; aria-hidden=&quot;true&quot;&gt;&lt;span class=&quot;base&quot;&gt;&lt;span class=&quot;strut&quot; style=&quot;height:0.8888799999999999em;vertical-align:-0.19444em;&quot;&gt;&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.02778em;&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;an&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;mord&quot;&gt;‘.&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.13889em;&quot;&gt;F&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;ore&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;am&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.01968em;&quot;&gt;pl&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;mpunct&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;mspace&quot; style=&quot;margin-right:0.16666666666666666em;&quot;&gt;&lt;/span&gt;&lt;span class=&quot;mord&quot;&gt;‘&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;rand[i]</code> provides the <code>ith</code> random value.</p>
+<p>Random values may only be accessed within source sections for constraints, i.e. the <a href="./constraints.html#boundary-constraints-boundary_constraints"><code>boundary_constraints</code> section</a> and the <a href="./constraints.html#transition-constraints-transition_constraints"><code>transition_constraints</code> section</a>.</p>
+<h2 id="delimiters-and-special-characters"><a class="header" href="#delimiters-and-special-characters">Delimiters and special characters</a></h2>
+<ul>
+<li><code>:</code> is used as a delimiter when declaring <a href="./structure.html#source-sections">source sections</a> and <a href="./declarations.html">types</a></li>
+<li><code>.</code> is used to access a boundary on a trace column, e.g. <code>a.first</code> or <code>a.last</code></li>
+<li><code>[</code> and <code>]</code> are used for defining arrays in <a href="./declarations.html">type declarations</a> and for indexing in <a href="./constraints.html">constraint descriptions</a></li>
+<li><code>,</code> is used as a delimiter for defining arrays in <a href="./declarations.html">type declarations</a></li>
+<li><code>&lt;span class=&quot;katex&quot;&gt;&lt;span class=&quot;katex-html&quot; aria-hidden=&quot;true&quot;&gt;&lt;span class=&quot;base&quot;&gt;&lt;span class=&quot;strut&quot; style=&quot;height:0.8888799999999999em;vertical-align:-0.19444em;&quot;&gt;&lt;/span&gt;&lt;span class=&quot;mord&quot;&gt;‘&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;s&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;u&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;se&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;t&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;o&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;in&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;c&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;a&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;t&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;a&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;s&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;p&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;ec&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;ia&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.01968em;&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;b&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;u&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;lt&lt;/span&gt;&lt;span class=&quot;mspace&quot; style=&quot;margin-right:0.2222222222222222em;&quot;&gt;&lt;/span&gt;&lt;span class=&quot;mbin&quot;&gt;−&lt;/span&gt;&lt;span class=&quot;mspace&quot; style=&quot;margin-right:0.2222222222222222em;&quot;&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;base&quot;&gt;&lt;span class=&quot;strut&quot; style=&quot;height:0.8888799999999999em;vertical-align:-0.19444em;&quot;&gt;&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;in&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.03588em;&quot;&gt;v&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;a&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.01968em;&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;u&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;e&lt;/span&gt;&lt;span class=&quot;mord&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.07153em;&quot;&gt;C&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;u&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;rre&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.01968em;&quot;&gt;tl&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.03588em;&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;mpunct&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;mspace&quot; style=&quot;margin-right:0.16666666666666666em;&quot;&gt;&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;t&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;so&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.01968em;&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.03588em;&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;u&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;se&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.02691em;&quot;&gt;w&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;t&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;h&lt;/span&gt;&lt;span class=&quot;mord&quot;&gt;‘&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;rand</code> for accessing random values.</li>
+</ul>
+<h2 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h2>
+<p>Valid identifiers are strings that start with a letter <code>a-z</code> or <code>A-Z</code> followed by any combination of letters, digits <code>0-9</code> or an underscore <code>_</code>.</p>
+<h2 id="numbers"><a class="header" href="#numbers">Numbers</a></h2>
+<p>The only supported numbers are integers, and all integers are parsed as u64. Using a number larger than 2^64 - 1 will result in a <code>ParseError</code>.</p>
+<h2 id="operations"><a class="header" href="#operations">Operations</a></h2>
+<p>The following operations are supported in <a href="./constraints.html">constraint descriptions</a> with the specified syntax:</p>
+<ul>
+<li>Equality (<code>a = b</code>)</li>
+<li>Addition (<code>a + b</code>)</li>
+<li>Subtraction (<code>a - b</code>)</li>
+<li>Multiplication (<code>a * b</code>)</li>
+<li>Exponentiation by a constant integer x (<code>a^x</code>)</li>
+</ul>
+<p>The following operations are <strong>not supported</strong>:</p>
+<ul>
+<li>Negation</li>
+<li>Division</li>
+<li>Inversion</li>
+</ul>
+<h3 id="parentheses-and-complex-expressions"><a class="header" href="#parentheses-and-complex-expressions">Parentheses and complex expressions</a></h3>
+<p>Parentheses (<code>(</code> and <code>)</code>) are supported and can be included in any expression except exponentiation, where complex expressions are not allowed.</p>
+<p>The following is allowed:</p>
+<pre><code>a * (b + c)
+</code></pre>
+<p>The following is not allowed:</p>
+<pre><code>a^(2 + 3)
+</code></pre>
+<h2 id="section-specific-accessors"><a class="header" href="#section-specific-accessors">Section-specific accessors</a></h2>
+<p>These accessors may only be used in the specified <a href="./structure.html">source section</a> in which they are described below.</p>
+<h3 id="boundary-constraints"><a class="header" href="#boundary-constraints"><a href="./constraints.html#boundary_constraints">Boundary constraints</a></a></h3>
+<p>The following accessors may only be applied to trace columns when they are in boundary constraint definitions.</p>
+<ul>
+<li>First boundary (<code>.first</code>): accesses the trace column's value in the first row. It is only supported in <a href="./constraints.html#boundary_constraints">boundary constraint descriptions</a></li>
+<li>Last boundary (<code>.last</code>): accesses the trace column's value in the first row. It is only supported in <a href="./constraints.html#boundary_constraints">boundary constraint descriptions</a></li>
+</ul>
+<p>The following accessor may only be applied to public inputs declared in <code>public_inputs</code> when they are referenced in boundary constraint definitions.</p>
+<ul>
+<li>Indexing (<code>input_name[i]</code>): public inputs may be accessed by using the indexing operator on the declared identifier name with an index value that is less than the declared size of its array.</li>
+</ul>
+<p>Here is an example of usage of first and last boundaries and a public input within a boundary constraint:</p>
+<pre><code>trace_columns:
+    main: [a]
+
+public_inputs:
+    stack_inputs: [4]
+    stack_outputs: [4]
+
+boundary_constraints:
+    enf a.first = stack_inputs[0]
+    enf a.last = stack_outputs[0]
+</code></pre>
+<h3 id="transition-constraints"><a class="header" href="#transition-constraints"><a href="./constraints.html#transition_constraints">Transition constraints</a></a></h3>
+<p>The following accessor may only be applied to trace columns when they are referenced in transition constraint definitions.</p>
+<ul>
+<li>Next Row (<code>a'</code>): <code>'</code> is a postfix operator that indicates the value of the specified trace column in the next row. It is only supported in <a href="./constraints.html#transition_constraints">transition constraint descriptions</a>.</li>
+</ul>
+<p>Here is an example of usage of the Next Row operator within a transition constraint:</p>
+<pre><code>trace_columns:
+  main: [a]
+  aux: [p]
+
+transition_constraints:
+  enf p' = p * a
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../description/main.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../description/structure.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../description/main.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../description/structure.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+    </body>
+</html>
