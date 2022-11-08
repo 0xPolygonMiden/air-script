@@ -26,16 +26,16 @@ To use the CLI, first run:
 cargo build --release
 ```
 
-Then, run the `air-script` target with the `transpile` option and specify your input file with `-i`. For example:
+Then, run the `airc` target with the `transpile` option and specify your input file with `-i`. For example:
 
 ```
-./target/release/air-script transpile -i examples/system.air
+./target/release/airc transpile -i examples/system.air
 ```
 
 You can use the `help` option to see other available options.
 
 ```
-./target/release/air-script transpile --help
+./target/release/airc transpile --help
 ```
 
 ## Future Work

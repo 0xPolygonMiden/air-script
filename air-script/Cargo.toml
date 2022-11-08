@@ -3,6 +3,10 @@ name = "air-script"
 version = "0.0.1"
 edition = "2021"
 
+[[bin]]
+name = "airc"
+path = "src/main.rs"
+
 [dependencies]
 parser = { package = "parser", path = "../parser", version = "0.0.1" }
 ir = { package = "ir", path = "../ir", version = "0.0.1" }
