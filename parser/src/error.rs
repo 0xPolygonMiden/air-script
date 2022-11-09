@@ -10,4 +10,5 @@ pub enum Error {
 pub enum ParseError {
     InvalidInt(String),
     InvalidTraceCols(String),
+    MissingMainTraceCols(String),
 }
