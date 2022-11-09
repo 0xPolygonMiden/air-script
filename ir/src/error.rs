@@ -6,5 +6,5 @@ pub enum SemanticError {
     IndexOutOfRange(String),
     TooManyConstraints(String),
     InvalidPeriodicColumn(String),
-    MissingSourceSection(String),
+    MissingDeclaration(String),
 }

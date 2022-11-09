@@ -99,10 +99,7 @@ impl AirIR {
         let (public_inputs, periodic_columns) = symbol_table.into_declarations();
 
         // validate sections
-        validator.check("trace_columns")?;
-        validator.check("public_inputs")?;
-        validator.check("boundary_constraints")?;
-        validator.check("transition_constraints")?;
+        validator.check()?;
 
         Ok(Self {
             air_name: air_name.to_string(),
@@ -203,9 +200,15 @@ mod tests {
     #[test]
     fn err_bc_column_undeclared() {
         let source = "
+        trace_columns:
+            main: [ctx]
+        public_inputs:
+            stack_inputs: [16]
         boundary_constraints:
             enf clk.first = 0
-            enf clk.last = 1";
+            enf clk.last = 1
+        transition_constraints:
+            enf clk' = clk + 1";
 
         let parsed = parse(source).expect("Parsing failed");
 
@@ -219,6 +222,8 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
         boundary_constraints:
         transition_constraints:
             enf clk' = clk + 1";
@@ -229,6 +234,8 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
         transition_constraints:
             enf clk' = clk + 1";
 
@@ -242,6 +249,10 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        transition_constraints:
+            enf clk' = clk + 1
         boundary_constraints:
             enf clk.first = 0
             enf clk.first = 1";
@@ -257,6 +268,10 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        transition_constraints:
+            enf clk' = clk + 1
         boundary_constraints:
             enf clk.last = 0
             enf clk.last = 1";
@@ -308,6 +323,8 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
         transition_constraints:
         boundary_constraints:
             enf clk.first = 0";
@@ -318,6 +335,8 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
         boundary_constraints:
             enf clk.first = 0";
 
@@ -329,6 +348,12 @@ mod tests {
     #[test]
     fn err_tc_column_undeclared() {
         let source = "
+        trace_columns:
+            main: [ctx]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf ctx.first = 0
         transition_constraints:
             enf clk' = clk + 1";
 
@@ -368,7 +393,7 @@ mod tests {
 
     #[test]
     fn err_trace_cols_omitted() {
-        // returns an error if trace columns section is missing
+        // returns an error if trace columns declaration is missing
         let source = "
         public_inputs:
             stack_inputs: [16]
@@ -378,8 +403,11 @@ mod tests {
             enf clk.first = 0";
 
         let parsed = parse(source).expect("Parsing failed");
+
         let result = AirIR::from_source(&parsed);
 
+        // this fails before the check for missing trace columns declaration since the clk column
+        // used in constraints is not declared.
         assert!(result.is_err());
     }
 

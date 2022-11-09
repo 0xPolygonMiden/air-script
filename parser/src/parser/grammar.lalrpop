@@ -42,7 +42,7 @@ TraceCols: TraceCols = {
         (Some(main_cols), Some(aux_cols)) => Ok(TraceCols { main_cols, aux_cols }),
         (Some(main_cols), None) => Ok(TraceCols { main_cols, aux_cols: vec![] }),
         (None, Some(_aux_cols)) => Err(ParseError::User {
-            error: Error::ParseError(MissingMainTraceCols("Main Trace Columns definition is required".to_string()))
+            error: Error::ParseError(MissingMainTraceCols("Declaration of main trace columns is required".to_string()))
         }),
         (None, None) => Err(ParseError::User {
             error: Error::ParseError(InvalidTraceCols("Trace Columns cannot be empty".to_string()))

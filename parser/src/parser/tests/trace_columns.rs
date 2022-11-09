@@ -64,7 +64,7 @@ fn main_trace_cols_missing_error() {
         enf clk.first = 0";
 
     let error = Error::ParseError(ParseError::MissingMainTraceCols(
-        "Main Trace Columns definition is required".to_string(),
+        "Declaration of main trace columns is required".to_string(),
     ));
     build_parse_test!(source).expect_error(error);
 }
