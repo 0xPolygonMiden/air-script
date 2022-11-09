@@ -47,7 +47,7 @@ impl Air for PubInputsAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![];
+        let main_degrees = vec![TransitionConstraintDegree::new(1)];
         let aux_degrees = Vec::new();
         let num_main_assertions = 8;
         let num_aux_assertions = 0;
@@ -90,6 +90,7 @@ impl Air for PubInputsAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let current = frame.current();
         let next = frame.next();
+        result[0] = next[0] - (current[1] + current[2]);
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])

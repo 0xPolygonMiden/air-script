@@ -19,3 +19,6 @@ boundary_constraints:
     enf b.last = stack_outputs[1]
     enf c.last = stack_outputs[2]
     enf d.last = stack_outputs[3]
+
+transition_constraints:
+    enf a' = b + c
