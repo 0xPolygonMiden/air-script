@@ -122,3 +122,12 @@ fn err_boundary_constraint_with_identifier() {
         enf clk.first = a + 5";
     build_parse_test!(source).expect_unrecognized_token();
 }
+
+#[test]
+fn err_empty_boundary_constraints() {
+    let source = "
+    boundary_constraints:
+    transition_constraints:
+        enf clk' = clk + 1";
+    build_parse_test!(source).expect_unrecognized_token();
+}

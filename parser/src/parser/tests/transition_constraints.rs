@@ -109,3 +109,13 @@ fn error_invalid_next_usage() {
         enf clk'' = clk + 1";
     build_parse_test!(source).expect_unrecognized_token();
 }
+
+#[test]
+fn err_empty_transition_constraints() {
+    let source = "
+    transition_constraints:
+        
+    boundary_constraints:
+        enf clk.first = 1";
+    build_parse_test!(source).expect_unrecognized_token();
+}
