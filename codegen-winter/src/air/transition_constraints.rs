@@ -81,7 +81,6 @@ impl Codegen for NodeIndex {
 }
 
 impl Codegen for Operation {
-    // TODO: Only add parentheses in Add and Mul if the expression is an arithmetic operation.
     fn to_string(&self, graph: &AlgebraicGraph) -> String {
         match self {
             Operation::Const(value) => format!("E::from({}_u64)", value),
@@ -98,29 +97,55 @@ impl Codegen for Operation {
                 format!("aux_rand_elements.get_segment_elements(0)[{}]", idx)
             }
             Operation::Neg(idx) => {
-                let str = idx.to_string(graph);
-                format!("- ({})", str)
+                if is_arithmetic_op(idx, graph) {
+                    format!("- ({})", idx.to_string(graph))
+                } else {
+                    format!("- {}", idx.to_string(graph))
+                }
             }
             Operation::Add(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
 
-                // output Add followed by Neg as "-"
                 let rhs = if let Operation::Neg(n_idx) = graph.node(r_idx).op() {
-                    format!("- ({})", n_idx.to_string(graph))
+                    // output Add followed by Neg as "-"
+                    if is_arithmetic_op(n_idx, graph) {
+                        format!("- ({})", n_idx.to_string(graph))
+                    } else {
+                        format!("- {}", n_idx.to_string(graph))
+                    }
                 } else {
                     format!("+ {}", r_idx.to_string(graph))
                 };
                 format!("{} {}", lhs, rhs)
             }
             Operation::Mul(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(graph);
-                let rhs = r_idx.to_string(graph);
-                format!("({}) * ({})", lhs, rhs)
+                let lhs = if is_arithmetic_op(l_idx, graph) {
+                    format!("({})", l_idx.to_string(graph))
+                } else {
+                    l_idx.to_string(graph)
+                };
+                let rhs = if is_arithmetic_op(r_idx, graph) {
+                    format!("({})", r_idx.to_string(graph))
+                } else {
+                    r_idx.to_string(graph)
+                };
+                format!("{} * {}", lhs, rhs)
             }
             Operation::Exp(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(graph);
-                format!("({}).exp(E::PositiveInteger::from({}_u64))", lhs, r_idx)
+                let lhs = if is_arithmetic_op(l_idx, graph) {
+                    format!("({})", l_idx.to_string(graph))
+                } else {
+                    l_idx.to_string(graph)
+                };
+                format!("{}.exp(E::PositiveInteger::from({}_u64))", lhs, r_idx)
             }
         }
     }
+}
+/// Checks whether the node represents an arithmetic operation.
+fn is_arithmetic_op(transition_constraint: &NodeIndex, graph: &AlgebraicGraph) -> bool {
+    matches!(
+        graph.node(transition_constraint).op(),
+        Operation::Add(_, _) | Operation::Mul(_, _) | Operation::Neg(_)
+    )
 }
