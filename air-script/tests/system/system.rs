@@ -2,21 +2,25 @@ use winter_air::{Air, AirContext, Assertion, AuxTraceRandElements, EvaluationFra
 use winter_math::{fields, ExtensionOf, FieldElement};
 use winter_utils::{collections, ByteWriter, Serializable};
 
-pub struct PublicInputs;
+pub struct PublicInputs {
+    stack_inputs: [Felt; 16],
+}
 
 impl PublicInputs {
-    pub fn new() -> Self {
-        Self {  }
+    pub fn new(stack_inputs: [Felt; 16]) -> Self {
+        Self { stack_inputs }
     }
 }
 
 impl Serializable for PublicInputs {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write(self.stack_inputs.as_slice());
     }
 }
 
 pub struct SystemAir {
     context: AirContext<Felt>,
+    stack_inputs: [Felt; 16],
 }
 
 impl SystemAir {
@@ -48,7 +52,7 @@ impl Air for SystemAir {
             options,
         )
         .set_num_transition_exemptions(2);
-        Self { context,  }
+        Self { context, stack_inputs: public_inputs.stack_inputs }
     }
 
     fn get_periodic_column_values(&self) -> Vec<Vec<Felt>> {

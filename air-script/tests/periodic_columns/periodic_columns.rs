@@ -2,21 +2,25 @@ use winter_air::{Air, AirContext, Assertion, AuxTraceRandElements, EvaluationFra
 use winter_math::{fields, ExtensionOf, FieldElement};
 use winter_utils::{collections, ByteWriter, Serializable};
 
-pub struct PublicInputs;
+pub struct PublicInputs {
+    stack_inputs: [Felt; 16],
+}
 
 impl PublicInputs {
-    pub fn new() -> Self {
-        Self {  }
+    pub fn new(stack_inputs: [Felt; 16]) -> Self {
+        Self { stack_inputs }
     }
 }
 
 impl Serializable for PublicInputs {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write(self.stack_inputs.as_slice());
     }
 }
 
 pub struct PeriodicColumnsAir {
     context: AirContext<Felt>,
+    stack_inputs: [Felt; 16],
 }
 
 impl PeriodicColumnsAir {
@@ -36,7 +40,7 @@ impl Air for PeriodicColumnsAir {
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
         let main_degrees = vec![TransitionConstraintDegree::with_cycles(1, vec![4]), TransitionConstraintDegree::with_cycles(1, vec![8])];
         let aux_degrees = Vec::new();
-        let num_main_assertions = 0;
+        let num_main_assertions = 1;
         let num_aux_assertions = 0;
 
         let context = AirContext::new_multi_segment(
@@ -48,7 +52,7 @@ impl Air for PeriodicColumnsAir {
             options,
         )
         .set_num_transition_exemptions(2);
-        Self { context,  }
+        Self { context, stack_inputs: public_inputs.stack_inputs }
     }
 
     fn get_periodic_column_values(&self) -> Vec<Vec<Felt>> {
@@ -57,6 +61,7 @@ impl Air for PeriodicColumnsAir {
 
     fn get_assertions(&self) -> Vec<Assertion<Felt>> {
         let mut result = Vec::new();
+        result.push(Assertion::single(0, 0, Felt::new(0)));
         result
     }
 

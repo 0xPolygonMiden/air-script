@@ -49,3 +49,22 @@ fn empty_trace_columns_error() {
     ));
     build_parse_test!(source).expect_error(error);
 }
+
+#[test]
+fn main_trace_cols_missing_error() {
+    // returns an error if main trace columns are not defined
+    let source = "
+    trace_columns:
+        aux: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    transition_constraints:
+        enf clk' = clk + 1
+    boundary_constraints:
+        enf clk.first = 0";
+
+    let error = Error::ParseError(ParseError::MissingMainTraceCols(
+        "Declaration of main trace columns is required".to_string(),
+    ));
+    build_parse_test!(source).expect_error(error);
+}
