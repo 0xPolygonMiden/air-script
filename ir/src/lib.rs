@@ -15,6 +15,9 @@ pub use transition_constraints::{NodeIndex, TransitionConstraintDegree};
 mod error;
 use error::SemanticError;
 
+mod helpers;
+use helpers::SourceValidator;
+
 pub type PublicInputs = Vec<(String, usize)>;
 pub type PeriodicColumns = Vec<Vec<u64>>;
 
@@ -36,12 +39,16 @@ impl AirIR {
     /// Consumes the provided source and generates a matching AirIR.
     pub fn from_source(source: &ast::Source) -> Result<Self, SemanticError> {
         let ast::Source(source) = source;
+
         // set a default name.
         let mut air_name = "CustomAir";
+
+        let mut validator = SourceValidator::new();
 
         // process the declarations of identifiers first, using a single symbol table to enforce
         // uniqueness.
         let mut symbol_table = SymbolTable::default();
+
         for section in source {
             match section {
                 ast::SourceSection::AirDef(Identifier(air_def)) => {
@@ -53,10 +60,12 @@ impl AirIR {
                     symbol_table.insert_main_trace_columns(&columns.main_cols)?;
                     // process & validate the auxiliary trace columns
                     symbol_table.insert_aux_trace_columns(&columns.aux_cols)?;
+                    validator.exists("trace_columns");
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
                     // process & validate the public inputs
                     symbol_table.insert_public_inputs(inputs)?;
+                    validator.exists("public_inputs");
                 }
                 ast::SourceSection::PeriodicColumns(columns) => {
                     // process & validate the periodic columns
@@ -75,17 +84,25 @@ impl AirIR {
                     for constraint in constraints.boundary_constraints.iter() {
                         boundary_constraints.insert(&symbol_table, constraint)?;
                     }
+                    validator.exists("boundary_constraints");
                 }
                 ast::SourceSection::TransitionConstraints(constraints) => {
                     for constraint in constraints.transition_constraints.iter() {
                         transition_constraints.insert(&symbol_table, constraint)?;
                     }
+                    validator.exists("transition_constraints");
                 }
                 _ => {}
             }
         }
 
         let (public_inputs, periodic_columns) = symbol_table.into_declarations();
+
+        // validate sections
+        validator.check("trace_columns")?;
+        validator.check("public_inputs")?;
+        validator.check("boundary_constraints")?;
+        validator.check("transition_constraints")?;
 
         Ok(Self {
             air_name: air_name.to_string(),
@@ -170,12 +187,15 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        transition_constraints:
+            enf clk' = clk + 1
         boundary_constraints:
             enf clk.first = 0
             enf clk.last = 1";
 
         let parsed = parse(source).expect("Parsing failed");
-
         let result = AirIR::from_source(&parsed);
         assert!(result.is_ok());
     }
@@ -189,6 +209,30 @@ mod tests {
 
         let parsed = parse(source).expect("Parsing failed");
 
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn err_bc_empty_or_omitted() {
+        // if boundary constraints are empty, an error should be returned at parser level.
+        let source = "
+        trace_columns:
+            main: [clk]
+        boundary_constraints:
+        transition_constraints:
+            enf clk' = clk + 1";
+
+        assert!(parse(source).is_err());
+
+        // if boundary constraints are omitted, an error should be returned at IR level.
+        let source = "
+        trace_columns:
+            main: [clk]
+        transition_constraints:
+            enf clk' = clk + 1";
+
+        let parsed = parse(source).expect("Parsing failed");
         let result = AirIR::from_source(&parsed);
         assert!(result.is_err());
     }
@@ -227,6 +271,10 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf clk.first = 0
         transition_constraints:
             enf clk' = clk + 1";
 
@@ -241,6 +289,10 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf clk.first = 0
         transition_constraints:
             enf clk' = (clk + 1)";
 
@@ -248,6 +300,30 @@ mod tests {
 
         let result = AirIR::from_source(&parsed);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn err_tc_empty_or_omitted() {
+        // if transition constraints are empty, an error should be returned at parser level.
+        let source = "
+        trace_columns:
+            main: [clk]
+        transition_constraints:
+        boundary_constraints:
+            enf clk.first = 0";
+
+        assert!(parse(source).is_err());
+
+        // if transition constraints are omitted, an error should be returned at IR level.
+        let source = "
+        trace_columns:
+            main: [clk]
+        boundary_constraints:
+            enf clk.first = 0";
+
+        let parsed = parse(source).expect("Parsing failed");
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -263,10 +339,59 @@ mod tests {
     }
 
     #[test]
+    fn err_public_inputs_empty_or_omitted() {
+        // if public inputs are empty, an error should be returned at parser level.
+        let source = "
+        trace_columns:
+            main: [clk]
+        public_inputs:
+        transition_constraints:
+            enf clk' = clk + 1
+        boundary_constraints:
+            enf clk.first = 0";
+
+        assert!(parse(source).is_err());
+
+        // if public inputs are omitted, an error should be returned at IR level.
+        let source = "
+        trace_columns:
+            main: [clk]
+        transition_constraints:
+            enf clk' = clk + 1
+        boundary_constraints:
+            enf clk.first = 0";
+
+        let parsed = parse(source).expect("Parsing failed");
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn err_trace_cols_omitted() {
+        // returns an error if trace columns section is missing
+        let source = "
+        public_inputs:
+            stack_inputs: [16]
+        transition_constraints:
+            enf clk' = clk + 1
+        boundary_constraints:
+            enf clk.first = 0";
+
+        let parsed = parse(source).expect("Parsing failed");
+        let result = AirIR::from_source(&parsed);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn op_mul() {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf clk.first = 0
         transition_constraints:
             enf clk' * clk = 1";
         let parsed = parse(source).expect("Parsing failed");
@@ -280,6 +405,10 @@ mod tests {
         let source = "
         trace_columns:
             main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf clk.first = 0
         transition_constraints:
             enf clk'^2 - clk = 1";
         let parsed = parse(source).expect("Parsing failed");
