@@ -1,5 +1,9 @@
 # AirScript
 
+<a href="https://github.com/0xPolygonMiden/air-script/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+<img src="https://github.com/0xPolygonMiden/air-script/workflows/CI/badge.svg?branch=main">
+<a href="https://crates.io/crates/air-script"><img src="https://img.shields.io/crates/v/air-script"></a>
+
 A domain-specific language for expressing AIR constraints for STARKs, especially for STARK-based virtual machines like [Miden VM](https://github.com/maticnetwork/miden/).
 
 An in-depth description of AirScript is available in the full AirScript [documentation](https://0xpolygonmiden.github.io/air-script/).
