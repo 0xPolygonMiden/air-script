@@ -33,6 +33,8 @@ impl TransitionConstraint {
 pub enum TransitionExpr {
     Const(u64),
     Var(Identifier),
+    VecElem(Identifier, usize),
+    MatrixElem(Identifier, usize, usize),
     Next(Identifier),
     /// Represents a random value provided by the verifier. The inner value is the index of this
     /// random value in the array of all random values.

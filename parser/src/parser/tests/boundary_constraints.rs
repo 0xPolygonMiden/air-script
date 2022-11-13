@@ -2,6 +2,10 @@ use super::{
     build_parse_test, Boundary, BoundaryConstraint, BoundaryConstraints, BoundaryExpr, Identifier,
     Source, SourceSection,
 };
+use crate::ast::constants::{
+    Constant,
+    ConstantType::{Matrix, Scalar, Vector},
+};
 
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
@@ -83,7 +87,7 @@ fn boundary_constraint_with_pub_input() {
             boundary_constraints: vec![BoundaryConstraint::new(
                 Identifier("clk".to_string()),
                 Boundary::First,
-                BoundaryExpr::PubInput(Identifier("a".to_string()), 0),
+                BoundaryExpr::VecElem(Identifier("a".to_string()), 0),
             )],
         },
     )]);
@@ -103,7 +107,7 @@ fn boundary_constraint_with_expr() {
                 BoundaryExpr::Add(
                     Box::new(BoundaryExpr::Add(
                         Box::new(BoundaryExpr::Const(5)),
-                        Box::new(BoundaryExpr::PubInput(Identifier("a".to_string()), 3)),
+                        Box::new(BoundaryExpr::VecElem(Identifier("a".to_string()), 3)),
                     )),
                     Box::new(BoundaryExpr::Const(6)),
                 ),
@@ -114,13 +118,44 @@ fn boundary_constraint_with_expr() {
 }
 
 #[test]
-fn err_boundary_constraint_with_identifier() {
-    // TODO: ending the constraint with a gives "UnrecognizedEOF" error. These errors should be
-    // improved to be more useful and consistent.
+fn boundary_constraint_with_const() {
     let source = "
+    constants:
+        a: 1
+        b: [0, 1]
+        c: [[0, 1], [1, 0]]
     boundary_constraints:
-        enf clk.first = a + 5";
-    build_parse_test!(source).expect_unrecognized_token();
+        enf clk.first = a + b[1] - c[0][1]";
+    let expected = Source(vec![
+        SourceSection::Constants(vec![
+            Constant {
+                name: Identifier("a".to_string()),
+                value: Scalar(1),
+            },
+            Constant {
+                name: Identifier("b".to_string()),
+                value: Vector(vec![0, 1]),
+            },
+            Constant {
+                name: Identifier("c".to_string()),
+                value: Matrix(vec![vec![0, 1], vec![1, 0]]),
+            },
+        ]),
+        SourceSection::BoundaryConstraints(BoundaryConstraints {
+            boundary_constraints: vec![BoundaryConstraint::new(
+                Identifier("clk".to_string()),
+                Boundary::First,
+                BoundaryExpr::Sub(
+                    Box::new(BoundaryExpr::Add(
+                        Box::new(BoundaryExpr::Var(Identifier("a".to_string()))),
+                        Box::new(BoundaryExpr::VecElem(Identifier("b".to_string()), 1)),
+                    )),
+                    Box::new(BoundaryExpr::MatrixElem(Identifier("c".to_string()), 0, 1)),
+                ),
+            )],
+        }),
+    ]);
+    build_parse_test!(source).expect_ast(expected);
 }
 
 #[test]

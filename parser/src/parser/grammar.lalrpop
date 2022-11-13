@@ -137,7 +137,10 @@ BoundaryAtom: BoundaryExpr = {
     <lexpr: BoundaryAtom> "^" <num: Num_u64> => BoundaryExpr::Exp(Box::new(lexpr), num),
     "$rand" "[" <n: Num_u64> "]" => BoundaryExpr::Rand(n as usize),
     <n: Num_u64> => BoundaryExpr::Const(n),
-    <ident: Identifier> "[" <index: Num_u64> "]" => BoundaryExpr::PubInput(ident, index as usize)
+    <ident: Identifier> => BoundaryExpr::Var(ident),
+    <ident: Identifier> "[" <idx: Num_u64> "]" => BoundaryExpr::VecElem(ident, idx as usize),
+    <ident: Identifier> "[" <idx_row: Num_u64> "]" "[" <idx_col: Num_u64> "]" =>
+        BoundaryExpr::MatrixElem(ident, idx_row as usize, idx_col as usize)
 }
 
 // TRANSITION CONSTRAINTS
@@ -170,8 +173,11 @@ TransitionAtom: TransitionExpr = {
     <lexpr: TransitionAtom> "^" <num: Num_u64> => TransitionExpr::Exp(Box::new(lexpr), num),
     "$rand" "[" <n: Num_u64> "]" => TransitionExpr::Rand(n as usize),
     <n: Num_u64> => TransitionExpr::Const(n),
-    <s: Identifier> => TransitionExpr::Var(s),
-    <s: Identifier> "'" => TransitionExpr::Next(s)
+    <ident: Identifier> => TransitionExpr::Var(ident),
+    <ident: Identifier> "[" <idx: Num_u64> "]" => TransitionExpr::VecElem(ident, idx as usize),
+    <ident: Identifier> "[" <idx_row: Num_u64> "]" "[" <idx_col: Num_u64> "]" =>
+        TransitionExpr::MatrixElem(ident, idx_row as usize, idx_col as usize),
+    <ident: Identifier> "'" => TransitionExpr::Next(ident)
 }
 
 // ATOMS

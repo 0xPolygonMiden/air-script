@@ -61,9 +61,14 @@ impl Display for Boundary {
 #[derive(Debug, PartialEq, Clone)]
 pub enum BoundaryExpr {
     Const(u64),
-    /// Reference to a public input element, identified by the name of a public input array and the
-    /// index of the cell.
-    PubInput(Identifier, usize),
+    /// Represents any named constant or variable.
+    Var(Identifier),
+    /// Represents an element inside a constant or variable vector. The index is the index of
+    /// this value inside the vector.
+    VecElem(Identifier, usize),
+    /// Represents an element inside a constant or variable matrix. Indices idx_row and idx_col
+    /// are the indices of this value inside the matrix.
+    MatrixElem(Identifier, usize, usize),
     /// Represents a random value provided by the verifier. The inner value is the index of this
     /// random value in the array of all random values.
     Rand(usize),

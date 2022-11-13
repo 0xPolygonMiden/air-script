@@ -121,7 +121,7 @@ fn validate_expression(
     expr: &ast::BoundaryExpr,
 ) -> Result<(), SemanticError> {
     match expr {
-        BoundaryExpr::PubInput(Identifier(name), index) => {
+        BoundaryExpr::VecElem(Identifier(name), index) => {
             symbol_table.validate_public_input(name, *index)
         }
         BoundaryExpr::Add(lhs, rhs) | BoundaryExpr::Sub(lhs, rhs) => {

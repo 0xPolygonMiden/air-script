@@ -99,3 +99,73 @@ fn constants_matrix() {
     ];
     expect_valid_tokenization(source, tokens);
 }
+
+#[test]
+fn constants_access_inside_boundary_expr() {
+    let source = "
+    boundary_constraints:
+        enf clk.first = a + b[0]
+        enf clk.last = c[0][1]
+    ";
+
+    let tokens = vec![
+        Token::BoundaryConstraints,
+        Token::Colon,
+        Token::Enf,
+        Token::Ident("clk".to_string()),
+        Token::Dot,
+        Token::First,
+        Token::Equal,
+        Token::Ident("a".to_string()),
+        Token::Plus,
+        Token::Ident("b".to_string()),
+        Token::Lsqb,
+        Token::Num("0".to_string()),
+        Token::Rsqb,
+        Token::Enf,
+        Token::Ident("clk".to_string()),
+        Token::Dot,
+        Token::Last,
+        Token::Equal,
+        Token::Ident("c".to_string()),
+        Token::Lsqb,
+        Token::Num("0".to_string()),
+        Token::Rsqb,
+        Token::Lsqb,
+        Token::Num("1".to_string()),
+        Token::Rsqb,
+    ];
+    expect_valid_tokenization(source, tokens);
+}
+
+#[test]
+fn constants_access_inside_transition_expr() {
+    let source = "
+        transition_constraints:
+            enf clk * 2^a = b[0] + c[0][1]
+    ";
+    let tokens = vec![
+        Token::TransitionConstraints,
+        Token::Colon,
+        Token::Enf,
+        Token::Ident("clk".to_string()),
+        Token::Mul,
+        Token::Num("2".to_string()),
+        Token::Exp,
+        Token::Ident("a".to_string()),
+        Token::Equal,
+        Token::Ident("b".to_string()),
+        Token::Lsqb,
+        Token::Num("0".to_string()),
+        Token::Rsqb,
+        Token::Plus,
+        Token::Ident("c".to_string()),
+        Token::Lsqb,
+        Token::Num("0".to_string()),
+        Token::Rsqb,
+        Token::Lsqb,
+        Token::Num("1".to_string()),
+        Token::Rsqb,
+    ];
+    expect_valid_tokenization(source, tokens);
+}
