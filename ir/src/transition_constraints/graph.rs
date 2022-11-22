@@ -64,6 +64,11 @@ impl AlgebraicGraph {
                 let rhs_base = self.accumulate_degree(cycles, rhs);
                 lhs_base.max(rhs_base)
             }
+            Operation::Sub(lhs, rhs) => {
+                let lhs_base = self.accumulate_degree(cycles, lhs);
+                let rhs_base = self.accumulate_degree(cycles, rhs);
+                lhs_base.max(rhs_base)
+            }
             Operation::Mul(lhs, rhs) => {
                 let lhs_base = self.accumulate_degree(cycles, lhs);
                 let rhs_base = self.accumulate_degree(cycles, rhs);
@@ -113,11 +118,9 @@ impl AlgebraicGraph {
                 // add both subexpressions.
                 let (lhs_type, lhs) = self.insert_expr(symbol_table, *lhs)?;
                 let (rhs_type, rhs) = self.insert_expr(symbol_table, *rhs)?;
-                // negate the right hand side.
-                let rhs = self.insert_op(Operation::Neg(rhs));
                 // add the expression.
                 let constraint_type = get_binop_constraint_type(lhs_type, rhs_type);
-                let node_index = self.insert_op(Operation::Add(lhs, rhs));
+                let node_index = self.insert_op(Operation::Sub(lhs, rhs));
                 Ok((constraint_type, node_index))
             }
             TransitionExpr::Mul(lhs, rhs) => {
@@ -268,6 +271,8 @@ pub enum Operation {
     Neg(NodeIndex),
     /// Addition operation applied to the nodes with the specified indices.
     Add(NodeIndex, NodeIndex),
+    /// Subtraction operation applied to the nodes with the specified indices.
+    Sub(NodeIndex, NodeIndex),
     /// Multiplication operation applied to the nodes with the specified indices.
     Mul(NodeIndex, NodeIndex),
     /// Exponentiation operation applied to the node with the specified index, using the provided
