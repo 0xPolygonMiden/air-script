@@ -29,7 +29,7 @@ cargo build --release
 Then, run the `airc` target with the `transpile` option and specify your input file with `-i`. For example:
 
 ```
-./target/release/airc transpile -i examples/system.air
+./target/release/airc transpile -i examples/example.air
 ```
 
 You can use the `help` option to see other available options.
