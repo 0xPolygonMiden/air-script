@@ -178,7 +178,8 @@ transition_constraints:
     enf s * (c - a * b) = 0
 
     # the auxiliary column contains the product of values of c offset by a random value.
-    enf p' = p * (c + &lt;span class=&quot;katex&quot;&gt;&lt;span class=&quot;katex-html&quot; aria-hidden=&quot;true&quot;&gt;&lt;span class=&quot;base&quot;&gt;&lt;span class=&quot;strut&quot; style=&quot;height:1em;vertical-align:-0.25em;&quot;&gt;&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot; style=&quot;margin-right:0.02778em;&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;an&lt;/span&gt;&lt;span class=&quot;mord mathnormal&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;mopen&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mord&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;mclose&quot;&gt;])&lt;/span&gt;&lt;span class=&quot;mord&quot;&gt;‘‘‘&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;</code></pre>
+    enf p' = p * (c + \$rand[0])
+</code></pre>
 
                     </main>
 
