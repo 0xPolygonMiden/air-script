@@ -55,3 +55,13 @@ fn system() {
     let expected = expect_file!["system/system.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn bitwise() {
+    let generated_air = Test::new("tests/bitwise/bitwise.air".to_string())
+        .transpile()
+        .unwrap();
+
+    let expected = expect_file!["bitwise/bitwise.rs"];
+    expected.assert_eq(&generated_air);
+}
