@@ -103,14 +103,15 @@ impl Codegen for Operation {
             }
             Operation::Add(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
+                let rhs = r_idx.to_string(graph);
 
-                // output Add followed by Neg as "-"
-                let rhs = if let Operation::Neg(n_idx) = graph.node(r_idx).op() {
-                    format!("- ({})", n_idx.to_string(graph))
-                } else {
-                    format!("+ {}", r_idx.to_string(graph))
-                };
-                format!("{} {}", lhs, rhs)
+                format!("{} + {}", lhs, rhs)
+            }
+            Operation::Sub(l_idx, r_idx) => {
+                let lhs = l_idx.to_string(graph);
+                let rhs = r_idx.to_string(graph);
+
+                format!("{} - ({})", lhs, rhs)
             }
             Operation::Mul(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
