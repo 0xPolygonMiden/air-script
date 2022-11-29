@@ -69,3 +69,55 @@ impl fmt::Display for Identifier {
         write!(f, "{}", &self.0)
     }
 }
+
+/// [VectorAccess] is used to represent an element inside vector at the specified index.
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone)]
+pub struct VectorAccess {
+    name: Identifier,
+    idx: u64,
+}
+
+impl VectorAccess {
+    pub fn new(name: Identifier, idx: u64) -> Self {
+        Self { name, idx }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name.0
+    }
+
+    pub fn idx(&self) -> u64 {
+        self.idx
+    }
+}
+
+/// [MatrixAccess] is used to represent an element inside vector at the specified row and column
+/// indices.
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone)]
+pub struct MatrixAccess {
+    name: Identifier,
+    col_idx: u64,
+    row_idx: u64,
+}
+
+impl MatrixAccess {
+    pub fn new(name: Identifier, col_idx: u64, row_idx: u64) -> Self {
+        Self {
+            name,
+            col_idx,
+            row_idx,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name.0
+    }
+
+    pub fn col_idx(&self) -> u64 {
+        self.col_idx
+    }
+
+    pub fn row_idx(&self) -> u64 {
+        self.row_idx
+    }
+}

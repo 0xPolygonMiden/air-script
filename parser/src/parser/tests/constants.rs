@@ -1,6 +1,8 @@
-use crate::ast::constants::{Constant, ConstantType};
-
 use super::{build_parse_test, Identifier, Source, SourceSection};
+use crate::{
+    ast::constants::{Constant, ConstantType},
+    error::{Error, ParseError},
+};
 
 // CONSTANTS
 // ================================================================================================
@@ -8,11 +10,11 @@ use super::{build_parse_test, Identifier, Source, SourceSection};
 #[test]
 fn constants_scalars() {
     let source = "constants:
-        a: 1
-        b: 2";
+        A: 1
+        B: 2";
     let expected = Source(vec![SourceSection::Constants(vec![
-        Constant::new(Identifier("a".to_string()), ConstantType::Scalar(1)),
-        Constant::new(Identifier("b".to_string()), ConstantType::Scalar(2)),
+        Constant::new(Identifier("A".to_string()), ConstantType::Scalar(1)),
+        Constant::new(Identifier("B".to_string()), ConstantType::Scalar(2)),
     ])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -20,15 +22,33 @@ fn constants_scalars() {
 #[test]
 fn constants_vectors() {
     let source = "constants:
-        a: [1, 2, 3, 4]
-        b: [5, 6, 7, 8]";
+        A: [1, 2, 3, 4]
+        B: [5, 6, 7, 8]";
     let expected = Source(vec![SourceSection::Constants(vec![
         Constant::new(
-            Identifier("a".to_string()),
+            Identifier("A".to_string()),
             ConstantType::Vector(vec![1, 2, 3, 4]),
         ),
         Constant::new(
-            Identifier("b".to_string()),
+            Identifier("B".to_string()),
+            ConstantType::Vector(vec![5, 6, 7, 8]),
+        ),
+    ])]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn constants_vectors_wrong() {
+    let source = "constants:
+        A: [1, 2, 3, 4]
+        B: [5, 6, 7, 8]";
+    let expected = Source(vec![SourceSection::Constants(vec![
+        Constant::new(
+            Identifier("A".to_string()),
+            ConstantType::Vector(vec![1, 2, 3, 4]),
+        ),
+        Constant::new(
+            Identifier("B".to_string()),
             ConstantType::Vector(vec![5, 6, 7, 8]),
         ),
     ])]);
@@ -38,15 +58,15 @@ fn constants_vectors() {
 #[test]
 fn constants_matrices() {
     let source = "constants:
-        a: [[1, 2], [3, 4]]
-        b: [[5, 6], [7, 8]]";
+        ABC: [[1, 2], [3, 4]]
+        XYZ: [[5, 6], [7, 8]]";
     let expected = Source(vec![SourceSection::Constants(vec![
         Constant::new(
-            Identifier("a".to_string()),
+            Identifier("ABC".to_string()),
             ConstantType::Matrix(vec![vec![1, 2], vec![3, 4]]),
         ),
         Constant::new(
-            Identifier("b".to_string()),
+            Identifier("XYZ".to_string()),
             ConstantType::Matrix(vec![vec![5, 6], vec![7, 8]]),
         ),
     ])]);
@@ -59,4 +79,15 @@ fn error_empty_constants_section() {
     constants:
     ";
     assert!(build_parse_test!(source).parse().is_err());
+}
+
+#[test]
+fn err_lowercase_constant_name() {
+    let source = "constants:
+    Ab: [[1, 2], [3, 4]]
+    C: [[5, 6], [7, 8]]";
+    let error = Error::ParseError(ParseError::LowercaseConstName(
+        "The constant name should be uppercase: Ab".to_string(),
+    ));
+    build_parse_test!(source).expect_error(error);
 }

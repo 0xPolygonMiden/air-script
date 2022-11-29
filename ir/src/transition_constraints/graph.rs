@@ -98,7 +98,7 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::Const(value));
                 Ok((constraint_type, node_index))
             }
-            TransitionExpr::Var(Identifier(ident)) => self.insert_variable(symbol_table, &ident),
+            TransitionExpr::Elem(Identifier(ident)) => self.insert_variable(symbol_table, &ident),
             TransitionExpr::Next(Identifier(ident)) => self.insert_next(symbol_table, &ident),
             TransitionExpr::Rand(index) => {
                 let constraint_type = ConstraintType::Auxiliary;
@@ -139,7 +139,7 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::Exp(lhs, rhs as usize));
                 Ok((constraint_type, node_index))
             }
-            TransitionExpr::VecElem(_, _) | TransitionExpr::MatrixElem(_, _, _) => todo!(),
+            TransitionExpr::VecElem(_) | TransitionExpr::MatrixElem(_) => todo!(),
         }
     }
 

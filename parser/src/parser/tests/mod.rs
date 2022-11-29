@@ -47,7 +47,7 @@ fn full_air_file() {
                 // clk' = clk + 1
                 TransitionExpr::Next(Identifier("clk".to_string())),
                 TransitionExpr::Add(
-                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     Box::new(TransitionExpr::Const(1)),
                 ),
             )],

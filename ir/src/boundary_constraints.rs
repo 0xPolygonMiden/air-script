@@ -1,4 +1,4 @@
-use super::{BTreeMap, BoundaryExpr, Identifier, IdentifierType, SemanticError, SymbolTable};
+use super::{BTreeMap, BoundaryExpr, IdentifierType, SemanticError, SymbolTable};
 use parser::ast;
 
 // BOUNDARY CONSTRAINTS
@@ -121,8 +121,8 @@ fn validate_expression(
     expr: &ast::BoundaryExpr,
 ) -> Result<(), SemanticError> {
     match expr {
-        BoundaryExpr::VecElem(Identifier(name), index) => {
-            symbol_table.validate_public_input(name, *index)
+        BoundaryExpr::VecElem(vector_access) => {
+            symbol_table.validate_public_input(vector_access.name(), vector_access.idx() as usize)
         }
         BoundaryExpr::Add(lhs, rhs) | BoundaryExpr::Sub(lhs, rhs) => {
             validate_expression(symbol_table, lhs)?;
