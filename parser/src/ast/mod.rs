@@ -64,6 +64,13 @@ pub struct TraceCols {
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone)]
 pub struct Identifier(pub String);
 
+impl Identifier {
+    /// Returns the name of the identifier.
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+}
+
 impl fmt::Display for Identifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
@@ -74,50 +81,57 @@ impl fmt::Display for Identifier {
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone)]
 pub struct VectorAccess {
     name: Identifier,
-    idx: u64,
+    idx: usize,
 }
 
 impl VectorAccess {
-    pub fn new(name: Identifier, idx: u64) -> Self {
+    /// Creates a new [VectorAccess] instance with the specified identifier name and index.
+    pub fn new(name: Identifier, idx: usize) -> Self {
         Self { name, idx }
     }
 
+    /// Returns the name of the vector.
     pub fn name(&self) -> &str {
-        &self.name.0
+        self.name.name()
     }
 
-    pub fn idx(&self) -> u64 {
+    /// Returns the index of the vector access.
+    pub fn idx(&self) -> usize {
         self.idx
     }
 }
 
-/// [MatrixAccess] is used to represent an element inside vector at the specified row and column
+/// [MatrixAccess] is used to represent an element inside a matrix at the specified row and column
 /// indices.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone)]
 pub struct MatrixAccess {
     name: Identifier,
-    col_idx: u64,
-    row_idx: u64,
+    row_idx: usize,
+    col_idx: usize,
 }
 
 impl MatrixAccess {
-    pub fn new(name: Identifier, col_idx: u64, row_idx: u64) -> Self {
+    /// Creates a new [MatrixAccess] instance with the specified identifier name and indices.
+    pub fn new(name: Identifier, col_idx: usize, row_idx: usize) -> Self {
         Self {
             name,
-            col_idx,
             row_idx,
+            col_idx,
         }
     }
 
+    /// Returns the name of the matrix.
     pub fn name(&self) -> &str {
-        &self.name.0
+        self.name.name()
     }
 
-    pub fn col_idx(&self) -> u64 {
-        self.col_idx
-    }
-
-    pub fn row_idx(&self) -> u64 {
+    /// Returns the row index of the matrix access.
+    pub fn row_idx(&self) -> usize {
         self.row_idx
+    }
+
+    /// Returns the column index of the matrix access.
+    pub fn col_idx(&self) -> usize {
+        self.col_idx
     }
 }

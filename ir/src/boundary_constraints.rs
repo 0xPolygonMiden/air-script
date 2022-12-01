@@ -121,8 +121,8 @@ fn validate_expression(
     expr: &ast::BoundaryExpr,
 ) -> Result<(), SemanticError> {
     match expr {
-        BoundaryExpr::VecElem(vector_access) => {
-            symbol_table.validate_public_input(vector_access.name(), vector_access.idx() as usize)
+        BoundaryExpr::VectorAccess(vector_access) => {
+            symbol_table.validate_public_input(vector_access.name(), vector_access.idx())
         }
         BoundaryExpr::Add(lhs, rhs) | BoundaryExpr::Sub(lhs, rhs) => {
             validate_expression(symbol_table, lhs)?;

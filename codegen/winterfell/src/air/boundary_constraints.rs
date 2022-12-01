@@ -103,7 +103,7 @@ impl Codegen for BoundaryExpr {
                     format!("Felt::new({})", value)
                 }
             }
-            Self::VecElem(vector_access) => {
+            Self::VectorAccess(vector_access) => {
                 format!("self.{}[{}]", vector_access.name(), vector_access.idx())
             }
             Self::Rand(index) => {
@@ -133,7 +133,7 @@ impl Codegen for BoundaryExpr {
             Self::Exp(lhs, rhs) => {
                 format!("({}).exp({})", lhs.to_string(is_aux_constraint), rhs)
             }
-            BoundaryExpr::Elem(_) | BoundaryExpr::MatrixElem(_) => todo!(),
+            BoundaryExpr::Elem(_) | BoundaryExpr::MatrixAccess(_) => todo!(),
         }
     }
 }

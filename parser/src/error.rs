@@ -11,5 +11,5 @@ pub enum ParseError {
     InvalidInt(String),
     InvalidTraceCols(String),
     MissingMainTraceCols(String),
-    LowercaseConstName(String),
+    InvalidConst(String),
 }

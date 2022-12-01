@@ -8,17 +8,16 @@ use std::fs;
 
 mod utils;
 
+mod arithmetic_ops;
 mod boundary_constraints;
+mod comments;
+mod constants;
+mod identifiers;
 mod periodic_columns;
 mod pub_inputs;
 mod sections;
 mod trace_columns;
 mod transition_constraints;
-
-mod comments;
-mod constants;
-mod expressions;
-mod identifiers;
 
 // FULL AIR FILE
 // ================================================================================================

@@ -93,7 +93,7 @@ fn boundary_constraint_with_pub_input() {
             boundary_constraints: vec![BoundaryConstraint::new(
                 Identifier("clk".to_string()),
                 Boundary::First,
-                BoundaryExpr::VecElem(VectorAccess::new(Identifier("a".to_string()), 0)),
+                BoundaryExpr::VectorAccess(VectorAccess::new(Identifier("a".to_string()), 0)),
             )],
         }),
     ]);
@@ -113,7 +113,7 @@ fn boundary_constraint_with_expr() {
                 BoundaryExpr::Add(
                     Box::new(BoundaryExpr::Add(
                         Box::new(BoundaryExpr::Const(5)),
-                        Box::new(BoundaryExpr::VecElem(VectorAccess::new(
+                        Box::new(BoundaryExpr::VectorAccess(VectorAccess::new(
                             Identifier("a".to_string()),
                             3,
                         ))),
@@ -151,12 +151,12 @@ fn boundary_constraint_with_const() {
                 BoundaryExpr::Sub(
                     Box::new(BoundaryExpr::Add(
                         Box::new(BoundaryExpr::Elem(Identifier("A".to_string()))),
-                        Box::new(BoundaryExpr::VecElem(VectorAccess::new(
+                        Box::new(BoundaryExpr::VectorAccess(VectorAccess::new(
                             Identifier("B".to_string()),
                             1,
                         ))),
                     )),
-                    Box::new(BoundaryExpr::MatrixElem(MatrixAccess::new(
+                    Box::new(BoundaryExpr::MatrixAccess(MatrixAccess::new(
                         Identifier("C".to_string()),
                         0,
                         1,

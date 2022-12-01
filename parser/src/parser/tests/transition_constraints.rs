@@ -128,11 +128,11 @@ fn transition_constraint_with_constants() {
                     Box::new(TransitionExpr::Elem(Identifier("A".to_string()))),
                 ),
                 TransitionExpr::Add(
-                    Box::new(TransitionExpr::VecElem(VectorAccess::new(
+                    Box::new(TransitionExpr::VectorAccess(VectorAccess::new(
                         Identifier("B".to_string()),
                         1,
                     ))),
-                    Box::new(TransitionExpr::MatrixElem(MatrixAccess::new(
+                    Box::new(TransitionExpr::MatrixAccess(MatrixAccess::new(
                         Identifier("C".to_string()),
                         1,
                         1,

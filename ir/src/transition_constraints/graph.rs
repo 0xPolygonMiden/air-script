@@ -139,7 +139,7 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::Exp(lhs, rhs as usize));
                 Ok((constraint_type, node_index))
             }
-            TransitionExpr::VecElem(_) | TransitionExpr::MatrixElem(_) => todo!(),
+            TransitionExpr::VectorAccess(_) | TransitionExpr::MatrixAccess(_) => todo!(),
         }
     }
 
