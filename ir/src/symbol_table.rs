@@ -154,6 +154,8 @@ impl SymbolTable {
         Ok(())
     }
 
+    /// Consumes this symbol table and returns the information required for declaring public inputs
+    /// and periodic columns for the AIR.
     pub(super) fn into_declarations(self) -> (PublicInputs, PeriodicColumns) {
         (self.public_inputs, self.periodic_columns)
     }
