@@ -99,7 +99,7 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
 
     // define the transition constraint degrees of the main trace `main_degrees`.
     let main_degrees = ir
-        .main_degrees()
+        .constraint_degrees(0)
         .iter()
         .map(|degree| degree.to_string(false))
         .collect::<Vec<_>>();
@@ -110,7 +110,7 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
 
     // define the transition constraint degrees of the aux trace `aux_degrees`.
     let aux_degrees = ir
-        .aux_degrees()
+        .constraint_degrees(1)
         .iter()
         .map(|degree| degree.to_string(true))
         .collect::<Vec<_>>();

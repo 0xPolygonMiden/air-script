@@ -18,6 +18,7 @@ use error::SemanticError;
 mod helpers;
 use helpers::SourceValidator;
 
+pub type TraceSegment = u8;
 pub type PublicInputs = Vec<(String, usize)>;
 pub type PeriodicColumns = Vec<Vec<u64>>;
 
@@ -57,9 +58,9 @@ impl AirIR {
                 }
                 ast::SourceSection::TraceCols(columns) => {
                     // process & validate the main trace columns
-                    symbol_table.insert_main_trace_columns(&columns.main_cols)?;
+                    symbol_table.insert_trace_columns(0, &columns.main_cols)?;
                     // process & validate the auxiliary trace columns
-                    symbol_table.insert_aux_trace_columns(&columns.aux_cols)?;
+                    symbol_table.insert_trace_columns(1, &columns.aux_cols)?;
                     validator.exists("trace_columns");
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
@@ -77,7 +78,8 @@ impl AirIR {
 
         // then process the constraints & validate them against the symbol table.
         let mut boundary_constraints = BoundaryConstraints::default();
-        let mut transition_constraints = TransitionConstraints::default();
+        let mut transition_constraints =
+            TransitionConstraints::new(symbol_table.num_trace_segments());
         for section in source {
             match section {
                 ast::SourceSection::BoundaryConstraints(constraints) => {
@@ -152,20 +154,16 @@ impl AirIR {
 
     // --- PUBLIC ACCESSORS FOR TRANSITION CONSTRAINTS --------------------------------------------
 
-    pub fn main_degrees(&self) -> Vec<TransitionConstraintDegree> {
-        self.transition_constraints.main_degrees()
+    pub fn constraint_degrees(
+        &self,
+        trace_segment: TraceSegment,
+    ) -> Vec<TransitionConstraintDegree> {
+        self.transition_constraints
+            .constraint_degrees(trace_segment)
     }
 
-    pub fn main_transition_constraints(&self) -> &[NodeIndex] {
-        self.transition_constraints.main_constraints()
-    }
-
-    pub fn aux_degrees(&self) -> Vec<TransitionConstraintDegree> {
-        self.transition_constraints.aux_degrees()
-    }
-
-    pub fn aux_transition_constraints(&self) -> &[NodeIndex] {
-        self.transition_constraints.aux_constraints()
+    pub fn transition_constraints(&self, trace_segment: TraceSegment) -> &[NodeIndex] {
+        self.transition_constraints.constraints(trace_segment)
     }
 
     pub fn transition_graph(&self) -> &AlgebraicGraph {

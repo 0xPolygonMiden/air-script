@@ -1,13 +1,14 @@
-use super::{BTreeMap, PeriodicColumns, PublicInputs, SemanticError, MIN_CYCLE_LENGTH};
+use super::{
+    BTreeMap, PeriodicColumns, PublicInputs, SemanticError, TraceSegment, MIN_CYCLE_LENGTH,
+};
 use parser::ast::{Identifier, PeriodicColumn, PublicInput};
 use std::fmt::Display;
 
 #[derive(Debug, Copy, Clone)]
 pub(super) enum IdentifierType {
-    /// an identifier for a main trace column, containing its index in the main trace
-    MainTraceColumn(usize),
-    /// an identifier for a auxiliary trace column, containing its index in the auxiliary trace
-    AuxTraceColumn(usize),
+    /// an identifier for a trace column, containing trace column information with its trace segment
+    /// and the index of the column in that segment.
+    TraceColumn(TraceColumn),
     /// an identifier for a public input, containing the size of the public input array
     PublicInput(usize),
     /// an identifier for a periodic column, containing its index out of all periodic columns and
@@ -20,9 +21,38 @@ impl Display for IdentifierType {
         match self {
             Self::PublicInput(_) => write!(f, "PublicInput"),
             Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
-            Self::MainTraceColumn(_) => write!(f, "MainTraceColumn"),
-            Self::AuxTraceColumn(_) => write!(f, "AuxTraceColumn"),
+            Self::TraceColumn(column) => {
+                write!(f, "TraceColumn in segment {}", column.trace_segment())
+            }
         }
+    }
+}
+
+/// Describes a column in the execution trace by the trace segment to which it belongs and its
+/// index within that segment.
+#[derive(Debug, Copy, Clone)]
+pub struct TraceColumn {
+    trace_segment: TraceSegment,
+    col_idx: usize,
+}
+
+impl TraceColumn {
+    /// Creates a [TraceColumn] in the specified trace segment at the specified index.
+    fn new(trace_segment: TraceSegment, col_idx: usize) -> Self {
+        Self {
+            trace_segment,
+            col_idx,
+        }
+    }
+
+    /// Gets the trace segment of this [TraceColumn].
+    pub fn trace_segment(&self) -> TraceSegment {
+        self.trace_segment
+    }
+
+    /// Gets the column index of this [TraceColumn].
+    pub fn col_idx(&self) -> usize {
+        self.col_idx
     }
 }
 
@@ -30,6 +60,9 @@ impl Display for IdentifierType {
 /// identifiers.
 #[derive(Default, Debug)]
 pub(super) struct SymbolTable {
+    /// The number of trace segments in the AIR.
+    num_trace_segments: usize,
+
     /// A map of all declared identifiers from their name (the key) to their type.
     identifiers: BTreeMap<String, IdentifierType>,
 
@@ -43,6 +76,12 @@ pub(super) struct SymbolTable {
 }
 
 impl SymbolTable {
+    /// Sets the number of trace segments to the maximum of `num_trace_segments` and the provided
+    /// trace segment identifier, which is indexed from zero.
+    fn set_num_trace_segments(&mut self, trace_segment: TraceSegment) {
+        self.num_trace_segments = self.num_trace_segments.max((trace_segment + 1).into())
+    }
+
     /// Adds a declared identifier to the symbol table using the identifier as the key and the
     /// type the identifier represents as the value.
     ///
@@ -63,28 +102,19 @@ impl SymbolTable {
         }
     }
 
-    // --- MUTATORS -------------------------------------------------------------------------------
+    // --- PUBLIC MUTATORS ------------------------------------------------------------------------
 
-    /// Add all main trace columns by their identifiers and indices in the main execution trace.
-    pub(super) fn insert_main_trace_columns(
+    /// Add all trace columns in the specified trace segment by their identifiers and indices.
+    pub(super) fn insert_trace_columns(
         &mut self,
+        trace_segment: TraceSegment,
         columns: &[Identifier],
     ) -> Result<(), SemanticError> {
-        for (idx, Identifier(name)) in columns.iter().enumerate() {
-            self.insert_symbol(name, IdentifierType::MainTraceColumn(idx))?;
-        }
+        self.set_num_trace_segments(trace_segment);
 
-        Ok(())
-    }
-
-    /// Adds all auxiliary trace columns by their identifier names and indices in the auxiliary
-    /// execution trace.
-    pub(super) fn insert_aux_trace_columns(
-        &mut self,
-        columns: &[Identifier],
-    ) -> Result<(), SemanticError> {
         for (idx, Identifier(name)) in columns.iter().enumerate() {
-            self.insert_symbol(name, IdentifierType::AuxTraceColumn(idx))?;
+            let trace_column = TraceColumn::new(trace_segment, idx);
+            self.insert_symbol(name, IdentifierType::TraceColumn(trace_column))?;
         }
 
         Ok(())
@@ -129,6 +159,11 @@ impl SymbolTable {
     }
 
     // --- ACCESSORS ------------------------------------------------------------------------------
+
+    /// Gets the number of trace segments that were specified for this AIR.
+    pub(super) fn num_trace_segments(&self) -> usize {
+        self.num_trace_segments
+    }
 
     /// Returns the type associated with the specified identifier name.
     ///
