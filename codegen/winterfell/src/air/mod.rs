@@ -98,17 +98,26 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
         .ret("Self");
 
     // define the transition constraint degrees of the main trace `main_degrees`.
-    let mut main_degrees: Vec<String> = Vec::new();
-    for degree in ir.main_degrees().iter() {
-        main_degrees.push(degree.to_string(false));
-    }
+    let main_degrees = ir
+        .main_degrees()
+        .iter()
+        .map(|degree| degree.to_string(false))
+        .collect::<Vec<_>>();
     new.line(format!(
         "let main_degrees = vec![{}];",
         main_degrees.join(", ")
     ));
 
     // define the transition constraint degrees of the aux trace `aux_degrees`.
-    new.line("let aux_degrees = Vec::new();");
+    let aux_degrees = ir
+        .aux_degrees()
+        .iter()
+        .map(|degree| degree.to_string(true))
+        .collect::<Vec<_>>();
+    new.line(format!(
+        "let aux_degrees = vec![{}];",
+        aux_degrees.join(", ")
+    ));
 
     // define the number of main trace boundary constraints `num_main_assertions`.
     new.line(format!(
@@ -117,7 +126,10 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
     ));
 
     // define the number of aux trace boundary constraints `num_aux_assertions`.
-    new.line("let num_aux_assertions = 0;");
+    new.line(format!(
+        "let num_aux_assertions = {};",
+        ir.num_aux_assertions()
+    ));
 
     // define the context.
     let context = "
