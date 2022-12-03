@@ -1,4 +1,4 @@
-use super::Identifier;
+use super::{Identifier, MatrixAccess, VectorAccess};
 use std::fmt::Display;
 
 // BOUNDARY CONSTRAINTS
@@ -61,9 +61,14 @@ impl Display for Boundary {
 #[derive(Debug, PartialEq, Clone)]
 pub enum BoundaryExpr {
     Const(u64),
-    /// Reference to a public input element, identified by the name of a public input array and the
-    /// index of the cell.
-    PubInput(Identifier, usize),
+    /// Represents any named constant or variable.
+    Elem(Identifier),
+    /// Represents an element inside a constant or variable vector. [VectorAccess] contains the
+    /// name of the vector and the index of the element to access.
+    VectorAccess(VectorAccess),
+    /// Represents an element inside a constant or variable matrix. [MatrixAccess] contains the
+    /// name of the matrix and indices of the element to access.
+    MatrixAccess(MatrixAccess),
     /// Represents a random value provided by the verifier. The inner value is the index of this
     /// random value in the array of all random values.
     Rand(usize),

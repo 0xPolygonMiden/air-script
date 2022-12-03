@@ -17,7 +17,7 @@ fn single_addition() {
             transition_constraints: vec![TransitionConstraint::new(
                 TransitionExpr::Add(
                     Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
-                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                 ),
                 TransitionExpr::Const(0),
             )],
@@ -38,7 +38,7 @@ fn multi_addition() {
                 TransitionExpr::Add(
                     Box::new(TransitionExpr::Add(
                         Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
-                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     )),
                     Box::new(TransitionExpr::Const(2)),
                 ),
@@ -60,7 +60,7 @@ fn single_subtraction() {
             transition_constraints: vec![TransitionConstraint::new(
                 TransitionExpr::Sub(
                     Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
-                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                 ),
                 TransitionExpr::Const(0),
             )],
@@ -81,7 +81,7 @@ fn multi_subtraction() {
                 TransitionExpr::Sub(
                     Box::new(TransitionExpr::Sub(
                         Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
-                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     )),
                     Box::new(TransitionExpr::Const(1)),
                 ),
@@ -103,7 +103,7 @@ fn single_multiplication() {
             transition_constraints: vec![TransitionConstraint::new(
                 TransitionExpr::Mul(
                     Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
-                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                 ),
                 TransitionExpr::Const(0),
             )],
@@ -124,7 +124,7 @@ fn multi_multiplication() {
                 TransitionExpr::Mul(
                     Box::new(TransitionExpr::Mul(
                         Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
-                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     )),
                     Box::new(TransitionExpr::Const(2)),
                 ),
@@ -167,7 +167,7 @@ fn ops_with_parens() {
                 TransitionExpr::Mul(
                     Box::new(TransitionExpr::Add(
                         Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
-                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     )),
                     Box::new(TransitionExpr::Const(2)),
                 ),
@@ -238,7 +238,7 @@ fn multi_arithmetic_ops_same_precedence() {
                     Box::new(TransitionExpr::Sub(
                         Box::new(TransitionExpr::Sub(
                             Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
-                            Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                            Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                         )),
                         Box::new(TransitionExpr::Const(2)),
                     )),
@@ -272,7 +272,7 @@ fn multi_arithmetic_ops_different_precedence() {
                             2,
                         )),
                         Box::new(TransitionExpr::Mul(
-                            Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                            Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                             Box::new(TransitionExpr::Const(2)),
                         )),
                     )),
@@ -304,7 +304,7 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
                     Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
                     Box::new(TransitionExpr::Mul(
                         Box::new(TransitionExpr::Exp(
-                            Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                            Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                             2,
                         )),
                         Box::new(TransitionExpr::Sub(

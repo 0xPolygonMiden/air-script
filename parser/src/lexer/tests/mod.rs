@@ -4,6 +4,7 @@ use crate::{
 };
 
 mod boundary_constraints;
+mod constants;
 mod expressions;
 mod identifiers;
 mod periodic_columns;

@@ -2,6 +2,13 @@ use super::{
     build_parse_test, Boundary, BoundaryConstraint, BoundaryConstraints, BoundaryExpr, Identifier,
     Source, SourceSection,
 };
+use crate::ast::{
+    constants::{
+        Constant,
+        ConstantType::{Matrix, Scalar, Vector},
+    },
+    MatrixAccess, PublicInput, VectorAccess,
+};
 
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
@@ -76,17 +83,20 @@ fn multiple_boundary_constraints() {
 #[test]
 fn boundary_constraint_with_pub_input() {
     let source = "
+    public_inputs:
+        a: [16]
     boundary_constraints:
         enf clk.first = a[0]";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(
-        BoundaryConstraints {
+    let expected = Source(vec![
+        SourceSection::PublicInputs(vec![PublicInput::new(Identifier("a".to_string()), 16)]),
+        SourceSection::BoundaryConstraints(BoundaryConstraints {
             boundary_constraints: vec![BoundaryConstraint::new(
                 Identifier("clk".to_string()),
                 Boundary::First,
-                BoundaryExpr::PubInput(Identifier("a".to_string()), 0),
+                BoundaryExpr::VectorAccess(VectorAccess::new(Identifier("a".to_string()), 0)),
             )],
-        },
-    )]);
+        }),
+    ]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -103,7 +113,10 @@ fn boundary_constraint_with_expr() {
                 BoundaryExpr::Add(
                     Box::new(BoundaryExpr::Add(
                         Box::new(BoundaryExpr::Const(5)),
-                        Box::new(BoundaryExpr::PubInput(Identifier("a".to_string()), 3)),
+                        Box::new(BoundaryExpr::VectorAccess(VectorAccess::new(
+                            Identifier("a".to_string()),
+                            3,
+                        ))),
                     )),
                     Box::new(BoundaryExpr::Const(6)),
                 ),
@@ -114,13 +127,45 @@ fn boundary_constraint_with_expr() {
 }
 
 #[test]
-fn err_boundary_constraint_with_identifier() {
-    // TODO: ending the constraint with a gives "UnrecognizedEOF" error. These errors should be
-    // improved to be more useful and consistent.
+fn boundary_constraint_with_const() {
     let source = "
+    constants:
+        A: 1
+        B: [0, 1]
+        C: [[0, 1], [1, 0]]
     boundary_constraints:
-        enf clk.first = a + 5";
-    build_parse_test!(source).expect_unrecognized_token();
+        enf clk.first = A + B[1] - C[0][1]";
+    let expected = Source(vec![
+        SourceSection::Constants(vec![
+            Constant::new(Identifier("A".to_string()), Scalar(1)),
+            Constant::new(Identifier("B".to_string()), Vector(vec![0, 1])),
+            Constant::new(
+                Identifier("C".to_string()),
+                Matrix(vec![vec![0, 1], vec![1, 0]]),
+            ),
+        ]),
+        SourceSection::BoundaryConstraints(BoundaryConstraints {
+            boundary_constraints: vec![BoundaryConstraint::new(
+                Identifier("clk".to_string()),
+                Boundary::First,
+                BoundaryExpr::Sub(
+                    Box::new(BoundaryExpr::Add(
+                        Box::new(BoundaryExpr::Elem(Identifier("A".to_string()))),
+                        Box::new(BoundaryExpr::VectorAccess(VectorAccess::new(
+                            Identifier("B".to_string()),
+                            1,
+                        ))),
+                    )),
+                    Box::new(BoundaryExpr::MatrixAccess(MatrixAccess::new(
+                        Identifier("C".to_string()),
+                        0,
+                        1,
+                    ))),
+                ),
+            )],
+        }),
+    ]);
+    build_parse_test!(source).expect_ast(expected);
 }
 
 #[test]

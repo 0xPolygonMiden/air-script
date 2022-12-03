@@ -2,6 +2,10 @@ use super::{
     build_parse_test, Identifier, Source, SourceSection, TransitionConstraint,
     TransitionConstraints, TransitionExpr,
 };
+use crate::ast::{
+    constants::{Constant, ConstantType::Matrix, ConstantType::Scalar, ConstantType::Vector},
+    MatrixAccess, VectorAccess,
+};
 
 // TRANSITION CONSTRAINTS
 // ================================================================================================
@@ -16,7 +20,7 @@ fn transition_constraints() {
             transition_constraints: vec![TransitionConstraint::new(
                 TransitionExpr::Next(Identifier("clk".to_string())),
                 TransitionExpr::Add(
-                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     Box::new(TransitionExpr::Const(1)),
                 ),
             )],
@@ -44,14 +48,14 @@ fn multiple_transition_constraints() {
                 TransitionConstraint::new(
                     TransitionExpr::Next(Identifier("clk".to_string())),
                     TransitionExpr::Add(
-                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                         Box::new(TransitionExpr::Const(1)),
                     ),
                 ),
                 TransitionConstraint::new(
                     TransitionExpr::Sub(
                         Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
-                        Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                        Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     ),
                     TransitionExpr::Const(1),
                 ),
@@ -70,8 +74,8 @@ fn transition_constraint_with_periodic_col() {
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
                 TransitionExpr::Add(
-                    Box::new(TransitionExpr::Var(Identifier("k0".to_string()))),
-                    Box::new(TransitionExpr::Var(Identifier("b".to_string()))),
+                    Box::new(TransitionExpr::Elem(Identifier("k0".to_string()))),
+                    Box::new(TransitionExpr::Elem(Identifier("b".to_string()))),
                 ),
                 TransitionExpr::Const(0),
             )],
@@ -89,13 +93,54 @@ fn transition_constraint_with_random_value() {
         TransitionConstraints {
             transition_constraints: vec![TransitionConstraint::new(
                 TransitionExpr::Add(
-                    Box::new(TransitionExpr::Var(Identifier("a".to_string()))),
+                    Box::new(TransitionExpr::Elem(Identifier("a".to_string()))),
                     Box::new(TransitionExpr::Rand(1)),
                 ),
                 TransitionExpr::Const(0),
             )],
         },
     )]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn transition_constraint_with_constants() {
+    let source = "
+    constants:
+        A: 0
+        B: [0, 1]
+        C: [[0, 1], [1, 0]]
+    transition_constraints:
+        enf clk + A = B[1] + C[1][1]";
+    let expected = Source(vec![
+        SourceSection::Constants(vec![
+            Constant::new(Identifier("A".to_string()), Scalar(0)),
+            Constant::new(Identifier("B".to_string()), Vector(vec![0, 1])),
+            Constant::new(
+                Identifier("C".to_string()),
+                Matrix(vec![vec![0, 1], vec![1, 0]]),
+            ),
+        ]),
+        SourceSection::TransitionConstraints(TransitionConstraints {
+            transition_constraints: vec![TransitionConstraint::new(
+                TransitionExpr::Add(
+                    Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Elem(Identifier("A".to_string()))),
+                ),
+                TransitionExpr::Add(
+                    Box::new(TransitionExpr::VectorAccess(VectorAccess::new(
+                        Identifier("B".to_string()),
+                        1,
+                    ))),
+                    Box::new(TransitionExpr::MatrixAccess(MatrixAccess::new(
+                        Identifier("C".to_string()),
+                        1,
+                        1,
+                    ))),
+                ),
+            )],
+        }),
+    ]);
     build_parse_test!(source).expect_ast(expected);
 }
 

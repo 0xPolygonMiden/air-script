@@ -8,16 +8,16 @@ use std::fs;
 
 mod utils;
 
+mod arithmetic_ops;
 mod boundary_constraints;
+mod comments;
+mod constants;
+mod identifiers;
 mod periodic_columns;
 mod pub_inputs;
 mod sections;
 mod trace_columns;
 mod transition_constraints;
-
-mod comments;
-mod expressions;
-mod identifiers;
 
 // FULL AIR FILE
 // ================================================================================================
@@ -46,7 +46,7 @@ fn full_air_file() {
                 // clk' = clk + 1
                 TransitionExpr::Next(Identifier("clk".to_string())),
                 TransitionExpr::Add(
-                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
+                    Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     Box::new(TransitionExpr::Const(1)),
                 ),
             )],

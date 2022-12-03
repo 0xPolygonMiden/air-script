@@ -2,8 +2,11 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryExpr}, 
         transition_constraints::{TransitionConstraint, TransitionConstraints, TransitionExpr},
-        Identifier, Source, SourceSection, TraceCols, PublicInput, PeriodicColumn
-    }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols}}, lexer::Token
+        constants::{Constant, ConstantType},
+        Identifier, Source, SourceSection, TraceCols, PublicInput, PeriodicColumn, VectorAccess,
+        MatrixAccess
+    }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
+    InvalidConst}}, lexer::Token
 };
 use std::str::FromStr;
 use lalrpop_util::ParseError;
@@ -19,6 +22,7 @@ pub Source: Source = {
 
 SourceSection: SourceSection = {
     AirDef => SourceSection::AirDef(<>),
+    Constants => SourceSection::Constants(<>),
     TraceCols => SourceSection::TraceCols(<>),
     PublicInputs => SourceSection::PublicInputs(<>),
     PeriodicColumns => SourceSection::PeriodicColumns(<>),
@@ -42,7 +46,9 @@ TraceCols: TraceCols = {
         (Some(main_cols), Some(aux_cols)) => Ok(TraceCols { main_cols, aux_cols }),
         (Some(main_cols), None) => Ok(TraceCols { main_cols, aux_cols: vec![] }),
         (None, Some(_aux_cols)) => Err(ParseError::User {
-            error: Error::ParseError(MissingMainTraceCols("Declaration of main trace columns is required".to_string()))
+            error: Error::ParseError(
+                MissingMainTraceCols("Declaration of main trace columns is required".to_string())
+            )
         }),
         (None, None) => Err(ParseError::User {
             error: Error::ParseError(InvalidTraceCols("Trace Columns cannot be empty".to_string()))
@@ -58,6 +64,35 @@ AuxCols: Vec<Identifier> = {
     "aux" ":" "[" <aux_cols: CommaElems<Identifier>> "]" => aux_cols,
 }
 
+// CONSTANTS
+// ================================================================================================
+
+// The constants section is optional but cannot be empty. If the section is declared, then at least
+// one constant is required.
+Constants: Vec<Constant> = {
+    "constants" ":" <constants: Constant+> => constants
+}
+
+Constant: Constant = {
+    <name: ConstName> ":" <scalar_value: Num_u64> => 
+        Constant::new(name, ConstantType::Scalar(scalar_value)),
+    <name: ConstName> ":" "[" <vector_value: CommaElems<Num_u64>> "]" =>
+        Constant::new(name, ConstantType::Vector(vector_value)),
+    <name: ConstName> ":" "[" <matrix_value: CommaElems<Vector<Num_u64>>> "]" =>
+        Constant::new(name, ConstantType::Matrix(matrix_value)),
+}
+
+ConstName: Identifier = {
+    <name: Identifier> =>? if name.0.chars().all(|v| v.is_uppercase()) {
+        Ok(Identifier(name.to_string()))
+    } else {
+        Err(ParseError::User {
+            error: Error::ParseError(InvalidConst(
+                format!("The constant name should be uppercase: {}", <>).to_string()
+            ))
+        })
+    }
+}
 
 // PUBLIC INPUTS
 // ================================================================================================
@@ -68,7 +103,7 @@ PublicInputs: Vec<PublicInput> = {
 }
 
 PublicInput: PublicInput = {
-    <name: Identifier> ":" "[" <size: Num_u64> "]" => PublicInput::new(name, size),
+    <name: Identifier> ":" <size: Size> => PublicInput::new(name, size),
 }
 
 // PERIODIC COLUMNS
@@ -80,7 +115,8 @@ PeriodicColumns: Vec<PeriodicColumn> = {
 }
 
 PeriodicColumn: PeriodicColumn = {
-    <name: Identifier> ":" "[" <values: CommaElems<Num_u64>> "]" => PeriodicColumn::new(name, values),
+    <name: Identifier> ":" "[" <values: CommaElems<Num_u64>> "]" =>
+        PeriodicColumn::new(name, values),
 }
 
 // BOUNDARY CONSTRAINTS
@@ -104,22 +140,27 @@ Boundary: Boundary = {
 // --- BOUNDARY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
 
 BoundaryExpr: BoundaryExpr = {
-    <lexpr: BoundaryExpr> "+" <rexpr: BoundaryFactor> => BoundaryExpr::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: BoundaryExpr> "-" <rexpr: BoundaryFactor> => BoundaryExpr::Sub(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: BoundaryExpr> "+" <rexpr: BoundaryFactor> =>
+        BoundaryExpr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: BoundaryExpr> "-" <rexpr: BoundaryFactor> =>
+        BoundaryExpr::Sub(Box::new(lexpr), Box::new(rexpr)),
     BoundaryFactor
 }
 
 BoundaryFactor: BoundaryExpr = {
-    <lexpr: BoundaryFactor> "*" <rexpr: BoundaryAtom> => BoundaryExpr::Mul(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: BoundaryFactor> "*" <rexpr: BoundaryAtom> =>
+        BoundaryExpr::Mul(Box::new(lexpr), Box::new(rexpr)),
     BoundaryAtom
 }
 
 BoundaryAtom: BoundaryExpr = {
     "(" <BoundaryExpr> ")",
     <lexpr: BoundaryAtom> "^" <num: Num_u64> => BoundaryExpr::Exp(Box::new(lexpr), num),
-    "$rand" "[" <n: Num_u64> "]" => BoundaryExpr::Rand(n as usize),
+    "$rand" <idx: Index> => BoundaryExpr::Rand(idx),
     <n: Num_u64> => BoundaryExpr::Const(n),
-    <ident: Identifier> "[" <index: Num_u64> "]" => BoundaryExpr::PubInput(ident, index as usize)
+    <ident: Identifier> => BoundaryExpr::Elem(ident),
+    <vector_access: VectorAccess> => BoundaryExpr::VectorAccess(vector_access),
+    <matrix_access: MatrixAccess> => BoundaryExpr::MatrixAccess(matrix_access)
 }
 
 // TRANSITION CONSTRAINTS
@@ -137,23 +178,28 @@ TransitionConstraint: TransitionConstraint = {
 // --- TRANSITION CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
 
 TransitionExpr: TransitionExpr = {
-    <lexpr: TransitionExpr> "+" <rexpr: TransitionFactor> => TransitionExpr::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: TransitionExpr> "-" <rexpr: TransitionFactor> => TransitionExpr::Sub(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: TransitionExpr> "+" <rexpr: TransitionFactor> =>
+        TransitionExpr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: TransitionExpr> "-" <rexpr: TransitionFactor> =>
+        TransitionExpr::Sub(Box::new(lexpr), Box::new(rexpr)),
     TransitionFactor
 }
 
 TransitionFactor: TransitionExpr = {
-    <lexpr: TransitionFactor> "*" <rexpr: TransitionAtom> => TransitionExpr::Mul(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: TransitionFactor> "*" <rexpr: TransitionAtom> =>
+        TransitionExpr::Mul(Box::new(lexpr), Box::new(rexpr)),
     TransitionAtom
 }
 
 TransitionAtom: TransitionExpr = {
     "(" <TransitionExpr> ")",
     <lexpr: TransitionAtom> "^" <num: Num_u64> => TransitionExpr::Exp(Box::new(lexpr), num),
-    "$rand" "[" <n: Num_u64> "]" => TransitionExpr::Rand(n as usize),
+    "$rand" <idx: Index> => TransitionExpr::Rand(idx),
     <n: Num_u64> => TransitionExpr::Const(n),
-    <s: Identifier> => TransitionExpr::Var(s),
-    <s: Identifier> "'" => TransitionExpr::Next(s)
+    <ident: Identifier> => TransitionExpr::Elem(ident),
+    <vector_access: VectorAccess> => TransitionExpr::VectorAccess(vector_access),
+    <matrix_access: MatrixAccess> => TransitionExpr::MatrixAccess(matrix_access),
+    <ident: Identifier> "'" => TransitionExpr::Next(ident)
 }
 
 // ATOMS
@@ -166,6 +212,32 @@ CommaElems<T>: Vec<T> = {
         v
     }
 }
+
+Vector<T>: Vec<T> = {
+    "[" <e:T> <v:("," <T>)*> "]" => {
+        let mut v = v;
+        v.insert(0, e);
+        v
+    }
+}
+
+Size: u64 = {
+    "[" <size: Num_u64> "]" => size
+}
+
+Index: usize = {
+    "[" <idx: Num_u64> "]" => idx as usize
+}
+
+VectorAccess: VectorAccess = {
+    <ident: Identifier> <idx: Index> => VectorAccess::new(ident, idx)
+}
+
+MatrixAccess: MatrixAccess = {
+    <ident: Identifier> <row: Index> <col: Index> =>
+        MatrixAccess::new(ident, row, col)
+}
+
 Identifier: Identifier = {
     <n:identifier> => Identifier(n.to_string())
 }
@@ -189,6 +261,7 @@ extern {
         r"[0-9]+" => Token::Num(<String>),
         "def" => Token::Def,
         "trace_columns" => Token::TraceColumnns,
+        "constants" => Token::Constants,
         "main" => Token::Main,
         "aux" => Token::Aux,
         "public_inputs" => Token::PublicInputs,
