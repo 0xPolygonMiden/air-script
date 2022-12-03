@@ -7,6 +7,7 @@ title = "AirScript by Polygon Miden"
 
 [output.katex]
 [output.html]
+git-repository-url = "https://github.com/0xPolygonMiden/air-script/"
 
 [output.linkcheck]
 warning-policy = "ignore"
