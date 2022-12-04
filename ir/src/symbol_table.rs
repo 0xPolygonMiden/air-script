@@ -1,11 +1,16 @@
 use super::{
     BTreeMap, PeriodicColumns, PublicInputs, SemanticError, TraceSegment, MIN_CYCLE_LENGTH,
 };
-use parser::ast::{Identifier, PeriodicColumn, PublicInput};
+use parser::ast::{
+    constants::{Constant, ConstantType},
+    Identifier, PeriodicColumn, PublicInput,
+};
 use std::fmt::Display;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub(super) enum IdentifierType {
+    /// an identifier for a constant, containing it's type and value
+    Constant(ConstantType),
     /// an identifier for a trace column, containing trace column information with its trace segment
     /// and the index of the column in that segment.
     TraceColumn(TraceColumn),
@@ -19,6 +24,7 @@ pub(super) enum IdentifierType {
 impl Display for IdentifierType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Constant(_) => write!(f, "Constant"),
             Self::PublicInput(_) => write!(f, "PublicInput"),
             Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
             Self::TraceColumn(column) => {
@@ -92,7 +98,9 @@ impl SymbolTable {
         ident_name: &str,
         ident_type: IdentifierType,
     ) -> Result<(), SemanticError> {
-        let result = self.identifiers.insert(ident_name.to_owned(), ident_type);
+        let result = self
+            .identifiers
+            .insert(ident_name.to_owned(), ident_type.clone());
         match result {
             Some(prev_type) => Err(SemanticError::DuplicateIdentifier(format!(
                 "Cannot declare {} as a {}, since it was already defined as a {}",
@@ -103,6 +111,16 @@ impl SymbolTable {
     }
 
     // --- PUBLIC MUTATORS ------------------------------------------------------------------------
+
+    /// Add all constants by their identifiers and values.
+    pub(super) fn insert_constants(&mut self, constants: &[Constant]) -> Result<(), SemanticError> {
+        for constant in constants {
+            let Identifier(name) = &constant.name();
+            self.insert_symbol(name, IdentifierType::Constant(constant.value().clone()))?;
+        }
+
+        Ok(())
+    }
 
     /// Add all trace columns in the specified trace segment by their identifiers and indices.
     pub(super) fn insert_trace_columns(
@@ -173,7 +191,7 @@ impl SymbolTable {
     /// Returns an error if the identifier was not in the symbol table.
     pub(super) fn get_type(&self, name: &str) -> Result<IdentifierType, SemanticError> {
         if let Some(ident_type) = self.identifiers.get(name) {
-            Ok(*ident_type)
+            Ok(ident_type.clone())
         } else {
             Err(SemanticError::InvalidIdentifier(format!(
                 "Identifier {} was not declared",

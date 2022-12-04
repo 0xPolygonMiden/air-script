@@ -56,6 +56,9 @@ impl AirIR {
                     // update the name of the air.
                     air_name = air_def;
                 }
+                ast::SourceSection::Constants(constants) => {
+                    symbol_table.insert_constants(constants)?;
+                }
                 ast::SourceSection::TraceCols(columns) => {
                     // process & validate the main trace columns
                     symbol_table.insert_trace_columns(0, &columns.main_cols)?;
