@@ -81,13 +81,13 @@ impl AirIR {
         for section in source {
             match section {
                 ast::SourceSection::BoundaryConstraints(constraints) => {
-                    for constraint in constraints.boundary_constraints.iter() {
+                    for constraint in constraints.boundary_constraints().iter() {
                         boundary_constraints.insert(&symbol_table, constraint)?;
                     }
                     validator.exists("boundary_constraints");
                 }
                 ast::SourceSection::TransitionConstraints(constraints) => {
-                    for constraint in constraints.transition_constraints.iter() {
+                    for constraint in constraints.transition_constraints().iter() {
                         transition_constraints.insert(&symbol_table, constraint)?;
                     }
                     validator.exists("transition_constraints");

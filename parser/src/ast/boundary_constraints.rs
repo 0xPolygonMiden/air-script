@@ -7,7 +7,32 @@ use std::fmt::Display;
 /// Stores the boundary constraints to be enforced on the trace column values.
 #[derive(Debug, PartialEq)]
 pub struct BoundaryConstraints {
-    pub boundary_constraints: Vec<BoundaryConstraint>,
+    variables: Vec<BoundaryVariable>,
+    boundary_constraints: Vec<BoundaryConstraint>,
+}
+
+impl BoundaryConstraints {
+    /// Creates a new instance of [BoundaryConstraints] sith the specified variables and
+    /// boundary constraints
+    pub fn new(
+        variables: Vec<BoundaryVariable>,
+        boundary_constraints: Vec<BoundaryConstraint>,
+    ) -> Self {
+        Self {
+            variables,
+            boundary_constraints,
+        }
+    }
+
+    /// Returns variables declared in the boundary constraints section.
+    pub fn variables(&self) -> &Vec<BoundaryVariable> {
+        &self.variables
+    }
+
+    /// Returns boundary constraints defined in the boundary constraints section.
+    pub fn boundary_constraints(&self) -> &Vec<BoundaryConstraint> {
+        &self.boundary_constraints
+    }
 }
 
 /// Stores the expression corresponding to the boundary constraint.
@@ -76,4 +101,28 @@ pub enum BoundaryExpr {
     Sub(Box<BoundaryExpr>, Box<BoundaryExpr>),
     Mul(Box<BoundaryExpr>, Box<BoundaryExpr>),
     Exp(Box<BoundaryExpr>, u64),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BoundaryVariable {
+    name: Identifier,
+    value: BoundaryVariableType,
+}
+
+impl BoundaryVariable {
+    pub fn new(name: Identifier, value: BoundaryVariableType) -> Self {
+        Self { name, value }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BoundaryVariableType {
+    Scalar(BoundaryExpr),
+    Vector(Vec<BoundaryExpr>),
+    Matrix(Vec<Vec<BoundaryExpr>>),
+}
+
+pub enum BoundaryElem {
+    Constraint(BoundaryConstraint),
+    Variable(BoundaryVariable),
 }

@@ -6,7 +6,32 @@ use super::{Identifier, MatrixAccess, VectorAccess};
 /// Stores the transition constraints to be enforced on the trace column values.
 #[derive(Debug, PartialEq)]
 pub struct TransitionConstraints {
-    pub transition_constraints: Vec<TransitionConstraint>,
+    variables: Vec<TransitionVariable>,
+    transition_constraints: Vec<TransitionConstraint>,
+}
+
+impl TransitionConstraints {
+    /// Creates a new instance of [TransitionConstraints] sith the specified variables and
+    /// transition constraints
+    pub fn new(
+        variables: Vec<TransitionVariable>,
+        transition_constraints: Vec<TransitionConstraint>,
+    ) -> Self {
+        Self {
+            variables,
+            transition_constraints,
+        }
+    }
+
+    /// Returns variables declared in the transition constraints section.
+    pub fn variables(&self) -> &Vec<TransitionVariable> {
+        &self.variables
+    }
+
+    /// Returns transition constraints defined in the transition constraints section.
+    pub fn transition_constraints(&self) -> &Vec<TransitionConstraint> {
+        &self.transition_constraints
+    }
 }
 
 /// Stores the expression corresponding to the transition constraint.
@@ -48,4 +73,28 @@ pub enum TransitionExpr {
     Sub(Box<TransitionExpr>, Box<TransitionExpr>),
     Mul(Box<TransitionExpr>, Box<TransitionExpr>),
     Exp(Box<TransitionExpr>, u64),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TransitionVariable {
+    name: Identifier,
+    value: TransitionVariableType,
+}
+
+impl TransitionVariable {
+    pub fn new(name: Identifier, value: TransitionVariableType) -> Self {
+        Self { name, value }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum TransitionVariableType {
+    Scalar(TransitionExpr),
+    Vector(Vec<TransitionExpr>),
+    Matrix(Vec<Vec<TransitionExpr>>),
+}
+
+pub enum TransitionElem {
+    Constraint(TransitionConstraint),
+    Variable(TransitionVariable),
 }
