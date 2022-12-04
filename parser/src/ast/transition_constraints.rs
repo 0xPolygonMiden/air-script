@@ -11,7 +11,7 @@ pub struct TransitionConstraints {
 }
 
 impl TransitionConstraints {
-    /// Creates a new instance of [TransitionConstraints] sith the specified variables and
+    /// Creates a new instance of [TransitionConstraints] with the specified variables and
     /// transition constraints
     pub fn new(
         variables: Vec<TransitionVariable>,
@@ -94,7 +94,7 @@ pub enum TransitionVariableType {
     Matrix(Vec<Vec<TransitionExpr>>),
 }
 
-pub enum TransitionElem {
+pub enum TransitionStmt {
     Constraint(TransitionConstraint),
     Variable(TransitionVariable),
 }

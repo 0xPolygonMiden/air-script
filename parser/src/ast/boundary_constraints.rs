@@ -12,7 +12,7 @@ pub struct BoundaryConstraints {
 }
 
 impl BoundaryConstraints {
-    /// Creates a new instance of [BoundaryConstraints] sith the specified variables and
+    /// Creates a new instance of [BoundaryConstraints] with the specified variables and
     /// boundary constraints
     pub fn new(
         variables: Vec<BoundaryVariable>,
@@ -122,7 +122,7 @@ pub enum BoundaryVariableType {
     Matrix(Vec<Vec<BoundaryExpr>>),
 }
 
-pub enum BoundaryElem {
+pub enum BoundaryStmt {
     Constraint(BoundaryConstraint),
     Variable(BoundaryVariable),
 }

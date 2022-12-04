@@ -1,9 +1,9 @@
 use crate::{
     ast::{
-        boundary_constraints::{Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryElem,
+        boundary_constraints::{Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryStmt,
         BoundaryExpr, BoundaryVariable, BoundaryVariableType}, 
         transition_constraints::{TransitionConstraint, TransitionConstraints, TransitionExpr,
-        TransitionElem, TransitionVariable, TransitionVariableType},
+        TransitionStmt, TransitionVariable, TransitionVariableType},
         constants::{Constant, ConstantType},
         Identifier, Source, SourceSection, TraceCols, PublicInput, PeriodicColumn, VectorAccess,
         MatrixAccess
@@ -125,13 +125,13 @@ PeriodicColumn: PeriodicColumn = {
 // ================================================================================================
 
 BoundaryConstraints: BoundaryConstraints = {
-    "boundary_constraints" ":" <boundary_elems: BoundaryElem+> =>? {
+    "boundary_constraints" ":" <boundary_stmts: BoundaryStmt+> =>? {
         let mut variables = Vec::new();
         let mut boundary_constraints = Vec::new();
-        for elem in boundary_elems {
-            match elem {
-                BoundaryElem::Constraint(constraint) => boundary_constraints.push(constraint),
-                BoundaryElem::Variable(variable) => variables.push(variable),
+        for stmt in boundary_stmts {
+            match stmt {
+                BoundaryStmt::Constraint(constraint) => boundary_constraints.push(constraint),
+                BoundaryStmt::Variable(variable) => variables.push(variable),
             }
         }
         if boundary_constraints.is_empty() {
@@ -147,11 +147,11 @@ BoundaryConstraints: BoundaryConstraints = {
     }
 }
 
-BoundaryElem: BoundaryElem = {
+BoundaryStmt: BoundaryStmt = {
     "enf" <column: Identifier> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
-        BoundaryElem::Constraint(BoundaryConstraint::new(column, boundary, value)),
+        BoundaryStmt::Constraint(BoundaryConstraint::new(column, boundary, value)),
     "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
-        BoundaryElem::Variable(BoundaryVariable::new(name, boundary_variable_type)),
+        BoundaryStmt::Variable(BoundaryVariable::new(name, boundary_variable_type)),
 }
 
 BoundaryVariableType: BoundaryVariableType = {
@@ -198,13 +198,13 @@ BoundaryAtom: BoundaryExpr = {
 // ================================================================================================
 
 TransitionConstraints: TransitionConstraints = {
-    "transition_constraints" ":" <transition_elems: TransitionElem+> =>? {
+    "transition_constraints" ":" <transition_stmts: TransitionStmt+> =>? {
         let mut variables = Vec::new();
         let mut transition_constraints = Vec::new();
-        for elem in transition_elems {
-            match elem {
-                TransitionElem::Constraint(constraint) => transition_constraints.push(constraint),
-                TransitionElem::Variable(variable) => variables.push(variable),
+        for stmt in transition_stmts {
+            match stmt {
+                TransitionStmt::Constraint(constraint) => transition_constraints.push(constraint),
+                TransitionStmt::Variable(variable) => variables.push(variable),
             }
         }
         if transition_constraints.is_empty() {
@@ -220,11 +220,11 @@ TransitionConstraints: TransitionConstraints = {
     }
 }
 
-TransitionElem: TransitionElem = {
+TransitionStmt: TransitionStmt = {
     "enf" <lhs: TransitionExpr> "=" <rhs: TransitionExpr> =>
-        TransitionElem::Constraint(TransitionConstraint::new(lhs, rhs)),
+        TransitionStmt::Constraint(TransitionConstraint::new(lhs, rhs)),
     "let" <name: Identifier> "=" <transition_variable_type: TransitionVariableType> =>
-        TransitionElem::Variable(TransitionVariable::new(name, transition_variable_type)),
+        TransitionStmt::Variable(TransitionVariable::new(name, transition_variable_type)),
 }
 
 TransitionVariableType: TransitionVariableType = {
