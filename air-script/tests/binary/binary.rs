@@ -39,7 +39,7 @@ impl Air for BinaryAir {
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
         let main_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2)];
-        let aux_degrees = Vec::new();
+        let aux_degrees = vec![];
         let num_main_assertions = 1;
         let num_aux_assertions = 0;
 

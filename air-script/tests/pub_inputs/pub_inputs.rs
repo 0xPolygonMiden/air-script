@@ -48,7 +48,7 @@ impl Air for PubInputsAir {
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
         let main_degrees = vec![TransitionConstraintDegree::new(1)];
-        let aux_degrees = Vec::new();
+        let aux_degrees = vec![];
         let num_main_assertions = 8;
         let num_aux_assertions = 0;
 

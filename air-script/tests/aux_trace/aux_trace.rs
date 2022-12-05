@@ -39,9 +39,9 @@ impl Air for AuxiliaryAir {
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
         let main_degrees = vec![TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1)];
-        let aux_degrees = Vec::new();
+        let aux_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2)];
         let num_main_assertions = 2;
-        let num_aux_assertions = 0;
+        let num_aux_assertions = 4;
 
         let context = AirContext::new_multi_segment(
             trace_info,

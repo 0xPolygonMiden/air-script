@@ -39,7 +39,7 @@ impl Air for PeriodicColumnsAir {
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
         let main_degrees = vec![TransitionConstraintDegree::with_cycles(1, vec![4]), TransitionConstraintDegree::with_cycles(1, vec![8])];
-        let aux_degrees = Vec::new();
+        let aux_degrees = vec![];
         let num_main_assertions = 1;
         let num_aux_assertions = 0;
 
