@@ -206,32 +206,88 @@ impl SymbolTable {
         }
     }
 
-    /// Checks that the specified name and index are a valid reference to a declared public input or
-    /// returns an error.
+    /// Checks that the specified name and index are a valid reference to a declared public input
+    /// or a vector constant. If not, it returns an error.
     ///
     /// # Errors
-    /// - Returns an error if the name was not declared as a public input.
+    /// - Returns an error if the identifier is not associated with a vector access type.
     /// - Returns an error if the index is not in the declared public input array.
-    pub(super) fn validate_public_input(
+    /// - Returns an error if the index is greater than the vector's length.
+    pub(super) fn validate_vector_access(
         &self,
         name: &str,
-        index: usize,
+        idx: usize,
     ) -> Result<(), SemanticError> {
-        let ident_type = self.get_type(name)?;
-        if let IdentifierType::PublicInput(size) = ident_type {
-            if index < size {
-                Ok(())
-            } else {
-                Err(SemanticError::IndexOutOfRange(format!(
-                    "Out-of-range index {} in public input {} of length {}",
-                    index, name, size
-                )))
+        let vector_access_type = self.get_type(name)?;
+        match vector_access_type {
+            IdentifierType::PublicInput(size) => {
+                if idx < size {
+                    Ok(())
+                } else {
+                    Err(SemanticError::IndexOutOfRange(format!(
+                        "Out-of-range index {} in public input {} of length {}",
+                        idx, name, size
+                    )))
+                }
             }
-        } else {
-            Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as {}, not as a public input",
-                name, ident_type
-            )))
+            IdentifierType::Constant(ConstantType::Vector(vector)) => {
+                if idx < vector.len() {
+                    Ok(())
+                } else {
+                    Err(SemanticError::IndexOutOfRange(format!(
+                        "Out-of-range index {} in vector constant {} of length {}",
+                        idx,
+                        name,
+                        vector.len()
+                    )))
+                }
+            }
+            _ => Err(SemanticError::InvalidUsage(format!(
+                "Identifier {} was declared as {} which is not a supported type.",
+                name, vector_access_type
+            ))),
+        }
+    }
+
+    /// Checks that the specified name and index are a valid reference to a declared public input
+    /// or a vector constant. If not, it returns an error.
+    ///
+    /// # Errors
+    /// - Returns an error if the identifier is not associated with a vector access type.
+    /// - Returns an error if the index is not in the declared public input array.
+    /// - Returns an error if the index is greater than the vector's length.
+    pub(super) fn validate_matrix_access(
+        &self,
+        name: &str,
+        row_idx: usize,
+        col_idx: usize,
+    ) -> Result<(), SemanticError> {
+        let matrix_access_type = self.get_type(name)?;
+        match matrix_access_type {
+            IdentifierType::Constant(ConstantType::Matrix(matrix)) => {
+                if row_idx > matrix.len() {
+                    return Err(SemanticError::IndexOutOfRange(format!(
+                        "Out-of-range index [{}] in matrix constant {} of row length {}",
+                        row_idx,
+                        name,
+                        matrix.len()
+                    )));
+                }
+                if col_idx > matrix[0].len() {
+                    return Err(SemanticError::IndexOutOfRange(format!(
+                        "Out-of-range index [{}][{}] in matrix constant {} of column length {}",
+                        row_idx,
+                        col_idx,
+                        name,
+                        matrix[0].len()
+                    )));
+                }
+                Ok(())
+            }
+            _ => Err(SemanticError::InvalidUsage(format!(
+                "Identifier {} was declared as {} which is not a supported type.",
+                name, matrix_access_type
+            ))),
         }
     }
 }

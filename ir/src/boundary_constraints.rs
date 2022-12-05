@@ -125,6 +125,14 @@ fn validate_expression(
     expr: &ast::BoundaryExpr,
 ) -> Result<(), SemanticError> {
     match expr {
+        BoundaryExpr::VectorAccess(vector_access) => {
+            symbol_table.validate_vector_access(vector_access.name(), vector_access.idx())
+        }
+        BoundaryExpr::MatrixAccess(matrix_access) => symbol_table.validate_matrix_access(
+            matrix_access.name(),
+            matrix_access.row_idx(),
+            matrix_access.col_idx(),
+        ),
         BoundaryExpr::Add(lhs, rhs) | BoundaryExpr::Sub(lhs, rhs) => {
             validate_expression(symbol_table, lhs)?;
             validate_expression(symbol_table, rhs)

@@ -212,6 +212,8 @@ impl AlgebraicGraph {
         symbol_table: &SymbolTable,
         vector_access: &VectorAccess,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
+        // check that vector access is valid
+        symbol_table.validate_vector_access(vector_access.name(), vector_access.idx())?;
         let vector_access_type = symbol_table.get_type(vector_access.name())?;
         match vector_access_type {
             IdentifierType::Constant(ConstantType::Vector(_)) => {
@@ -233,6 +235,12 @@ impl AlgebraicGraph {
         symbol_table: &SymbolTable,
         matrix_access: &MatrixAccess,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
+        // check that matrix access is valid
+        symbol_table.validate_matrix_access(
+            matrix_access.name(),
+            matrix_access.row_idx(),
+            matrix_access.col_idx(),
+        )?;
         let matrix_access_type = symbol_table.get_type(matrix_access.name())?;
         match matrix_access_type {
             IdentifierType::Constant(ConstantType::Matrix(_)) => {
