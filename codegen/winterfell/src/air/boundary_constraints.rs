@@ -104,25 +104,45 @@ impl Codegen for BoundaryExpr {
                 }
             }
             // TODO: Check element type and cast accordingly.
-            Self::Elem(ident) => format!("E::from({})", ident),
+            Self::Elem(ident) => {
+                if is_aux_constraint {
+                    format!("E::from({})", ident)
+                } else {
+                    format!("{}", ident)
+                }
+            }
             Self::VectorAccess(vector_access) => {
-                // check if vector_access is not a public input
+                // check if vector_access is a public input
+                // TODO: figure out a better way to handle this lookup.
                 if ir
                     .public_inputs()
                     .iter()
-                    .all(|input| input.0 != vector_access.name())
+                    .any(|input| input.0 == vector_access.name())
                 {
+                    format!("self.{}[{}]", vector_access.name(), vector_access.idx())
+                } else if is_aux_constraint {
                     format!("E::from({}[{}])", vector_access.name(), vector_access.idx())
                 } else {
-                    format!("self.{}[{}]", vector_access.name(), vector_access.idx())
+                    format!("{}[{}]", vector_access.name(), vector_access.idx())
                 }
             }
-            Self::MatrixAccess(matrix_access) => format!(
-                "E::from({}[{}][{}])",
-                matrix_access.name(),
-                matrix_access.row_idx(),
-                matrix_access.col_idx()
-            ),
+            Self::MatrixAccess(matrix_access) => {
+                if is_aux_constraint {
+                    format!(
+                        "E::from({}[{}][{}])",
+                        matrix_access.name(),
+                        matrix_access.row_idx(),
+                        matrix_access.col_idx()
+                    )
+                } else {
+                    format!(
+                        "{}[{}][{}]",
+                        matrix_access.name(),
+                        matrix_access.row_idx(),
+                        matrix_access.col_idx()
+                    )
+                }
+            }
             Self::Rand(index) => {
                 format!("aux_rand_elements.get_segment_elements(0)[{}]", index)
             }

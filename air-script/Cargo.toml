@@ -6,7 +6,7 @@ authors = ["miden contributors"]
 readme="README.md"
 license = "MIT"
 repository = "https://github.com/0xPolygonMiden/air-script"
-documnetation = "https://0xpolygonmiden.github.io/air-script/"
+documentation = "https://0xpolygonmiden.github.io/air-script/"
 categories = ["compilers", "cryptography"]
 keywords = ["air", "stark", "zero-knowledge", "zkp"]
 edition = "2021"
@@ -25,4 +25,7 @@ parser = { package = "air-parser", path = "../parser", version = "0.1.0" }
 structopt = "0.3.26"
 
 [dev-dependencies]
+winter-air = { package = "winter-air", version = "0.4.2", default-features = false }
+winter-math = { package = "winter-math", version = "0.4.2", default-features = false }
+winter-utils = { package = "winter-utils", version = "0.4.2", default-features = false }
 expect-test = "1.4.0"

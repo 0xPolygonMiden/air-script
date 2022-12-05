@@ -86,8 +86,15 @@ impl Codegen for Operation {
         match self {
             Operation::Constant(ConstantValue::Inline(value)) => format!("E::from({}_u64)", value),
             Operation::Constant(ConstantValue::Scalar(ident)) => format!("E::from({})", ident),
-            Operation::Constant(ConstantValue::Vector(vector_access)) => format!("E::from({}[{}])", vector_access.name(), vector_access.idx()),
-            Operation::Constant(ConstantValue::Matrix(matrix_access)) => format!("E::from({}[{}][{}])", matrix_access.name(), matrix_access.row_idx(), matrix_access.col_idx()),
+            Operation::Constant(ConstantValue::Vector(vector_access)) => {
+                format!("E::from({}[{}])", vector_access.name(), vector_access.idx())
+            }
+            Operation::Constant(ConstantValue::Matrix(matrix_access)) => format!(
+                "E::from({}[{}][{}])",
+                matrix_access.name(),
+                matrix_access.row_idx(),
+                matrix_access.col_idx()
+            ),
             Operation::TraceElement(trace_access) => match trace_access.row_offset() {
                 0 => {
                     format!("current[{}]", trace_access.col_idx())

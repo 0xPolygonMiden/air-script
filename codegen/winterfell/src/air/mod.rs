@@ -22,7 +22,7 @@ use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_tra
 /// Updates the provided scope with a new Air struct and Winterfell Air trait implementation
 /// which are equivalent the provided AirIR.
 pub(super) fn add_air(scope: &mut Scope, ir: &AirIR) {
-    // add constant declarations
+    // add constant declarations. Check required to avoid adding extra line during codegen.
     if !ir.constants().is_empty() {
         add_constants(scope, ir);
     }
