@@ -25,7 +25,7 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
 
     // output the constraints.
     let graph = ir.transition_graph();
-    for (idx, constraint) in ir.main_transition_constraints().iter().enumerate() {
+    for (idx, constraint) in ir.transition_constraints(0).iter().enumerate() {
         evaluate_transition.line(format!(
             "result[{}] = {};",
             idx,
@@ -56,7 +56,7 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
 
     // output the constraints.
     let graph = ir.transition_graph();
-    for (idx, constraint) in ir.aux_transition_constraints().iter().enumerate() {
+    for (idx, constraint) in ir.transition_constraints(1).iter().enumerate() {
         evaluate_aux_transition.line(format!(
             "result[{}] = {};",
             idx,
@@ -85,12 +85,15 @@ impl Codegen for Operation {
     fn to_string(&self, graph: &AlgebraicGraph) -> String {
         match self {
             Operation::Const(value) => format!("E::from({}_u64)", value),
-            Operation::MainTraceCurrentRow(col_idx) | Operation::AuxTraceCurrentRow(col_idx) => {
-                format!("current[{}]", col_idx)
-            }
-            Operation::MainTraceNextRow(col_idx) | Operation::AuxTraceNextRow(col_idx) => {
-                format!("next[{}]", col_idx)
-            }
+            Operation::TraceElement(trace_access) => match trace_access.row_offset() {
+                0 => {
+                    format!("current[{}]", trace_access.col_idx())
+                }
+                1 => {
+                    format!("next[{}]", trace_access.col_idx())
+                }
+                _ => panic!("Winterfell doesn't support row offsets greater than 1."),
+            },
             Operation::PeriodicColumn(col_idx, _) => {
                 format!("periodic_values[{}]", col_idx)
             }
