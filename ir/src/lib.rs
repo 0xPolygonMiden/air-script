@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 use parser::ast::{self, constants::Constant, BoundaryStmt, TransitionStmt};
+=======
+use parser::ast::{self, constants::Constant};
+>>>>>>> e19e45d (test: add const declaration tests for IR)
 pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
 use std::collections::BTreeMap;
 
