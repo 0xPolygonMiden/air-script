@@ -1,6 +1,9 @@
 use super::{AirIR, Impl, Scope};
 use ir::TransitionConstraintDegree;
 
+mod constants;
+use constants::add_constants;
+
 mod public_inputs;
 use public_inputs::add_public_inputs_struct;
 
@@ -19,6 +22,9 @@ use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_tra
 /// Updates the provided scope with a new Air struct and Winterfell Air trait implementation
 /// which are equivalent the provided AirIR.
 pub(super) fn add_air(scope: &mut Scope, ir: &AirIR) {
+    // add constant declarations
+    add_constants(scope, ir);
+
     // add the Public Inputs struct and its base implementation.
     add_public_inputs_struct(scope, ir);
 

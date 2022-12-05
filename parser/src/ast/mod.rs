@@ -1,7 +1,7 @@
 use std::fmt;
 
 pub mod constants;
-use constants::Constant;
+pub use constants::Constant;
 
 pub mod pub_inputs;
 pub use pub_inputs::PublicInput;
