@@ -1,5 +1,6 @@
 use super::{
-    BTreeMap, PeriodicColumns, PublicInputs, SemanticError, TraceSegment, MIN_CYCLE_LENGTH,
+    BTreeMap, Constants, PeriodicColumns, PublicInputs, SemanticError, TraceSegment,
+    MIN_CYCLE_LENGTH,
 };
 use parser::ast::{
     constants::{Constant, ConstantType},
@@ -72,6 +73,9 @@ pub(super) struct SymbolTable {
     /// A map of all declared identifiers from their name (the key) to their type.
     identifiers: BTreeMap<String, IdentifierType>,
 
+    /// A vector of constants declared in the AirScript module.
+    constants: Constants,
+
     /// A map of the Air's periodic columns using the index of the column within the declared
     /// periodic columns as the key and the vector of periodic values as the value
     periodic_columns: PeriodicColumns,
@@ -116,7 +120,9 @@ impl SymbolTable {
     pub(super) fn insert_constants(&mut self, constants: &[Constant]) -> Result<(), SemanticError> {
         for constant in constants {
             let Identifier(name) = &constant.name();
+            validate_constant(constant)?;
             self.insert_symbol(name, IdentifierType::Constant(constant.value().clone()))?;
+            self.constants.push(constant.clone());
         }
 
         Ok(())
@@ -172,10 +178,10 @@ impl SymbolTable {
         Ok(())
     }
 
-    /// Consumes this symbol table and returns the information required for declaring public inputs
-    /// and periodic columns for the AIR.
-    pub(super) fn into_declarations(self) -> (PublicInputs, PeriodicColumns) {
-        (self.public_inputs, self.periodic_columns)
+    /// Consumes this symbol table and returns the information required for declaring constants,
+    /// public inputs and periodic columns for the AIR.
+    pub(super) fn into_declarations(self) -> (Constants, PublicInputs, PeriodicColumns) {
+        (self.constants, self.public_inputs, self.periodic_columns)
     }
 
     // --- ACCESSORS ------------------------------------------------------------------------------
@@ -250,4 +256,25 @@ pub(super) fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticErr
     }
 
     Ok(())
+}
+
+// HELPERS
+// ================================================================================================
+
+fn validate_constant(constant: &Constant) -> Result<(), SemanticError> {
+    match constant.value() {
+        // check the number of elements in each row are same for a matrix
+        ConstantType::Matrix(matrix) => {
+            let row_len = matrix[0].len();
+            if matrix.iter().skip(1).all(|row| row.len() == row_len) {
+                Ok(())
+            } else {
+                Err(SemanticError::InvalidConstant(format!(
+                    "The matrix value of constant {} is invalid",
+                    constant.name()
+                )))
+            }
+        }
+        _ => Ok(()),
+    }
 }

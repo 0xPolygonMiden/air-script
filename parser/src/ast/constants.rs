@@ -7,7 +7,7 @@ use super::Identifier;
 /// - Scalar: 123
 /// - Vector: \[1, 2, 3\]
 /// - Matrix: \[\[1, 2, 3\], \[4, 5, 6\]\]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Constant {
     name: Identifier,
     value: ConstantType,

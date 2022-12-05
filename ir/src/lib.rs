@@ -1,4 +1,4 @@
-use parser::ast::{self, BoundaryStmt, TransitionStmt};
+use parser::ast::{self, constants::Constant, BoundaryStmt, TransitionStmt};
 pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
 use std::collections::BTreeMap;
 
@@ -19,6 +19,7 @@ mod helpers;
 use helpers::SourceValidator;
 
 pub type TraceSegment = u8;
+pub type Constants = Vec<Constant>;
 pub type PublicInputs = Vec<(String, usize)>;
 pub type PeriodicColumns = Vec<Vec<u64>>;
 
@@ -28,6 +29,7 @@ pub type PeriodicColumns = Vec<Vec<u64>>;
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
+    constants: Constants,
     public_inputs: PublicInputs,
     periodic_columns: PeriodicColumns,
     boundary_constraints: BoundaryConstraints,
@@ -111,13 +113,14 @@ impl AirIR {
             }
         }
 
-        let (public_inputs, periodic_columns) = symbol_table.into_declarations();
+        let (constants, public_inputs, periodic_columns) = symbol_table.into_declarations();
 
         // validate sections
         validator.check()?;
 
         Ok(Self {
             air_name: air_name.to_string(),
+            constants,
             public_inputs,
             periodic_columns,
             boundary_constraints,
@@ -206,6 +209,49 @@ mod tests {
         let parsed = parse(source).expect("Parsing failed");
         let result = AirIR::from_source(&parsed);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn boundary_constraints_with_constants() {
+        let source = "
+        constants:
+            A: 123
+            B: [1, 2, 3]
+            C: [[1, 2, 3], [4, 5, 6]]
+        trace_columns:
+            main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        transition_constraints:
+            enf clk' = clk + A
+        boundary_constraints:
+            enf clk.first = 0
+            enf clk.last = 1";
+
+        let parsed = parse(source).expect("Parsing failed");
+        let result = AirIR::from_source(&parsed);
+        println!("{:?}", result);
+        // assert!(result.is_ok());
+    }
+
+    #[test]
+    fn boundary_constraint_with_invalid_matrix_const() {
+        let source = "
+        constants:
+            A: [[2, 3], [1, 0, 2]]
+        trace_columns:
+            main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        transition_constraints:
+            enf clk' = clk + 1
+        boundary_constraints:
+            enf clk.first = 0
+            enf clk.last = 1";
+
+        let parsed = parse(source).expect("Parsing failed");
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
     }
 
     #[test]

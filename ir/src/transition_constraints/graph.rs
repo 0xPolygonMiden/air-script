@@ -171,9 +171,6 @@ impl AlgebraicGraph {
         ident: &str,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         let col_type = symbol_table.get_type(ident)?;
-
-        // since variable definitions are not possible yet, the identifier must match one of
-        // the declared trace columns or one of the declared periodic columns.
         match col_type {
             IdentifierType::TraceColumn(column) => {
                 let trace_segment = column.trace_segment();
