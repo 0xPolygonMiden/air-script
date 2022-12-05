@@ -1,11 +1,10 @@
 use super::{
-    build_parse_test, Identifier, Source, SourceSection, TransitionConstraint,
-    TransitionConstraints, TransitionExpr,
+    build_parse_test, Identifier, Source, SourceSection, TransitionConstraint, TransitionExpr,
 };
 use crate::{
     ast::{
         constants::{Constant, ConstantType::Matrix, ConstantType::Scalar, ConstantType::Vector},
-        MatrixAccess, TransitionVariable, TransitionVariableType, VectorAccess,
+        MatrixAccess, TransitionStmt, TransitionVariable, TransitionVariableType, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -18,18 +17,15 @@ fn transition_constraints() {
     let source = "
     transition_constraints:
         enf clk' = clk + 1";
-    let expected = Source(vec![SourceSection::TransitionConstraints(
-        TransitionConstraints::new(
-            vec![],
-            vec![TransitionConstraint::new(
-                TransitionExpr::Next(Identifier("clk".to_string())),
-                TransitionExpr::Add(
-                    Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
-                    Box::new(TransitionExpr::Const(1)),
-                ),
-            )],
-        ),
-    )]);
+    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
+        TransitionStmt::Constraint(TransitionConstraint::new(
+            TransitionExpr::Next(Identifier("clk".to_string())),
+            TransitionExpr::Add(
+                Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
+                Box::new(TransitionExpr::Const(1)),
+            ),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -46,27 +42,22 @@ fn multiple_transition_constraints() {
     transition_constraints:
         enf clk' = clk + 1
         enf clk' - clk = 1";
-    let expected = Source(vec![SourceSection::TransitionConstraints(
-        TransitionConstraints::new(
-            vec![],
-            vec![
-                TransitionConstraint::new(
-                    TransitionExpr::Next(Identifier("clk".to_string())),
-                    TransitionExpr::Add(
-                        Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
-                        Box::new(TransitionExpr::Const(1)),
-                    ),
-                ),
-                TransitionConstraint::new(
-                    TransitionExpr::Sub(
-                        Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
-                        Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
-                    ),
-                    TransitionExpr::Const(1),
-                ),
-            ],
-        ),
-    )]);
+    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
+        TransitionStmt::Constraint(TransitionConstraint::new(
+            TransitionExpr::Next(Identifier("clk".to_string())),
+            TransitionExpr::Add(
+                Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
+                Box::new(TransitionExpr::Const(1)),
+            ),
+        )),
+        TransitionStmt::Constraint(TransitionConstraint::new(
+            TransitionExpr::Sub(
+                Box::new(TransitionExpr::Next(Identifier("clk".to_string()))),
+                Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
+            ),
+            TransitionExpr::Const(1),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -75,18 +66,15 @@ fn transition_constraint_with_periodic_col() {
     let source = "
     transition_constraints:
         enf k0 + b = 0";
-    let expected = Source(vec![SourceSection::TransitionConstraints(
-        TransitionConstraints::new(
-            vec![],
-            vec![TransitionConstraint::new(
-                TransitionExpr::Add(
-                    Box::new(TransitionExpr::Elem(Identifier("k0".to_string()))),
-                    Box::new(TransitionExpr::Elem(Identifier("b".to_string()))),
-                ),
-                TransitionExpr::Const(0),
-            )],
-        ),
-    )]);
+    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
+        TransitionStmt::Constraint(TransitionConstraint::new(
+            TransitionExpr::Add(
+                Box::new(TransitionExpr::Elem(Identifier("k0".to_string()))),
+                Box::new(TransitionExpr::Elem(Identifier("b".to_string()))),
+            ),
+            TransitionExpr::Const(0),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -95,18 +83,15 @@ fn transition_constraint_with_random_value() {
     let source = "
     transition_constraints:
         enf a + $rand[1] = 0";
-    let expected = Source(vec![SourceSection::TransitionConstraints(
-        TransitionConstraints::new(
-            vec![],
-            vec![TransitionConstraint::new(
-                TransitionExpr::Add(
-                    Box::new(TransitionExpr::Elem(Identifier("a".to_string()))),
-                    Box::new(TransitionExpr::Rand(1)),
-                ),
-                TransitionExpr::Const(0),
-            )],
-        ),
-    )]);
+    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
+        TransitionStmt::Constraint(TransitionConstraint::new(
+            TransitionExpr::Add(
+                Box::new(TransitionExpr::Elem(Identifier("a".to_string()))),
+                Box::new(TransitionExpr::Rand(1)),
+            ),
+            TransitionExpr::Const(0),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -128,9 +113,8 @@ fn transition_constraint_with_constants() {
                 Matrix(vec![vec![0, 1], vec![1, 0]]),
             ),
         ]),
-        SourceSection::TransitionConstraints(TransitionConstraints::new(
-            vec![],
-            vec![TransitionConstraint::new(
+        SourceSection::TransitionConstraints(vec![TransitionStmt::Constraint(
+            TransitionConstraint::new(
                 TransitionExpr::Add(
                     Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     Box::new(TransitionExpr::Elem(Identifier("A".to_string()))),
@@ -146,8 +130,8 @@ fn transition_constraint_with_constants() {
                         1,
                     ))),
                 ),
-            )],
-        )),
+            ),
+        )]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -160,71 +144,61 @@ fn transition_constraint_with_variables() {
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]
         enf clk + a = b[1] + c[1][1]";
-    let expected = Source(vec![SourceSection::TransitionConstraints(
-        TransitionConstraints::new(
-            vec![
-                TransitionVariable::new(
-                    Identifier("a".to_string()),
-                    TransitionVariableType::Scalar(TransitionExpr::Exp(
-                        Box::new(TransitionExpr::Const(2)),
-                        2,
-                    )),
-                ),
-                TransitionVariable::new(
-                    Identifier("b".to_string()),
-                    TransitionVariableType::Vector(vec![
-                        TransitionExpr::Elem(Identifier("a".to_string())),
-                        TransitionExpr::Mul(
-                            Box::new(TransitionExpr::Const(2)),
-                            Box::new(TransitionExpr::Elem(Identifier("a".to_string()))),
-                        ),
-                    ]),
-                ),
-                TransitionVariable::new(
-                    Identifier("c".to_string()),
-                    TransitionVariableType::Matrix(vec![
-                        vec![
-                            TransitionExpr::Sub(
-                                Box::new(TransitionExpr::Elem(Identifier("a".to_string()))),
-                                Box::new(TransitionExpr::Const(1)),
-                            ),
-                            TransitionExpr::Exp(
-                                Box::new(TransitionExpr::Elem(Identifier("a".to_string()))),
-                                2,
-                            ),
-                        ],
-                        vec![
-                            TransitionExpr::VectorAccess(VectorAccess::new(
-                                Identifier("b".to_string()),
-                                0,
-                            )),
-                            TransitionExpr::VectorAccess(VectorAccess::new(
-                                Identifier("b".to_string()),
-                                1,
-                            )),
-                        ],
-                    ]),
-                ),
-            ],
-            vec![TransitionConstraint::new(
-                TransitionExpr::Add(
-                    Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
+    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
+        TransitionStmt::Variable(TransitionVariable::new(
+            Identifier("a".to_string()),
+            TransitionVariableType::Scalar(TransitionExpr::Exp(
+                Box::new(TransitionExpr::Const(2)),
+                2,
+            )),
+        )),
+        TransitionStmt::Variable(TransitionVariable::new(
+            Identifier("b".to_string()),
+            TransitionVariableType::Vector(vec![
+                TransitionExpr::Elem(Identifier("a".to_string())),
+                TransitionExpr::Mul(
+                    Box::new(TransitionExpr::Const(2)),
                     Box::new(TransitionExpr::Elem(Identifier("a".to_string()))),
                 ),
-                TransitionExpr::Add(
-                    Box::new(TransitionExpr::VectorAccess(VectorAccess::new(
-                        Identifier("b".to_string()),
-                        1,
-                    ))),
-                    Box::new(TransitionExpr::MatrixAccess(MatrixAccess::new(
-                        Identifier("c".to_string()),
-                        1,
-                        1,
-                    ))),
-                ),
-            )],
-        ),
-    )]);
+            ]),
+        )),
+        TransitionStmt::Variable(TransitionVariable::new(
+            Identifier("c".to_string()),
+            TransitionVariableType::Matrix(vec![
+                vec![
+                    TransitionExpr::Sub(
+                        Box::new(TransitionExpr::Elem(Identifier("a".to_string()))),
+                        Box::new(TransitionExpr::Const(1)),
+                    ),
+                    TransitionExpr::Exp(
+                        Box::new(TransitionExpr::Elem(Identifier("a".to_string()))),
+                        2,
+                    ),
+                ],
+                vec![
+                    TransitionExpr::VectorAccess(VectorAccess::new(Identifier("b".to_string()), 0)),
+                    TransitionExpr::VectorAccess(VectorAccess::new(Identifier("b".to_string()), 1)),
+                ],
+            ]),
+        )),
+        TransitionStmt::Constraint(TransitionConstraint::new(
+            TransitionExpr::Add(
+                Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
+                Box::new(TransitionExpr::Elem(Identifier("a".to_string()))),
+            ),
+            TransitionExpr::Add(
+                Box::new(TransitionExpr::VectorAccess(VectorAccess::new(
+                    Identifier("b".to_string()),
+                    1,
+                ))),
+                Box::new(TransitionExpr::MatrixAccess(MatrixAccess::new(
+                    Identifier("c".to_string()),
+                    1,
+                    1,
+                ))),
+            ),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 

@@ -1,6 +1,5 @@
 use super::{
-    build_parse_test, Boundary, BoundaryConstraint, BoundaryConstraints, BoundaryExpr, Identifier,
-    Source, SourceSection,
+    build_parse_test, Boundary, BoundaryConstraint, BoundaryExpr, Identifier, Source, SourceSection,
 };
 use crate::{
     ast::{
@@ -8,7 +7,8 @@ use crate::{
             Constant,
             ConstantType::{Matrix, Scalar, Vector},
         },
-        BoundaryVariable, BoundaryVariableType, MatrixAccess, PublicInput, VectorAccess,
+        BoundaryStmt, BoundaryVariable, BoundaryVariableType, MatrixAccess, PublicInput,
+        VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -21,16 +21,13 @@ fn boundary_constraint_at_first() {
     let source = "
     boundary_constraints:
         enf clk.first = 0";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(
-        BoundaryConstraints::new(
-            vec![],
-            vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
-                Boundary::First,
-                BoundaryExpr::Const(0),
-            )],
-        ),
-    )]);
+    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
+        BoundaryStmt::Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::First,
+            BoundaryExpr::Const(0),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -39,16 +36,13 @@ fn boundary_constraint_at_last() {
     let source = "
     boundary_constraints:
         enf clk.last = 15";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(
-        BoundaryConstraints::new(
-            vec![],
-            vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
-                Boundary::Last,
-                BoundaryExpr::Const(15),
-            )],
-        ),
-    )]);
+    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
+        BoundaryStmt::Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::Last,
+            BoundaryExpr::Const(15),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -66,23 +60,18 @@ fn multiple_boundary_constraints() {
     boundary_constraints:
         enf clk.first = 0
         enf clk.last = 1";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(
-        BoundaryConstraints::new(
-            vec![],
-            vec![
-                BoundaryConstraint::new(
-                    Identifier("clk".to_string()),
-                    Boundary::First,
-                    BoundaryExpr::Const(0),
-                ),
-                BoundaryConstraint::new(
-                    Identifier("clk".to_string()),
-                    Boundary::Last,
-                    BoundaryExpr::Const(1),
-                ),
-            ],
-        ),
-    )]);
+    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
+        BoundaryStmt::Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::First,
+            BoundaryExpr::Const(0),
+        )),
+        BoundaryStmt::Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::Last,
+            BoundaryExpr::Const(1),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -95,14 +84,13 @@ fn boundary_constraint_with_pub_input() {
         enf clk.first = a[0]";
     let expected = Source(vec![
         SourceSection::PublicInputs(vec![PublicInput::new(Identifier("a".to_string()), 16)]),
-        SourceSection::BoundaryConstraints(BoundaryConstraints::new(
-            vec![],
-            vec![BoundaryConstraint::new(
+        SourceSection::BoundaryConstraints(vec![BoundaryStmt::Constraint(
+            BoundaryConstraint::new(
                 Identifier("clk".to_string()),
                 Boundary::First,
                 BoundaryExpr::VectorAccess(VectorAccess::new(Identifier("a".to_string()), 0)),
-            )],
-        )),
+            ),
+        )]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -112,25 +100,22 @@ fn boundary_constraint_with_expr() {
     let source = "
     boundary_constraints:
         enf clk.first = 5 + a[3] + 6";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(
-        BoundaryConstraints::new(
-            vec![],
-            vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
-                Boundary::First,
-                BoundaryExpr::Add(
-                    Box::new(BoundaryExpr::Add(
-                        Box::new(BoundaryExpr::Const(5)),
-                        Box::new(BoundaryExpr::VectorAccess(VectorAccess::new(
-                            Identifier("a".to_string()),
-                            3,
-                        ))),
-                    )),
-                    Box::new(BoundaryExpr::Const(6)),
-                ),
-            )],
-        ),
-    )]);
+    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
+        BoundaryStmt::Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::First,
+            BoundaryExpr::Add(
+                Box::new(BoundaryExpr::Add(
+                    Box::new(BoundaryExpr::Const(5)),
+                    Box::new(BoundaryExpr::VectorAccess(VectorAccess::new(
+                        Identifier("a".to_string()),
+                        3,
+                    ))),
+                )),
+                Box::new(BoundaryExpr::Const(6)),
+            ),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -152,9 +137,8 @@ fn boundary_constraint_with_const() {
                 Matrix(vec![vec![0, 1], vec![1, 0]]),
             ),
         ]),
-        SourceSection::BoundaryConstraints(BoundaryConstraints::new(
-            vec![],
-            vec![BoundaryConstraint::new(
+        SourceSection::BoundaryConstraints(vec![BoundaryStmt::Constraint(
+            BoundaryConstraint::new(
                 Identifier("clk".to_string()),
                 Boundary::First,
                 BoundaryExpr::Sub(
@@ -171,8 +155,8 @@ fn boundary_constraint_with_const() {
                         1,
                     ))),
                 ),
-            )],
-        )),
+            ),
+        )]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -185,68 +169,52 @@ fn boundary_constraint_with_variables() {
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]
         enf clk.first = 5 + a[3] + 6";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(
-        BoundaryConstraints::new(
-            vec![
-                BoundaryVariable::new(
-                    Identifier("a".to_string()),
-                    BoundaryVariableType::Scalar(BoundaryExpr::Exp(
-                        Box::new(BoundaryExpr::Const(2)),
-                        2,
-                    )),
+    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
+        BoundaryStmt::Variable(BoundaryVariable::new(
+            Identifier("a".to_string()),
+            BoundaryVariableType::Scalar(BoundaryExpr::Exp(Box::new(BoundaryExpr::Const(2)), 2)),
+        )),
+        BoundaryStmt::Variable(BoundaryVariable::new(
+            Identifier("b".to_string()),
+            BoundaryVariableType::Vector(vec![
+                BoundaryExpr::Elem(Identifier("a".to_string())),
+                BoundaryExpr::Mul(
+                    Box::new(BoundaryExpr::Const(2)),
+                    Box::new(BoundaryExpr::Elem(Identifier("a".to_string()))),
                 ),
-                BoundaryVariable::new(
-                    Identifier("b".to_string()),
-                    BoundaryVariableType::Vector(vec![
-                        BoundaryExpr::Elem(Identifier("a".to_string())),
-                        BoundaryExpr::Mul(
-                            Box::new(BoundaryExpr::Const(2)),
-                            Box::new(BoundaryExpr::Elem(Identifier("a".to_string()))),
-                        ),
-                    ]),
-                ),
-                BoundaryVariable::new(
-                    Identifier("c".to_string()),
-                    BoundaryVariableType::Matrix(vec![
-                        vec![
-                            BoundaryExpr::Sub(
-                                Box::new(BoundaryExpr::Elem(Identifier("a".to_string()))),
-                                Box::new(BoundaryExpr::Const(1)),
-                            ),
-                            BoundaryExpr::Exp(
-                                Box::new(BoundaryExpr::Elem(Identifier("a".to_string()))),
-                                2,
-                            ),
-                        ],
-                        vec![
-                            BoundaryExpr::VectorAccess(VectorAccess::new(
-                                Identifier("b".to_string()),
-                                0,
-                            )),
-                            BoundaryExpr::VectorAccess(VectorAccess::new(
-                                Identifier("b".to_string()),
-                                1,
-                            )),
-                        ],
-                    ]),
-                ),
-            ],
-            vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
-                Boundary::First,
-                BoundaryExpr::Add(
-                    Box::new(BoundaryExpr::Add(
-                        Box::new(BoundaryExpr::Const(5)),
-                        Box::new(BoundaryExpr::VectorAccess(VectorAccess::new(
-                            Identifier("a".to_string()),
-                            3,
-                        ))),
-                    )),
-                    Box::new(BoundaryExpr::Const(6)),
-                ),
-            )],
-        ),
-    )]);
+            ]),
+        )),
+        BoundaryStmt::Variable(BoundaryVariable::new(
+            Identifier("c".to_string()),
+            BoundaryVariableType::Matrix(vec![
+                vec![
+                    BoundaryExpr::Sub(
+                        Box::new(BoundaryExpr::Elem(Identifier("a".to_string()))),
+                        Box::new(BoundaryExpr::Const(1)),
+                    ),
+                    BoundaryExpr::Exp(Box::new(BoundaryExpr::Elem(Identifier("a".to_string()))), 2),
+                ],
+                vec![
+                    BoundaryExpr::VectorAccess(VectorAccess::new(Identifier("b".to_string()), 0)),
+                    BoundaryExpr::VectorAccess(VectorAccess::new(Identifier("b".to_string()), 1)),
+                ],
+            ]),
+        )),
+        BoundaryStmt::Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::First,
+            BoundaryExpr::Add(
+                Box::new(BoundaryExpr::Add(
+                    Box::new(BoundaryExpr::Const(5)),
+                    Box::new(BoundaryExpr::VectorAccess(VectorAccess::new(
+                        Identifier("a".to_string()),
+                        3,
+                    ))),
+                )),
+                Box::new(BoundaryExpr::Const(6)),
+            ),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 

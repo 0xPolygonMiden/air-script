@@ -1,4 +1,4 @@
-use parser::ast;
+use parser::ast::{self, BoundaryStmt, TransitionStmt};
 pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
 use std::collections::BTreeMap;
 
@@ -80,15 +80,25 @@ impl AirIR {
         let mut transition_constraints = TransitionConstraints::default();
         for section in source {
             match section {
-                ast::SourceSection::BoundaryConstraints(constraints) => {
-                    for constraint in constraints.boundary_constraints().iter() {
-                        boundary_constraints.insert(&symbol_table, constraint)?;
+                ast::SourceSection::BoundaryConstraints(stmts) => {
+                    for stmt in stmts {
+                        match stmt {
+                            BoundaryStmt::Constraint(constraint) => {
+                                boundary_constraints.insert(&symbol_table, constraint)?
+                            }
+                            BoundaryStmt::Variable(_) => todo!(),
+                        }
                     }
                     validator.exists("boundary_constraints");
                 }
-                ast::SourceSection::TransitionConstraints(constraints) => {
-                    for constraint in constraints.transition_constraints().iter() {
-                        transition_constraints.insert(&symbol_table, constraint)?;
+                ast::SourceSection::TransitionConstraints(stmts) => {
+                    for stmt in stmts {
+                        match stmt {
+                            TransitionStmt::Constraint(constraint) => {
+                                transition_constraints.insert(&symbol_table, constraint)?
+                            }
+                            TransitionStmt::Variable(_) => todo!(),
+                        }
                     }
                     validator.exists("transition_constraints");
                 }

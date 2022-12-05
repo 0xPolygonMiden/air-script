@@ -1,9 +1,9 @@
 use crate::{
     ast::{
-        boundary_constraints::{Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryStmt,
-        BoundaryExpr, BoundaryVariable, BoundaryVariableType}, 
-        transition_constraints::{TransitionConstraint, TransitionConstraints, TransitionExpr,
-        TransitionStmt, TransitionVariable, TransitionVariableType},
+        boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt, BoundaryExpr,
+        BoundaryVariable, BoundaryVariableType}, 
+        transition_constraints::{TransitionConstraint, TransitionExpr, TransitionStmt,
+        TransitionVariable, TransitionVariableType},
         constants::{Constant, ConstantType},
         Identifier, Source, SourceSection, TraceCols, PublicInput, PeriodicColumn, VectorAccess,
         MatrixAccess
@@ -124,17 +124,14 @@ PeriodicColumn: PeriodicColumn = {
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
-BoundaryConstraints: BoundaryConstraints = {
+BoundaryConstraints: Vec<BoundaryStmt> = {
     "boundary_constraints" ":" <boundary_stmts: BoundaryStmt+> =>? {
-        let mut variables = Vec::new();
-        let mut boundary_constraints = Vec::new();
-        for stmt in boundary_stmts {
-            match stmt {
-                BoundaryStmt::Constraint(constraint) => boundary_constraints.push(constraint),
-                BoundaryStmt::Variable(variable) => variables.push(variable),
-            }
-        }
-        if boundary_constraints.is_empty() {
+        // check if at least one boundary constraint is defined
+        let boundary_constraints_exist = boundary_stmts.iter().any(|stmt| match stmt {
+            BoundaryStmt::Constraint(_) => true,
+            _ => false,
+        });
+        if !boundary_constraints_exist {
             return Err(ParseError::User {
                 error: Error::ParseError(
                     MissingBoundaryConstraint(
@@ -143,7 +140,7 @@ BoundaryConstraints: BoundaryConstraints = {
                 )
             });
         }
-        Ok(BoundaryConstraints::new(variables, boundary_constraints))
+        Ok(boundary_stmts)
     }
 }
 
@@ -197,17 +194,14 @@ BoundaryAtom: BoundaryExpr = {
 // TRANSITION CONSTRAINTS
 // ================================================================================================
 
-TransitionConstraints: TransitionConstraints = {
+TransitionConstraints: Vec<TransitionStmt> = {
     "transition_constraints" ":" <transition_stmts: TransitionStmt+> =>? {
-        let mut variables = Vec::new();
-        let mut transition_constraints = Vec::new();
-        for stmt in transition_stmts {
-            match stmt {
-                TransitionStmt::Constraint(constraint) => transition_constraints.push(constraint),
-                TransitionStmt::Variable(variable) => variables.push(variable),
-            }
-        }
-        if transition_constraints.is_empty() {
+        // check if at least one transition constraint is defined
+        let transition_constraints_exist = transition_stmts.iter().any(|stmt| match stmt {
+            TransitionStmt::Constraint(_) => true,
+            _ => false,
+        });
+        if !transition_constraints_exist {
             return Err(ParseError::User {
                 error: Error::ParseError(
                     MissingTransitionConstraint(
@@ -216,7 +210,7 @@ TransitionConstraints: TransitionConstraints = {
                 )
             });
         }
-        Ok(TransitionConstraints::new(variables, transition_constraints))
+        Ok(transition_stmts)
     }
 }
 

@@ -3,37 +3,6 @@ use super::{Identifier, MatrixAccess, VectorAccess};
 // TRANSITION CONSTRAINTS
 // ================================================================================================
 
-/// Stores the transition constraints to be enforced on the trace column values.
-#[derive(Debug, PartialEq)]
-pub struct TransitionConstraints {
-    variables: Vec<TransitionVariable>,
-    transition_constraints: Vec<TransitionConstraint>,
-}
-
-impl TransitionConstraints {
-    /// Creates a new instance of [TransitionConstraints] with the specified variables and
-    /// transition constraints
-    pub fn new(
-        variables: Vec<TransitionVariable>,
-        transition_constraints: Vec<TransitionConstraint>,
-    ) -> Self {
-        Self {
-            variables,
-            transition_constraints,
-        }
-    }
-
-    /// Returns variables declared in the transition constraints section.
-    pub fn variables(&self) -> &Vec<TransitionVariable> {
-        &self.variables
-    }
-
-    /// Returns transition constraints defined in the transition constraints section.
-    pub fn transition_constraints(&self) -> &Vec<TransitionConstraint> {
-        &self.transition_constraints
-    }
-}
-
 /// Stores the expression corresponding to the transition constraint.
 #[derive(Debug, PartialEq, Clone)]
 pub struct TransitionConstraint {
@@ -94,6 +63,7 @@ pub enum TransitionVariableType {
     Matrix(Vec<Vec<TransitionExpr>>),
 }
 
+#[derive(Debug, PartialEq)]
 pub enum TransitionStmt {
     Constraint(TransitionConstraint),
     Variable(TransitionVariable),
