@@ -1,10 +1,11 @@
 #[derive(Debug)]
 pub enum SemanticError {
-    InvalidIdentifier(String),
     DuplicateIdentifier(String),
-    InvalidUsage(String),
     IndexOutOfRange(String),
-    TooManyConstraints(String),
+    InvalidConstraint(String),
+    InvalidIdentifier(String),
     InvalidPeriodicColumn(String),
+    InvalidUsage(String),
     MissingDeclaration(String),
+    TooManyConstraints(String),
 }

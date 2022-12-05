@@ -1,5 +1,5 @@
 use super::{
-    super::BTreeMap, degree::TransitionConstraintDegree, ConstraintType, SemanticError, SymbolTable,
+    super::BTreeMap, degree::TransitionConstraintDegree, SemanticError, SymbolTable, TraceSegment,
 };
 use crate::symbol_table::IdentifierType;
 use parser::ast::{Identifier, TransitionExpr};
@@ -50,10 +50,7 @@ impl AlgebraicGraph {
         // recursively walk the subgraph and compute the degree from the operation and child nodes
         match self.node(index).op() {
             Operation::Const(_) | Operation::RandomValue(_) => 0,
-            Operation::MainTraceCurrentRow(_)
-            | Operation::MainTraceNextRow(_)
-            | Operation::AuxTraceCurrentRow(_)
-            | Operation::AuxTraceNextRow(_) => 1,
+            Operation::TraceElement(_) => 1,
             Operation::PeriodicColumn(index, cycle_len) => {
                 cycles.insert(*index, *cycle_len);
                 0
@@ -90,54 +87,58 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         expr: TransitionExpr,
-    ) -> Result<(ConstraintType, NodeIndex), SemanticError> {
+    ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         match expr {
             TransitionExpr::Const(value) => {
                 // constraint target defaults to Main trace.
-                let constraint_type = ConstraintType::Main;
+                let trace_segment = 0;
                 let node_index = self.insert_op(Operation::Const(value));
-                Ok((constraint_type, node_index))
+                Ok((trace_segment, node_index))
             }
             TransitionExpr::Elem(Identifier(ident)) => self.insert_variable(symbol_table, &ident),
             TransitionExpr::Next(Identifier(ident)) => self.insert_next(symbol_table, &ident),
             TransitionExpr::Rand(index) => {
-                let constraint_type = ConstraintType::Auxiliary;
+                // constraint target for random values defaults to the second trace segment.
+                // TODO: make this more general, so random values from further trace segments can be
+                // used. This requires having a way to describe different sets of randomness in
+                // the AirScript syntax.
+                let trace_segment = 1;
                 let node_index = self.insert_op(Operation::RandomValue(index));
-                Ok((constraint_type, node_index))
+                Ok((trace_segment, node_index))
             }
             TransitionExpr::Add(lhs, rhs) => {
                 // add both subexpressions.
-                let (lhs_type, lhs) = self.insert_expr(symbol_table, *lhs)?;
-                let (rhs_type, rhs) = self.insert_expr(symbol_table, *rhs)?;
+                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs)?;
+                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs)?;
                 // add the expression.
-                let constraint_type = get_binop_constraint_type(lhs_type, rhs_type);
+                let trace_segment = lhs_segment.max(rhs_segment);
                 let node_index = self.insert_op(Operation::Add(lhs, rhs));
-                Ok((constraint_type, node_index))
+                Ok((trace_segment, node_index))
             }
             TransitionExpr::Sub(lhs, rhs) => {
                 // add both subexpressions.
-                let (lhs_type, lhs) = self.insert_expr(symbol_table, *lhs)?;
-                let (rhs_type, rhs) = self.insert_expr(symbol_table, *rhs)?;
+                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs)?;
+                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs)?;
                 // add the expression.
-                let constraint_type = get_binop_constraint_type(lhs_type, rhs_type);
+                let trace_segment = lhs_segment.max(rhs_segment);
                 let node_index = self.insert_op(Operation::Sub(lhs, rhs));
-                Ok((constraint_type, node_index))
+                Ok((trace_segment, node_index))
             }
             TransitionExpr::Mul(lhs, rhs) => {
                 // add both subexpressions.
-                let (lhs_type, lhs) = self.insert_expr(symbol_table, *lhs)?;
-                let (rhs_type, rhs) = self.insert_expr(symbol_table, *rhs)?;
+                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs)?;
+                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs)?;
                 // add the expression.
-                let constraint_type = get_binop_constraint_type(lhs_type, rhs_type);
+                let trace_segment = lhs_segment.max(rhs_segment);
                 let node_index = self.insert_op(Operation::Mul(lhs, rhs));
-                Ok((constraint_type, node_index))
+                Ok((trace_segment, node_index))
             }
             TransitionExpr::Exp(lhs, rhs) => {
                 // add base subexpression.
-                let (constraint_type, lhs) = self.insert_expr(symbol_table, *lhs)?;
+                let (trace_segment, lhs) = self.insert_expr(symbol_table, *lhs)?;
                 // add exponent subexpression.
                 let node_index = self.insert_op(Operation::Exp(lhs, rhs as usize));
-                Ok((constraint_type, node_index))
+                Ok((trace_segment, node_index))
             }
             TransitionExpr::VectorAccess(_) | TransitionExpr::MatrixAccess(_) => todo!(),
         }
@@ -147,20 +148,15 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         ident: &str,
-    ) -> Result<(ConstraintType, NodeIndex), SemanticError> {
+    ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         let col_type = symbol_table.get_type(ident)?;
 
-        // a "next" variable expression always references an execution trace columns
         match col_type {
-            IdentifierType::MainTraceColumn(index) => {
-                let constraint_type = ConstraintType::Main;
-                let node_index = self.insert_op(Operation::MainTraceNextRow(index));
-                Ok((constraint_type, node_index))
-            }
-            IdentifierType::AuxTraceColumn(index) => {
-                let constraint_type = ConstraintType::Auxiliary;
-                let node_index = self.insert_op(Operation::AuxTraceNextRow(index));
-                Ok((constraint_type, node_index))
+            IdentifierType::TraceColumn(column) => {
+                let trace_segment = column.trace_segment();
+                let trace_access = TraceAccess::new(trace_segment, column.col_idx(), 1);
+                let node_index = self.insert_op(Operation::TraceElement(trace_access));
+                Ok((trace_segment, node_index))
             }
             _ => Err(SemanticError::InvalidUsage(format!(
                 "Identifier {} was declared as a {} not as a trace column",
@@ -173,27 +169,23 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         ident: &str,
-    ) -> Result<(ConstraintType, NodeIndex), SemanticError> {
+    ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         let col_type = symbol_table.get_type(ident)?;
 
         // since variable definitions are not possible yet, the identifier must match one of
         // the declared trace columns or one of the declared periodic columns.
         match col_type {
-            IdentifierType::MainTraceColumn(index) => {
-                let constraint_type = ConstraintType::Main;
-                let node_index = self.insert_op(Operation::MainTraceCurrentRow(index));
-                Ok((constraint_type, node_index))
-            }
-            IdentifierType::AuxTraceColumn(index) => {
-                let constraint_type = ConstraintType::Auxiliary;
-                let node_index = self.insert_op(Operation::AuxTraceCurrentRow(index));
-                Ok((constraint_type, node_index))
+            IdentifierType::TraceColumn(column) => {
+                let trace_segment = column.trace_segment();
+                let trace_access = TraceAccess::new(trace_segment, column.col_idx(), 0);
+                let node_index = self.insert_op(Operation::TraceElement(trace_access));
+                Ok((trace_segment, node_index))
             }
             IdentifierType::PeriodicColumn(index, cycle_len) => {
                 // constraint target defaults to Main trace.
-                let constraint_type = ConstraintType::Main;
+                let trace_segment = 0;
                 let node_index = self.insert_op(Operation::PeriodicColumn(index, cycle_len));
-                Ok((constraint_type, node_index))
+                Ok((trace_segment, node_index))
             }
             _ => Err(SemanticError::InvalidUsage(format!(
                 "Identifier {} was declared as a {} not as a trace column",
@@ -220,16 +212,8 @@ impl AlgebraicGraph {
     }
 }
 
-fn get_binop_constraint_type(lhs_type: ConstraintType, rhs_type: ConstraintType) -> ConstraintType {
-    if lhs_type == ConstraintType::Auxiliary || rhs_type == ConstraintType::Auxiliary {
-        ConstraintType::Auxiliary
-    } else {
-        ConstraintType::Main
-    }
-}
-
 /// Reference to a node in a graph by its index in the nodes vector of the graph struct.
-#[derive(Debug, Eq, PartialEq, Default)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
 pub struct NodeIndex(usize);
 
 #[derive(Debug)]
@@ -248,18 +232,9 @@ impl Node {
 #[derive(Debug, Eq, PartialEq)]
 pub enum Operation {
     Const(u64),
-    /// An identifier for a for a cell in the specified column in the current row in the main trace.
-    /// The inner value is the index of the column within the trace.
-    MainTraceCurrentRow(usize),
-    /// An identifier for a cell in the specified column in the next row in the main trace. The
-    /// inner value is the index of the column within the trace.
-    MainTraceNextRow(usize),
-    /// An identifier for a cell in the specified column in the current row in the auxiliary trace.
-    /// The inner value is the index of the column within the trace.
-    AuxTraceCurrentRow(usize),
-    /// An identifier for a cell in the specified column in the next row in the auxiliary trace. The
-    /// inner value is the index of the column within the trace.
-    AuxTraceNextRow(usize),
+    /// An identifier for an element in the trace segment, column, and row offset specified by the
+    /// [TraceAccess]
+    TraceElement(TraceAccess),
     /// An identifier for a periodic value from a specified periodic column. The first inner value
     /// is the index of the periodic column within the declared periodic columns. The second inner
     /// value is the length of the column's periodic cycle. The periodic value made available from
@@ -279,4 +254,36 @@ pub enum Operation {
     /// Exponentiation operation applied to the node with the specified index, using the provided
     /// value as the power.
     Exp(NodeIndex, usize),
+}
+
+/// Access information for getting an element in the execution trace. The trace_segment specifies
+/// how many trace commitments have preceded the specified segment. `col_idx` specifies the index
+/// of the column within that trace segment, and `row_offset` specifies the offset from the current
+/// row. For example, an element in the "next" row of the "main" trace would be specified by
+/// a trace_segment of 0 and a row_offset of 1.
+#[derive(Debug, Eq, PartialEq)]
+pub struct TraceAccess {
+    trace_segment: TraceSegment,
+    col_idx: usize,
+    row_offset: usize,
+}
+
+impl TraceAccess {
+    fn new(trace_segment: TraceSegment, col_idx: usize, row_offset: usize) -> Self {
+        Self {
+            trace_segment,
+            col_idx,
+            row_offset,
+        }
+    }
+
+    /// Gets the column index of this [TraceAccess].
+    pub fn col_idx(&self) -> usize {
+        self.col_idx
+    }
+
+    /// Gets the row offset of this [TraceAccess].
+    pub fn row_offset(&self) -> usize {
+        self.row_offset
+    }
 }

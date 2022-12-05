@@ -8,6 +8,7 @@ use parser::ast;
 /// boundaries (first row and last row). For ease of code generation and evaluation, constraints are
 /// sorted into maps by the boundary. This also simplifies ensuring that there are no conflicting
 /// constraints sharing a boundary and column index.
+/// TODO: generalize the way we store boundary constraints for more trace segments.
 #[derive(Default, Debug)]
 pub(crate) struct BoundaryConstraints {
     /// The boundary constraints to be applied at the first row of the main trace, with the trace
@@ -80,13 +81,16 @@ impl BoundaryConstraints {
         // add the constraint to the specified boundary for the specified trace
         let col_type = symbol_table.get_type(constraint.column())?;
         let result = match col_type {
-            IdentifierType::MainTraceColumn(col_idx) => match constraint.boundary() {
-                ast::Boundary::First => self.main_first.insert(col_idx, expr),
-                ast::Boundary::Last => self.main_last.insert(col_idx, expr),
-            },
-            IdentifierType::AuxTraceColumn(col_idx) => match constraint.boundary() {
-                ast::Boundary::First => self.aux_first.insert(col_idx, expr),
-                ast::Boundary::Last => self.aux_last.insert(col_idx, expr),
+            IdentifierType::TraceColumn(column) => match column.trace_segment() {
+                0 => match constraint.boundary() {
+                    ast::Boundary::First => self.main_first.insert(column.col_idx(), expr),
+                    ast::Boundary::Last => self.main_last.insert(column.col_idx(), expr),
+                },
+                1 => match constraint.boundary() {
+                    ast::Boundary::First => self.aux_first.insert(column.col_idx(), expr),
+                    ast::Boundary::Last => self.aux_last.insert(column.col_idx(), expr),
+                },
+                _ => unimplemented!(),
             },
             _ => {
                 return Err(SemanticError::InvalidUsage(format!(
