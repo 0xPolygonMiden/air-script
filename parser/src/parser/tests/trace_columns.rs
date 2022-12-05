@@ -1,4 +1,4 @@
-use super::{build_parse_test, Error, Identifier, ParseError, Source, SourceSection, TraceCols};
+use super::{build_parse_test, Error, Identifier, ParseError, Source, SourceSection::*, TraceCols};
 
 // TRACE COLUMNS
 // ================================================================================================
@@ -8,7 +8,7 @@ fn trace_columns() {
     let source = "
     trace_columns:
         main: [clk, fmp, ctx]";
-    let expected = Source(vec![SourceSection::TraceCols(TraceCols {
+    let expected = Source(vec![TraceCols(TraceCols {
         main_cols: vec![
             Identifier("clk".to_string()),
             Identifier("fmp".to_string()),
@@ -25,7 +25,7 @@ fn trace_columns_main_and_aux() {
     trace_columns:
         main: [clk, fmp, ctx]
         aux: [rc_bus, ch_bus]";
-    let expected = Source(vec![SourceSection::TraceCols(TraceCols {
+    let expected = Source(vec![TraceCols(TraceCols {
         main_cols: vec![
             Identifier("clk".to_string()),
             Identifier("fmp".to_string()),

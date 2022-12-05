@@ -3,6 +3,12 @@ use super::{Identifier, MatrixAccess, VectorAccess};
 // TRANSITION CONSTRAINTS
 // ================================================================================================
 
+#[derive(Debug, PartialEq)]
+pub enum TransitionStmt {
+    Constraint(TransitionConstraint),
+    Variable(TransitionVariable),
+}
+
 /// Stores the expression corresponding to the transition constraint.
 #[derive(Debug, PartialEq, Clone)]
 pub struct TransitionConstraint {
@@ -61,10 +67,4 @@ pub enum TransitionVariableType {
     Scalar(TransitionExpr),
     Vector(Vec<TransitionExpr>),
     Matrix(Vec<Vec<TransitionExpr>>),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum TransitionStmt {
-    Constraint(TransitionConstraint),
-    Variable(TransitionVariable),
 }

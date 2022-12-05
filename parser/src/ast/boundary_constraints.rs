@@ -4,6 +4,12 @@ use std::fmt::Display;
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
+#[derive(Debug, PartialEq)]
+pub enum BoundaryStmt {
+    Constraint(BoundaryConstraint),
+    Variable(BoundaryVariable),
+}
+
 /// Stores the expression corresponding to the boundary constraint.
 #[derive(Debug, PartialEq)]
 pub struct BoundaryConstraint {
@@ -89,10 +95,4 @@ pub enum BoundaryVariableType {
     Scalar(BoundaryExpr),
     Vector(Vec<BoundaryExpr>),
     Matrix(Vec<Vec<BoundaryExpr>>),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum BoundaryStmt {
-    Constraint(BoundaryConstraint),
-    Variable(BoundaryVariable),
 }
