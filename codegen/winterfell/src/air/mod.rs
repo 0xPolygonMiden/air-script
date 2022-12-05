@@ -23,7 +23,9 @@ use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_tra
 /// which are equivalent the provided AirIR.
 pub(super) fn add_air(scope: &mut Scope, ir: &AirIR) {
     // add constant declarations
-    add_constants(scope, ir);
+    if !ir.constants().is_empty() {
+        add_constants(scope, ir);
+    }
 
     // add the Public Inputs struct and its base implementation.
     add_public_inputs_struct(scope, ir);
@@ -107,7 +109,7 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
     let main_degrees = ir
         .constraint_degrees(0)
         .iter()
-        .map(|degree| degree.to_string(false))
+        .map(|degree| degree.to_string(ir, false))
         .collect::<Vec<_>>();
     new.line(format!(
         "let main_degrees = vec![{}];",
@@ -118,7 +120,7 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
     let aux_degrees = ir
         .constraint_degrees(1)
         .iter()
-        .map(|degree| degree.to_string(true))
+        .map(|degree| degree.to_string(ir, true))
         .collect::<Vec<_>>();
     new.line(format!(
         "let aux_degrees = vec![{}];",
@@ -165,11 +167,11 @@ let context = AirContext::new_multi_segment(
 
 /// Code generation trait for generating Rust code strings from boundary constraint expressions.
 pub trait Codegen {
-    fn to_string(&self, is_aux_constraint: bool) -> String;
+    fn to_string(&self, ir: &AirIR, is_aux_constraint: bool) -> String;
 }
 
 impl Codegen for TransitionConstraintDegree {
-    fn to_string(&self, _is_aux_constraint: bool) -> String {
+    fn to_string(&self, _ir: &AirIR, _is_aux_constraint: bool) -> String {
         if self.cycles().is_empty() {
             format!("TransitionConstraintDegree::new({})", self.base())
         } else {

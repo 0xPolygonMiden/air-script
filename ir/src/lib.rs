@@ -1,6 +1,6 @@
 
-use parser::ast::{self, constants::Constant, BoundaryStmt, TransitionStmt};
-pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
+use parser::ast::{BoundaryStmt, TransitionStmt};
+pub use parser::ast::{self, constants::Constant, boundary_constraints::BoundaryExpr, Identifier, PublicInput};
 use std::collections::BTreeMap;
 
 mod symbol_table;
