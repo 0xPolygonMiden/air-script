@@ -125,6 +125,7 @@ impl Codegen for Operation {
                 let lhs = l_idx.to_string(graph);
                 format!("({}).exp(E::PositiveInteger::from({}_u64))", lhs, r_idx)
             }
+            _ => todo!(),
         }
     }
 }

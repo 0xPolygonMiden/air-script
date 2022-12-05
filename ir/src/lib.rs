@@ -29,6 +29,8 @@ pub type PeriodicColumns = Vec<Vec<u64>>;
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
+    //TODO: remove dead code attribute
+    #[allow(dead_code)]
     constants: Constants,
     public_inputs: PublicInputs,
     periodic_columns: PeriodicColumns,
@@ -223,15 +225,14 @@ mod tests {
         public_inputs:
             stack_inputs: [16]
         transition_constraints:
-            enf clk' = clk + A
+            enf clk' = clk - 1
         boundary_constraints:
             enf clk.first = 0
             enf clk.last = 1";
 
         let parsed = parse(source).expect("Parsing failed");
         let result = AirIR::from_source(&parsed);
-        println!("{:?}", result);
-        // assert!(result.is_ok());
+        assert!(result.is_ok());
     }
 
     #[test]

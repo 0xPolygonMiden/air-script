@@ -2,7 +2,9 @@ use super::{
     super::BTreeMap, degree::TransitionConstraintDegree, SemanticError, SymbolTable, TraceSegment,
 };
 use crate::symbol_table::IdentifierType;
-use parser::ast::{Identifier, TransitionExpr};
+use parser::ast::{
+    constants::ConstantType, Identifier, MatrixAccess, TransitionExpr, VectorAccess,
+};
 
 // ALGEBRAIC GRAPH
 // ================================================================================================
@@ -49,7 +51,11 @@ impl AlgebraicGraph {
     fn accumulate_degree(&self, cycles: &mut BTreeMap<usize, usize>, index: &NodeIndex) -> usize {
         // recursively walk the subgraph and compute the degree from the operation and child nodes
         match self.node(index).op() {
-            Operation::Const(_) | Operation::RandomValue(_) => 0,
+            Operation::Const(_)
+            | Operation::ScalarConstant(_)
+            | Operation::VectorConstant(_)
+            | Operation::MatrixConstant(_)
+            | Operation::RandomValue(_) => 0,
             Operation::TraceElement(_) => 1,
             Operation::PeriodicColumn(index, cycle_len) => {
                 cycles.insert(*index, *cycle_len);
@@ -95,7 +101,13 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::Const(value));
                 Ok((trace_segment, node_index))
             }
-            TransitionExpr::Elem(Identifier(ident)) => self.insert_variable(symbol_table, &ident),
+            TransitionExpr::Elem(Identifier(ident)) => self.insert_elem(symbol_table, &ident),
+            TransitionExpr::VectorAccess(vector_access) => {
+                self.insert_vector_access(symbol_table, &vector_access)
+            }
+            TransitionExpr::MatrixAccess(matrix_access) => {
+                self.insert_matrix_access(symbol_table, &matrix_access)
+            }
             TransitionExpr::Next(Identifier(ident)) => self.insert_next(symbol_table, &ident),
             TransitionExpr::Rand(index) => {
                 // constraint target for random values defaults to the second trace segment.
@@ -140,7 +152,6 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::Exp(lhs, rhs as usize));
                 Ok((trace_segment, node_index))
             }
-            TransitionExpr::VectorAccess(_) | TransitionExpr::MatrixAccess(_) => todo!(),
         }
     }
 
@@ -165,13 +176,13 @@ impl AlgebraicGraph {
         }
     }
 
-    fn insert_variable(
+    fn insert_elem(
         &mut self,
         symbol_table: &SymbolTable,
         ident: &str,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
-        let col_type = symbol_table.get_type(ident)?;
-        match col_type {
+        let elem_type = symbol_table.get_type(ident)?;
+        match elem_type {
             IdentifierType::TraceColumn(column) => {
                 let trace_segment = column.trace_segment();
                 let trace_access = TraceAccess::new(trace_segment, column.col_idx(), 0);
@@ -184,9 +195,57 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::PeriodicColumn(index, cycle_len));
                 Ok((trace_segment, node_index))
             }
+            IdentifierType::Constant(ConstantType::Scalar(scalar_const)) => {
+                let trace_segment = 0;
+                let node_index = self.insert_op(Operation::ScalarConstant(scalar_const));
+                Ok((trace_segment, node_index))
+            }
             _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as a {} not as a trace column",
-                ident, col_type
+                "Identifier {} was declared as a {} which is not a supported type.",
+                ident, elem_type
+            ))),
+        }
+    }
+
+    fn insert_vector_access(
+        &mut self,
+        symbol_table: &SymbolTable,
+        vector_access: &VectorAccess,
+    ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
+        let vector_access_type = symbol_table.get_type(vector_access.name())?;
+        match vector_access_type {
+            IdentifierType::Constant(ConstantType::Vector(_)) => {
+                let trace_segment = 0;
+                let node_index = self.insert_op(Operation::VectorConstant(vector_access.clone()));
+                Ok((trace_segment, node_index))
+            }
+            _ => Err(SemanticError::InvalidUsage(format!(
+                "Vector Access {}[{}] was declared as a {} which is not a supported type.",
+                vector_access.name(),
+                vector_access.idx(),
+                vector_access_type
+            ))),
+        }
+    }
+
+    fn insert_matrix_access(
+        &mut self,
+        symbol_table: &SymbolTable,
+        matrix_access: &MatrixAccess,
+    ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
+        let matrix_access_type = symbol_table.get_type(matrix_access.name())?;
+        match matrix_access_type {
+            IdentifierType::Constant(ConstantType::Matrix(_)) => {
+                let trace_segment = 0;
+                let node_index = self.insert_op(Operation::MatrixConstant(matrix_access.clone()));
+                Ok((trace_segment, node_index))
+            }
+            _ => Err(SemanticError::InvalidUsage(format!(
+                "Matrix Access {}[{}][{}] was declared as a {} which is not a supported type.",
+                matrix_access.name(),
+                matrix_access.row_idx(),
+                matrix_access.col_idx(),
+                matrix_access_type
             ))),
         }
     }
@@ -229,6 +288,9 @@ impl Node {
 #[derive(Debug, Eq, PartialEq)]
 pub enum Operation {
     Const(u64),
+    ScalarConstant(u64),
+    VectorConstant(VectorAccess),
+    MatrixConstant(MatrixAccess),
     /// An identifier for an element in the trace segment, column, and row offset specified by the
     /// [TraceAccess]
     TraceElement(TraceAccess),
