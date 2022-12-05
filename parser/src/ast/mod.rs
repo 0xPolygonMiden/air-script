@@ -112,7 +112,7 @@ pub struct MatrixAccess {
 
 impl MatrixAccess {
     /// Creates a new [MatrixAccess] instance with the specified identifier name and indices.
-    pub fn new(name: Identifier, col_idx: usize, row_idx: usize) -> Self {
+    pub fn new(name: Identifier, row_idx: usize, col_idx: usize) -> Self {
         Self {
             name,
             row_idx,

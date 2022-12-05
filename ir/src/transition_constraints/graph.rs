@@ -207,6 +207,8 @@ impl AlgebraicGraph {
         }
     }
 
+    /// Validates and adds a vector access to the graph.
+    /// Returns an error if the vector identifier's value is not of a supported type.'
     fn insert_vector_access(
         &mut self,
         symbol_table: &SymbolTable,
@@ -230,6 +232,8 @@ impl AlgebraicGraph {
         }
     }
 
+    /// Validates and adds a matrix access to the graph.
+    /// Returns an error if the matrix identifier's value is not of a supported type.
     fn insert_matrix_access(
         &mut self,
         symbol_table: &SymbolTable,

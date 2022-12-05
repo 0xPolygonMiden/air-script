@@ -227,8 +227,8 @@ mod tests {
         transition_constraints:
             enf clk' = clk - 1
         boundary_constraints:
-            enf clk.first = 0
-            enf clk.last = 1";
+            enf clk.first = A
+            enf clk.last = B[0] + C[0][1]";
 
         let parsed = parse(source).expect("Parsing failed");
         let result = AirIR::from_source(&parsed);
@@ -236,21 +236,64 @@ mod tests {
     }
 
     #[test]
-    fn boundary_constraint_with_invalid_matrix_const() {
+    fn err_tc_invalid_vector_access() {
         let source = "
         constants:
-            A: [[2, 3], [1, 0, 2]]
+            A: 123
+            B: [1, 2, 3]
+            C: [[1, 2, 3], [4, 5, 6]]
         trace_columns:
             main: [clk]
         public_inputs:
             stack_inputs: [16]
-        transition_constraints:
-            enf clk' = clk + 1
         boundary_constraints:
             enf clk.first = 0
-            enf clk.last = 1";
+        transition_constraints:
+            enf clk' = clk + A + B[3] - C[1][2]";
 
         let parsed = parse(source).expect("Parsing failed");
+
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn err_tc_invalid_matrix_access() {
+        let source = "
+        constants:
+            A: 123
+            B: [1, 2, 3]
+            C: [[1, 2, 3], [4, 5, 6]]
+        trace_columns:
+            main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf clk.first = 0
+        transition_constraints:
+            enf clk' = clk + A + B[1] - C[3][2]";
+
+        let parsed = parse(source).expect("Parsing failed");
+
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
+
+        let source = "
+        constants:
+            A: 123
+            B: [1, 2, 3]
+            C: [[1, 2, 3], [4, 5, 6]]
+        trace_columns:
+            main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf clk.first = 0
+        transition_constraints:
+            enf clk' = clk + A + B[1] - C[1][3]";
+
+        let parsed = parse(source).expect("Parsing failed");
+
         let result = AirIR::from_source(&parsed);
         assert!(result.is_err());
     }
@@ -358,6 +401,28 @@ mod tests {
     }
 
     #[test]
+    fn transition_constraints_with_constants() {
+        let source = "
+        constants:
+            A: 123
+            B: [1, 2, 3]
+            C: [[1, 2, 3], [4, 5, 6]]
+        trace_columns:
+            main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf clk.first = 0
+        transition_constraints:
+            enf clk' = clk + A + B[1] - C[1][2]";
+
+        let parsed = parse(source).expect("Parsing failed");
+
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_ok());
+    }
+
+    #[test]
     fn transition_constraints_using_parens() {
         let source = "
         trace_columns:
@@ -373,6 +438,69 @@ mod tests {
 
         let result = AirIR::from_source(&parsed);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn err_bc_invalid_vector_access() {
+        let source = "
+        constants:
+            A: 123
+            B: [1, 2, 3]
+            C: [[1, 2, 3], [4, 5, 6]]
+        trace_columns:
+            main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf clk.first = A + B[3] - C[1][2]
+        transition_constraints:
+            enf clk' = clk + 1";
+
+        let parsed = parse(source).expect("Parsing failed");
+
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn err_bc_invalid_matrix_access() {
+        let source = "
+        constants:
+            A: 123
+            B: [1, 2, 3]
+            C: [[1, 2, 3], [4, 5, 6]]
+        trace_columns:
+            main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf clk.first = A + B[1] - C[3][2]
+        transition_constraints:
+            enf clk' = clk + 1";
+
+        let parsed = parse(source).expect("Parsing failed");
+
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
+
+        let source = "
+        constants:
+            A: 123
+            B: [1, 2, 3]
+            C: [[1, 2, 3], [4, 5, 6]]
+        trace_columns:
+            main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        boundary_constraints:
+            enf clk.first = A + B[1] - C[1][3]
+        transition_constraints:
+            enf clk' = clk + 1";
+
+        let parsed = parse(source).expect("Parsing failed");
+
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -501,5 +629,25 @@ mod tests {
 
         let result = AirIR::from_source(&parsed);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn err_invalid_matrix_const() {
+        let source = "
+        constants:
+            A: [[2, 3], [1, 0, 2]]
+        trace_columns:
+            main: [clk]
+        public_inputs:
+            stack_inputs: [16]
+        transition_constraints:
+            enf clk' = clk + 1
+        boundary_constraints:
+            enf clk.first = 0
+            enf clk.last = 1";
+
+        let parsed = parse(source).expect("Parsing failed");
+        let result = AirIR::from_source(&parsed);
+        assert!(result.is_err());
     }
 }

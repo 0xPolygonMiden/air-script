@@ -249,13 +249,13 @@ impl SymbolTable {
         }
     }
 
-    /// Checks that the specified name and index are a valid reference to a declared public input
-    /// or a vector constant. If not, it returns an error.
+    /// Checks that the specified name and index are a valid reference to a declared matrix constant.
+    /// If not, it returns an error.
     ///
     /// # Errors
-    /// - Returns an error if the identifier is not associated with a vector access type.
-    /// - Returns an error if the index is not in the declared public input array.
-    /// - Returns an error if the index is greater than the vector's length.
+    /// - Returns an error if the identifier is not associated with a matrix access type.
+    /// - Returns an error if the row index is greater than the matrix row length.
+    /// - Returns an error if the column index is greater than the matrix column length.
     pub(super) fn validate_matrix_access(
         &self,
         name: &str,
@@ -265,7 +265,7 @@ impl SymbolTable {
         let matrix_access_type = self.get_type(name)?;
         match matrix_access_type {
             IdentifierType::Constant(ConstantType::Matrix(matrix)) => {
-                if row_idx > matrix.len() {
+                if row_idx >= matrix.len() {
                     return Err(SemanticError::IndexOutOfRange(format!(
                         "Out-of-range index [{}] in matrix constant {} of row length {}",
                         row_idx,
@@ -273,7 +273,7 @@ impl SymbolTable {
                         matrix.len()
                     )));
                 }
-                if col_idx > matrix[0].len() {
+                if col_idx >= matrix[0].len() {
                     return Err(SemanticError::IndexOutOfRange(format!(
                         "Out-of-range index [{}][{}] in matrix constant {} of column length {}",
                         row_idx,
@@ -317,6 +317,7 @@ pub(super) fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticErr
 // HELPERS
 // ================================================================================================
 
+/// Checks that the declared value of a constant is valid.
 fn validate_constant(constant: &Constant) -> Result<(), SemanticError> {
     match constant.value() {
         // check the number of elements in each row are same for a matrix
