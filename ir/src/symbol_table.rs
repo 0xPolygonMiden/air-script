@@ -4,7 +4,7 @@ use super::{
 };
 use parser::ast::{
     constants::{Constant, ConstantType},
-    Identifier, PeriodicColumn, PublicInput,
+    Identifier, MatrixAccess, PeriodicColumn, PublicInput, VectorAccess,
 };
 use std::fmt::Display;
 
@@ -195,9 +195,9 @@ impl SymbolTable {
     ///
     /// # Errors
     /// Returns an error if the identifier was not in the symbol table.
-    pub(super) fn get_type(&self, name: &str) -> Result<IdentifierType, SemanticError> {
+    pub(super) fn get_type(&self, name: &str) -> Result<&IdentifierType, SemanticError> {
         if let Some(ident_type) = self.identifiers.get(name) {
-            Ok(ident_type.clone())
+            Ok(ident_type)
         } else {
             Err(SemanticError::InvalidIdentifier(format!(
                 "Identifier {} was not declared",
@@ -207,93 +207,91 @@ impl SymbolTable {
     }
 
     /// Checks that the specified name and index are a valid reference to a declared public input
-    /// or a vector constant. If not, it returns an error.
+    /// or a vector constant and returns the symbol type. If it's not a valid reference, an error
+    /// is returned.
     ///
     /// # Errors
+    /// - Returns an error if the identifier is not in the symbol table.
     /// - Returns an error if the identifier is not associated with a vector access type.
     /// - Returns an error if the index is not in the declared public input array.
     /// - Returns an error if the index is greater than the vector's length.
-    pub(super) fn validate_vector_access(
+    pub(super) fn access_vector_element(
         &self,
-        name: &str,
-        idx: usize,
-    ) -> Result<(), SemanticError> {
-        let vector_access_type = self.get_type(name)?;
-        match vector_access_type {
+        vector_access: &VectorAccess,
+    ) -> Result<&IdentifierType, SemanticError> {
+        let symbol_type = self.get_type(vector_access.name())?;
+        match symbol_type {
             IdentifierType::PublicInput(size) => {
-                if idx < size {
-                    Ok(())
+                if vector_access.idx() < *size {
+                    Ok(symbol_type)
                 } else {
-                    Err(SemanticError::IndexOutOfRange(format!(
-                        "Out-of-range index {} in public input {} of length {}",
-                        idx, name, size
-                    )))
+                    Err(SemanticError::public_inputs_out_of_bounds(
+                        vector_access,
+                        *size,
+                    ))
                 }
             }
             IdentifierType::Constant(ConstantType::Vector(vector)) => {
-                if idx < vector.len() {
-                    Ok(())
+                if vector_access.idx() < vector.len() {
+                    Ok(symbol_type)
                 } else {
-                    Err(SemanticError::IndexOutOfRange(format!(
-                        "Out-of-range index {} in vector constant {} of length {}",
-                        idx,
-                        name,
-                        vector.len()
-                    )))
+                    Err(SemanticError::vector_access_out_of_bounds(
+                        vector_access,
+                        vector.len(),
+                    ))
                 }
             }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as {} which is not a supported type.",
-                name, vector_access_type
-            ))),
+            _ => Err(SemanticError::invalid_vector_access(
+                vector_access,
+                symbol_type,
+            )),
         }
     }
 
-    /// Checks that the specified name and index are a valid reference to a declared matrix constant.
-    /// If not, it returns an error.
+    /// Checks that the specified name and index are a valid reference to a matrix constant and
+    /// returns the symbol type. If it's not a valid reference, an error is returned.
     ///
     /// # Errors
+    /// - Returns an error if the identifier is not in the symbol table.
     /// - Returns an error if the identifier is not associated with a matrix access type.
     /// - Returns an error if the row index is greater than the matrix row length.
     /// - Returns an error if the column index is greater than the matrix column length.
-    pub(super) fn validate_matrix_access(
+    pub(super) fn access_matrix_element(
         &self,
-        name: &str,
-        row_idx: usize,
-        col_idx: usize,
-    ) -> Result<(), SemanticError> {
-        let matrix_access_type = self.get_type(name)?;
-        match matrix_access_type {
+        matrix_access: &MatrixAccess,
+    ) -> Result<&IdentifierType, SemanticError> {
+        let symbol_type = self.get_type(matrix_access.name())?;
+        match symbol_type {
             IdentifierType::Constant(ConstantType::Matrix(matrix)) => {
-                if row_idx >= matrix.len() {
-                    return Err(SemanticError::IndexOutOfRange(format!(
-                        "Out-of-range index [{}] in matrix constant {} of row length {}",
-                        row_idx,
-                        name,
-                        matrix.len()
-                    )));
+                if matrix_access.row_idx() >= matrix.len() {
+                    return Err(SemanticError::matrix_access_out_of_bounds(
+                        matrix_access,
+                        matrix.len(),
+                        matrix[0].len(),
+                    ));
                 }
-                if col_idx >= matrix[0].len() {
-                    return Err(SemanticError::IndexOutOfRange(format!(
-                        "Out-of-range index [{}][{}] in matrix constant {} of column length {}",
-                        row_idx,
-                        col_idx,
-                        name,
-                        matrix[0].len()
-                    )));
+                if matrix_access.col_idx() >= matrix[0].len() {
+                    return Err(SemanticError::matrix_access_out_of_bounds(
+                        matrix_access,
+                        matrix.len(),
+                        matrix[0].len(),
+                    ));
                 }
-                Ok(())
+                Ok(symbol_type)
             }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as {} which is not a supported type.",
-                name, matrix_access_type
-            ))),
+            _ => Err(SemanticError::invalid_matrix_access(
+                matrix_access,
+                symbol_type,
+            )),
         }
     }
 }
 
+// HELPERS
+// ================================================================================================
+
 /// Validates the cycle length of the specified periodic column.
-pub(super) fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
+fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
     let name = column.name();
     let cycle = column.values().len();
 
@@ -313,9 +311,6 @@ pub(super) fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticErr
 
     Ok(())
 }
-
-// HELPERS
-// ================================================================================================
 
 /// Checks that the declared value of a constant is valid.
 fn validate_constant(constant: &Constant) -> Result<(), SemanticError> {

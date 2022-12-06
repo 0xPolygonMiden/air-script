@@ -5,7 +5,7 @@ mod degree;
 pub use degree::TransitionConstraintDegree;
 
 mod graph;
-pub use graph::{AlgebraicGraph, NodeIndex, Operation};
+pub use graph::{AlgebraicGraph, ConstantValue, NodeIndex, Operation};
 
 // CONSTANTS
 // ================================================================================================

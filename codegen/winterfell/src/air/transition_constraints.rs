@@ -1,6 +1,6 @@
 use super::{AirIR, Impl};
 use ir::{
-    transition_constraints::{AlgebraicGraph, Operation},
+    transition_constraints::{AlgebraicGraph, ConstantValue, Operation},
     NodeIndex,
 };
 
@@ -84,7 +84,7 @@ impl Codegen for Operation {
     // TODO: Only add parentheses in Add and Mul if the expression is an arithmetic operation.
     fn to_string(&self, graph: &AlgebraicGraph) -> String {
         match self {
-            Operation::Const(value) => format!("E::from({}_u64)", value),
+            Operation::Constant(ConstantValue::Inline(value)) => format!("E::from({}_u64)", value),
             Operation::TraceElement(trace_access) => match trace_access.row_offset() {
                 0 => {
                     format!("current[{}]", trace_access.col_idx())
