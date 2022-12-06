@@ -3,10 +3,10 @@ use super::{Identifier, MatrixAccess, VectorAccess};
 // TRANSITION CONSTRAINTS
 // ================================================================================================
 
-/// Stores the transition constraints to be enforced on the trace column values.
 #[derive(Debug, PartialEq)]
-pub struct TransitionConstraints {
-    pub transition_constraints: Vec<TransitionConstraint>,
+pub enum TransitionStmt {
+    Constraint(TransitionConstraint),
+    Variable(TransitionVariable),
 }
 
 /// Stores the expression corresponding to the transition constraint.
@@ -48,4 +48,23 @@ pub enum TransitionExpr {
     Sub(Box<TransitionExpr>, Box<TransitionExpr>),
     Mul(Box<TransitionExpr>, Box<TransitionExpr>),
     Exp(Box<TransitionExpr>, u64),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TransitionVariable {
+    name: Identifier,
+    value: TransitionVariableType,
+}
+
+impl TransitionVariable {
+    pub fn new(name: Identifier, value: TransitionVariableType) -> Self {
+        Self { name, value }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum TransitionVariableType {
+    Scalar(TransitionExpr),
+    Vector(Vec<TransitionExpr>),
+    Matrix(Vec<Vec<TransitionExpr>>),
 }

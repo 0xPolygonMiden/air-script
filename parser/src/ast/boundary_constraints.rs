@@ -4,10 +4,10 @@ use std::fmt::Display;
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
-/// Stores the boundary constraints to be enforced on the trace column values.
 #[derive(Debug, PartialEq)]
-pub struct BoundaryConstraints {
-    pub boundary_constraints: Vec<BoundaryConstraint>,
+pub enum BoundaryStmt {
+    Constraint(BoundaryConstraint),
+    Variable(BoundaryVariable),
 }
 
 /// Stores the expression corresponding to the boundary constraint.
@@ -76,4 +76,23 @@ pub enum BoundaryExpr {
     Sub(Box<BoundaryExpr>, Box<BoundaryExpr>),
     Mul(Box<BoundaryExpr>, Box<BoundaryExpr>),
     Exp(Box<BoundaryExpr>, u64),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BoundaryVariable {
+    name: Identifier,
+    value: BoundaryVariableType,
+}
+
+impl BoundaryVariable {
+    pub fn new(name: Identifier, value: BoundaryVariableType) -> Self {
+        Self { name, value }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BoundaryVariableType {
+    Scalar(BoundaryExpr),
+    Vector(Vec<BoundaryExpr>),
+    Matrix(Vec<Vec<BoundaryExpr>>),
 }

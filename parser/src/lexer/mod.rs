@@ -27,6 +27,10 @@ pub enum Token {
     #[token("def")]
     Def,
 
+    /// Used to declare intermediate variables in the AIR constraints module.
+    #[token("let")]
+    Let,
+
     /// Used to declare constants in the AIR constraints module.
     #[token("constants")]
     Constants,

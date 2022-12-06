@@ -1,4 +1,4 @@
-use super::{build_parse_test, Identifier, Source, SourceSection};
+use super::{build_parse_test, Identifier, Source, SourceSection::*};
 use crate::{
     ast::constants::{Constant, ConstantType},
     error::{Error, ParseError},
@@ -12,7 +12,7 @@ fn constants_scalars() {
     let source = "constants:
         A: 1
         B: 2";
-    let expected = Source(vec![SourceSection::Constants(vec![
+    let expected = Source(vec![Constants(vec![
         Constant::new(Identifier("A".to_string()), ConstantType::Scalar(1)),
         Constant::new(Identifier("B".to_string()), ConstantType::Scalar(2)),
     ])]);
@@ -24,7 +24,7 @@ fn constants_vectors() {
     let source = "constants:
         A: [1, 2, 3, 4]
         B: [5, 6, 7, 8]";
-    let expected = Source(vec![SourceSection::Constants(vec![
+    let expected = Source(vec![Constants(vec![
         Constant::new(
             Identifier("A".to_string()),
             ConstantType::Vector(vec![1, 2, 3, 4]),
@@ -42,7 +42,7 @@ fn constants_matrices() {
     let source = "constants:
         ABC: [[1, 2], [3, 4]]
         XYZ: [[5, 6], [7, 8]]";
-    let expected = Source(vec![SourceSection::Constants(vec![
+    let expected = Source(vec![Constants(vec![
         Constant::new(
             Identifier("ABC".to_string()),
             ConstantType::Matrix(vec![vec![1, 2], vec![3, 4]]),
@@ -61,7 +61,7 @@ fn const_matrix_unequal_number_of_cols() {
     // validation happens at the IR level.
     let source = "constants:
     A: [[1, 2], [3, 4, 5]]";
-    let expected = Source(vec![SourceSection::Constants(vec![Constant::new(
+    let expected = Source(vec![Constants(vec![Constant::new(
         Identifier("A".to_string()),
         ConstantType::Matrix(vec![vec![1, 2], vec![3, 4, 5]]),
     )])]);

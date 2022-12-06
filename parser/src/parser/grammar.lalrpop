@@ -1,12 +1,14 @@
 use crate::{
     ast::{
-        boundary_constraints::{Boundary, BoundaryConstraints, BoundaryConstraint, BoundaryExpr}, 
-        transition_constraints::{TransitionConstraint, TransitionConstraints, TransitionExpr},
+        boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt, BoundaryExpr,
+        BoundaryVariable, BoundaryVariableType}, 
+        transition_constraints::{TransitionConstraint, TransitionExpr, TransitionStmt,
+        TransitionVariable, TransitionVariableType},
         constants::{Constant, ConstantType},
         Identifier, Source, SourceSection, TraceCols, PublicInput, PeriodicColumn, VectorAccess,
         MatrixAccess
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
-    InvalidConst}}, lexer::Token
+    InvalidConst, MissingBoundaryConstraint, MissingTransitionConstraint}}, lexer::Token
 };
 use std::str::FromStr;
 use lalrpop_util::ParseError;
@@ -122,14 +124,40 @@ PeriodicColumn: PeriodicColumn = {
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
-BoundaryConstraints: BoundaryConstraints = {
-    "boundary_constraints" ":" <boundary_constraints: BoundaryConstraint+> =>
-        BoundaryConstraints { boundary_constraints }
+BoundaryConstraints: Vec<BoundaryStmt> = {
+    "boundary_constraints" ":" <boundary_stmts: BoundaryStmt+> =>? {
+        // check if at least one boundary constraint is defined
+        let boundary_constraints_exist = boundary_stmts.iter().any(|stmt| match stmt {
+            BoundaryStmt::Constraint(_) => true,
+            _ => false,
+        });
+        if !boundary_constraints_exist {
+            return Err(ParseError::User {
+                error: Error::ParseError(
+                    MissingBoundaryConstraint(
+                        "Declaration of at least one boundary constraint is required".to_string()
+                    )
+                )
+            });
+        }
+        Ok(boundary_stmts)
+    }
 }
 
-BoundaryConstraint: BoundaryConstraint = {
+BoundaryStmt: BoundaryStmt = {
     "enf" <column: Identifier> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
-        BoundaryConstraint::new(column, boundary, value)
+        BoundaryStmt::Constraint(BoundaryConstraint::new(column, boundary, value)),
+    "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
+        BoundaryStmt::Variable(BoundaryVariable::new(name, boundary_variable_type)),
+}
+
+BoundaryVariableType: BoundaryVariableType = {
+    <scalar_value: BoundaryExpr> =>
+        BoundaryVariableType::Scalar(scalar_value),
+    "[" <vector_value: CommaElems<BoundaryExpr>> "]" =>
+        BoundaryVariableType::Vector(vector_value),
+    "[" <matrix_value: CommaElems<Vector<BoundaryExpr>>> "]" =>
+        BoundaryVariableType::Matrix(matrix_value),
 }
 
 Boundary: Boundary = {
@@ -166,13 +194,40 @@ BoundaryAtom: BoundaryExpr = {
 // TRANSITION CONSTRAINTS
 // ================================================================================================
 
-TransitionConstraints: TransitionConstraints = {
-    "transition_constraints" ":" <transition_constraints: TransitionConstraint+> =>
-        TransitionConstraints { transition_constraints }
+TransitionConstraints: Vec<TransitionStmt> = {
+    "transition_constraints" ":" <transition_stmts: TransitionStmt+> =>? {
+        // check if at least one transition constraint is defined
+        let transition_constraints_exist = transition_stmts.iter().any(|stmt| match stmt {
+            TransitionStmt::Constraint(_) => true,
+            _ => false,
+        });
+        if !transition_constraints_exist {
+            return Err(ParseError::User {
+                error: Error::ParseError(
+                    MissingTransitionConstraint(
+                        "Declaration of at least one transition constraint is required".to_string()
+                    )
+                )
+            });
+        }
+        Ok(transition_stmts)
+    }
 }
 
-TransitionConstraint: TransitionConstraint = {
-    "enf" <lhs: TransitionExpr> "=" <rhs: TransitionExpr> => TransitionConstraint::new(lhs, rhs)
+TransitionStmt: TransitionStmt = {
+    "enf" <lhs: TransitionExpr> "=" <rhs: TransitionExpr> =>
+        TransitionStmt::Constraint(TransitionConstraint::new(lhs, rhs)),
+    "let" <name: Identifier> "=" <transition_variable_type: TransitionVariableType> =>
+        TransitionStmt::Variable(TransitionVariable::new(name, transition_variable_type)),
+}
+
+TransitionVariableType: TransitionVariableType = {
+    <scalar_value: TransitionExpr> =>
+        TransitionVariableType::Scalar(scalar_value),
+    "[" <vector_value: CommaElems<TransitionExpr>> "]" =>
+        TransitionVariableType::Vector(vector_value),
+    "[" <matrix_value: CommaElems<Vector<TransitionExpr>>> "]" =>
+        TransitionVariableType::Matrix(matrix_value),
 }
 
 // --- TRANSITION CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
@@ -260,8 +315,9 @@ extern {
         identifier => Token::Ident(<String>),
         r"[0-9]+" => Token::Num(<String>),
         "def" => Token::Def,
-        "trace_columns" => Token::TraceColumnns,
+        "let" => Token::Let,
         "constants" => Token::Constants,
+        "trace_columns" => Token::TraceColumnns,
         "main" => Token::Main,
         "aux" => Token::Aux,
         "public_inputs" => Token::PublicInputs,

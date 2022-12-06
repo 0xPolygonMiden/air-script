@@ -1,13 +1,17 @@
 use super::{
-    build_parse_test, Boundary, BoundaryConstraint, BoundaryConstraints, BoundaryExpr, Identifier,
-    Source, SourceSection,
+    build_parse_test, Boundary, BoundaryConstraint, BoundaryExpr::*, Identifier, Source,
+    SourceSection::*,
 };
-use crate::ast::{
-    constants::{
-        Constant,
-        ConstantType::{Matrix, Scalar, Vector},
+use crate::{
+    ast::{
+        constants::{
+            Constant,
+            ConstantType::{Matrix, Scalar, Vector},
+        },
+        BoundaryStmt::*,
+        BoundaryVariable, BoundaryVariableType, MatrixAccess, PublicInput, VectorAccess,
     },
-    MatrixAccess, PublicInput, VectorAccess,
+    error::{Error, ParseError},
 };
 
 // BOUNDARY CONSTRAINTS
@@ -18,15 +22,9 @@ fn boundary_constraint_at_first() {
     let source = "
     boundary_constraints:
         enf clk.first = 0";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(
-        BoundaryConstraints {
-            boundary_constraints: vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
-                Boundary::First,
-                BoundaryExpr::Const(0),
-            )],
-        },
-    )]);
+    let expected = Source(vec![BoundaryConstraints(vec![Constraint(
+        BoundaryConstraint::new(Identifier("clk".to_string()), Boundary::First, Const(0)),
+    )])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -35,15 +33,9 @@ fn boundary_constraint_at_last() {
     let source = "
     boundary_constraints:
         enf clk.last = 15";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(
-        BoundaryConstraints {
-            boundary_constraints: vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
-                Boundary::Last,
-                BoundaryExpr::Const(15),
-            )],
-        },
-    )]);
+    let expected = Source(vec![BoundaryConstraints(vec![Constraint(
+        BoundaryConstraint::new(Identifier("clk".to_string()), Boundary::Last, Const(15)),
+    )])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -61,22 +53,18 @@ fn multiple_boundary_constraints() {
     boundary_constraints:
         enf clk.first = 0
         enf clk.last = 1";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(
-        BoundaryConstraints {
-            boundary_constraints: vec![
-                BoundaryConstraint::new(
-                    Identifier("clk".to_string()),
-                    Boundary::First,
-                    BoundaryExpr::Const(0),
-                ),
-                BoundaryConstraint::new(
-                    Identifier("clk".to_string()),
-                    Boundary::Last,
-                    BoundaryExpr::Const(1),
-                ),
-            ],
-        },
-    )]);
+    let expected = Source(vec![BoundaryConstraints(vec![
+        Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::First,
+            Const(0),
+        )),
+        Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::Last,
+            Const(1),
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -88,14 +76,12 @@ fn boundary_constraint_with_pub_input() {
     boundary_constraints:
         enf clk.first = a[0]";
     let expected = Source(vec![
-        SourceSection::PublicInputs(vec![PublicInput::new(Identifier("a".to_string()), 16)]),
-        SourceSection::BoundaryConstraints(BoundaryConstraints {
-            boundary_constraints: vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
-                Boundary::First,
-                BoundaryExpr::VectorAccess(VectorAccess::new(Identifier("a".to_string()), 0)),
-            )],
-        }),
+        PublicInputs(vec![PublicInput::new(Identifier("a".to_string()), 16)]),
+        BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::First,
+            VectorAccess(VectorAccess::new(Identifier("a".to_string()), 0)),
+        ))]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -105,24 +91,22 @@ fn boundary_constraint_with_expr() {
     let source = "
     boundary_constraints:
         enf clk.first = 5 + a[3] + 6";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(
-        BoundaryConstraints {
-            boundary_constraints: vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
-                Boundary::First,
-                BoundaryExpr::Add(
-                    Box::new(BoundaryExpr::Add(
-                        Box::new(BoundaryExpr::Const(5)),
-                        Box::new(BoundaryExpr::VectorAccess(VectorAccess::new(
-                            Identifier("a".to_string()),
-                            3,
-                        ))),
-                    )),
-                    Box::new(BoundaryExpr::Const(6)),
-                ),
-            )],
-        },
-    )]);
+    let expected = Source(vec![BoundaryConstraints(vec![Constraint(
+        BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::First,
+            Add(
+                Box::new(Add(
+                    Box::new(Const(5)),
+                    Box::new(VectorAccess(VectorAccess::new(
+                        Identifier("a".to_string()),
+                        3,
+                    ))),
+                )),
+                Box::new(Const(6)),
+            ),
+        ),
+    )])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -136,7 +120,7 @@ fn boundary_constraint_with_const() {
     boundary_constraints:
         enf clk.first = A + B[1] - C[0][1]";
     let expected = Source(vec![
-        SourceSection::Constants(vec![
+        Constants(vec![
             Constant::new(Identifier("A".to_string()), Scalar(1)),
             Constant::new(Identifier("B".to_string()), Vector(vec![0, 1])),
             Constant::new(
@@ -144,28 +128,104 @@ fn boundary_constraint_with_const() {
                 Matrix(vec![vec![0, 1], vec![1, 0]]),
             ),
         ]),
-        SourceSection::BoundaryConstraints(BoundaryConstraints {
-            boundary_constraints: vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
-                Boundary::First,
-                BoundaryExpr::Sub(
-                    Box::new(BoundaryExpr::Add(
-                        Box::new(BoundaryExpr::Elem(Identifier("A".to_string()))),
-                        Box::new(BoundaryExpr::VectorAccess(VectorAccess::new(
-                            Identifier("B".to_string()),
-                            1,
-                        ))),
-                    )),
-                    Box::new(BoundaryExpr::MatrixAccess(MatrixAccess::new(
-                        Identifier("C".to_string()),
-                        0,
+        BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::First,
+            Sub(
+                Box::new(Add(
+                    Box::new(Elem(Identifier("A".to_string()))),
+                    Box::new(VectorAccess(VectorAccess::new(
+                        Identifier("B".to_string()),
                         1,
                     ))),
-                ),
-            )],
-        }),
+                )),
+                Box::new(MatrixAccess(MatrixAccess::new(
+                    Identifier("C".to_string()),
+                    0,
+                    1,
+                ))),
+            ),
+        ))]),
     ]);
     build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn boundary_constraint_with_variables() {
+    let source = "
+    boundary_constraints:
+        let a = 2^2
+        let b = [a, 2 * a]
+        let c = [[a - 1, a^2], [b[0], b[1]]]
+        enf clk.first = 5 + a[3] + 6";
+    let expected = Source(vec![BoundaryConstraints(vec![
+        Variable(BoundaryVariable::new(
+            Identifier("a".to_string()),
+            BoundaryVariableType::Scalar(Exp(Box::new(Const(2)), 2)),
+        )),
+        Variable(BoundaryVariable::new(
+            Identifier("b".to_string()),
+            BoundaryVariableType::Vector(vec![
+                Elem(Identifier("a".to_string())),
+                Mul(
+                    Box::new(Const(2)),
+                    Box::new(Elem(Identifier("a".to_string()))),
+                ),
+            ]),
+        )),
+        Variable(BoundaryVariable::new(
+            Identifier("c".to_string()),
+            BoundaryVariableType::Matrix(vec![
+                vec![
+                    Sub(
+                        Box::new(Elem(Identifier("a".to_string()))),
+                        Box::new(Const(1)),
+                    ),
+                    Exp(Box::new(Elem(Identifier("a".to_string()))), 2),
+                ],
+                vec![
+                    VectorAccess(VectorAccess::new(Identifier("b".to_string()), 0)),
+                    VectorAccess(VectorAccess::new(Identifier("b".to_string()), 1)),
+                ],
+            ]),
+        )),
+        Constraint(BoundaryConstraint::new(
+            Identifier("clk".to_string()),
+            Boundary::First,
+            Add(
+                Box::new(Add(
+                    Box::new(Const(5)),
+                    Box::new(VectorAccess(VectorAccess::new(
+                        Identifier("a".to_string()),
+                        3,
+                    ))),
+                )),
+                Box::new(Const(6)),
+            ),
+        )),
+    ])]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn err_invalid_variable() {
+    let source = "
+    boundary_constraints:
+        let a = 2^2 + [1]";
+    build_parse_test!(source).expect_unrecognized_token();
+}
+
+#[test]
+fn err_missing_boundary_constraint() {
+    let source = "
+    boundary_constraints:
+        let a = 2^2
+        let b = [a, 2 * a]
+        let c = [[a - 1, a^2], [b[0], b[1]]]";
+    let error = Error::ParseError(ParseError::MissingBoundaryConstraint(
+        "Declaration of at least one boundary constraint is required".to_string(),
+    ));
+    build_parse_test!(source).expect_error(error);
 }
 
 #[test]

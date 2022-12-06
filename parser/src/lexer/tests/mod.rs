@@ -3,12 +3,13 @@ use crate::{
     lexer::{Lexer, Token},
 };
 
+mod arithmetic_ops;
 mod boundary_constraints;
 mod constants;
-mod expressions;
 mod identifiers;
 mod periodic_columns;
 mod pub_inputs;
+mod variables;
 
 // TEST HELPERS
 // ================================================================================================
