@@ -23,6 +23,10 @@ The project is organized into several crates as follows:
 | [IR](ir) | Contains the IR for AirScript, `AirIR`. `AirIR` is initialized with an AirScript AST, which it converts to an internal representation that can be optimized and used to generate code in multiple target languages. |
 | [Winterfell code generator](codegen/winterfell/) | Contains a code generator targeting the [Winterfell prover](https://github.com/novifinancial/winterfell) Rust library. The Winterfell code generator converts a provided AirScript `AirIR` into Rust code that represents the AIR as a new custom struct that implements Winterfell's `Air` trait. |
 
+## Contributing to AirScript
+
+AirScript is an open project and we welcome everyone to contribute! If you are interested in contributing to AirScript, please have a look at our [Contribution guidelines](https://github.com/0xPolygonMiden/air-script/blob/main/CONTRIBUTING.md). If you want to work on a specific issue, please add a comment on the GitHub issue indicating you are interested before submitting a PR. This will help avoid duplicated effort. If you have thoughts on how to improve AirScript, we'd love to know them. So, please don't hesitate to open issues.
+
 ## References
 
 1. [Logos](https://github.com/maciejhirsz/logos/): Library for generating fast lexers in Rust.
