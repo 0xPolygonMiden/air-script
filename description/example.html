@@ -109,9 +109,6 @@
                         <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        <a href="https://github.com/0xPolygonMiden/air-script/" title="Git repository" aria-label="Git repository">
-                            <i id="git-repository-button" class="fa fa-github"></i>
-                        </a>
                     </div>
                 </div>
 
@@ -180,7 +177,7 @@ transition_constraints:
     enf s * (c - a * b) = 0
 
     # the auxiliary column contains the product of values of c offset by a random value.
-    enf p' = p * (c + \$rand[0])
+    enf p' = p * (c + $rand[0])
 </code></pre>
 
                     </main>
