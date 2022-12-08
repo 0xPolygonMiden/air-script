@@ -1,4 +1,4 @@
-use parser::ast::{self, BoundaryStmt, TransitionStmt};
+use parser::ast::{self, constants::Constant, BoundaryStmt, TransitionStmt};
 pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
 use std::collections::BTreeMap;
 
@@ -18,7 +18,11 @@ use error::SemanticError;
 mod helpers;
 use helpers::SourceValidator;
 
+#[cfg(test)]
+mod tests;
+
 pub type TraceSegment = u8;
+pub type Constants = Vec<Constant>;
 pub type PublicInputs = Vec<(String, usize)>;
 pub type PeriodicColumns = Vec<Vec<u64>>;
 
@@ -28,6 +32,9 @@ pub type PeriodicColumns = Vec<Vec<u64>>;
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
+    //TODO: remove dead code attribute
+    #[allow(dead_code)]
+    constants: Constants,
     public_inputs: PublicInputs,
     periodic_columns: PeriodicColumns,
     boundary_constraints: BoundaryConstraints,
@@ -55,6 +62,9 @@ impl AirIR {
                 ast::SourceSection::AirDef(Identifier(air_def)) => {
                     // update the name of the air.
                     air_name = air_def;
+                }
+                ast::SourceSection::Constants(constants) => {
+                    symbol_table.insert_constants(constants)?;
                 }
                 ast::SourceSection::TraceCols(columns) => {
                     // process & validate the main trace columns
@@ -108,13 +118,14 @@ impl AirIR {
             }
         }
 
-        let (public_inputs, periodic_columns) = symbol_table.into_declarations();
+        let (constants, public_inputs, periodic_columns) = symbol_table.into_declarations();
 
         // validate sections
         validator.check()?;
 
         Ok(Self {
             air_name: air_name.to_string(),
+            constants,
             public_inputs,
             periodic_columns,
             boundary_constraints,
@@ -178,278 +189,5 @@ impl AirIR {
 
     pub fn transition_graph(&self) -> &AlgebraicGraph {
         self.transition_constraints.graph()
-    }
-}
-
-// TODO: add checks for the correctness of the AirIR that is built.
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use parser::parse;
-
-    #[test]
-    fn boundary_constraints() {
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        transition_constraints:
-            enf clk' = clk + 1
-        boundary_constraints:
-            enf clk.first = 0
-            enf clk.last = 1";
-
-        let parsed = parse(source).expect("Parsing failed");
-        let result = AirIR::from_source(&parsed);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn err_bc_column_undeclared() {
-        let source = "
-        trace_columns:
-            main: [ctx]
-        public_inputs:
-            stack_inputs: [16]
-        boundary_constraints:
-            enf clk.first = 0
-            enf clk.last = 1
-        transition_constraints:
-            enf clk' = clk + 1";
-
-        let parsed = parse(source).expect("Parsing failed");
-
-        let result = AirIR::from_source(&parsed);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn err_bc_empty_or_omitted() {
-        // if boundary constraints are empty, an error should be returned at parser level.
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        boundary_constraints:
-        transition_constraints:
-            enf clk' = clk + 1";
-
-        assert!(parse(source).is_err());
-
-        // if boundary constraints are omitted, an error should be returned at IR level.
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        transition_constraints:
-            enf clk' = clk + 1";
-
-        let parsed = parse(source).expect("Parsing failed");
-        let result = AirIR::from_source(&parsed);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn err_bc_duplicate_first() {
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        transition_constraints:
-            enf clk' = clk + 1
-        boundary_constraints:
-            enf clk.first = 0
-            enf clk.first = 1";
-
-        let parsed = parse(source).expect("Parsing failed");
-        let result = AirIR::from_source(&parsed);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn err_bc_duplicate_last() {
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        transition_constraints:
-            enf clk' = clk + 1
-        boundary_constraints:
-            enf clk.last = 0
-            enf clk.last = 1";
-
-        let parsed = parse(source).expect("Parsing failed");
-
-        assert!(AirIR::from_source(&parsed).is_err());
-    }
-
-    #[test]
-    fn transition_constraints() {
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        boundary_constraints:
-            enf clk.first = 0
-        transition_constraints:
-            enf clk' = clk + 1";
-
-        let parsed = parse(source).expect("Parsing failed");
-
-        let result = AirIR::from_source(&parsed);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn transition_constraints_using_parens() {
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        boundary_constraints:
-            enf clk.first = 0
-        transition_constraints:
-            enf clk' = (clk + 1)";
-
-        let parsed = parse(source).expect("Parsing failed");
-
-        let result = AirIR::from_source(&parsed);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn err_tc_empty_or_omitted() {
-        // if transition constraints are empty, an error should be returned at parser level.
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        transition_constraints:
-        boundary_constraints:
-            enf clk.first = 0";
-
-        assert!(parse(source).is_err());
-
-        // if transition constraints are omitted, an error should be returned at IR level.
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        boundary_constraints:
-            enf clk.first = 0";
-
-        let parsed = parse(source).expect("Parsing failed");
-        let result = AirIR::from_source(&parsed);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn err_tc_column_undeclared() {
-        let source = "
-        trace_columns:
-            main: [ctx]
-        public_inputs:
-            stack_inputs: [16]
-        boundary_constraints:
-            enf ctx.first = 0
-        transition_constraints:
-            enf clk' = clk + 1";
-
-        let parsed = parse(source).expect("Parsing failed");
-
-        let result = AirIR::from_source(&parsed);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn err_public_inputs_empty_or_omitted() {
-        // if public inputs are empty, an error should be returned at parser level.
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-        transition_constraints:
-            enf clk' = clk + 1
-        boundary_constraints:
-            enf clk.first = 0";
-
-        assert!(parse(source).is_err());
-
-        // if public inputs are omitted, an error should be returned at IR level.
-        let source = "
-        trace_columns:
-            main: [clk]
-        transition_constraints:
-            enf clk' = clk + 1
-        boundary_constraints:
-            enf clk.first = 0";
-
-        let parsed = parse(source).expect("Parsing failed");
-        let result = AirIR::from_source(&parsed);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn err_trace_cols_omitted() {
-        // returns an error if trace columns declaration is missing
-        let source = "
-        public_inputs:
-            stack_inputs: [16]
-        transition_constraints:
-            enf clk' = clk + 1
-        boundary_constraints:
-            enf clk.first = 0";
-
-        let parsed = parse(source).expect("Parsing failed");
-
-        let result = AirIR::from_source(&parsed);
-
-        // this fails before the check for missing trace columns declaration since the clk column
-        // used in constraints is not declared.
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn op_mul() {
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        boundary_constraints:
-            enf clk.first = 0
-        transition_constraints:
-            enf clk' * clk = 1";
-        let parsed = parse(source).expect("Parsing failed");
-
-        let result = AirIR::from_source(&parsed);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn op_exp() {
-        let source = "
-        trace_columns:
-            main: [clk]
-        public_inputs:
-            stack_inputs: [16]
-        boundary_constraints:
-            enf clk.first = 0
-        transition_constraints:
-            enf clk'^2 - clk = 1";
-        let parsed = parse(source).expect("Parsing failed");
-
-        let result = AirIR::from_source(&parsed);
-        assert!(result.is_ok());
     }
 }
