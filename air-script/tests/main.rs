@@ -65,3 +65,13 @@ fn bitwise() {
     let expected = expect_file!["bitwise/bitwise.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn constants() {
+    let generated_air = Test::new("tests/constants/constants.air".to_string())
+        .transpile()
+        .unwrap();
+
+    let expected = expect_file!["constants/constants.rs"];
+    expected.assert_eq(&generated_air);
+}

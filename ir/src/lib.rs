@@ -1,5 +1,7 @@
-use parser::ast::{self, constants::Constant, BoundaryStmt, TransitionStmt};
-pub use parser::ast::{boundary_constraints::BoundaryExpr, Identifier, PublicInput};
+pub use parser::ast::{
+    self, boundary_constraints::BoundaryExpr, constants::Constant, Identifier, PublicInput,
+};
+use parser::ast::{BoundaryStmt, TransitionStmt};
 use std::collections::BTreeMap;
 
 mod symbol_table;
@@ -137,6 +139,10 @@ impl AirIR {
 
     pub fn air_name(&self) -> &str {
         &self.air_name
+    }
+
+    pub fn constants(&self) -> &Constants {
+        &self.constants
     }
 
     pub fn public_inputs(&self) -> &PublicInputs {

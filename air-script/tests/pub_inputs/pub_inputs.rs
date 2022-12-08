@@ -1,6 +1,8 @@
 use winter_air::{Air, AirContext, Assertion, AuxTraceRandElements, EvaluationFrame, ProofOptions as WinterProofOptions, TransitionConstraintDegree, TraceInfo};
-use winter_math::{fields, ExtensionOf, FieldElement};
-use winter_utils::{collections, ByteWriter, Serializable};
+use winter_math::fields::f64::BaseElement as Felt;
+use winter_math::{ExtensionOf, FieldElement};
+use winter_utils::collections::Vec;
+use winter_utils::{ByteWriter, Serializable};
 
 pub struct PublicInputs {
     program_hash: [Felt; 4],

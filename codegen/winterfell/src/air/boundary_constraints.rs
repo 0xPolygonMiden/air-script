@@ -21,7 +21,7 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
         let assertion = format!(
             "result.push(Assertion::single({}, 0, {}));",
             col_idx,
-            constraint.to_string(false)
+            constraint.to_string(ir, false)
         );
         get_assertions.line(assertion);
     }
@@ -35,7 +35,7 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
             let assertion = format!(
                 "result.push(Assertion::single({}, last_step, {}));",
                 col_idx,
-                constraint.to_string(false)
+                constraint.to_string(ir, false)
             );
             get_assertions.line(assertion);
         }
@@ -64,7 +64,7 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
         let assertion = format!(
             "result.push(Assertion::single({}, 0, {}));",
             col_idx,
-            constraint.to_string(true)
+            constraint.to_string(ir, true)
         );
         get_aux_assertions.line(assertion);
     }
@@ -78,7 +78,7 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
             let assertion = format!(
                 "result.push(Assertion::single({}, last_step, {}));",
                 col_idx,
-                constraint.to_string(true)
+                constraint.to_string(ir, true)
             );
             get_aux_assertions.line(assertion);
         }
@@ -94,7 +94,7 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
 /// Code generation trait for generating Rust code strings from boundary constraint expressions.
 impl Codegen for BoundaryExpr {
     // TODO: Only add parentheses in Add/Sub/Mul/Exp if the expression is an arithmetic operation.
-    fn to_string(&self, is_aux_constraint: bool) -> String {
+    fn to_string(&self, ir: &AirIR, is_aux_constraint: bool) -> String {
         match self {
             Self::Const(value) => {
                 if is_aux_constraint {
@@ -103,8 +103,45 @@ impl Codegen for BoundaryExpr {
                     format!("Felt::new({})", value)
                 }
             }
+            // TODO: Check element type and cast accordingly.
+            Self::Elem(ident) => {
+                if is_aux_constraint {
+                    format!("E::from({})", ident)
+                } else {
+                    format!("{}", ident)
+                }
+            }
             Self::VectorAccess(vector_access) => {
-                format!("self.{}[{}]", vector_access.name(), vector_access.idx())
+                // check if vector_access is a public input
+                // TODO: figure out a better way to handle this lookup.
+                if ir
+                    .public_inputs()
+                    .iter()
+                    .any(|input| input.0 == vector_access.name())
+                {
+                    format!("self.{}[{}]", vector_access.name(), vector_access.idx())
+                } else if is_aux_constraint {
+                    format!("E::from({}[{}])", vector_access.name(), vector_access.idx())
+                } else {
+                    format!("{}[{}]", vector_access.name(), vector_access.idx())
+                }
+            }
+            Self::MatrixAccess(matrix_access) => {
+                if is_aux_constraint {
+                    format!(
+                        "E::from({}[{}][{}])",
+                        matrix_access.name(),
+                        matrix_access.row_idx(),
+                        matrix_access.col_idx()
+                    )
+                } else {
+                    format!(
+                        "{}[{}][{}]",
+                        matrix_access.name(),
+                        matrix_access.row_idx(),
+                        matrix_access.col_idx()
+                    )
+                }
             }
             Self::Rand(index) => {
                 format!("aux_rand_elements.get_segment_elements(0)[{}]", index)
@@ -112,28 +149,27 @@ impl Codegen for BoundaryExpr {
             Self::Add(lhs, rhs) => {
                 format!(
                     "({}) + ({})",
-                    lhs.to_string(is_aux_constraint),
-                    rhs.to_string(is_aux_constraint)
+                    lhs.to_string(ir, is_aux_constraint),
+                    rhs.to_string(ir, is_aux_constraint)
                 )
             }
             Self::Sub(lhs, rhs) => {
                 format!(
                     "({}) - ({})",
-                    lhs.to_string(is_aux_constraint),
-                    rhs.to_string(is_aux_constraint)
+                    lhs.to_string(ir, is_aux_constraint),
+                    rhs.to_string(ir, is_aux_constraint)
                 )
             }
             Self::Mul(lhs, rhs) => {
                 format!(
                     "({}) * ({})",
-                    lhs.to_string(is_aux_constraint),
-                    rhs.to_string(is_aux_constraint)
+                    lhs.to_string(ir, is_aux_constraint),
+                    rhs.to_string(ir, is_aux_constraint)
                 )
             }
             Self::Exp(lhs, rhs) => {
-                format!("({}).exp({})", lhs.to_string(is_aux_constraint), rhs)
+                format!("({}).exp({})", lhs.to_string(ir, is_aux_constraint), rhs)
             }
-            BoundaryExpr::Elem(_) | BoundaryExpr::MatrixAccess(_) => todo!(),
         }
     }
 }
