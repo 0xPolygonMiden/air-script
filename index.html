@@ -109,6 +109,9 @@
                         <a href="print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
+                        <a href="https://github.com/0xPolygonMiden/air-script/" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
                     </div>
                 </div>
 
@@ -135,7 +138,7 @@
                     <main>
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<p>Polygon Miden's AirScript is designed to make it simple to describe AIR constraints and generate efficient and accurate code in the required target language.</p>
+<p>Polygon Miden's AirScript is designed to make it simple to describe AIR constraints and generate efficient and accurate code in the required target language. The code for AirScript can be found <a href="https://github.com/0xPolygonMiden/air-script/">here</a>.</p>
 <h2 id="current-version"><a class="header" href="#current-version">Current Version</a></h2>
 <p>Currently, AirScript is on version 0.1, which supports a simple syntax for describing air constraints and generation of Rust code targeting the <a href="https://github.com/novifinancial/winterfell">Winterfell prover</a>.</p>
 <p>The simplified version of the language is based on <a href="https://github.com/maticnetwork/miden/discussions/254">this discussion</a>, but only includes the following:</p>
@@ -153,7 +156,7 @@
 <pre><code>cargo build --release
 </code></pre>
 <p>Then, run the <code>airc</code> target with the <code>transpile</code> option and specify your input file with <code>-i</code>. For example:</p>
-<pre><code>./target/release/airc transpile -i examples/system.air
+<pre><code>./target/release/airc transpile -i examples/example.air
 </code></pre>
 <p>You can use the <code>help</code> option to see other available options.</p>
 <pre><code>./target/release/airc transpile --help

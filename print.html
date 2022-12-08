@@ -110,6 +110,9 @@
                         <a href="print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
+                        <a href="https://github.com/0xPolygonMiden/air-script/" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
                     </div>
                 </div>
 
@@ -136,7 +139,7 @@
                     <main>
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<p>Polygon Miden's AirScript is designed to make it simple to describe AIR constraints and generate efficient and accurate code in the required target language.</p>
+<p>Polygon Miden's AirScript is designed to make it simple to describe AIR constraints and generate efficient and accurate code in the required target language. The code for AirScript can be found <a href="https://github.com/0xPolygonMiden/air-script/">here</a>.</p>
 <h2 id="current-version"><a class="header" href="#current-version">Current Version</a></h2>
 <p>Currently, AirScript is on version 0.1, which supports a simple syntax for describing air constraints and generation of Rust code targeting the <a href="https://github.com/novifinancial/winterfell">Winterfell prover</a>.</p>
 <p>The simplified version of the language is based on <a href="https://github.com/maticnetwork/miden/discussions/254">this discussion</a>, but only includes the following:</p>
@@ -154,7 +157,7 @@
 <pre><code>cargo build --release
 </code></pre>
 <p>Then, run the <code>airc</code> target with the <code>transpile</code> option and specify your input file with <code>-i</code>. For example:</p>
-<pre><code>./target/release/airc transpile -i examples/system.air
+<pre><code>./target/release/airc transpile -i examples/example.air
 </code></pre>
 <p>You can use the <code>help</code> option to see other available options.</p>
 <pre><code>./target/release/airc transpile --help
@@ -207,7 +210,7 @@
 <h2 id="keywords"><a class="header" href="#keywords">Keywords</a></h2>
 <p>AirScript defines the following keywords:</p>
 <ul>
-<li><code>$rand</code>: used to access random values provided by the verifier.</li>
+<li><code>\$rand</code>: used to access random values provided by the verifier.</li>
 <li><code>def</code>: used to <a href="description/./structure.html">define the name</a> of an AirScript module.</li>
 <li><code>boundary_constraints</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./constraints.html#boundary_constraints">boundary constraints are described</a>.
 <ul>
@@ -227,9 +230,10 @@
 <li><code>transition_constraints</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./constraints.html#transition_constraints">transition constraints are described</a>.</li>
 </ul>
 <h2 id="built-in-variables"><a class="header" href="#built-in-variables">Built-in variables</a></h2>
-<p>Built-in variables are identified by the starting character <code>$</code>.</p>
-<h3 id="randcurrentlytheonlybuiltinisrand-which-is-used-to-get-random-values-provided-by-the-verifier"><a class="header" href="#randcurrentlytheonlybuiltinisrand-which-is-used-to-get-random-values-provided-by-the-verifier"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">an</span><span class="mord mathnormal">d</span><span class="mord mathnormal" style="margin-right:0.07153em;">C</span><span class="mord mathnormal">u</span><span class="mord mathnormal">rre</span><span class="mord mathnormal">n</span><span class="mord mathnormal" style="margin-right:0.01968em;">tl</span><span class="mord mathnormal" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord mathnormal">eo</span><span class="mord mathnormal">n</span><span class="mord mathnormal" style="margin-right:0.01968em;">l</span><span class="mord mathnormal" style="margin-right:0.03588em;">y</span><span class="mord mathnormal">b</span><span class="mord mathnormal">u</span><span class="mord mathnormal">i</span><span class="mord mathnormal">lt</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6595em;"></span><span class="mord mathnormal">ini</span><span class="mord mathnormal">s</span></span></span></span><code>$rand</code>, which is used to get random values provided by the verifier.</a></h3>
-<p>These random values may be accessed by using the indexing operator on <code>$rand</code>. For example, <code>$rand[i]</code> provides the <code>ith</code> random value.</p>
+<p>Built-in variables are identified by the starting character <code>\$</code>.</p>
+<h3 id="rand"><a class="header" href="#rand">$rand</a></h3>
+<p>Currently, the only built-in is <code>\$rand</code>, which is used to get random values provided by the verifier.</p>
+<p>These random values may be accessed by using the indexing operator on <code>\$rand</code>. For example, <code>\$rand[i]</code> provides the <code>ith</code> random value.</p>
 <p>Random values may only be accessed within source sections for constraints, i.e. the <a href="description/./constraints.html#boundary-constraints-boundary_constraints"><code>boundary_constraints</code> section</a> and the <a href="description/./constraints.html#transition-constraints-transition_constraints"><code>transition_constraints</code> section</a>.</p>
 <h2 id="delimiters-and-special-characters"><a class="header" href="#delimiters-and-special-characters">Delimiters and special characters</a></h2>
 <ul>
@@ -237,7 +241,7 @@
 <li><code>.</code> is used to access a boundary on a trace column, e.g. <code>a.first</code> or <code>a.last</code></li>
 <li><code>[</code> and <code>]</code> are used for defining arrays in <a href="description/./declarations.html">type declarations</a> and for indexing in <a href="description/./constraints.html">constraint descriptions</a></li>
 <li><code>,</code> is used as a delimiter for defining arrays in <a href="description/./declarations.html">type declarations</a></li>
-<li><code>$</code> is used to indicate a special built-in value. Currently, it is only used with <code>$rand</code> for accessing random values.</li>
+<li><code>\$</code> is used to indicate a special built-in value. Currently, it is only used with <code>\$rand</code> for accessing random values.</li>
 </ul>
 <h2 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h2>
 <p>Valid identifiers are strings that start with a letter <code>a-z</code> or <code>A-Z</code> followed by any combination of letters, digits <code>0-9</code> or an underscore <code>_</code>.</p>
@@ -272,7 +276,7 @@
 <p>The following accessors may only be applied to trace columns when they are in boundary constraint definitions.</p>
 <ul>
 <li>First boundary (<code>.first</code>): accesses the trace column's value in the first row. It is only supported in <a href="description/./constraints.html#boundary_constraints">boundary constraint descriptions</a></li>
-<li>Last boundary (<code>.last</code>): accesses the trace column's value in the first row. It is only supported in <a href="description/./constraints.html#boundary_constraints">boundary constraint descriptions</a></li>
+<li>Last boundary (<code>.last</code>): accesses the trace column's value in the last row. It is only supported in <a href="description/./constraints.html#boundary_constraints">boundary constraint descriptions</a></li>
 </ul>
 <p>The following accessor may only be applied to public inputs declared in <code>public_inputs</code> when they are referenced in boundary constraint definitions.</p>
 <ul>
@@ -562,7 +566,7 @@ transition_constraints:
     enf s * (c - a * b) = 0
 
     # the auxiliary column contains the product of values of c offset by a random value.
-    enf p' = p * (c + $rand[0])
+    enf p' = p * (c + \$rand[0])
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="language-implementation"><a class="header" href="#language-implementation">Language Implementation</a></h1>
