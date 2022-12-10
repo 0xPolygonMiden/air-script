@@ -34,9 +34,9 @@ fn full_air_file() {
         //     main: [clk, fmp, ctx]
         SourceSection::TraceCols(TraceCols {
             main_cols: vec![
-                Identifier("clk".to_string()),
-                Identifier("fmp".to_string()),
-                Identifier("ctx".to_string()),
+                TraceCol::Single(Identifier("clk".to_string())),
+                TraceCol::Single(Identifier("fmp".to_string())),
+                TraceCol::Single(Identifier("ctx".to_string())),
             ],
             aux_cols: vec![],
         }),
@@ -45,7 +45,7 @@ fn full_air_file() {
         SourceSection::TransitionConstraints(vec![TransitionStmt::Constraint(
             TransitionConstraint::new(
                 // clk' = clk + 1
-                TransitionExpr::Next(Identifier("clk".to_string())),
+                TransitionExpr::Next(TraceColAccess::Single(Identifier("clk".to_string()))),
                 TransitionExpr::Add(
                     Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     Box::new(TransitionExpr::Const(1)),
@@ -56,7 +56,7 @@ fn full_air_file() {
         //     enf clk.first = 0
         SourceSection::BoundaryConstraints(vec![BoundaryStmt::Constraint(
             BoundaryConstraint::new(
-                Identifier("clk".to_string()),
+                TraceColAccess::Single(Identifier("clk".to_string())),
                 Boundary::First,
                 BoundaryExpr::Const(0),
             ),

@@ -9,7 +9,8 @@ use crate::{
             ConstantType::{Matrix, Scalar, Vector},
         },
         BoundaryStmt::*,
-        BoundaryVariable, BoundaryVariableType, MatrixAccess, PublicInput, VectorAccess,
+        BoundaryVariable, BoundaryVariableType, MatrixAccess, PublicInput, TraceColAccess,
+        VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -55,12 +56,12 @@ fn multiple_boundary_constraints() {
         enf clk.last = 1";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
         Constraint(BoundaryConstraint::new(
-            Identifier("clk".to_string()),
+            TraceColAccess::Single(Identifier("clk".to_string())),
             Boundary::First,
             Const(0),
         )),
         Constraint(BoundaryConstraint::new(
-            Identifier("clk".to_string()),
+            TraceColAccess::Single(Identifier("clk".to_string())),
             Boundary::Last,
             Const(1),
         )),
@@ -93,7 +94,7 @@ fn boundary_constraint_with_expr() {
         enf clk.first = 5 + a[3] + 6";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
-            Identifier("clk".to_string()),
+            TraceColAccess::Single(Identifier("clk".to_string())),
             Boundary::First,
             Add(
                 Box::new(Add(
@@ -190,7 +191,7 @@ fn boundary_constraint_with_variables() {
             ]),
         )),
         Constraint(BoundaryConstraint::new(
-            Identifier("clk".to_string()),
+            TraceColAccess::Single(Identifier("clk".to_string())),
             Boundary::First,
             Add(
                 Box::new(Add(
