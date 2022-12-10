@@ -46,7 +46,11 @@ fn multiple_transition_constraints() {
         enf clk' - clk = 1";
     let expected = Source(vec![SourceSection::TransitionConstraints(vec![
         Constraint(TransitionConstraint::new(
+<<<<<<< HEAD
             Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
+=======
+            Next(TraceColAccess::Single(Identifier("clk".to_string()))),
+>>>>>>> 8197516 (test: add trace col group tests and refactor old tests)
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
@@ -54,7 +58,11 @@ fn multiple_transition_constraints() {
         )),
         Constraint(TransitionConstraint::new(
             Sub(
+<<<<<<< HEAD
                 Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
+=======
+                Box::new(Next(TraceColAccess::Single(Identifier("clk".to_string())))),
+>>>>>>> 8197516 (test: add trace col group tests and refactor old tests)
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
             Const(1),
