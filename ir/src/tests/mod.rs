@@ -580,7 +580,6 @@ fn err_variable_vector_invalid_access() {
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::from_source(&parsed);
-    println!("{:?}", result);
     assert!(result.is_err());
 }
 
@@ -594,14 +593,31 @@ fn err_variable_matrix_invalid_access() {
     public_inputs:
         stack_inputs: [16]
     transition_constraints:
-        let a = [1, 2]
-        enf clk' = clk + a[1]
+        let a = [[1, 2, 3], [4, 5, 6]]
+        enf clk' = clk + a[1][3]
     boundary_constraints:
         enf clk.first = 0
         enf clk.last = 1";
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::from_source(&parsed);
-    println!("{:?}", result);
+    assert!(result.is_err());
+
+    let source = "
+    constants:
+        A: [[2, 3], [1, 0]]
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    transition_constraints:
+        let a = [[1, 2, 3], [4, 5, 6]]
+        enf clk' = clk + a[2][0]
+    boundary_constraints:
+        enf clk.first = 0
+        enf clk.last = 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
     assert!(result.is_err());
 }

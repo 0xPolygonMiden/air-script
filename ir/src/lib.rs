@@ -162,7 +162,6 @@ impl AirIR {
     }
 
     pub fn num_aux_assertions(&self) -> usize {
-        println!("{}", self.num_trace_segments);
         if self.num_trace_segments == 2 {
             self.boundary_stmts.num_boundary_constraints(1)
         } else {
