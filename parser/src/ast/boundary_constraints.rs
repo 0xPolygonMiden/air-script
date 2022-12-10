@@ -4,14 +4,14 @@ use std::fmt::Display;
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum BoundaryStmt {
     Constraint(BoundaryConstraint),
     Variable(BoundaryVariable),
 }
 
 /// Stores the expression corresponding to the boundary constraint.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct BoundaryConstraint {
     column: TraceAccess,
     boundary: Boundary,
@@ -58,7 +58,7 @@ impl Display for Boundary {
 }
 
 /// Arithmetic expressions for evaluation of boundary constraints.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum BoundaryExpr {
     Const(u64),
     /// Represents any named constant or variable.
@@ -78,7 +78,7 @@ pub enum BoundaryExpr {
     Exp(Box<BoundaryExpr>, u64),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct BoundaryVariable {
     name: Identifier,
     value: BoundaryVariableType,
@@ -88,9 +88,17 @@ impl BoundaryVariable {
     pub fn new(name: Identifier, value: BoundaryVariableType) -> Self {
         Self { name, value }
     }
+
+    pub fn name(&self) -> &str {
+        self.name.name()
+    }
+
+    pub fn value(&self) -> &BoundaryVariableType {
+        &self.value
+    }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BoundaryVariableType {
     Scalar(BoundaryExpr),
     Vector(Vec<BoundaryExpr>),

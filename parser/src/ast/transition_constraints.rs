@@ -3,14 +3,14 @@ use super::{Identifier, MatrixAccess, TraceAccess, VectorAccess};
 // TRANSITION CONSTRAINTS
 // ================================================================================================
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum TransitionStmt {
     Constraint(TransitionConstraint),
     Variable(TransitionVariable),
 }
 
 /// Stores the expression corresponding to the transition constraint.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TransitionConstraint {
     lhs: TransitionExpr,
     rhs: TransitionExpr,
@@ -29,7 +29,7 @@ impl TransitionConstraint {
 }
 
 /// Arithmetic expressions for evaluation of transition constraints.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum TransitionExpr {
     Const(u64),
     /// Represents any named constant or variable.
@@ -50,7 +50,7 @@ pub enum TransitionExpr {
     Exp(Box<TransitionExpr>, u64),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TransitionVariable {
     name: Identifier,
     value: TransitionVariableType,
@@ -60,9 +60,17 @@ impl TransitionVariable {
     pub fn new(name: Identifier, value: TransitionVariableType) -> Self {
         Self { name, value }
     }
+
+    pub fn name(&self) -> &str {
+        self.name.name()
+    }
+
+    pub fn value(&self) -> &TransitionVariableType {
+        &self.value
+    }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TransitionVariableType {
     Scalar(TransitionExpr),
     Vector(Vec<TransitionExpr>),
