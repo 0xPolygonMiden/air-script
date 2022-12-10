@@ -5,10 +5,11 @@ use super::{
 use parser::ast::{
     constants::{Constant, ConstantType},
     Identifier, MatrixAccess, PeriodicColumn, PublicInput, TraceCols, VectorAccess,
+    BoundaryVariable, BoundaryVariableType, TransitionVariable, TransitionVariableType,
 };
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(super) enum IdentifierType {
     /// an identifier for a constant, containing it's type and value
     Constant(ConstantType),
@@ -20,6 +21,8 @@ pub(super) enum IdentifierType {
     /// an identifier for a periodic column, containing its index out of all periodic columns and
     /// its cycle length in that order.
     PeriodicColumn(usize, usize),
+    BoundaryVariable(BoundaryVariable),
+    TransitionVariable(TransitionVariable),
 }
 
 impl Display for IdentifierType {
@@ -31,13 +34,15 @@ impl Display for IdentifierType {
             Self::TraceColumn(column) => {
                 write!(f, "TraceColumn in segment {}", column.trace_segment())
             }
+            Self::BoundaryVariable(_) => write!(f, "BoundaryVariable"),
+            Self::TransitionVariable(_) => write!(f, "TransitionVariable"),
         }
     }
 }
 
 /// Describes a column in the execution trace by the trace segment to which it belongs and its
 /// index within that segment.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TraceColumn {
     trace_segment: TraceSegment,
     col_idx: usize,
@@ -178,6 +183,28 @@ impl SymbolTable {
         Ok(())
     }
 
+    pub(super) fn insert_boundary_variable(
+        &mut self,
+        variable: &BoundaryVariable,
+    ) -> Result<(), SemanticError> {
+        self.insert_symbol(
+            variable.name(),
+            IdentifierType::BoundaryVariable(variable.clone()),
+        )?;
+        Ok(())
+    }
+
+    pub(super) fn insert_transition_variable(
+        &mut self,
+        variable: &TransitionVariable,
+    ) -> Result<(), SemanticError> {
+        self.insert_symbol(
+            variable.name(),
+            IdentifierType::TransitionVariable(variable.clone()),
+        )?;
+        Ok(())
+    }
+
     /// Consumes this symbol table and returns the information required for declaring constants,
     /// public inputs and periodic columns for the AIR.
     pub(super) fn into_declarations(self) -> (Constants, PublicInputs, PeriodicColumns) {
@@ -241,6 +268,40 @@ impl SymbolTable {
                     ))
                 }
             }
+            IdentifierType::BoundaryVariable(boundary_variable) => {
+                if let BoundaryVariableType::Vector(vector) = boundary_variable.value() {
+                    if vector_access.idx() < vector.len() {
+                        Ok(symbol_type)
+                    } else {
+                        Err(SemanticError::vector_access_out_of_bounds(
+                            vector_access,
+                            vector.len(),
+                        ))
+                    }
+                } else {
+                    Err(SemanticError::invalid_vector_access(
+                        vector_access,
+                        symbol_type,
+                    ))
+                }
+            }
+            IdentifierType::TransitionVariable(transition_variable) => {
+                if let TransitionVariableType::Vector(vector) = transition_variable.value() {
+                    if vector_access.idx() < vector.len() {
+                        Ok(symbol_type)
+                    } else {
+                        Err(SemanticError::vector_access_out_of_bounds(
+                            vector_access,
+                            vector.len(),
+                        ))
+                    }
+                } else {
+                    Err(SemanticError::invalid_vector_access(
+                        vector_access,
+                        symbol_type,
+                    ))
+                }
+            }
             _ => Err(SemanticError::invalid_vector_access(
                 vector_access,
                 symbol_type,
@@ -278,6 +339,54 @@ impl SymbolTable {
                     ));
                 }
                 Ok(symbol_type)
+            }
+            IdentifierType::BoundaryVariable(boundary_variable) => {
+                if let BoundaryVariableType::Matrix(matrix) = boundary_variable.value() {
+                    if matrix_access.row_idx() >= matrix.len() {
+                        return Err(SemanticError::matrix_access_out_of_bounds(
+                            matrix_access,
+                            matrix.len(),
+                            matrix[0].len(),
+                        ));
+                    }
+                    if matrix_access.col_idx() >= matrix[0].len() {
+                        return Err(SemanticError::matrix_access_out_of_bounds(
+                            matrix_access,
+                            matrix.len(),
+                            matrix[0].len(),
+                        ));
+                    }
+                    Ok(symbol_type)
+                } else {
+                    Err(SemanticError::invalid_matrix_access(
+                        matrix_access,
+                        symbol_type,
+                    ))
+                }
+            }
+            IdentifierType::TransitionVariable(transition_variable) => {
+                if let TransitionVariableType::Matrix(matrix) = transition_variable.value() {
+                    if matrix_access.row_idx() >= matrix.len() {
+                        return Err(SemanticError::matrix_access_out_of_bounds(
+                            matrix_access,
+                            matrix.len(),
+                            matrix[0].len(),
+                        ));
+                    }
+                    if matrix_access.col_idx() >= matrix[0].len() {
+                        return Err(SemanticError::matrix_access_out_of_bounds(
+                            matrix_access,
+                            matrix.len(),
+                            matrix[0].len(),
+                        ));
+                    }
+                    Ok(symbol_type)
+                } else {
+                    Err(SemanticError::invalid_matrix_access(
+                        matrix_access,
+                        symbol_type,
+                    ))
+                }
             }
             _ => Err(SemanticError::invalid_matrix_access(
                 matrix_access,

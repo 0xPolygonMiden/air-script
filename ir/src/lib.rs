@@ -1,18 +1,18 @@
 pub use parser::ast::{
     self, boundary_constraints::BoundaryExpr, constants::Constant, Identifier, PublicInput,
 };
-use parser::ast::{BoundaryStmt, TransitionStmt};
+use parser::ast::{BoundaryVariable, TransitionVariable};
 use std::collections::BTreeMap;
 
 mod symbol_table;
 use symbol_table::{IdentifierType, SymbolTable};
 
-pub mod boundary_constraints;
-use boundary_constraints::BoundaryConstraints;
+pub mod boundary_stmts;
+use boundary_stmts::BoundaryStmts;
 
-pub mod transition_constraints;
-use transition_constraints::{AlgebraicGraph, TransitionConstraints, MIN_CYCLE_LENGTH};
-pub use transition_constraints::{NodeIndex, TransitionConstraintDegree};
+pub mod transition_stmts;
+use transition_stmts::{AlgebraicGraph, TransitionStmts, VariableValue, MIN_CYCLE_LENGTH};
+pub use transition_stmts::{NodeIndex, TransitionConstraintDegree};
 
 mod error;
 use error::SemanticError;
@@ -37,10 +37,11 @@ pub struct AirIR {
     //TODO: remove dead code attribute
     #[allow(dead_code)]
     constants: Constants,
+    num_trace_segments: usize,
     public_inputs: PublicInputs,
     periodic_columns: PeriodicColumns,
-    boundary_constraints: BoundaryConstraints,
-    transition_constraints: TransitionConstraints,
+    boundary_stmts: BoundaryStmts,
+    transition_stmts: TransitionStmts,
 }
 
 impl AirIR {
@@ -71,8 +72,10 @@ impl AirIR {
                 ast::SourceSection::Trace(columns) => {
                     // process & validate the main trace columns
                     symbol_table.insert_trace_columns(0, &columns.main_cols)?;
-                    // process & validate the auxiliary trace columns
-                    symbol_table.insert_trace_columns(1, &columns.aux_cols)?;
+                    if !columns.aux_cols.is_empty() {
+                        // process & validate the auxiliary trace columns
+                        symbol_table.insert_trace_columns(1, &columns.aux_cols)?;
+                    }
                     validator.exists("trace_columns");
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
@@ -88,31 +91,21 @@ impl AirIR {
             }
         }
 
+        let num_trace_segments = symbol_table.num_trace_segments();
         // then process the constraints & validate them against the symbol table.
-        let mut boundary_constraints = BoundaryConstraints::default();
-        let mut transition_constraints =
-            TransitionConstraints::new(symbol_table.num_trace_segments());
+        let mut boundary_stmts = BoundaryStmts::default();
+        let mut transition_stmts = TransitionStmts::new(num_trace_segments);
         for section in source {
             match section {
                 ast::SourceSection::BoundaryConstraints(stmts) => {
                     for stmt in stmts {
-                        match stmt {
-                            BoundaryStmt::Constraint(constraint) => {
-                                boundary_constraints.insert(&symbol_table, constraint)?
-                            }
-                            BoundaryStmt::Variable(_) => todo!(),
-                        }
+                        boundary_stmts.insert(&mut symbol_table, stmt)?
                     }
                     validator.exists("boundary_constraints");
                 }
                 ast::SourceSection::TransitionConstraints(stmts) => {
                     for stmt in stmts {
-                        match stmt {
-                            TransitionStmt::Constraint(constraint) => {
-                                transition_constraints.insert(&symbol_table, constraint)?
-                            }
-                            TransitionStmt::Variable(_) => todo!(),
-                        }
+                        transition_stmts.insert(&mut symbol_table, stmt)?
                     }
                     validator.exists("transition_constraints");
                 }
@@ -128,10 +121,11 @@ impl AirIR {
         Ok(Self {
             air_name: air_name.to_string(),
             constants,
+            num_trace_segments,
             public_inputs,
             periodic_columns,
-            boundary_constraints,
-            transition_constraints,
+            boundary_stmts,
+            transition_stmts,
         })
     }
 
@@ -156,27 +150,44 @@ impl AirIR {
     // --- PUBLIC ACCESSORS FOR BOUNDARY CONSTRAINTS ----------------------------------------------
 
     pub fn num_main_assertions(&self) -> usize {
-        self.boundary_constraints.main_len()
+        self.boundary_stmts.num_boundary_constraints(0)
     }
 
     pub fn main_first_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
-        self.boundary_constraints.main_first()
+        self.boundary_stmts.first_boundary_constraints(0)
     }
 
     pub fn main_last_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
-        self.boundary_constraints.main_last()
+        self.boundary_stmts.last_boundary_constraints(0)
     }
 
     pub fn num_aux_assertions(&self) -> usize {
-        self.boundary_constraints.aux_len()
+        println!("{}", self.num_trace_segments);
+        if self.num_trace_segments == 2 {
+            self.boundary_stmts.num_boundary_constraints(1)
+        } else {
+            0
+        }
     }
 
     pub fn aux_first_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
-        self.boundary_constraints.aux_first()
+        if self.num_trace_segments == 2 {
+            self.boundary_stmts.first_boundary_constraints(1)
+        } else {
+            vec![]
+        }
     }
 
     pub fn aux_last_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
-        self.boundary_constraints.aux_last()
+        if self.num_trace_segments == 2 {
+            self.boundary_stmts.last_boundary_constraints(1)
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn boundary_variables(&self) -> &Vec<BoundaryVariable> {
+        self.boundary_stmts.variables()
     }
 
     // --- PUBLIC ACCESSORS FOR TRANSITION CONSTRAINTS --------------------------------------------
@@ -185,15 +196,26 @@ impl AirIR {
         &self,
         trace_segment: TraceSegment,
     ) -> Vec<TransitionConstraintDegree> {
-        self.transition_constraints
-            .constraint_degrees(trace_segment)
+        self.transition_stmts.constraint_degrees(trace_segment)
     }
 
     pub fn transition_constraints(&self, trace_segment: TraceSegment) -> &[NodeIndex] {
-        self.transition_constraints.constraints(trace_segment)
+        self.transition_stmts.constraints(trace_segment)
     }
 
     pub fn transition_graph(&self) -> &AlgebraicGraph {
-        self.transition_constraints.graph()
+        self.transition_stmts.graph()
+    }
+
+    pub fn transition_variables(&self) -> &Vec<TransitionVariable> {
+        self.transition_stmts.variables()
+    }
+
+    pub fn variable_roots(&self) -> &BTreeMap<VariableValue, NodeIndex> {
+        self.transition_stmts.variable_roots()
+    }
+
+    pub fn variables_graph(&self) -> &AlgebraicGraph {
+        self.transition_stmts.variables_graph()
     }
 }
