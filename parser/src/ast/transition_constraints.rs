@@ -1,4 +1,4 @@
-use super::{Identifier, MatrixAccess, VectorAccess};
+use super::{Identifier, MatrixAccess, TraceColAccess, VectorAccess};
 
 // TRANSITION CONSTRAINTS
 // ================================================================================================
@@ -40,7 +40,7 @@ pub enum TransitionExpr {
     /// Represents an element inside a constant or variable matrix. [MatrixAccess] contains the
     /// name of the matrix and indices of the element to access.
     MatrixAccess(MatrixAccess),
-    Next(Identifier),
+    Next(TraceColAccess),
     /// Represents a random value provided by the verifier. The inner value is the index of this
     /// random value in the array of all random values.
     Rand(usize),

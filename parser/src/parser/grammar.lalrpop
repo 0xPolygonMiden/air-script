@@ -5,8 +5,8 @@ use crate::{
         transition_constraints::{TransitionConstraint, TransitionExpr, TransitionStmt,
         TransitionVariable, TransitionVariableType},
         constants::{Constant, ConstantType},
-        Identifier, Source, SourceSection, TraceCols, PublicInput, PeriodicColumn, VectorAccess,
-        MatrixAccess
+        Identifier, Source, SourceSection, TraceCol, TraceColAccess, TraceCols, PublicInput,
+        PeriodicColumn, VectorAccess, MatrixAccess
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
     InvalidConst, MissingBoundaryConstraint, MissingTransitionConstraint}}, lexer::Token
 };
@@ -58,12 +58,17 @@ TraceCols: TraceCols = {
     } 
 }
 
-MainCols: Vec<Identifier> = {
-    "main" ":" "[" <main_cols: CommaElems<Identifier>> "]" => main_cols,
+MainCols: Vec<TraceCol> = {
+    "main" ":" "[" <main_cols: CommaElems<TraceCol>> "]" => main_cols,
 }
 
-AuxCols: Vec<Identifier> = {
-    "aux" ":" "[" <aux_cols: CommaElems<Identifier>> "]" => aux_cols,
+AuxCols: Vec<TraceCol> = {
+    "aux" ":" "[" <aux_cols: CommaElems<TraceCol>> "]" => aux_cols,
+}
+
+TraceCol: TraceCol = {
+    <name: Identifier> => TraceCol::Single(name),
+    <name: Identifier> <size: Size> => TraceCol::Group(name, size)
 }
 
 // CONSTANTS
@@ -139,7 +144,7 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
 }
 
 BoundaryStmt: BoundaryStmt = {
-    "enf" <column: Identifier> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
+    "enf" <column: TraceColAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
         BoundaryStmt::Constraint(BoundaryConstraint::new(column, boundary, value)),
     "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
         BoundaryStmt::Variable(BoundaryVariable::new(name, boundary_variable_type)),
@@ -248,7 +253,7 @@ TransitionAtom: TransitionExpr = {
     <ident: Identifier> => TransitionExpr::Elem(ident),
     <vector_access: VectorAccess> => TransitionExpr::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => TransitionExpr::MatrixAccess(matrix_access),
-    <ident: Identifier> "'" => TransitionExpr::Next(ident)
+    <trace_col: TraceColAccess> "'" => TransitionExpr::Next(trace_col)
 }
 
 // ATOMS
@@ -285,6 +290,11 @@ VectorAccess: VectorAccess = {
 MatrixAccess: MatrixAccess = {
     <ident: Identifier> <row: Index> <col: Index> =>
         MatrixAccess::new(ident, row, col)
+}
+
+TraceColAccess: TraceColAccess = {
+    <ident: Identifier> => TraceColAccess::Single(ident),
+    <ident: Identifier> <idx: Index> => TraceColAccess::GroupAccess(ident, idx)
 }
 
 Identifier: Identifier = {

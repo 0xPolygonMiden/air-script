@@ -4,7 +4,7 @@ use super::{
 };
 use parser::ast::{
     constants::{Constant, ConstantType},
-    Identifier, MatrixAccess, PeriodicColumn, PublicInput, VectorAccess,
+    Identifier, MatrixAccess, PeriodicColumn, PublicInput, TraceCol, VectorAccess,
 };
 use std::fmt::Display;
 
@@ -130,13 +130,18 @@ impl SymbolTable {
     pub(super) fn insert_trace_columns(
         &mut self,
         trace_segment: TraceSegment,
-        columns: &[Identifier],
+        columns: &[TraceCol],
     ) -> Result<(), SemanticError> {
         self.set_num_trace_segments(trace_segment);
 
-        for (idx, Identifier(name)) in columns.iter().enumerate() {
-            let trace_column = TraceColumn::new(trace_segment, idx);
-            self.insert_symbol(name, IdentifierType::TraceColumn(trace_column))?;
+        for (idx, trace_col) in columns.iter().enumerate() {
+            match trace_col {
+                TraceCol::Single(Identifier(name)) => {
+                    let trace_column = TraceColumn::new(trace_segment, idx);
+                    self.insert_symbol(name, IdentifierType::TraceColumn(trace_column))?;
+                }
+                TraceCol::Group(_, _) => todo!(),
+            }
         }
 
         Ok(())

@@ -1,5 +1,5 @@
 use super::{BTreeMap, BoundaryExpr, IdentifierType, SemanticError, SymbolTable};
-use parser::ast;
+use parser::ast::{self, TraceColAccess};
 
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
@@ -79,7 +79,10 @@ impl BoundaryConstraints {
         validate_expression(symbol_table, &expr)?;
 
         // add the constraint to the specified boundary for the specified trace
-        let col_type = symbol_table.get_type(constraint.column())?;
+        let (col_type, col_name) = match constraint.column() {
+            TraceColAccess::Single(name) => (symbol_table.get_type(name.name())?, name),
+            TraceColAccess::GroupAccess(_, _) => todo!(),
+        };
         let result = match col_type {
             IdentifierType::TraceColumn(column) => match column.trace_segment() {
                 0 => match constraint.boundary() {
@@ -95,8 +98,7 @@ impl BoundaryConstraints {
             _ => {
                 return Err(SemanticError::InvalidUsage(format!(
                     "Identifier {} was declared as a {}, not as a trace column",
-                    constraint.column(),
-                    col_type
+                    col_name, col_type
                 )));
             }
         };
@@ -106,7 +108,7 @@ impl BoundaryConstraints {
             return Err(SemanticError::TooManyConstraints(format!(
                 "A boundary constraint was already defined for {} '{}' at the {}",
                 col_type,
-                constraint.column(),
+                col_name,
                 constraint.boundary()
             )));
         }

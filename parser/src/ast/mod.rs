@@ -53,8 +53,22 @@ pub enum SourceSection {
 /// [TraceCols] contains the main and auxiliary trace columns of the execution trace.
 #[derive(Debug, Eq, PartialEq)]
 pub struct TraceCols {
-    pub main_cols: Vec<Identifier>,
-    pub aux_cols: Vec<Identifier>,
+    pub main_cols: Vec<TraceCol>,
+    pub aux_cols: Vec<TraceCol>,
+}
+
+/// [TraceCol] is used to represent a single or a group of columns in the execution trace.
+#[derive(Debug, Eq, PartialEq)]
+pub enum TraceCol {
+    Single(Identifier),
+    Group(Identifier, u64),
+}
+
+/// [TraceCol] is used to represent a single or a group of columns in the execution trace.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum TraceColAccess {
+    Single(Identifier),
+    GroupAccess(Identifier, usize),
 }
 
 // SHARED ATOMIC TYPES
