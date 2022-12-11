@@ -46,6 +46,10 @@ const NEXT_ROW: usize = 1;
 pub struct AirIR {
     air_name: String,
     constants: Constants,
+    // I don't think that adding a new field just for generic constraint evaluation worth it.
+    // TODO: get rid of this field
+    // amount of named columns: (main, aux)
+    num_polys: Vec<u16>,
     public_inputs: PublicInputs,
     periodic_columns: PeriodicColumns,
     boundary_stmts: BoundaryStmts,
@@ -121,7 +125,8 @@ impl AirIR {
             }
         }
 
-        let (constants, public_inputs, periodic_columns) = symbol_table.into_declarations();
+        let (constants, public_inputs, periodic_columns, num_polys) =
+            symbol_table.into_declarations();
 
         // validate sections
         validator.check()?;
@@ -129,6 +134,7 @@ impl AirIR {
         Ok(Self {
             air_name: air_name.to_string(),
             constants,
+            num_polys,
             public_inputs,
             periodic_columns,
             boundary_stmts,
@@ -144,6 +150,10 @@ impl AirIR {
 
     pub fn constants(&self) -> &Constants {
         &self.constants
+    }
+
+    pub fn num_polys(&self) -> &Vec<u16> {
+        &self.num_polys
     }
 
     pub fn public_inputs(&self) -> &PublicInputs {

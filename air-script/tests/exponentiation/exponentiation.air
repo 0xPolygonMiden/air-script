@@ -1,0 +1,14 @@
+def ExponentiationAir
+
+trace_columns:
+    main: [a, b]
+
+public_inputs:
+    stack_inputs: [16]
+
+boundary_constraints:
+    enf a.first = stack_inputs[0]^3
+
+transition_constraints:
+    enf a^15 - a = 0
+    enf b^2 - b = 0

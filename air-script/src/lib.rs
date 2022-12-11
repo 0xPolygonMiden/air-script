@@ -8,4 +8,4 @@ pub use parser::parse;
 pub use ir::AirIR;
 
 /// Code generation targeting Rust for the Winterfell prover
-pub use codegen_winter::CodeGenerator;
+pub use codegen_winter::WinterfellCodeGenerator;
