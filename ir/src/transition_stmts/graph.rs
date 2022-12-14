@@ -5,6 +5,7 @@ use crate::{symbol_table::IdentifierType, VariableRoots};
 use parser::ast::{
     constants::ConstantType, Identifier, MatrixAccess, TransitionExpr, TransitionVariableType,
     VectorAccess,
+    self, constants::ConstantType, Identifier, MatrixAccess, TransitionExpr, VectorAccess,
 };
 
 // ALGEBRAIC GRAPH
@@ -109,7 +110,7 @@ impl AlgebraicGraph {
                 self.insert_matrix_access(symbol_table, &matrix_access, variable_roots)
             }
             TransitionExpr::Next(trace_access) => {
-                self.insert_next(symbol_table, trace_access.name())
+                self.insert_next(symbol_table, &trace_access)
             }
             TransitionExpr::Rand(index) => {
                 // constraint target for random values defaults to the second trace segment.
@@ -164,21 +165,38 @@ impl AlgebraicGraph {
     fn insert_next(
         &mut self,
         symbol_table: &SymbolTable,
-        ident: &str,
+        trace_col_access: &ast::TraceAccess,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
-        let col_type = symbol_table.get_type(ident)?;
-
-        match col_type {
-            IdentifierType::TraceColumn(column) => {
-                let trace_segment = column.trace_segment();
-                let trace_access = TraceAccess::new(trace_segment, column.col_idx(), 1);
-                let node_index = self.insert_op(Operation::TraceElement(trace_access));
-                Ok((trace_segment, node_index))
+        match trace_col_access {
+            TraceColAccess::Single(ident) => {
+                let col_type = symbol_table.get_type(ident.name())?;
+                if let IdentifierType::TraceColumn(column) = col_type {
+                    let trace_segment = column.trace_segment();
+                    let trace_access = TraceAccess::new(trace_segment, column.col_idx(), 1);
+                    let node_index = self.insert_op(Operation::TraceElement(trace_access));
+                    Ok((trace_segment, node_index))
+                } else {
+                    Err(SemanticError::InvalidUsage(format!(
+                        "Identifier {} was declared as a {} not as a trace column",
+                        ident, col_type
+                    )))
+                }
             }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as a {} not as a trace column",
-                ident, col_type
-            ))),
+            TraceColAccess::GroupAccess(ident, idx) => {
+                let col_type = symbol_table.get_type(ident.name())?;
+                if let IdentifierType::TraceColumnGroup(column_group) = col_type {
+                    let trace_segment = column_group.trace_segment();
+                    let trace_access =
+                        TraceAccess::new(trace_segment, idx + column_group.start_col_idx(), 1);
+                    let node_index = self.insert_op(Operation::TraceElement(trace_access));
+                    Ok((trace_segment, node_index))
+                } else {
+                    Err(SemanticError::InvalidUsage(format!(
+                        "Identifier {} was declared as a {} not as a trace column group",
+                        ident, col_type
+                    )))
+                }
+            }
         }
     }
 
@@ -286,6 +304,16 @@ impl AlgebraicGraph {
                         symbol_type
                     )))
                 }
+            }
+            IdentifierType::TraceColumnGroup(trace_column_group) => {
+                let trace_segment = trace_column_group.trace_segment();
+                let col_idx = trace_column_group.start_col_idx() + vector_access.idx();
+                let node_index = self.insert_op(Operation::TraceElement(TraceAccess::new(
+                    trace_segment,
+                    col_idx,
+                    0,
+                )));
+                Ok((trace_segment, node_index))
             }
             _ => Err(SemanticError::invalid_vector_access(
                 vector_access,

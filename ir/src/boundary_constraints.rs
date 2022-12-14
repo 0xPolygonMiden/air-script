@@ -92,6 +92,40 @@ impl BoundaryConstraints {
                 },
                 _ => unimplemented!(),
             },
+            IdentifierType::TraceColumnGroup(column_group) => {
+                if let TraceColAccess::GroupAccess(name, idx) = constraint.column() {
+                    if *idx >= column_group.size() {
+                        return Err(SemanticError::vector_access_out_of_bounds(
+                            &VectorAccess::new(name.clone(), *idx),
+                            column_group.size(),
+                        ));
+                    }
+                    match column_group.trace_segment() {
+                        0 => match constraint.boundary() {
+                            ast::Boundary::First => self
+                                .main_first
+                                .insert(column_group.start_col_idx() + idx, expr),
+                            ast::Boundary::Last => self
+                                .main_last
+                                .insert(column_group.start_col_idx() + idx, expr),
+                        },
+                        1 => match constraint.boundary() {
+                            ast::Boundary::First => self
+                                .aux_first
+                                .insert(column_group.start_col_idx() + idx, expr),
+                            ast::Boundary::Last => self
+                                .aux_last
+                                .insert(column_group.start_col_idx() + idx, expr),
+                        },
+                        _ => unimplemented!(),
+                    }
+                } else {
+                    return Err(SemanticError::InvalidUsage(format!(
+                        "Identifier {} was declared as a {}, not as a trace column group",
+                        col_name, col_type
+                    )));
+                }
+            }
             _ => {
                 return Err(SemanticError::InvalidUsage(format!(
                     "Identifier {} was declared as a {}, not as a trace column",

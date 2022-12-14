@@ -1,6 +1,7 @@
 use super::{
+    trace_column::{TraceColumn, TraceColumnGroup},
     BTreeMap, Constants, PeriodicColumns, PublicInputs, SemanticError, TraceSegment,
-    MIN_CYCLE_LENGTH,
+    TraceColumnGroups, MIN_CYCLE_LENGTH,
 };
 use parser::ast::{
     constants::{Constant, ConstantType},
@@ -16,6 +17,7 @@ pub(super) enum IdentifierType {
     /// an identifier for a trace column, containing trace column information with its trace segment
     /// and the index of the column in that segment.
     TraceColumn(TraceColumn),
+    TraceColumnGroup(TraceColumnGroup),
     /// an identifier for a public input, containing the size of the public input array
     PublicInput(usize),
     /// an identifier for a periodic column, containing its index out of all periodic columns and
@@ -35,6 +37,13 @@ impl Display for IdentifierType {
                 write!(f, "TraceColumn in segment {}", column.trace_segment())
             }
             Self::TransitionVariable(_) => write!(f, "TransitionVariable"),
+            Self::TraceColumnGroup(column_group) => {
+                write!(
+                    f,
+                    "TraceColumnGroup in segment {}",
+                    column_group.trace_segment()
+                )
+            }
         }
     }
 }
@@ -259,6 +268,16 @@ impl SymbolTable {
                     Err(SemanticError::invalid_vector_access(
                         vector_access,
                         symbol_type,
+                    ))
+                }
+            }
+            IdentifierType::TraceColumnGroup(trace_column_group) => {
+                if vector_access.idx() < trace_column_group.size() {
+                    Ok(symbol_type)
+                } else {
+                    Err(SemanticError::vector_access_out_of_bounds(
+                        vector_access,
+                        trace_column_group.size(),
                     ))
                 }
             }
