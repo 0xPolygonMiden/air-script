@@ -43,10 +43,9 @@ fn boundary_constraints_with_constants() {
 #[test]
 fn trace_cols_groups() {
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk, a[4]]
     public_inputs:
@@ -58,6 +57,7 @@ fn trace_cols_groups() {
         enf clk.last = B[0] + C[0][1]";
 
     let parsed = parse(source).expect("Parsing failed");
+
     let result = AirIR::from_source(&parsed);
     assert!(result.is_ok());
 }
@@ -66,10 +66,9 @@ fn trace_cols_groups() {
 fn err_trace_cols_access_out_of_bounds() {
     // out of bounds in transition constraints
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk, a[4]]
     public_inputs:
@@ -87,10 +86,9 @@ fn err_trace_cols_access_out_of_bounds() {
 
     // out of bounds in boundary constraints
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk, a[4]]
     public_inputs:

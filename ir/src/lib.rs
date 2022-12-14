@@ -2,11 +2,6 @@ pub use parser::ast::{
     self, boundary_constraints::BoundaryExpr, constants::Constant, Identifier, PublicInput,
     TransitionVariable,
 };
-<<<<<<< HEAD
-=======
-use parser::ast::{BoundaryStmt, TransitionStmt};
-use trace_column::TraceColumnGroup;
->>>>>>> 41eb6b1 (feat(ir): add support for trace col groups to IR)
 use std::collections::BTreeMap;
 
 mod symbol_table;
@@ -19,7 +14,7 @@ pub mod transition_stmts;
 use transition_stmts::{AlgebraicGraph, TransitionStmts, VariableValue, MIN_CYCLE_LENGTH};
 pub use transition_stmts::{NodeIndex, TransitionConstraintDegree};
 
-mod trace_column;
+mod trace_columns;
 
 mod error;
 use error::SemanticError;
@@ -30,13 +25,19 @@ use helpers::SourceValidator;
 #[cfg(test)]
 mod tests;
 
+// ==== ALIASES ===================================================================================
 pub type TraceSegment = u8;
 pub type Constants = Vec<Constant>;
 pub type PublicInputs = Vec<(String, usize)>;
 pub type PeriodicColumns = Vec<Vec<u64>>;
 pub type BoundaryConstraintsMap = BTreeMap<usize, BoundaryExpr>;
 pub type VariableRoots = BTreeMap<VariableValue, (TraceSegment, NodeIndex)>;
-pub type TraceColumnGroups = BTreeMap<String, TraceColumnGroup>;
+
+// ==== CONSTANTS =================================================================================
+const CURRENT_ROW: usize = 0;
+const NEXT_ROW: usize = 1;
+
+// ==== AIR IR ====================================================================================
 
 /// Internal representation of an AIR.
 ///

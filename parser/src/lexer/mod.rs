@@ -37,7 +37,7 @@ pub enum Token {
 
     /// Used to declare trace columns section in the AIR constraints module.
     #[token("trace_columns")]
-    TraceColumnns,
+    TraceColumns,
 
     /// Used to declare main trace columns.
     #[token("main")]

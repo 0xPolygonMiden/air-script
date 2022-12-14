@@ -85,3 +85,13 @@ fn variables() {
     let expected = expect_file!["variables/variables.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn trace_col_groups() {
+    let generated_air = Test::new("tests/trace_col_groups/trace_col_groups.air".to_string())
+        .transpile()
+        .unwrap();
+
+    let expected = expect_file!["trace_col_groups/trace_col_groups.rs"];
+    expected.assert_eq(&generated_air);
+}

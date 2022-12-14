@@ -133,16 +133,24 @@ impl BoundaryStmts {
                 // add the constraint to the specified boundary for the specified trace
                 let col_type = symbol_table.get_type(constraint.column().name())?;
                 let result = match col_type {
-                    IdentifierType::TraceColumn(column) => match constraint.boundary() {
-                        ast::Boundary::First => self.boundary_constraints
-                            [column.trace_segment() as usize]
-                            .first_mut()
-                            .insert(column.col_idx(), expr),
-                        ast::Boundary::Last => self.boundary_constraints
-                            [column.trace_segment() as usize]
-                            .last_mut()
-                            .insert(column.col_idx(), expr),
-                    },
+                    IdentifierType::TraceColumns(columns) => {
+                        if constraint.column().idx() >= columns.size() {
+                            return Err(SemanticError::trace_access_out_of_bounds(
+                                constraint.column(),
+                                columns.size(),
+                            ));
+                        }
+                        match constraint.boundary() {
+                            ast::Boundary::First => self.boundary_constraints
+                                [columns.trace_segment() as usize]
+                                .first_mut()
+                                .insert(columns.offset() + constraint.column().idx(), expr),
+                            ast::Boundary::Last => self.boundary_constraints
+                                [columns.trace_segment() as usize]
+                                .last_mut()
+                                .insert(columns.offset() + constraint.column().idx(), expr),
+                        }
+                    }
                     _ => {
                         return Err(SemanticError::InvalidUsage(format!(
                             "Identifier {} was declared as a {}, not as a trace column",
