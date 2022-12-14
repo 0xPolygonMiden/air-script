@@ -41,31 +41,6 @@ fn boundary_constraints_with_constants() {
 }
 
 #[test]
-fn boundary_constraints_with_variables() {
-    let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
-    trace_columns:
-        main: [clk]
-    public_inputs:
-        stack_inputs: [16]
-    transition_constraints:
-        enf clk' = clk - 1
-    boundary_constraints:
-        let a = 1
-        let b = [a, a*a]
-        let c = [[b[0] - clk, clk - a], [1 + 8, 2^2]]
-        enf clk.first = A + a - b[0]
-        enf clk.last = B[0] + C[0][1] - c[0][1]";
-
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::from_source(&parsed);
-    assert!(result.is_ok());
-}
-
-#[test]
 fn err_tc_invalid_vector_access() {
     let source = "
     const A = 123
@@ -251,10 +226,9 @@ fn transition_constraints_with_constants() {
 #[test]
 fn transition_constraints_with_variables() {
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -265,10 +239,11 @@ fn transition_constraints_with_variables() {
         let c = [[clk' - clk, clk - a], [1 + 8, 2^2]]
         enf c[0][0] = 1
     boundary_constraints:
-        enf clk.first = A + a - b[0]
-        enf clk.last = B[0] + C[0][1] - c[0][1]";
+        enf clk.first = A
+        enf clk.last = B[0] + C[0][1]";
 
     let parsed = parse(source).expect("Parsing failed");
+
     let result = AirIR::from_source(&parsed);
     assert!(result.is_ok());
 }
@@ -501,8 +476,7 @@ fn err_invalid_matrix_const() {
 #[test]
 fn err_bc_variable_access_before_declaration() {
     let source = "
-    constants:
-        A: [[2, 3], [1, 0]]
+    const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -522,8 +496,7 @@ fn err_bc_variable_access_before_declaration() {
 #[test]
 fn err_tc_variable_access_before_declaration() {
     let source = "
-    constants:
-        A: [[2, 3], [1, 0]]
+    const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -541,32 +514,9 @@ fn err_tc_variable_access_before_declaration() {
 }
 
 #[test]
-fn err_variable_declaration_in_bc_and_tc() {
-    let source = "
-    constants:
-        A: [[2, 3], [1, 0]]
-    trace_columns:
-        main: [clk]
-    public_inputs:
-        stack_inputs: [16]
-    transition_constraints:
-        let a = 1
-        enf clk' = clk + a
-    boundary_constraints:
-        let a = 0
-        enf clk.first = a
-        enf clk.last = 1";
-
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::from_source(&parsed);
-    assert!(result.is_err());
-}
-
-#[test]
 fn err_variable_vector_invalid_access() {
     let source = "
-    constants:
-        A: [[2, 3], [1, 0]]
+    const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -586,8 +536,7 @@ fn err_variable_vector_invalid_access() {
 #[test]
 fn err_variable_matrix_invalid_access() {
     let source = "
-    constants:
-        A: [[2, 3], [1, 0]]
+    const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -604,8 +553,7 @@ fn err_variable_matrix_invalid_access() {
     assert!(result.is_err());
 
     let source = "
-    constants:
-        A: [[2, 3], [1, 0]]
+    const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
     public_inputs:

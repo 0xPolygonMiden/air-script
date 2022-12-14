@@ -1,8 +1,7 @@
 use super::{AirIR, Impl};
 use ir::{
-    ast::{MatrixAccess, TransitionVariableType, VectorAccess},
-    transition_stmts::{AlgebraicGraph, ConstantValue, Operation, VariableValue},
-    Identifier, NodeIndex,
+    transition_stmts::{AlgebraicGraph, ConstantValue, Operation},
+    NodeIndex,
 };
 
 // HELPERS TO GENERATE THE WINTERFELL TRANSITION CONSTRAINT METHODS
@@ -19,12 +18,6 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
         .arg("frame", "&EvaluationFrame<E>")
         .arg("periodic_values", "&[E]")
         .arg("result", "&mut [E]");
-
-    // TODO: Only add variables used in main trace assertions
-    let variables = add_variables(ir);
-    for variable in variables {
-        evaluate_transition.line(variable);
-    }
 
     // declare current and next trace row arrays.
     evaluate_transition.line("let current = frame.current();");
@@ -57,12 +50,6 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
         .bound("F", "FieldElement<BaseField = Felt>")
         .bound("E", "FieldElement<BaseField = Felt> + ExtensionOf<F>");
 
-    // TODO: Only add variables used in aux trace assertions.
-    let variables = add_variables(ir);
-    for variable in variables {
-        evaluate_aux_transition.line(variable);
-    }
-
     // declare current and next trace row arrays.
     evaluate_aux_transition.line("let current = aux_frame.current();");
     evaluate_aux_transition.line("let next = aux_frame.next();");
@@ -76,65 +63,6 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
             constraint.to_string(graph)
         ));
     }
-}
-
-/// A helper function to add variable definitions to the evaluate_transition and
-/// evaluate_aux_transition functions.
-fn add_variables(ir: &AirIR) -> Vec<String> {
-    let mut vars = Vec::new();
-    let variables = ir.transition_variables();
-    let variables_graph = ir.variables_graph();
-    for variable in variables {
-        let variable_name = variable.name();
-        let variable_def = match variable.value() {
-            TransitionVariableType::Scalar(_) => {
-                let key = VariableValue::Scalar(variable_name.to_string());
-                let variable_value = ir.variable_roots().get(&key).unwrap_or_else(|| {
-                    panic!("Variable {} not found in variable_roots map", variable_name)
-                });
-                format!(
-                    "let {} = {};",
-                    variable_name,
-                    variable_value.to_string(variables_graph)
-                )
-            }
-            TransitionVariableType::Vector(vector) => {
-                let mut vector_str = Vec::new();
-                for idx in 0..vector.len() {
-                    let key = VariableValue::Vector(VectorAccess::new(
-                        Identifier(variable_name.to_string()),
-                        idx,
-                    ));
-                    let variable_value = ir.variable_roots().get(&key).unwrap_or_else(|| {
-                        panic!("Variable {} not found in variable_roots map", variable_name)
-                    });
-                    vector_str.push(variable_value.to_string(variables_graph));
-                }
-                format!("let {} = [{}];", variable_name, vector_str.join(", "))
-            }
-            TransitionVariableType::Matrix(matrix) => {
-                let mut rows = Vec::new();
-                for row_idx in 0..matrix.len() {
-                    let mut cols = Vec::new();
-                    for col_idx in 0..matrix[0].len() {
-                        let key = VariableValue::Matrix(MatrixAccess::new(
-                            Identifier(variable_name.to_string()),
-                            row_idx,
-                            col_idx,
-                        ));
-                        let variable_value = ir.variable_roots().get(&key).unwrap_or_else(|| {
-                            panic!("Variable {} not found in variable_roots map", variable_name)
-                        });
-                        cols.push(variable_value.to_string(variables_graph));
-                    }
-                    rows.push(format!("[{}]", cols.join(", ")));
-                }
-                format!("let {} = [{}];", variable_name, rows.join(", "))
-            }
-        };
-        vars.push(variable_def);
-    }
-    vars
 }
 
 /// Code generation trait for generating Rust code strings from [AlgebraicGraph] types.
@@ -160,16 +88,6 @@ impl Codegen for Operation {
             }
             Operation::Constant(ConstantValue::Matrix(matrix_access)) => format!(
                 "E::from({}[{}][{}])",
-                matrix_access.name(),
-                matrix_access.row_idx(),
-                matrix_access.col_idx()
-            ),
-            Operation::Variable(VariableValue::Scalar(ident), _) => ident.to_string(),
-            Operation::Variable(VariableValue::Vector(vector_access), _) => {
-                format!("{}[{}]", vector_access.name(), vector_access.idx())
-            }
-            Operation::Variable(VariableValue::Matrix(matrix_access), _) => format!(
-                "{}[{}][{}]",
                 matrix_access.name(),
                 matrix_access.row_idx(),
                 matrix_access.col_idx()

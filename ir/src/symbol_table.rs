@@ -4,8 +4,8 @@ use super::{
 };
 use parser::ast::{
     constants::{Constant, ConstantType},
-    Identifier, MatrixAccess, PeriodicColumn, PublicInput, TraceCols, VectorAccess,
-    BoundaryVariable, BoundaryVariableType, TransitionVariable, TransitionVariableType,
+    Identifier, MatrixAccess, PeriodicColumn, PublicInput, TraceCols, TransitionVariable,
+    TransitionVariableType, VectorAccess,
 };
 use std::fmt::Display;
 
@@ -21,7 +21,7 @@ pub(super) enum IdentifierType {
     /// an identifier for a periodic column, containing its index out of all periodic columns and
     /// its cycle length in that order.
     PeriodicColumn(usize, usize),
-    BoundaryVariable(BoundaryVariable),
+    /// an identifier for a transition variable, containing its name and value
     TransitionVariable(TransitionVariable),
 }
 
@@ -34,7 +34,6 @@ impl Display for IdentifierType {
             Self::TraceColumn(column) => {
                 write!(f, "TraceColumn in segment {}", column.trace_segment())
             }
-            Self::BoundaryVariable(_) => write!(f, "BoundaryVariable"),
             Self::TransitionVariable(_) => write!(f, "TransitionVariable"),
         }
     }
@@ -183,17 +182,7 @@ impl SymbolTable {
         Ok(())
     }
 
-    pub(super) fn insert_boundary_variable(
-        &mut self,
-        variable: &BoundaryVariable,
-    ) -> Result<(), SemanticError> {
-        self.insert_symbol(
-            variable.name(),
-            IdentifierType::BoundaryVariable(variable.clone()),
-        )?;
-        Ok(())
-    }
-
+    /// Inserts a transition variable into the symbol table.
     pub(super) fn insert_transition_variable(
         &mut self,
         variable: &TransitionVariable,
@@ -259,42 +248,13 @@ impl SymbolTable {
                 }
             }
             IdentifierType::Constant(ConstantType::Vector(vector)) => {
-                if vector_access.idx() < vector.len() {
-                    Ok(symbol_type)
-                } else {
-                    Err(SemanticError::vector_access_out_of_bounds(
-                        vector_access,
-                        vector.len(),
-                    ))
-                }
-            }
-            IdentifierType::BoundaryVariable(boundary_variable) => {
-                if let BoundaryVariableType::Vector(vector) = boundary_variable.value() {
-                    if vector_access.idx() < vector.len() {
-                        Ok(symbol_type)
-                    } else {
-                        Err(SemanticError::vector_access_out_of_bounds(
-                            vector_access,
-                            vector.len(),
-                        ))
-                    }
-                } else {
-                    Err(SemanticError::invalid_vector_access(
-                        vector_access,
-                        symbol_type,
-                    ))
-                }
+                validate_vector_access(vector_access, vector.len())?;
+                Ok(symbol_type)
             }
             IdentifierType::TransitionVariable(transition_variable) => {
                 if let TransitionVariableType::Vector(vector) = transition_variable.value() {
-                    if vector_access.idx() < vector.len() {
-                        Ok(symbol_type)
-                    } else {
-                        Err(SemanticError::vector_access_out_of_bounds(
-                            vector_access,
-                            vector.len(),
-                        ))
-                    }
+                    validate_vector_access(vector_access, vector.len())?;
+                    Ok(symbol_type)
                 } else {
                     Err(SemanticError::invalid_vector_access(
                         vector_access,
@@ -324,62 +284,12 @@ impl SymbolTable {
         let symbol_type = self.get_type(matrix_access.name())?;
         match symbol_type {
             IdentifierType::Constant(ConstantType::Matrix(matrix)) => {
-                if matrix_access.row_idx() >= matrix.len() {
-                    return Err(SemanticError::matrix_access_out_of_bounds(
-                        matrix_access,
-                        matrix.len(),
-                        matrix[0].len(),
-                    ));
-                }
-                if matrix_access.col_idx() >= matrix[0].len() {
-                    return Err(SemanticError::matrix_access_out_of_bounds(
-                        matrix_access,
-                        matrix.len(),
-                        matrix[0].len(),
-                    ));
-                }
+                validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                 Ok(symbol_type)
-            }
-            IdentifierType::BoundaryVariable(boundary_variable) => {
-                if let BoundaryVariableType::Matrix(matrix) = boundary_variable.value() {
-                    if matrix_access.row_idx() >= matrix.len() {
-                        return Err(SemanticError::matrix_access_out_of_bounds(
-                            matrix_access,
-                            matrix.len(),
-                            matrix[0].len(),
-                        ));
-                    }
-                    if matrix_access.col_idx() >= matrix[0].len() {
-                        return Err(SemanticError::matrix_access_out_of_bounds(
-                            matrix_access,
-                            matrix.len(),
-                            matrix[0].len(),
-                        ));
-                    }
-                    Ok(symbol_type)
-                } else {
-                    Err(SemanticError::invalid_matrix_access(
-                        matrix_access,
-                        symbol_type,
-                    ))
-                }
             }
             IdentifierType::TransitionVariable(transition_variable) => {
                 if let TransitionVariableType::Matrix(matrix) = transition_variable.value() {
-                    if matrix_access.row_idx() >= matrix.len() {
-                        return Err(SemanticError::matrix_access_out_of_bounds(
-                            matrix_access,
-                            matrix.len(),
-                            matrix[0].len(),
-                        ));
-                    }
-                    if matrix_access.col_idx() >= matrix[0].len() {
-                        return Err(SemanticError::matrix_access_out_of_bounds(
-                            matrix_access,
-                            matrix.len(),
-                            matrix[0].len(),
-                        ));
-                    }
+                    validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                     Ok(symbol_type)
                 } else {
                     Err(SemanticError::invalid_matrix_access(
@@ -438,4 +348,41 @@ fn validate_constant(constant: &Constant) -> Result<(), SemanticError> {
         }
         _ => Ok(()),
     }
+}
+
+/// Checks that the specified vector access index is valid and returns an error otherwise.
+fn validate_vector_access(
+    vector_access: &VectorAccess,
+    vector_len: usize,
+) -> Result<(), SemanticError> {
+    if vector_access.idx() >= vector_len {
+        return Err(SemanticError::vector_access_out_of_bounds(
+            vector_access,
+            vector_len,
+        ));
+    }
+    Ok(())
+}
+
+/// Checks that the specified matrix access indices are valid and returns an error otherwise.
+fn validate_matrix_access(
+    matrix_access: &MatrixAccess,
+    matrix_row_len: usize,
+    matrix_col_len: usize,
+) -> Result<(), SemanticError> {
+    if matrix_access.row_idx() >= matrix_row_len {
+        return Err(SemanticError::matrix_access_out_of_bounds(
+            matrix_access,
+            matrix_row_len,
+            matrix_col_len,
+        ));
+    }
+    if matrix_access.col_idx() >= matrix_col_len {
+        return Err(SemanticError::matrix_access_out_of_bounds(
+            matrix_access,
+            matrix_row_len,
+            matrix_col_len,
+        ));
+    }
+    Ok(())
 }

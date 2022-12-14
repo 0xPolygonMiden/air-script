@@ -1,5 +1,5 @@
 use super::{AirIR, Codegen, Impl};
-use ir::{ast::BoundaryVariableType, BoundaryExpr};
+use ir::BoundaryExpr;
 
 // HELPERS TO GENERATE THE WINTERFELL BOUNDARY CONSTRAINT METHODS
 // ================================================================================================
@@ -12,12 +12,6 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
         .new_fn("get_assertions")
         .arg_ref_self()
         .ret("Vec<Assertion<Felt>>");
-
-    // TODO: Only add variables used in main trace assertions
-    let variables = add_variables(ir, false);
-    for variable in variables {
-        get_assertions.line(variable);
-    }
 
     // declare the result vector to be returned.
     get_assertions.line("let mut result = Vec::new();");
@@ -62,12 +56,6 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
         .arg("aux_rand_elements", "&AuxTraceRandElements<E>")
         .ret("Vec<Assertion<E>>");
 
-    // TODO: Only add variables used in aux trace assertions
-    let variables = add_variables(ir, true);
-    for variable in variables {
-        get_aux_assertions.line(variable);
-    }
-
     // declare the result vector to be returned.
     get_aux_assertions.line("let mut result = Vec::new();");
 
@@ -98,52 +86,6 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
 
     // return the result
     get_aux_assertions.line("result");
-}
-
-/// A helper function to add variable definitions to the enforce_assertions and
-/// enforce_aux_assertions functions.
-fn add_variables(ir: &AirIR, is_aux_constraint: bool) -> Vec<String> {
-    let mut vars = Vec::new();
-    let variables = ir.boundary_variables();
-    for variable in variables {
-        let variable_name = variable.name();
-        let variable_def = match variable.value() {
-            BoundaryVariableType::Scalar(expr) => {
-                format!(
-                    "let {} = {};",
-                    variable_name,
-                    expr.to_string(ir, is_aux_constraint)
-                )
-            }
-            BoundaryVariableType::Vector(vector) => format!(
-                "let {} = [{}];",
-                variable_name,
-                vector
-                    .iter()
-                    .map(|expr| expr.to_string(ir, is_aux_constraint))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
-            BoundaryVariableType::Matrix(matrix) => {
-                let variable_value = {
-                    let mut rows = vec![];
-                    for row in matrix {
-                        rows.push(format!(
-                            "[{}]",
-                            row.iter()
-                                .map(|expr| expr.to_string(ir, is_aux_constraint))
-                                .collect::<Vec<String>>()
-                                .join(", "),
-                        ))
-                    }
-                    format!("[{}]", rows.join(", "))
-                };
-                format!("let {} = {};", variable_name, variable_value)
-            }
-        };
-        vars.push(variable_def);
-    }
-    vars
 }
 
 // RUST STRING GENERATION
