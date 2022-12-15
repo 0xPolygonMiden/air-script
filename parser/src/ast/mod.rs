@@ -39,7 +39,7 @@ pub struct Source(pub Vec<SourceSection>);
 #[derive(Debug, PartialEq)]
 pub enum SourceSection {
     AirDef(Identifier),
-    Constants(Vec<Constant>),
+    Constant(Constant),
     TraceCols(TraceCols),
     PublicInputs(Vec<PublicInput>),
     PeriodicColumns(Vec<PeriodicColumn>),

@@ -24,7 +24,7 @@ pub Source: Source = {
 
 SourceSection: SourceSection = {
     AirDef => SourceSection::AirDef(<>),
-    Constants => SourceSection::Constants(<>),
+    Constant => SourceSection::Constant(<>),
     TraceCols => SourceSection::TraceCols(<>),
     PublicInputs => SourceSection::PublicInputs(<>),
     PeriodicColumns => SourceSection::PeriodicColumns(<>),
@@ -69,18 +69,12 @@ AuxCols: Vec<Identifier> = {
 // CONSTANTS
 // ================================================================================================
 
-// The constants section is optional but cannot be empty. If the section is declared, then at least
-// one constant is required.
-Constants: Vec<Constant> = {
-    "constants" ":" <constants: Constant+> => constants
-}
-
 Constant: Constant = {
-    <name: ConstName> ":" <scalar_value: Num_u64> => 
+    "const" <name: ConstName> "=" <scalar_value: Num_u64> => 
         Constant::new(name, ConstantType::Scalar(scalar_value)),
-    <name: ConstName> ":" "[" <vector_value: CommaElems<Num_u64>> "]" =>
+    "const" <name: ConstName> "=" "[" <vector_value: CommaElems<Num_u64>> "]" =>
         Constant::new(name, ConstantType::Vector(vector_value)),
-    <name: ConstName> ":" "[" <matrix_value: CommaElems<Vector<Num_u64>>> "]" =>
+    "const" <name: ConstName> "=" "[" <matrix_value: CommaElems<Vector<Num_u64>>> "]" =>
         Constant::new(name, ConstantType::Matrix(matrix_value)),
 }
 
@@ -316,7 +310,7 @@ extern {
         r"[0-9]+" => Token::Num(<String>),
         "def" => Token::Def,
         "let" => Token::Let,
-        "constants" => Token::Constants,
+        "const" => Token::Const,
         "trace_columns" => Token::TraceColumnns,
         "main" => Token::Main,
         "aux" => Token::Aux,
