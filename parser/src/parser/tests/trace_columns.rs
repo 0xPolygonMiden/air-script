@@ -1,14 +1,6 @@
-<<<<<<< HEAD
 use super::{
     build_parse_test, Error, Identifier, ParseError, Source, SourceSection::*, Trace, TraceAccess,
     TraceCols, TransitionConstraint, TransitionExpr::*, TransitionStmt::*,
-=======
-use crate::ast::TraceColAccess;
-
-use super::{
-    build_parse_test, Error, Identifier, ParseError, Source, SourceSection::*, TraceCol, TraceCols,
-    TransitionConstraint, TransitionExpr::*, TransitionStmt::*,
->>>>>>> 8197516 (test: add trace col group tests and refactor old tests)
 };
 
 // TRACE COLUMNS
@@ -21,15 +13,9 @@ fn trace_columns() {
         main: [clk, fmp, ctx]";
     let expected = Source(vec![Trace(Trace {
         main_cols: vec![
-<<<<<<< HEAD
             TraceCols::new(Identifier("clk".to_string()), 1),
             TraceCols::new(Identifier("fmp".to_string()), 1),
             TraceCols::new(Identifier("ctx".to_string()), 1),
-=======
-            TraceCol::Single(Identifier("clk".to_string())),
-            TraceCol::Single(Identifier("fmp".to_string())),
-            TraceCol::Single(Identifier("ctx".to_string())),
->>>>>>> 8197516 (test: add trace col group tests and refactor old tests)
         ],
         aux_cols: vec![],
     })]);

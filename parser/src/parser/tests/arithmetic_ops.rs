@@ -1,5 +1,3 @@
-use crate::ast::TraceColAccess;
-
 use super::{
     build_parse_test, Identifier, Source, SourceSection::*, TransitionConstraint,
     TransitionExpr::*, TransitionStmt::*,
