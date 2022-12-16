@@ -5,7 +5,7 @@ use crate::{
         transition_constraints::{TransitionConstraint, TransitionExpr, TransitionStmt,
         TransitionVariable, TransitionVariableType},
         constants::{Constant, ConstantType},
-        Identifier, Source, SourceSection, TraceCol, TraceColAccess, TraceCols, PublicInput,
+        Identifier, Source, SourceSection, Trace, TraceAccess, TraceCols, PublicInput,
         PeriodicColumn, VectorAccess, MatrixAccess
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
     InvalidConst, MissingBoundaryConstraint, MissingTransitionConstraint}}, lexer::Token
@@ -25,7 +25,7 @@ pub Source: Source = {
 SourceSection: SourceSection = {
     AirDef => SourceSection::AirDef(<>),
     Constant => SourceSection::Constant(<>),
-    TraceCols => SourceSection::TraceCols(<>),
+    Trace => SourceSection::Trace(<>),
     PublicInputs => SourceSection::PublicInputs(<>),
     PeriodicColumns => SourceSection::PeriodicColumns(<>),
     BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
@@ -42,11 +42,11 @@ AirDef: Identifier = {
 // TRACE COLUMNS
 // ================================================================================================
 
-TraceCols: TraceCols = {
+Trace: Trace = {
     "trace_columns" ":" <main_cols: MainCols?> <aux_cols: AuxCols?> =>? match (main_cols, aux_cols)
     {
-        (Some(main_cols), Some(aux_cols)) => Ok(TraceCols { main_cols, aux_cols }),
-        (Some(main_cols), None) => Ok(TraceCols { main_cols, aux_cols: vec![] }),
+        (Some(main_cols), Some(aux_cols)) => Ok(Trace { main_cols, aux_cols }),
+        (Some(main_cols), None) => Ok(Trace { main_cols, aux_cols: vec![] }),
         (None, Some(_aux_cols)) => Err(ParseError::User {
             error: Error::ParseError(
                 MissingMainTraceCols("Declaration of main trace columns is required".to_string())
@@ -58,17 +58,17 @@ TraceCols: TraceCols = {
     } 
 }
 
-MainCols: Vec<TraceCol> = {
-    "main" ":" "[" <main_cols: CommaElems<TraceCol>> "]" => main_cols,
+MainCols: Vec<TraceCols> = {
+    "main" ":" "[" <main_cols: CommaElems<TraceCols>> "]" => main_cols,
 }
 
-AuxCols: Vec<TraceCol> = {
-    "aux" ":" "[" <aux_cols: CommaElems<TraceCol>> "]" => aux_cols,
+AuxCols: Vec<TraceCols> = {
+    "aux" ":" "[" <aux_cols: CommaElems<TraceCols>> "]" => aux_cols,
 }
 
-TraceCol: TraceCol = {
-    <name: Identifier> => TraceCol::Single(name),
-    <name: Identifier> <size: Size> => TraceCol::Group(name, size)
+TraceCols: TraceCols = {
+    <name: Identifier> => TraceCols::new(name, 1),
+    <name: Identifier> <size: Size> => TraceCols::new(name, size)
 }
 
 // CONSTANTS
@@ -144,7 +144,7 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
 }
 
 BoundaryStmt: BoundaryStmt = {
-    "enf" <column: TraceColAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
+    "enf" <column: TraceAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
         BoundaryStmt::Constraint(BoundaryConstraint::new(column, boundary, value)),
     "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
         BoundaryStmt::Variable(BoundaryVariable::new(name, boundary_variable_type)),
@@ -253,7 +253,7 @@ TransitionAtom: TransitionExpr = {
     <ident: Identifier> => TransitionExpr::Elem(ident),
     <vector_access: VectorAccess> => TransitionExpr::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => TransitionExpr::MatrixAccess(matrix_access),
-    <trace_col: TraceColAccess> "'" => TransitionExpr::Next(trace_col)
+    <trace_access: TraceAccess> "'" => TransitionExpr::Next(trace_access)
 }
 
 // ATOMS
@@ -292,9 +292,9 @@ MatrixAccess: MatrixAccess = {
         MatrixAccess::new(ident, row, col)
 }
 
-TraceColAccess: TraceColAccess = {
-    <ident: Identifier> => TraceColAccess::Single(ident),
-    <ident: Identifier> <idx: Index> => TraceColAccess::GroupAccess(ident, idx)
+TraceAccess: TraceAccess = {
+    <ident: Identifier> => TraceAccess::new(ident, 0),
+    <ident: Identifier> <idx: Index> => TraceAccess::new(ident, idx)
 }
 
 Identifier: Identifier = {

@@ -3,7 +3,7 @@ use super::{
 };
 use crate::symbol_table::IdentifierType;
 use parser::ast::{
-    constants::ConstantType, Identifier, MatrixAccess, TraceColAccess, TransitionExpr, VectorAccess,
+    constants::ConstantType, Identifier, MatrixAccess, TransitionExpr, VectorAccess,
 };
 
 // ALGEBRAIC GRAPH
@@ -106,10 +106,9 @@ impl AlgebraicGraph {
             TransitionExpr::MatrixAccess(matrix_access) => {
                 self.insert_matrix_access(symbol_table, &matrix_access)
             }
-            TransitionExpr::Next(TraceColAccess::Single(Identifier(ident))) => {
-                self.insert_next(symbol_table, &ident)
+            TransitionExpr::Next(trace_access) => {
+                self.insert_next(symbol_table, trace_access.name())
             }
-            TransitionExpr::Next(_) => todo!(),
             TransitionExpr::Rand(index) => {
                 // constraint target for random values defaults to the second trace segment.
                 // TODO: make this more general, so random values from further trace segments can be

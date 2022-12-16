@@ -32,11 +32,11 @@ fn full_air_file() {
         SourceSection::AirDef(Identifier("SystemAir".to_string())),
         // trace_columns:
         //     main: [clk, fmp, ctx]
-        SourceSection::TraceCols(TraceCols {
+        SourceSection::Trace(Trace {
             main_cols: vec![
-                TraceCol::Single(Identifier("clk".to_string())),
-                TraceCol::Single(Identifier("fmp".to_string())),
-                TraceCol::Single(Identifier("ctx".to_string())),
+                TraceCols::new(Identifier("clk".to_string()), 1),
+                TraceCols::new(Identifier("fmp".to_string()), 1),
+                TraceCols::new(Identifier("ctx".to_string()), 1),
             ],
             aux_cols: vec![],
         }),
@@ -45,7 +45,7 @@ fn full_air_file() {
         SourceSection::TransitionConstraints(vec![TransitionStmt::Constraint(
             TransitionConstraint::new(
                 // clk' = clk + 1
-                TransitionExpr::Next(TraceColAccess::Single(Identifier("clk".to_string()))),
+                TransitionExpr::Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
                 TransitionExpr::Add(
                     Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
                     Box::new(TransitionExpr::Const(1)),
@@ -56,7 +56,7 @@ fn full_air_file() {
         //     enf clk.first = 0
         SourceSection::BoundaryConstraints(vec![BoundaryStmt::Constraint(
             BoundaryConstraint::new(
-                TraceColAccess::Single(Identifier("clk".to_string())),
+                TraceAccess::new(Identifier("clk".to_string()), 0),
                 Boundary::First,
                 BoundaryExpr::Const(0),
             ),

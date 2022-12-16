@@ -4,7 +4,7 @@ use super::{
 use crate::{
     ast::{
         constants::{Constant, ConstantType::Matrix, ConstantType::Scalar, ConstantType::Vector},
-        MatrixAccess, TraceColAccess,
+        MatrixAccess, TraceAccess,
         TransitionStmt::*,
         TransitionVariable, TransitionVariableType, VectorAccess,
     },
@@ -21,7 +21,7 @@ fn transition_constraints() {
         enf clk' = clk + 1";
     let expected = Source(vec![SourceSection::TransitionConstraints(vec![
         Constraint(TransitionConstraint::new(
-            Next(Identifier("clk".to_string())),
+            Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
@@ -46,7 +46,7 @@ fn multiple_transition_constraints() {
         enf clk' - clk = 1";
     let expected = Source(vec![SourceSection::TransitionConstraints(vec![
         Constraint(TransitionConstraint::new(
-            Next(TraceColAccess::Single(Identifier("clk".to_string()))),
+            Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
@@ -54,7 +54,7 @@ fn multiple_transition_constraints() {
         )),
         Constraint(TransitionConstraint::new(
             Sub(
-                Box::new(Next(TraceColAccess::Single(Identifier("clk".to_string())))),
+                Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
             Const(1),

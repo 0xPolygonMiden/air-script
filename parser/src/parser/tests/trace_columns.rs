@@ -1,8 +1,6 @@
-use crate::ast::TraceColAccess;
-
 use super::{
-    build_parse_test, Error, Identifier, ParseError, Source, SourceSection::*, TraceCol, TraceCols,
-    TransitionConstraint, TransitionExpr::*, TransitionStmt::*,
+    build_parse_test, Error, Identifier, ParseError, Source, SourceSection::*, Trace, TraceAccess,
+    TraceCols, TransitionConstraint, TransitionExpr::*, TransitionStmt::*,
 };
 
 // TRACE COLUMNS
@@ -13,11 +11,11 @@ fn trace_columns() {
     let source = "
     trace_columns:
         main: [clk, fmp, ctx]";
-    let expected = Source(vec![TraceCols(TraceCols {
+    let expected = Source(vec![Trace(Trace {
         main_cols: vec![
-            TraceCol::Single(Identifier("clk".to_string())),
-            TraceCol::Single(Identifier("fmp".to_string())),
-            TraceCol::Single(Identifier("ctx".to_string())),
+            TraceCols::new(Identifier("clk".to_string()), 1),
+            TraceCols::new(Identifier("fmp".to_string()), 1),
+            TraceCols::new(Identifier("ctx".to_string()), 1),
         ],
         aux_cols: vec![],
     })]);
@@ -30,15 +28,15 @@ fn trace_columns_main_and_aux() {
     trace_columns:
         main: [clk, fmp, ctx]
         aux: [rc_bus, ch_bus]";
-    let expected = Source(vec![TraceCols(TraceCols {
+    let expected = Source(vec![Trace(Trace {
         main_cols: vec![
-            TraceCol::Single(Identifier("clk".to_string())),
-            TraceCol::Single(Identifier("fmp".to_string())),
-            TraceCol::Single(Identifier("ctx".to_string())),
+            TraceCols::new(Identifier("clk".to_string()), 1),
+            TraceCols::new(Identifier("fmp".to_string()), 1),
+            TraceCols::new(Identifier("ctx".to_string()), 1),
         ],
         aux_cols: vec![
-            TraceCol::Single(Identifier("rc_bus".to_string())),
-            TraceCol::Single(Identifier("ch_bus".to_string())),
+            TraceCols::new(Identifier("rc_bus".to_string()), 1),
+            TraceCols::new(Identifier("ch_bus".to_string()), 1),
         ],
     })]);
     build_parse_test!(source).expect_ast(expected);
@@ -51,25 +49,35 @@ fn trace_columns_groups() {
         main: [clk, fmp, ctx, a[3]]
         aux: [rc_bus, b[4], ch_bus]
     transition_constraints:
-        enf a[1]' = 1";
+        enf a[1]' = 1
+        enf clk' = clk - 1";
     let expected = Source(vec![
-        TraceCols(TraceCols {
+        Trace(Trace {
             main_cols: vec![
-                TraceCol::Single(Identifier("clk".to_string())),
-                TraceCol::Single(Identifier("fmp".to_string())),
-                TraceCol::Single(Identifier("ctx".to_string())),
-                TraceCol::Group(Identifier("a".to_string()), 3),
+                TraceCols::new(Identifier("clk".to_string()), 1),
+                TraceCols::new(Identifier("fmp".to_string()), 1),
+                TraceCols::new(Identifier("ctx".to_string()), 1),
+                TraceCols::new(Identifier("a".to_string()), 3),
             ],
             aux_cols: vec![
-                TraceCol::Single(Identifier("rc_bus".to_string())),
-                TraceCol::Group(Identifier("b".to_string()), 4),
-                TraceCol::Single(Identifier("ch_bus".to_string())),
+                TraceCols::new(Identifier("rc_bus".to_string()), 1),
+                TraceCols::new(Identifier("b".to_string()), 4),
+                TraceCols::new(Identifier("ch_bus".to_string()), 1),
             ],
         }),
-        TransitionConstraints(vec![Constraint(TransitionConstraint::new(
-            Next(TraceColAccess::GroupAccess(Identifier("a".to_string()), 1)),
-            Const(1),
-        ))]),
+        TransitionConstraints(vec![
+            Constraint(TransitionConstraint::new(
+                Next(TraceAccess::new(Identifier("a".to_string()), 1)),
+                Const(1),
+            )),
+            Constraint(TransitionConstraint::new(
+                Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
+                Sub(
+                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(Const(1)),
+                ),
+            )),
+        ]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }

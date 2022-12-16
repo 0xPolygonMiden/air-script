@@ -40,7 +40,7 @@ pub struct Source(pub Vec<SourceSection>);
 pub enum SourceSection {
     AirDef(Identifier),
     Constant(Constant),
-    TraceCols(TraceCols),
+    Trace(Trace),
     PublicInputs(Vec<PublicInput>),
     PeriodicColumns(Vec<PeriodicColumn>),
     BoundaryConstraints(Vec<BoundaryStmt>),
@@ -50,25 +50,56 @@ pub enum SourceSection {
 // TRACE
 // ================================================================================================
 
-/// [TraceCols] contains the main and auxiliary trace columns of the execution trace.
+/// [Trace] contains the main and auxiliary trace segments of the execution trace.
+#[derive(Debug, Eq, PartialEq)]
+pub struct Trace {
+    pub main_cols: Vec<TraceCols>,
+    pub aux_cols: Vec<TraceCols>,
+}
+
+/// [TraceCols] is used to represent a single or a group of columns in the execution trace. For
+/// single columns, the size is 1. For groups, the size is the number of columns in the group.
 #[derive(Debug, Eq, PartialEq)]
 pub struct TraceCols {
-    pub main_cols: Vec<TraceCol>,
-    pub aux_cols: Vec<TraceCol>,
+    name: Identifier,
+    size: u64,
 }
 
-/// [TraceCol] is used to represent a single or a group of columns in the execution trace.
-#[derive(Debug, Eq, PartialEq)]
-pub enum TraceCol {
-    Single(Identifier),
-    Group(Identifier, u64),
+impl TraceCols {
+    pub fn new(name: Identifier, size: u64) -> Self {
+        Self { name, size }
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.name()
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
+    }
 }
 
-/// [TraceCol] is used to represent a single or a group of columns in the execution trace.
+/// [TraceAccess] is used to indicate a column in the trace by specifying its index within a set of
+/// [TraceCols] with the given identifier. If the identifier refers to a single column ([TraceCols]
+/// with size 1), then the index is always zero.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum TraceColAccess {
-    Single(Identifier),
-    GroupAccess(Identifier, usize),
+pub struct TraceAccess {
+    name: Identifier,
+    idx: usize,
+}
+
+impl TraceAccess {
+    pub fn new(name: Identifier, idx: usize) -> Self {
+        Self { name, idx }
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.name()
+    }
+
+    pub fn idx(&self) -> usize {
+        self.idx
+    }
 }
 
 // SHARED ATOMIC TYPES
