@@ -108,11 +108,59 @@ fn test_add_periodic_columns() {
     decls.check_expected(&sym_table);
 }
 
+/// Test inserting duplicate trace columns into the symbol table.
+#[test]
+fn test_err_dup_idents() {
+    let mut sym_table = SymbolTable::default();
+
+    // --- test 2 duplicate columns in the same trace ---------------------------------------------
+    let cols = vec!["a", "a"];
+    let segment = 0;
+    let main_trace = (segment, cols);
+
+    // insert main trace columns.
+    let res = sym_table.insert_trace_columns(segment, &main_trace.build_ast_type());
+
+    // trace columns were not added.
+    assert!(res.is_err());
+
+    // --- test duplicate columns in different traces ---------------------------------------------
+    let aux_trace = (1, vec!["a"]);
+    let res = sym_table.insert_trace_columns(1, &aux_trace.build_ast_type());
+    assert!(res.is_err());
+
+    // --- test duplicate identifiers in different types ------------------------------------------
+    // test scalar constant
+    let constants = vec![("a", ConstantType::Scalar(5))];
+    let res = sym_table.insert_constants(&constants.build_ast_type());
+    assert!(res.is_err());
+
+    // test vector constant
+    let constants = vec![("a", ConstantType::Vector(vec![5]))];
+    let res = sym_table.insert_constants(&constants.build_ast_type());
+    assert!(res.is_err());
+
+    // test matrix constant
+    let constants = vec![("a", ConstantType::Matrix(vec![vec![5]]))];
+    let res = sym_table.insert_constants(&constants.build_ast_type());
+    assert!(res.is_err());
+
+    // test public inputs
+    let pub_inputs = vec![("a", 5_u64)];
+    let res = sym_table.insert_public_inputs(&pub_inputs.build_ast_type());
+    assert!(res.is_err());
+
+    // test periodic columns
+    let periodic_columns = vec![("a", vec![1_u64, 0])];
+    let res = sym_table.insert_periodic_columns(&periodic_columns.build_ast_type());
+    assert!(res.is_err());
+}
+
 // HELPERS
 // ================================================================================================
 
-/// Utility trait for testing symbol table processing of AST types. It takes the AST type as the
-/// generic type and is implemented for an input format containing the required data.
+/// Utility trait for testing symbol table processing of AST types. It takes the AST type as a
+/// generic and is implemented for an input format containing the required data for the AST type.
 trait SymbolTest<T> {
     fn build_ast_type(&self) -> Vec<T>;
     fn check_expected(self, sym_table: &SymbolTable);
