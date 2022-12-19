@@ -12,7 +12,7 @@ pub struct PublicInput {
 }
 
 impl PublicInput {
-    pub(crate) fn new(name: Identifier, size: u64) -> Self {
+    pub fn new(name: Identifier, size: u64) -> Self {
         Self {
             name,
             size: size as usize,

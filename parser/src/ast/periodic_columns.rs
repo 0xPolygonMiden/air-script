@@ -14,7 +14,7 @@ pub struct PeriodicColumn {
 }
 
 impl PeriodicColumn {
-    pub(crate) fn new(name: Identifier, values: Vec<u64>) -> Self {
+    pub fn new(name: Identifier, values: Vec<u64>) -> Self {
         Self { name, values }
     }
 
