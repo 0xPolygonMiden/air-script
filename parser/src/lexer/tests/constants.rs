@@ -3,18 +3,17 @@ use super::{expect_valid_tokenization, Token};
 #[test]
 fn constants_scalar() {
     let source = "
-constants:
-    A: 1
-    B: 2";
+    const A = 1
+    const B = 2";
 
     let tokens = vec![
-        Token::Constants,
-        Token::Colon,
+        Token::Const,
         Token::Ident("A".to_string()),
-        Token::Colon,
+        Token::Equal,
         Token::Num("1".to_string()),
+        Token::Const,
         Token::Ident("B".to_string()),
-        Token::Colon,
+        Token::Equal,
         Token::Num("2".to_string()),
     ];
     expect_valid_tokenization(source, tokens);
@@ -23,15 +22,13 @@ constants:
 #[test]
 fn constants_vector() {
     let source = "
-constants:
-    A: [1, 2, 3, 4]
-    B: [5, 6, 7, 8]";
+    const A = [1, 2, 3, 4]
+    const B = [5, 6, 7, 8]";
 
     let tokens = vec![
-        Token::Constants,
-        Token::Colon,
+        Token::Const,
         Token::Ident("A".to_string()),
-        Token::Colon,
+        Token::Equal,
         Token::Lsqb,
         Token::Num("1".to_string()),
         Token::Comma,
@@ -41,8 +38,9 @@ constants:
         Token::Comma,
         Token::Num("4".to_string()),
         Token::Rsqb,
+        Token::Const,
         Token::Ident("B".to_string()),
-        Token::Colon,
+        Token::Equal,
         Token::Lsqb,
         Token::Num("5".to_string()),
         Token::Comma,
@@ -59,15 +57,13 @@ constants:
 #[test]
 fn constants_matrix() {
     let source = "
-    constants:
-        A: [[1, 2], [3, 4]]
-        B: [[5, 6], [7, 8]]";
+        const A = [[1, 2], [3, 4]]
+        const B = [[5, 6], [7, 8]]";
 
     let tokens = vec![
-        Token::Constants,
-        Token::Colon,
+        Token::Const,
         Token::Ident("A".to_string()),
-        Token::Colon,
+        Token::Equal,
         Token::Lsqb,
         Token::Lsqb,
         Token::Num("1".to_string()),
@@ -81,8 +77,9 @@ fn constants_matrix() {
         Token::Num("4".to_string()),
         Token::Rsqb,
         Token::Rsqb,
+        Token::Const,
         Token::Ident("B".to_string()),
-        Token::Colon,
+        Token::Equal,
         Token::Lsqb,
         Token::Lsqb,
         Token::Num("5".to_string()),
@@ -143,28 +140,28 @@ fn constants_access_inside_boundary_expr() {
 #[test]
 fn constants_access_inside_transition_expr() {
     let source = "
-        constants:
-            A: 1
-            B: [1, 0]
-            C: [[1, 0], [0, 1]]
+        const A = 1
+        const B = [1, 0]
+        const C = [[1, 0], [0, 1]]
         transition_constraints:
             enf clk * 2^A = B[0] + C[0][1]
     ";
     let tokens = vec![
-        Token::Constants,
-        Token::Colon,
+        Token::Const,
         Token::Ident("A".to_string()),
-        Token::Colon,
+        Token::Equal,
         Token::Num("1".to_string()),
+        Token::Const,
         Token::Ident("B".to_string()),
-        Token::Colon,
+        Token::Equal,
         Token::Lsqb,
         Token::Num("1".to_string()),
         Token::Comma,
         Token::Num("0".to_string()),
         Token::Rsqb,
+        Token::Const,
         Token::Ident("C".to_string()),
-        Token::Colon,
+        Token::Equal,
         Token::Lsqb,
         Token::Lsqb,
         Token::Num("1".to_string()),

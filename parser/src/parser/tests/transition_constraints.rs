@@ -1,5 +1,5 @@
 use super::{
-    build_parse_test, Identifier, Source, SourceSection::*, TransitionConstraint, TransitionExpr::*,
+    build_parse_test, Identifier, Source, SourceSection, TransitionConstraint, TransitionExpr::*,
 };
 use crate::{
     ast::{
@@ -19,15 +19,15 @@ fn transition_constraints() {
     let source = "
     transition_constraints:
         enf clk' = clk + 1";
-    let expected = Source(vec![TransitionConstraints(vec![Constraint(
-        TransitionConstraint::new(
+    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
+        Constraint(TransitionConstraint::new(
             Next(Identifier("clk".to_string())),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
             ),
-        ),
-    )])]);
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -44,7 +44,7 @@ fn multiple_transition_constraints() {
     transition_constraints:
         enf clk' = clk + 1
         enf clk' - clk = 1";
-    let expected = Source(vec![TransitionConstraints(vec![
+    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
         Constraint(TransitionConstraint::new(
             Next(Identifier("clk".to_string())),
             Add(
@@ -68,15 +68,15 @@ fn transition_constraint_with_periodic_col() {
     let source = "
     transition_constraints:
         enf k0 + b = 0";
-    let expected = Source(vec![TransitionConstraints(vec![Constraint(
-        TransitionConstraint::new(
+    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
+        Constraint(TransitionConstraint::new(
             Add(
                 Box::new(Elem(Identifier("k0".to_string()))),
                 Box::new(Elem(Identifier("b".to_string()))),
             ),
             Const(0),
-        ),
-    )])]);
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
@@ -85,37 +85,37 @@ fn transition_constraint_with_random_value() {
     let source = "
     transition_constraints:
         enf a + $rand[1] = 0";
-    let expected = Source(vec![TransitionConstraints(vec![Constraint(
-        TransitionConstraint::new(
+    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
+        Constraint(TransitionConstraint::new(
             Add(
                 Box::new(Elem(Identifier("a".to_string()))),
                 Box::new(Rand(1)),
             ),
             Const(0),
-        ),
-    )])]);
+        )),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
 #[test]
 fn transition_constraint_with_constants() {
     let source = "
-    constants:
-        A: 0
-        B: [0, 1]
-        C: [[0, 1], [1, 0]]
+        const A = 0
+        const B = [0, 1]
+        const C = [[0, 1], [1, 0]]
     transition_constraints:
         enf clk + A = B[1] + C[1][1]";
     let expected = Source(vec![
-        Constants(vec![
-            Constant::new(Identifier("A".to_string()), Scalar(0)),
-            Constant::new(Identifier("B".to_string()), Vector(vec![0, 1])),
-            Constant::new(
-                Identifier("C".to_string()),
-                Matrix(vec![vec![0, 1], vec![1, 0]]),
-            ),
-        ]),
-        TransitionConstraints(vec![Constraint(TransitionConstraint::new(
+        SourceSection::Constant(Constant::new(Identifier("A".to_string()), Scalar(0))),
+        SourceSection::Constant(Constant::new(
+            Identifier("B".to_string()),
+            Vector(vec![0, 1]),
+        )),
+        SourceSection::Constant(Constant::new(
+            Identifier("C".to_string()),
+            Matrix(vec![vec![0, 1], vec![1, 0]]),
+        )),
+        SourceSection::TransitionConstraints(vec![Constraint(TransitionConstraint::new(
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Elem(Identifier("A".to_string()))),
@@ -144,7 +144,7 @@ fn transition_constraint_with_variables() {
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]
         enf clk + a = b[1] + c[1][1]";
-    let expected = Source(vec![TransitionConstraints(vec![
+    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
         Variable(TransitionVariable::new(
             Identifier("a".to_string()),
             TransitionVariableType::Scalar(Exp(Box::new(Const(2)), 2)),

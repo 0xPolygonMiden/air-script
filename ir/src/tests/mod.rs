@@ -22,10 +22,9 @@ fn boundary_constraints() {
 #[test]
 fn boundary_constraints_with_constants() {
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -44,10 +43,9 @@ fn boundary_constraints_with_constants() {
 #[test]
 fn err_tc_invalid_vector_access() {
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -66,10 +64,9 @@ fn err_tc_invalid_vector_access() {
 #[test]
 fn err_tc_invalid_matrix_access() {
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -85,10 +82,9 @@ fn err_tc_invalid_matrix_access() {
     assert!(result.is_err());
 
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -209,10 +205,9 @@ fn transition_constraints() {
 #[test]
 fn transition_constraints_with_constants() {
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -249,10 +244,9 @@ fn transition_constraints_using_parens() {
 #[test]
 fn err_bc_invalid_vector_access() {
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -271,10 +265,9 @@ fn err_bc_invalid_vector_access() {
 #[test]
 fn err_bc_invalid_matrix_access() {
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -290,10 +283,9 @@ fn err_bc_invalid_matrix_access() {
     assert!(result.is_err());
 
     let source = "
-    constants:
-        A: 123
-        B: [1, 2, 3]
-        C: [[1, 2, 3], [4, 5, 6]]
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk]
     public_inputs:
@@ -440,8 +432,7 @@ fn op_exp() {
 #[test]
 fn err_invalid_matrix_const() {
     let source = "
-    constants:
-        A: [[2, 3], [1, 0, 2]]
+    const A = [[2, 3], [1, 0, 2]]
     trace_columns:
         main: [clk]
     public_inputs:

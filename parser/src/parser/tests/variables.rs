@@ -6,8 +6,7 @@ use super::build_parse_test;
 #[test]
 fn err_vector_defined_outside_boundary_or_transition_constraints() {
     let source = "
-    constants:
-        A: 1
+        const A = 1
         let a = 0";
     build_parse_test!(source).expect_unrecognized_token();
 }

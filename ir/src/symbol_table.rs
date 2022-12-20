@@ -117,13 +117,11 @@ impl SymbolTable {
     // --- PUBLIC MUTATORS ------------------------------------------------------------------------
 
     /// Add all constants by their identifiers and values.
-    pub(super) fn insert_constants(&mut self, constants: &[Constant]) -> Result<(), SemanticError> {
-        for constant in constants {
-            let Identifier(name) = &constant.name();
-            validate_constant(constant)?;
-            self.insert_symbol(name, IdentifierType::Constant(constant.value().clone()))?;
-            self.constants.push(constant.clone());
-        }
+    pub(super) fn insert_constant(&mut self, constant: &Constant) -> Result<(), SemanticError> {
+        let Identifier(name) = &constant.name();
+        validate_constant(constant)?;
+        self.insert_symbol(name, IdentifierType::Constant(constant.value().clone()))?;
+        self.constants.push(constant.clone());
 
         Ok(())
     }

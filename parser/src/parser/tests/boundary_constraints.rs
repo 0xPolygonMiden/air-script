@@ -1,6 +1,6 @@
 use super::{
     build_parse_test, Boundary, BoundaryConstraint, BoundaryExpr::*, Identifier, Source,
-    SourceSection::*,
+    SourceSection,
 };
 use crate::{
     ast::{
@@ -22,7 +22,7 @@ fn boundary_constraint_at_first() {
     let source = "
     boundary_constraints:
         enf clk.first = 0";
-    let expected = Source(vec![BoundaryConstraints(vec![Constraint(
+    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(Identifier("clk".to_string()), Boundary::First, Const(0)),
     )])]);
     build_parse_test!(source).expect_ast(expected);
@@ -33,7 +33,7 @@ fn boundary_constraint_at_last() {
     let source = "
     boundary_constraints:
         enf clk.last = 15";
-    let expected = Source(vec![BoundaryConstraints(vec![Constraint(
+    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(Identifier("clk".to_string()), Boundary::Last, Const(15)),
     )])]);
     build_parse_test!(source).expect_ast(expected);
@@ -53,7 +53,7 @@ fn multiple_boundary_constraints() {
     boundary_constraints:
         enf clk.first = 0
         enf clk.last = 1";
-    let expected = Source(vec![BoundaryConstraints(vec![
+    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
         Constraint(BoundaryConstraint::new(
             Identifier("clk".to_string()),
             Boundary::First,
@@ -76,8 +76,8 @@ fn boundary_constraint_with_pub_input() {
     boundary_constraints:
         enf clk.first = a[0]";
     let expected = Source(vec![
-        PublicInputs(vec![PublicInput::new(Identifier("a".to_string()), 16)]),
-        BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
+        SourceSection::PublicInputs(vec![PublicInput::new(Identifier("a".to_string()), 16)]),
+        SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
             Identifier("clk".to_string()),
             Boundary::First,
             VectorAccess(VectorAccess::new(Identifier("a".to_string()), 0)),
@@ -91,7 +91,7 @@ fn boundary_constraint_with_expr() {
     let source = "
     boundary_constraints:
         enf clk.first = 5 + a[3] + 6";
-    let expected = Source(vec![BoundaryConstraints(vec![Constraint(
+    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
             Identifier("clk".to_string()),
             Boundary::First,
@@ -113,22 +113,22 @@ fn boundary_constraint_with_expr() {
 #[test]
 fn boundary_constraint_with_const() {
     let source = "
-    constants:
-        A: 1
-        B: [0, 1]
-        C: [[0, 1], [1, 0]]
+    const A = 1
+    const B = [0, 1]
+    const C = [[0, 1], [1, 0]]
     boundary_constraints:
         enf clk.first = A + B[1] - C[0][1]";
     let expected = Source(vec![
-        Constants(vec![
-            Constant::new(Identifier("A".to_string()), Scalar(1)),
-            Constant::new(Identifier("B".to_string()), Vector(vec![0, 1])),
-            Constant::new(
-                Identifier("C".to_string()),
-                Matrix(vec![vec![0, 1], vec![1, 0]]),
-            ),
-        ]),
-        BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
+        SourceSection::Constant(Constant::new(Identifier("A".to_string()), Scalar(1))),
+        SourceSection::Constant(Constant::new(
+            Identifier("B".to_string()),
+            Vector(vec![0, 1]),
+        )),
+        SourceSection::Constant(Constant::new(
+            Identifier("C".to_string()),
+            Matrix(vec![vec![0, 1], vec![1, 0]]),
+        )),
+        SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
             Identifier("clk".to_string()),
             Boundary::First,
             Sub(
@@ -158,7 +158,7 @@ fn boundary_constraint_with_variables() {
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]
         enf clk.first = 5 + a[3] + 6";
-    let expected = Source(vec![BoundaryConstraints(vec![
+    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
         Variable(BoundaryVariable::new(
             Identifier("a".to_string()),
             BoundaryVariableType::Scalar(Exp(Box::new(Const(2)), 2)),
