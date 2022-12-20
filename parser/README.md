@@ -30,4 +30,4 @@ The `SourceSection` types are:
 - `PublicInputs`, which is a vector of all of the public inputs defined in the module. Each public input is represented by its identifier and a fixed size.
 - `PeriodicColumns`, which is a vector of all of the periodic columns defined in the module. Each periodic column is represented by its identifier and a vector containing the pattern of its repeated (periodic) values.
 - `BoundaryConstraints`, which contains a vector of `BoundaryConstraint` expressions, each represented as an expression tree.
-- `TransitionConstraints`, which contains a vector of `TransitionConstraint` expressions, each represented as an expression tree.
+- `IntegrityConstraints`, which contains a vector of `IntegrityConstraint` expressions, each represented as an expression tree.

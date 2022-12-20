@@ -5,7 +5,7 @@ pub(super) struct SourceValidator {
     trace_columns_exists: bool,
     public_inputs_exists: bool,
     boundary_constraints_exists: bool,
-    transition_constraints_exists: bool,
+    integrity_constraints_exists: bool,
 }
 
 impl SourceValidator {
@@ -14,7 +14,7 @@ impl SourceValidator {
             trace_columns_exists: false,
             public_inputs_exists: false,
             boundary_constraints_exists: false,
-            transition_constraints_exists: false,
+            integrity_constraints_exists: false,
         }
     }
 
@@ -24,7 +24,7 @@ impl SourceValidator {
             "trace_columns" => self.trace_columns_exists = true,
             "public_inputs" => self.public_inputs_exists = true,
             "boundary_constraints" => self.boundary_constraints_exists = true,
-            "transition_constraints" => self.transition_constraints_exists = true,
+            "integrity_constraints" => self.integrity_constraints_exists = true,
             _ => unreachable!(),
         }
     }
@@ -49,10 +49,10 @@ impl SourceValidator {
                 "boundary_constraints section is missing".to_string(),
             ));
         }
-        // make sure transition_constraints are declared.
-        if !self.transition_constraints_exists {
+        // make sure integrity_constraints are declared.
+        if !self.integrity_constraints_exists {
             return Err(SemanticError::MissingDeclaration(
-                "transition_constraints section is missing".to_string(),
+                "integrity_constraints section is missing".to_string(),
             ));
         }
 

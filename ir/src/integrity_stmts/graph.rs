@@ -1,16 +1,16 @@
 use super::{
-    super::BTreeMap, degree::TransitionConstraintDegree, SemanticError, SymbolTable, TraceSegment,
+    super::BTreeMap, degree::IntegrityConstraintDegree, SemanticError, SymbolTable, TraceSegment,
 };
 use crate::{symbol_table::IdentifierType, VariableRoots, CURRENT_ROW, NEXT_ROW};
 use parser::ast::{
-    self, constants::ConstantType, Identifier, MatrixAccess, TransitionExpr,
-    TransitionVariableType, VectorAccess,
+    self, constants::ConstantType, Identifier, IntegrityExpr, IntegrityVariableType, MatrixAccess,
+    VectorAccess,
 };
 
 // ALGEBRAIC GRAPH
 // ================================================================================================
 
-/// The AlgebraicGraph is a directed acyclic graph used to represent transition constraints. To
+/// The AlgebraicGraph is a directed acyclic graph used to represent integrity constraints. To
 /// store it compactly, it is represented as a vector of nodes where each node references other
 /// nodes by their index in the vector.
 ///
@@ -37,14 +37,14 @@ impl AlgebraicGraph {
     }
 
     /// Returns the degree of the subgraph which has the specified node as its tip.
-    pub fn degree(&self, index: &NodeIndex) -> TransitionConstraintDegree {
+    pub fn degree(&self, index: &NodeIndex) -> IntegrityConstraintDegree {
         let mut cycles: BTreeMap<usize, usize> = BTreeMap::new();
         let base = self.accumulate_degree(&mut cycles, index);
 
         if cycles.is_empty() {
-            TransitionConstraintDegree::new(base)
+            IntegrityConstraintDegree::new(base)
         } else {
-            TransitionConstraintDegree::with_cycles(base, cycles.values().cloned().collect())
+            IntegrityConstraintDegree::with_cycles(base, cycles.values().cloned().collect())
         }
     }
 
@@ -89,27 +89,27 @@ impl AlgebraicGraph {
     pub(super) fn insert_expr(
         &mut self,
         symbol_table: &SymbolTable,
-        expr: TransitionExpr,
+        expr: IntegrityExpr,
         variable_roots: &mut VariableRoots,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         match expr {
-            TransitionExpr::Const(value) => {
+            IntegrityExpr::Const(value) => {
                 // constraint target defaults to Main trace.
                 let trace_segment = 0;
                 let node_index = self.insert_op(Operation::Constant(ConstantValue::Inline(value)));
                 Ok((trace_segment, node_index))
             }
-            TransitionExpr::Elem(Identifier(ident)) => {
+            IntegrityExpr::Elem(Identifier(ident)) => {
                 self.insert_symbol_access(symbol_table, &ident, variable_roots)
             }
-            TransitionExpr::VectorAccess(vector_access) => {
+            IntegrityExpr::VectorAccess(vector_access) => {
                 self.insert_vector_access(symbol_table, &vector_access, variable_roots)
             }
-            TransitionExpr::MatrixAccess(matrix_access) => {
+            IntegrityExpr::MatrixAccess(matrix_access) => {
                 self.insert_matrix_access(symbol_table, &matrix_access, variable_roots)
             }
-            TransitionExpr::Next(trace_access) => self.insert_next(symbol_table, &trace_access),
-            TransitionExpr::Rand(index) => {
+            IntegrityExpr::Next(trace_access) => self.insert_next(symbol_table, &trace_access),
+            IntegrityExpr::Rand(index) => {
                 // constraint target for random values defaults to the second trace segment.
                 // TODO: make this more general, so random values from further trace segments can be
                 // used. This requires having a way to describe different sets of randomness in
@@ -118,7 +118,7 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::RandomValue(index));
                 Ok((trace_segment, node_index))
             }
-            TransitionExpr::Add(lhs, rhs) => {
+            IntegrityExpr::Add(lhs, rhs) => {
                 // add both subexpressions.
                 let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
                 let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs, variable_roots)?;
@@ -127,7 +127,7 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::Add(lhs, rhs));
                 Ok((trace_segment, node_index))
             }
-            TransitionExpr::Sub(lhs, rhs) => {
+            IntegrityExpr::Sub(lhs, rhs) => {
                 // add both subexpressions.
                 let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
                 let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs, variable_roots)?;
@@ -136,7 +136,7 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::Sub(lhs, rhs));
                 Ok((trace_segment, node_index))
             }
-            TransitionExpr::Mul(lhs, rhs) => {
+            IntegrityExpr::Mul(lhs, rhs) => {
                 // add both subexpressions.
                 let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
                 let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs, variable_roots)?;
@@ -145,7 +145,7 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::Mul(lhs, rhs));
                 Ok((trace_segment, node_index))
             }
-            TransitionExpr::Exp(lhs, rhs) => {
+            IntegrityExpr::Exp(lhs, rhs) => {
                 // add base subexpression.
                 let (trace_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
                 // add exponent subexpression.
@@ -217,8 +217,8 @@ impl AlgebraicGraph {
                 )));
                 Ok((trace_segment, node_index))
             }
-            IdentifierType::TransitionVariable(transition_variable) => {
-                if let TransitionVariableType::Scalar(expr) = transition_variable.value() {
+            IdentifierType::IntegrityVariable(integrity_variable) => {
+                if let IntegrityVariableType::Scalar(expr) = integrity_variable.value() {
                     if let Some((trace_segment, node_index)) =
                         variable_roots.get(&VariableValue::Scalar(ident.to_string()))
                     {
@@ -265,8 +265,8 @@ impl AlgebraicGraph {
                 )));
                 Ok((trace_segment, node_index))
             }
-            IdentifierType::TransitionVariable(transition_variable) => {
-                if let TransitionVariableType::Vector(vector) = transition_variable.value() {
+            IdentifierType::IntegrityVariable(integrity_variable) => {
+                if let IntegrityVariableType::Vector(vector) = integrity_variable.value() {
                     let expr = &vector[vector_access.idx()];
                     if let Some((trace_segment, node_index)) =
                         variable_roots.get(&VariableValue::Vector(vector_access.clone()))
@@ -325,8 +325,8 @@ impl AlgebraicGraph {
                 )));
                 Ok((trace_segment, node_index))
             }
-            IdentifierType::TransitionVariable(transition_variable) => {
-                if let TransitionVariableType::Matrix(matrix) = transition_variable.value() {
+            IdentifierType::IntegrityVariable(integrity_variable) => {
+                if let IntegrityVariableType::Matrix(matrix) = integrity_variable.value() {
                     let expr = &matrix[matrix_access.row_idx()][matrix_access.col_idx()];
                     if let Some((trace_segment, node_index)) =
                         variable_roots.get(&VariableValue::Matrix(matrix_access.clone()))
@@ -389,7 +389,7 @@ impl Node {
     }
 }
 
-/// A transition constraint operation or value reference.
+/// An integrity constraint operation or value reference.
 #[derive(Debug, Eq, PartialEq)]
 pub enum Operation {
     /// An inlined or named constant with identifier and access indices.

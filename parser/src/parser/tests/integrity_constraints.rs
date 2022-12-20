@@ -1,58 +1,57 @@
 use super::{
-    build_parse_test, Identifier, Source, SourceSection, TransitionConstraint, TransitionExpr::*,
+    build_parse_test, Identifier, IntegrityConstraint, IntegrityExpr::*, Source, SourceSection,
 };
 use crate::{
     ast::{
         constants::{Constant, ConstantType::Matrix, ConstantType::Scalar, ConstantType::Vector},
-        MatrixAccess, TraceAccess,
-        TransitionStmt::*,
-        TransitionVariable, TransitionVariableType, VectorAccess,
+        IntegrityStmt::*,
+        IntegrityVariable, IntegrityVariableType, MatrixAccess, TraceAccess, VectorAccess,
     },
     error::{Error, ParseError},
 };
 
-// TRANSITION CONSTRAINTS
+// INTEGRITY CONSTRAINTS
 // ================================================================================================
 
 #[test]
-fn transition_constraints() {
+fn integrity_constraints() {
     let source = "
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1";
-    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
-        Constraint(TransitionConstraint::new(
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
+        IntegrityConstraint::new(
             Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
             ),
-        )),
-    ])]);
+        ),
+    )])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
 #[test]
-fn transition_constraints_invalid() {
-    let source = "transition_constraints:
+fn integrity_constraints_invalid() {
+    let source = "integrity_constraints:
         enf clk' = clk = 1";
     build_parse_test!(source).expect_unrecognized_token();
 }
 
 #[test]
-fn multiple_transition_constraints() {
+fn multiple_integrity_constraints() {
     let source = "
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1
         enf clk' - clk = 1";
-    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
-        Constraint(TransitionConstraint::new(
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
+        Constraint(IntegrityConstraint::new(
             Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
             ),
         )),
-        Constraint(TransitionConstraint::new(
+        Constraint(IntegrityConstraint::new(
             Sub(
                 Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                 Box::new(Elem(Identifier("clk".to_string()))),
@@ -64,46 +63,46 @@ fn multiple_transition_constraints() {
 }
 
 #[test]
-fn transition_constraint_with_periodic_col() {
+fn integrity_constraint_with_periodic_col() {
     let source = "
-    transition_constraints:
+    integrity_constraints:
         enf k0 + b = 0";
-    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
-        Constraint(TransitionConstraint::new(
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
+        IntegrityConstraint::new(
             Add(
                 Box::new(Elem(Identifier("k0".to_string()))),
                 Box::new(Elem(Identifier("b".to_string()))),
             ),
             Const(0),
-        )),
-    ])]);
+        ),
+    )])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
 #[test]
-fn transition_constraint_with_random_value() {
+fn integrity_constraint_with_random_value() {
     let source = "
-    transition_constraints:
+    integrity_constraints:
         enf a + $rand[1] = 0";
-    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
-        Constraint(TransitionConstraint::new(
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
+        IntegrityConstraint::new(
             Add(
                 Box::new(Elem(Identifier("a".to_string()))),
                 Box::new(Rand(1)),
             ),
             Const(0),
-        )),
-    ])]);
+        ),
+    )])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
 #[test]
-fn transition_constraint_with_constants() {
+fn integrity_constraint_with_constants() {
     let source = "
         const A = 0
         const B = [0, 1]
         const C = [[0, 1], [1, 0]]
-    transition_constraints:
+    integrity_constraints:
         enf clk + A = B[1] + C[1][1]";
     let expected = Source(vec![
         SourceSection::Constant(Constant::new(Identifier("A".to_string()), Scalar(0))),
@@ -115,7 +114,7 @@ fn transition_constraint_with_constants() {
             Identifier("C".to_string()),
             Matrix(vec![vec![0, 1], vec![1, 0]]),
         )),
-        SourceSection::TransitionConstraints(vec![Constraint(TransitionConstraint::new(
+        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Elem(Identifier("A".to_string()))),
@@ -137,21 +136,21 @@ fn transition_constraint_with_constants() {
 }
 
 #[test]
-fn transition_constraint_with_variables() {
+fn integrity_constraint_with_variables() {
     let source = "
-    transition_constraints:
+    integrity_constraints:
         let a = 2^2
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]
         enf clk + a = b[1] + c[1][1]";
-    let expected = Source(vec![SourceSection::TransitionConstraints(vec![
-        Variable(TransitionVariable::new(
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
+        Variable(IntegrityVariable::new(
             Identifier("a".to_string()),
-            TransitionVariableType::Scalar(Exp(Box::new(Const(2)), 2)),
+            IntegrityVariableType::Scalar(Exp(Box::new(Const(2)), 2)),
         )),
-        Variable(TransitionVariable::new(
+        Variable(IntegrityVariable::new(
             Identifier("b".to_string()),
-            TransitionVariableType::Vector(vec![
+            IntegrityVariableType::Vector(vec![
                 Elem(Identifier("a".to_string())),
                 Mul(
                     Box::new(Const(2)),
@@ -159,9 +158,9 @@ fn transition_constraint_with_variables() {
                 ),
             ]),
         )),
-        Variable(TransitionVariable::new(
+        Variable(IntegrityVariable::new(
             Identifier("c".to_string()),
-            TransitionVariableType::Matrix(vec![
+            IntegrityVariableType::Matrix(vec![
                 vec![
                     Sub(
                         Box::new(Elem(Identifier("a".to_string()))),
@@ -175,7 +174,7 @@ fn transition_constraint_with_variables() {
                 ],
             ]),
         )),
-        Constraint(TransitionConstraint::new(
+        Constraint(IntegrityConstraint::new(
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Elem(Identifier("a".to_string()))),
@@ -197,14 +196,14 @@ fn transition_constraint_with_variables() {
 }
 
 #[test]
-fn err_missing_transition_constraint() {
+fn err_missing_integrity_constraint() {
     let source = "
-    transition_constraints:
+    integrity_constraints:
         let a = 2^2
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]";
-    let error = Error::ParseError(ParseError::MissingTransitionConstraint(
-        "Declaration of at least one transition constraint is required".to_string(),
+    let error = Error::ParseError(ParseError::MissingIntegrityConstraint(
+        "Declaration of at least one integrity constraint is required".to_string(),
     ));
     build_parse_test!(source).expect_error(error);
 }
@@ -215,15 +214,15 @@ fn err_missing_transition_constraint() {
 #[test]
 fn error_invalid_next_usage() {
     let source = "
-    transition_constraints:
+    integrity_constraints:
         enf clk'' = clk + 1";
     build_parse_test!(source).expect_unrecognized_token();
 }
 
 #[test]
-fn err_empty_transition_constraints() {
+fn err_empty_integrity_constraints() {
     let source = "
-    transition_constraints:
+    integrity_constraints:
         
     boundary_constraints:
         enf clk.first = 1";

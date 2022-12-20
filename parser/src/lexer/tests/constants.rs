@@ -138,12 +138,12 @@ fn constants_access_inside_boundary_expr() {
 }
 
 #[test]
-fn constants_access_inside_transition_expr() {
+fn constants_access_inside_integrity_expr() {
     let source = "
         const A = 1
         const B = [1, 0]
         const C = [[1, 0], [0, 1]]
-        transition_constraints:
+        integrity_constraints:
             enf clk * 2^A = B[0] + C[0][1]
     ";
     let tokens = vec![
@@ -175,7 +175,7 @@ fn constants_access_inside_transition_expr() {
         Token::Num("1".to_string()),
         Token::Rsqb,
         Token::Rsqb,
-        Token::TransitionConstraints,
+        Token::IntegrityConstraints,
         Token::Colon,
         Token::Enf,
         Token::Ident("clk".to_string()),
@@ -201,15 +201,15 @@ fn constants_access_inside_transition_expr() {
 }
 
 #[test]
-fn constants_access_inside_transition_expr_invalid() {
+fn constants_access_inside_integrity_expr_invalid() {
     // This is invalid since the constants are not declared and the constant names should be
     // capitalized but these errors will be thrown at the IR level and parsing level respectively.
     let source = "
-        transition_constraints:
+        integrity_constraints:
             enf clk * 2^a = b[0] + c[0][1]
     ";
     let tokens = vec![
-        Token::TransitionConstraints,
+        Token::IntegrityConstraints,
         Token::Colon,
         Token::Enf,
         Token::Ident("clk".to_string()),

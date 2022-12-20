@@ -13,11 +13,11 @@ AirScript defines the following keywords:
   - `last`: used to access the value of a trace column at the last row of the trace. _It may only be used when defining boundary constraints._
 - `enf`: used to describe a single [constraint](./constraints.md).
 - `public_inputs`: used to declare the [source section](./structure.md#source-sections) where the [public inputs are declared](./declarations.md). _They may only be referenced when defining boundary constraints._
-- `periodic_columns`: used to declare the [source section](./structure.md#source-sections) where the [periodic columns are declared](./declarations.md). _They may only be referenced when defining transition constraints._
+- `periodic_columns`: used to declare the [source section](./structure.md#source-sections) where the [periodic columns are declared](./declarations.md). _They may only be referenced when defining integrity constraints._
 - `trace_columns`: used to declare the [source section](./structure.md#source-sections) where the [execution trace is described](./declarations.md).
   - `main`: used to declare the main execution trace.
   - `aux`: used to declare the auxiliary execution trace.
-- `transition_constraints`: used to declare the [source section](./structure.md#source-sections) where the [transition constraints are described](./constraints.md#transition_constraints).
+- `integrity_constraints`: used to declare the [source section](./structure.md#source-sections) where the [integrity constraints are described](./constraints.md#integrity_constraints).
 
 ## Built-in variables
 
@@ -29,7 +29,7 @@ Currently, the only built-in is `\$rand`, which is used to get random values pro
 
 These random values may be accessed by using the indexing operator on `\$rand`. For example, `\$rand[i]` provides the `ith` random value.
 
-Random values may only be accessed within source sections for constraints, i.e. the [`boundary_constraints` section](./constraints.md#boundary-constraints-boundary_constraints) and the [`transition_constraints` section](./constraints.md#transition-constraints-transition_constraints).
+Random values may only be accessed within source sections for constraints, i.e. the [`boundary_constraints` section](./constraints.md#boundary-constraints-boundary_constraints) and the [`integrity_constraints` section](./constraints.md#integrity-constraints-integrity_constraints).
 
 ## Delimiters and special characters
 
@@ -109,19 +109,19 @@ boundary_constraints:
     enf a.last = stack_outputs[0]
 ```
 
-### [Transition constraints](./constraints.md#transition_constraints)
+### [Integrity constraints](./constraints.md#integrity_constraints)
 
-The following accessor may only be applied to trace columns when they are referenced in transition constraint definitions.
+The following accessor may only be applied to trace columns when they are referenced in integrity constraint definitions.
 
-- Next Row (`a'`): `'` is a postfix operator that indicates the value of the specified trace column in the next row. It is only supported in [transition constraint descriptions](./constraints.md#transition_constraints).
+- Next Row (`a'`): `'` is a postfix operator that indicates the value of the specified trace column in the next row. It is only supported in [integrity constraint descriptions](./constraints.md#integrity_constraints).
 
-Here is an example of usage of the Next Row operator within a transition constraint:
+Here is an example of usage of the Next Row operator within an integrity constraint:
 
 ```
 trace_columns:
   main: [a]
   aux: [p]
 
-transition_constraints:
+integrity_constraints:
   enf p' = p * a
 ```

@@ -1,6 +1,6 @@
 pub use parser::ast::{
-    self, boundary_constraints::BoundaryExpr, constants::Constant, Identifier, PublicInput,
-    TransitionVariable,
+    self, boundary_constraints::BoundaryExpr, constants::Constant, Identifier, IntegrityVariable,
+    PublicInput,
 };
 use std::collections::BTreeMap;
 
@@ -10,9 +10,9 @@ use symbol_table::{IdentifierType, SymbolTable};
 pub mod boundary_stmts;
 use boundary_stmts::BoundaryStmts;
 
-pub mod transition_stmts;
-use transition_stmts::{AlgebraicGraph, TransitionStmts, VariableValue, MIN_CYCLE_LENGTH};
-pub use transition_stmts::{NodeIndex, TransitionConstraintDegree};
+pub mod integrity_stmts;
+use integrity_stmts::{AlgebraicGraph, IntegrityStmts, VariableValue, MIN_CYCLE_LENGTH};
+pub use integrity_stmts::{IntegrityConstraintDegree, NodeIndex};
 
 mod trace_columns;
 
@@ -49,7 +49,7 @@ pub struct AirIR {
     public_inputs: PublicInputs,
     periodic_columns: PeriodicColumns,
     boundary_stmts: BoundaryStmts,
-    transition_stmts: TransitionStmts,
+    integrity_stmts: IntegrityStmts,
 }
 
 impl AirIR {
@@ -102,7 +102,7 @@ impl AirIR {
         let num_trace_segments = symbol_table.num_trace_segments();
         // then process the constraints & validate them against the symbol table.
         let mut boundary_stmts = BoundaryStmts::new(num_trace_segments);
-        let mut transition_stmts = TransitionStmts::new(num_trace_segments);
+        let mut integrity_stmts = IntegrityStmts::new(num_trace_segments);
         for section in source {
             match section {
                 ast::SourceSection::BoundaryConstraints(stmts) => {
@@ -111,11 +111,11 @@ impl AirIR {
                     }
                     validator.exists("boundary_constraints");
                 }
-                ast::SourceSection::TransitionConstraints(stmts) => {
+                ast::SourceSection::IntegrityConstraints(stmts) => {
                     for stmt in stmts {
-                        transition_stmts.insert(&mut symbol_table, stmt)?
+                        integrity_stmts.insert(&mut symbol_table, stmt)?
                     }
-                    validator.exists("transition_constraints");
+                    validator.exists("integrity_constraints");
                 }
                 _ => {}
             }
@@ -132,7 +132,7 @@ impl AirIR {
             public_inputs,
             periodic_columns,
             boundary_stmts,
-            transition_stmts,
+            integrity_stmts,
         })
     }
 
@@ -180,20 +180,20 @@ impl AirIR {
         self.boundary_stmts.last_boundary_constraints(1)
     }
 
-    // --- PUBLIC ACCESSORS FOR TRANSITION CONSTRAINTS --------------------------------------------
+    // --- PUBLIC ACCESSORS FOR INTEGRITY CONSTRAINTS --------------------------------------------
 
     pub fn constraint_degrees(
         &self,
         trace_segment: TraceSegment,
-    ) -> Vec<TransitionConstraintDegree> {
-        self.transition_stmts.constraint_degrees(trace_segment)
+    ) -> Vec<IntegrityConstraintDegree> {
+        self.integrity_stmts.constraint_degrees(trace_segment)
     }
 
-    pub fn transition_constraints(&self, trace_segment: TraceSegment) -> &[NodeIndex] {
-        self.transition_stmts.constraints(trace_segment)
+    pub fn integrity_constraints(&self, trace_segment: TraceSegment) -> &[NodeIndex] {
+        self.integrity_stmts.constraints(trace_segment)
     }
 
-    pub fn transition_graph(&self) -> &AlgebraicGraph {
-        self.transition_stmts.graph()
+    pub fn constraint_graph(&self) -> &AlgebraicGraph {
+        self.integrity_stmts.graph()
     }
 }

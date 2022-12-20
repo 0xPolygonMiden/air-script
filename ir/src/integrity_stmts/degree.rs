@@ -1,16 +1,16 @@
-//! The [TransitionConstraintDegree] struct and documentation contained in this file were duplicated
-//! from the Winterfell STARK prover library (https://github.com/novifinancial/winterfell), which is
-//! licensed under the MIT license. The implementation in this file is a subset of the Winterfell
-//! code.
+//! The [IntegrityConstraintDegree] struct and documentation contained in this file is a duplicate
+//! of the [TransitionConstraintDegree] struct defined in the Winterfell STARK prover library
+//! (https://github.com/novifinancial/winterfell), which is licensed under the MIT license. The
+//! implementation in this file is a subset of the Winterfell code.
 //!
 //! The original code is available in the Winterfell library in the `air` crate:
 //! https://github.com/novifinancial/winterfell/blob/main/air/src/air/transition/degree.rs
 
 use super::MIN_CYCLE_LENGTH;
 
-// TRANSITION CONSTRAINT DEGREE
+// INTEGRITY CONSTRAINT DEGREE
 // ================================================================================================
-/// Degree descriptor of a transition constraint.
+/// Degree descriptor of an integrity constraint.
 ///
 /// Describes constraint degree as a combination of multiplications of periodic and trace
 /// columns. For example, degree of a constraint which requires multiplication of two trace
@@ -18,12 +18,12 @@ use super::MIN_CYCLE_LENGTH;
 /// multiplication of 3 trace columns and a periodic column with a period of 32 steps can be
 /// described as: `base: 3, cycles: [32]`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TransitionConstraintDegree {
+pub struct IntegrityConstraintDegree {
     base: usize,
     cycles: Vec<usize>,
 }
 
-impl TransitionConstraintDegree {
+impl IntegrityConstraintDegree {
     pub fn base(&self) -> usize {
         self.base
     }
@@ -32,7 +32,7 @@ impl TransitionConstraintDegree {
         &self.cycles
     }
 
-    /// Creates a new transition constraint degree descriptor for constraints which involve
+    /// Creates a new integrity constraint degree descriptor for constraints which involve
     /// multiplications of trace columns only.
     ///
     /// For example, if a constraint involves multiplication of two trace columns, `degree`
@@ -41,15 +41,15 @@ impl TransitionConstraintDegree {
     pub(super) fn new(degree: usize) -> Self {
         assert!(
             degree > 0,
-            "transition constraint degree must be at least one, but was zero"
+            "integrity constraint degree must be at least one, but was zero"
         );
-        TransitionConstraintDegree {
+        IntegrityConstraintDegree {
             base: degree,
             cycles: vec![],
         }
     }
 
-    /// Creates a new transition degree descriptor for constraints which involve multiplication
+    /// Creates a new integrity degree descriptor for constraints which involve multiplication
     /// of trace columns and periodic columns.
     ///
     /// For example, if a constraint involves multiplication of two trace columns and one
@@ -62,7 +62,7 @@ impl TransitionConstraintDegree {
     pub(super) fn with_cycles(base_degree: usize, cycles: Vec<usize>) -> Self {
         assert!(
             base_degree > 0,
-            "transition constraint degree must be at least one, but was zero"
+            "integrity constraint degree must be at least one, but was zero"
         );
         for (i, &cycle) in cycles.iter().enumerate() {
             assert!(
@@ -79,7 +79,7 @@ impl TransitionConstraintDegree {
                 i
             );
         }
-        TransitionConstraintDegree {
+        IntegrityConstraintDegree {
             base: base_degree,
             cycles,
         }

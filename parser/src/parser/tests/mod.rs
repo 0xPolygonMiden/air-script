@@ -13,11 +13,11 @@ mod boundary_constraints;
 mod comments;
 mod constants;
 mod identifiers;
+mod integrity_constraints;
 mod periodic_columns;
 mod pub_inputs;
 mod sections;
 mod trace_columns;
-mod transition_constraints;
 mod variables;
 
 // FULL AIR FILE
@@ -40,15 +40,15 @@ fn full_air_file() {
             ],
             aux_cols: vec![],
         }),
-        // transition_constraints:
+        // integrity_constraints:
         //     enf clk' = clk + 1
-        SourceSection::TransitionConstraints(vec![TransitionStmt::Constraint(
-            TransitionConstraint::new(
+        SourceSection::IntegrityConstraints(vec![IntegrityStmt::Constraint(
+            IntegrityConstraint::new(
                 // clk' = clk + 1
-                TransitionExpr::Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
-                TransitionExpr::Add(
-                    Box::new(TransitionExpr::Elem(Identifier("clk".to_string()))),
-                    Box::new(TransitionExpr::Const(1)),
+                IntegrityExpr::Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
+                IntegrityExpr::Add(
+                    Box::new(IntegrityExpr::Elem(Identifier("clk".to_string()))),
+                    Box::new(IntegrityExpr::Const(1)),
                 ),
             ),
         )]),
