@@ -1,6 +1,6 @@
 use super::{AirIR, Impl};
 use ir::{
-    transition_constraints::{AlgebraicGraph, ConstantValue, Operation},
+    transition_stmts::{AlgebraicGraph, ConstantValue, Operation},
     NodeIndex,
 };
 
@@ -64,9 +64,6 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
         ));
     }
 }
-
-// RUST STRING GENERATION
-// ================================================================================================
 
 /// Code generation trait for generating Rust code strings from [AlgebraicGraph] types.
 trait Codegen {

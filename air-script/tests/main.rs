@@ -75,3 +75,13 @@ fn constants() {
     let expected = expect_file!["constants/constants.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn variables() {
+    let generated_air = Test::new("tests/variables/variables.air".to_string())
+        .transpile()
+        .unwrap();
+
+    let expected = expect_file!["variables/variables.rs"];
+    expected.assert_eq(&generated_air);
+}

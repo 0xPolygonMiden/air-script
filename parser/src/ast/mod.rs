@@ -19,7 +19,7 @@ pub use transition_constraints::*;
 // ================================================================================================
 
 /// [Source] is the root node of the AST representing the AIR constraints file.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Source(pub Vec<SourceSection>);
 
 /// Source is divided into SourceSections.
@@ -36,7 +36,7 @@ pub struct Source(pub Vec<SourceSection>);
 ///   representing the first and last rows of the column.
 /// - TransitionConstraints: Transition Constraints to be enforced on the trace columns defined
 ///   in the TraceCols section.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum SourceSection {
     AirDef(Identifier),
     Constant(Constant),

@@ -1,9 +1,10 @@
 use super::{
     super::BTreeMap, degree::TransitionConstraintDegree, SemanticError, SymbolTable, TraceSegment,
 };
-use crate::symbol_table::IdentifierType;
+use crate::{symbol_table::IdentifierType, VariableRoots};
 use parser::ast::{
-    constants::ConstantType, Identifier, MatrixAccess, TransitionExpr, VectorAccess,
+    constants::ConstantType, Identifier, MatrixAccess, TransitionExpr, TransitionVariableType,
+    VectorAccess,
 };
 
 // ALGEBRAIC GRAPH
@@ -82,13 +83,14 @@ impl AlgebraicGraph {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    /// Add the expression to the graph and return the result index and a constraint type indicating
-    /// whether it is applied to the main execution trace or an auxiliary trace. Expressions are
-    /// added recursively to reuse existing matching nodes.
+    /// Adds the expression to the graph and returns the result index and a constraint type
+    /// indicating whether it is applied to the main execution trace or an auxiliary trace.
+    /// Expressions are added recursively to reuse existing matching nodes.
     pub(super) fn insert_expr(
         &mut self,
         symbol_table: &SymbolTable,
         expr: TransitionExpr,
+        variable_roots: &mut VariableRoots,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         match expr {
             TransitionExpr::Const(value) => {
@@ -98,13 +100,13 @@ impl AlgebraicGraph {
                 Ok((trace_segment, node_index))
             }
             TransitionExpr::Elem(Identifier(ident)) => {
-                self.insert_symbol_access(symbol_table, &ident)
+                self.insert_symbol_access(symbol_table, &ident, variable_roots)
             }
             TransitionExpr::VectorAccess(vector_access) => {
-                self.insert_vector_access(symbol_table, &vector_access)
+                self.insert_vector_access(symbol_table, &vector_access, variable_roots)
             }
             TransitionExpr::MatrixAccess(matrix_access) => {
-                self.insert_matrix_access(symbol_table, &matrix_access)
+                self.insert_matrix_access(symbol_table, &matrix_access, variable_roots)
             }
             TransitionExpr::Next(trace_access) => {
                 self.insert_next(symbol_table, trace_access.name())
@@ -120,8 +122,8 @@ impl AlgebraicGraph {
             }
             TransitionExpr::Add(lhs, rhs) => {
                 // add both subexpressions.
-                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs)?;
-                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs)?;
+                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
+                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs, variable_roots)?;
                 // add the expression.
                 let trace_segment = lhs_segment.max(rhs_segment);
                 let node_index = self.insert_op(Operation::Add(lhs, rhs));
@@ -129,8 +131,8 @@ impl AlgebraicGraph {
             }
             TransitionExpr::Sub(lhs, rhs) => {
                 // add both subexpressions.
-                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs)?;
-                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs)?;
+                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
+                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs, variable_roots)?;
                 // add the expression.
                 let trace_segment = lhs_segment.max(rhs_segment);
                 let node_index = self.insert_op(Operation::Sub(lhs, rhs));
@@ -138,8 +140,8 @@ impl AlgebraicGraph {
             }
             TransitionExpr::Mul(lhs, rhs) => {
                 // add both subexpressions.
-                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs)?;
-                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs)?;
+                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
+                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs, variable_roots)?;
                 // add the expression.
                 let trace_segment = lhs_segment.max(rhs_segment);
                 let node_index = self.insert_op(Operation::Mul(lhs, rhs));
@@ -147,7 +149,7 @@ impl AlgebraicGraph {
             }
             TransitionExpr::Exp(lhs, rhs) => {
                 // add base subexpression.
-                let (trace_segment, lhs) = self.insert_expr(symbol_table, *lhs)?;
+                let (trace_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
                 // add exponent subexpression.
                 let node_index = self.insert_op(Operation::Exp(lhs, rhs as usize));
                 Ok((trace_segment, node_index))
@@ -155,6 +157,10 @@ impl AlgebraicGraph {
         }
     }
 
+    /// Adds a next row operator to the graph and returns the node index and the trace segment.
+    ///
+    /// # Errors
+    /// Returns an error if the operator is not applied to a trace column in the symbol table.
     fn insert_next(
         &mut self,
         symbol_table: &SymbolTable,
@@ -176,10 +182,17 @@ impl AlgebraicGraph {
         }
     }
 
+    /// Adds a trace column, periodic column, named constant or a variable to the graph and returns
+    /// the node index and trace segment.
+    ///
+    /// # Errors
+    /// Returns an error if the identifier is not present in the symbol table or is not a supported
+    /// type.
     fn insert_symbol_access(
         &mut self,
         symbol_table: &SymbolTable,
         ident: &str,
+        variable_roots: &mut VariableRoots,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         let elem_type = symbol_table.get_type(ident)?;
         match elem_type {
@@ -202,6 +215,28 @@ impl AlgebraicGraph {
                 )));
                 Ok((trace_segment, node_index))
             }
+            IdentifierType::TransitionVariable(transition_variable) => {
+                if let TransitionVariableType::Scalar(expr) = transition_variable.value() {
+                    if let Some((trace_segment, node_index)) =
+                        variable_roots.get(&VariableValue::Scalar(ident.to_string()))
+                    {
+                        Ok((*trace_segment, *node_index))
+                    } else {
+                        let (trace_segment, node_index) =
+                            self.insert_expr(symbol_table, expr.clone(), variable_roots)?;
+                        variable_roots.insert(
+                            VariableValue::Scalar(ident.to_string()),
+                            (trace_segment, node_index),
+                        );
+                        Ok((trace_segment, node_index))
+                    }
+                } else {
+                    Err(SemanticError::InvalidUsage(format!(
+                        "Identifier {} was declared as a {} which is not a supported type.",
+                        ident, elem_type
+                    )))
+                }
+            }
             _ => Err(SemanticError::InvalidUsage(format!(
                 "Identifier {} was declared as a {} which is not a supported type.",
                 ident, elem_type
@@ -210,53 +245,102 @@ impl AlgebraicGraph {
     }
 
     /// Validates and adds a vector access to the graph.
+    ///
+    /// # Errors
     /// Returns an error if the identifier's value is not of a supported type.
     fn insert_vector_access(
         &mut self,
         symbol_table: &SymbolTable,
         vector_access: &VectorAccess,
+        variable_roots: &mut VariableRoots,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         let symbol_type = symbol_table.access_vector_element(vector_access)?;
-        if !matches!(
-            symbol_type,
-            IdentifierType::Constant(ConstantType::Vector(_))
-        ) {
-            return Err(SemanticError::invalid_vector_access(
+        match symbol_type {
+            IdentifierType::Constant(ConstantType::Vector(_)) => {
+                let trace_segment = 0;
+                let node_index = self.insert_op(Operation::Constant(ConstantValue::Vector(
+                    vector_access.clone(),
+                )));
+                Ok((trace_segment, node_index))
+            }
+            IdentifierType::TransitionVariable(transition_variable) => {
+                if let TransitionVariableType::Vector(vector) = transition_variable.value() {
+                    let expr = &vector[vector_access.idx()];
+                    if let Some((trace_segment, node_index)) =
+                        variable_roots.get(&VariableValue::Vector(vector_access.clone()))
+                    {
+                        Ok((*trace_segment, *node_index))
+                    } else {
+                        let (trace_segment, node_index) =
+                            self.insert_expr(symbol_table, expr.clone(), variable_roots)?;
+                        variable_roots.insert(
+                            VariableValue::Vector(vector_access.clone()),
+                            (trace_segment, node_index),
+                        );
+                        Ok((trace_segment, node_index))
+                    }
+                } else {
+                    Err(SemanticError::InvalidUsage(format!(
+                        "Identifier {} was declared as a {} which is not a supported type.",
+                        vector_access.name(),
+                        symbol_type
+                    )))
+                }
+            }
+            _ => Err(SemanticError::invalid_vector_access(
                 vector_access,
                 symbol_type,
-            ));
+            )),
         }
-
-        let trace_segment = 0;
-        let node_index = self.insert_op(Operation::Constant(ConstantValue::Vector(
-            vector_access.clone(),
-        )));
-        Ok((trace_segment, node_index))
     }
 
     /// Validates and adds a matrix access to the graph.
+    ///
+    /// # Errors
     /// Returns an error if the identifier's value is not of a supported type.
     fn insert_matrix_access(
         &mut self,
         symbol_table: &SymbolTable,
         matrix_access: &MatrixAccess,
+        variable_roots: &mut VariableRoots,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         let symbol_type = symbol_table.access_matrix_element(matrix_access)?;
-        if !matches!(
-            symbol_type,
-            IdentifierType::Constant(ConstantType::Matrix(_))
-        ) {
-            return Err(SemanticError::invalid_matrix_access(
+        match symbol_type {
+            IdentifierType::Constant(ConstantType::Matrix(_)) => {
+                let trace_segment = 0;
+                let node_index = self.insert_op(Operation::Constant(ConstantValue::Matrix(
+                    matrix_access.clone(),
+                )));
+                Ok((trace_segment, node_index))
+            }
+            IdentifierType::TransitionVariable(transition_variable) => {
+                if let TransitionVariableType::Matrix(matrix) = transition_variable.value() {
+                    let expr = &matrix[matrix_access.row_idx()][matrix_access.col_idx()];
+                    if let Some((trace_segment, node_index)) =
+                        variable_roots.get(&VariableValue::Matrix(matrix_access.clone()))
+                    {
+                        Ok((*trace_segment, *node_index))
+                    } else {
+                        let (trace_segment, node_index) =
+                            self.insert_expr(symbol_table, expr.clone(), variable_roots)?;
+                        variable_roots.insert(
+                            VariableValue::Matrix(matrix_access.clone()),
+                            (trace_segment, node_index),
+                        );
+                        Ok((trace_segment, node_index))
+                    }
+                } else {
+                    Err(SemanticError::invalid_matrix_access(
+                        matrix_access,
+                        symbol_type,
+                    ))
+                }
+            }
+            _ => Err(SemanticError::invalid_matrix_access(
                 matrix_access,
                 symbol_type,
-            ));
+            )),
         }
-
-        let trace_segment = 0;
-        let node_index = self.insert_op(Operation::Constant(ConstantValue::Matrix(
-            matrix_access.clone(),
-        )));
-        Ok((trace_segment, node_index))
     }
 
     /// Insert the operation and return its node index. If an identical node already exists, return
@@ -357,6 +441,13 @@ impl TraceAccess {
 #[derive(Debug, Eq, PartialEq)]
 pub enum ConstantValue {
     Inline(u64),
+    Scalar(String),
+    Vector(VectorAccess),
+    Matrix(MatrixAccess),
+}
+
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum VariableValue {
     Scalar(String),
     Vector(VectorAccess),
     Matrix(MatrixAccess),
