@@ -68,7 +68,7 @@ impl AirIR {
                 ast::SourceSection::Constant(constant) => {
                     symbol_table.insert_constant(constant)?;
                 }
-                ast::SourceSection::TraceCols(columns) => {
+                ast::SourceSection::Trace(columns) => {
                     // process & validate the main trace columns
                     symbol_table.insert_trace_columns(0, &columns.main_cols)?;
                     // process & validate the auxiliary trace columns

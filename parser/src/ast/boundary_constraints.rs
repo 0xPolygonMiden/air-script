@@ -1,4 +1,4 @@
-use super::{Identifier, MatrixAccess, VectorAccess};
+use super::{Identifier, MatrixAccess, TraceAccess, VectorAccess};
 use std::fmt::Display;
 
 // BOUNDARY CONSTRAINTS
@@ -13,13 +13,13 @@ pub enum BoundaryStmt {
 /// Stores the expression corresponding to the boundary constraint.
 #[derive(Debug, PartialEq)]
 pub struct BoundaryConstraint {
-    column: Identifier,
+    column: TraceAccess,
     boundary: Boundary,
     value: BoundaryExpr,
 }
 
 impl BoundaryConstraint {
-    pub fn new(column: Identifier, boundary: Boundary, value: BoundaryExpr) -> Self {
+    pub fn new(column: TraceAccess, boundary: Boundary, value: BoundaryExpr) -> Self {
         Self {
             column,
             boundary,
@@ -27,8 +27,8 @@ impl BoundaryConstraint {
         }
     }
 
-    pub fn column(&self) -> &str {
-        &self.column.0
+    pub fn column(&self) -> &TraceAccess {
+        &self.column
     }
 
     pub fn boundary(&self) -> Boundary {

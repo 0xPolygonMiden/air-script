@@ -106,7 +106,9 @@ impl AlgebraicGraph {
             TransitionExpr::MatrixAccess(matrix_access) => {
                 self.insert_matrix_access(symbol_table, &matrix_access)
             }
-            TransitionExpr::Next(Identifier(ident)) => self.insert_next(symbol_table, &ident),
+            TransitionExpr::Next(trace_access) => {
+                self.insert_next(symbol_table, trace_access.name())
+            }
             TransitionExpr::Rand(index) => {
                 // constraint target for random values defaults to the second trace segment.
                 // TODO: make this more general, so random values from further trace segments can be

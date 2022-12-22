@@ -2,6 +2,7 @@ use super::{
     build_parse_test, Identifier, Source, SourceSection::*, TransitionConstraint,
     TransitionExpr::*, TransitionStmt::*,
 };
+use crate::ast::TraceAccess;
 
 // EXPRESSIONS
 // ================================================================================================
@@ -15,7 +16,7 @@ fn single_addition() {
     let expected = Source(vec![TransitionConstraints(vec![Constraint(
         TransitionConstraint::new(
             Add(
-                Box::new(Next(Identifier("clk".to_string()))),
+                Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
             Const(0),
@@ -34,7 +35,7 @@ fn multi_addition() {
         TransitionConstraint::new(
             Add(
                 Box::new(Add(
-                    Box::new(Next(Identifier("clk".to_string()))),
+                    Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                     Box::new(Elem(Identifier("clk".to_string()))),
                 )),
                 Box::new(Const(2)),
@@ -54,7 +55,7 @@ fn single_subtraction() {
     let expected = Source(vec![TransitionConstraints(vec![Constraint(
         TransitionConstraint::new(
             Sub(
-                Box::new(Next(Identifier("clk".to_string()))),
+                Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
             Const(0),
@@ -73,7 +74,7 @@ fn multi_subtraction() {
         TransitionConstraint::new(
             Sub(
                 Box::new(Sub(
-                    Box::new(Next(Identifier("clk".to_string()))),
+                    Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                     Box::new(Elem(Identifier("clk".to_string()))),
                 )),
                 Box::new(Const(1)),
@@ -93,7 +94,7 @@ fn single_multiplication() {
     let expected = Source(vec![TransitionConstraints(vec![Constraint(
         TransitionConstraint::new(
             Mul(
-                Box::new(Next(Identifier("clk".to_string()))),
+                Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
             Const(0),
@@ -112,7 +113,7 @@ fn multi_multiplication() {
         TransitionConstraint::new(
             Mul(
                 Box::new(Mul(
-                    Box::new(Next(Identifier("clk".to_string()))),
+                    Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                     Box::new(Elem(Identifier("clk".to_string()))),
                 )),
                 Box::new(Const(2)),
@@ -145,7 +146,7 @@ fn ops_with_parens() {
         TransitionConstraint::new(
             Mul(
                 Box::new(Add(
-                    Box::new(Next(Identifier("clk".to_string()))),
+                    Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                     Box::new(Elem(Identifier("clk".to_string()))),
                 )),
                 Box::new(Const(2)),
@@ -164,7 +165,10 @@ fn single_exponentiation() {
         enf clk'^2 = 1";
     let expected = Source(vec![TransitionConstraints(vec![Constraint(
         TransitionConstraint::new(
-            Exp(Box::new(Next(Identifier("clk".to_string()))), 2),
+            Exp(
+                Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
+                2,
+            ),
             Const(1),
         ),
     )])]);
@@ -209,7 +213,7 @@ fn multi_arithmetic_ops_same_precedence() {
             Add(
                 Box::new(Sub(
                     Box::new(Sub(
-                        Box::new(Next(Identifier("clk".to_string()))),
+                        Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                         Box::new(Elem(Identifier("clk".to_string()))),
                     )),
                     Box::new(Const(2)),
@@ -237,7 +241,10 @@ fn multi_arithmetic_ops_different_precedence() {
         TransitionConstraint::new(
             Sub(
                 Box::new(Sub(
-                    Box::new(Exp(Box::new(Next(Identifier("clk".to_string()))), 2)),
+                    Box::new(Exp(
+                        Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
+                        2,
+                    )),
                     Box::new(Mul(
                         Box::new(Elem(Identifier("clk".to_string()))),
                         Box::new(Const(2)),
@@ -266,7 +273,7 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
     let expected = Source(vec![TransitionConstraints(vec![Constraint(
         TransitionConstraint::new(
             Sub(
-                Box::new(Next(Identifier("clk".to_string()))),
+                Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
                 Box::new(Mul(
                     Box::new(Exp(Box::new(Elem(Identifier("clk".to_string()))), 2)),
                     Box::new(Sub(Box::new(Const(2)), Box::new(Const(1)))),
