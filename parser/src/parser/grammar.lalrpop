@@ -321,7 +321,7 @@ extern {
         "def" => Token::Def,
         "let" => Token::Let,
         "const" => Token::Const,
-        "trace_columns" => Token::TraceColumnns,
+        "trace_columns" => Token::TraceColumns,
         "main" => Token::Main,
         "aux" => Token::Aux,
         "public_inputs" => Token::PublicInputs,
