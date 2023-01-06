@@ -1,39 +1,36 @@
-use super::{BTreeMap, SemanticError};
+use super::TraceSegment;
 
-/// A representation of the trace columns declared for the AIR.
-#[derive(Debug, Default)]
+/// Describes columns in the execution trace by the trace segment to which it belongs, it's size
+/// and it's offset.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TraceColumns {
-    /// A map of a set of trace columns using the declared identifier as the key and the column
-    /// index as the value.
-    columns: BTreeMap<String, usize>,
+    trace_segment: TraceSegment,
+    offset: usize,
+    size: usize,
 }
 
 impl TraceColumns {
-    /// Add a new column by its name and index
-    pub(super) fn insert(&mut self, name: &str, index: usize) -> Result<(), SemanticError> {
-        let result = self.columns.insert(name.to_string(), index);
-        if result.is_some() {
-            Err(SemanticError::DuplicateTraceColumn(format!(
-                "{} was defined more than once",
-                name
-            )))
-        } else {
-            Ok(())
+    /// Creates a [TraceColumns] in the specified trace segment of the specified size and offset.
+    pub fn new(trace_segment: TraceSegment, offset: usize, size: usize) -> Self {
+        Self {
+            trace_segment,
+            size,
+            offset,
         }
     }
 
-    /// Returns the index in the trace of the column with the specified name.
-    ///
-    /// # Errors
-    /// Returns an error if the column name identifier is not recognized as a valid trace column.
-    pub(crate) fn get_column_index(&self, name: &str) -> Result<usize, SemanticError> {
-        if let Some(&index) = self.columns.get(name) {
-            Ok(index)
-        } else {
-            Err(SemanticError::InvalidIdentifier(format!(
-                "Trace column {} was not declared",
-                name,
-            )))
-        }
+    /// Returns the trace segment of this [TraceColumns].
+    pub fn trace_segment(&self) -> TraceSegment {
+        self.trace_segment
+    }
+
+    /// Returns the offset of this [TraceColumns].
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    /// Returns the size of this [TraceColumns].
+    pub fn size(&self) -> usize {
+        self.size
     }
 }

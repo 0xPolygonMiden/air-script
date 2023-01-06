@@ -1,27 +1,40 @@
-use super::{BTreeMap, PeriodicColumns, PublicInputs, SemanticError, MIN_CYCLE_LENGTH};
-use parser::ast::{Identifier, PeriodicColumn, PublicInput};
+use super::{
+    trace_columns::TraceColumns, BTreeMap, Constants, PeriodicColumns, PublicInputs, SemanticError,
+    TraceSegment, MIN_CYCLE_LENGTH,
+};
+use parser::ast::{
+    constants::{Constant, ConstantType},
+    Identifier, MatrixAccess, PeriodicColumn, PublicInput, TraceCols, TransitionVariable,
+    TransitionVariableType, VectorAccess,
+};
 use std::fmt::Display;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(super) enum IdentifierType {
-    /// an identifier for a main trace column, containing its index in the main trace
-    MainTraceColumn(usize),
-    /// an identifier for a auxiliary trace column, containing its index in the auxiliary trace
-    AuxTraceColumn(usize),
+    /// an identifier for a constant, containing it's type and value
+    Constant(ConstantType),
+    /// an identifier for a trace column, containing trace column information with its trace
+    /// segment, it's size and it's offset.
+    TraceColumns(TraceColumns),
     /// an identifier for a public input, containing the size of the public input array
     PublicInput(usize),
     /// an identifier for a periodic column, containing its index out of all periodic columns and
     /// its cycle length in that order.
     PeriodicColumn(usize, usize),
+    /// an identifier for a transition variable, containing its name and value
+    TransitionVariable(TransitionVariable),
 }
 
 impl Display for IdentifierType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Constant(_) => write!(f, "Constant"),
             Self::PublicInput(_) => write!(f, "PublicInput"),
             Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
-            Self::MainTraceColumn(_) => write!(f, "MainTraceColumn"),
-            Self::AuxTraceColumn(_) => write!(f, "AuxTraceColumn"),
+            Self::TraceColumns(columns) => {
+                write!(f, "TraceColumns in segment {}", columns.trace_segment())
+            }
+            Self::TransitionVariable(_) => write!(f, "TransitionVariable"),
         }
     }
 }
@@ -30,8 +43,14 @@ impl Display for IdentifierType {
 /// identifiers.
 #[derive(Default, Debug)]
 pub(super) struct SymbolTable {
+    /// The number of trace segments in the AIR.
+    num_trace_segments: usize,
+
     /// A map of all declared identifiers from their name (the key) to their type.
     identifiers: BTreeMap<String, IdentifierType>,
+
+    /// A vector of constants declared in the AirScript module.
+    constants: Constants,
 
     /// A map of the Air's periodic columns using the index of the column within the declared
     /// periodic columns as the key and the vector of periodic values as the value
@@ -43,6 +62,12 @@ pub(super) struct SymbolTable {
 }
 
 impl SymbolTable {
+    /// Sets the number of trace segments to the maximum of `num_trace_segments` and the provided
+    /// trace segment identifier, which is indexed from zero.
+    fn set_num_trace_segments(&mut self, trace_segment: TraceSegment) {
+        self.num_trace_segments = self.num_trace_segments.max((trace_segment + 1).into())
+    }
+
     /// Adds a declared identifier to the symbol table using the identifier as the key and the
     /// type the identifier represents as the value.
     ///
@@ -53,7 +78,9 @@ impl SymbolTable {
         ident_name: &str,
         ident_type: IdentifierType,
     ) -> Result<(), SemanticError> {
-        let result = self.identifiers.insert(ident_name.to_owned(), ident_type);
+        let result = self
+            .identifiers
+            .insert(ident_name.to_owned(), ident_type.clone());
         match result {
             Some(prev_type) => Err(SemanticError::DuplicateIdentifier(format!(
                 "Cannot declare {} as a {}, since it was already defined as a {}",
@@ -63,28 +90,35 @@ impl SymbolTable {
         }
     }
 
-    // --- MUTATORS -------------------------------------------------------------------------------
+    // --- PUBLIC MUTATORS ------------------------------------------------------------------------
 
-    /// Add all main trace columns by their identifiers and indices in the main execution trace.
-    pub(super) fn insert_main_trace_columns(
-        &mut self,
-        columns: &[Identifier],
-    ) -> Result<(), SemanticError> {
-        for (idx, Identifier(name)) in columns.iter().enumerate() {
-            self.insert_symbol(name, IdentifierType::MainTraceColumn(idx))?;
-        }
+    /// Add all constants by their identifiers and values.
+    pub(super) fn insert_constant(&mut self, constant: &Constant) -> Result<(), SemanticError> {
+        let Identifier(name) = &constant.name();
+        validate_constant(constant)?;
+        self.insert_symbol(name, IdentifierType::Constant(constant.value().clone()))?;
+        self.constants.push(constant.clone());
 
         Ok(())
     }
 
-    /// Adds all auxiliary trace columns by their identifier names and indices in the auxiliary
-    /// execution trace.
-    pub(super) fn insert_aux_trace_columns(
+    /// Add all trace columns in the specified trace segment by their identifiers, sizes and indices.
+    pub(super) fn insert_trace_columns(
         &mut self,
-        columns: &[Identifier],
+        trace_segment: TraceSegment,
+        trace: &[TraceCols],
     ) -> Result<(), SemanticError> {
-        for (idx, Identifier(name)) in columns.iter().enumerate() {
-            self.insert_symbol(name, IdentifierType::AuxTraceColumn(idx))?;
+        self.set_num_trace_segments(trace_segment);
+
+        let mut col_idx = 0;
+        for trace_cols in trace {
+            let trace_columns =
+                TraceColumns::new(trace_segment, col_idx, trace_cols.size() as usize);
+            self.insert_symbol(
+                trace_cols.name(),
+                IdentifierType::TraceColumns(trace_columns),
+            )?;
+            col_idx += trace_cols.size() as usize;
         }
 
         Ok(())
@@ -124,19 +158,38 @@ impl SymbolTable {
         Ok(())
     }
 
-    pub(super) fn into_declarations(self) -> (PublicInputs, PeriodicColumns) {
-        (self.public_inputs, self.periodic_columns)
+    /// Inserts a transition variable into the symbol table.
+    pub(super) fn insert_transition_variable(
+        &mut self,
+        variable: &TransitionVariable,
+    ) -> Result<(), SemanticError> {
+        self.insert_symbol(
+            variable.name(),
+            IdentifierType::TransitionVariable(variable.clone()),
+        )?;
+        Ok(())
+    }
+
+    /// Consumes this symbol table and returns the information required for declaring constants,
+    /// public inputs and periodic columns for the AIR.
+    pub(super) fn into_declarations(self) -> (Constants, PublicInputs, PeriodicColumns) {
+        (self.constants, self.public_inputs, self.periodic_columns)
     }
 
     // --- ACCESSORS ------------------------------------------------------------------------------
+
+    /// Gets the number of trace segments that were specified for this AIR.
+    pub(super) fn num_trace_segments(&self) -> usize {
+        self.num_trace_segments
+    }
 
     /// Returns the type associated with the specified identifier name.
     ///
     /// # Errors
     /// Returns an error if the identifier was not in the symbol table.
-    pub(super) fn get_type(&self, name: &str) -> Result<IdentifierType, SemanticError> {
+    pub(super) fn get_type(&self, name: &str) -> Result<&IdentifierType, SemanticError> {
         if let Some(ident_type) = self.identifiers.get(name) {
-            Ok(*ident_type)
+            Ok(ident_type)
         } else {
             Err(SemanticError::InvalidIdentifier(format!(
                 "Identifier {} was not declared",
@@ -145,38 +198,105 @@ impl SymbolTable {
         }
     }
 
-    /// Checks that the specified name and index are a valid reference to a declared public input or
-    /// returns an error.
+    /// Checks that the specified name and index are a valid reference to a declared public input
+    /// or a vector constant and returns the symbol type. If it's not a valid reference, an error
+    /// is returned.
     ///
     /// # Errors
-    /// - Returns an error if the name was not declared as a public input.
+    /// - Returns an error if the identifier is not in the symbol table.
+    /// - Returns an error if the identifier is not associated with a vector access type.
     /// - Returns an error if the index is not in the declared public input array.
-    pub(super) fn validate_public_input(
+    /// - Returns an error if the index is greater than the vector's length.
+    pub(super) fn access_vector_element(
         &self,
-        name: &str,
-        index: usize,
-    ) -> Result<(), SemanticError> {
-        let ident_type = self.get_type(name)?;
-        if let IdentifierType::PublicInput(size) = ident_type {
-            if index < size {
-                Ok(())
-            } else {
-                Err(SemanticError::IndexOutOfRange(format!(
-                    "Out-of-range index {} in public input {} of length {}",
-                    index, name, size
-                )))
+        vector_access: &VectorAccess,
+    ) -> Result<&IdentifierType, SemanticError> {
+        let symbol_type = self.get_type(vector_access.name())?;
+        match symbol_type {
+            IdentifierType::PublicInput(size) => {
+                if vector_access.idx() < *size {
+                    Ok(symbol_type)
+                } else {
+                    Err(SemanticError::public_inputs_out_of_bounds(
+                        vector_access,
+                        *size,
+                    ))
+                }
             }
-        } else {
-            Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as {}, not as a public input",
-                name, ident_type
-            )))
+            IdentifierType::Constant(ConstantType::Vector(vector)) => {
+                validate_vector_access(vector_access, vector.len())?;
+                Ok(symbol_type)
+            }
+            IdentifierType::TransitionVariable(transition_variable) => {
+                if let TransitionVariableType::Vector(vector) = transition_variable.value() {
+                    validate_vector_access(vector_access, vector.len())?;
+                    Ok(symbol_type)
+                } else {
+                    Err(SemanticError::invalid_vector_access(
+                        vector_access,
+                        symbol_type,
+                    ))
+                }
+            }
+            IdentifierType::TraceColumns(trace_columns) => {
+                if vector_access.idx() < trace_columns.size() {
+                    Ok(symbol_type)
+                } else {
+                    Err(SemanticError::vector_access_out_of_bounds(
+                        vector_access,
+                        trace_columns.size(),
+                    ))
+                }
+            }
+            _ => Err(SemanticError::invalid_vector_access(
+                vector_access,
+                symbol_type,
+            )),
+        }
+    }
+
+    /// Checks that the specified name and index are a valid reference to a matrix constant and
+    /// returns the symbol type. If it's not a valid reference, an error is returned.
+    ///
+    /// # Errors
+    /// - Returns an error if the identifier is not in the symbol table.
+    /// - Returns an error if the identifier is not associated with a matrix access type.
+    /// - Returns an error if the row index is greater than the matrix row length.
+    /// - Returns an error if the column index is greater than the matrix column length.
+    pub(super) fn access_matrix_element(
+        &self,
+        matrix_access: &MatrixAccess,
+    ) -> Result<&IdentifierType, SemanticError> {
+        let symbol_type = self.get_type(matrix_access.name())?;
+        match symbol_type {
+            IdentifierType::Constant(ConstantType::Matrix(matrix)) => {
+                validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
+                Ok(symbol_type)
+            }
+            IdentifierType::TransitionVariable(transition_variable) => {
+                if let TransitionVariableType::Matrix(matrix) = transition_variable.value() {
+                    validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
+                    Ok(symbol_type)
+                } else {
+                    Err(SemanticError::invalid_matrix_access(
+                        matrix_access,
+                        symbol_type,
+                    ))
+                }
+            }
+            _ => Err(SemanticError::invalid_matrix_access(
+                matrix_access,
+                symbol_type,
+            )),
         }
     }
 }
 
+// HELPERS
+// ================================================================================================
+
 /// Validates the cycle length of the specified periodic column.
-pub(super) fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
+fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
     let name = column.name();
     let cycle = column.values().len();
 
@@ -194,5 +314,61 @@ pub(super) fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticErr
         )));
     }
 
+    Ok(())
+}
+
+/// Checks that the declared value of a constant is valid.
+fn validate_constant(constant: &Constant) -> Result<(), SemanticError> {
+    match constant.value() {
+        // check the number of elements in each row are same for a matrix
+        ConstantType::Matrix(matrix) => {
+            let row_len = matrix[0].len();
+            if matrix.iter().skip(1).all(|row| row.len() == row_len) {
+                Ok(())
+            } else {
+                Err(SemanticError::InvalidConstant(format!(
+                    "The matrix value of constant {} is invalid",
+                    constant.name()
+                )))
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Checks that the specified vector access index is valid and returns an error otherwise.
+fn validate_vector_access(
+    vector_access: &VectorAccess,
+    vector_len: usize,
+) -> Result<(), SemanticError> {
+    if vector_access.idx() >= vector_len {
+        return Err(SemanticError::vector_access_out_of_bounds(
+            vector_access,
+            vector_len,
+        ));
+    }
+    Ok(())
+}
+
+/// Checks that the specified matrix access indices are valid and returns an error otherwise.
+fn validate_matrix_access(
+    matrix_access: &MatrixAccess,
+    matrix_row_len: usize,
+    matrix_col_len: usize,
+) -> Result<(), SemanticError> {
+    if matrix_access.row_idx() >= matrix_row_len {
+        return Err(SemanticError::matrix_access_out_of_bounds(
+            matrix_access,
+            matrix_row_len,
+            matrix_col_len,
+        ));
+    }
+    if matrix_access.col_idx() >= matrix_col_len {
+        return Err(SemanticError::matrix_access_out_of_bounds(
+            matrix_access,
+            matrix_row_len,
+            matrix_col_len,
+        ));
+    }
     Ok(())
 }

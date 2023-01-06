@@ -1,6 +1,8 @@
 use winter_air::{Air, AirContext, Assertion, AuxTraceRandElements, EvaluationFrame, ProofOptions as WinterProofOptions, TransitionConstraintDegree, TraceInfo};
-use winter_math::{fields, ExtensionOf, FieldElement};
-use winter_utils::{collections, ByteWriter, Serializable};
+use winter_math::fields::f64::BaseElement as Felt;
+use winter_math::{ExtensionOf, FieldElement};
+use winter_utils::collections::Vec;
+use winter_utils::{ByteWriter, Serializable};
 
 pub struct PublicInputs {
     stack_inputs: [Felt; 16],
@@ -39,7 +41,7 @@ impl Air for BinaryAir {
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
         let main_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2)];
-        let aux_degrees = Vec::new();
+        let aux_degrees = vec![];
         let num_main_assertions = 1;
         let num_aux_assertions = 0;
 

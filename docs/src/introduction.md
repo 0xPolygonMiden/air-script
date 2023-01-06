@@ -1,6 +1,6 @@
 # Introduction
 
-Polygon Miden's AirScript is designed to make it simple to describe AIR constraints and generate efficient and accurate code in the required target language.
+Polygon Miden's AirScript is designed to make it simple to describe AIR constraints and generate efficient and accurate code in the required target language. The code for AirScript can be found [here](https://github.com/0xPolygonMiden/air-script/).
 
 ## Current Version
 
@@ -29,7 +29,7 @@ cargo build --release
 Then, run the `airc` target with the `transpile` option and specify your input file with `-i`. For example:
 
 ```
-./target/release/airc transpile -i examples/system.air
+./target/release/airc transpile -i examples/example.air
 ```
 
 You can use the `help` option to see other available options.

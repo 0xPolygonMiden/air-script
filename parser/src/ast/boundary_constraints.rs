@@ -1,25 +1,25 @@
-use super::Identifier;
+use super::{Identifier, MatrixAccess, TraceAccess, VectorAccess};
 use std::fmt::Display;
 
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
-/// Stores the boundary constraints to be enforced on the trace column values.
-#[derive(Debug, PartialEq)]
-pub struct BoundaryConstraints {
-    pub boundary_constraints: Vec<BoundaryConstraint>,
+#[derive(Debug, Eq, PartialEq)]
+pub enum BoundaryStmt {
+    Constraint(BoundaryConstraint),
+    Variable(BoundaryVariable),
 }
 
 /// Stores the expression corresponding to the boundary constraint.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct BoundaryConstraint {
-    column: Identifier,
+    column: TraceAccess,
     boundary: Boundary,
     value: BoundaryExpr,
 }
 
 impl BoundaryConstraint {
-    pub fn new(column: Identifier, boundary: Boundary, value: BoundaryExpr) -> Self {
+    pub fn new(column: TraceAccess, boundary: Boundary, value: BoundaryExpr) -> Self {
         Self {
             column,
             boundary,
@@ -27,8 +27,8 @@ impl BoundaryConstraint {
         }
     }
 
-    pub fn column(&self) -> &str {
-        &self.column.0
+    pub fn column(&self) -> &TraceAccess {
+        &self.column
     }
 
     pub fn boundary(&self) -> Boundary {
@@ -58,12 +58,17 @@ impl Display for Boundary {
 }
 
 /// Arithmetic expressions for evaluation of boundary constraints.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum BoundaryExpr {
     Const(u64),
-    /// Reference to a public input element, identified by the name of a public input array and the
-    /// index of the cell.
-    PubInput(Identifier, usize),
+    /// Represents any named constant or variable.
+    Elem(Identifier),
+    /// Represents an element inside a constant or variable vector. [VectorAccess] contains the
+    /// name of the vector and the index of the element to access.
+    VectorAccess(VectorAccess),
+    /// Represents an element inside a constant or variable matrix. [MatrixAccess] contains the
+    /// name of the matrix and indices of the element to access.
+    MatrixAccess(MatrixAccess),
     /// Represents a random value provided by the verifier. The inner value is the index of this
     /// random value in the array of all random values.
     Rand(usize),
@@ -71,4 +76,31 @@ pub enum BoundaryExpr {
     Sub(Box<BoundaryExpr>, Box<BoundaryExpr>),
     Mul(Box<BoundaryExpr>, Box<BoundaryExpr>),
     Exp(Box<BoundaryExpr>, u64),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct BoundaryVariable {
+    name: Identifier,
+    value: BoundaryVariableType,
+}
+
+impl BoundaryVariable {
+    pub fn new(name: Identifier, value: BoundaryVariableType) -> Self {
+        Self { name, value }
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.name()
+    }
+
+    pub fn value(&self) -> &BoundaryVariableType {
+        &self.value
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum BoundaryVariableType {
+    Scalar(BoundaryExpr),
+    Vector(Vec<BoundaryExpr>),
+    Matrix(Vec<Vec<BoundaryExpr>>),
 }

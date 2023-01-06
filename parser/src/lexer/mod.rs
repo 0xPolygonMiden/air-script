@@ -27,9 +27,17 @@ pub enum Token {
     #[token("def")]
     Def,
 
+    /// Used to declare intermediate variables in the AIR constraints module.
+    #[token("let")]
+    Let,
+
+    /// Used to declare constants in the AIR constraints module.
+    #[token("const")]
+    Const,
+
     /// Used to declare trace columns section in the AIR constraints module.
     #[token("trace_columns")]
-    TraceColumnns,
+    TraceColumns,
 
     /// Used to declare main trace columns.
     #[token("main")]

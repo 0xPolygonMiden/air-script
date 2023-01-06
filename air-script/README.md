@@ -45,10 +45,10 @@ cargo build --release
 Then, run the `airc` target with the `transpile` option and specify your input file with `-i`. For example:
 
 ```
-./target/release/airc transpile -i examples/system.air
+./target/release/airc transpile -i examples/example.air
 ```
 
-When no output destination is specified, the output file will use the path and name of the input file, replacing the `.air` extension with `.rs`. For the above example, `examples/system.rs` will contain the generated output.
+When no output destination is specified, the output file will use the path and name of the input file, replacing the `.air` extension with `.rs`. For the above example, `examples/example.rs` will contain the generated output.
 
 You can use the `help` option to see other available options.
 

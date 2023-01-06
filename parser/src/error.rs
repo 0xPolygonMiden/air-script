@@ -11,4 +11,7 @@ pub enum ParseError {
     InvalidInt(String),
     InvalidTraceCols(String),
     MissingMainTraceCols(String),
+    InvalidConst(String),
+    MissingBoundaryConstraint(String),
+    MissingTransitionConstraint(String),
 }

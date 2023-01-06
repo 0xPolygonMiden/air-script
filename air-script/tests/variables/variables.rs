@@ -6,32 +6,35 @@ use winter_utils::{ByteWriter, Serializable};
 
 pub struct PublicInputs {
     stack_inputs: [Felt; 16],
+    stack_outputs: [Felt; 16],
 }
 
 impl PublicInputs {
-    pub fn new(stack_inputs: [Felt; 16]) -> Self {
-        Self { stack_inputs }
+    pub fn new(stack_inputs: [Felt; 16], stack_outputs: [Felt; 16]) -> Self {
+        Self { stack_inputs, stack_outputs }
     }
 }
 
 impl Serializable for PublicInputs {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         target.write(self.stack_inputs.as_slice());
+        target.write(self.stack_outputs.as_slice());
     }
 }
 
-pub struct SystemAir {
+pub struct VariablesAir {
     context: AirContext<Felt>,
     stack_inputs: [Felt; 16],
+    stack_outputs: [Felt; 16],
 }
 
-impl SystemAir {
+impl VariablesAir {
     pub fn last_step(&self) -> usize {
         self.trace_length() - self.context().num_transition_exemptions()
     }
 }
 
-impl Air for SystemAir {
+impl Air for VariablesAir {
     type BaseField = Felt;
     type PublicInputs = PublicInputs;
 
@@ -40,9 +43,9 @@ impl Air for SystemAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![TransitionConstraintDegree::new(1)];
-        let aux_degrees = vec![];
-        let num_main_assertions = 1;
+        let main_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::with_cycles(1, vec![8]), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(3)];
+        let aux_degrees = vec![TransitionConstraintDegree::new(2)];
+        let num_main_assertions = 2;
         let num_aux_assertions = 0;
 
         let context = AirContext::new_multi_segment(
@@ -54,16 +57,18 @@ impl Air for SystemAir {
             options,
         )
         .set_num_transition_exemptions(2);
-        Self { context, stack_inputs: public_inputs.stack_inputs }
+        Self { context, stack_inputs: public_inputs.stack_inputs, stack_outputs: public_inputs.stack_outputs }
     }
 
     fn get_periodic_column_values(&self) -> Vec<Vec<Felt>> {
-        vec![]
+        vec![vec![Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(0)]]
     }
 
     fn get_assertions(&self) -> Vec<Assertion<Felt>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(0, 0, Felt::new(0)));
+        result.push(Assertion::single(1, 0, self.stack_inputs[0]));
+        let last_step = self.last_step();
+        result.push(Assertion::single(1, last_step, Felt::new(1)));
         result
     }
 
@@ -75,7 +80,10 @@ impl Air for SystemAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let current = frame.current();
         let next = frame.next();
-        result[0] = next[0] - (current[0] + E::from(1_u64));
+        result[0] = (current[0]).exp(E::PositiveInteger::from(2_u64)) - (current[0]);
+        result[1] = (periodic_values[0]) * (next[0] - (current[0])) - (E::from(0_u64));
+        result[2] = (E::from(1_u64) - (current[0])) * (current[3] - (current[1]) + current[2]) - ((E::from(2_u64)) * (E::from(3_u64)) - (current[0]));
+        result[3] = (current[0]) * (current[3] - ((current[1]) * (current[2]))) - (next[0] - (E::from(3_u64)) - (E::from(4_u64) - (E::from(2_u64))));
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
@@ -84,5 +92,6 @@ impl Air for SystemAir {
     {
         let current = aux_frame.current();
         let next = aux_frame.next();
+        result[0] = next[0] - ((current[0]) * (current[3] + aux_rand_elements.get_segment_elements(0)[0]));
     }
 }

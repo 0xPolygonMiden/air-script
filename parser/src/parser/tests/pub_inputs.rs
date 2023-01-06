@@ -1,4 +1,4 @@
-use super::{build_parse_test, Identifier, PublicInput, Source, SourceSection};
+use super::{build_parse_test, Identifier, PublicInput, Source, SourceSection::*};
 
 // PUBLIC INPUTS
 // ================================================================================================
@@ -9,7 +9,7 @@ fn public_inputs() {
     public_inputs:
         program_hash: [4]
         stack_inputs: [16]";
-    let expected = Source(vec![SourceSection::PublicInputs(vec![
+    let expected = Source(vec![PublicInputs(vec![
         PublicInput::new(Identifier("program_hash".to_string()), 4),
         PublicInput::new(Identifier("stack_inputs".to_string()), 16),
     ])]);

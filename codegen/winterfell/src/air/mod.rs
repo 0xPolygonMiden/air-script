@@ -1,6 +1,9 @@
 use super::{AirIR, Impl, Scope};
 use ir::TransitionConstraintDegree;
 
+mod constants;
+use constants::add_constants;
+
 mod public_inputs;
 use public_inputs::add_public_inputs_struct;
 
@@ -19,6 +22,11 @@ use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_tra
 /// Updates the provided scope with a new Air struct and Winterfell Air trait implementation
 /// which are equivalent the provided AirIR.
 pub(super) fn add_air(scope: &mut Scope, ir: &AirIR) {
+    // add constant declarations. Check required to avoid adding extra line during codegen.
+    if !ir.constants().is_empty() {
+        add_constants(scope, ir);
+    }
+
     // add the Public Inputs struct and its base implementation.
     add_public_inputs_struct(scope, ir);
 
@@ -98,17 +106,26 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
         .ret("Self");
 
     // define the transition constraint degrees of the main trace `main_degrees`.
-    let mut main_degrees: Vec<String> = Vec::new();
-    for degree in ir.main_degrees().iter() {
-        main_degrees.push(degree.to_string(false));
-    }
+    let main_degrees = ir
+        .constraint_degrees(0)
+        .iter()
+        .map(|degree| degree.to_string(ir, false))
+        .collect::<Vec<_>>();
     new.line(format!(
         "let main_degrees = vec![{}];",
         main_degrees.join(", ")
     ));
 
     // define the transition constraint degrees of the aux trace `aux_degrees`.
-    new.line("let aux_degrees = Vec::new();");
+    let aux_degrees = ir
+        .constraint_degrees(1)
+        .iter()
+        .map(|degree| degree.to_string(ir, true))
+        .collect::<Vec<_>>();
+    new.line(format!(
+        "let aux_degrees = vec![{}];",
+        aux_degrees.join(", ")
+    ));
 
     // define the number of main trace boundary constraints `num_main_assertions`.
     new.line(format!(
@@ -117,7 +134,10 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
     ));
 
     // define the number of aux trace boundary constraints `num_aux_assertions`.
-    new.line("let num_aux_assertions = 0;");
+    new.line(format!(
+        "let num_aux_assertions = {};",
+        ir.num_aux_assertions()
+    ));
 
     // define the context.
     let context = "
@@ -147,11 +167,11 @@ let context = AirContext::new_multi_segment(
 
 /// Code generation trait for generating Rust code strings from boundary constraint expressions.
 pub trait Codegen {
-    fn to_string(&self, is_aux_constraint: bool) -> String;
+    fn to_string(&self, ir: &AirIR, is_aux_constraint: bool) -> String;
 }
 
 impl Codegen for TransitionConstraintDegree {
-    fn to_string(&self, _is_aux_constraint: bool) -> String {
+    fn to_string(&self, _ir: &AirIR, _is_aux_constraint: bool) -> String {
         if self.cycles().is_empty() {
             format!("TransitionConstraintDegree::new({})", self.base())
         } else {

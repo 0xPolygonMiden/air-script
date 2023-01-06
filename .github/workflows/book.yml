@@ -3,7 +3,7 @@ name: AirScript book
 on:
   push:
     branches:
-      - main
+      - next
 
 jobs:
   deploy:

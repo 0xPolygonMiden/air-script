@@ -20,18 +20,18 @@ impl Serializable for PublicInputs {
     }
 }
 
-pub struct SystemAir {
+pub struct TraceColGroupAir {
     context: AirContext<Felt>,
     stack_inputs: [Felt; 16],
 }
 
-impl SystemAir {
+impl TraceColGroupAir {
     pub fn last_step(&self) -> usize {
         self.trace_length() - self.context().num_transition_exemptions()
     }
 }
 
-impl Air for SystemAir {
+impl Air for TraceColGroupAir {
     type BaseField = Felt;
     type PublicInputs = PublicInputs;
 
@@ -40,10 +40,10 @@ impl Air for SystemAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![TransitionConstraintDegree::new(1)];
+        let main_degrees = vec![TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1)];
         let aux_degrees = vec![];
-        let num_main_assertions = 1;
-        let num_aux_assertions = 0;
+        let num_main_assertions = 0;
+        let num_aux_assertions = 1;
 
         let context = AirContext::new_multi_segment(
             trace_info,
@@ -63,19 +63,20 @@ impl Air for SystemAir {
 
     fn get_assertions(&self) -> Vec<Assertion<Felt>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(0, 0, Felt::new(0)));
         result
     }
 
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxTraceRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
+        result.push(Assertion::single(4, 0, E::from(0_u64)));
         result
     }
 
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let current = frame.current();
         let next = frame.next();
-        result[0] = next[0] - (current[0] + E::from(1_u64));
+        result[0] = next[2] - (current[2] + E::from(1_u64));
+        result[1] = next[1] - (current[1] - (E::from(1_u64)));
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])

@@ -1,6 +1,6 @@
 use super::{AirIR, Impl};
 use ir::{
-    transition_constraints::{AlgebraicGraph, Operation},
+    transition_stmts::{AlgebraicGraph, ConstantValue, Operation},
     NodeIndex,
 };
 
@@ -25,7 +25,7 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
 
     // output the constraints.
     let graph = ir.transition_graph();
-    for (idx, constraint) in ir.main_transition_constraints().iter().enumerate() {
+    for (idx, constraint) in ir.transition_constraints(0).iter().enumerate() {
         evaluate_transition.line(format!(
             "result[{}] = {};",
             idx,
@@ -56,7 +56,7 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
 
     // output the constraints.
     let graph = ir.transition_graph();
-    for (idx, constraint) in ir.aux_transition_constraints().iter().enumerate() {
+    for (idx, constraint) in ir.transition_constraints(1).iter().enumerate() {
         evaluate_aux_transition.line(format!(
             "result[{}] = {};",
             idx,
@@ -64,9 +64,6 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
         ));
     }
 }
-
-// RUST STRING GENERATION
-// ================================================================================================
 
 /// Code generation trait for generating Rust code strings from [AlgebraicGraph] types.
 trait Codegen {
@@ -84,13 +81,26 @@ impl Codegen for Operation {
     // TODO: Only add parentheses in Add and Mul if the expression is an arithmetic operation.
     fn to_string(&self, graph: &AlgebraicGraph) -> String {
         match self {
-            Operation::Const(value) => format!("E::from({}_u64)", value),
-            Operation::MainTraceCurrentRow(col_idx) | Operation::AuxTraceCurrentRow(col_idx) => {
-                format!("current[{}]", col_idx)
+            Operation::Constant(ConstantValue::Inline(value)) => format!("E::from({}_u64)", value),
+            Operation::Constant(ConstantValue::Scalar(ident)) => format!("E::from({})", ident),
+            Operation::Constant(ConstantValue::Vector(vector_access)) => {
+                format!("E::from({}[{}])", vector_access.name(), vector_access.idx())
             }
-            Operation::MainTraceNextRow(col_idx) | Operation::AuxTraceNextRow(col_idx) => {
-                format!("next[{}]", col_idx)
-            }
+            Operation::Constant(ConstantValue::Matrix(matrix_access)) => format!(
+                "E::from({}[{}][{}])",
+                matrix_access.name(),
+                matrix_access.row_idx(),
+                matrix_access.col_idx()
+            ),
+            Operation::TraceElement(trace_access) => match trace_access.row_offset() {
+                0 => {
+                    format!("current[{}]", trace_access.col_idx())
+                }
+                1 => {
+                    format!("next[{}]", trace_access.col_idx())
+                }
+                _ => panic!("Winterfell doesn't support row offsets greater than 1."),
+            },
             Operation::PeriodicColumn(col_idx, _) => {
                 format!("periodic_values[{}]", col_idx)
             }
@@ -103,14 +113,15 @@ impl Codegen for Operation {
             }
             Operation::Add(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
+                let rhs = r_idx.to_string(graph);
 
-                // output Add followed by Neg as "-"
-                let rhs = if let Operation::Neg(n_idx) = graph.node(r_idx).op() {
-                    format!("- ({})", n_idx.to_string(graph))
-                } else {
-                    format!("+ {}", r_idx.to_string(graph))
-                };
-                format!("{} {}", lhs, rhs)
+                format!("{} + {}", lhs, rhs)
+            }
+            Operation::Sub(l_idx, r_idx) => {
+                let lhs = l_idx.to_string(graph);
+                let rhs = r_idx.to_string(graph);
+
+                format!("{} - ({})", lhs, rhs)
             }
             Operation::Mul(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
