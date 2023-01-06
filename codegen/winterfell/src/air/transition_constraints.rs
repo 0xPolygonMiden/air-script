@@ -1,6 +1,6 @@
 use super::{AirIR, Impl};
 use ir::{
-    transition_stmts::{AlgebraicGraph, ConstantValue, Operation},
+    integrity_stmts::{AlgebraicGraph, ConstantValue, Operation},
     NodeIndex,
 };
 
@@ -24,8 +24,8 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
     evaluate_transition.line("let next = frame.next();");
 
     // output the constraints.
-    let graph = ir.transition_graph();
-    for (idx, constraint) in ir.transition_constraints(0).iter().enumerate() {
+    let graph = ir.constraint_graph();
+    for (idx, constraint) in ir.integrity_constraints(0).iter().enumerate() {
         evaluate_transition.line(format!(
             "result[{}] = {};",
             idx,
@@ -55,8 +55,8 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
     evaluate_aux_transition.line("let next = aux_frame.next();");
 
     // output the constraints.
-    let graph = ir.transition_graph();
-    for (idx, constraint) in ir.transition_constraints(1).iter().enumerate() {
+    let graph = ir.constraint_graph();
+    for (idx, constraint) in ir.integrity_constraints(1).iter().enumerate() {
         evaluate_aux_transition.line(format!(
             "result[{}] = {};",
             idx,

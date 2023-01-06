@@ -14,7 +14,7 @@ boundary_constraints:
     # This is a dummy trace column to satisfy requirement of at least one boundary constraint.
     enf dummy.first = 0
 
-transition_constraints:
+integrity_constraints:
     # Enforce that selector must be binary
     enf s^2 - s = 0
 

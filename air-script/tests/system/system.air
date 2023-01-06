@@ -6,7 +6,7 @@ trace_columns:
 public_inputs:
     stack_inputs: [16]
 
-transition_constraints:
+integrity_constraints:
     enf clk' = clk + 1
   
 boundary_constraints:

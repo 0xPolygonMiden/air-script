@@ -61,7 +61,7 @@ fn boundary_constraint_with_vector_variables() {
 }
 
 #[test]
-fn transition_constraint_with_scalar_variables() {
+fn integrity_constraint_with_scalar_variables() {
     let source = "
     let a = 0
     enf clk' = clk - a";
@@ -82,7 +82,7 @@ fn transition_constraint_with_scalar_variables() {
 }
 
 #[test]
-fn transition_constraint_with_vector_variables() {
+fn integrity_constraint_with_vector_variables() {
     let source = "
     let a = [0, 1]
     enf clk' = clk - a[0] + a[1]";

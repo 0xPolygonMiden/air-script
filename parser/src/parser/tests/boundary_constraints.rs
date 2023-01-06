@@ -241,7 +241,7 @@ fn err_missing_boundary_constraint() {
 fn err_empty_boundary_constraints() {
     let source = "
     boundary_constraints:
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1";
     build_parse_test!(source).expect_unrecognized_token();
 }

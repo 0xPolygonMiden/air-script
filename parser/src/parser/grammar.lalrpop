@@ -2,13 +2,13 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt, BoundaryExpr,
         BoundaryVariable, BoundaryVariableType}, 
-        transition_constraints::{TransitionConstraint, TransitionExpr, TransitionStmt,
-        TransitionVariable, TransitionVariableType},
+        integrity_constraints::{IntegrityConstraint, IntegrityExpr, IntegrityStmt,
+        IntegrityVariable, IntegrityVariableType},
         constants::{Constant, ConstantType},
         Identifier, Source, SourceSection, Trace, TraceAccess, TraceCols, PublicInput,
         PeriodicColumn, VectorAccess, MatrixAccess
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
-    InvalidConst, MissingBoundaryConstraint, MissingTransitionConstraint}}, lexer::Token
+    InvalidConst, MissingBoundaryConstraint, MissingIntegrityConstraint}}, lexer::Token
 };
 use std::str::FromStr;
 use lalrpop_util::ParseError;
@@ -29,7 +29,7 @@ SourceSection: SourceSection = {
     PublicInputs => SourceSection::PublicInputs(<>),
     PeriodicColumns => SourceSection::PeriodicColumns(<>),
     BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
-    TransitionConstraints => SourceSection::TransitionConstraints(<>),
+    IntegrityConstraints => SourceSection::IntegrityConstraints(<>),
 }
 
 // AIR DEF
@@ -190,70 +190,70 @@ BoundaryAtom: BoundaryExpr = {
     <matrix_access: MatrixAccess> => BoundaryExpr::MatrixAccess(matrix_access)
 }
 
-// TRANSITION CONSTRAINTS
+// INTEGRITY CONSTRAINTS
 // ================================================================================================
 
-TransitionConstraints: Vec<TransitionStmt> = {
-    "transition_constraints" ":" <transition_stmts: TransitionStmt+> =>? {
-        // check if at least one transition constraint is defined
-        let transition_constraints_exist = transition_stmts.iter().any(|stmt| match stmt {
-            TransitionStmt::Constraint(_) => true,
+IntegrityConstraints: Vec<IntegrityStmt> = {
+    "integrity_constraints" ":" <integrity_stmts: IntegrityStmt+> =>? {
+        // check if at least one integrity constraint is defined
+        let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
+            IntegrityStmt::Constraint(_) => true,
             _ => false,
         });
-        if !transition_constraints_exist {
+        if !integrity_constraints_exist {
             return Err(ParseError::User {
                 error: Error::ParseError(
-                    MissingTransitionConstraint(
-                        "Declaration of at least one transition constraint is required".to_string()
+                    MissingIntegrityConstraint(
+                        "Declaration of at least one integrity constraint is required".to_string()
                     )
                 )
             });
         }
-        Ok(transition_stmts)
+        Ok(integrity_stmts)
     }
 }
 
-TransitionStmt: TransitionStmt = {
-    "enf" <lhs: TransitionExpr> "=" <rhs: TransitionExpr> =>
-        TransitionStmt::Constraint(TransitionConstraint::new(lhs, rhs)),
-    "let" <name: Identifier> "=" <transition_variable_type: TransitionVariableType> =>
-        TransitionStmt::Variable(TransitionVariable::new(name, transition_variable_type)),
+IntegrityStmt: IntegrityStmt = {
+    "enf" <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
+        IntegrityStmt::Constraint(IntegrityConstraint::new(lhs, rhs)),
+    "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
+        IntegrityStmt::Variable(IntegrityVariable::new(name, integrity_variable_type)),
 }
 
-TransitionVariableType: TransitionVariableType = {
-    <scalar_value: TransitionExpr> =>
-        TransitionVariableType::Scalar(scalar_value),
-    "[" <vector_value: CommaElems<TransitionExpr>> "]" =>
-        TransitionVariableType::Vector(vector_value),
-    "[" <matrix_value: CommaElems<Vector<TransitionExpr>>> "]" =>
-        TransitionVariableType::Matrix(matrix_value),
+IntegrityVariableType: IntegrityVariableType = {
+    <scalar_value: IntegrityExpr> =>
+        IntegrityVariableType::Scalar(scalar_value),
+    "[" <vector_value: CommaElems<IntegrityExpr>> "]" =>
+        IntegrityVariableType::Vector(vector_value),
+    "[" <matrix_value: CommaElems<Vector<IntegrityExpr>>> "]" =>
+        IntegrityVariableType::Matrix(matrix_value),
 }
 
-// --- TRANSITION CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
+// --- INTEGRITY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
 
-TransitionExpr: TransitionExpr = {
-    <lexpr: TransitionExpr> "+" <rexpr: TransitionFactor> =>
-        TransitionExpr::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: TransitionExpr> "-" <rexpr: TransitionFactor> =>
-        TransitionExpr::Sub(Box::new(lexpr), Box::new(rexpr)),
-    TransitionFactor
+IntegrityExpr: IntegrityExpr = {
+    <lexpr: IntegrityExpr> "+" <rexpr: IntegrityFactor> =>
+        IntegrityExpr::Add(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: IntegrityExpr> "-" <rexpr: IntegrityFactor> =>
+        IntegrityExpr::Sub(Box::new(lexpr), Box::new(rexpr)),
+    IntegrityFactor
 }
 
-TransitionFactor: TransitionExpr = {
-    <lexpr: TransitionFactor> "*" <rexpr: TransitionAtom> =>
-        TransitionExpr::Mul(Box::new(lexpr), Box::new(rexpr)),
-    TransitionAtom
+IntegrityFactor: IntegrityExpr = {
+    <lexpr: IntegrityFactor> "*" <rexpr: IntegrityAtom> =>
+        IntegrityExpr::Mul(Box::new(lexpr), Box::new(rexpr)),
+    IntegrityAtom
 }
 
-TransitionAtom: TransitionExpr = {
-    "(" <TransitionExpr> ")",
-    <lexpr: TransitionAtom> "^" <num: Num_u64> => TransitionExpr::Exp(Box::new(lexpr), num),
-    "$rand" <idx: Index> => TransitionExpr::Rand(idx),
-    <n: Num_u64> => TransitionExpr::Const(n),
-    <ident: Identifier> => TransitionExpr::Elem(ident),
-    <vector_access: VectorAccess> => TransitionExpr::VectorAccess(vector_access),
-    <matrix_access: MatrixAccess> => TransitionExpr::MatrixAccess(matrix_access),
-    <trace_access: TraceAccess> "'" => TransitionExpr::Next(trace_access)
+IntegrityAtom: IntegrityExpr = {
+    "(" <IntegrityExpr> ")",
+    <lexpr: IntegrityAtom> "^" <num: Num_u64> => IntegrityExpr::Exp(Box::new(lexpr), num),
+    "$rand" <idx: Index> => IntegrityExpr::Rand(idx),
+    <n: Num_u64> => IntegrityExpr::Const(n),
+    <ident: Identifier> => IntegrityExpr::Elem(ident),
+    <vector_access: VectorAccess> => IntegrityExpr::VectorAccess(vector_access),
+    <matrix_access: MatrixAccess> => IntegrityExpr::MatrixAccess(matrix_access),
+    <trace_access: TraceAccess> "'" => IntegrityExpr::Next(trace_access)
 }
 
 // ATOMS
@@ -329,7 +329,7 @@ extern {
         "boundary_constraints" => Token::BoundaryConstraints,
         "first" => Token::First,
         "last" => Token::Last,
-        "transition_constraints" => Token::TransitionConstraints,
+        "integrity_constraints" => Token::IntegrityConstraints,
         "$rand" => Token::Rand,
         "enf" => Token::Enf,
         "'" => Token::Next,

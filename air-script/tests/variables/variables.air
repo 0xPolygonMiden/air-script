@@ -17,7 +17,7 @@ boundary_constraints:
     enf a.first = stack_inputs[0]
     enf a.last = 1
     
-transition_constraints:
+integrity_constraints:
     let m = 0
 
     # the selector must be binary.

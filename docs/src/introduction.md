@@ -53,8 +53,8 @@ The following changes are some of the improvements under consideration for futur
   - support for evaluators
   - support for selectors
 - optimizations, such as:
-  - removing unnecessary nodes from the `AlgebraicGraph` of transition constraints
-  - combining transition constraints with mutually exclusive selectors to reduce the total number of constraints
+  - removing unnecessary nodes from the `AlgebraicGraph` of integrity constraints
+  - combining integrity constraints with mutually exclusive selectors to reduce the total number of constraints
 - additional language targets for simplifying verifier implementations:
   - Solidity
   - Miden Assembly

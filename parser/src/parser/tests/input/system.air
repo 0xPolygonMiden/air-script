@@ -3,7 +3,7 @@ def SystemAir
 trace_columns:
     main: [clk, fmp, ctx]
   
-transition_constraints:
+integrity_constraints:
     enf clk' = clk + 1
   
 boundary_constraints:

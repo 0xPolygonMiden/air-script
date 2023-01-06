@@ -14,7 +14,7 @@ The parser is split into 3 modules:
 
 The IR is where semantic checking is done and where optimizations will be done in the future.
 
-A directed acyclic graph called `AlgebraicGraph` is responsible for efficiently representing all transition constraints, identifying their type (main or auxiliary), and computing their degrees.
+A directed acyclic graph called `AlgebraicGraph` is responsible for efficiently representing all integrity constraints, identifying their type (main or auxiliary), and computing their degrees.
 
 Currently, the checks in the IR are very minimal and cover the following simple cases.
 
@@ -35,12 +35,12 @@ Currently, the checks in the IR are very minimal and cover the following simple 
   - ensuring valid indices for public inputs.
 - Identify boundary constraint types (main or auxiliary), based on the trace column to which the constraint is applied.
 
-### Transition constraints
+### Integrity constraints
 
-- Ensure transition constraints contain valid identifier references by:
+- Ensure integrity constraints contain valid identifier references by:
   - Preventing public inputs from being used.
   - Preventing "next" indicators from being applied to anything other than trace columns.
-- Identify transition constraint types (main or auxiliary) based on the constraint expression.
+- Identify integrity constraint types (main or auxiliary) based on the constraint expression.
   - Constraints referencing the auxiliary trace or using random values are identified as constraints against the auxiliary trace.
   - All other constraints are identified as constraints against the main trace.
 

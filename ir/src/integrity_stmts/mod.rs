@@ -1,9 +1,9 @@
 use super::{SemanticError, SymbolTable, TraceSegment, VariableRoots};
-use parser::ast::TransitionStmt;
+use parser::ast::IntegrityStmt;
 use std::collections::BTreeMap;
 
 mod degree;
-pub use degree::TransitionConstraintDegree;
+pub use degree::IntegrityConstraintDegree;
 
 mod graph;
 pub use graph::{AlgebraicGraph, ConstantValue, NodeIndex, Operation, VariableValue};
@@ -13,28 +13,28 @@ pub use graph::{AlgebraicGraph, ConstantValue, NodeIndex, Operation, VariableVal
 
 pub const MIN_CYCLE_LENGTH: usize = 2;
 
-// TRANSITION CONSTRAINTS
+// INTEGRITY CONSTRAINTS
 // ================================================================================================
 
 #[derive(Default, Debug)]
-pub(super) struct TransitionStmts {
-    /// Transition constraints against the execution trace, where each index contains a vector of
+pub(super) struct IntegrityStmts {
+    /// Integrity constraints against the execution trace, where each index contains a vector of
     /// the constraint roots for all constraints against that segment of the trace. For example,
     /// constraints against the main execution trace, which is trace segment 0, will be specified by
     /// a vector in constraint_roots[0] containing a [NodeIndex] in the graph for each constraint
     /// against the main trace.
     constraint_roots: Vec<Vec<NodeIndex>>,
 
-    /// A directed acyclic graph which represents all of the transition constraints.
+    /// A directed acyclic graph which represents all of the integrity constraints.
     constraints_graph: AlgebraicGraph,
 
-    /// Variable roots for the variables used in transition constraints. For each element in a
+    /// Variable roots for the variables used in integrity constraints. For each element in a
     /// vector or a matrix, a new root is added with a key equal to the [VariableValue] of the
     /// element.
     variable_roots: VariableRoots,
 }
 
-impl TransitionStmts {
+impl IntegrityStmts {
     // --- CONSTRUCTOR ----------------------------------------------------------------------------
 
     pub fn new(num_trace_segments: usize) -> Self {
@@ -47,12 +47,12 @@ impl TransitionStmts {
 
     // --- PUBLIC ACCESSORS -----------------------------------------------------------------------
 
-    /// Returns a vector of the degrees of the transition constraints for the specified trace
+    /// Returns a vector of the degrees of the integrity constraints for the specified trace
     /// segment.
     pub fn constraint_degrees(
         &self,
         trace_segment: TraceSegment,
-    ) -> Vec<TransitionConstraintDegree> {
+    ) -> Vec<IntegrityConstraintDegree> {
         if self.constraint_roots.len() <= trace_segment.into() {
             return Vec::new();
         }
@@ -63,7 +63,7 @@ impl TransitionStmts {
             .collect()
     }
 
-    /// Returns all transition constraints against the specified trace segment as a vector of
+    /// Returns all integrity constraints against the specified trace segment as a vector of
     /// [NodeIndex] where each index is the tip of the subgraph representing the constraint within
     /// the constraints [AlgebraicGraph].
     pub fn constraints(&self, trace_segment: TraceSegment) -> &[NodeIndex] {
@@ -74,15 +74,15 @@ impl TransitionStmts {
         &self.constraint_roots[trace_segment as usize]
     }
 
-    /// Returns the [AlgebraicGraph] representing all transition constraints.
+    /// Returns the [AlgebraicGraph] representing all integrity constraints.
     pub fn graph(&self) -> &AlgebraicGraph {
         &self.constraints_graph
     }
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    /// Adds the provided parsed transition statement to the graph. The statement can either be a
-    /// variable defined in the transition constraints section or a transition constraint.
+    /// Adds the provided parsed integrity statement to the graph. The statement can either be a
+    /// variable defined in the integrity constraints section or an integrity constraint.
     ///
     /// In case the statement is a variable, it is added to the symbol table.
     ///
@@ -92,13 +92,13 @@ impl TransitionStmts {
     pub(super) fn insert(
         &mut self,
         symbol_table: &mut SymbolTable,
-        stmt: &TransitionStmt,
+        stmt: &IntegrityStmt,
     ) -> Result<(), SemanticError> {
         match stmt {
-            TransitionStmt::Constraint(constraint) => {
+            IntegrityStmt::Constraint(constraint) => {
                 let expr = constraint.expr();
 
-                // add it to the transition constraints graph and get its entry index.
+                // add it to the integrity constraints graph and get its entry index.
                 let (trace_segment, root_index) = self.constraints_graph.insert_expr(
                     symbol_table,
                     expr,
@@ -112,11 +112,11 @@ impl TransitionStmts {
                     ));
                 }
 
-                // add the transition constraint to the appropriate set of constraints.
+                // add the integrity constraint to the appropriate set of constraints.
                 self.constraint_roots[trace_segment as usize].push(root_index);
             }
-            TransitionStmt::Variable(variable) => {
-                symbol_table.insert_transition_variable(variable)?
+            IntegrityStmt::Variable(variable) => {
+                symbol_table.insert_integrity_variable(variable)?
             }
         }
 

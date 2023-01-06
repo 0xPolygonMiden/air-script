@@ -1,5 +1,5 @@
 use super::{AirIR, Impl, Scope};
-use ir::TransitionConstraintDegree;
+use ir::IntegrityConstraintDegree;
 
 mod constants;
 use constants::add_constants;
@@ -170,7 +170,7 @@ pub trait Codegen {
     fn to_string(&self, ir: &AirIR, is_aux_constraint: bool) -> String;
 }
 
-impl Codegen for TransitionConstraintDegree {
+impl Codegen for IntegrityConstraintDegree {
     fn to_string(&self, _ir: &AirIR, _is_aux_constraint: bool) -> String {
         if self.cycles().is_empty() {
             format!("TransitionConstraintDegree::new({})", self.base())

@@ -12,8 +12,8 @@ pub use periodic_columns::PeriodicColumn;
 pub mod boundary_constraints;
 pub use boundary_constraints::*;
 
-pub mod transition_constraints;
-pub use transition_constraints::*;
+pub mod integrity_constraints;
+pub use integrity_constraints::*;
 
 // AST
 // ================================================================================================
@@ -34,7 +34,7 @@ pub struct Source(pub Vec<SourceSection>);
 /// - BoundaryConstraints: Boundary Constraints to be enforced on the boundaries of columns defined
 ///   in the TraceCols section. Currently there are two types of boundaries, First and Last
 ///   representing the first and last rows of the column.
-/// - TransitionConstraints: Transition Constraints to be enforced on the trace columns defined
+/// - IntegrityConstraints: Integrity Constraints to be enforced on the trace columns defined
 ///   in the TraceCols section.
 #[derive(Debug, Eq, PartialEq)]
 pub enum SourceSection {
@@ -44,7 +44,7 @@ pub enum SourceSection {
     PublicInputs(Vec<PublicInput>),
     PeriodicColumns(Vec<PeriodicColumn>),
     BoundaryConstraints(Vec<BoundaryStmt>),
-    TransitionConstraints(Vec<TransitionStmt>),
+    IntegrityConstraints(Vec<IntegrityStmt>),
 }
 
 // TRACE

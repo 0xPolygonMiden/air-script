@@ -1,6 +1,6 @@
 use super::{
-    build_parse_test, Error, Identifier, ParseError, Source, SourceSection::*, Trace, TraceAccess,
-    TraceCols, TransitionConstraint, TransitionExpr::*, TransitionStmt::*,
+    build_parse_test, Error, Identifier, IntegrityConstraint, IntegrityExpr::*, IntegrityStmt::*,
+    ParseError, Source, SourceSection::*, Trace, TraceAccess, TraceCols,
 };
 
 // TRACE COLUMNS
@@ -48,7 +48,7 @@ fn trace_columns_groups() {
     trace_columns:
         main: [clk, fmp, ctx, a[3]]
         aux: [rc_bus, b[4], ch_bus]
-    transition_constraints:
+    integrity_constraints:
         enf a[1]' = 1
         enf clk' = clk - 1";
     let expected = Source(vec![
@@ -65,12 +65,12 @@ fn trace_columns_groups() {
                 TraceCols::new(Identifier("ch_bus".to_string()), 1),
             ],
         }),
-        TransitionConstraints(vec![
-            Constraint(TransitionConstraint::new(
+        IntegrityConstraints(vec![
+            Constraint(IntegrityConstraint::new(
                 Next(TraceAccess::new(Identifier("a".to_string()), 1)),
                 Const(1),
             )),
-            Constraint(TransitionConstraint::new(
+            Constraint(IntegrityConstraint::new(
                 Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
                 Sub(
                     Box::new(Elem(Identifier("clk".to_string()))),
@@ -101,7 +101,7 @@ fn main_trace_cols_missing_error() {
         aux: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1
     boundary_constraints:
         enf clk.first = 0";

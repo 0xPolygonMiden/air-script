@@ -9,7 +9,7 @@ fn error_invalid_int() {
     let num: u128 = u64::max_value() as u128 + 1;
     let source = format!(
         "
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + {}",
         num
     );
@@ -35,7 +35,7 @@ fn error_identifier_starting_with_int() {
     // hence this fails at parser level since a valid identifier is expected
     // at that position which 1 is not.
     let source = "
-    transition_constraints:
+    integrity_constraints:
         enf 1clk' = clk + 1";
     build_parse_test!(source).expect_unrecognized_token();
 }
