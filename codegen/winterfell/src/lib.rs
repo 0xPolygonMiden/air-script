@@ -13,11 +13,11 @@ use air::add_air;
 /// CodeGenerator is used to generate a Rust implementation of the Winterfell STARK prover library's
 /// Air trait. The generated Air expresses the constraints specified by the AirIR used to build the
 /// CodeGenerator.
-pub struct WinterfellCodeGenerator {
+pub struct CodeGenerator {
     scope: Scope,
 }
 
-impl WinterfellCodeGenerator {
+impl CodeGenerator {
     // --- CONSTRUCTOR ----------------------------------------------------------------------------
 
     /// Builds a new Rust scope that represents a Winterfell Air trait implementation for the

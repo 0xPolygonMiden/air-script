@@ -9,6 +9,8 @@ use super::helpers::{
 use ir::{AirIR, BoundaryExpr};
 use std::collections::BTreeMap;
 
+/// Parses expressions in boundary constraints vectors, creates [Expression] instances and pushes
+/// them to the `expressions` vector, adding theit indexes to the `oututs` vector.
 pub fn set_boundary_expressions_and_outputs(
     ir: &AirIR,
     boundary_constraints_vec: [&Vec<(usize, &BoundaryExpr)>; 4],
@@ -48,7 +50,7 @@ pub fn set_boundary_expressions_and_outputs(
 // to the .last boundary constraints)
 // #4: Need to be able to reuse boundary expressions if it has already been created
 /// Parses boundary operation, creates related [Expression] instance, pushes it to the `expressions`
-/// array and adds its index to the `outputs` array
+/// array and adds its index to the `outputs` array.
 fn handle_boundary_operation(
     ir: &AirIR,
     expr: &(usize, &BoundaryExpr),
@@ -165,7 +167,7 @@ fn handle_boundary_operation(
 }
 
 /// Creates an [Expression] instance on an equation of the form `boundary_constraint = expression`,
-/// pushes it to the `expressions` array and adds its index to the `outputs` array
+/// pushes it to the `expressions` array and adds its index to the `outputs` array.
 fn push_boundary_value(
     expressions: &mut Vec<Expression>,
     outputs: &mut Vec<usize>,
@@ -191,7 +193,7 @@ fn push_boundary_value(
 }
 
 /// Parses boundary operation in case it is an expression. Creates [Expression], pushes it to the
-/// `expressions` array and adds its index to the `outputs` array
+/// `expressions` array and adds its index to the `outputs` array.
 fn parse_boundary_expression(
     ir: &AirIR,
     boundary_expr: (usize, &BoundaryExpr, &BoundaryExpr),
@@ -226,7 +228,7 @@ fn parse_boundary_expression(
 }
 
 /// Recursively parses boundary expression.
-/// Returns [NodeReference] to the parsed expression
+/// Returns [NodeReference] to the parsed expression.
 fn parse_recursive_boundary_expression(
     ir: &AirIR,
     boundary_expr: (&BoundaryExpr, &BoundaryExpr),
@@ -264,7 +266,7 @@ fn parse_recursive_boundary_expression(
 }
 
 /// Parses boundary expression limb.
-/// Returns [NodeReference] to the parsed expression
+/// Returns [NodeReference] to the parsed expression.
 fn parse_boundary_limb(
     ir: &AirIR,
     i: &BoundaryExpr,

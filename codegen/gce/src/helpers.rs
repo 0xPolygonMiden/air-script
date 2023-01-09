@@ -71,13 +71,13 @@ pub fn count_boundary_rand_values<'a>(
 }
 
 /// Pushes inline constants found in boundary expression to the `constants` vector
-pub fn acumulate_constants(expr: &BoundaryExpr, constants: &mut Vec<u64>) {
+pub fn accumulate_constants(expr: &BoundaryExpr, constants: &mut Vec<u64>) {
     use BoundaryExpr::*;
     match expr {
         Const(v) => constants.push(*v),
         Add(l, r) | Sub(l, r) | Mul(l, r) => {
-            acumulate_constants(l, constants);
-            acumulate_constants(r, constants);
+            accumulate_constants(l, constants);
+            accumulate_constants(r, constants);
         }
         Exp(i, degree) => {
             if *degree == 0 {
@@ -85,7 +85,7 @@ pub fn acumulate_constants(expr: &BoundaryExpr, constants: &mut Vec<u64>) {
             } else {
                 constants.push(*degree);
             }
-            acumulate_constants(i, constants);
+            accumulate_constants(i, constants);
         }
         _ => {}
     }

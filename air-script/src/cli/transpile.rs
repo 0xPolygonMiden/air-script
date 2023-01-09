@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
 
-use codegen_winter::WinterfellCodeGenerator;
+use codegen_winter::CodeGenerator;
 use ir::AirIR;
 use parser::parse;
 
@@ -64,7 +64,7 @@ impl TranspileCmd {
         let ir = ir.unwrap();
 
         // generate Rust code targeting Winterfell
-        let codegen = WinterfellCodeGenerator::new(&ir);
+        let codegen = CodeGenerator::new(&ir);
 
         // write transpiled output to the output path
         let result = fs::write(output_path.clone(), codegen.generate());

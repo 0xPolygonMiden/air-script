@@ -11,7 +11,7 @@ mod error;
 use error::ConstraintEvaluationError;
 
 mod helpers;
-use helpers::{acumulate_constants, count_boundary_rand_values, Expression, NodeType};
+use helpers::{accumulate_constants, count_boundary_rand_values, Expression, NodeType};
 
 mod transition_constraints;
 use transition_constraints::{set_transition_expressions, set_transition_outputs};
@@ -22,7 +22,7 @@ use std::io::Write;
 
 /// Holds data for JSON generation
 #[derive(Default, Debug)]
-pub struct GCECodeGenerator {
+pub struct CodeGenerator {
     num_polys: u16,
     num_variables: usize,
     constants: Vec<u64>,
@@ -30,7 +30,7 @@ pub struct GCECodeGenerator {
     outputs: Vec<usize>,
 }
 
-impl GCECodeGenerator {
+impl CodeGenerator {
     pub fn new(ir: &AirIR, extension_degree: u8) -> Result<Self, ConstraintEvaluationError> {
         // vector of all boundary constraints vectors
         let boundary_constraints_vec = [
@@ -74,7 +74,7 @@ impl GCECodeGenerator {
             &const_public_type_map,
         )?;
 
-        Ok(GCECodeGenerator {
+        Ok(CodeGenerator {
             num_polys,
             num_variables,
             constants,
@@ -105,6 +105,9 @@ impl GCECodeGenerator {
 // HELPER FUNCTIONS
 // ================================================================================================
 
+/// Returns total number of trace columns according to provided extension degree.
+/// The result is calculated as `number of main columns + (number of aux columns) * extension
+/// degree`.
 fn set_num_polys(ir: &AirIR, extension_degree: u8) -> u16 {
     // TODO: Should all aux columns be extended to be quadratic or cubic?
     let num_polys_vec = ir.num_polys();
@@ -116,6 +119,7 @@ fn set_num_polys(ir: &AirIR, extension_degree: u8) -> u16 {
         })
 }
 
+/// Returns total number of public intuts and random values.
 fn set_num_variables<'a>(
     ir: &'a AirIR,
     const_public_type_map: &mut BTreeMap<&'a str, NodeType>,
@@ -147,6 +151,25 @@ fn set_num_variables<'a>(
     num_variables + max_random_values_index
 }
 
+/// Returns a vector of all constants: named ones defined in `constants` section and inline ones
+/// used in constraints calculation. Every value in vector or matrix considered as new constant.
+///
+/// # Examples
+///
+/// Fragment of AIR script:
+///
+/// ```airscript
+/// const A = 1
+/// const B = [0, 1]
+/// const C = [[1, 2], [2, 0]]
+///
+/// boundary_constraints:
+///     enf a.first = 1
+///     enf a.last = 5
+///
+/// ```
+///
+/// Result vector: `[1, 0, 1, 1, 2, 2, 0, 1, 5]`
 fn set_constants<'a>(
     ir: &'a AirIR,
     const_public_type_map: &mut BTreeMap<&'a str, NodeType>,
@@ -177,7 +200,7 @@ fn set_constants<'a>(
     // constants from boundary_constraints
     for constraints in boundary_constraints_vec {
         for (_, expr) in constraints {
-            acumulate_constants(expr, &mut constants);
+            accumulate_constants(expr, &mut constants);
         }
     }
 

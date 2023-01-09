@@ -13,6 +13,8 @@ use std::collections::BTreeMap;
 
 const MAIN_TRACE_SEGMENT_INDEX: u8 = 0;
 
+/// Parses expressions in transition graph's Node vector, creates [Expression] instances and pushes
+/// them to the `expressions` vector.
 pub fn set_transition_expressions(
     ir: &AirIR,
     expressions: &mut Vec<Expression>,
@@ -34,6 +36,7 @@ pub fn set_transition_expressions(
                     constants,
                     expressions_map,
                 )?);
+                // create mapping (index in node graph: index in expressions vector)
                 expressions_map.insert(index, expressions.len() - 1);
             }
             Operation::Sub(l, r) => {
@@ -103,7 +106,7 @@ pub fn set_transition_expressions(
     Ok(())
 }
 
-/// Fills the `outputs` vector according to the indexes from `expressions_map`
+/// Fills the `outputs` vector with indexes from `expressions` vector according to the `expressions_map`.
 pub fn set_transition_outputs(
     ir: &AirIR,
     outputs: &mut Vec<usize>,
@@ -120,7 +123,7 @@ pub fn set_transition_outputs(
     Ok(())
 }
 
-/// Parses expression in transition graph Node vector and returns related [Expression] instance
+/// Parses expression in transition graph Node vector and returns related [Expression] instance.
 fn handle_transition_expression(
     ir: &AirIR,
     op: String,
@@ -135,7 +138,7 @@ fn handle_transition_expression(
 }
 
 /// Parses expression in transition graph Node vector by [NodeIndex] and returns related
-/// [NodeReference] instance
+/// [NodeReference] instance.
 fn handle_node_reference(
     ir: &AirIR,
     i: NodeIndex,
@@ -242,7 +245,7 @@ fn handle_node_reference(
 }
 
 /// Replaces the exponentiation operation with multiplication operations, adding them to the
-/// expressions vector
+/// expressions vector.
 fn handle_exponentiation(
     ir: &AirIR,
     expressions: &mut Vec<Expression>,

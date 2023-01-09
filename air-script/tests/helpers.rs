@@ -1,7 +1,4 @@
-use codegen_gce::GCECodeGenerator;
-use codegen_winter::WinterfellCodeGenerator;
-use ir::AirIR;
-use parser::parse;
+use air_script::{parse, AirIR, GceCodeGenerator, WinterfellCodeGenerator};
 use std::fs;
 
 #[derive(Debug)]
@@ -9,20 +6,25 @@ pub enum TestError {
     IO(String),
     Parse(String),
     IR(String),
-    Gce(String),
+    Codegen(String),
 }
 
 pub struct Test {
-    ir: AirIR,
+    input_path: String,
 }
 
 impl Test {
-    pub fn new(input_path: String) -> Result<Self, TestError> {
+    pub fn new(input_path: String) -> Self {
+        Test { input_path }
+    }
+
+    /// Parse data in file at `input_path` and return [AirIR] with this data
+    fn generate_ir(&self) -> Result<AirIR, TestError> {
         // load source input from file
-        let source = fs::read_to_string(&input_path).map_err(|err| {
+        let source = fs::read_to_string(&self.input_path).map_err(|err| {
             TestError::IO(format!(
                 "Failed to open input file `{:?}` - {}",
-                input_path, err
+                &self.input_path, err
             ))
         })?;
 
@@ -30,33 +32,36 @@ impl Test {
         let parsed = parse(source.as_str()).map_err(|_| {
             TestError::Parse(format!(
                 "Failed to parse the input air file at {}",
-                input_path
+                &self.input_path
             ))
         })?;
 
         let ir = AirIR::from_source(&parsed).map_err(|_| {
             TestError::IR(format!(
                 "Failed to convert the input air file at {} to IR representation",
-                input_path
+                &self.input_path
             ))
         })?;
 
-        Ok(Test { ir })
+        Ok(ir)
     }
 
-    pub fn generate_winterfell(&self) -> String {
+    /// Generate Rust code containing a Winterfell Air implementation for the AirIR
+    pub fn generate_winterfell(&self) -> Result<String, TestError> {
+        let ir = Self::generate_ir(self)?;
         // generate Rust code targeting Winterfell
-        let codegen = WinterfellCodeGenerator::new(&self.ir);
-        codegen.generate()
+        let codegen = WinterfellCodeGenerator::new(&ir);
+        Ok(codegen.generate())
     }
 
+    /// Generate JSON file in generic constraint evaluation format
     pub fn generate_gce(&self, extension_degree: u8, path: &str) -> Result<(), TestError> {
-        // generate Rust code targeting Winterfell
-        let codegen = GCECodeGenerator::new(&self.ir, extension_degree).map_err(|err| {
-            TestError::Gce(format!("Failed to create GCECodeGenerator: {:?}", err))
+        let ir = Self::generate_ir(self)?;
+        let codegen = GceCodeGenerator::new(&ir, extension_degree).map_err(|err| {
+            TestError::Codegen(format!("Failed to create GCECodeGenerator: {:?}", err))
         })?;
         codegen
             .generate(path)
-            .map_err(|err| TestError::Gce(format!("Failed to generate JSON file: {:?}", err)))
+            .map_err(|err| TestError::Codegen(format!("Failed to generate JSON file: {:?}", err)))
     }
 }
