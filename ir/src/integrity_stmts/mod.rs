@@ -21,9 +21,9 @@ pub(super) struct IntegrityStmts {
     /// Integrity constraints against the execution trace, where each index contains a vector of
     /// the constraint roots for all constraints against that segment of the trace. For example,
     /// constraints against the main execution trace, which is trace segment 0, will be specified by
-    /// a vector in constraint_roots[0] containing a [NodeIndex] in the graph for each constraint
-    /// against the main trace.
-    constraint_roots: Vec<Vec<NodeIndex>>,
+    /// a vector in constraint_roots[0] containing a [ConstraintRoot] in the graph for each
+    /// constraint against the main trace.
+    constraint_roots: Vec<Vec<ConstraintRoot>>,
 
     /// A directed acyclic graph which represents all of the integrity constraints.
     constraints_graph: AlgebraicGraph,
@@ -59,14 +59,14 @@ impl IntegrityStmts {
 
         self.constraint_roots[trace_segment as usize]
             .iter()
-            .map(|entry_index| self.constraints_graph.degree(entry_index))
+            .map(|entry_index| self.constraints_graph.degree(entry_index.node_index()))
             .collect()
     }
 
     /// Returns all integrity constraints against the specified trace segment as a vector of
-    /// [NodeIndex] where each index is the tip of the subgraph representing the constraint within
-    /// the constraints [AlgebraicGraph].
-    pub fn constraints(&self, trace_segment: TraceSegment) -> &[NodeIndex] {
+    /// [ConstraintRoot] where each index is the tip of the subgraph representing the constraint
+    /// within the constraints [AlgebraicGraph].
+    pub fn constraints(&self, trace_segment: TraceSegment) -> &[ConstraintRoot] {
         if self.constraint_roots.len() <= trace_segment.into() {
             return &[];
         }
@@ -98,10 +98,12 @@ impl IntegrityStmts {
             IntegrityStmt::Constraint(constraint) => {
                 let expr = constraint.expr();
 
+                let mut row_offsets = Vec::new();
                 // add it to the integrity constraints graph and get its entry index.
                 let (trace_segment, root_index) = self.constraints_graph.insert_expr(
                     symbol_table,
                     expr,
+                    &mut row_offsets,
                     &mut self.variable_roots,
                 )?;
 
@@ -112,8 +114,9 @@ impl IntegrityStmts {
                     ));
                 }
 
+                let constraint_root = ConstraintRoot::new(root_index, row_offsets);
                 // add the integrity constraint to the appropriate set of constraints.
-                self.constraint_roots[trace_segment as usize].push(root_index);
+                self.constraint_roots[trace_segment as usize].push(constraint_root);
             }
             IntegrityStmt::Variable(variable) => {
                 symbol_table.insert_integrity_variable(variable)?
@@ -121,5 +124,30 @@ impl IntegrityStmts {
         }
 
         Ok(())
+    }
+}
+
+/// A [ConstraintRoot] represents the entry node of a subgraph representing an integrity constraint
+/// within the [AlgebraicGraph]. It also contains the row offsets for the constraint.
+#[derive(Debug, Clone)]
+pub struct ConstraintRoot {
+    index: NodeIndex,
+    offsets: Vec<usize>,
+}
+
+impl ConstraintRoot {
+    /// Creates a new [ConstraintRoot] with the specified entry index and row offsets.
+    pub fn new(index: NodeIndex, offsets: Vec<usize>) -> Self {
+        Self { index, offsets }
+    }
+
+    /// Returns the index of the entry node of the subgraph representing the constraint.
+    pub fn node_index(&self) -> &NodeIndex {
+        &self.index
+    }
+
+    /// Returns the row offsets for the constraint.
+    pub fn offsets(&self) -> &[usize] {
+        &self.offsets
     }
 }

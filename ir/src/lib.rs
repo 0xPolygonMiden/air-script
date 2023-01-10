@@ -11,7 +11,9 @@ pub mod boundary_stmts;
 use boundary_stmts::BoundaryStmts;
 
 pub mod integrity_stmts;
-use integrity_stmts::{AlgebraicGraph, IntegrityStmts, VariableValue, MIN_CYCLE_LENGTH};
+use integrity_stmts::{
+    AlgebraicGraph, ConstraintRoot, IntegrityStmts, VariableValue, MIN_CYCLE_LENGTH,
+};
 pub use integrity_stmts::{IntegrityConstraintDegree, NodeIndex};
 
 mod trace_columns;
@@ -189,7 +191,7 @@ impl AirIR {
         self.integrity_stmts.constraint_degrees(trace_segment)
     }
 
-    pub fn integrity_constraints(&self, trace_segment: TraceSegment) -> &[NodeIndex] {
+    pub fn integrity_constraints(&self, trace_segment: TraceSegment) -> &[ConstraintRoot] {
         self.integrity_stmts.constraints(trace_segment)
     }
 

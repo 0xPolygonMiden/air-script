@@ -29,7 +29,7 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
         evaluate_transition.line(format!(
             "result[{}] = {};",
             idx,
-            constraint.to_string(graph)
+            constraint.node_index().to_string(graph)
         ));
     }
 }
@@ -60,7 +60,7 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
         evaluate_aux_transition.line(format!(
             "result[{}] = {};",
             idx,
-            constraint.to_string(graph)
+            constraint.node_index().to_string(graph)
         ));
     }
 }
