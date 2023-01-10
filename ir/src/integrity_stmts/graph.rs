@@ -90,6 +90,7 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         expr: IntegrityExpr,
+        row_offsets: &mut Vec<usize>,
         variable_roots: &mut VariableRoots,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         match expr {
@@ -100,15 +101,18 @@ impl AlgebraicGraph {
                 Ok((trace_segment, node_index))
             }
             IntegrityExpr::Elem(Identifier(ident)) => {
-                self.insert_symbol_access(symbol_table, &ident, variable_roots)
+                self.insert_symbol_access(symbol_table, &ident, row_offsets, variable_roots)
             }
             IntegrityExpr::VectorAccess(vector_access) => {
-                self.insert_vector_access(symbol_table, &vector_access, variable_roots)
+                self.insert_vector_access(symbol_table, &vector_access, row_offsets, variable_roots)
             }
             IntegrityExpr::MatrixAccess(matrix_access) => {
-                self.insert_matrix_access(symbol_table, &matrix_access, variable_roots)
+                self.insert_matrix_access(symbol_table, &matrix_access, row_offsets, variable_roots)
             }
-            IntegrityExpr::Next(trace_access) => self.insert_next(symbol_table, &trace_access),
+            IntegrityExpr::Next(trace_access) => {
+                row_offsets.push(NEXT_ROW);
+                self.insert_next(symbol_table, &trace_access)
+            }
             IntegrityExpr::Rand(index) => {
                 // constraint target for random values defaults to the second trace segment.
                 // TODO: make this more general, so random values from further trace segments can be
@@ -120,8 +124,10 @@ impl AlgebraicGraph {
             }
             IntegrityExpr::Add(lhs, rhs) => {
                 // add both subexpressions.
-                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
-                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs, variable_roots)?;
+                let (lhs_segment, lhs) =
+                    self.insert_expr(symbol_table, *lhs, row_offsets, variable_roots)?;
+                let (rhs_segment, rhs) =
+                    self.insert_expr(symbol_table, *rhs, row_offsets, variable_roots)?;
                 // add the expression.
                 let trace_segment = lhs_segment.max(rhs_segment);
                 let node_index = self.insert_op(Operation::Add(lhs, rhs));
@@ -129,8 +135,10 @@ impl AlgebraicGraph {
             }
             IntegrityExpr::Sub(lhs, rhs) => {
                 // add both subexpressions.
-                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
-                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs, variable_roots)?;
+                let (lhs_segment, lhs) =
+                    self.insert_expr(symbol_table, *lhs, row_offsets, variable_roots)?;
+                let (rhs_segment, rhs) =
+                    self.insert_expr(symbol_table, *rhs, row_offsets, variable_roots)?;
                 // add the expression.
                 let trace_segment = lhs_segment.max(rhs_segment);
                 let node_index = self.insert_op(Operation::Sub(lhs, rhs));
@@ -138,8 +146,10 @@ impl AlgebraicGraph {
             }
             IntegrityExpr::Mul(lhs, rhs) => {
                 // add both subexpressions.
-                let (lhs_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
-                let (rhs_segment, rhs) = self.insert_expr(symbol_table, *rhs, variable_roots)?;
+                let (lhs_segment, lhs) =
+                    self.insert_expr(symbol_table, *lhs, row_offsets, variable_roots)?;
+                let (rhs_segment, rhs) =
+                    self.insert_expr(symbol_table, *rhs, row_offsets, variable_roots)?;
                 // add the expression.
                 let trace_segment = lhs_segment.max(rhs_segment);
                 let node_index = self.insert_op(Operation::Mul(lhs, rhs));
@@ -147,7 +157,8 @@ impl AlgebraicGraph {
             }
             IntegrityExpr::Exp(lhs, rhs) => {
                 // add base subexpression.
-                let (trace_segment, lhs) = self.insert_expr(symbol_table, *lhs, variable_roots)?;
+                let (trace_segment, lhs) =
+                    self.insert_expr(symbol_table, *lhs, row_offsets, variable_roots)?;
                 // add exponent subexpression.
                 let node_index = self.insert_op(Operation::Exp(lhs, rhs as usize));
                 Ok((trace_segment, node_index))
@@ -194,6 +205,7 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         ident: &str,
+        row_offsets: &mut Vec<usize>,
         variable_roots: &mut VariableRoots,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         let elem_type = symbol_table.get_type(ident)?;
@@ -202,6 +214,7 @@ impl AlgebraicGraph {
                 let trace_segment = columns.trace_segment();
                 let trace_access = TraceAccess::new(trace_segment, columns.offset(), CURRENT_ROW);
                 let node_index = self.insert_op(Operation::TraceElement(trace_access));
+                row_offsets.push(CURRENT_ROW);
                 Ok((trace_segment, node_index))
             }
             IdentifierType::PeriodicColumn(index, cycle_len) => {
@@ -224,8 +237,12 @@ impl AlgebraicGraph {
                     {
                         Ok((*trace_segment, *node_index))
                     } else {
-                        let (trace_segment, node_index) =
-                            self.insert_expr(symbol_table, expr.clone(), variable_roots)?;
+                        let (trace_segment, node_index) = self.insert_expr(
+                            symbol_table,
+                            expr.clone(),
+                            row_offsets,
+                            variable_roots,
+                        )?;
                         variable_roots.insert(
                             VariableValue::Scalar(ident.to_string()),
                             (trace_segment, node_index),
@@ -254,6 +271,7 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         vector_access: &VectorAccess,
+        row_offsets: &mut Vec<usize>,
         variable_roots: &mut VariableRoots,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         let symbol_type = symbol_table.access_vector_element(vector_access)?;
@@ -273,8 +291,12 @@ impl AlgebraicGraph {
                     {
                         Ok((*trace_segment, *node_index))
                     } else {
-                        let (trace_segment, node_index) =
-                            self.insert_expr(symbol_table, expr.clone(), variable_roots)?;
+                        let (trace_segment, node_index) = self.insert_expr(
+                            symbol_table,
+                            expr.clone(),
+                            row_offsets,
+                            variable_roots,
+                        )?;
                         variable_roots.insert(
                             VariableValue::Vector(vector_access.clone()),
                             (trace_segment, node_index),
@@ -314,6 +336,7 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         matrix_access: &MatrixAccess,
+        row_offsets: &mut Vec<usize>,
         variable_roots: &mut VariableRoots,
     ) -> Result<(TraceSegment, NodeIndex), SemanticError> {
         let symbol_type = symbol_table.access_matrix_element(matrix_access)?;
@@ -333,8 +356,12 @@ impl AlgebraicGraph {
                     {
                         Ok((*trace_segment, *node_index))
                     } else {
-                        let (trace_segment, node_index) =
-                            self.insert_expr(symbol_table, expr.clone(), variable_roots)?;
+                        let (trace_segment, node_index) = self.insert_expr(
+                            symbol_table,
+                            expr.clone(),
+                            row_offsets,
+                            variable_roots,
+                        )?;
                         variable_roots.insert(
                             VariableValue::Matrix(matrix_access.clone()),
                             (trace_segment, node_index),
