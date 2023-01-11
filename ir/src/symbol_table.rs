@@ -46,6 +46,9 @@ pub(super) struct SymbolTable {
     /// The number of trace segments in the AIR.
     num_trace_segments: usize,
 
+    /// A vector of segment lengths (each value is a number of trace columns in i'th segment)
+    num_polys: Vec<u16>,
+
     /// A map of all declared identifiers from their name (the key) to their type.
     identifiers: BTreeMap<String, IdentifierType>,
 
@@ -121,6 +124,11 @@ impl SymbolTable {
             col_idx += trace_cols.size() as usize;
         }
 
+        if trace_segment >= self.num_polys.len() as u8 {
+            self.num_polys.resize(trace_segment as usize + 1, 0);
+        }
+        self.num_polys[trace_segment as usize] = col_idx as u16;
+
         Ok(())
     }
 
@@ -172,8 +180,13 @@ impl SymbolTable {
 
     /// Consumes this symbol table and returns the information required for declaring constants,
     /// public inputs and periodic columns for the AIR.
-    pub(super) fn into_declarations(self) -> (Constants, PublicInputs, PeriodicColumns) {
-        (self.constants, self.public_inputs, self.periodic_columns)
+    pub(super) fn into_declarations(self) -> (Constants, PublicInputs, PeriodicColumns, Vec<u16>) {
+        (
+            self.constants,
+            self.public_inputs,
+            self.periodic_columns,
+            self.num_polys,
+        )
     }
 
     // --- ACCESSORS ------------------------------------------------------------------------------

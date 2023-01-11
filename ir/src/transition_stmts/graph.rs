@@ -36,6 +36,10 @@ impl AlgebraicGraph {
         &self.nodes[index.0]
     }
 
+    pub fn nodes(&self) -> &Vec<Node> {
+        &self.nodes
+    }
+
     /// Returns the degree of the subgraph which has the specified node as its tip.
     pub fn degree(&self, index: &NodeIndex) -> TransitionConstraintDegree {
         let mut cycles: BTreeMap<usize, usize> = BTreeMap::new();
@@ -377,6 +381,12 @@ impl AlgebraicGraph {
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
 pub struct NodeIndex(usize);
 
+impl NodeIndex {
+    pub fn index(&self) -> usize {
+        self.0
+    }
+}
+
 #[derive(Debug)]
 pub struct Node {
     /// The operation represented by this node
@@ -447,6 +457,10 @@ impl TraceAccess {
     /// Gets the row offset of this [TraceAccess].
     pub fn row_offset(&self) -> usize {
         self.row_offset
+    }
+
+    pub fn trace_segment(&self) -> u8 {
+        self.trace_segment
     }
 }
 

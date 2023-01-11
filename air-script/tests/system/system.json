@@ -1,0 +1,11 @@
+{
+	"num_polys": 3,
+	"num_variables": 16,
+	"constants": [0, 1],
+	"expressions": [
+		{"op": "ADD", "lhs": {"type": "POL", "index": 0}, "rhs": {"type": "CONST", "index": 1}},
+		{"op": "SUB", "lhs": {"type": "POL_NEXT", "index": 0}, "rhs": {"type": "EXPR", "index": 0}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 0}, "rhs": {"type": "CONST", "index": 0}}
+	],
+	"outputs": [1, 2]
+}

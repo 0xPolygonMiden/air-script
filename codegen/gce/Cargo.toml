@@ -1,7 +1,7 @@
 [package]
-name = "air-codegen-winter"
+name = "air-codegen-gce"
 version = "0.1.0"
-description="Winterfell code generator for the AirScript language"
+description="Code generation for the generic constraint evaluation format."
 authors = ["miden contributors"]
 readme="README.md"
 license = "MIT"
@@ -14,6 +14,3 @@ rust-version = "1.65"
 [dependencies]
 codegen = "0.2.0"
 ir = {package = "air-ir", path="../../ir", version="0.1.0" }
-
-[dev-dependencies]
-parser = { package = "air-parser", path = "../../parser", version = "0.1.0" }
