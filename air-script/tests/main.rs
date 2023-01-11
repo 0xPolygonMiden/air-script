@@ -33,9 +33,10 @@ fn gce_aux_trace() {
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .expect("Failed to read form file");
-    fs::remove_file(result_file).expect("Failed to remove file");
 
     expected.assert_eq(&contents);
+
+    fs::remove_file(result_file).expect("Failed to remove file");
 }
 
 #[test]
@@ -64,9 +65,10 @@ fn gce_binary() {
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .expect("Failed to read form file");
-    fs::remove_file(result_file).expect("Failed to remove file");
 
     expected.assert_eq(&contents);
+
+    fs::remove_file(result_file).expect("Failed to remove file");
 }
 
 #[test]
@@ -78,28 +80,6 @@ fn winterfell_periodic_columns() {
 
     let expected = expect_file!["periodic_columns/periodic_columns.rs"];
     expected.assert_eq(&generated_air);
-}
-
-// not yet implemented (periodic columns)
-#[test]
-#[ignore]
-fn gce_periodic_columns() {
-    let test_path = "tests/periodic_columns/periodic_columns";
-    let result_file = "tests/periodic_columns/generated_periodic_columns.json";
-
-    let test = Test::new([test_path, "air"].join("."));
-    test.generate_gce(2, result_file)
-        .expect("GCE generation failed");
-
-    let expected = expect_file![[test_path, "json"].join(".").trim_start_matches("tests/")];
-
-    let mut file = File::open(result_file).expect("Failed to open file");
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        .expect("Failed to read form file");
-    fs::remove_file(result_file).expect("Failed to remove file");
-
-    expected.assert_eq(&contents);
 }
 
 #[test]
@@ -128,9 +108,10 @@ fn gce_pub_inputs() {
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .expect("Failed to read form file");
-    fs::remove_file(result_file).expect("Failed to remove file");
 
     expected.assert_eq(&contents);
+
+    fs::remove_file(result_file).expect("Failed to remove file");
 }
 
 #[test]
@@ -159,9 +140,10 @@ fn gce_system() {
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .expect("Failed to read form file");
-    fs::remove_file(result_file).expect("Failed to remove file");
 
     expected.assert_eq(&contents);
+
+    fs::remove_file(result_file).expect("Failed to remove file");
 }
 
 #[test]
@@ -173,28 +155,6 @@ fn winterfell_bitwise() {
 
     let expected = expect_file!["bitwise/bitwise.rs"];
     expected.assert_eq(&generated_air);
-}
-
-// not yet implemented (periodic columns)
-#[test]
-#[ignore]
-fn gce_bitwise() {
-    let test_path = "tests/bitwise/bitwise";
-    let result_file = "tests/bitwise/generated_bitwise.json";
-
-    let test = Test::new([test_path, "air"].join("."));
-    test.generate_gce(2, result_file)
-        .expect("GCE generation failed");
-
-    let expected = expect_file![[test_path, "json"].join(".").trim_start_matches("tests/")];
-
-    let mut file = File::open(result_file).expect("Failed to open file");
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        .expect("Failed to read form file");
-    fs::remove_file(result_file).expect("Failed to remove file");
-
-    expected.assert_eq(&contents);
 }
 
 #[test]
@@ -223,30 +183,10 @@ fn gce_constants() {
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .expect("Failed to read form file");
-    fs::remove_file(result_file).expect("Failed to remove file");
 
     expected.assert_eq(&contents);
-}
 
-#[test]
-#[ignore] // exponentiation for boundary constraints is not ready
-fn gce_exponentiation() {
-    let test_path = "tests/exponentiation/exponentiation";
-    let result_file = "tests/exponentiation/generated_exponentiation.json";
-
-    let test = Test::new([test_path, "air"].join("."));
-    test.generate_gce(2, result_file)
-        .expect("GCE generation failed");
-
-    let expected = expect_file![[test_path, "json"].join(".").trim_start_matches("tests/")];
-
-    let mut file = File::open(result_file).expect("Failed to open file");
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        .expect("Failed to read form file");
     fs::remove_file(result_file).expect("Failed to remove file");
-
-    expected.assert_eq(&contents);
 }
 
 #[test]

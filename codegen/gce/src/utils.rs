@@ -3,56 +3,6 @@ use ir::{
     ast::{constants::ConstantType, MatrixAccess, VectorAccess},
     AirIR, BoundaryExpr,
 };
-use std::fmt::Display;
-
-// I think we can allow non camel case type since we translate it directly to string in node
-// reference type, where we don't use camel case
-/// Stroes node type required in [NodeReference] struct
-#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-#[derive(Debug, Clone)]
-pub enum NodeType {
-    POL,
-    POL_NEXT,
-    VAR,
-    CONST,
-    EXPR,
-}
-
-/// Stores data used in JSON generation
-#[derive(Debug, Clone)]
-pub struct NodeReference {
-    pub node_type: NodeType,
-    pub index: usize,
-}
-
-// TODO: change String to &str (Or should I create another enum?)
-/// Stores data used in JSON generation
-#[derive(Debug)]
-pub struct Expression {
-    pub op: String,
-    pub lhs: NodeReference,
-    pub rhs: NodeReference,
-}
-
-impl Display for NodeReference {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{{\"type\": \"{:?}\", \"index\": {}}}",
-            self.node_type, self.index
-        )
-    }
-}
-
-impl Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{{\"op\": \"{}\", \"lhs\": {}, \"rhs\": {}}}",
-            self.op, self.lhs, self.rhs
-        )
-    }
-}
 
 /// Counts overall number of random values in boundary constraints
 pub fn count_boundary_rand_values<'a>(
@@ -74,16 +24,22 @@ pub fn count_boundary_rand_values<'a>(
 pub fn accumulate_constants(expr: &BoundaryExpr, constants: &mut Vec<u64>) {
     use BoundaryExpr::*;
     match expr {
-        Const(v) => constants.push(*v),
+        Const(v) => {
+            if !constants.contains(v) {
+                constants.push(*v);
+            }
+        }
         Add(l, r) | Sub(l, r) | Mul(l, r) => {
             accumulate_constants(l, constants);
             accumulate_constants(r, constants);
         }
         Exp(i, degree) => {
             if *degree == 0 {
-                constants.push(1); // constant needed for optimization, since node^0 is Const(1)
-            } else {
-                constants.push(*degree);
+                if !constants.contains(&1) {
+                    constants.push(1); // constant needed for optimization, since node^0 is Const(1)
+                }
+            } else if !constants.contains(degree) {
+                constants.push(*degree)
             }
             accumulate_constants(i, constants);
         }

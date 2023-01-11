@@ -1,10 +1,11 @@
-use crate::helpers::get_random_value_index;
-
 use super::error::ConstraintEvaluationError;
-use super::helpers::{
-    get_constant_index_by_matrix_access, get_constant_index_by_name, get_constant_index_by_value,
-    get_constant_index_by_vector_access, get_public_input_index, Expression, NodeReference,
-    NodeType,
+use super::{
+    utils::{
+        get_constant_index_by_matrix_access, get_constant_index_by_name,
+        get_constant_index_by_value, get_constant_index_by_vector_access, get_public_input_index,
+        get_random_value_index,
+    },
+    Expression, ExpressionOperation, NodeReference, NodeType,
 };
 use ir::{AirIR, BoundaryExpr};
 use std::collections::BTreeMap;
@@ -66,7 +67,7 @@ fn handle_boundary_operation(
             push_boundary_value(
                 expressions,
                 outputs,
-                NodeType::CONST,
+                NodeType::Const,
                 constant_index,
                 expr.0,
             );
@@ -77,7 +78,7 @@ fn handle_boundary_operation(
             push_boundary_value(
                 expressions,
                 outputs,
-                NodeType::CONST,
+                NodeType::Const,
                 constant_index,
                 expr.0,
             );
@@ -90,24 +91,24 @@ fn handle_boundary_operation(
                     ConstraintEvaluationError::identifier_not_found(vector_access.name())
                 })?;
             match node_type {
-                NodeType::CONST => {
+                NodeType::Const => {
                     let constant_index =
                         get_constant_index_by_vector_access(ir, vector_access, constants)?;
                     push_boundary_value(
                         expressions,
                         outputs,
-                        NodeType::CONST,
+                        NodeType::Const,
                         constant_index,
                         expr.0,
                     );
                     Ok(())
                 }
-                NodeType::VAR => {
+                NodeType::Var => {
                     let public_input_index = get_public_input_index(ir, vector_access)?;
                     push_boundary_value(
                         expressions,
                         outputs,
-                        NodeType::VAR,
+                        NodeType::Var,
                         public_input_index,
                         expr.0,
                     );
@@ -123,7 +124,7 @@ fn handle_boundary_operation(
             push_boundary_value(
                 expressions,
                 outputs,
-                NodeType::CONST,
+                NodeType::Const,
                 constant_index,
                 expr.0,
             );
@@ -131,13 +132,13 @@ fn handle_boundary_operation(
         }
         Rand(rand_index) => {
             let index = get_random_value_index(ir, *rand_index);
-            push_boundary_value(expressions, outputs, NodeType::VAR, index, expr.0);
+            push_boundary_value(expressions, outputs, NodeType::Var, index, expr.0);
             Ok(())
         }
         Add(l, r) => parse_boundary_expression(
             ir,
             (expr.0, l, r),
-            "ADD".to_string(),
+            ExpressionOperation::Add,
             constants,
             const_public_type_map,
             expressions,
@@ -146,7 +147,7 @@ fn handle_boundary_operation(
         Sub(l, r) => parse_boundary_expression(
             ir,
             (expr.0, l, r),
-            "SUB".to_string(),
+            ExpressionOperation::Sub,
             constants,
             const_public_type_map,
             expressions,
@@ -155,7 +156,7 @@ fn handle_boundary_operation(
         Mul(l, r) => parse_boundary_expression(
             ir,
             (expr.0, l, r),
-            "MUL".to_string(),
+            ExpressionOperation::Mul,
             constants,
             const_public_type_map,
             expressions,
@@ -176,7 +177,7 @@ fn push_boundary_value(
     column_index: usize,
 ) {
     let lhs = NodeReference {
-        node_type: NodeType::POL,
+        node_type: NodeType::Pol,
         index: column_index,
     };
     let rhs = NodeReference {
@@ -184,7 +185,7 @@ fn push_boundary_value(
         index: value_index,
     };
     let result = Expression {
-        op: "SUB".to_string(),
+        op: ExpressionOperation::Sub,
         lhs,
         rhs,
     };
@@ -197,7 +198,7 @@ fn push_boundary_value(
 fn parse_boundary_expression(
     ir: &AirIR,
     boundary_expr: (usize, &BoundaryExpr, &BoundaryExpr),
-    op_type: String,
+    op_type: ExpressionOperation,
     constants: &Vec<u64>,
     const_public_type_map: &BTreeMap<&str, NodeType>,
     expressions: &mut Vec<Expression>,
@@ -213,12 +214,12 @@ fn parse_boundary_expression(
     )?;
 
     let lhs = NodeReference {
-        node_type: NodeType::POL,
+        node_type: NodeType::Pol,
         index: boundary_expr.0,
     };
     let rhs = node_reference;
     let result = Expression {
-        op: "SUB".to_string(),
+        op: ExpressionOperation::Sub,
         lhs,
         rhs,
     };
@@ -232,7 +233,7 @@ fn parse_boundary_expression(
 fn parse_recursive_boundary_expression(
     ir: &AirIR,
     boundary_expr: (&BoundaryExpr, &BoundaryExpr),
-    op_type: String,
+    op_type: ExpressionOperation,
     constants: &Vec<u64>,
     const_public_type_map: &BTreeMap<&str, NodeType>,
     expressions: &mut Vec<Expression>,
@@ -260,7 +261,7 @@ fn parse_recursive_boundary_expression(
     expressions.push(result);
 
     Ok(NodeReference {
-        node_type: NodeType::EXPR,
+        node_type: NodeType::Expr,
         index: expressions.len() - 1,
     })
 }
@@ -279,14 +280,14 @@ fn parse_boundary_limb(
         Const(v) => {
             let constant_index = get_constant_index_by_value(*v, constants)?;
             Ok(NodeReference {
-                node_type: NodeType::CONST,
+                node_type: NodeType::Const,
                 index: constant_index,
             })
         }
         Elem(id) => {
             let constant_index = get_constant_index_by_name(ir, &id.0, constants)?;
             Ok(NodeReference {
-                node_type: NodeType::CONST,
+                node_type: NodeType::Const,
                 index: constant_index,
             })
         }
@@ -297,18 +298,18 @@ fn parse_boundary_limb(
                     ConstraintEvaluationError::identifier_not_found(vector_access.name())
                 })?;
             match node_type {
-                NodeType::CONST => {
+                NodeType::Const => {
                     let constant_index =
                         get_constant_index_by_vector_access(ir, vector_access, constants)?;
                     Ok(NodeReference {
-                        node_type: NodeType::CONST,
+                        node_type: NodeType::Const,
                         index: constant_index,
                     })
                 }
-                NodeType::VAR => {
+                NodeType::Var => {
                     let public_input_index = get_public_input_index(ir, vector_access)?;
                     Ok(NodeReference {
-                        node_type: NodeType::VAR,
+                        node_type: NodeType::Var,
                         index: public_input_index,
                     })
                 }
@@ -320,21 +321,21 @@ fn parse_boundary_limb(
         MatrixAccess(matrix_access) => {
             let constant_index = get_constant_index_by_matrix_access(ir, matrix_access, constants)?;
             Ok(NodeReference {
-                node_type: NodeType::CONST,
+                node_type: NodeType::Const,
                 index: constant_index,
             })
         }
         Rand(rand_index) => {
             let index = get_random_value_index(ir, *rand_index);
             Ok(NodeReference {
-                node_type: NodeType::VAR,
+                node_type: NodeType::Var,
                 index,
             })
         }
         Add(l, r) => parse_recursive_boundary_expression(
             ir,
             (l, r),
-            "ADD".to_string(),
+            ExpressionOperation::Add,
             constants,
             const_public_type_map,
             expressions,
@@ -342,7 +343,7 @@ fn parse_boundary_limb(
         Sub(l, r) => parse_recursive_boundary_expression(
             ir,
             (l, r),
-            "SUB".to_string(),
+            ExpressionOperation::Sub,
             constants,
             const_public_type_map,
             expressions,
@@ -350,7 +351,7 @@ fn parse_boundary_limb(
         Mul(l, r) => parse_recursive_boundary_expression(
             ir,
             (l, r),
-            "MUL".to_string(),
+            ExpressionOperation::Mul,
             constants,
             const_public_type_map,
             expressions,

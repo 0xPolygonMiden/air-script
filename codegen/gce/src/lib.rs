@@ -3,6 +3,7 @@ use ir::{
     transition_stmts::{ConstantValue, Operation},
     AirIR, BoundaryExpr,
 };
+use std::fmt::Display;
 
 mod boundary_constraints;
 use boundary_constraints::set_boundary_expressions_and_outputs;
@@ -10,8 +11,8 @@ use boundary_constraints::set_boundary_expressions_and_outputs;
 mod error;
 use error::ConstraintEvaluationError;
 
-mod helpers;
-use helpers::{accumulate_constants, count_boundary_rand_values, Expression, NodeType};
+mod utils;
+use utils::{accumulate_constants, count_boundary_rand_values};
 
 mod transition_constraints;
 use transition_constraints::{set_transition_expressions, set_transition_outputs};
@@ -59,8 +60,6 @@ impl CodeGenerator {
 
         // TODO #1: get rid of the vector and push values directly into result string
         // constants from Constants AirIR field
-        // TODO #2: currently I add all found constants in the vector. Should I add only unique ones,
-        // since I'll get constants by their value, not index?
         let constants = set_constants(ir, &mut const_public_type_map, boundary_constraints_vec);
 
         set_transition_expressions(ir, &mut expressions, &constants, &mut expressions_map)?;
@@ -129,7 +128,7 @@ fn set_num_variables<'a>(
     // public inputs
     for input in ir.public_inputs() {
         num_variables += input.1;
-        const_public_type_map.insert(input.0.as_str(), NodeType::VAR);
+        const_public_type_map.insert(input.0.as_str(), NodeType::Var);
     }
 
     // TODO: how many random values can we have? Would them fit in u8?
@@ -179,11 +178,15 @@ fn set_constants<'a>(
     for constant in ir.constants() {
         match constant.value() {
             Scalar(value) => {
-                constants.push(*value);
+                if !constants.contains(value) {
+                    constants.push(*value);
+                }
             }
             Vector(values) => {
                 for elem in values {
-                    constants.push(*elem);
+                    if !constants.contains(elem) {
+                        constants.push(*elem);
+                    }
                 }
                 // not sure thet this approach is better
                 // let mut local_values = values.clone();
@@ -191,11 +194,13 @@ fn set_constants<'a>(
             }
             Matrix(values) => {
                 for elem in values.iter().flatten() {
-                    constants.push(*elem);
+                    if !constants.contains(elem) {
+                        constants.push(*elem);
+                    }
                 }
             }
         }
-        const_public_type_map.insert(constant.name().name(), NodeType::CONST);
+        const_public_type_map.insert(constant.name().name(), NodeType::Const);
     }
     // constants from boundary_constraints
     for constraints in boundary_constraints_vec {
@@ -207,11 +212,17 @@ fn set_constants<'a>(
     // constants and random values from transition_constraints
     for node in ir.transition_graph().nodes() {
         match node.op() {
-            Operation::Constant(ConstantValue::Inline(v)) => constants.push(*v),
+            Operation::Constant(ConstantValue::Inline(v)) => {
+                if !constants.contains(v) {
+                    constants.push(*v);
+                }
+            }
             Operation::Exp(_, degree) => {
                 if *degree == 0 {
-                    constants.push(1); // constant needed for optimization, since node^0 is Const(1)
-                } else {
+                    if !constants.contains(&1) {
+                        constants.push(1); // constant needed for optimization, since node^0 is Const(1)
+                    }
+                } else if !constants.contains(&(*degree as u64)) {
                     constants.push(*degree as u64)
                 }
             }
@@ -220,4 +231,79 @@ fn set_constants<'a>(
     }
 
     constants
+}
+
+/// Stroes node type required in [NodeReference] struct
+#[derive(Debug, Clone)]
+pub enum NodeType {
+    Pol,
+    PolNext,
+    Var,
+    Const,
+    Expr,
+}
+
+impl Display for NodeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Pol => write!(f, "POL"),
+            Self::PolNext => write!(f, "POL_NEXT"),
+            Self::Var => write!(f, "VAR"),
+            Self::Const => write!(f, "CONST"),
+            Self::Expr => write!(f, "EXPR"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ExpressionOperation {
+    Add,
+    Sub,
+    Mul,
+}
+
+impl Display for ExpressionOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Add => write!(f, "ADD"),
+            Self::Sub => write!(f, "SUB"),
+            Self::Mul => write!(f, "MUL"),
+        }
+    }
+}
+
+/// Stores data used in JSON generation
+#[derive(Debug, Clone)]
+pub struct NodeReference {
+    pub node_type: NodeType,
+    pub index: usize,
+}
+
+impl Display for NodeReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{\"type\": \"{}\", \"index\": {}}}",
+            self.node_type, self.index
+        )
+    }
+}
+
+// TODO: change String to &str (Or should I create another enum?)
+/// Stores data used in JSON generation
+#[derive(Debug)]
+pub struct Expression {
+    pub op: ExpressionOperation,
+    pub lhs: NodeReference,
+    pub rhs: NodeReference,
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{\"op\": \"{}\", \"lhs\": {}, \"rhs\": {}}}",
+            self.op, self.lhs, self.rhs
+        )
+    }
 }

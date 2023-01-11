@@ -1,7 +1,7 @@
 {
 	"num_polys": 7,
 	"num_variables": 18,
-	"constants": [1, 1, 1, 1, 1],
+	"constants": [1],
 	"expressions": [
 		{"op": "ADD", "lhs": {"type": "POL", "index": 1}, "rhs": {"type": "POL", "index": 2}},
 		{"op": "SUB", "lhs": {"type": "POL_NEXT", "index": 0}, "rhs": {"type": "EXPR", "index": 0}},

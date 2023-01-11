@@ -1,9 +1,10 @@
-use crate::helpers::get_random_value_index;
-
 use super::error::ConstraintEvaluationError;
-use super::helpers::{
-    get_constant_index_by_matrix_access, get_constant_index_by_name, get_constant_index_by_value,
-    get_constant_index_by_vector_access, Expression, NodeReference, NodeType,
+use super::{
+    utils::{
+        get_constant_index_by_matrix_access, get_constant_index_by_name,
+        get_constant_index_by_value, get_constant_index_by_vector_access, get_random_value_index,
+    },
+    Expression, ExpressionOperation, NodeReference, NodeType,
 };
 use ir::{
     transition_stmts::{ConstantValue, Operation},
@@ -30,7 +31,7 @@ pub fn set_transition_expressions(
             Operation::Add(l, r) => {
                 expressions.push(handle_transition_expression(
                     ir,
-                    "ADD".to_string(),
+                    ExpressionOperation::Add,
                     *l,
                     *r,
                     constants,
@@ -42,7 +43,7 @@ pub fn set_transition_expressions(
             Operation::Sub(l, r) => {
                 expressions.push(handle_transition_expression(
                     ir,
-                    "SUB".to_string(),
+                    ExpressionOperation::Sub,
                     *l,
                     *r,
                     constants,
@@ -53,7 +54,7 @@ pub fn set_transition_expressions(
             Operation::Mul(l, r) => {
                 expressions.push(handle_transition_expression(
                     ir,
-                    "MUL".to_string(),
+                    ExpressionOperation::Mul,
                     *l,
                     *r,
                     constants,
@@ -67,11 +68,11 @@ pub fn set_transition_expressions(
                         // I decided that node^0 could be emulated using the product of 1*1, but perhaps there are better ways
                         let index_of_1 = get_constant_index_by_value(1, constants)?;
                         let const_1_node = NodeReference {
-                            node_type: NodeType::CONST,
+                            node_type: NodeType::Const,
                             index: index_of_1,
                         };
                         expressions.push(Expression {
-                            op: "MUL".to_string(),
+                            op: ExpressionOperation::Mul,
                             lhs: const_1_node.clone(),
                             rhs: const_1_node,
                         });
@@ -80,11 +81,11 @@ pub fn set_transition_expressions(
                         let lhs = handle_node_reference(ir, *i, constants, expressions_map)?;
                         let degree_index = get_constant_index_by_value(1, constants)?;
                         let rhs = NodeReference {
-                            node_type: NodeType::CONST,
+                            node_type: NodeType::Const,
                             index: degree_index,
                         };
                         expressions.push(Expression {
-                            op: "MUL".to_string(),
+                            op: ExpressionOperation::Mul,
                             lhs,
                             rhs,
                         });
@@ -126,7 +127,7 @@ pub fn set_transition_outputs(
 /// Parses expression in transition graph Node vector and returns related [Expression] instance.
 fn handle_transition_expression(
     ir: &AirIR,
-    op: String,
+    op: ExpressionOperation,
     l: NodeIndex,
     r: NodeIndex,
     constants: &[u64],
@@ -152,7 +153,7 @@ fn handle_node_reference(
                 .get(&i.index())
                 .ok_or_else(|| ConstraintEvaluationError::operation_not_found(i.index()))?;
             Ok(NodeReference {
-                node_type: NodeType::EXPR,
+                node_type: NodeType::Expr,
                 index: *index,
             })
         }
@@ -161,14 +162,14 @@ fn handle_node_reference(
                 ConstantValue::Inline(v) => {
                     let index = get_constant_index_by_value(*v, constants)?;
                     Ok(NodeReference {
-                        node_type: NodeType::CONST,
+                        node_type: NodeType::Const,
                         index,
                     })
                 }
                 ConstantValue::Scalar(name) => {
                     let index = get_constant_index_by_name(ir, name, constants)?;
                     Ok(NodeReference {
-                        node_type: NodeType::CONST,
+                        node_type: NodeType::Const,
                         index,
                     })
                 }
@@ -177,14 +178,14 @@ fn handle_node_reference(
                     // VectorAccess.name.name() and returns &str? (same with MatrixAccess)
                     let index = get_constant_index_by_vector_access(ir, vector_access, constants)?;
                     Ok(NodeReference {
-                        node_type: NodeType::CONST,
+                        node_type: NodeType::Const,
                         index,
                     })
                 }
                 ConstantValue::Matrix(matrix_access) => {
                     let index = get_constant_index_by_matrix_access(ir, matrix_access, constants)?;
                     Ok(NodeReference {
-                        node_type: NodeType::CONST,
+                        node_type: NodeType::Const,
                         index,
                     })
                 }
@@ -197,12 +198,12 @@ fn handle_node_reference(
                     // TODO: handle other offsets (not only 1)
                     if trace_access.row_offset() == 0 {
                         Ok(NodeReference {
-                            node_type: NodeType::POL,
+                            node_type: NodeType::Pol,
                             index: trace_access.col_idx(),
                         })
                     } else {
                         Ok(NodeReference {
-                            node_type: NodeType::POL_NEXT,
+                            node_type: NodeType::PolNext,
                             index: trace_access.col_idx(),
                         })
                     }
@@ -212,12 +213,12 @@ fn handle_node_reference(
                         + trace_access.col_idx();
                     if trace_access.row_offset() == 0 {
                         Ok(NodeReference {
-                            node_type: NodeType::POL,
+                            node_type: NodeType::Pol,
                             index: col_index,
                         })
                     } else {
                         Ok(NodeReference {
-                            node_type: NodeType::POL_NEXT,
+                            node_type: NodeType::PolNext,
                             index: col_index,
                         })
                     }
@@ -230,7 +231,7 @@ fn handle_node_reference(
         RandomValue(rand_index) => {
             let index = get_random_value_index(ir, *rand_index);
             Ok(NodeReference {
-                node_type: NodeType::VAR,
+                node_type: NodeType::Var,
                 index,
             })
         }
@@ -258,7 +259,7 @@ fn handle_exponentiation(
     let base_node = handle_node_reference(ir, i, constants, expressions_map)?;
     // push node^2 expression
     expressions.push(Expression {
-        op: "MUL".to_string(),
+        op: ExpressionOperation::Mul,
         lhs: base_node.clone(),
         rhs: base_node.clone(),
     });
@@ -268,11 +269,11 @@ fn handle_exponentiation(
     let mut cur_degree_of_2 = 1; // currently we have node^(2^cur_degree_of_2) = node^(2^1) = node^2
     while 2_usize.pow(cur_degree_of_2) <= degree / 2 {
         let last_node = NodeReference {
-            node_type: NodeType::EXPR,
+            node_type: NodeType::Expr,
             index: expressions.len() - 1,
         };
         expressions.push(Expression {
-            op: "MUL".to_string(),
+            op: ExpressionOperation::Mul,
             lhs: last_node.clone(),
             rhs: last_node,
         });
@@ -286,11 +287,11 @@ fn handle_exponentiation(
         if diff == 1 {
             // if we need to add first degree (base node)
             let last_node = NodeReference {
-                node_type: NodeType::EXPR,
+                node_type: NodeType::Expr,
                 index: expressions.len() - 1,
             };
             expressions.push(Expression {
-                op: "MUL".to_string(),
+                op: ExpressionOperation::Mul,
                 lhs: last_node,
                 rhs: base_node,
             });
@@ -298,16 +299,16 @@ fn handle_exponentiation(
         }
         if 2_usize.pow(cur_degree_of_2 - 1) <= diff {
             let last_node = NodeReference {
-                node_type: NodeType::EXPR,
+                node_type: NodeType::Expr,
                 index: expressions.len() - 1,
             };
             let fitting_degree_of_2_node = NodeReference {
-                node_type: NodeType::EXPR,
+                node_type: NodeType::Expr,
                 // cur_degree_of_2 shows how many indexes we need to add to reach the largest fitting degree of 2
                 index: square_node_index + cur_degree_of_2 as usize - 2,
             };
             expressions.push(Expression {
-                op: "MUL".to_string(),
+                op: ExpressionOperation::Mul,
                 lhs: last_node,
                 rhs: fitting_degree_of_2_node,
             });
