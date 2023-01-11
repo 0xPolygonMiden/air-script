@@ -43,8 +43,8 @@ impl Display for IdentifierType {
 /// identifiers.
 #[derive(Default, Debug)]
 pub(super) struct SymbolTable {
-    /// The number of trace segments in the AIR.
-    num_trace_segments: usize,
+    /// Vector in which index is trace segment and value is number of columns in this segment
+    segment_widths: Vec<u16>,
 
     /// A map of all declared identifiers from their name (the key) to their type.
     identifiers: BTreeMap<String, IdentifierType>,
@@ -62,10 +62,12 @@ pub(super) struct SymbolTable {
 }
 
 impl SymbolTable {
-    /// Sets the number of trace segments to the maximum of `num_trace_segments` and the provided
+    /// Sets the number of trace segments to the maximum of `segment_widths.len()` and the provided
     /// trace segment identifier, which is indexed from zero.
-    fn set_num_trace_segments(&mut self, trace_segment: TraceSegment) {
-        self.num_trace_segments = self.num_trace_segments.max((trace_segment + 1).into())
+    fn set_segment_widths_len(&mut self, trace_segment: TraceSegment) {
+        if trace_segment >= self.segment_widths.len() as u8 {
+            self.segment_widths.resize(trace_segment as usize + 1, 0);
+        }
     }
 
     /// Adds a declared identifier to the symbol table using the identifier as the key and the
@@ -108,7 +110,7 @@ impl SymbolTable {
         trace_segment: TraceSegment,
         trace: &[TraceCols],
     ) -> Result<(), SemanticError> {
-        self.set_num_trace_segments(trace_segment);
+        self.set_segment_widths_len(trace_segment);
 
         let mut col_idx = 0;
         for trace_cols in trace {
@@ -120,6 +122,7 @@ impl SymbolTable {
             )?;
             col_idx += trace_cols.size() as usize;
         }
+        self.segment_widths[trace_segment as usize] = col_idx as u16;
 
         Ok(())
     }
@@ -171,16 +174,21 @@ impl SymbolTable {
     }
 
     /// Consumes this symbol table and returns the information required for declaring constants,
-    /// public inputs and periodic columns for the AIR.
-    pub(super) fn into_declarations(self) -> (Constants, PublicInputs, PeriodicColumns) {
-        (self.constants, self.public_inputs, self.periodic_columns)
+    /// public inputs, periodic columns and columns amount for the AIR.
+    pub(super) fn into_declarations(self) -> (Constants, PublicInputs, PeriodicColumns, Vec<u16>) {
+        (
+            self.constants,
+            self.public_inputs,
+            self.periodic_columns,
+            self.segment_widths,
+        )
     }
 
     // --- ACCESSORS ------------------------------------------------------------------------------
 
     /// Gets the number of trace segments that were specified for this AIR.
     pub(super) fn num_trace_segments(&self) -> usize {
-        self.num_trace_segments
+        self.segment_widths.len() + 1
     }
 
     /// Returns the type associated with the specified identifier name.
@@ -196,6 +204,10 @@ impl SymbolTable {
                 name
             )))
         }
+    }
+
+    pub(super) fn segment_widths(&self) -> &Vec<u16> {
+        &self.segment_widths
     }
 
     /// Checks that the specified name and index are a valid reference to a declared public input

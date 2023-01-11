@@ -4,8 +4,9 @@ use super::{
 use crate::{
     ast::{
         constants::{Constant, ConstantType::Matrix, ConstantType::Scalar, ConstantType::Vector},
+        IndexedTraceAccess,
         IntegrityStmt::*,
-        IntegrityVariable, IntegrityVariableType, MatrixAccess, TraceAccess, VectorAccess,
+        IntegrityVariable, IntegrityVariableType, MatrixAccess, NamedTraceAccess, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -20,7 +21,7 @@ fn integrity_constraints() {
         enf clk' = clk + 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         IntegrityConstraint::new(
-            Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
+            Next(NamedTraceAccess::new(Identifier("clk".to_string()), 0)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
@@ -45,7 +46,7 @@ fn multiple_integrity_constraints() {
         enf clk' - clk = 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
         Constraint(IntegrityConstraint::new(
-            Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
+            Next(NamedTraceAccess::new(Identifier("clk".to_string()), 0)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
@@ -53,7 +54,10 @@ fn multiple_integrity_constraints() {
         )),
         Constraint(IntegrityConstraint::new(
             Sub(
-                Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
+                Box::new(Next(NamedTraceAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                ))),
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
             Const(1),

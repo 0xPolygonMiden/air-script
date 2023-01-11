@@ -1,5 +1,5 @@
 use crate::symbol_table::IdentifierType;
-use parser::ast::{MatrixAccess, TraceAccess, VectorAccess};
+use parser::ast::{MatrixAccess, NamedTraceAccess, VectorAccess};
 
 #[derive(Debug)]
 pub enum SemanticError {
@@ -49,7 +49,7 @@ impl SemanticError {
         ))
     }
 
-    pub(super) fn trace_access_out_of_bounds(access: &TraceAccess, size: usize) -> Self {
+    pub(super) fn trace_access_out_of_bounds(access: &NamedTraceAccess, size: usize) -> Self {
         Self::IndexOutOfRange(format!(
             "Out-of-range index {} in trace {} of length {}",
             access.idx(),

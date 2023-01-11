@@ -41,11 +41,19 @@ pub enum Token {
 
     /// Used to declare main trace columns.
     #[token("main")]
-    Main,
+    MainDecl,
 
     /// Used to declare aux trace columns.
     #[token("aux")]
-    Aux,
+    AuxDecl,
+
+    /// A reserved keyword for accessing main columns by index
+    #[token("$main")]
+    MainAccess,
+
+    /// A reserved keyword for accessing aux columns by index
+    #[token("$aux")]
+    AuxAccess,
 
     /// Keyword to declare the public inputs declaration section for the AIR.
     #[token("public_inputs")]

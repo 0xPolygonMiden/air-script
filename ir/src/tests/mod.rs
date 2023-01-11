@@ -41,6 +41,25 @@ fn boundary_constraints_with_constants() {
 }
 
 #[test]
+fn trace_columns_index_access() {
+    let source = "
+    trace_columns:
+        main: [a, b]
+        aux: [c, d]
+    public_inputs:
+        stack_inputs: [16]
+    integrity_constraints:
+        enf $main[0]' - $main[1] = 0
+        enf $aux[0]^3 - $aux[1]' = 0
+    boundary_constraints:
+        enf a.first = stack_inputs[0]^3";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_ok());
+}
+
+#[test]
 fn trace_cols_groups() {
     let source = "
     const A = 123
