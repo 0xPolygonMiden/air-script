@@ -98,12 +98,10 @@ impl IntegrityStmts {
             IntegrityStmt::Constraint(constraint) => {
                 let expr = constraint.expr();
 
-                let mut row_offsets = Vec::new();
                 // add it to the integrity constraints graph and get its entry index.
-                let (trace_segment, root_index) = self.constraints_graph.insert_expr(
+                let (trace_segment, root_index, row_offset) = self.constraints_graph.insert_expr(
                     symbol_table,
                     expr,
-                    &mut row_offsets,
                     &mut self.variable_roots,
                 )?;
 
@@ -114,7 +112,7 @@ impl IntegrityStmts {
                     ));
                 }
 
-                let constraint_root = ConstraintRoot::new(root_index, row_offsets);
+                let constraint_root = ConstraintRoot::new(root_index, row_offset);
                 // add the integrity constraint to the appropriate set of constraints.
                 self.constraint_roots[trace_segment as usize].push(constraint_root);
             }
@@ -128,17 +126,20 @@ impl IntegrityStmts {
 }
 
 /// A [ConstraintRoot] represents the entry node of a subgraph representing an integrity constraint
-/// within the [AlgebraicGraph]. It also contains the row offsets for the constraint.
+/// within the [AlgebraicGraph]. It also contains the row offset for the constraint which is the
+/// maximum of all row offsets accessed by the constraint. For example, if a constraint only
+/// accesses the trace in the current row then the row offset will be 0, but if it accesses the
+/// trace in both the current and the next rows then the row offset will be 1.
 #[derive(Debug, Clone)]
 pub struct ConstraintRoot {
     index: NodeIndex,
-    offsets: Vec<usize>,
+    offset: usize,
 }
 
 impl ConstraintRoot {
-    /// Creates a new [ConstraintRoot] with the specified entry index and row offsets.
-    pub fn new(index: NodeIndex, offsets: Vec<usize>) -> Self {
-        Self { index, offsets }
+    /// Creates a new [ConstraintRoot] with the specified entry index and row offset.
+    pub fn new(index: NodeIndex, offset: usize) -> Self {
+        Self { index, offset }
     }
 
     /// Returns the index of the entry node of the subgraph representing the constraint.
@@ -146,8 +147,11 @@ impl ConstraintRoot {
         &self.index
     }
 
-    /// Returns the row offsets for the constraint.
-    pub fn offsets(&self) -> &[usize] {
-        &self.offsets
+    /// Returns the row offset for the constraint which is the maximum of all the row offsets
+    /// accessed by the constraint. For example, if a constraint only accesses the trace in the
+    /// current row then the row offset will be 0, but if it accesses the trace in both the current
+    /// and the next rows then the row offset will be 1.
+    pub fn offset(&self) -> usize {
+        self.offset
     }
 }
