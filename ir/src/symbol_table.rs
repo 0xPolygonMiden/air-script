@@ -4,8 +4,8 @@ use super::{
 };
 use parser::ast::{
     constants::{Constant, ConstantType},
-    Identifier, MatrixAccess, PeriodicColumn, PublicInput, TraceCols, TransitionVariable,
-    TransitionVariableType, VectorAccess,
+    Identifier, IntegrityVariable, IntegrityVariableType, MatrixAccess, PeriodicColumn,
+    PublicInput, TraceCols, VectorAccess,
 };
 use std::fmt::Display;
 
@@ -21,8 +21,8 @@ pub(super) enum IdentifierType {
     /// an identifier for a periodic column, containing its index out of all periodic columns and
     /// its cycle length in that order.
     PeriodicColumn(usize, usize),
-    /// an identifier for a transition variable, containing its name and value
-    TransitionVariable(TransitionVariable),
+    /// an identifier for an integrity variable, containing its name and value
+    IntegrityVariable(IntegrityVariable),
 }
 
 impl Display for IdentifierType {
@@ -34,7 +34,7 @@ impl Display for IdentifierType {
             Self::TraceColumns(columns) => {
                 write!(f, "TraceColumns in segment {}", columns.trace_segment())
             }
-            Self::TransitionVariable(_) => write!(f, "TransitionVariable"),
+            Self::IntegrityVariable(_) => write!(f, "IntegrityVariable"),
         }
     }
 }
@@ -158,14 +158,14 @@ impl SymbolTable {
         Ok(())
     }
 
-    /// Inserts a transition variable into the symbol table.
-    pub(super) fn insert_transition_variable(
+    /// Inserts an integrity variable into the symbol table.
+    pub(super) fn insert_integrity_variable(
         &mut self,
-        variable: &TransitionVariable,
+        variable: &IntegrityVariable,
     ) -> Result<(), SemanticError> {
         self.insert_symbol(
             variable.name(),
-            IdentifierType::TransitionVariable(variable.clone()),
+            IdentifierType::IntegrityVariable(variable.clone()),
         )?;
         Ok(())
     }
@@ -227,8 +227,8 @@ impl SymbolTable {
                 validate_vector_access(vector_access, vector.len())?;
                 Ok(symbol_type)
             }
-            IdentifierType::TransitionVariable(transition_variable) => {
-                if let TransitionVariableType::Vector(vector) = transition_variable.value() {
+            IdentifierType::IntegrityVariable(integrity_variable) => {
+                if let IntegrityVariableType::Vector(vector) = integrity_variable.value() {
                     validate_vector_access(vector_access, vector.len())?;
                     Ok(symbol_type)
                 } else {
@@ -273,8 +273,8 @@ impl SymbolTable {
                 validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                 Ok(symbol_type)
             }
-            IdentifierType::TransitionVariable(transition_variable) => {
-                if let TransitionVariableType::Matrix(matrix) = transition_variable.value() {
+            IdentifierType::IntegrityVariable(transition_variable) => {
+                if let IntegrityVariableType::Matrix(matrix) = transition_variable.value() {
                     validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                     Ok(symbol_type)
                 } else {

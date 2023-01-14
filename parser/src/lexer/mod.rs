@@ -69,11 +69,11 @@ pub enum Token {
     #[token("last")]
     Last,
 
-    // TRANSITION CONSTRAINT KEYWORDS
+    // INTEGRITY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
-    /// Marks the beginning of transition constraints section in the constraints file.
-    #[token("transition_constraints")]
-    TransitionConstraints,
+    /// Marks the beginning of integrity constraints section in the constraints file.
+    #[token("integrity_constraints")]
+    IntegrityConstraints,
 
     /// A modifier for identifiers used to indicate the next row.
     #[token("'")]

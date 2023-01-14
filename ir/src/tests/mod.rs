@@ -8,7 +8,7 @@ fn boundary_constraints() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1
     boundary_constraints:
         enf clk.first = 0
@@ -29,7 +29,7 @@ fn boundary_constraints_with_constants() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk - 1
     boundary_constraints:
         enf clk.first = A
@@ -50,7 +50,7 @@ fn trace_cols_groups() {
         main: [clk, a[4]]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf a[0]' = a[1] - 1
     boundary_constraints:
         enf a[1].first = A
@@ -64,7 +64,7 @@ fn trace_cols_groups() {
 
 #[test]
 fn err_trace_cols_access_out_of_bounds() {
-    // out of bounds in transition constraints
+    // out of bounds in integrity constraints
     let source = "
     const A = 123
     const B = [1, 2, 3]
@@ -73,7 +73,7 @@ fn err_trace_cols_access_out_of_bounds() {
         main: [clk, a[4]]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf a[4]' = a[4] - 1
     boundary_constraints:
         enf a[1].first = A
@@ -93,7 +93,7 @@ fn err_trace_cols_access_out_of_bounds() {
         main: [clk, a[4]]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf a[0]' = a[0] - 1
     boundary_constraints:
         enf a[4].first = A
@@ -117,7 +117,7 @@ fn err_tc_invalid_vector_access() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = 0
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + A + B[3] - C[1][2]";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -127,7 +127,7 @@ fn err_tc_invalid_vector_access() {
 }
 
 #[test]
-fn err_tc_invalid_matrix_access() {
+fn err_ic_invalid_matrix_access() {
     let source = "
     const A = 123
     const B = [1, 2, 3]
@@ -138,7 +138,7 @@ fn err_tc_invalid_matrix_access() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = 0
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + A + B[1] - C[3][2]";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -156,7 +156,7 @@ fn err_tc_invalid_matrix_access() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = 0
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + A + B[1] - C[1][3]";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -175,7 +175,7 @@ fn err_bc_column_undeclared() {
     boundary_constraints:
         enf clk.first = 0
         enf clk.last = 1
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -193,7 +193,7 @@ fn err_bc_empty_or_omitted() {
     public_inputs:
         stack_inputs: [16]
     boundary_constraints:
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1";
 
     assert!(parse(source).is_err());
@@ -204,7 +204,7 @@ fn err_bc_empty_or_omitted() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -219,7 +219,7 @@ fn err_bc_duplicate_first() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1
     boundary_constraints:
         enf clk.first = 0
@@ -238,7 +238,7 @@ fn err_bc_duplicate_last() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1
     boundary_constraints:
         enf clk.last = 0
@@ -250,7 +250,7 @@ fn err_bc_duplicate_last() {
 }
 
 #[test]
-fn transition_constraints() {
+fn integrity_constraints() {
     let source = "
     trace_columns:
         main: [clk]
@@ -258,7 +258,7 @@ fn transition_constraints() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = 0
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -268,7 +268,7 @@ fn transition_constraints() {
 }
 
 #[test]
-fn transition_constraints_with_constants() {
+fn integrity_constraints_with_constants() {
     let source = "
     const A = 123
     const B = [1, 2, 3]
@@ -279,7 +279,7 @@ fn transition_constraints_with_constants() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = 0
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + A + B[1] - C[1][2]";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -289,7 +289,7 @@ fn transition_constraints_with_constants() {
 }
 
 #[test]
-fn transition_constraints_with_variables() {
+fn integrity_constraints_with_variables() {
     let source = "
     const A = 123
     const B = [1, 2, 3]
@@ -298,7 +298,7 @@ fn transition_constraints_with_variables() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         let a = 1
         let b = [a, a*a]
         let c = [[clk' - clk, clk - a], [1 + 8, 2^2]]
@@ -322,7 +322,7 @@ fn transition_constraints_using_parens() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = 0
-    transition_constraints:
+    integrity_constraints:
         enf clk' = (clk + 1)";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -343,7 +343,7 @@ fn err_bc_invalid_vector_access() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = A + B[3] - C[1][2]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -364,7 +364,7 @@ fn err_bc_invalid_matrix_access() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = A + B[1] - C[3][2]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -382,7 +382,7 @@ fn err_bc_invalid_matrix_access() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = A + B[1] - C[1][3]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -392,20 +392,20 @@ fn err_bc_invalid_matrix_access() {
 }
 
 #[test]
-fn err_tc_empty_or_omitted() {
-    // if transition constraints are empty, an error should be returned at parser level.
+fn err_ic_empty_or_omitted() {
+    // if integrity constraints are empty, an error should be returned at parser level.
     let source = "
     trace_columns:
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
     boundary_constraints:
         enf clk.first = 0";
 
     assert!(parse(source).is_err());
 
-    // if transition constraints are omitted, an error should be returned at IR level.
+    // if integrity constraints are omitted, an error should be returned at IR level.
     let source = "
     trace_columns:
         main: [clk]
@@ -420,7 +420,7 @@ fn err_tc_empty_or_omitted() {
 }
 
 #[test]
-fn err_tc_column_undeclared() {
+fn err_ic_column_undeclared() {
     let source = "
     trace_columns:
         main: [ctx]
@@ -428,7 +428,7 @@ fn err_tc_column_undeclared() {
         stack_inputs: [16]
     boundary_constraints:
         enf ctx.first = 0
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
@@ -444,7 +444,7 @@ fn err_public_inputs_empty_or_omitted() {
     trace_columns:
         main: [clk]
     public_inputs:
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1
     boundary_constraints:
         enf clk.first = 0";
@@ -455,7 +455,7 @@ fn err_public_inputs_empty_or_omitted() {
     let source = "
     trace_columns:
         main: [clk]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1
     boundary_constraints:
         enf clk.first = 0";
@@ -471,7 +471,7 @@ fn err_trace_cols_omitted() {
     let source = "
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1
     boundary_constraints:
         enf clk.first = 0";
@@ -494,7 +494,7 @@ fn op_mul() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = 0
-    transition_constraints:
+    integrity_constraints:
         enf clk' * clk = 1";
     let parsed = parse(source).expect("Parsing failed");
 
@@ -511,7 +511,7 @@ fn op_exp() {
         stack_inputs: [16]
     boundary_constraints:
         enf clk.first = 0
-    transition_constraints:
+    integrity_constraints:
         enf clk'^2 - clk = 1";
     let parsed = parse(source).expect("Parsing failed");
 
@@ -527,7 +527,7 @@ fn err_invalid_matrix_const() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1
     boundary_constraints:
         enf clk.first = 0
@@ -546,7 +546,7 @@ fn err_bc_variable_access_before_declaration() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + 1
     boundary_constraints:
         enf clk.first = a
@@ -566,7 +566,7 @@ fn err_tc_variable_access_before_declaration() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         enf clk' = clk + a
         let a = 1
     boundary_constraints:
@@ -586,7 +586,7 @@ fn err_variable_vector_invalid_access() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         let a = [1, 2]
         enf clk' = clk + a[2]
     boundary_constraints:
@@ -606,7 +606,7 @@ fn err_variable_matrix_invalid_access() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         let a = [[1, 2, 3], [4, 5, 6]]
         enf clk' = clk + a[1][3]
     boundary_constraints:
@@ -623,7 +623,7 @@ fn err_variable_matrix_invalid_access() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    transition_constraints:
+    integrity_constraints:
         let a = [[1, 2, 3], [4, 5, 6]]
         enf clk' = clk + a[2][0]
     boundary_constraints:
