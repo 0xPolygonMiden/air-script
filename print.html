@@ -191,8 +191,8 @@
 </li>
 <li>optimizations, such as:
 <ul>
-<li>removing unnecessary nodes from the <code>AlgebraicGraph</code> of transition constraints</li>
-<li>combining transition constraints with mutually exclusive selectors to reduce the total number of constraints</li>
+<li>removing unnecessary nodes from the <code>AlgebraicGraph</code> of integrity constraints</li>
+<li>combining integrity constraints with mutually exclusive selectors to reduce the total number of constraints</li>
 </ul>
 </li>
 <li>additional language targets for simplifying verifier implementations:
@@ -228,21 +228,21 @@
 </li>
 <li><code>enf</code>: used to describe a single <a href="description/./constraints.html">constraint</a>.</li>
 <li><code>public_inputs</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">public inputs are declared</a>. <em>They may only be referenced when defining boundary constraints.</em></li>
-<li><code>periodic_columns</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">periodic columns are declared</a>. <em>They may only be referenced when defining transition constraints.</em></li>
+<li><code>periodic_columns</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">periodic columns are declared</a>. <em>They may only be referenced when defining integrity constraints.</em></li>
 <li><code>trace_columns</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">execution trace is described</a>.
 <ul>
 <li><code>main</code>: used to declare the main execution trace.</li>
 <li><code>aux</code>: used to declare the auxiliary execution trace.</li>
 </ul>
 </li>
-<li><code>transition_constraints</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./constraints.html#transition_constraints">transition constraints are described</a>.</li>
+<li><code>integrity_constraints</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./constraints.html#integrity_constraints">integrity constraints are described</a>.</li>
 </ul>
 <h2 id="built-in-variables"><a class="header" href="#built-in-variables">Built-in variables</a></h2>
 <p>Built-in variables are identified by the starting character <code>\$</code>.</p>
 <h3 id="rand"><a class="header" href="#rand">$rand</a></h3>
 <p>Currently, the only built-in is <code>\$rand</code>, which is used to get random values provided by the verifier.</p>
 <p>These random values may be accessed by using the indexing operator on <code>\$rand</code>. For example, <code>\$rand[i]</code> provides the <code>ith</code> random value.</p>
-<p>Random values may only be accessed within source sections for constraints, i.e. the <a href="description/./constraints.html#boundary-constraints-boundary_constraints"><code>boundary_constraints</code> section</a> and the <a href="description/./constraints.html#transition-constraints-transition_constraints"><code>transition_constraints</code> section</a>.</p>
+<p>Random values may only be accessed within source sections for constraints, i.e. the <a href="description/./constraints.html#boundary-constraints-boundary_constraints"><code>boundary_constraints</code> section</a> and the <a href="description/./constraints.html#integrity-constraints-integrity_constraints"><code>integrity_constraints</code> section</a>.</p>
 <h2 id="delimiters-and-special-characters"><a class="header" href="#delimiters-and-special-characters">Delimiters and special characters</a></h2>
 <ul>
 <li><code>:</code> is used as a delimiter when declaring <a href="description/./structure.html#source-sections">source sections</a> and <a href="description/./declarations.html">types</a></li>
@@ -302,22 +302,22 @@ boundary_constraints:
     enf a.first = stack_inputs[0]
     enf a.last = stack_outputs[0]
 </code></pre>
-<h3 id="transition-constraints"><a class="header" href="#transition-constraints"><a href="description/./constraints.html#transition_constraints">Transition constraints</a></a></h3>
-<p>The following accessor may only be applied to trace columns when they are referenced in transition constraint definitions.</p>
+<h3 id="integrity-constraints"><a class="header" href="#integrity-constraints"><a href="description/./constraints.html#integrity_constraints">Integrity constraints</a></a></h3>
+<p>The following accessor may only be applied to trace columns when they are referenced in integrity constraint definitions.</p>
 <ul>
-<li>Next Row (<code>a'</code>): <code>'</code> is a postfix operator that indicates the value of the specified trace column in the next row. It is only supported in <a href="description/./constraints.html#transition_constraints">transition constraint descriptions</a>.</li>
+<li>Next Row (<code>a'</code>): <code>'</code> is a postfix operator that indicates the value of the specified trace column in the next row. It is only supported in <a href="description/./constraints.html#integrity_constraints">integrity constraint descriptions</a>.</li>
 </ul>
-<p>Here is an example of usage of the Next Row operator within a transition constraint:</p>
+<p>Here is an example of usage of the Next Row operator within an integrity constraint:</p>
 <pre><code>trace_columns:
   main: [a]
   aux: [p]
 
-transition_constraints:
+integrity_constraints:
   enf p' = p * a
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="file-structure"><a class="header" href="#file-structure">File Structure</a></h1>
-<p>An AIR Script file consists of a name definition and several source sections which contain declarations and constraints. The declarations describe the shape of the execution trace to which constraints are applied and the public inputs, and periodic columns that are used for computing those constraints. The constraints describe boundary and transition constraints which must hold for an execution trace and set of public inputs in order for them to be valid (i.e. in order for a valid proof to be generated or verification to pass).</p>
+<p>An AIR Script file consists of a name definition and several source sections which contain declarations and constraints. The declarations describe the shape of the execution trace to which constraints are applied and the public inputs, and periodic columns that are used for computing those constraints. The constraints describe boundary and integrity constraints which must hold for an execution trace and set of public inputs in order for them to be valid (i.e. in order for a valid proof to be generated or verification to pass).</p>
 <h2 id="air-name-definition"><a class="header" href="#air-name-definition">AIR name definition</a></h2>
 <p>An AirScript file starts with a definition of the name of the AIR module, such as:</p>
 <pre><code>def ExampleAir
@@ -350,7 +350,7 @@ trace_columns:
 <p>Valid keywords for constraint description sections are the following:</p>
 <ul>
 <li><code>boundary_constraints</code></li>
-<li><code>transition_constraints</code></li>
+<li><code>integrity_constraints</code></li>
 </ul>
 <p>By convention, type declaration sections precede constraint description sections, although this is not a requirement of the language.</p>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
@@ -380,7 +380,7 @@ trace_columns:
 <p>In the above example, the public input <code>program_hash</code> is an array of length <code>4</code>. <code>stack_inputs</code> and <code>stack_outputs</code> are both arrays of length <code>16</code>.</p>
 <p>Public inputs can be referenced by <a href="description/./constraints.html#boundary_constraints">boundary constraints</a> by using the identifier and an index. For example, the 3rd element of the <code>program_hash</code> declared above would be referenced as <code>program_hash[2]</code>.</p>
 <h2 id="periodic-columns-periodic_columns"><a class="header" href="#periodic-columns-periodic_columns">Periodic columns (<code>periodic_columns</code>)</a></h2>
-<p>A <code>periodic_columns</code> section contains declarations for periodic columns used in the description and evaluation of transition constraints. Each periodic column declares an array of periodic values which can then be referenced by the declared identifier.</p>
+<p>A <code>periodic_columns</code> section contains declarations for periodic columns used in the description and evaluation of integrity constraints. Each periodic column declares an array of periodic values which can then be referenced by the declared identifier.</p>
 <p>There is no limit to how many of them can be declared within the <code>periodic_columns</code> section.</p>
 <p><strong>Periodic columns are optional.</strong> It is equally valid to define an empty <code>periodic_columns</code> section or to omit the <code>periodic_columns</code> section declaration entirely.</p>
 <p>Each periodic column is described by an identifier and an array of integers in the following format. These integers are the periodic values.</p>
@@ -393,8 +393,8 @@ trace_columns:
     k1: [1, 1, 1, 1, 1, 1, 1, 0]
 </code></pre>
 <p>In the above example, <code>k0</code> declares a periodic column with a cycle of length <code>4</code>, and <code>k1</code> declares a periodic column with a cycle of length <code>8</code>.</p>
-<p>Periodic columns can be referenced by <a href="description/./constraints.html#transition_constraints">transition constraints</a> by using the column's identifier.</p>
-<p>When constraints are evaluated, these periodic values always refer to the value of the column in the current row. For example, when evaluating a transition constraint such as <code>enf k0 * a = 0</code>, <code>k0</code> would be evaluated as <code>0</code> in rows <code>0</code>, <code>1</code>, <code>2</code> of the trace and as <code>1</code> in row <code>3</code>, and then the cycle would repeat. Attempting to refer to the &quot;next&quot; row of a periodic column, such as by <code>k0'</code>, is invalid and will cause a <code>ParseError</code>.</p>
+<p>Periodic columns can be referenced by <a href="description/./constraints.html#integrity_constraints">integrity constraints</a> by using the column's identifier.</p>
+<p>When constraints are evaluated, these periodic values always refer to the value of the column in the current row. For example, when evaluating an integrity constraint such as <code>enf k0 * a = 0</code>, <code>k0</code> would be evaluated as <code>0</code> in rows <code>0</code>, <code>1</code>, <code>2</code> of the trace and as <code>1</code> in row <code>3</code>, and then the cycle would repeat. Attempting to refer to the &quot;next&quot; row of a periodic column, such as by <code>k0'</code>, is invalid and will cause a <code>ParseError</code>.</p>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="constraint-description-sections"><a class="header" href="#constraint-description-sections">Constraint description sections</a></h1>
 <h2 id="boundary-constraints-boundary_constraints"><a class="header" href="#boundary-constraints-boundary_constraints">Boundary constraints (<code>boundary_constraints</code>)</a></h2>
@@ -429,7 +429,7 @@ boundary_constraints:
     enf p.first = 1
     enf p.last = 1
 
-transition_constraints:
+integrity_constraints:
     &lt;omitted for brevity&gt;
 </code></pre>
 <h3 id="public-inputs-and-random-values"><a class="header" href="#public-inputs-and-random-values">Public inputs and random values</a></h3>
@@ -461,24 +461,24 @@ boundary_constraints:
     enf b.first = a + $rand[0]
     enf p1.first = (stack_inputs[2] + $rand[0]) * (stack_inputs[3] + $rand[1])
 
-transition_constraints:
+integrity_constraints:
     &lt;omitted for brevity&gt;
 </code></pre>
-<h2 id="transition-constraints-transition_constraints"><a class="header" href="#transition-constraints-transition_constraints">Transition constraints (<code>transition_constraints</code>)</a></h2>
-<p>The <code>transition_constraints</code> section consists of expressions describing constraints that must be true at each row of the execution trace in order for the proof to be valid.</p>
-<p><strong>Transition constraints are required.</strong> The <code>transition_constraints</code> section must be defined and contain at least one transition constraint.</p>
-<p>Transition constraints that are defined against auxiliary columns or that use random values from the built-in <code>$rand</code> array will be identified as auxiliary constraints.</p>
-<p>A transition constraint definition must:</p>
+<h2 id="integrity-constraints-integrity_constraints"><a class="header" href="#integrity-constraints-integrity_constraints">Integrity constraints (<code>integrity_constraints</code>)</a></h2>
+<p>The <code>integrity_constraints</code> section consists of expressions describing constraints that must be true at each row of the execution trace in order for the proof to be valid.</p>
+<p><strong>Integrity constraints are required.</strong> The <code>integrity_constraints</code> section must be defined and contain at least one integrity constraint.</p>
+<p>Integrity constraints that are defined against auxiliary columns or that use random values from the built-in <code>$rand</code> array will be identified as auxiliary constraints.</p>
+<p>An integrity constraint definition must:</p>
 <ol>
 <li>start with a block indentation and the <code>enf</code> keyword to indicate that the constraint must be <em>enforced</em>.</li>
 <li>continue with an equality expression that describes the constraint. The expression may include numbers, trace columns, periodic columns, random values, and any of the available <a href="description/./syntax.html#operations">operations</a>.</li>
 <li>end with a newline.</li>
 </ol>
 <h3 id="current-and-next-rows"><a class="header" href="#current-and-next-rows">Current and next rows</a></h3>
-<p>Transition constraints have access to values in the &quot;current&quot; row of the trace to which the constraint is being applied, as well as the &quot;next&quot; row of the trace. The value of a trace column in the next row is specified with the <code>'</code> postfix operator, as described by the <a href="description/./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
-<h3 id="simple-example-of-transition-constraints"><a class="header" href="#simple-example-of-transition-constraints">Simple example of transition constraints</a></h3>
-<p>The following is a simple example of a valid <code>transition_constraints</code> block using values from the current and next rows of the main and auxiliary traces:</p>
-<pre><code>def TransitionConstraintsExample
+<p>Integrity constraints have access to values in the &quot;current&quot; row of the trace to which the constraint is being applied, as well as the &quot;next&quot; row of the trace. The value of a trace column in the next row is specified with the <code>'</code> postfix operator, as described by the <a href="description/./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
+<h3 id="simple-example-of-integrity-constraints"><a class="header" href="#simple-example-of-integrity-constraints">Simple example of integrity constraints</a></h3>
+<p>The following is a simple example of a valid <code>integrity_constraints</code> block using values from the current and next rows of the main and auxiliary traces:</p>
+<pre><code>def IntegrityConstraintsExample
 
 trace_columns:
     main: [a, b]
@@ -490,7 +490,7 @@ public_inputs:
 boundary_constraints:
     &lt;omitted for brevity&gt;
 
-transition_constraints:
+integrity_constraints:
     # these are main constraints. they both express the same constraint.
     enf a' = a + 1
     enf b' - b - 1 = 0
@@ -499,12 +499,12 @@ transition_constraints:
     enf p = p' * a
 </code></pre>
 <h3 id="periodic-columns-and-random-values"><a class="header" href="#periodic-columns-and-random-values">Periodic columns and random values</a></h3>
-<p>Transition constraints can access the value of any periodic column in the current row, as well as random values provided by the verifier.</p>
+<p>Integrity constraints can access the value of any periodic column in the current row, as well as random values provided by the verifier.</p>
 <p>To use periodic column values, the periodic column must be declared in the <code>periodic_columns</code> source section. The value in the current row can then be accessed by using the defined identifier of the periodic column.</p>
 <p>Random values can be accessed by using array indexing syntax on the <code>$rand</code> built-in, as described by the <a href="description/./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
-<h3 id="example-of-transition-constraints-with-periodic-columns-and-random-values"><a class="header" href="#example-of-transition-constraints-with-periodic-columns-and-random-values">Example of transition constraints with periodic columns and random values</a></h3>
-<p>The following is an example of a valid <code>transition_constraints</code> block that uses periodic columns and random values:</p>
-<pre><code>def TransitionConstraintsExample
+<h3 id="example-of-integrity-constraints-with-periodic-columns-and-random-values"><a class="header" href="#example-of-integrity-constraints-with-periodic-columns-and-random-values">Example of integrity constraints with periodic columns and random values</a></h3>
+<p>The following is an example of a valid <code>integrity_constraints</code> block that uses periodic columns and random values:</p>
+<pre><code>def IntegrityConstraintsExample
 
 trace_columns:
     main: [a, b]
@@ -519,7 +519,7 @@ periodic_columns:
 boundary_constraints:
     &lt;omitted for brevity&gt;
 
-transition_constraints:
+integrity_constraints:
     # this is a main constraint that uses a periodic column.
     enf a' = k * a
 
@@ -560,7 +560,7 @@ boundary_constraints:
     # set the first row of the auxiliary column p to 1
     enf p.first = 1
 
-transition_constraints:
+integrity_constraints:
     # the selector must be binary.
     enf s^2 = s
 
@@ -588,7 +588,7 @@ transition_constraints:
 </ul>
 <h2 id="ir"><a class="header" href="#ir">IR</a></h2>
 <p>The IR is where semantic checking is done and where optimizations will be done in the future.</p>
-<p>A directed acyclic graph called <code>AlgebraicGraph</code> is responsible for efficiently representing all transition constraints, identifying their type (main or auxiliary), and computing their degrees.</p>
+<p>A directed acyclic graph called <code>AlgebraicGraph</code> is responsible for efficiently representing all integrity constraints, identifying their type (main or auxiliary), and computing their degrees.</p>
 <p>Currently, the checks in the IR are very minimal and cover the following simple cases.</p>
 <h3 id="identifiers-1"><a class="header" href="#identifiers-1">Identifiers</a></h3>
 <ul>
@@ -610,15 +610,15 @@ transition_constraints:
 </li>
 <li>Identify boundary constraint types (main or auxiliary), based on the trace column to which the constraint is applied.</li>
 </ul>
-<h3 id="transition-constraints-1"><a class="header" href="#transition-constraints-1">Transition constraints</a></h3>
+<h3 id="integrity-constraints-1"><a class="header" href="#integrity-constraints-1">Integrity constraints</a></h3>
 <ul>
-<li>Ensure transition constraints contain valid identifier references by:
+<li>Ensure integrity constraints contain valid identifier references by:
 <ul>
 <li>Preventing public inputs from being used.</li>
 <li>Preventing &quot;next&quot; indicators from being applied to anything other than trace columns.</li>
 </ul>
 </li>
-<li>Identify transition constraint types (main or auxiliary) based on the constraint expression.
+<li>Identify integrity constraint types (main or auxiliary) based on the constraint expression.
 <ul>
 <li>Constraints referencing the auxiliary trace or using random values are identified as constraints against the auxiliary trace.</li>
 <li>All other constraints are identified as constraints against the main trace.</li>

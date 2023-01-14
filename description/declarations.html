@@ -171,7 +171,7 @@
 <p>In the above example, the public input <code>program_hash</code> is an array of length <code>4</code>. <code>stack_inputs</code> and <code>stack_outputs</code> are both arrays of length <code>16</code>.</p>
 <p>Public inputs can be referenced by <a href="./constraints.html#boundary_constraints">boundary constraints</a> by using the identifier and an index. For example, the 3rd element of the <code>program_hash</code> declared above would be referenced as <code>program_hash[2]</code>.</p>
 <h2 id="periodic-columns-periodic_columns"><a class="header" href="#periodic-columns-periodic_columns">Periodic columns (<code>periodic_columns</code>)</a></h2>
-<p>A <code>periodic_columns</code> section contains declarations for periodic columns used in the description and evaluation of transition constraints. Each periodic column declares an array of periodic values which can then be referenced by the declared identifier.</p>
+<p>A <code>periodic_columns</code> section contains declarations for periodic columns used in the description and evaluation of integrity constraints. Each periodic column declares an array of periodic values which can then be referenced by the declared identifier.</p>
 <p>There is no limit to how many of them can be declared within the <code>periodic_columns</code> section.</p>
 <p><strong>Periodic columns are optional.</strong> It is equally valid to define an empty <code>periodic_columns</code> section or to omit the <code>periodic_columns</code> section declaration entirely.</p>
 <p>Each periodic column is described by an identifier and an array of integers in the following format. These integers are the periodic values.</p>
@@ -184,8 +184,8 @@
     k1: [1, 1, 1, 1, 1, 1, 1, 0]
 </code></pre>
 <p>In the above example, <code>k0</code> declares a periodic column with a cycle of length <code>4</code>, and <code>k1</code> declares a periodic column with a cycle of length <code>8</code>.</p>
-<p>Periodic columns can be referenced by <a href="./constraints.html#transition_constraints">transition constraints</a> by using the column's identifier.</p>
-<p>When constraints are evaluated, these periodic values always refer to the value of the column in the current row. For example, when evaluating a transition constraint such as <code>enf k0 * a = 0</code>, <code>k0</code> would be evaluated as <code>0</code> in rows <code>0</code>, <code>1</code>, <code>2</code> of the trace and as <code>1</code> in row <code>3</code>, and then the cycle would repeat. Attempting to refer to the &quot;next&quot; row of a periodic column, such as by <code>k0'</code>, is invalid and will cause a <code>ParseError</code>.</p>
+<p>Periodic columns can be referenced by <a href="./constraints.html#integrity_constraints">integrity constraints</a> by using the column's identifier.</p>
+<p>When constraints are evaluated, these periodic values always refer to the value of the column in the current row. For example, when evaluating an integrity constraint such as <code>enf k0 * a = 0</code>, <code>k0</code> would be evaluated as <code>0</code> in rows <code>0</code>, <code>1</code>, <code>2</code> of the trace and as <code>1</code> in row <code>3</code>, and then the cycle would repeat. Attempting to refer to the &quot;next&quot; row of a periodic column, such as by <code>k0'</code>, is invalid and will cause a <code>ParseError</code>.</p>
 
                     </main>
 

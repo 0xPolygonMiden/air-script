@@ -178,7 +178,7 @@ boundary_constraints:
     enf p.first = 1
     enf p.last = 1
 
-transition_constraints:
+integrity_constraints:
     &lt;omitted for brevity&gt;
 </code></pre>
 <h3 id="public-inputs-and-random-values"><a class="header" href="#public-inputs-and-random-values">Public inputs and random values</a></h3>
@@ -210,24 +210,24 @@ boundary_constraints:
     enf b.first = a + $rand[0]
     enf p1.first = (stack_inputs[2] + $rand[0]) * (stack_inputs[3] + $rand[1])
 
-transition_constraints:
+integrity_constraints:
     &lt;omitted for brevity&gt;
 </code></pre>
-<h2 id="transition-constraints-transition_constraints"><a class="header" href="#transition-constraints-transition_constraints">Transition constraints (<code>transition_constraints</code>)</a></h2>
-<p>The <code>transition_constraints</code> section consists of expressions describing constraints that must be true at each row of the execution trace in order for the proof to be valid.</p>
-<p><strong>Transition constraints are required.</strong> The <code>transition_constraints</code> section must be defined and contain at least one transition constraint.</p>
-<p>Transition constraints that are defined against auxiliary columns or that use random values from the built-in <code>$rand</code> array will be identified as auxiliary constraints.</p>
-<p>A transition constraint definition must:</p>
+<h2 id="integrity-constraints-integrity_constraints"><a class="header" href="#integrity-constraints-integrity_constraints">Integrity constraints (<code>integrity_constraints</code>)</a></h2>
+<p>The <code>integrity_constraints</code> section consists of expressions describing constraints that must be true at each row of the execution trace in order for the proof to be valid.</p>
+<p><strong>Integrity constraints are required.</strong> The <code>integrity_constraints</code> section must be defined and contain at least one integrity constraint.</p>
+<p>Integrity constraints that are defined against auxiliary columns or that use random values from the built-in <code>$rand</code> array will be identified as auxiliary constraints.</p>
+<p>An integrity constraint definition must:</p>
 <ol>
 <li>start with a block indentation and the <code>enf</code> keyword to indicate that the constraint must be <em>enforced</em>.</li>
 <li>continue with an equality expression that describes the constraint. The expression may include numbers, trace columns, periodic columns, random values, and any of the available <a href="./syntax.html#operations">operations</a>.</li>
 <li>end with a newline.</li>
 </ol>
 <h3 id="current-and-next-rows"><a class="header" href="#current-and-next-rows">Current and next rows</a></h3>
-<p>Transition constraints have access to values in the &quot;current&quot; row of the trace to which the constraint is being applied, as well as the &quot;next&quot; row of the trace. The value of a trace column in the next row is specified with the <code>'</code> postfix operator, as described by the <a href="./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
-<h3 id="simple-example-of-transition-constraints"><a class="header" href="#simple-example-of-transition-constraints">Simple example of transition constraints</a></h3>
-<p>The following is a simple example of a valid <code>transition_constraints</code> block using values from the current and next rows of the main and auxiliary traces:</p>
-<pre><code>def TransitionConstraintsExample
+<p>Integrity constraints have access to values in the &quot;current&quot; row of the trace to which the constraint is being applied, as well as the &quot;next&quot; row of the trace. The value of a trace column in the next row is specified with the <code>'</code> postfix operator, as described by the <a href="./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
+<h3 id="simple-example-of-integrity-constraints"><a class="header" href="#simple-example-of-integrity-constraints">Simple example of integrity constraints</a></h3>
+<p>The following is a simple example of a valid <code>integrity_constraints</code> block using values from the current and next rows of the main and auxiliary traces:</p>
+<pre><code>def IntegrityConstraintsExample
 
 trace_columns:
     main: [a, b]
@@ -239,7 +239,7 @@ public_inputs:
 boundary_constraints:
     &lt;omitted for brevity&gt;
 
-transition_constraints:
+integrity_constraints:
     # these are main constraints. they both express the same constraint.
     enf a' = a + 1
     enf b' - b - 1 = 0
@@ -248,12 +248,12 @@ transition_constraints:
     enf p = p' * a
 </code></pre>
 <h3 id="periodic-columns-and-random-values"><a class="header" href="#periodic-columns-and-random-values">Periodic columns and random values</a></h3>
-<p>Transition constraints can access the value of any periodic column in the current row, as well as random values provided by the verifier.</p>
+<p>Integrity constraints can access the value of any periodic column in the current row, as well as random values provided by the verifier.</p>
 <p>To use periodic column values, the periodic column must be declared in the <code>periodic_columns</code> source section. The value in the current row can then be accessed by using the defined identifier of the periodic column.</p>
 <p>Random values can be accessed by using array indexing syntax on the <code>$rand</code> built-in, as described by the <a href="./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
-<h3 id="example-of-transition-constraints-with-periodic-columns-and-random-values"><a class="header" href="#example-of-transition-constraints-with-periodic-columns-and-random-values">Example of transition constraints with periodic columns and random values</a></h3>
-<p>The following is an example of a valid <code>transition_constraints</code> block that uses periodic columns and random values:</p>
-<pre><code>def TransitionConstraintsExample
+<h3 id="example-of-integrity-constraints-with-periodic-columns-and-random-values"><a class="header" href="#example-of-integrity-constraints-with-periodic-columns-and-random-values">Example of integrity constraints with periodic columns and random values</a></h3>
+<p>The following is an example of a valid <code>integrity_constraints</code> block that uses periodic columns and random values:</p>
+<pre><code>def IntegrityConstraintsExample
 
 trace_columns:
     main: [a, b]
@@ -268,7 +268,7 @@ periodic_columns:
 boundary_constraints:
     &lt;omitted for brevity&gt;
 
-transition_constraints:
+integrity_constraints:
     # this is a main constraint that uses a periodic column.
     enf a' = k * a
 

@@ -156,7 +156,7 @@
 </ul>
 <h2 id="ir"><a class="header" href="#ir">IR</a></h2>
 <p>The IR is where semantic checking is done and where optimizations will be done in the future.</p>
-<p>A directed acyclic graph called <code>AlgebraicGraph</code> is responsible for efficiently representing all transition constraints, identifying their type (main or auxiliary), and computing their degrees.</p>
+<p>A directed acyclic graph called <code>AlgebraicGraph</code> is responsible for efficiently representing all integrity constraints, identifying their type (main or auxiliary), and computing their degrees.</p>
 <p>Currently, the checks in the IR are very minimal and cover the following simple cases.</p>
 <h3 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h3>
 <ul>
@@ -178,15 +178,15 @@
 </li>
 <li>Identify boundary constraint types (main or auxiliary), based on the trace column to which the constraint is applied.</li>
 </ul>
-<h3 id="transition-constraints"><a class="header" href="#transition-constraints">Transition constraints</a></h3>
+<h3 id="integrity-constraints"><a class="header" href="#integrity-constraints">Integrity constraints</a></h3>
 <ul>
-<li>Ensure transition constraints contain valid identifier references by:
+<li>Ensure integrity constraints contain valid identifier references by:
 <ul>
 <li>Preventing public inputs from being used.</li>
 <li>Preventing &quot;next&quot; indicators from being applied to anything other than trace columns.</li>
 </ul>
 </li>
-<li>Identify transition constraint types (main or auxiliary) based on the constraint expression.
+<li>Identify integrity constraint types (main or auxiliary) based on the constraint expression.
 <ul>
 <li>Constraints referencing the auxiliary trace or using random values are identified as constraints against the auxiliary trace.</li>
 <li>All other constraints are identified as constraints against the main trace.</li>

@@ -146,7 +146,7 @@
                     <main>
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="file-structure"><a class="header" href="#file-structure">File Structure</a></h1>
-<p>An AIR Script file consists of a name definition and several source sections which contain declarations and constraints. The declarations describe the shape of the execution trace to which constraints are applied and the public inputs, and periodic columns that are used for computing those constraints. The constraints describe boundary and transition constraints which must hold for an execution trace and set of public inputs in order for them to be valid (i.e. in order for a valid proof to be generated or verification to pass).</p>
+<p>An AIR Script file consists of a name definition and several source sections which contain declarations and constraints. The declarations describe the shape of the execution trace to which constraints are applied and the public inputs, and periodic columns that are used for computing those constraints. The constraints describe boundary and integrity constraints which must hold for an execution trace and set of public inputs in order for them to be valid (i.e. in order for a valid proof to be generated or verification to pass).</p>
 <h2 id="air-name-definition"><a class="header" href="#air-name-definition">AIR name definition</a></h2>
 <p>An AirScript file starts with a definition of the name of the AIR module, such as:</p>
 <pre><code>def ExampleAir
@@ -179,7 +179,7 @@ trace_columns:
 <p>Valid keywords for constraint description sections are the following:</p>
 <ul>
 <li><code>boundary_constraints</code></li>
-<li><code>transition_constraints</code></li>
+<li><code>integrity_constraints</code></li>
 </ul>
 <p>By convention, type declaration sections precede constraint description sections, although this is not a requirement of the language.</p>
 

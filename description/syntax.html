@@ -160,21 +160,21 @@
 </li>
 <li><code>enf</code>: used to describe a single <a href="./constraints.html">constraint</a>.</li>
 <li><code>public_inputs</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./declarations.html">public inputs are declared</a>. <em>They may only be referenced when defining boundary constraints.</em></li>
-<li><code>periodic_columns</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./declarations.html">periodic columns are declared</a>. <em>They may only be referenced when defining transition constraints.</em></li>
+<li><code>periodic_columns</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./declarations.html">periodic columns are declared</a>. <em>They may only be referenced when defining integrity constraints.</em></li>
 <li><code>trace_columns</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./declarations.html">execution trace is described</a>.
 <ul>
 <li><code>main</code>: used to declare the main execution trace.</li>
 <li><code>aux</code>: used to declare the auxiliary execution trace.</li>
 </ul>
 </li>
-<li><code>transition_constraints</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./constraints.html#transition_constraints">transition constraints are described</a>.</li>
+<li><code>integrity_constraints</code>: used to declare the <a href="./structure.html#source-sections">source section</a> where the <a href="./constraints.html#integrity_constraints">integrity constraints are described</a>.</li>
 </ul>
 <h2 id="built-in-variables"><a class="header" href="#built-in-variables">Built-in variables</a></h2>
 <p>Built-in variables are identified by the starting character <code>\$</code>.</p>
 <h3 id="rand"><a class="header" href="#rand">$rand</a></h3>
 <p>Currently, the only built-in is <code>\$rand</code>, which is used to get random values provided by the verifier.</p>
 <p>These random values may be accessed by using the indexing operator on <code>\$rand</code>. For example, <code>\$rand[i]</code> provides the <code>ith</code> random value.</p>
-<p>Random values may only be accessed within source sections for constraints, i.e. the <a href="./constraints.html#boundary-constraints-boundary_constraints"><code>boundary_constraints</code> section</a> and the <a href="./constraints.html#transition-constraints-transition_constraints"><code>transition_constraints</code> section</a>.</p>
+<p>Random values may only be accessed within source sections for constraints, i.e. the <a href="./constraints.html#boundary-constraints-boundary_constraints"><code>boundary_constraints</code> section</a> and the <a href="./constraints.html#integrity-constraints-integrity_constraints"><code>integrity_constraints</code> section</a>.</p>
 <h2 id="delimiters-and-special-characters"><a class="header" href="#delimiters-and-special-characters">Delimiters and special characters</a></h2>
 <ul>
 <li><code>:</code> is used as a delimiter when declaring <a href="./structure.html#source-sections">source sections</a> and <a href="./declarations.html">types</a></li>
@@ -234,17 +234,17 @@ boundary_constraints:
     enf a.first = stack_inputs[0]
     enf a.last = stack_outputs[0]
 </code></pre>
-<h3 id="transition-constraints"><a class="header" href="#transition-constraints"><a href="./constraints.html#transition_constraints">Transition constraints</a></a></h3>
-<p>The following accessor may only be applied to trace columns when they are referenced in transition constraint definitions.</p>
+<h3 id="integrity-constraints"><a class="header" href="#integrity-constraints"><a href="./constraints.html#integrity_constraints">Integrity constraints</a></a></h3>
+<p>The following accessor may only be applied to trace columns when they are referenced in integrity constraint definitions.</p>
 <ul>
-<li>Next Row (<code>a'</code>): <code>'</code> is a postfix operator that indicates the value of the specified trace column in the next row. It is only supported in <a href="./constraints.html#transition_constraints">transition constraint descriptions</a>.</li>
+<li>Next Row (<code>a'</code>): <code>'</code> is a postfix operator that indicates the value of the specified trace column in the next row. It is only supported in <a href="./constraints.html#integrity_constraints">integrity constraint descriptions</a>.</li>
 </ul>
-<p>Here is an example of usage of the Next Row operator within a transition constraint:</p>
+<p>Here is an example of usage of the Next Row operator within an integrity constraint:</p>
 <pre><code>trace_columns:
   main: [a]
   aux: [p]
 
-transition_constraints:
+integrity_constraints:
   enf p' = p * a
 </code></pre>
 
