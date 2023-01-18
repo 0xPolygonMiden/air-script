@@ -1,7 +1,7 @@
 use super::{Expression, NamedTraceAccess, Variable};
 use std::fmt::Display;
 
-// BOUNDARY CONSTRAINTS
+// BOUNDARY STATEMENTS
 // ================================================================================================
 
 #[derive(Debug, Eq, PartialEq)]

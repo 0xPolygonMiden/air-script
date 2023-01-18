@@ -3,7 +3,7 @@ use crate::{BoundaryConstraintsMap, TraceSegment};
 use super::{BTreeMap, Expression, IdentifierType, SemanticError, SymbolTable};
 use parser::ast::{self, BoundaryStmt};
 
-// BOUNDARY CONSTRAINTS
+// BOUNDARY STATEMENTS
 // ================================================================================================
 
 /// A struct containing all of the boundary constraints to be applied at each of the 2 allowed

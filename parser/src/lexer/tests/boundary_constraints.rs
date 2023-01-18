@@ -1,6 +1,6 @@
 use super::{expect_valid_tokenization, Token};
 
-// BOUNDARY CONSTRAINTS VALID TOKENIZATION
+// BOUNDARY STATEMENTS VALID TOKENIZATION
 // ================================================================================================
 
 #[test]

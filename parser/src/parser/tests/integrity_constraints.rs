@@ -7,7 +7,7 @@ use crate::{
     error::{Error, ParseError},
 };
 
-// INTEGRITY CONSTRAINTS
+// INTEGRITY STATEMENTS
 // ================================================================================================
 
 #[test]

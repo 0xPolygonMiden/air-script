@@ -1,6 +1,6 @@
 pub use air_script_core::{
     Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, MatrixAccess,
-    NamedTraceAccess, Variable, VariableType, VectorAccess,
+    NamedTraceAccess, TraceSegment, Variable, VariableType, VectorAccess,
 };
 pub use parser::ast::{self, PublicInput};
 use std::collections::BTreeMap;
@@ -12,9 +12,7 @@ pub mod boundary_stmts;
 use boundary_stmts::BoundaryStmts;
 
 pub mod integrity_stmts;
-use integrity_stmts::{
-    AlgebraicGraph, ConstraintRoot, IntegrityStmts, VariableValue, MIN_CYCLE_LENGTH,
-};
+use integrity_stmts::{AlgebraicGraph, ConstraintRoot, IntegrityStmts, MIN_CYCLE_LENGTH};
 pub use integrity_stmts::{IntegrityConstraintDegree, NodeIndex};
 
 mod trace_columns;
@@ -28,27 +26,15 @@ use helpers::SourceValidator;
 #[cfg(test)]
 mod tests;
 
-// ==== ALIASES ===================================================================================
-pub type TraceSegment = u8;
+// TYPE ALIASES
+// ================================================================================================
 pub type Constants = Vec<Constant>;
 pub type PublicInputs = Vec<(String, usize)>;
 pub type PeriodicColumns = Vec<Vec<u64>>;
 pub type BoundaryConstraintsMap = BTreeMap<usize, Expression>;
-pub type VariableRoots = BTreeMap<VariableValue, ExprDetails>;
 
-/// A tuple containing the node index of the root of an expression or a constraint, it's trace
-/// segment, indicating whether it is applied to the main execution trace or an auxiliary trace and
-/// the row offset, which is equal to the maximum row offset accessed by the expression from the
-/// current row. For example, if an expression only accesses the trace in the current row then the
-/// row offset will be 0, but if it accesses the trace in both the current and the next rows then
-/// the row offset will be 1.
-pub type ExprDetails = (TraceSegment, NodeIndex, usize);
-
-// ==== CONSTANTS =================================================================================
-const CURRENT_ROW: usize = 0;
-const NEXT_ROW: usize = 1;
-
-// ==== AIR IR ====================================================================================
+// AIR IR
+// ================================================================================================
 
 /// Internal representation of an AIR.
 ///
@@ -212,19 +198,11 @@ impl AirIR {
     }
 
     pub fn validity_constraints(&self, trace_segment: TraceSegment) -> Vec<&ConstraintRoot> {
-        self.integrity_stmts
-            .constraints(trace_segment)
-            .iter()
-            .filter(|c| c.offset() == CURRENT_ROW)
-            .collect::<Vec<_>>()
+        self.integrity_stmts.validity_constraints(trace_segment)
     }
 
     pub fn transition_constraints(&self, trace_segment: TraceSegment) -> Vec<&ConstraintRoot> {
-        self.integrity_stmts
-            .constraints(trace_segment)
-            .iter()
-            .filter(|c| c.offset() == NEXT_ROW)
-            .collect::<Vec<_>>()
+        self.integrity_stmts.transition_constraints(trace_segment)
     }
 
     pub fn constraint_graph(&self) -> &AlgebraicGraph {
