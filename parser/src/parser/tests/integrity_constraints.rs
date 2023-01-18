@@ -200,6 +200,31 @@ fn integrity_constraint_with_variables() {
 }
 
 #[test]
+fn integrity_constraint_with_column_access() {
+    let source = "
+    integrity_constraints:
+        enf $main[0]' = $main[1] + 1
+        enf $aux[0]' - $aux[1] = 1";
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
+        Constraint(IntegrityConstraint::new(
+            IndexedTraceAccess(IndexedTraceAccess::new(0, 0, 1)),
+            Add(
+                Box::new(IndexedTraceAccess(IndexedTraceAccess::new(0, 1, 0))),
+                Box::new(Const(1)),
+            ),
+        )),
+        Constraint(IntegrityConstraint::new(
+            Sub(
+                Box::new(IndexedTraceAccess(IndexedTraceAccess::new(1, 0, 1))),
+                Box::new(IndexedTraceAccess(IndexedTraceAccess::new(1, 1, 0))),
+            ),
+            Const(1),
+        )),
+    ])]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
 fn err_missing_integrity_constraint() {
     let source = "
     integrity_constraints:

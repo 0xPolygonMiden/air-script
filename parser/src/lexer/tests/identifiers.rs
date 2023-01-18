@@ -68,6 +68,36 @@ fn valid_tokenization_next_token() {
     expect_valid_tokenization(source, tokens);
 }
 
+#[test]
+fn valid_tokenization_column_access() {
+    let source = "enf $main[0]' = $main[1] + $aux[0] + $aux[1]'";
+    let tokens = vec![
+        Token::Enf,
+        Token::MainAccess,
+        Token::Lsqb,
+        Token::Num("0".to_string()),
+        Token::Rsqb,
+        Token::Next,
+        Token::Equal,
+        Token::MainAccess,
+        Token::Lsqb,
+        Token::Num("1".to_string()),
+        Token::Rsqb,
+        Token::Plus,
+        Token::AuxAccess,
+        Token::Lsqb,
+        Token::Num("0".to_string()),
+        Token::Rsqb,
+        Token::Plus,
+        Token::AuxAccess,
+        Token::Lsqb,
+        Token::Num("1".to_string()),
+        Token::Rsqb,
+        Token::Next,
+    ];
+    expect_valid_tokenization(source, tokens);
+}
+
 // SCAN ERRORS
 // ================================================================================================
 
