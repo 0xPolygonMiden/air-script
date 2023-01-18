@@ -102,8 +102,9 @@ impl NamedTraceAccess {
     }
 }
 
-/// [IndexedTraceAccess] is used to represent a column and its offset in the execution trace by the
-/// segment index, column index within the segment, and row offset.
+/// [IndexedTraceAccess] is used to represent accessing an element in the execution trace during
+/// constraint evaluation at the specified segment index, column index within the segment, and row
+/// offset from the current row.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct IndexedTraceAccess {
     segment_idx: usize,

@@ -55,8 +55,8 @@ const NEXT_ROW: usize = 1;
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
-    constants: Constants,
     segment_widths: Vec<u16>,
+    constants: Constants,
     public_inputs: PublicInputs,
     periodic_columns: PeriodicColumns,
     boundary_stmts: BoundaryStmts,
@@ -132,7 +132,7 @@ impl AirIR {
             }
         }
 
-        let (constants, public_inputs, periodic_columns, segment_widths) =
+        let (segment_widths, constants, public_inputs, periodic_columns) =
             symbol_table.into_declarations();
 
         // validate sections
@@ -140,8 +140,8 @@ impl AirIR {
 
         Ok(Self {
             air_name: air_name.to_string(),
-            constants,
             segment_widths,
+            constants,
             public_inputs,
             periodic_columns,
             boundary_stmts,

@@ -62,14 +62,6 @@ pub(super) struct SymbolTable {
 }
 
 impl SymbolTable {
-    /// Sets the number of trace segments to the maximum of `segment_widths.len()` and the provided
-    /// trace segment identifier, which is indexed from zero.
-    fn set_segment_widths_len(&mut self, trace_segment: TraceSegment) {
-        if trace_segment >= self.segment_widths.len() as u8 {
-            self.segment_widths.resize(trace_segment as usize + 1, 0);
-        }
-    }
-
     /// Adds a declared identifier to the symbol table using the identifier as the key and the
     /// type the identifier represents as the value.
     ///
@@ -110,7 +102,9 @@ impl SymbolTable {
         trace_segment: TraceSegment,
         trace: &[TraceCols],
     ) -> Result<(), SemanticError> {
-        self.set_segment_widths_len(trace_segment);
+        if trace_segment >= self.segment_widths.len() as u8 {
+            self.segment_widths.resize(trace_segment as usize + 1, 0);
+        }
 
         let mut col_idx = 0;
         for trace_cols in trace {
@@ -175,12 +169,12 @@ impl SymbolTable {
 
     /// Consumes this symbol table and returns the information required for declaring constants,
     /// public inputs, periodic columns and columns amount for the AIR.
-    pub(super) fn into_declarations(self) -> (Constants, PublicInputs, PeriodicColumns, Vec<u16>) {
+    pub(super) fn into_declarations(self) -> (Vec<u16>, Constants, PublicInputs, PeriodicColumns) {
         (
+            self.segment_widths,
             self.constants,
             self.public_inputs,
             self.periodic_columns,
-            self.segment_widths,
         )
     }
 

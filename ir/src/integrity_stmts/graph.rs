@@ -118,7 +118,7 @@ impl AlgebraicGraph {
                 Ok((trace_segment, node_index, CURRENT_ROW))
             }
             IntegrityExpr::IndexedTraceAccess(column_access) => {
-                self.insert_column_access(symbol_table, column_access)
+                self.insert_trace_access(symbol_table, column_access)
             }
             IntegrityExpr::Add(lhs, rhs) => {
                 // add both subexpressions.
@@ -197,11 +197,13 @@ impl AlgebraicGraph {
         }
     }
 
-    /// Adds a trace column to the graph and returns the node index and trace segment.
+    /// Adds a trace element access to the graph and returns the node index and trace segment.
     ///
     /// # Errors
-    /// Returns an error if the identifier is bigger than overall number of columns in segment.
-    fn insert_column_access(
+    /// Returns an error if:
+    /// - The identifier is greater than overall number of columns in segment.
+    /// - The segment is greater than the maximum number of segments.
+    fn insert_trace_access(
         &mut self,
         symbol_table: &SymbolTable,
         column_access: IndexedTraceAccess,
@@ -219,7 +221,7 @@ impl AlgebraicGraph {
         let segment_idx = column_access.segment_idx();
         if segment_idx > u8::MAX as usize {
             return Err(SemanticError::IndexOutOfRange(format!(
-                "Segment index {} is greater than 255",
+                "Segment index {} is greater than the maximum number of segments (255)",
                 segment_idx
             )));
         }

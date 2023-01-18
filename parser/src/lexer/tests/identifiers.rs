@@ -69,7 +69,7 @@ fn valid_tokenization_next_token() {
 }
 
 #[test]
-fn valid_tokenization_column_access() {
+fn valid_tokenization_indexed_trace_access() {
     let source = "enf $main[0]' = $main[1] + $aux[0] + $aux[1]'";
     let tokens = vec![
         Token::Enf,

@@ -200,7 +200,7 @@ fn integrity_constraint_with_variables() {
 }
 
 #[test]
-fn integrity_constraint_with_column_access() {
+fn integrity_constraint_with_indexed_trace_access() {
     let source = "
     integrity_constraints:
         enf $main[0]' = $main[1] + 1

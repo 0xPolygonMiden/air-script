@@ -1,4 +1,4 @@
-def IndexColAccessAir
+def IndexedTraceAccessAir
 
 trace_columns:
     main: [a, b]

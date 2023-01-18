@@ -97,11 +97,12 @@ fn trace_col_groups() {
 }
 
 #[test]
-fn index_col_access() {
-    let generated_air = Test::new("tests/index_col_access/index_col_access.air".to_string())
-        .transpile()
-        .unwrap();
+fn indexed_trace_access() {
+    let generated_air =
+        Test::new("tests/indexed_trace_access/indexed_trace_access.air".to_string())
+            .transpile()
+            .unwrap();
 
-    let expected = expect_file!["index_col_access/index_col_access.rs"];
+    let expected = expect_file!["indexed_trace_access/indexed_trace_access.rs"];
     expected.assert_eq(&generated_air);
 }
