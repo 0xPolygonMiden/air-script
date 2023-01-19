@@ -3,8 +3,8 @@ use super::{
 };
 use crate::{symbol_table::IdentifierType, ExprDetails, VariableRoots, CURRENT_ROW, NEXT_ROW};
 use parser::ast::{
-    self, constants::ConstantType, Identifier, IntegrityExpr, IntegrityVariableType, MatrixAccess,
-    VectorAccess,
+    self, constants::ConstantType, Identifier, IndexedTraceAccess, IntegrityExpr,
+    IntegrityVariableType, MatrixAccess, VectorAccess,
 };
 
 // ALGEBRAIC GRAPH
@@ -117,6 +117,9 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::RandomValue(index));
                 Ok((trace_segment, node_index, CURRENT_ROW))
             }
+            IntegrityExpr::IndexedTraceAccess(column_access) => {
+                self.insert_trace_access(symbol_table, column_access)
+            }
             IntegrityExpr::Add(lhs, rhs) => {
                 // add both subexpressions.
                 let (lhs_segment, lhs, lhs_row_offset) =
@@ -172,7 +175,7 @@ impl AlgebraicGraph {
     fn insert_next(
         &mut self,
         symbol_table: &SymbolTable,
-        trace_access: &ast::TraceAccess,
+        trace_access: &ast::NamedTraceAccess,
     ) -> Result<ExprDetails, SemanticError> {
         let col_type = symbol_table.get_type(trace_access.name())?;
         match col_type {
@@ -192,6 +195,40 @@ impl AlgebraicGraph {
                 col_type
             ))),
         }
+    }
+
+    /// Adds a trace element access to the graph and returns the node index and trace segment.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - The identifier is greater than overall number of columns in segment.
+    /// - The segment is greater than the maximum number of segments.
+    fn insert_trace_access(
+        &mut self,
+        symbol_table: &SymbolTable,
+        column_access: IndexedTraceAccess,
+    ) -> Result<ExprDetails, SemanticError> {
+        if column_access.column_idx() as u16
+            >= symbol_table.segment_widths()[column_access.segment_idx()]
+        {
+            return Err(SemanticError::IndexOutOfRange(format!(
+                "Out-of-range index {} in trace segment {} of length {}",
+                column_access.column_idx(),
+                column_access.segment_idx(),
+                symbol_table.segment_widths()[column_access.segment_idx()]
+            )));
+        }
+        let segment_idx = column_access.segment_idx();
+        if segment_idx > u8::MAX as usize {
+            return Err(SemanticError::IndexOutOfRange(format!(
+                "Segment index {} is greater than the maximum number of segments (255)",
+                segment_idx
+            )));
+        }
+        let row_offset = column_access.row_offset();
+        let trace_access = TraceAccess::from(column_access);
+        let node_index = self.insert_op(Operation::TraceElement(trace_access));
+        Ok((segment_idx as u8, node_index, row_offset))
     }
 
     /// Adds a trace column, periodic column, named constant or a variable to the graph and returns
@@ -459,6 +496,16 @@ impl TraceAccess {
     /// Gets the row offset of this [TraceAccess].
     pub fn row_offset(&self) -> usize {
         self.row_offset
+    }
+}
+
+impl From<IndexedTraceAccess> for TraceAccess {
+    fn from(indexed_trace_access: IndexedTraceAccess) -> Self {
+        TraceAccess {
+            trace_segment: indexed_trace_access.segment_idx() as u8,
+            col_idx: indexed_trace_access.column_idx(),
+            row_offset: indexed_trace_access.row_offset(),
+        }
     }
 }
 

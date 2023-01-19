@@ -79,16 +79,16 @@ impl TraceCols {
     }
 }
 
-/// [TraceAccess] is used to indicate a column in the trace by specifying its index within a set of
+/// [NamedTraceAccess] is used to indicate a column in the trace by specifying its index within a set of
 /// [TraceCols] with the given identifier. If the identifier refers to a single column ([TraceCols]
 /// with size 1), then the index is always zero.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct TraceAccess {
+pub struct NamedTraceAccess {
     name: Identifier,
     idx: usize,
 }
 
-impl TraceAccess {
+impl NamedTraceAccess {
     pub fn new(name: Identifier, idx: usize) -> Self {
         Self { name, idx }
     }
@@ -99,6 +99,38 @@ impl TraceAccess {
 
     pub fn idx(&self) -> usize {
         self.idx
+    }
+}
+
+/// [IndexedTraceAccess] is used to represent accessing an element in the execution trace during
+/// constraint evaluation at the specified segment index, column index within the segment, and row
+/// offset from the current row.
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct IndexedTraceAccess {
+    segment_idx: usize,
+    column_idx: usize,
+    row_offset: usize,
+}
+
+impl IndexedTraceAccess {
+    pub fn new(segment_idx: usize, column_idx: usize, row_offset: usize) -> Self {
+        Self {
+            segment_idx,
+            column_idx,
+            row_offset,
+        }
+    }
+
+    pub fn segment_idx(&self) -> usize {
+        self.segment_idx
+    }
+
+    pub fn column_idx(&self) -> usize {
+        self.column_idx
+    }
+
+    pub fn row_offset(&self) -> usize {
+        self.row_offset
     }
 }
 

@@ -4,8 +4,9 @@ use super::{
 use crate::{
     ast::{
         constants::{Constant, ConstantType::Matrix, ConstantType::Scalar, ConstantType::Vector},
+        IndexedTraceAccess,
         IntegrityStmt::*,
-        IntegrityVariable, IntegrityVariableType, MatrixAccess, TraceAccess, VectorAccess,
+        IntegrityVariable, IntegrityVariableType, MatrixAccess, NamedTraceAccess, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -20,7 +21,7 @@ fn integrity_constraints() {
         enf clk' = clk + 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         IntegrityConstraint::new(
-            Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
+            Next(NamedTraceAccess::new(Identifier("clk".to_string()), 0)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
@@ -45,7 +46,7 @@ fn multiple_integrity_constraints() {
         enf clk' - clk = 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
         Constraint(IntegrityConstraint::new(
-            Next(TraceAccess::new(Identifier("clk".to_string()), 0)),
+            Next(NamedTraceAccess::new(Identifier("clk".to_string()), 0)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
@@ -53,7 +54,10 @@ fn multiple_integrity_constraints() {
         )),
         Constraint(IntegrityConstraint::new(
             Sub(
-                Box::new(Next(TraceAccess::new(Identifier("clk".to_string()), 0))),
+                Box::new(Next(NamedTraceAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                ))),
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
             Const(1),
@@ -190,6 +194,31 @@ fn integrity_constraint_with_variables() {
                     1,
                 ))),
             ),
+        )),
+    ])]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn integrity_constraint_with_indexed_trace_access() {
+    let source = "
+    integrity_constraints:
+        enf $main[0]' = $main[1] + 1
+        enf $aux[0]' - $aux[1] = 1";
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
+        Constraint(IntegrityConstraint::new(
+            IndexedTraceAccess(IndexedTraceAccess::new(0, 0, 1)),
+            Add(
+                Box::new(IndexedTraceAccess(IndexedTraceAccess::new(0, 1, 0))),
+                Box::new(Const(1)),
+            ),
+        )),
+        Constraint(IntegrityConstraint::new(
+            Sub(
+                Box::new(IndexedTraceAccess(IndexedTraceAccess::new(1, 0, 1))),
+                Box::new(IndexedTraceAccess(IndexedTraceAccess::new(1, 1, 0))),
+            ),
+            Const(1),
         )),
     ])]);
     build_parse_test!(source).expect_ast(expected);

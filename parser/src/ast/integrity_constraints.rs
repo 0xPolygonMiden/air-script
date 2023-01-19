@@ -1,4 +1,4 @@
-use super::{Identifier, MatrixAccess, TraceAccess, VectorAccess};
+use super::{Identifier, IndexedTraceAccess, MatrixAccess, NamedTraceAccess, VectorAccess};
 
 // INTEGRITY CONSTRAINTS
 // ================================================================================================
@@ -40,7 +40,15 @@ pub enum IntegrityExpr {
     /// Represents an element inside a constant or variable matrix. [MatrixAccess] contains the
     /// name of the matrix and indices of the element to access.
     MatrixAccess(MatrixAccess),
-    Next(TraceAccess),
+    /// Represents accessing a column by its name in the next row of the execution trace at a particular row offset.
+    /// [NamedTraceAccess] contains the name of [TraceCols] and index within it to be accessed.
+    Next(NamedTraceAccess),
+    /// Represents accessing a column in the execution trace at a particular row offset,
+    /// e.g. $main[2]', which accesses the second column of the main trace (segment 0) at the next
+    /// row (offset 1).
+    /// [IndexedTraceAccess] contains the segment index, column index within the segment, and row
+    /// offset of the element to be accessed.
+    IndexedTraceAccess(IndexedTraceAccess),
     /// Represents a random value provided by the verifier. The inner value is the index of this
     /// random value in the array of all random values.
     Rand(usize),

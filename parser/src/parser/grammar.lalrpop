@@ -5,8 +5,8 @@ use crate::{
         integrity_constraints::{IntegrityConstraint, IntegrityExpr, IntegrityStmt,
         IntegrityVariable, IntegrityVariableType},
         constants::{Constant, ConstantType},
-        Identifier, Source, SourceSection, Trace, TraceAccess, TraceCols, PublicInput,
-        PeriodicColumn, VectorAccess, MatrixAccess
+        Identifier, Source, SourceSection, Trace, NamedTraceAccess, TraceCols, PublicInput,
+        PeriodicColumn, VectorAccess, MatrixAccess, IndexedTraceAccess
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
     InvalidConst, MissingBoundaryConstraint, MissingIntegrityConstraint}}, lexer::Token
 };
@@ -144,7 +144,7 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
 }
 
 BoundaryStmt: BoundaryStmt = {
-    "enf" <column: TraceAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
+    "enf" <column: NamedTraceAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
         BoundaryStmt::Constraint(BoundaryConstraint::new(column, boundary, value)),
     "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
         BoundaryStmt::Variable(BoundaryVariable::new(name, boundary_variable_type)),
@@ -249,11 +249,12 @@ IntegrityAtom: IntegrityExpr = {
     "(" <IntegrityExpr> ")",
     <lexpr: IntegrityAtom> "^" <num: Num_u64> => IntegrityExpr::Exp(Box::new(lexpr), num),
     "$rand" <idx: Index> => IntegrityExpr::Rand(idx),
+    <col_access: IndexedTraceAccess> => IntegrityExpr::IndexedTraceAccess(col_access),
     <n: Num_u64> => IntegrityExpr::Const(n),
     <ident: Identifier> => IntegrityExpr::Elem(ident),
     <vector_access: VectorAccess> => IntegrityExpr::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => IntegrityExpr::MatrixAccess(matrix_access),
-    <trace_access: TraceAccess> "'" => IntegrityExpr::Next(trace_access)
+    <trace_access: NamedTraceAccess> "'" => IntegrityExpr::Next(trace_access)
 }
 
 // ATOMS
@@ -292,9 +293,16 @@ MatrixAccess: MatrixAccess = {
         MatrixAccess::new(ident, row, col)
 }
 
-TraceAccess: TraceAccess = {
-    <ident: Identifier> => TraceAccess::new(ident, 0),
-    <ident: Identifier> <idx: Index> => TraceAccess::new(ident, idx)
+NamedTraceAccess: NamedTraceAccess = {
+    <ident: Identifier> => NamedTraceAccess::new(ident, 0),
+    <ident: Identifier> <idx: Index> => NamedTraceAccess::new(ident, idx)
+}
+
+IndexedTraceAccess: IndexedTraceAccess = {
+    "$main" <idx: Index> => IndexedTraceAccess::new(0, idx, 0),
+    "$main" <idx: Index> "'" => IndexedTraceAccess::new(0, idx, 1), 
+    "$aux" <idx: Index> => IndexedTraceAccess::new(1, idx, 0),
+    "$aux" <idx: Index> "'" => IndexedTraceAccess::new(1, idx, 1),
 }
 
 Identifier: Identifier = {
@@ -322,8 +330,8 @@ extern {
         "let" => Token::Let,
         "const" => Token::Const,
         "trace_columns" => Token::TraceColumns,
-        "main" => Token::Main,
-        "aux" => Token::Aux,
+        "main" => Token::MainDecl,
+        "aux" => Token::AuxDecl,
         "public_inputs" => Token::PublicInputs,
         "periodic_columns" => Token::PeriodicColumns,
         "boundary_constraints" => Token::BoundaryConstraints,
@@ -331,6 +339,8 @@ extern {
         "last" => Token::Last,
         "integrity_constraints" => Token::IntegrityConstraints,
         "$rand" => Token::Rand,
+        "$main" => Token::MainAccess,
+        "$aux" => Token::AuxAccess,
         "enf" => Token::Enf,
         "'" => Token::Next,
         "=" => Token::Equal,
