@@ -76,7 +76,7 @@ impl Air for TraceColGroupAir {
         let current = frame.current();
         let next = frame.next();
         result[0] = next[2] - (current[2] + E::from(1_u64));
-        result[1] = next[1] - (current[1] - (E::from(1_u64)));
+        result[1] = next[1] - (current[1] - E::from(1_u64));
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])

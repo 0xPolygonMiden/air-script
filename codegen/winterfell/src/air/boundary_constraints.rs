@@ -1,7 +1,6 @@
 use super::{AirIR, Codegen, Expression, Impl};
 use std::cmp::Ordering;
 
-
 // HELPERS TO GENERATE THE WINTERFELL BOUNDARY CONSTRAINT METHODS
 // ================================================================================================
 
@@ -94,7 +93,6 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
 
 /// Code generation trait for generating Rust code strings from boundary constraint expressions.
 impl Codegen for Expression {
-    // TODO: Only add parentheses in Add/Sub/Mul/Exp if the expression is an arithmetic operation.
     fn to_string(&self, ir: &AirIR, is_aux_constraint: bool) -> String {
         match self {
             Self::Const(value) => {
@@ -147,9 +145,7 @@ impl Codegen for Expression {
             Self::Rand(index) => {
                 format!("aux_rand_elements.get_segment_elements(0)[{}]", index)
             }
-            BoundaryExpr::Add(lhs, rhs) => {
-                compound_op_to_string(ir, lhs, rhs, '+', is_aux_constraint)
-            }
+            Self::Add(lhs, rhs) => compound_op_to_string(ir, lhs, rhs, '+', is_aux_constraint),
             Self::Sub(lhs, rhs) => compound_op_to_string(ir, lhs, rhs, '-', is_aux_constraint),
             Self::Mul(lhs, rhs) => compound_op_to_string(ir, lhs, rhs, '*', is_aux_constraint),
             Self::Exp(lhs, rhs) => {

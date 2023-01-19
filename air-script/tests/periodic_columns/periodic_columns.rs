@@ -75,8 +75,8 @@ impl Air for PeriodicColumnsAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let current = frame.current();
         let next = frame.next();
-        result[0] = (periodic_values[0]) * (current[1] + current[2]) - (E::from(0_u64));
-        result[1] = (periodic_values[1]) * (next[0] - (current[0])) - (E::from(0_u64));
+        result[0] = periodic_values[0] * (current[1] + current[2]) - E::from(0_u64);
+        result[1] = periodic_values[1] * (next[0] - current[0]) - E::from(0_u64);
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
