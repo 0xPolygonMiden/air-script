@@ -1,16 +1,8 @@
-use super::{
-    build_parse_test, Boundary, BoundaryConstraint, BoundaryExpr::*, Identifier, Source,
-    SourceSection,
-};
+use super::{build_parse_test, Boundary, BoundaryConstraint, Identifier, Source, SourceSection};
 use crate::{
     ast::{
-        constants::{
-            Constant,
-            ConstantType::{Matrix, Scalar, Vector},
-        },
-        BoundaryStmt::*,
-        BoundaryVariable, BoundaryVariableType, MatrixAccess, NamedTraceAccess, PublicInput,
-        VectorAccess,
+        BoundaryStmt::*, Constant, ConstantType::*, Expression::*, MatrixAccess, NamedTraceAccess,
+        PublicInput, Variable, VariableType, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -25,7 +17,7 @@ fn boundary_constraint_at_first() {
         enf clk.first = 0";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0),
+            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
             Boundary::First,
             Const(0),
         ),
@@ -40,7 +32,7 @@ fn boundary_constraint_at_last() {
         enf clk.last = 15";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0),
+            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
             Boundary::Last,
             Const(15),
         ),
@@ -64,12 +56,12 @@ fn multiple_boundary_constraints() {
         enf clk.last = 1";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
         Constraint(BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0),
+            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
             Boundary::First,
             Const(0),
         )),
         Constraint(BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0),
+            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
             Boundary::Last,
             Const(1),
         )),
@@ -87,7 +79,7 @@ fn boundary_constraint_with_pub_input() {
     let expected = Source(vec![
         SourceSection::PublicInputs(vec![PublicInput::new(Identifier("a".to_string()), 16)]),
         SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0),
+            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
             Boundary::First,
             VectorAccess(VectorAccess::new(Identifier("a".to_string()), 0)),
         ))]),
@@ -102,7 +94,7 @@ fn boundary_constraint_with_expr() {
         enf clk.first = 5 + a[3] + 6";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0),
+            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
             Boundary::First,
             Add(
                 Box::new(Add(
@@ -138,7 +130,7 @@ fn boundary_constraint_with_const() {
             Matrix(vec![vec![0, 1], vec![1, 0]]),
         )),
         SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0),
+            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
             Boundary::First,
             Sub(
                 Box::new(Add(
@@ -168,13 +160,13 @@ fn boundary_constraint_with_variables() {
         let c = [[a - 1, a^2], [b[0], b[1]]]
         enf clk.first = 5 + a[3] + 6";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
-        Variable(BoundaryVariable::new(
+        Variable(Variable::new(
             Identifier("a".to_string()),
-            BoundaryVariableType::Scalar(Exp(Box::new(Const(2)), 2)),
+            VariableType::Scalar(Exp(Box::new(Const(2)), 2)),
         )),
-        Variable(BoundaryVariable::new(
+        Variable(Variable::new(
             Identifier("b".to_string()),
-            BoundaryVariableType::Vector(vec![
+            VariableType::Vector(vec![
                 Elem(Identifier("a".to_string())),
                 Mul(
                     Box::new(Const(2)),
@@ -182,9 +174,9 @@ fn boundary_constraint_with_variables() {
                 ),
             ]),
         )),
-        Variable(BoundaryVariable::new(
+        Variable(Variable::new(
             Identifier("c".to_string()),
-            BoundaryVariableType::Matrix(vec![
+            VariableType::Matrix(vec![
                 vec![
                     Sub(
                         Box::new(Elem(Identifier("a".to_string()))),
@@ -199,7 +191,7 @@ fn boundary_constraint_with_variables() {
             ]),
         )),
         Constraint(BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0),
+            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
             Boundary::First,
             Add(
                 Box::new(Add(

@@ -1,12 +1,8 @@
-use super::{
-    build_parse_test, Identifier, IntegrityConstraint, IntegrityExpr::*, Source, SourceSection,
-};
+use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::{
     ast::{
-        constants::{Constant, ConstantType::Matrix, ConstantType::Scalar, ConstantType::Vector},
-        IndexedTraceAccess,
-        IntegrityStmt::*,
-        IntegrityVariable, IntegrityVariableType, MatrixAccess, NamedTraceAccess, VectorAccess,
+        Constant, ConstantType::*, Expression::*, IndexedTraceAccess, IntegrityStmt::*,
+        MatrixAccess, NamedTraceAccess, Variable, VariableType, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -21,7 +17,7 @@ fn integrity_constraints() {
         enf clk' = clk + 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         IntegrityConstraint::new(
-            Next(NamedTraceAccess::new(Identifier("clk".to_string()), 0)),
+            NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
@@ -46,7 +42,7 @@ fn multiple_integrity_constraints() {
         enf clk' - clk = 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
         Constraint(IntegrityConstraint::new(
-            Next(NamedTraceAccess::new(Identifier("clk".to_string()), 0)),
+            NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
@@ -54,9 +50,10 @@ fn multiple_integrity_constraints() {
         )),
         Constraint(IntegrityConstraint::new(
             Sub(
-                Box::new(Next(NamedTraceAccess::new(
+                Box::new(NamedTraceAccess(NamedTraceAccess::new(
                     Identifier("clk".to_string()),
                     0,
+                    1,
                 ))),
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
@@ -148,13 +145,13 @@ fn integrity_constraint_with_variables() {
         let c = [[a - 1, a^2], [b[0], b[1]]]
         enf clk + a = b[1] + c[1][1]";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Variable(IntegrityVariable::new(
+        Variable(Variable::new(
             Identifier("a".to_string()),
-            IntegrityVariableType::Scalar(Exp(Box::new(Const(2)), 2)),
+            VariableType::Scalar(Exp(Box::new(Const(2)), 2)),
         )),
-        Variable(IntegrityVariable::new(
+        Variable(Variable::new(
             Identifier("b".to_string()),
-            IntegrityVariableType::Vector(vec![
+            VariableType::Vector(vec![
                 Elem(Identifier("a".to_string())),
                 Mul(
                     Box::new(Const(2)),
@@ -162,9 +159,9 @@ fn integrity_constraint_with_variables() {
                 ),
             ]),
         )),
-        Variable(IntegrityVariable::new(
+        Variable(Variable::new(
             Identifier("c".to_string()),
-            IntegrityVariableType::Matrix(vec![
+            VariableType::Matrix(vec![
                 vec![
                     Sub(
                         Box::new(Elem(Identifier("a".to_string()))),

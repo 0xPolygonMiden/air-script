@@ -1,5 +1,5 @@
 use super::{
-    build_parse_test, Error, Identifier, IntegrityConstraint, IntegrityExpr::*, IntegrityStmt::*,
+    build_parse_test, Error, Expression::*, Identifier, IntegrityConstraint, IntegrityStmt::*,
     NamedTraceAccess, ParseError, Source, SourceSection::*, Trace, TraceCols,
 };
 
@@ -67,11 +67,11 @@ fn trace_columns_groups() {
         }),
         IntegrityConstraints(vec![
             Constraint(IntegrityConstraint::new(
-                Next(NamedTraceAccess::new(Identifier("a".to_string()), 1)),
+                NamedTraceAccess(NamedTraceAccess::new(Identifier("a".to_string()), 1, 1)),
                 Const(1),
             )),
             Constraint(IntegrityConstraint::new(
-                Next(NamedTraceAccess::new(Identifier("clk".to_string()), 0)),
+                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
                 Sub(
                     Box::new(Elem(Identifier("clk".to_string()))),
                     Box::new(Const(1)),

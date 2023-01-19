@@ -1,12 +1,9 @@
 use super::{
-    trace_columns::TraceColumns, BTreeMap, Constants, PeriodicColumns, PublicInputs, SemanticError,
-    TraceSegment, MIN_CYCLE_LENGTH,
+    trace_columns::TraceColumns, BTreeMap, Constant, ConstantType, Constants, Identifier,
+    MatrixAccess, PeriodicColumns, PublicInputs, SemanticError, TraceSegment, Variable,
+    VariableType, VectorAccess, MIN_CYCLE_LENGTH,
 };
-use parser::ast::{
-    constants::{Constant, ConstantType},
-    Identifier, IntegrityVariable, IntegrityVariableType, MatrixAccess, PeriodicColumn,
-    PublicInput, TraceCols, VectorAccess,
-};
+use parser::ast::{PeriodicColumn, PublicInput, TraceCols};
 use std::fmt::Display;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -22,7 +19,7 @@ pub(super) enum IdentifierType {
     /// its cycle length in that order.
     PeriodicColumn(usize, usize),
     /// an identifier for an integrity variable, containing its name and value
-    IntegrityVariable(IntegrityVariable),
+    IntegrityVariable(Variable),
 }
 
 impl Display for IdentifierType {
@@ -158,7 +155,7 @@ impl SymbolTable {
     /// Inserts an integrity variable into the symbol table.
     pub(super) fn insert_integrity_variable(
         &mut self,
-        variable: &IntegrityVariable,
+        variable: &Variable,
     ) -> Result<(), SemanticError> {
         self.insert_symbol(
             variable.name(),
@@ -234,7 +231,7 @@ impl SymbolTable {
                 Ok(symbol_type)
             }
             IdentifierType::IntegrityVariable(integrity_variable) => {
-                if let IntegrityVariableType::Vector(vector) = integrity_variable.value() {
+                if let VariableType::Vector(vector) = integrity_variable.value() {
                     validate_vector_access(vector_access, vector.len())?;
                     Ok(symbol_type)
                 } else {
@@ -280,7 +277,7 @@ impl SymbolTable {
                 Ok(symbol_type)
             }
             IdentifierType::IntegrityVariable(transition_variable) => {
-                if let IntegrityVariableType::Matrix(matrix) = transition_variable.value() {
+                if let VariableType::Matrix(matrix) = transition_variable.value() {
                     validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                     Ok(symbol_type)
                 } else {

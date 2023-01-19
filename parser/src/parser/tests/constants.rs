@@ -1,6 +1,6 @@
 use super::{build_parse_test, Identifier, Source, SourceSection};
 use crate::{
-    ast::constants::{Constant, ConstantType},
+    ast::{Constant, ConstantType},
     error::{Error, ParseError},
 };
 

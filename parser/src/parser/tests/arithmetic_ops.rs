@@ -1,5 +1,5 @@
 use super::{
-    build_parse_test, Identifier, IntegrityConstraint, IntegrityExpr::*, IntegrityStmt::*, Source,
+    build_parse_test, Expression::*, Identifier, IntegrityConstraint, IntegrityStmt::*, Source,
     SourceSection::*,
 };
 use crate::ast::NamedTraceAccess;
@@ -16,9 +16,10 @@ fn single_addition() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         IntegrityConstraint::new(
             Add(
-                Box::new(Next(NamedTraceAccess::new(
+                Box::new(NamedTraceAccess(NamedTraceAccess::new(
                     Identifier("clk".to_string()),
                     0,
+                    1,
                 ))),
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
@@ -38,9 +39,10 @@ fn multi_addition() {
         IntegrityConstraint::new(
             Add(
                 Box::new(Add(
-                    Box::new(Next(NamedTraceAccess::new(
+                    Box::new(NamedTraceAccess(NamedTraceAccess::new(
                         Identifier("clk".to_string()),
                         0,
+                        1,
                     ))),
                     Box::new(Elem(Identifier("clk".to_string()))),
                 )),
@@ -61,9 +63,10 @@ fn single_subtraction() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         IntegrityConstraint::new(
             Sub(
-                Box::new(Next(NamedTraceAccess::new(
+                Box::new(NamedTraceAccess(NamedTraceAccess::new(
                     Identifier("clk".to_string()),
                     0,
+                    1,
                 ))),
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
@@ -83,9 +86,10 @@ fn multi_subtraction() {
         IntegrityConstraint::new(
             Sub(
                 Box::new(Sub(
-                    Box::new(Next(NamedTraceAccess::new(
+                    Box::new(NamedTraceAccess(NamedTraceAccess::new(
                         Identifier("clk".to_string()),
                         0,
+                        1,
                     ))),
                     Box::new(Elem(Identifier("clk".to_string()))),
                 )),
@@ -106,9 +110,10 @@ fn single_multiplication() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         IntegrityConstraint::new(
             Mul(
-                Box::new(Next(NamedTraceAccess::new(
+                Box::new(NamedTraceAccess(NamedTraceAccess::new(
                     Identifier("clk".to_string()),
                     0,
+                    1,
                 ))),
                 Box::new(Elem(Identifier("clk".to_string()))),
             ),
@@ -128,9 +133,10 @@ fn multi_multiplication() {
         IntegrityConstraint::new(
             Mul(
                 Box::new(Mul(
-                    Box::new(Next(NamedTraceAccess::new(
+                    Box::new(NamedTraceAccess(NamedTraceAccess::new(
                         Identifier("clk".to_string()),
                         0,
+                        1,
                     ))),
                     Box::new(Elem(Identifier("clk".to_string()))),
                 )),
@@ -164,9 +170,10 @@ fn ops_with_parens() {
         IntegrityConstraint::new(
             Mul(
                 Box::new(Add(
-                    Box::new(Next(NamedTraceAccess::new(
+                    Box::new(NamedTraceAccess(NamedTraceAccess::new(
                         Identifier("clk".to_string()),
                         0,
+                        1,
                     ))),
                     Box::new(Elem(Identifier("clk".to_string()))),
                 )),
@@ -187,9 +194,10 @@ fn single_exponentiation() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         IntegrityConstraint::new(
             Exp(
-                Box::new(Next(NamedTraceAccess::new(
+                Box::new(NamedTraceAccess(NamedTraceAccess::new(
                     Identifier("clk".to_string()),
                     0,
+                    1,
                 ))),
                 2,
             ),
@@ -237,9 +245,10 @@ fn multi_arithmetic_ops_same_precedence() {
             Add(
                 Box::new(Sub(
                     Box::new(Sub(
-                        Box::new(Next(NamedTraceAccess::new(
+                        Box::new(NamedTraceAccess(NamedTraceAccess::new(
                             Identifier("clk".to_string()),
                             0,
+                            1,
                         ))),
                         Box::new(Elem(Identifier("clk".to_string()))),
                     )),
@@ -269,9 +278,10 @@ fn multi_arithmetic_ops_different_precedence() {
             Sub(
                 Box::new(Sub(
                     Box::new(Exp(
-                        Box::new(Next(NamedTraceAccess::new(
+                        Box::new(NamedTraceAccess(NamedTraceAccess::new(
                             Identifier("clk".to_string()),
                             0,
+                            1,
                         ))),
                         2,
                     )),
@@ -303,9 +313,10 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         IntegrityConstraint::new(
             Sub(
-                Box::new(Next(NamedTraceAccess::new(
+                Box::new(NamedTraceAccess(NamedTraceAccess::new(
                     Identifier("clk".to_string()),
                     0,
+                    1,
                 ))),
                 Box::new(Mul(
                     Box::new(Exp(Box::new(Elem(Identifier("clk".to_string()))), 2)),

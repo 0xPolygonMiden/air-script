@@ -1,5 +1,4 @@
-use super::Scope;
-use ir::{ast::constants::ConstantType, AirIR, Constant};
+use super::{AirIR, Constant, ConstantType, Scope};
 
 /// Updates the provided scope with constant declarations.
 pub(super) fn add_constants(scope: &mut Scope, ir: &AirIR) {
