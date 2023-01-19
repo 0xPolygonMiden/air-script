@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use super::{AirIR, Impl};
 use ir::{
     integrity_stmts::{AlgebraicGraph, ConstantValue, Operation},
@@ -78,7 +80,6 @@ impl Codegen for NodeIndex {
 }
 
 impl Codegen for Operation {
-    // TODO: Only add parentheses in Add and Mul if the expression is an arithmetic operation.
     fn to_string(&self, graph: &AlgebraicGraph) -> String {
         match self {
             Operation::Constant(ConstantValue::Inline(value)) => format!("E::from({}_u64)", value),
@@ -111,27 +112,33 @@ impl Codegen for Operation {
                 let str = idx.to_string(graph);
                 format!("- ({})", str)
             }
-            Operation::Add(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(graph);
-                let rhs = r_idx.to_string(graph);
-
-                format!("{} + {}", lhs, rhs)
-            }
-            Operation::Sub(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(graph);
-                let rhs = r_idx.to_string(graph);
-
-                format!("{} - ({})", lhs, rhs)
-            }
-            Operation::Mul(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(graph);
-                let rhs = r_idx.to_string(graph);
-                format!("({}) * ({})", lhs, rhs)
-            }
+            Operation::Add(l_idx, r_idx) => compound_op_to_string(graph, l_idx, r_idx, '+'),
+            Operation::Sub(l_idx, r_idx) => compound_op_to_string(graph, l_idx, r_idx, '-'),
+            Operation::Mul(l_idx, r_idx) => compound_op_to_string(graph, l_idx, r_idx, '*'),
             Operation::Exp(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(graph);
-                format!("({}).exp(E::PositiveInteger::from({}_u64))", lhs, r_idx)
+                let lhs_node = graph.node(l_idx);
+                let lhs_str = lhs_node.op().to_string(graph);
+                format!("({}).exp(E::PositiveInteger::from({}_u64))", lhs_str, r_idx)
             }
         }
+    }
+}
+
+/// Returns a string representation of a compound operation (e.g. addition, subtraction,
+/// multiplication) between two boundary expressions based on operator precedence.
+fn compound_op_to_string(
+    graph: &AlgebraicGraph,
+    l_idx: &NodeIndex,
+    r_idx: &NodeIndex,
+    operator: char,
+) -> String {
+    let lhs_node = graph.node(l_idx);
+    let rhs_node = graph.node(r_idx);
+    let lhs_str = lhs_node.op().to_string(graph);
+    let rhs_str = rhs_node.op().to_string(graph);
+    match lhs_node.op().precedence().cmp(&rhs_node.op().precedence()) {
+        Ordering::Less => format!("({}) {} {}", lhs_str, operator, rhs_str),
+        Ordering::Greater => format!("{} {} ({})", lhs_str, operator, rhs_str),
+        Ordering::Equal => format!("{} {} {}", lhs_str, operator, rhs_str),
     }
 }

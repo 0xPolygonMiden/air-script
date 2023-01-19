@@ -22,3 +22,13 @@ pub enum Expression {
     Mul(Box<Expression>, Box<Expression>),
     Exp(Box<Expression>, u64),
 }
+
+impl Expression {
+    pub fn precedence(&self) -> u8 {
+        match self {
+            Expression::Sub(_, _) => 1,
+            Expression::Add(_, _) => 2,
+            _ => 3,
+        }
+    }
+}

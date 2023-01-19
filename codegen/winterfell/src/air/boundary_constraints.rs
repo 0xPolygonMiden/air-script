@@ -1,4 +1,6 @@
 use super::{AirIR, Codegen, Expression, Impl};
+use std::cmp::Ordering;
+
 
 // HELPERS TO GENERATE THE WINTERFELL BOUNDARY CONSTRAINT METHODS
 // ================================================================================================
@@ -145,31 +147,33 @@ impl Codegen for Expression {
             Self::Rand(index) => {
                 format!("aux_rand_elements.get_segment_elements(0)[{}]", index)
             }
-            Self::Add(lhs, rhs) => {
-                format!(
-                    "({}) + ({})",
-                    lhs.to_string(ir, is_aux_constraint),
-                    rhs.to_string(ir, is_aux_constraint)
-                )
+            BoundaryExpr::Add(lhs, rhs) => {
+                compound_op_to_string(ir, lhs, rhs, '+', is_aux_constraint)
             }
-            Self::Sub(lhs, rhs) => {
-                format!(
-                    "({}) - ({})",
-                    lhs.to_string(ir, is_aux_constraint),
-                    rhs.to_string(ir, is_aux_constraint)
-                )
-            }
-            Self::Mul(lhs, rhs) => {
-                format!(
-                    "({}) * ({})",
-                    lhs.to_string(ir, is_aux_constraint),
-                    rhs.to_string(ir, is_aux_constraint)
-                )
-            }
+            Self::Sub(lhs, rhs) => compound_op_to_string(ir, lhs, rhs, '-', is_aux_constraint),
+            Self::Mul(lhs, rhs) => compound_op_to_string(ir, lhs, rhs, '*', is_aux_constraint),
             Self::Exp(lhs, rhs) => {
                 format!("({}).exp({})", lhs.to_string(ir, is_aux_constraint), rhs)
             }
             _ => panic!("boundary constraint expressions cannot reference the trace"),
         }
+    }
+}
+
+/// Returns a string representation of a compound operation (e.g. addition, subtraction,
+/// multiplication) between two boundary expressions based on operator precedence.
+fn compound_op_to_string(
+    ir: &AirIR,
+    lhs: &Expression,
+    rhs: &Expression,
+    operator: char,
+    is_aux_constraint: bool,
+) -> String {
+    let lhs_str = lhs.to_string(ir, is_aux_constraint);
+    let rhs_str = rhs.to_string(ir, is_aux_constraint);
+    match lhs.precedence().cmp(&rhs.precedence()) {
+        Ordering::Less => format!("({}) {} {}", lhs_str, operator, rhs_str),
+        Ordering::Greater => format!("{} {} ({})", lhs_str, operator, rhs_str),
+        Ordering::Equal => format!("{} {} {}", lhs_str, operator, rhs_str),
     }
 }
