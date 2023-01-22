@@ -1,12 +1,10 @@
 use crate::{
     ast::{
-        boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt, BoundaryExpr,
-        BoundaryVariable, BoundaryVariableType}, 
-        integrity_constraints::{IntegrityConstraint, IntegrityExpr, IntegrityStmt,
-        IntegrityVariable, IntegrityVariableType},
-        constants::{Constant, ConstantType},
-        Identifier, Source, SourceSection, Trace, NamedTraceAccess, TraceCols, PublicInput,
-        PeriodicColumn, VectorAccess, MatrixAccess, IndexedTraceAccess
+        boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt}, 
+        integrity_constraints::{IntegrityConstraint, IntegrityStmt},
+        Constant, ConstantType, Expression, Identifier, Variable, VariableType,
+        Source, SourceSection, Trace, TraceCols, PublicInput, PeriodicColumn, 
+        IndexedTraceAccess, NamedTraceAccess, MatrixAccess, VectorAccess
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
     InvalidConst, MissingBoundaryConstraint, MissingIntegrityConstraint}}, lexer::Token
 };
@@ -147,16 +145,16 @@ BoundaryStmt: BoundaryStmt = {
     "enf" <column: NamedTraceAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
         BoundaryStmt::Constraint(BoundaryConstraint::new(column, boundary, value)),
     "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
-        BoundaryStmt::Variable(BoundaryVariable::new(name, boundary_variable_type)),
+        BoundaryStmt::Variable(Variable::new(name, boundary_variable_type)),
 }
 
-BoundaryVariableType: BoundaryVariableType = {
+BoundaryVariableType: VariableType = {
     <scalar_value: BoundaryExpr> =>
-        BoundaryVariableType::Scalar(scalar_value),
+        VariableType::Scalar(scalar_value),
     "[" <vector_value: CommaElems<BoundaryExpr>> "]" =>
-        BoundaryVariableType::Vector(vector_value),
+        VariableType::Vector(vector_value),
     "[" <matrix_value: CommaElems<Vector<BoundaryExpr>>> "]" =>
-        BoundaryVariableType::Matrix(matrix_value),
+        VariableType::Matrix(matrix_value),
 }
 
 Boundary: Boundary = {
@@ -166,28 +164,28 @@ Boundary: Boundary = {
 
 // --- BOUNDARY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
 
-BoundaryExpr: BoundaryExpr = {
+BoundaryExpr: Expression = {
     <lexpr: BoundaryExpr> "+" <rexpr: BoundaryFactor> =>
-        BoundaryExpr::Add(Box::new(lexpr), Box::new(rexpr)),
+        Expression::Add(Box::new(lexpr), Box::new(rexpr)),
     <lexpr: BoundaryExpr> "-" <rexpr: BoundaryFactor> =>
-        BoundaryExpr::Sub(Box::new(lexpr), Box::new(rexpr)),
+        Expression::Sub(Box::new(lexpr), Box::new(rexpr)),
     BoundaryFactor
 }
 
-BoundaryFactor: BoundaryExpr = {
+BoundaryFactor: Expression = {
     <lexpr: BoundaryFactor> "*" <rexpr: BoundaryAtom> =>
-        BoundaryExpr::Mul(Box::new(lexpr), Box::new(rexpr)),
+        Expression::Mul(Box::new(lexpr), Box::new(rexpr)),
     BoundaryAtom
 }
 
-BoundaryAtom: BoundaryExpr = {
+BoundaryAtom: Expression = {
     "(" <BoundaryExpr> ")",
-    <lexpr: BoundaryAtom> "^" <num: Num_u64> => BoundaryExpr::Exp(Box::new(lexpr), num),
-    "$rand" <idx: Index> => BoundaryExpr::Rand(idx),
-    <n: Num_u64> => BoundaryExpr::Const(n),
-    <ident: Identifier> => BoundaryExpr::Elem(ident),
-    <vector_access: VectorAccess> => BoundaryExpr::VectorAccess(vector_access),
-    <matrix_access: MatrixAccess> => BoundaryExpr::MatrixAccess(matrix_access)
+    <lexpr: BoundaryAtom> "^" <num: Num_u64> => Expression::Exp(Box::new(lexpr), num),
+    "$rand" <idx: Index> => Expression::Rand(idx),
+    <n: Num_u64> => Expression::Const(n),
+    <ident: Identifier> => Expression::Elem(ident),
+    <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
+    <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access)
 }
 
 // INTEGRITY CONSTRAINTS
@@ -217,44 +215,44 @@ IntegrityStmt: IntegrityStmt = {
     "enf" <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
         IntegrityStmt::Constraint(IntegrityConstraint::new(lhs, rhs)),
     "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
-        IntegrityStmt::Variable(IntegrityVariable::new(name, integrity_variable_type)),
+        IntegrityStmt::Variable(Variable::new(name, integrity_variable_type)),
 }
 
-IntegrityVariableType: IntegrityVariableType = {
+IntegrityVariableType: VariableType = {
     <scalar_value: IntegrityExpr> =>
-        IntegrityVariableType::Scalar(scalar_value),
+        VariableType::Scalar(scalar_value),
     "[" <vector_value: CommaElems<IntegrityExpr>> "]" =>
-        IntegrityVariableType::Vector(vector_value),
+        VariableType::Vector(vector_value),
     "[" <matrix_value: CommaElems<Vector<IntegrityExpr>>> "]" =>
-        IntegrityVariableType::Matrix(matrix_value),
+        VariableType::Matrix(matrix_value),
 }
 
 // --- INTEGRITY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
 
-IntegrityExpr: IntegrityExpr = {
+IntegrityExpr: Expression = {
     <lexpr: IntegrityExpr> "+" <rexpr: IntegrityFactor> =>
-        IntegrityExpr::Add(Box::new(lexpr), Box::new(rexpr)),
+        Expression::Add(Box::new(lexpr), Box::new(rexpr)),
     <lexpr: IntegrityExpr> "-" <rexpr: IntegrityFactor> =>
-        IntegrityExpr::Sub(Box::new(lexpr), Box::new(rexpr)),
+        Expression::Sub(Box::new(lexpr), Box::new(rexpr)),
     IntegrityFactor
 }
 
-IntegrityFactor: IntegrityExpr = {
+IntegrityFactor: Expression = {
     <lexpr: IntegrityFactor> "*" <rexpr: IntegrityAtom> =>
-        IntegrityExpr::Mul(Box::new(lexpr), Box::new(rexpr)),
+        Expression::Mul(Box::new(lexpr), Box::new(rexpr)),
     IntegrityAtom
 }
 
-IntegrityAtom: IntegrityExpr = {
+IntegrityAtom: Expression = {
     "(" <IntegrityExpr> ")",
-    <lexpr: IntegrityAtom> "^" <num: Num_u64> => IntegrityExpr::Exp(Box::new(lexpr), num),
-    "$rand" <idx: Index> => IntegrityExpr::Rand(idx),
-    <col_access: IndexedTraceAccess> => IntegrityExpr::IndexedTraceAccess(col_access),
-    <n: Num_u64> => IntegrityExpr::Const(n),
-    <ident: Identifier> => IntegrityExpr::Elem(ident),
-    <vector_access: VectorAccess> => IntegrityExpr::VectorAccess(vector_access),
-    <matrix_access: MatrixAccess> => IntegrityExpr::MatrixAccess(matrix_access),
-    <trace_access: NamedTraceAccess> "'" => IntegrityExpr::Next(trace_access)
+    <lexpr: IntegrityAtom> "^" <num: Num_u64> => Expression::Exp(Box::new(lexpr), num),
+    "$rand" <idx: Index> => Expression::Rand(idx),
+    <col_access: IndexedTraceAccess> => Expression::IndexedTraceAccess(col_access),
+    <n: Num_u64> => Expression::Const(n),
+    <ident: Identifier> => Expression::Elem(ident),
+    <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
+    <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access),
+    <trace_access: NamedTraceAccessWithOffset> => Expression::NamedTraceAccess(trace_access)
 }
 
 // ATOMS
@@ -294,8 +292,13 @@ MatrixAccess: MatrixAccess = {
 }
 
 NamedTraceAccess: NamedTraceAccess = {
-    <ident: Identifier> => NamedTraceAccess::new(ident, 0),
-    <ident: Identifier> <idx: Index> => NamedTraceAccess::new(ident, idx)
+    <ident: Identifier> => NamedTraceAccess::new(ident, 0, 0),
+    <ident: Identifier> <idx: Index> => NamedTraceAccess::new(ident, idx, 0)
+}
+
+NamedTraceAccessWithOffset: NamedTraceAccess = {
+    <ident: Identifier> "'" => NamedTraceAccess::new(ident, 0, 1),
+    <ident: Identifier> <idx: Index> "'" => NamedTraceAccess::new(ident, idx, 1)
 }
 
 IndexedTraceAccess: IndexedTraceAccess = {

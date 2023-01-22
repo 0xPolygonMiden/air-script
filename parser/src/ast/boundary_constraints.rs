@@ -1,4 +1,4 @@
-use super::{Identifier, MatrixAccess, NamedTraceAccess, VectorAccess};
+use super::{Expression, NamedTraceAccess, Variable};
 use std::fmt::Display;
 
 // BOUNDARY CONSTRAINTS
@@ -7,7 +7,7 @@ use std::fmt::Display;
 #[derive(Debug, Eq, PartialEq)]
 pub enum BoundaryStmt {
     Constraint(BoundaryConstraint),
-    Variable(BoundaryVariable),
+    Variable(Variable),
 }
 
 /// Stores the expression corresponding to the boundary constraint.
@@ -15,11 +15,11 @@ pub enum BoundaryStmt {
 pub struct BoundaryConstraint {
     column: NamedTraceAccess,
     boundary: Boundary,
-    value: BoundaryExpr,
+    value: Expression,
 }
 
 impl BoundaryConstraint {
-    pub fn new(column: NamedTraceAccess, boundary: Boundary, value: BoundaryExpr) -> Self {
+    pub fn new(column: NamedTraceAccess, boundary: Boundary, value: Expression) -> Self {
         Self {
             column,
             boundary,
@@ -35,9 +35,9 @@ impl BoundaryConstraint {
         self.boundary
     }
 
-    /// Returns a clone of the constraint's value expression.
-    pub fn value(&self) -> BoundaryExpr {
-        self.value.clone()
+    /// Returns the constraint's value expression.
+    pub fn value(&self) -> &Expression {
+        &self.value
     }
 }
 
@@ -55,52 +55,4 @@ impl Display for Boundary {
             Boundary::Last => write!(f, "last boundary"),
         }
     }
-}
-
-/// Arithmetic expressions for evaluation of boundary constraints.
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum BoundaryExpr {
-    Const(u64),
-    /// Represents any named constant or variable.
-    Elem(Identifier),
-    /// Represents an element inside a constant or variable vector. [VectorAccess] contains the
-    /// name of the vector and the index of the element to access.
-    VectorAccess(VectorAccess),
-    /// Represents an element inside a constant or variable matrix. [MatrixAccess] contains the
-    /// name of the matrix and indices of the element to access.
-    MatrixAccess(MatrixAccess),
-    /// Represents a random value provided by the verifier. The inner value is the index of this
-    /// random value in the array of all random values.
-    Rand(usize),
-    Add(Box<BoundaryExpr>, Box<BoundaryExpr>),
-    Sub(Box<BoundaryExpr>, Box<BoundaryExpr>),
-    Mul(Box<BoundaryExpr>, Box<BoundaryExpr>),
-    Exp(Box<BoundaryExpr>, u64),
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct BoundaryVariable {
-    name: Identifier,
-    value: BoundaryVariableType,
-}
-
-impl BoundaryVariable {
-    pub fn new(name: Identifier, value: BoundaryVariableType) -> Self {
-        Self { name, value }
-    }
-
-    pub fn name(&self) -> &str {
-        self.name.name()
-    }
-
-    pub fn value(&self) -> &BoundaryVariableType {
-        &self.value
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum BoundaryVariableType {
-    Scalar(BoundaryExpr),
-    Vector(Vec<BoundaryExpr>),
-    Matrix(Vec<Vec<BoundaryExpr>>),
 }

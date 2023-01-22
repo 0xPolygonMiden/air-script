@@ -1,7 +1,7 @@
+use super::Identifier;
+
 // CONSTANTS
 // ================================================================================================
-
-use super::Identifier;
 
 /// Stores a constant's name and value. There are three types of constants:
 /// - Scalar: 123

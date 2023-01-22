@@ -1,4 +1,5 @@
 use super::{AirIR, Impl, Scope};
+use air_script_core::{Constant, ConstantType, Expression};
 use ir::IntegrityConstraintDegree;
 
 mod constants;

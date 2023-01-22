@@ -1,10 +1,8 @@
-use super::{
-    super::BTreeMap, degree::IntegrityConstraintDegree, SemanticError, SymbolTable, TraceSegment,
-};
-use crate::{symbol_table::IdentifierType, ExprDetails, VariableRoots, CURRENT_ROW, NEXT_ROW};
-use parser::ast::{
-    self, constants::ConstantType, Identifier, IndexedTraceAccess, IntegrityExpr,
-    IntegrityVariableType, MatrixAccess, VectorAccess,
+use super::{super::BTreeMap, degree::IntegrityConstraintDegree, SemanticError, SymbolTable};
+use crate::{
+    symbol_table::IdentifierType, ConstantType, ExprDetails, Expression, Identifier,
+    IndexedTraceAccess, MatrixAccess, NamedTraceAccess, VariableRoots, VariableType, VectorAccess,
+    CURRENT_ROW,
 };
 
 // ALGEBRAIC GRAPH
@@ -88,27 +86,26 @@ impl AlgebraicGraph {
     pub(super) fn insert_expr(
         &mut self,
         symbol_table: &SymbolTable,
-        expr: IntegrityExpr,
+        expr: Expression,
         variable_roots: &mut VariableRoots,
     ) -> Result<ExprDetails, SemanticError> {
         match expr {
-            IntegrityExpr::Const(value) => {
+            Expression::Const(value) => {
                 // constraint target defaults to Main trace.
                 let trace_segment = 0;
                 let node_index = self.insert_op(Operation::Constant(ConstantValue::Inline(value)));
                 Ok((trace_segment, node_index, CURRENT_ROW))
             }
-            IntegrityExpr::Elem(Identifier(ident)) => {
+            Expression::Elem(Identifier(ident)) => {
                 self.insert_symbol_access(symbol_table, &ident, variable_roots)
             }
-            IntegrityExpr::VectorAccess(vector_access) => {
+            Expression::VectorAccess(vector_access) => {
                 self.insert_vector_access(symbol_table, &vector_access, variable_roots)
             }
-            IntegrityExpr::MatrixAccess(matrix_access) => {
+            Expression::MatrixAccess(matrix_access) => {
                 self.insert_matrix_access(symbol_table, &matrix_access, variable_roots)
             }
-            IntegrityExpr::Next(trace_access) => self.insert_next(symbol_table, &trace_access),
-            IntegrityExpr::Rand(index) => {
+            Expression::Rand(index) => {
                 // constraint target for random values defaults to the second trace segment.
                 // TODO: make this more general, so random values from further trace segments can be
                 // used. This requires having a way to describe different sets of randomness in
@@ -117,10 +114,13 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::RandomValue(index));
                 Ok((trace_segment, node_index, CURRENT_ROW))
             }
-            IntegrityExpr::IndexedTraceAccess(column_access) => {
-                self.insert_trace_access(symbol_table, column_access)
+            Expression::IndexedTraceAccess(column_access) => {
+                self.insert_indexed_trace_access(symbol_table, column_access)
             }
-            IntegrityExpr::Add(lhs, rhs) => {
+            Expression::NamedTraceAccess(trace_access) => {
+                self.insert_named_trace_access(symbol_table, &trace_access)
+            }
+            Expression::Add(lhs, rhs) => {
                 // add both subexpressions.
                 let (lhs_segment, lhs, lhs_row_offset) =
                     self.insert_expr(symbol_table, *lhs, variable_roots)?;
@@ -132,7 +132,7 @@ impl AlgebraicGraph {
                 let row_offset = lhs_row_offset.max(rhs_row_offset);
                 Ok((trace_segment, node_index, row_offset))
             }
-            IntegrityExpr::Sub(lhs, rhs) => {
+            Expression::Sub(lhs, rhs) => {
                 // add both subexpressions.
                 let (lhs_segment, lhs, lhs_row_offset) =
                     self.insert_expr(symbol_table, *lhs, variable_roots)?;
@@ -144,7 +144,7 @@ impl AlgebraicGraph {
                 let row_offset = lhs_row_offset.max(rhs_row_offset);
                 Ok((trace_segment, node_index, row_offset))
             }
-            IntegrityExpr::Mul(lhs, rhs) => {
+            Expression::Mul(lhs, rhs) => {
                 // add both subexpressions.
                 let (lhs_segment, lhs, lhs_row_offset) =
                     self.insert_expr(symbol_table, *lhs, variable_roots)?;
@@ -156,7 +156,7 @@ impl AlgebraicGraph {
                 let row_offset = lhs_row_offset.max(rhs_row_offset);
                 Ok((trace_segment, node_index, row_offset))
             }
-            IntegrityExpr::Exp(lhs, rhs) => {
+            Expression::Exp(lhs, rhs) => {
                 // add base subexpression.
                 let (trace_segment, lhs, row_offset) =
                     self.insert_expr(symbol_table, *lhs, variable_roots)?;
@@ -167,68 +167,72 @@ impl AlgebraicGraph {
         }
     }
 
-    /// Adds a next row operator to the graph and returns the [ExprDetails] of the inserted
-    /// `Next` expression.
+    /// Adds a trace element access to the graph and returns the node index, trace segment, and row
+    /// offset.
     ///
     /// # Errors
-    /// Returns an error if the operator is not applied to a trace column in the symbol table.
-    fn insert_next(
+    /// Returns an error if:
+    /// - The identifier is greater than overall number of columns in segment.
+    /// - The segment is greater than the number of segments.
+    fn insert_indexed_trace_access(
         &mut self,
         symbol_table: &SymbolTable,
-        trace_access: &ast::NamedTraceAccess,
+        trace_access: IndexedTraceAccess,
     ) -> Result<ExprDetails, SemanticError> {
-        let col_type = symbol_table.get_type(trace_access.name())?;
-        match col_type {
-            IdentifierType::TraceColumns(columns) => {
-                let trace_segment = columns.trace_segment();
-                let trace_access = TraceAccess::new(
-                    trace_segment,
-                    columns.offset() + trace_access.idx(),
-                    NEXT_ROW,
-                );
-                let node_index = self.insert_op(Operation::TraceElement(trace_access));
-                Ok((trace_segment, node_index, NEXT_ROW))
-            }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as a {} not as a trace column",
-                trace_access.name(),
-                col_type
-            ))),
+        let segment_idx = trace_access.trace_segment() as usize;
+        if segment_idx > symbol_table.segment_widths().len() {
+            return Err(SemanticError::IndexOutOfRange(format!(
+                "Segment index {} is greater than the number of segments in the trace ({}).",
+                segment_idx,
+                symbol_table.segment_widths().len()
+            )));
         }
+        if trace_access.col_idx() as u16 >= symbol_table.segment_widths()[segment_idx] {
+            return Err(SemanticError::IndexOutOfRange(format!(
+                "Out-of-range index {} in trace segment {} of length {}",
+                trace_access.col_idx(),
+                trace_access.trace_segment(),
+                symbol_table.segment_widths()[segment_idx]
+            )));
+        }
+
+        let trace_segment = trace_access.trace_segment();
+        let row_offset = trace_access.row_offset();
+        let node_index = self.insert_op(Operation::TraceElement(trace_access));
+        Ok((trace_segment, node_index, row_offset))
     }
 
-    /// Adds a trace element access to the graph and returns the node index and trace segment.
+    /// Adds a named trace element access to the graph and returns the node index, trace segment,
+    /// and row offset.
     ///
     /// # Errors
     /// Returns an error if:
     /// - The identifier is greater than overall number of columns in segment.
     /// - The segment is greater than the maximum number of segments.
-    fn insert_trace_access(
+    fn insert_named_trace_access(
         &mut self,
         symbol_table: &SymbolTable,
-        column_access: IndexedTraceAccess,
+        trace_access: &NamedTraceAccess,
     ) -> Result<ExprDetails, SemanticError> {
-        if column_access.column_idx() as u16
-            >= symbol_table.segment_widths()[column_access.segment_idx()]
-        {
-            return Err(SemanticError::IndexOutOfRange(format!(
-                "Out-of-range index {} in trace segment {} of length {}",
-                column_access.column_idx(),
-                column_access.segment_idx(),
-                symbol_table.segment_widths()[column_access.segment_idx()]
-            )));
+        let elem_type = symbol_table.get_type(trace_access.name())?;
+        match elem_type {
+            IdentifierType::TraceColumns(columns) => {
+                let trace_segment = columns.trace_segment();
+                let row_offset = trace_access.row_offset();
+                let trace_access = IndexedTraceAccess::new(
+                    trace_segment,
+                    columns.offset() + trace_access.idx(),
+                    row_offset,
+                );
+                let node_index = self.insert_op(Operation::TraceElement(trace_access));
+                Ok((trace_segment, node_index, row_offset))
+            }
+            _ => Err(SemanticError::InvalidUsage(format!(
+                "Identifier {} was declared as a {} not as a trace column",
+                trace_access.name(),
+                elem_type
+            ))),
         }
-        let segment_idx = column_access.segment_idx();
-        if segment_idx > u8::MAX as usize {
-            return Err(SemanticError::IndexOutOfRange(format!(
-                "Segment index {} is greater than the maximum number of segments (255)",
-                segment_idx
-            )));
-        }
-        let row_offset = column_access.row_offset();
-        let trace_access = TraceAccess::from(column_access);
-        let node_index = self.insert_op(Operation::TraceElement(trace_access));
-        Ok((segment_idx as u8, node_index, row_offset))
     }
 
     /// Adds a trace column, periodic column, named constant or a variable to the graph and returns
@@ -247,7 +251,8 @@ impl AlgebraicGraph {
         match elem_type {
             IdentifierType::TraceColumns(columns) => {
                 let trace_segment = columns.trace_segment();
-                let trace_access = TraceAccess::new(trace_segment, columns.offset(), CURRENT_ROW);
+                let trace_access =
+                    IndexedTraceAccess::new(trace_segment, columns.offset(), CURRENT_ROW);
                 let node_index = self.insert_op(Operation::TraceElement(trace_access));
                 Ok((trace_segment, node_index, CURRENT_ROW))
             }
@@ -265,7 +270,7 @@ impl AlgebraicGraph {
                 Ok((trace_segment, node_index, CURRENT_ROW))
             }
             IdentifierType::IntegrityVariable(integrity_variable) => {
-                if let IntegrityVariableType::Scalar(expr) = integrity_variable.value() {
+                if let VariableType::Scalar(expr) = integrity_variable.value() {
                     if let Some((trace_segment, node_index, row_offset)) =
                         variable_roots.get(&VariableValue::Scalar(ident.to_string()))
                     {
@@ -314,7 +319,7 @@ impl AlgebraicGraph {
                 Ok((trace_segment, node_index, CURRENT_ROW))
             }
             IdentifierType::IntegrityVariable(integrity_variable) => {
-                if let IntegrityVariableType::Vector(vector) = integrity_variable.value() {
+                if let VariableType::Vector(vector) = integrity_variable.value() {
                     let expr = &vector[vector_access.idx()];
                     if let Some((trace_segment, node_index, row_offset)) =
                         variable_roots.get(&VariableValue::Vector(vector_access.clone()))
@@ -340,7 +345,7 @@ impl AlgebraicGraph {
             IdentifierType::TraceColumns(columns) => {
                 let trace_segment = columns.trace_segment();
                 let col_idx = columns.offset() + vector_access.idx();
-                let node_index = self.insert_op(Operation::TraceElement(TraceAccess::new(
+                let node_index = self.insert_op(Operation::TraceElement(IndexedTraceAccess::new(
                     trace_segment,
                     col_idx,
                     CURRENT_ROW,
@@ -375,7 +380,7 @@ impl AlgebraicGraph {
                 Ok((trace_segment, node_index, CURRENT_ROW))
             }
             IdentifierType::IntegrityVariable(integrity_variable) => {
-                if let IntegrityVariableType::Matrix(matrix) = integrity_variable.value() {
+                if let VariableType::Matrix(matrix) = integrity_variable.value() {
                     let expr = &matrix[matrix_access.row_idx()][matrix_access.col_idx()];
                     if let Some((trace_segment, node_index, row_offset)) =
                         variable_roots.get(&VariableValue::Matrix(matrix_access.clone()))
@@ -444,8 +449,8 @@ pub enum Operation {
     /// An inlined or named constant with identifier and access indices.
     Constant(ConstantValue),
     /// An identifier for an element in the trace segment, column, and row offset specified by the
-    /// [TraceAccess]
-    TraceElement(TraceAccess),
+    /// [IndexedTraceAccess]
+    TraceElement(IndexedTraceAccess),
     /// An identifier for a periodic value from a specified periodic column. The first inner value
     /// is the index of the periodic column within the declared periodic columns. The second inner
     /// value is the length of the column's periodic cycle. The periodic value made available from
@@ -465,48 +470,6 @@ pub enum Operation {
     /// Exponentiation operation applied to the node with the specified index, using the provided
     /// value as the power.
     Exp(NodeIndex, usize),
-}
-
-/// Access information for getting an element in the execution trace. The trace_segment specifies
-/// how many trace commitments have preceded the specified segment. `col_idx` specifies the index
-/// of the column within that trace segment, and `row_offset` specifies the offset from the current
-/// row. For example, an element in the "next" row of the "main" trace would be specified by
-/// a trace_segment of 0 and a row_offset of 1.
-#[derive(Debug, Eq, PartialEq)]
-pub struct TraceAccess {
-    trace_segment: TraceSegment,
-    col_idx: usize,
-    row_offset: usize,
-}
-
-impl TraceAccess {
-    fn new(trace_segment: TraceSegment, col_idx: usize, row_offset: usize) -> Self {
-        Self {
-            trace_segment,
-            col_idx,
-            row_offset,
-        }
-    }
-
-    /// Gets the column index of this [TraceAccess].
-    pub fn col_idx(&self) -> usize {
-        self.col_idx
-    }
-
-    /// Gets the row offset of this [TraceAccess].
-    pub fn row_offset(&self) -> usize {
-        self.row_offset
-    }
-}
-
-impl From<IndexedTraceAccess> for TraceAccess {
-    fn from(indexed_trace_access: IndexedTraceAccess) -> Self {
-        TraceAccess {
-            trace_segment: indexed_trace_access.segment_idx() as u8,
-            col_idx: indexed_trace_access.column_idx(),
-            row_offset: indexed_trace_access.row_offset(),
-        }
-    }
 }
 
 #[derive(Debug, Eq, PartialEq)]

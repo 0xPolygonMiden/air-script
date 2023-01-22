@@ -1,6 +1,6 @@
 use crate::{BoundaryConstraintsMap, TraceSegment};
 
-use super::{BTreeMap, BoundaryExpr, IdentifierType, SemanticError, SymbolTable};
+use super::{BTreeMap, Expression, IdentifierType, SemanticError, SymbolTable};
 use parser::ast::{self, BoundaryStmt};
 
 // BOUNDARY CONSTRAINTS
@@ -76,7 +76,7 @@ impl BoundaryStmts {
     pub fn first_boundary_constraints(
         &self,
         trace_segment: TraceSegment,
-    ) -> Vec<(usize, &BoundaryExpr)> {
+    ) -> Vec<(usize, &Expression)> {
         if self.boundary_constraints.len() <= trace_segment.into() {
             Vec::new()
         } else {
@@ -93,7 +93,7 @@ impl BoundaryStmts {
     pub fn last_boundary_constraints(
         &self,
         trace_segment: TraceSegment,
-    ) -> Vec<(usize, &BoundaryExpr)> {
+    ) -> Vec<(usize, &Expression)> {
         if self.boundary_constraints.len() <= trace_segment.into() {
             Vec::new()
         } else {
@@ -128,7 +128,7 @@ impl BoundaryStmts {
             BoundaryStmt::Constraint(constraint) => {
                 // validate the expression
                 let expr = constraint.value();
-                validate_expression(symbol_table, &expr)?;
+                validate_expression(symbol_table, expr)?;
 
                 // add the constraint to the specified boundary for the specified trace
                 let col_type = symbol_table.get_type(constraint.column().name())?;
@@ -144,11 +144,11 @@ impl BoundaryStmts {
                             ast::Boundary::First => self.boundary_constraints
                                 [columns.trace_segment() as usize]
                                 .first_mut()
-                                .insert(columns.offset() + constraint.column().idx(), expr),
+                                .insert(columns.offset() + constraint.column().idx(), expr.clone()),
                             ast::Boundary::Last => self.boundary_constraints
                                 [columns.trace_segment() as usize]
                                 .last_mut()
-                                .insert(columns.offset() + constraint.column().idx(), expr),
+                                .insert(columns.offset() + constraint.column().idx(), expr.clone()),
                         }
                     }
                     _ => {
@@ -176,33 +176,30 @@ impl BoundaryStmts {
     }
 }
 
-/// Recursively validates the BoundaryExpression.
+/// Recursively validates the Expression.
 ///
 /// # Errors
 /// Returns an error if the expression includes a reference to a public input that hasn't been
 /// declared or to an invalid index in an existing public input.
-fn validate_expression(
-    symbol_table: &SymbolTable,
-    expr: &ast::BoundaryExpr,
-) -> Result<(), SemanticError> {
+fn validate_expression(symbol_table: &SymbolTable, expr: &Expression) -> Result<(), SemanticError> {
     match expr {
-        BoundaryExpr::Elem(ident) => {
+        Expression::Elem(ident) => {
             symbol_table.get_type(ident.name())?;
             Ok(())
         }
-        BoundaryExpr::VectorAccess(vector_access) => {
+        Expression::VectorAccess(vector_access) => {
             symbol_table.access_vector_element(vector_access)?;
             Ok(())
         }
-        BoundaryExpr::MatrixAccess(matrix_access) => {
+        Expression::MatrixAccess(matrix_access) => {
             symbol_table.access_matrix_element(matrix_access)?;
             Ok(())
         }
-        BoundaryExpr::Add(lhs, rhs) | BoundaryExpr::Sub(lhs, rhs) | BoundaryExpr::Mul(lhs, rhs) => {
+        Expression::Add(lhs, rhs) | Expression::Sub(lhs, rhs) | Expression::Mul(lhs, rhs) => {
             validate_expression(symbol_table, lhs)?;
             validate_expression(symbol_table, rhs)
         }
-        BoundaryExpr::Exp(lhs, _) => validate_expression(symbol_table, lhs),
+        Expression::Exp(lhs, _) => validate_expression(symbol_table, lhs),
         _ => Ok(()),
     }
 }

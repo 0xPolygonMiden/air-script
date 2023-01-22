@@ -1,7 +1,7 @@
 [package]
-name = "air-ir"
+name = "air-script-core"
 version = "0.1.0"
-description="Intermediate representation for the AirScript language"
+description="Core types for the AirScript compiler"
 authors = ["miden contributors"]
 readme="README.md"
 license = "MIT"
@@ -12,5 +12,3 @@ edition = "2021"
 rust-version = "1.65"
 
 [dependencies]
-air-script-core = {package = "air-script-core", path="../air-script-core", version="0.1.0" }
-parser = { package = "air-parser", path = "../parser", version = "0.1.0" }

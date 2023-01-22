@@ -1,7 +1,8 @@
-pub use parser::ast::{
-    self, boundary_constraints::BoundaryExpr, constants::Constant, Identifier, IntegrityVariable,
-    PublicInput,
+pub use air_script_core::{
+    Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, MatrixAccess,
+    NamedTraceAccess, Variable, VariableType, VectorAccess,
 };
+pub use parser::ast::{self, PublicInput};
 use std::collections::BTreeMap;
 
 mod symbol_table;
@@ -32,7 +33,7 @@ pub type TraceSegment = u8;
 pub type Constants = Vec<Constant>;
 pub type PublicInputs = Vec<(String, usize)>;
 pub type PeriodicColumns = Vec<Vec<u64>>;
-pub type BoundaryConstraintsMap = BTreeMap<usize, BoundaryExpr>;
+pub type BoundaryConstraintsMap = BTreeMap<usize, Expression>;
 pub type VariableRoots = BTreeMap<VariableValue, ExprDetails>;
 
 /// A tuple containing the node index of the root of an expression or a constraint, it's trace
@@ -177,11 +178,11 @@ impl AirIR {
         self.boundary_stmts.num_boundary_constraints(0)
     }
 
-    pub fn main_first_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
+    pub fn main_first_boundary_constraints(&self) -> Vec<(usize, &Expression)> {
         self.boundary_stmts.first_boundary_constraints(0)
     }
 
-    pub fn main_last_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
+    pub fn main_last_boundary_constraints(&self) -> Vec<(usize, &Expression)> {
         self.boundary_stmts.last_boundary_constraints(0)
     }
 
@@ -189,11 +190,11 @@ impl AirIR {
         self.boundary_stmts.num_boundary_constraints(1)
     }
 
-    pub fn aux_first_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
+    pub fn aux_first_boundary_constraints(&self) -> Vec<(usize, &Expression)> {
         self.boundary_stmts.first_boundary_constraints(1)
     }
 
-    pub fn aux_last_boundary_constraints(&self) -> Vec<(usize, &BoundaryExpr)> {
+    pub fn aux_last_boundary_constraints(&self) -> Vec<(usize, &Expression)> {
         self.boundary_stmts.last_boundary_constraints(1)
     }
 

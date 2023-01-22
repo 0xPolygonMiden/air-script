@@ -1,5 +1,5 @@
+use super::{MatrixAccess, NamedTraceAccess, VectorAccess};
 use crate::symbol_table::IdentifierType;
-use parser::ast::{MatrixAccess, NamedTraceAccess, VectorAccess};
 
 #[derive(Debug)]
 pub enum SemanticError {
