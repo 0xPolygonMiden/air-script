@@ -7,7 +7,7 @@ use crate::{
     error::{Error, ParseError},
 };
 
-// BOUNDARY CONSTRAINTS
+// BOUNDARY STATEMENTS
 // ================================================================================================
 
 #[test]

@@ -1,6 +1,9 @@
-use super::{SemanticError, SymbolTable, TraceSegment, VariableRoots};
+use super::{SemanticError, SymbolTable, TraceSegment};
 use parser::ast::IntegrityStmt;
 use std::collections::BTreeMap;
+
+mod constraint;
+pub use constraint::{ConstraintDomain, ConstraintRoot};
 
 mod degree;
 pub use degree::IntegrityConstraintDegree;
@@ -8,12 +11,19 @@ pub use degree::IntegrityConstraintDegree;
 mod graph;
 pub use graph::{AlgebraicGraph, ConstantValue, NodeIndex, Operation, VariableValue};
 
+// TYPE ALIASES
+// ================================================================================================
+/// A tuple containing the node index which is the root of an expression and the trace segment and
+/// constraint domain against which any constraint containing this expression must be applied.
+type ExprDetails = (NodeIndex, TraceSegment, ConstraintDomain);
+type VariableRoots = BTreeMap<VariableValue, ExprDetails>;
+
 // CONSTANTS
 // ================================================================================================
 
 pub const MIN_CYCLE_LENGTH: usize = 2;
 
-// INTEGRITY CONSTRAINTS
+// STATEMENTS
 // ================================================================================================
 
 #[derive(Default, Debug)]
@@ -63,7 +73,7 @@ impl IntegrityStmts {
             .collect()
     }
 
-    /// Returns all integrity constraints against the specified trace segment as a vector of
+    /// Returns all integrity constraints against the specified trace segment as a slice of
     /// [ConstraintRoot] where each index is the tip of the subgraph representing the constraint
     /// within the constraints [AlgebraicGraph].
     pub fn constraints(&self, trace_segment: TraceSegment) -> &[ConstraintRoot] {
@@ -72,6 +82,34 @@ impl IntegrityStmts {
         }
 
         &self.constraint_roots[trace_segment as usize]
+    }
+
+    /// Returns all validity constraints against the specified trace segment as a vector of
+    /// references to [ConstraintRoot] where each index is the tip of the subgraph representing the
+    /// constraint within the [AlgebraicGraph].
+    pub fn validity_constraints(&self, trace_segment: TraceSegment) -> Vec<&ConstraintRoot> {
+        if self.constraint_roots.len() <= trace_segment.into() {
+            return Vec::new();
+        }
+
+        self.constraint_roots[trace_segment as usize]
+            .iter()
+            .filter(|c| matches!(c.domain(), ConstraintDomain::EveryRow))
+            .collect()
+    }
+
+    /// Returns all transition constraints against the specified trace segment as a vector of
+    /// references to [ConstraintRoot] where each index is the tip of the subgraph representing the
+    /// constraint within the [AlgebraicGraph].
+    pub fn transition_constraints(&self, trace_segment: TraceSegment) -> Vec<&ConstraintRoot> {
+        if self.constraint_roots.len() <= trace_segment.into() {
+            return Vec::new();
+        }
+
+        self.constraint_roots[trace_segment as usize]
+            .iter()
+            .filter(|c| matches!(c.domain(), ConstraintDomain::EveryFrame(2)))
+            .collect()
     }
 
     /// Returns the [AlgebraicGraph] representing all integrity constraints.
@@ -99,7 +137,7 @@ impl IntegrityStmts {
                 let expr = constraint.expr();
 
                 // add it to the integrity constraints graph and get its entry index.
-                let (trace_segment, root_index, row_offset) = self.constraints_graph.insert_expr(
+                let (root_index, trace_segment, domain) = self.constraints_graph.insert_expr(
                     symbol_table,
                     expr,
                     &mut self.variable_roots,
@@ -112,7 +150,7 @@ impl IntegrityStmts {
                     ));
                 }
 
-                let constraint_root = ConstraintRoot::new(root_index, row_offset);
+                let constraint_root = ConstraintRoot::new(root_index, domain);
                 // add the integrity constraint to the appropriate set of constraints.
                 self.constraint_roots[trace_segment as usize].push(constraint_root);
             }
@@ -122,36 +160,5 @@ impl IntegrityStmts {
         }
 
         Ok(())
-    }
-}
-
-/// A [ConstraintRoot] represents the entry node of a subgraph representing an integrity constraint
-/// within the [AlgebraicGraph]. It also contains the row offset for the constraint which is the
-/// maximum of all row offsets accessed by the constraint. For example, if a constraint only
-/// accesses the trace in the current row then the row offset will be 0, but if it accesses the
-/// trace in both the current and the next rows then the row offset will be 1.
-#[derive(Debug, Clone)]
-pub struct ConstraintRoot {
-    index: NodeIndex,
-    offset: usize,
-}
-
-impl ConstraintRoot {
-    /// Creates a new [ConstraintRoot] with the specified entry index and row offset.
-    pub fn new(index: NodeIndex, offset: usize) -> Self {
-        Self { index, offset }
-    }
-
-    /// Returns the index of the entry node of the subgraph representing the constraint.
-    pub fn node_index(&self) -> &NodeIndex {
-        &self.index
-    }
-
-    /// Returns the row offset for the constraint which is the maximum of all the row offsets
-    /// accessed by the constraint. For example, if a constraint only accesses the trace in the
-    /// current row then the row offset will be 0, but if it accesses the trace in both the current
-    /// and the next rows then the row offset will be 1.
-    pub fn offset(&self) -> usize {
-        self.offset
     }
 }

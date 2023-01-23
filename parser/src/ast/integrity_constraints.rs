@@ -1,6 +1,6 @@
 use super::{Expression, Variable};
 
-// INTEGRITY CONSTRAINTS
+// INTEGRITY STATEMENTS
 // ================================================================================================
 
 #[derive(Debug, Eq, PartialEq)]

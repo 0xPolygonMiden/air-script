@@ -8,10 +8,10 @@ use std::fmt::Display;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(super) enum IdentifierType {
-    /// an identifier for a constant, containing it's type and value
+    /// an identifier for a constant, containing its type and value
     Constant(ConstantType),
     /// an identifier for a trace column, containing trace column information with its trace
-    /// segment, it's size and it's offset.
+    /// segment, its size and its offset.
     TraceColumns(TraceColumns),
     /// an identifier for a public input, containing the size of the public input array
     PublicInput(usize),

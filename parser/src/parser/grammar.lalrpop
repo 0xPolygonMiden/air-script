@@ -118,7 +118,7 @@ PeriodicColumn: PeriodicColumn = {
         PeriodicColumn::new(name, values),
 }
 
-// BOUNDARY CONSTRAINTS
+// BOUNDARY STATEMENTS
 // ================================================================================================
 
 BoundaryConstraints: Vec<BoundaryStmt> = {
