@@ -162,7 +162,7 @@ fn boundary_constraint_with_variables() {
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
         Variable(Variable::new(
             Identifier("a".to_string()),
-            VariableType::Scalar(Exp(Box::new(Const(2)), 2)),
+            VariableType::Scalar(Exp(Box::new(Const(2)), Box::new(Const(2)))),
         )),
         Variable(Variable::new(
             Identifier("b".to_string()),
@@ -182,7 +182,10 @@ fn boundary_constraint_with_variables() {
                         Box::new(Elem(Identifier("a".to_string()))),
                         Box::new(Const(1)),
                     ),
-                    Exp(Box::new(Elem(Identifier("a".to_string()))), 2),
+                    Exp(
+                        Box::new(Elem(Identifier("a".to_string()))),
+                        Box::new(Const(2)),
+                    ),
                 ],
                 vec![
                     VectorAccess(VectorAccess::new(Identifier("b".to_string()), 0)),

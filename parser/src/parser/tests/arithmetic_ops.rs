@@ -186,7 +186,7 @@ fn ops_with_parens() {
 }
 
 #[test]
-fn single_exponentiation() {
+fn const_exponentiation() {
     // the operation must be put into a source section, or parsing will fail
     let source = "
     integrity_constraints:
@@ -199,7 +199,32 @@ fn single_exponentiation() {
                     0,
                     1,
                 ))),
-                2,
+                Box::new(Const(2)),
+            ),
+            Const(1),
+        ),
+    )])]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn non_const_exponentiation() {
+    // the operation must be put into a source section, or parsing will fail
+    let source = "
+    integrity_constraints:
+        enf clk'^(clk + 2) = 1";
+    let expected = Source(vec![IntegrityConstraints(vec![Constraint(
+        IntegrityConstraint::new(
+            Exp(
+                Box::new(NamedTraceAccess(NamedTraceAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                    1,
+                ))),
+                Box::new(Add(
+                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(Const(2)),
+                )),
             ),
             Const(1),
         ),
@@ -222,15 +247,6 @@ fn err_closing_paren_without_opening_paren() {
     let source = "
     integrity_constraints:
         enf clk' + clk) * 2 = 4";
-    build_parse_test!(source).expect_unrecognized_token();
-}
-
-#[test]
-fn non_const_exp_fail() {
-    // Should fail if the exponent is not a constant
-    let source = "
-    integrity_constraints:
-        enf clk'^a = 1";
     build_parse_test!(source).expect_unrecognized_token();
 }
 
@@ -283,7 +299,7 @@ fn multi_arithmetic_ops_different_precedence() {
                             0,
                             1,
                         ))),
-                        2,
+                        Box::new(Const(2)),
                     )),
                     Box::new(Mul(
                         Box::new(Elem(Identifier("clk".to_string()))),
@@ -319,7 +335,10 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
                     1,
                 ))),
                 Box::new(Mul(
-                    Box::new(Exp(Box::new(Elem(Identifier("clk".to_string()))), 2)),
+                    Box::new(Exp(
+                        Box::new(Elem(Identifier("clk".to_string()))),
+                        Box::new(Const(2)),
+                    )),
                     Box::new(Sub(Box::new(Const(2)), Box::new(Const(1)))),
                 )),
             ),

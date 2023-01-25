@@ -167,7 +167,11 @@ impl Codegen for Expression {
                 )
             }
             Self::Exp(lhs, rhs) => {
-                format!("({}).exp({})", lhs.to_string(ir, is_aux_constraint), rhs)
+                if let Self::Const(rhs) = **rhs {
+                    format!("({}).exp({})", lhs.to_string(ir, is_aux_constraint), rhs)
+                } else {
+                    todo!()
+                }
             }
             _ => panic!("boundary constraint expressions cannot reference the trace"),
         }
