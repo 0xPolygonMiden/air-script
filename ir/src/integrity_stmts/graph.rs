@@ -301,14 +301,12 @@ impl AlgebraicGraph {
                     }
                 } else {
                     Err(SemanticError::InvalidUsage(format!(
-                        "Identifier {} was declared as a {} which is not a supported type.",
-                        ident, elem_type
+                        "Identifier {ident} was declared as a {elem_type} which is not a supported type."
                     )))
                 }
             }
             _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as a {} which is not a supported type.",
-                ident, elem_type
+                "Identifier {ident} was declared as a {elem_type} which is not a supported type."
             ))),
         }
     }

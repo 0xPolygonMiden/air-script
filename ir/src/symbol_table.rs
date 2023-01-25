@@ -74,8 +74,7 @@ impl SymbolTable {
             .insert(ident_name.to_owned(), ident_type.clone());
         match result {
             Some(prev_type) => Err(SemanticError::DuplicateIdentifier(format!(
-                "Cannot declare {} as a {}, since it was already defined as a {}",
-                ident_name, ident_type, prev_type
+                "Cannot declare {ident_name} as a {ident_type}, since it was already defined as a {prev_type}"
             ))),
             None => Ok(()),
         }
@@ -191,8 +190,7 @@ impl SymbolTable {
             Ok(ident_type)
         } else {
             Err(SemanticError::InvalidIdentifier(format!(
-                "Identifier {} was not declared",
-                name
+                "Identifier {name} was not declared"
             )))
         }
     }
@@ -305,15 +303,13 @@ fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
 
     if !cycle.is_power_of_two() {
         return Err(SemanticError::InvalidPeriodicColumn(format!(
-            "cycle length must be a power of two, but was {} for cycle {}",
-            cycle, name
+            "cycle length must be a power of two, but was {cycle} for cycle {name}"
         )));
     }
 
     if cycle < MIN_CYCLE_LENGTH {
         return Err(SemanticError::InvalidPeriodicColumn(format!(
-            "cycle length must be at least {}, but was {} for cycle {}",
-            MIN_CYCLE_LENGTH, cycle, name
+            "cycle length must be at least {MIN_CYCLE_LENGTH}, but was {cycle} for cycle {name}"
         )));
     }
 

@@ -41,13 +41,13 @@ impl Codegen for Constant {
     fn to_string(&self) -> String {
         match self.value() {
             ConstantType::Scalar(scalar_const) => {
-                format!("Felt::new({})", scalar_const)
+                format!("Felt::new({scalar_const})")
             }
             ConstantType::Vector(vector_const) => format!(
                 "[{}]",
                 vector_const
                     .iter()
-                    .map(|val| format!("Felt::new({})", val))
+                    .map(|val| format!("Felt::new({val})"))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -57,7 +57,7 @@ impl Codegen for Constant {
                     rows.push(format!(
                         "[{}]",
                         row.iter()
-                            .map(|val| format!("Felt::new({})", val))
+                            .map(|val| format!("Felt::new({val})"))
                             .collect::<Vec<String>>()
                             .join(", "),
                     ))

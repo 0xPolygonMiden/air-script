@@ -97,17 +97,17 @@ impl Codegen for Expression {
         match self {
             Self::Const(value) => {
                 if is_aux_constraint {
-                    format!("E::from({}_u64)", value)
+                    format!("E::from({value}_u64)")
                 } else {
-                    format!("Felt::new({})", value)
+                    format!("Felt::new({value})")
                 }
             }
             // TODO: Check element type and cast accordingly.
             Self::Elem(ident) => {
                 if is_aux_constraint {
-                    format!("E::from({})", ident)
+                    format!("E::from({ident})")
                 } else {
-                    format!("{}", ident)
+                    format!("{ident}")
                 }
             }
             Self::VectorAccess(vector_access) => {
@@ -143,7 +143,7 @@ impl Codegen for Expression {
                 }
             }
             Self::Rand(index) => {
-                format!("aux_rand_elements.get_segment_elements(0)[{}]", index)
+                format!("aux_rand_elements.get_segment_elements(0)[{index}]")
             }
             Self::Add(lhs, rhs) => {
                 format!(

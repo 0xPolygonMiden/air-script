@@ -81,8 +81,8 @@ impl Codegen for Operation {
     // TODO: Only add parentheses in Add and Mul if the expression is an arithmetic operation.
     fn to_string(&self, graph: &AlgebraicGraph) -> String {
         match self {
-            Operation::Constant(ConstantValue::Inline(value)) => format!("E::from({}_u64)", value),
-            Operation::Constant(ConstantValue::Scalar(ident)) => format!("E::from({})", ident),
+            Operation::Constant(ConstantValue::Inline(value)) => format!("E::from({value}_u64)"),
+            Operation::Constant(ConstantValue::Scalar(ident)) => format!("E::from({ident})"),
             Operation::Constant(ConstantValue::Vector(vector_access)) => {
                 format!("E::from({}[{}])", vector_access.name(), vector_access.idx())
             }
@@ -102,35 +102,35 @@ impl Codegen for Operation {
                 _ => panic!("Winterfell doesn't support row offsets greater than 1."),
             },
             Operation::PeriodicColumn(col_idx, _) => {
-                format!("periodic_values[{}]", col_idx)
+                format!("periodic_values[{col_idx}]")
             }
             Operation::RandomValue(idx) => {
-                format!("aux_rand_elements.get_segment_elements(0)[{}]", idx)
+                format!("aux_rand_elements.get_segment_elements(0)[{idx}]")
             }
             Operation::Neg(idx) => {
                 let str = idx.to_string(graph);
-                format!("- ({})", str)
+                format!("- ({str})")
             }
             Operation::Add(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
                 let rhs = r_idx.to_string(graph);
 
-                format!("{} + {}", lhs, rhs)
+                format!("{lhs} + {rhs}")
             }
             Operation::Sub(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
                 let rhs = r_idx.to_string(graph);
 
-                format!("{} - ({})", lhs, rhs)
+                format!("{lhs} - ({rhs})")
             }
             Operation::Mul(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
                 let rhs = r_idx.to_string(graph);
-                format!("({}) * ({})", lhs, rhs)
+                format!("({lhs}) * ({rhs})")
             }
             Operation::Exp(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(graph);
-                format!("({}).exp(E::PositiveInteger::from({}_u64))", lhs, r_idx)
+                format!("({lhs}).exp(E::PositiveInteger::from({r_idx}_u64))")
             }
         }
     }

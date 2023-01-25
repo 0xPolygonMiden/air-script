@@ -67,16 +67,11 @@ impl IntegrityConstraintDegree {
         for (i, &cycle) in cycles.iter().enumerate() {
             assert!(
                 cycle >= MIN_CYCLE_LENGTH,
-                "cycle length must be at least {}, but was {} for cycle {}",
-                MIN_CYCLE_LENGTH,
-                cycle,
-                i
+                "cycle length must be at least {MIN_CYCLE_LENGTH}, but was {cycle} for cycle {i}"
             );
             assert!(
                 cycle.is_power_of_two(),
-                "cycle length must be a power of two, but was {} for cycle {}",
-                cycle,
-                i
+                "cycle length must be a power of two, but was {cycle} for cycle {i}"
             );
         }
         IntegrityConstraintDegree {
