@@ -1,8 +1,4 @@
-use super::{AirIR, Impl};
-use ir::{
-    constraints::{AlgebraicGraph, ConstantValue, Operation},
-    NodeIndex,
-};
+use super::{AirIR, Codegen, ElemType, Impl};
 
 // HELPERS TO GENERATE THE WINTERFELL TRANSITION CONSTRAINT METHODS
 // ================================================================================================
@@ -24,14 +20,7 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
     evaluate_transition.line("let next = frame.next();");
 
     // output the constraints.
-    let graph = ir.constraint_graph();
-    for (idx, constraint) in ir.integrity_constraints(0).iter().enumerate() {
-        evaluate_transition.line(format!(
-            "result[{}] = {};",
-            idx,
-            constraint.node_index().to_string(graph)
-        ));
-    }
+    add_constraints(evaluate_transition, ir, 0);
 }
 
 /// Adds an implementation of the "evaluate_aux_transition" method to the referenced Air implementation
@@ -55,83 +44,22 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
     evaluate_aux_transition.line("let next = aux_frame.next();");
 
     // output the constraints.
-    let graph = ir.constraint_graph();
-    for (idx, constraint) in ir.integrity_constraints(1).iter().enumerate() {
-        evaluate_aux_transition.line(format!(
+    add_constraints(evaluate_aux_transition, ir, 1);
+}
+
+/// Iterates through the integrity constraints in the IR, and appends a line of generated code to
+/// the provided codegen function body for each constraint.
+fn add_constraints(func_body: &mut codegen::Function, ir: &AirIR, trace_segment: u8) {
+    for (idx, constraint) in ir
+        .validity_constraints(trace_segment)
+        .iter()
+        .chain(ir.transition_constraints(trace_segment).iter())
+        .enumerate()
+    {
+        func_body.line(format!(
             "result[{}] = {};",
             idx,
-            constraint.node_index().to_string(graph)
+            constraint.node_index().to_string(ir, ElemType::Ext)
         ));
-    }
-}
-
-/// Code generation trait for generating Rust code strings from [AlgebraicGraph] types.
-trait Codegen {
-    fn to_string(&self, graph: &AlgebraicGraph) -> String;
-}
-
-impl Codegen for NodeIndex {
-    fn to_string(&self, graph: &AlgebraicGraph) -> String {
-        let op = graph.node(self).op();
-        op.to_string(graph)
-    }
-}
-
-impl Codegen for Operation {
-    // TODO: Only add parentheses in Add and Mul if the expression is an arithmetic operation.
-    fn to_string(&self, graph: &AlgebraicGraph) -> String {
-        match self {
-            Operation::Constant(ConstantValue::Inline(value)) => format!("E::from({value}_u64)"),
-            Operation::Constant(ConstantValue::Scalar(ident)) => format!("E::from({ident})"),
-            Operation::Constant(ConstantValue::Vector(vector_access)) => {
-                format!("E::from({}[{}])", vector_access.name(), vector_access.idx())
-            }
-            Operation::Constant(ConstantValue::Matrix(matrix_access)) => format!(
-                "E::from({}[{}][{}])",
-                matrix_access.name(),
-                matrix_access.row_idx(),
-                matrix_access.col_idx()
-            ),
-            Operation::TraceElement(trace_access) => match trace_access.row_offset() {
-                0 => {
-                    format!("current[{}]", trace_access.col_idx())
-                }
-                1 => {
-                    format!("next[{}]", trace_access.col_idx())
-                }
-                _ => panic!("Winterfell doesn't support row offsets greater than 1."),
-            },
-            Operation::PeriodicColumn(col_idx, _) => {
-                format!("periodic_values[{col_idx}]")
-            }
-            Operation::RandomValue(idx) => {
-                format!("aux_rand_elements.get_segment_elements(0)[{idx}]")
-            }
-            Operation::Neg(idx) => {
-                let str = idx.to_string(graph);
-                format!("- ({str})")
-            }
-            Operation::Add(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(graph);
-                let rhs = r_idx.to_string(graph);
-
-                format!("{lhs} + {rhs}")
-            }
-            Operation::Sub(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(graph);
-                let rhs = r_idx.to_string(graph);
-
-                format!("{lhs} - ({rhs})")
-            }
-            Operation::Mul(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(graph);
-                let rhs = r_idx.to_string(graph);
-                format!("({lhs}) * ({rhs})")
-            }
-            Operation::Exp(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(graph);
-                format!("({lhs}).exp(E::PositiveInteger::from({r_idx}_u64))")
-            }
-        }
     }
 }

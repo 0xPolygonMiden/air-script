@@ -1,6 +1,9 @@
 use super::{AirIR, Impl, Scope};
-use air_script_core::{Constant, ConstantType, Expression};
-use ir::IntegrityConstraintDegree;
+use air_script_core::{Constant, ConstantType, IndexedTraceAccess};
+use ir::{
+    constraints::{AlgebraicGraph, ConstantValue, ConstraintDomain, Operation},
+    IntegrityConstraintDegree, NodeIndex, PeriodicColumns,
+};
 
 mod constants;
 use constants::add_constants;
@@ -11,11 +14,23 @@ use public_inputs::add_public_inputs_struct;
 mod periodic_columns;
 use periodic_columns::add_fn_get_periodic_column_values;
 
+mod graph;
+use graph::Codegen;
+
 mod boundary_constraints;
 use boundary_constraints::{add_fn_get_assertions, add_fn_get_aux_assertions};
 
 mod transition_constraints;
 use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_transition};
+
+// HELPER TYPES
+// ================================================================================================
+
+#[derive(Debug, Clone, Copy)]
+pub enum ElemType {
+    Base,
+    Ext,
+}
 
 // HELPERS TO GENERATE AN IMPLEMENTATION OF THE WINTERFELL AIR TRAIT
 // ================================================================================================
@@ -107,26 +122,10 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
         .ret("Self");
 
     // define the integrity constraint degrees of the main trace `main_degrees`.
-    let main_degrees = ir
-        .integrity_constraint_degrees(0)
-        .iter()
-        .map(|degree| degree.to_string(ir, false))
-        .collect::<Vec<_>>();
-    new.line(format!(
-        "let main_degrees = vec![{}];",
-        main_degrees.join(", ")
-    ));
+    add_constraint_degrees(new, ir, 0, "main_degrees");
 
     // define the integrity constraint degrees of the aux trace `aux_degrees`.
-    let aux_degrees = ir
-        .integrity_constraint_degrees(1)
-        .iter()
-        .map(|degree| degree.to_string(ir, true))
-        .collect::<Vec<_>>();
-    new.line(format!(
-        "let aux_degrees = vec![{}];",
-        aux_degrees.join(", ")
-    ));
+    add_constraint_degrees(new, ir, 1, "aux_degrees");
 
     // define the number of main trace boundary constraints `num_main_assertions`.
     new.line(format!(
@@ -163,30 +162,19 @@ let context = AirContext::new_multi_segment(
     new.line(format!("Self {{ context, {} }}", pub_inputs.join(", ")));
 }
 
-// RUST STRING GENERATION
-// ================================================================================================
-
-/// Code generation trait for generating Rust code strings from boundary constraint expressions.
-pub trait Codegen {
-    fn to_string(&self, ir: &AirIR, is_aux_constraint: bool) -> String;
-}
-
-impl Codegen for IntegrityConstraintDegree {
-    fn to_string(&self, _ir: &AirIR, _is_aux_constraint: bool) -> String {
-        if self.cycles().is_empty() {
-            format!("TransitionConstraintDegree::new({})", self.base())
-        } else {
-            let cycles = self
-                .cycles()
-                .iter()
-                .map(|cycle_len| cycle_len.to_string())
-                .collect::<Vec<String>>()
-                .join(", ");
-            format!(
-                "TransitionConstraintDegree::with_cycles({}, vec![{}])",
-                self.base(),
-                cycles
-            )
-        }
-    }
+/// Iterates through the degrees of the integrity constraints in the IR, and appends a line of
+/// generated code to the function body that declares all of the constraint degrees.
+fn add_constraint_degrees(
+    func_body: &mut codegen::Function,
+    ir: &AirIR,
+    trace_segment: u8,
+    decl_name: &str,
+) {
+    let degrees = ir
+        .validity_constraint_degrees(trace_segment)
+        .iter()
+        .chain(ir.transition_constraint_degrees(trace_segment).iter())
+        .map(|degree| degree.to_string(ir, ElemType::Ext))
+        .collect::<Vec<_>>();
+    func_body.line(format!("let {decl_name} = vec![{}];", degrees.join(", ")));
 }

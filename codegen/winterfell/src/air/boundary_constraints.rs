@@ -1,10 +1,16 @@
-use super::{AirIR, Codegen, Expression, Impl};
+use core::panic;
+
+use super::{
+    AirIR, AlgebraicGraph, Codegen, ConstraintDomain, ElemType, Impl, IndexedTraceAccess,
+    NodeIndex, Operation,
+};
 
 // HELPERS TO GENERATE THE WINTERFELL BOUNDARY CONSTRAINT METHODS
 // ================================================================================================
 
 /// Adds an implementation of the "get_assertions" method to the referenced Air implementation
 /// based on the data in the provided AirIR.
+/// TODO: add result types to these functions.
 pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
     // define the function
     let get_assertions = impl_ref
@@ -12,22 +18,8 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
         .arg_ref_self()
         .ret("Vec<Assertion<Felt>>");
 
-    // declare the result vector to be returned.
-    get_assertions.line("let mut result = Vec::new();");
-    get_assertions.line("let last_step = self.last_step();");
-
     // add the boundary constraints
-    // TODO: need to do something clever here to get the trace column, since the constraint was combined in the graph
-    // maybe it's worth representing this in two halves?
-    for (col_idx, constraint) in ir.boundary_constraints(0) {
-        let assertion = format!(
-            "result.push(Assertion::single({}, {}, {}));",
-            col_idx,
-            constraint.domain(), // TODO: get the step number from the constraint domain
-            constraint.to_string(ir, false)
-        );
-        get_assertions.line(assertion);
-    }
+    add_assertions(get_assertions, ir, 0);
 
     // return the result
     get_assertions.line("result");
@@ -44,112 +36,74 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
         .arg("aux_rand_elements", "&AuxTraceRandElements<E>")
         .ret("Vec<Assertion<E>>");
 
-    // declare the result vector to be returned.
-    get_aux_assertions.line("let mut result = Vec::new();");
-    get_assertions.line("let last_step = self.last_step();");
-
-    // TODO: update this analagously to above
-    // add the constraints for the auxiliary columns for the first boundary.
-    for (col_idx, constraint) in ir.boundary_constraints(1) {
-        let assertion = format!(
-            "result.push(Assertion::single({}, 0, {}));",
-            col_idx,
-            constraint.to_string(ir, true)
-        );
-        get_aux_assertions.line(assertion);
-    }
+    // add the boundary constraints
+    add_assertions(get_aux_assertions, ir, 1);
 
     // return the result
     get_aux_assertions.line("result");
 }
 
-// RUST STRING GENERATION
+/// Declares a result vector and adds assertions for boundary constraints to it for the specified
+/// trace segment
+fn add_assertions(func_body: &mut codegen::Function, ir: &AirIR, trace_segment: u8) {
+    let elem_type = if trace_segment == 0 {
+        ElemType::Base
+    } else {
+        ElemType::Ext
+    };
+
+    // declare the result vector to be returned.
+    func_body.line("let mut result = Vec::new();");
+
+    // add the boundary constraints
+    for constraint in ir.boundary_constraints(trace_segment) {
+        let (trace_access, expr_root) =
+            split_boundary_constraint(ir.constraint_graph(), constraint.node_index());
+        debug_assert!(trace_access.trace_segment() == trace_segment);
+
+        let assertion = format!(
+            "result.push(Assertion::single({}, {}, {}));",
+            trace_access.col_idx(),
+            domain_to_str(constraint.domain()),
+            expr_root.to_string(ir, elem_type)
+        );
+        func_body.line(assertion);
+    }
+}
+
+/// Returns a string slice representing the provided constraint domain.
+fn domain_to_str(domain: ConstraintDomain) -> String {
+    match domain {
+        ConstraintDomain::FirstRow => "0".to_string(),
+        ConstraintDomain::LastRow => "self.last_step()".to_string(),
+        // TODO: replace this with an Error once we have a Result return type.
+        _ => panic!("invalid constraint domain"),
+    }
+}
+
+// CONSTRAINT GRAPH HELPERS
 // ================================================================================================
 
-/// Code generation trait for generating Rust code strings from boundary constraint expressions.
-impl Codegen for Expression {
-    // TODO: Only add parentheses in Add/Sub/Mul/Exp if the expression is an arithmetic operation.
-    fn to_string(&self, ir: &AirIR, is_aux_constraint: bool) -> String {
-        match self {
-            Self::Const(value) => {
-                if is_aux_constraint {
-                    format!("E::from({value}_u64)")
-                } else {
-                    format!("Felt::new({value})")
-                }
+/// Given a node index that is expected to be the root index of a boundary constraint, returns
+/// the [IndexedTraceAccess] representing the trace segment and column against which the
+/// boundary constraint expression must hold, as well as the node index that represents the root
+/// of the constraint expression that must equal zero during evaluation.
+///
+/// TODO: replace panics with Result and Error
+pub fn split_boundary_constraint(
+    graph: &AlgebraicGraph,
+    index: &NodeIndex,
+) -> (IndexedTraceAccess, NodeIndex) {
+    let node = graph.node(index);
+    match node.op() {
+        Operation::Sub(lhs, rhs) => {
+            if let Operation::TraceElement(trace_access) = graph.node(lhs).op() {
+                debug_assert!(trace_access.row_offset() == 0);
+                (*trace_access, *rhs)
+            } else {
+                panic!("InvalidUsage: index {index:?} is not the constraint root of a boundary constraint");
             }
-            // TODO: Check element type and cast accordingly.
-            Self::Elem(ident) => {
-                if is_aux_constraint {
-                    format!("E::from({ident})")
-                } else {
-                    format!("{ident}")
-                }
-            }
-            Self::VectorAccess(vector_access) => {
-                // check if vector_access is a public input
-                // TODO: figure out a better way to handle this lookup.
-                if ir
-                    .public_inputs()
-                    .iter()
-                    .any(|input| input.0 == vector_access.name())
-                {
-                    format!("self.{}[{}]", vector_access.name(), vector_access.idx())
-                } else if is_aux_constraint {
-                    format!("E::from({}[{}])", vector_access.name(), vector_access.idx())
-                } else {
-                    format!("{}[{}]", vector_access.name(), vector_access.idx())
-                }
-            }
-            Self::MatrixAccess(matrix_access) => {
-                if is_aux_constraint {
-                    format!(
-                        "E::from({}[{}][{}])",
-                        matrix_access.name(),
-                        matrix_access.row_idx(),
-                        matrix_access.col_idx()
-                    )
-                } else {
-                    format!(
-                        "{}[{}][{}]",
-                        matrix_access.name(),
-                        matrix_access.row_idx(),
-                        matrix_access.col_idx()
-                    )
-                }
-            }
-            Self::Rand(index) => {
-                format!("aux_rand_elements.get_segment_elements(0)[{index}]")
-            }
-            Self::Add(lhs, rhs) => {
-                format!(
-                    "({}) + ({})",
-                    lhs.to_string(ir, is_aux_constraint),
-                    rhs.to_string(ir, is_aux_constraint)
-                )
-            }
-            Self::Sub(lhs, rhs) => {
-                format!(
-                    "({}) - ({})",
-                    lhs.to_string(ir, is_aux_constraint),
-                    rhs.to_string(ir, is_aux_constraint)
-                )
-            }
-            Self::Mul(lhs, rhs) => {
-                format!(
-                    "({}) * ({})",
-                    lhs.to_string(ir, is_aux_constraint),
-                    rhs.to_string(ir, is_aux_constraint)
-                )
-            }
-            Self::Exp(lhs, rhs) => {
-                if let Self::Const(rhs) = **rhs {
-                    format!("({}).exp({})", lhs.to_string(ir, is_aux_constraint), rhs)
-                } else {
-                    todo!()
-                }
-            }
-            _ => panic!("boundary constraint expressions cannot reference the trace"),
         }
+        _ => panic!("InvalidUsage: index {index:?} is not the root index of a constraint"),
     }
 }

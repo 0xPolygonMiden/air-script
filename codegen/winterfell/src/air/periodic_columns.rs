@@ -1,5 +1,4 @@
-use super::{AirIR, Impl};
-use ir::PeriodicColumns;
+use super::{AirIR, Impl, PeriodicColumns};
 
 pub(super) fn add_fn_get_periodic_column_values(impl_ref: &mut Impl, ir: &AirIR) {
     // define the function.
