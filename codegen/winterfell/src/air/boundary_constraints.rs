@@ -14,30 +14,19 @@ pub(super) fn add_fn_get_assertions(impl_ref: &mut Impl, ir: &AirIR) {
 
     // declare the result vector to be returned.
     get_assertions.line("let mut result = Vec::new();");
+    get_assertions.line("let last_step = self.last_step();");
 
-    // add the constraints for the first boundary
-    for (col_idx, constraint) in ir.main_first_boundary_constraints() {
+    // add the boundary constraints
+    // TODO: need to do something clever here to get the trace column, since the constraint was combined in the graph
+    // maybe it's worth representing this in two halves?
+    for (col_idx, constraint) in ir.boundary_constraints(0) {
         let assertion = format!(
-            "result.push(Assertion::single({}, 0, {}));",
+            "result.push(Assertion::single({}, {}, {}));",
             col_idx,
+            constraint.domain(), // TODO: get the step number from the constraint domain
             constraint.to_string(ir, false)
         );
         get_assertions.line(assertion);
-    }
-
-    // add the constraints for the last boundary.
-    let last_constraints = ir.main_last_boundary_constraints();
-
-    if !last_constraints.is_empty() {
-        get_assertions.line("let last_step = self.last_step();");
-        for (col_idx, constraint) in last_constraints {
-            let assertion = format!(
-                "result.push(Assertion::single({}, last_step, {}));",
-                col_idx,
-                constraint.to_string(ir, false)
-            );
-            get_assertions.line(assertion);
-        }
     }
 
     // return the result
@@ -57,30 +46,17 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &AirIR) {
 
     // declare the result vector to be returned.
     get_aux_assertions.line("let mut result = Vec::new();");
+    get_assertions.line("let last_step = self.last_step();");
 
+    // TODO: update this analagously to above
     // add the constraints for the auxiliary columns for the first boundary.
-    for (col_idx, constraint) in ir.aux_first_boundary_constraints() {
+    for (col_idx, constraint) in ir.boundary_constraints(1) {
         let assertion = format!(
             "result.push(Assertion::single({}, 0, {}));",
             col_idx,
             constraint.to_string(ir, true)
         );
         get_aux_assertions.line(assertion);
-    }
-
-    let last_aux_constraints = ir.aux_last_boundary_constraints();
-
-    if !last_aux_constraints.is_empty() {
-        get_aux_assertions.line("let last_step = self.last_step();");
-        // add the constraints for the auxiliary columns for the last boundary.
-        for (col_idx, constraint) in last_aux_constraints {
-            let assertion = format!(
-                "result.push(Assertion::single({}, last_step, {}));",
-                col_idx,
-                constraint.to_string(ir, true)
-            );
-            get_aux_assertions.line(assertion);
-        }
     }
 
     // return the result

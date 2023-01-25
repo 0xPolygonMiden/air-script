@@ -1,6 +1,6 @@
 use super::{AirIR, Impl};
 use ir::{
-    integrity_stmts::{AlgebraicGraph, ConstantValue, Operation},
+    constraints::{AlgebraicGraph, ConstantValue, Operation},
     NodeIndex,
 };
 

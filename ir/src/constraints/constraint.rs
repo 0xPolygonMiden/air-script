@@ -1,10 +1,8 @@
-use super::NodeIndex;
+use super::{Boundary, NodeIndex, SemanticError};
 
-/// A [ConstraintRoot] represents the entry node of a subgraph representing an integrity constraint
-/// within the [AlgebraicGraph]. It also contains the row offset for the constraint which is the
-/// maximum of all row offsets accessed by the constraint. For example, if a constraint only
-/// accesses the trace in the current row then the row offset will be 0, but if it accesses the
-/// trace in both the current and the next rows then the row offset will be 1.
+/// A [ConstraintRoot] represents the entry node of a subgraph within the [AlgebraicGraph]
+/// representing a constraint. It also contains the [ConstraintDomain] for the constraint, which is
+/// the domain against which the constraint should be applied.
 #[derive(Debug, Clone)]
 pub struct ConstraintRoot {
     index: NodeIndex,
@@ -43,24 +41,32 @@ pub enum ConstraintDomain {
 }
 
 impl ConstraintDomain {
-    /// Combines the two [ConstraintDomain]s into a single [ConstraintDomain] that represents the
-    /// maximum constraint domain. For example, if one domain is [ConstraintDomain::EveryFrame(2)]
-    /// and the other is [ConstraintDomain::EveryFrame(3)] then the result will be
+    /// Combines two compatible [ConstraintDomain]s into a single [ConstraintDomain] that represents
+    /// the maximum of the two. For example, if one domain is [ConstraintDomain::EveryFrame(2)] and
+    /// the other is [ConstraintDomain::EveryFrame(3)], then the result will be
     /// [ConstraintDomain::EveryFrame(3)].
-    pub fn merge(&self, other: &ConstraintDomain) -> ConstraintDomain {
+    ///
+    /// # Errors
+    /// Domains for boundary constraints (FirstRow and LastRow) cannot be merged with other domains.
+    pub fn merge(&self, other: &ConstraintDomain) -> Result<ConstraintDomain, SemanticError> {
         if self == other {
-            return *other;
+            return Ok(*other);
         }
 
         match (self, other) {
-            (ConstraintDomain::EveryFrame(a), ConstraintDomain::EveryFrame(b)) => {
-                ConstraintDomain::EveryFrame(*a.max(b))
+            (ConstraintDomain::EveryFrame(a), ConstraintDomain::EveryRow) => {
+                Ok(ConstraintDomain::EveryFrame(*a))
             }
-            (ConstraintDomain::EveryFrame(a), _) => ConstraintDomain::EveryFrame(*a),
-            (_, ConstraintDomain::EveryFrame(b)) => ConstraintDomain::EveryFrame(*b),
-            // for any other pair of constraints which are not equal, the result of combining the
-            // domains is to apply the constraint at every row.
-            _ => ConstraintDomain::EveryRow,
+            (ConstraintDomain::EveryRow, ConstraintDomain::EveryFrame(b)) => {
+                Ok(ConstraintDomain::EveryFrame(*b))
+            }
+            (ConstraintDomain::EveryFrame(a), ConstraintDomain::EveryFrame(b)) => {
+                Ok(ConstraintDomain::EveryFrame(*a.max(b)))
+            }
+            // otherwise, the domains are not compatible.
+            _ => Err(SemanticError::InvalidConstraintDomain(format!(
+                "The specified constraint domain {other:?} is not compatible with the base domain {self:?}",
+            ))),
         }
     }
 }
@@ -72,6 +78,15 @@ impl From<usize> for ConstraintDomain {
             ConstraintDomain::EveryRow
         } else {
             ConstraintDomain::EveryFrame(row_offset + 1)
+        }
+    }
+}
+
+impl From<Boundary> for ConstraintDomain {
+    fn from(boundary: Boundary) -> Self {
+        match boundary {
+            Boundary::First => ConstraintDomain::FirstRow,
+            Boundary::Last => ConstraintDomain::LastRow,
         }
     }
 }

@@ -106,9 +106,9 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
         .arg("options", "WinterProofOptions")
         .ret("Self");
 
-    // define the transition constraint degrees of the main trace `main_degrees`.
+    // define the integrity constraint degrees of the main trace `main_degrees`.
     let main_degrees = ir
-        .constraint_degrees(0)
+        .integrity_constraint_degrees(0)
         .iter()
         .map(|degree| degree.to_string(ir, false))
         .collect::<Vec<_>>();
@@ -117,9 +117,9 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
         main_degrees.join(", ")
     ));
 
-    // define the transition constraint degrees of the aux trace `aux_degrees`.
+    // define the integrity constraint degrees of the aux trace `aux_degrees`.
     let aux_degrees = ir
-        .constraint_degrees(1)
+        .integrity_constraint_degrees(1)
         .iter()
         .map(|degree| degree.to_string(ir, true))
         .collect::<Vec<_>>();
@@ -131,13 +131,13 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
     // define the number of main trace boundary constraints `num_main_assertions`.
     new.line(format!(
         "let num_main_assertions = {};",
-        ir.num_main_assertions()
+        ir.num_boundary_constraints(0)
     ));
 
     // define the number of aux trace boundary constraints `num_aux_assertions`.
     new.line(format!(
         "let num_aux_assertions = {};",
-        ir.num_aux_assertions()
+        ir.num_boundary_constraints(1)
     ));
 
     // define the context.
