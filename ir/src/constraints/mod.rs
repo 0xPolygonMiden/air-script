@@ -249,7 +249,7 @@ impl Constraints {
                 let domain = constraint.boundary().into();
                 // add the trace access at the specified boundary to the graph.
                 // TODO: need to validate that only one constraint is specified against this column and boundary
-                let lhs = self.graph.insert_boundary_trace_access(
+                let lhs = self.graph.insert_named_trace_access(
                     symbol_table,
                     constraint.access(),
                     domain,

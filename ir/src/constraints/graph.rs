@@ -55,40 +55,24 @@ impl AlgebraicGraph {
         }
     }
 
-    /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.
-    fn accumulate_degree(&self, cycles: &mut BTreeMap<usize, usize>, index: &NodeIndex) -> usize {
-        // recursively walk the subgraph and compute the degree from the operation and child nodes
-        match self.node(index).op() {
-            Operation::Constant(_) | Operation::RandomValue(_) => 0,
-            Operation::TraceElement(_) => 1,
-            Operation::PeriodicColumn(index, cycle_len) => {
-                cycles.insert(*index, *cycle_len);
-                0
-            }
-            Operation::Neg(index) => self.accumulate_degree(cycles, index),
-            Operation::Add(lhs, rhs) => {
-                let lhs_base = self.accumulate_degree(cycles, lhs);
-                let rhs_base = self.accumulate_degree(cycles, rhs);
-                lhs_base.max(rhs_base)
-            }
-            Operation::Sub(lhs, rhs) => {
-                let lhs_base = self.accumulate_degree(cycles, lhs);
-                let rhs_base = self.accumulate_degree(cycles, rhs);
-                lhs_base.max(rhs_base)
-            }
-            Operation::Mul(lhs, rhs) => {
-                let lhs_base = self.accumulate_degree(cycles, lhs);
-                let rhs_base = self.accumulate_degree(cycles, rhs);
-                lhs_base + rhs_base
-            }
-            Operation::Exp(lhs, rhs) => {
-                let lhs_base = self.accumulate_degree(cycles, lhs);
-                lhs_base * rhs
-            }
-        }
-    }
+    // --- PUBLIC MUTATORS ------------------------------------------------------------------------
 
-    // --- MUTATORS -------------------------------------------------------------------------------
+    /// Combines two subgraphs representing equal subexpressions and returns the [ExprDetails] of
+    /// the new subgraph.
+    ///
+    /// TODO: we can optimize this in the future in the case where lhs or rhs equals zero to just
+    /// return the other expression.
+    pub(super) fn merge_equal_exprs(
+        &mut self,
+        lhs: &ExprDetails,
+        rhs: &ExprDetails,
+    ) -> Result<ExprDetails, SemanticError> {
+        let node_index = self.insert_op(Operation::Sub(lhs.root_idx(), rhs.root_idx()));
+        let trace_segment = lhs.trace_segment().max(rhs.trace_segment());
+        let domain = lhs.domain().merge(&rhs.domain())?;
+
+        Ok(ExprDetails::new(node_index, trace_segment, domain))
+    }
 
     /// Adds the expression to the graph and returns the [ExprDetails] of the constraint.
     /// Expressions are added recursively to reuse existing matching nodes.
@@ -135,38 +119,31 @@ impl AlgebraicGraph {
             Expression::IndexedTraceAccess(column_access) => {
                 self.insert_indexed_trace_access(symbol_table, column_access)
             }
-            Expression::NamedTraceAccess(trace_access) => {
-                self.insert_named_trace_access(symbol_table, trace_access)
-            }
+            Expression::NamedTraceAccess(trace_access) => self.insert_named_trace_access(
+                symbol_table,
+                trace_access,
+                ConstraintDomain::from(trace_access.row_offset()),
+            ),
             Expression::Add(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
                 let rhs = self.insert_expr(symbol_table, rhs, variable_roots, default_domain)?;
                 // add the expression.
-                let trace_segment = lhs.trace_segment().max(rhs.trace_segment());
-                let node_index = self.insert_op(Operation::Add(lhs.root_idx(), rhs.root_idx()));
-                let domain = lhs.domain().merge(&rhs.domain())?;
-                Ok(ExprDetails::new(node_index, trace_segment, domain))
+                self.insert_bin_op(&lhs, &rhs, Operation::Add(lhs.root_idx(), rhs.root_idx()))
             }
             Expression::Sub(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
                 let rhs = self.insert_expr(symbol_table, rhs, variable_roots, default_domain)?;
                 // add the expression.
-                let trace_segment = lhs.trace_segment().max(rhs.trace_segment());
-                let node_index = self.insert_op(Operation::Sub(lhs.root_idx(), rhs.root_idx()));
-                let domain = lhs.domain().merge(&rhs.domain())?;
-                Ok(ExprDetails::new(node_index, trace_segment, domain))
+                self.insert_bin_op(&lhs, &rhs, Operation::Sub(lhs.root_idx(), rhs.root_idx()))
             }
             Expression::Mul(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
                 let rhs = self.insert_expr(symbol_table, rhs, variable_roots, default_domain)?;
                 // add the expression.
-                let trace_segment = lhs.trace_segment().max(rhs.trace_segment());
-                let node_index = self.insert_op(Operation::Mul(lhs.root_idx(), rhs.root_idx()));
-                let domain = lhs.domain().merge(&rhs.domain())?;
-                Ok(ExprDetails::new(node_index, trace_segment, domain))
+                self.insert_bin_op(&lhs, &rhs, Operation::Mul(lhs.root_idx(), rhs.root_idx()))
             }
             Expression::Exp(lhs, rhs) => {
                 // add base subexpression.
@@ -187,15 +164,19 @@ impl AlgebraicGraph {
         }
     }
 
-    /// TODO
-    pub(super) fn insert_boundary_trace_access(
+    /// Converts a [NamedTraceAccess] element into an [IndexedTraceAccess] by its identifier name,
+    /// trace segment, and row offset, then adds it to the graph.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - The identifier was not declared as a trace column type.
+    pub(super) fn insert_named_trace_access(
         &mut self,
         symbol_table: &SymbolTable,
         trace_access: &NamedTraceAccess,
         domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
         let elem_type = symbol_table.get_type(trace_access.name())?;
-
         match elem_type {
             IdentifierType::TraceColumns(columns) => {
                 let trace_segment = columns.trace_segment();
@@ -212,6 +193,104 @@ impl AlgebraicGraph {
                 trace_access.name(),
                 elem_type
             ))),
+        }
+    }
+
+    // --- HELPERS --------------------------------------------------------------------------------
+
+    /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.
+    fn accumulate_degree(&self, cycles: &mut BTreeMap<usize, usize>, index: &NodeIndex) -> usize {
+        // recursively walk the subgraph and compute the degree from the operation and child nodes
+        match self.node(index).op() {
+            Operation::Constant(_) | Operation::RandomValue(_) => 0,
+            Operation::TraceElement(_) => 1,
+            Operation::PeriodicColumn(index, cycle_len) => {
+                cycles.insert(*index, *cycle_len);
+                0
+            }
+            Operation::Neg(index) => self.accumulate_degree(cycles, index),
+            Operation::Add(lhs, rhs) => {
+                let lhs_base = self.accumulate_degree(cycles, lhs);
+                let rhs_base = self.accumulate_degree(cycles, rhs);
+                lhs_base.max(rhs_base)
+            }
+            Operation::Sub(lhs, rhs) => {
+                let lhs_base = self.accumulate_degree(cycles, lhs);
+                let rhs_base = self.accumulate_degree(cycles, rhs);
+                lhs_base.max(rhs_base)
+            }
+            Operation::Mul(lhs, rhs) => {
+                let lhs_base = self.accumulate_degree(cycles, lhs);
+                let rhs_base = self.accumulate_degree(cycles, rhs);
+                lhs_base + rhs_base
+            }
+            Operation::Exp(lhs, rhs) => {
+                let lhs_base = self.accumulate_degree(cycles, lhs);
+                lhs_base * rhs
+            }
+        }
+    }
+
+    /// Insert the operation and return its node index. If an identical node already exists, return
+    /// that index instead.
+    fn insert_op(&mut self, op: Operation) -> NodeIndex {
+        self.nodes.iter().position(|n| *n.op() == op).map_or_else(
+            || {
+                // create a new node.
+                let index = self.nodes.len();
+                self.nodes.push(Node { op });
+                NodeIndex(index)
+            },
+            |index| {
+                // return the existing node's index.
+                NodeIndex(index)
+            },
+        )
+    }
+
+    /// Inserts a binary operation into the graph and returns the resulting expression details.
+    fn insert_bin_op(
+        &mut self,
+        lhs: &ExprDetails,
+        rhs: &ExprDetails,
+        op: Operation,
+    ) -> Result<ExprDetails, SemanticError> {
+        let node_index = self.insert_op(op);
+        let trace_segment = lhs.trace_segment().max(rhs.trace_segment());
+        let domain = lhs.domain().merge(&rhs.domain())?;
+        Ok(ExprDetails::new(node_index, trace_segment, domain))
+    }
+
+    /// Inserts the specified constant value into the graph and returns the resulting expression
+    /// details.
+    fn insert_constant(
+        &mut self,
+        constant: ConstantValue,
+        domain: ConstraintDomain,
+    ) -> Result<ExprDetails, SemanticError> {
+        let node_index = self.insert_op(Operation::Constant(constant));
+        Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
+    }
+
+    /// Looks up the specified variable value in the variable roots and returns the expression
+    /// details if it is found. Otherwise, inserts the variable expression into the graph, adds it
+    /// to the variable roots, and returns the resulting expression details.
+    fn insert_variable(
+        &mut self,
+        symbol_table: &SymbolTable,
+        variable_roots: &mut VariableRoots,
+        domain: ConstraintDomain,
+        variable_value: VariableValue,
+        variable_expr: &Expression,
+    ) -> Result<ExprDetails, SemanticError> {
+        if let Some(expr) = variable_roots.get(&variable_value) {
+            // If the variable has already been inserted, return the existing expression details.
+            Ok(*expr)
+        } else {
+            // Otherwise, insert the variable expression and create a new variable root.
+            let expr = self.insert_expr(symbol_table, variable_expr, variable_roots, domain)?;
+            variable_roots.insert(variable_value, expr);
+            Ok(expr)
         }
     }
 
@@ -250,59 +329,6 @@ impl AlgebraicGraph {
         Ok(ExprDetails::new(node_index, trace_segment, domain))
     }
 
-    /// Converts a [NamedTraceAccess] element into an [IndexedTraceAccess] by its identifier name,
-    /// trace segment, and row offset, then adds it to the graph.
-    ///
-    /// # Errors
-    /// Returns an error if:
-    /// - The identifier was not declared as a trace column type.
-    fn insert_named_trace_access(
-        &mut self,
-        symbol_table: &SymbolTable,
-        trace_access: &NamedTraceAccess,
-    ) -> Result<ExprDetails, SemanticError> {
-        let elem_type = symbol_table.get_type(trace_access.name())?;
-        match elem_type {
-            IdentifierType::TraceColumns(columns) => {
-                let trace_segment = columns.trace_segment();
-                let row_offset = trace_access.row_offset();
-                let trace_access = IndexedTraceAccess::new(
-                    trace_segment,
-                    columns.offset() + trace_access.idx(),
-                    row_offset,
-                );
-                let node_index = self.insert_op(Operation::TraceElement(trace_access));
-                Ok(ExprDetails::new(
-                    node_index,
-                    trace_segment,
-                    ConstraintDomain::from(row_offset),
-                ))
-            }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as a {} not as a trace column",
-                trace_access.name(),
-                elem_type
-            ))),
-        }
-    }
-
-    /// Combines two subgraphs representing equal subexpressions and returns the [ExprDetails] of
-    /// the new subgraph.
-    ///
-    /// TODO: we can optimize this in the future in the case where lhs or rhs equals zero to just
-    /// return the other expression.
-    pub(super) fn merge_equal_exprs(
-        &mut self,
-        lhs: &ExprDetails,
-        rhs: &ExprDetails,
-    ) -> Result<ExprDetails, SemanticError> {
-        let node_index = self.insert_op(Operation::Sub(lhs.root_idx(), rhs.root_idx()));
-        let trace_segment = lhs.trace_segment().max(rhs.trace_segment());
-        let domain = lhs.domain().merge(&rhs.domain())?;
-
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
-    }
-
     /// Adds a trace column, periodic column, named constant or a variable to the graph and returns
     /// the [ExprDetails] of the inserted expression.
     ///
@@ -318,39 +344,34 @@ impl AlgebraicGraph {
     ) -> Result<ExprDetails, SemanticError> {
         let elem_type = symbol_table.get_type(ident)?;
         match elem_type {
+            IdentifierType::Constant(ConstantType::Scalar(_)) => {
+                self.insert_constant(ConstantValue::Scalar(ident.to_string()), domain)
+            }
+            IdentifierType::IntegrityVariable(integrity_variable) => {
+                if let VariableType::Scalar(variable_expr) = integrity_variable.value() {
+                    self.insert_variable(
+                        symbol_table,
+                        variable_roots,
+                        domain,
+                        VariableValue::Scalar(ident.to_string()),
+                        variable_expr,
+                    )
+                } else {
+                    Err(SemanticError::InvalidUsage(format!(
+                        "Identifier {ident} was declared as a {elem_type} which is not a supported type."
+                    )))
+                }
+            }
+            IdentifierType::PeriodicColumn(index, cycle_len) => {
+                let node_index = self.insert_op(Operation::PeriodicColumn(*index, *cycle_len));
+                Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
+            }
             IdentifierType::TraceColumns(columns) => {
                 let trace_segment = columns.trace_segment();
                 let trace_access =
                     IndexedTraceAccess::new(trace_segment, columns.offset(), CURRENT_ROW);
                 let node_index = self.insert_op(Operation::TraceElement(trace_access));
                 Ok(ExprDetails::new(node_index, trace_segment, domain))
-            }
-            IdentifierType::PeriodicColumn(index, cycle_len) => {
-                let node_index = self.insert_op(Operation::PeriodicColumn(*index, *cycle_len));
-                Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
-            }
-            IdentifierType::Constant(ConstantType::Scalar(_)) => {
-                let node_index = self.insert_op(Operation::Constant(ConstantValue::Scalar(
-                    ident.to_string(),
-                )));
-                Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
-            }
-            IdentifierType::IntegrityVariable(integrity_variable) => {
-                if let VariableType::Scalar(expr) = integrity_variable.value() {
-                    if let Some(expr) =
-                        variable_roots.get(&VariableValue::Scalar(ident.to_string()))
-                    {
-                        Ok(*expr)
-                    } else {
-                        let expr = self.insert_expr(symbol_table, expr, variable_roots, domain)?;
-                        variable_roots.insert(VariableValue::Scalar(ident.to_string()), expr);
-                        Ok(expr)
-                    }
-                } else {
-                    Err(SemanticError::InvalidUsage(format!(
-                        "Identifier {ident} was declared as a {elem_type} which is not a supported type."
-                    )))
-                }
             }
             _ => Err(SemanticError::InvalidUsage(format!(
                 "Identifier {ident} was declared as a {elem_type} which is not a supported type."
@@ -373,39 +394,32 @@ impl AlgebraicGraph {
         let symbol_type = symbol_table.access_vector_element(vector_access)?;
         match symbol_type {
             IdentifierType::Constant(ConstantType::Vector(_)) => {
-                let node_index = self.insert_op(Operation::Constant(ConstantValue::Vector(
-                    vector_access.clone(),
-                )));
-                Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
+                self.insert_constant(ConstantValue::Vector(vector_access.clone()), domain)
             }
             IdentifierType::IntegrityVariable(integrity_variable) => {
                 if let VariableType::Vector(vector) = integrity_variable.value() {
-                    let expr = &vector[vector_access.idx()];
-                    if let Some(expr) =
-                        variable_roots.get(&VariableValue::Vector(vector_access.clone()))
-                    {
-                        Ok(*expr)
-                    } else {
-                        let expr = self.insert_expr(symbol_table, expr, variable_roots, domain)?;
-                        variable_roots.insert(VariableValue::Vector(vector_access.clone()), expr);
-                        Ok(expr)
-                    }
+                    self.insert_variable(
+                        symbol_table,
+                        variable_roots,
+                        domain,
+                        VariableValue::Vector(vector_access.clone()),
+                        &vector[vector_access.idx()],
+                    )
                 } else {
-                    Err(SemanticError::InvalidUsage(format!(
-                        "Identifier {} was declared as a {} which is not a supported type.",
-                        vector_access.name(),
-                        symbol_type
-                    )))
+                    Err(SemanticError::invalid_vector_access(
+                        vector_access,
+                        symbol_type,
+                    ))
                 }
             }
             IdentifierType::TraceColumns(columns) => {
                 let trace_segment = columns.trace_segment();
-                let col_idx = columns.offset() + vector_access.idx();
-                let node_index = self.insert_op(Operation::TraceElement(IndexedTraceAccess::new(
+                let trace_access = IndexedTraceAccess::new(
                     trace_segment,
-                    col_idx,
+                    columns.offset() + vector_access.idx(),
                     CURRENT_ROW,
-                )));
+                );
+                let node_index = self.insert_op(Operation::TraceElement(trace_access));
                 Ok(ExprDetails::new(node_index, trace_segment, domain))
             }
             IdentifierType::PublicInput(_) => {
@@ -433,23 +447,17 @@ impl AlgebraicGraph {
         let symbol_type = symbol_table.access_matrix_element(matrix_access)?;
         match symbol_type {
             IdentifierType::Constant(ConstantType::Matrix(_)) => {
-                let node_index = self.insert_op(Operation::Constant(ConstantValue::Matrix(
-                    matrix_access.clone(),
-                )));
-                Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
+                self.insert_constant(ConstantValue::Matrix(matrix_access.clone()), domain)
             }
             IdentifierType::IntegrityVariable(integrity_variable) => {
                 if let VariableType::Matrix(matrix) = integrity_variable.value() {
-                    let expr = &matrix[matrix_access.row_idx()][matrix_access.col_idx()];
-                    if let Some(expr) =
-                        variable_roots.get(&VariableValue::Matrix(matrix_access.clone()))
-                    {
-                        Ok(*expr)
-                    } else {
-                        let expr = self.insert_expr(symbol_table, expr, variable_roots, domain)?;
-                        variable_roots.insert(VariableValue::Matrix(matrix_access.clone()), expr);
-                        Ok(expr)
-                    }
+                    self.insert_variable(
+                        symbol_table,
+                        variable_roots,
+                        domain,
+                        VariableValue::Matrix(matrix_access.clone()),
+                        &matrix[matrix_access.row_idx()][matrix_access.col_idx()],
+                    )
                 } else {
                     Err(SemanticError::invalid_matrix_access(
                         matrix_access,
@@ -462,23 +470,6 @@ impl AlgebraicGraph {
                 symbol_type,
             )),
         }
-    }
-
-    /// Insert the operation and return its node index. If an identical node already exists, return
-    /// that index instead.
-    fn insert_op(&mut self, op: Operation) -> NodeIndex {
-        self.nodes.iter().position(|n| *n.op() == op).map_or_else(
-            || {
-                // create a new node.
-                let index = self.nodes.len();
-                self.nodes.push(Node { op });
-                NodeIndex(index)
-            },
-            |index| {
-                // return the existing node's index.
-                NodeIndex(index)
-            },
-        )
     }
 }
 
