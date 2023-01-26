@@ -15,6 +15,9 @@ pub use boundary_constraints::*;
 pub mod integrity_constraints;
 pub use integrity_constraints::*;
 
+pub mod random_values;
+pub use random_values::*;
+
 // AST
 // ================================================================================================
 
@@ -31,6 +34,7 @@ pub struct Source(pub Vec<SourceSection>);
 /// - PeriodicColumns: Periodic columns are each represented by a fixed-size array with all of its
 ///   elements specified. The array length is expected to be a power of 2, but this is not checked
 ///   during parsing.
+/// - RandomValues: Random Values represent the randomness sent by the Verifier
 /// - BoundaryConstraints: Boundary Constraints to be enforced on the boundaries of columns defined
 ///   in the TraceCols section. Currently there are two types of boundaries, First and Last
 ///   representing the first and last rows of the column.
@@ -43,6 +47,7 @@ pub enum SourceSection {
     Trace(Trace),
     PublicInputs(Vec<PublicInput>),
     PeriodicColumns(Vec<PeriodicColumn>),
+    RandomValues(RandomValues),
     BoundaryConstraints(Vec<BoundaryStmt>),
     IntegrityConstraints(Vec<IntegrityStmt>),
 }

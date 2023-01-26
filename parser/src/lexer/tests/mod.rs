@@ -9,6 +9,7 @@ mod constants;
 mod identifiers;
 mod periodic_columns;
 mod pub_inputs;
+mod random_values;
 mod variables;
 
 // TEST HELPERS
