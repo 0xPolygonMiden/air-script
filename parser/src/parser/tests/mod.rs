@@ -17,6 +17,7 @@ mod integrity_constraints;
 mod list_comprehension;
 mod periodic_columns;
 mod pub_inputs;
+mod random_values;
 mod sections;
 mod trace_columns;
 mod variables;
