@@ -62,7 +62,7 @@ impl AlgebraicGraph {
     fn accumulate_degree(&self, cycles: &mut BTreeMap<usize, usize>, index: &NodeIndex) -> usize {
         // recursively walk the subgraph and compute the degree from the operation and child nodes
         match self.node(index).op() {
-            Operation::Constant(_) | Operation::RandomValue(_) => 0,
+            Operation::Constant(_) | Operation::RandomValue(_, _) => 0,
             Operation::TraceElement(_) => 1,
             Operation::PeriodicColumn(index, cycle_len) => {
                 cycles.insert(*index, *cycle_len);
@@ -115,15 +115,7 @@ impl AlgebraicGraph {
             Expression::MatrixAccess(matrix_access) => {
                 self.insert_matrix_access(symbol_table, &matrix_access, variable_roots)
             }
-            Expression::Rand(index) => {
-                // constraint target for random values defaults to the second trace segment.
-                // TODO: make this more general, so random values from further trace segments can be
-                // used. This requires having a way to describe different sets of randomness in
-                // the AirScript syntax.
-                let trace_segment = 1;
-                let node_index = self.insert_op(Operation::RandomValue(index));
-                Ok((node_index, trace_segment, DEFAULT_DOMAIN))
-            }
+            Expression::Rand(index) => self.insert_random_access(symbol_table, index),
             Expression::IndexedTraceAccess(column_access) => {
                 self.insert_indexed_trace_access(symbol_table, column_access)
             }
@@ -284,6 +276,11 @@ impl AlgebraicGraph {
                 )));
                 Ok((node_index, DEFAULT_SEGMENT, DEFAULT_DOMAIN))
             }
+            IdentifierType::RandomValue(offset, _size) => {
+                let trace_segment = 1;
+                let node_index = self.insert_op(Operation::RandomValue(*offset, 0));
+                Ok((node_index, trace_segment, DEFAULT_DOMAIN))
+            }
             IdentifierType::IntegrityVariable(integrity_variable) => {
                 if let VariableType::Scalar(expr) = integrity_variable.value() {
                     if let Some((node_index, trace_segment, domain)) =
@@ -364,6 +361,17 @@ impl AlgebraicGraph {
                 )));
                 Ok((node_index, trace_segment, DEFAULT_DOMAIN))
             }
+            IdentifierType::RandomValue(offset, size) => {
+                if vector_access.idx() >= *size {
+                    return Err(SemanticError::IndexOutOfRange(format!(
+                        "Index {} of the array type random value is greater than or equal to the length of this value ({})", vector_access.idx(), size
+                    )));
+                }
+                let trace_segment = 1;
+                let node_index =
+                    self.insert_op(Operation::RandomValue(*offset, vector_access.idx()));
+                Ok((node_index, trace_segment, DEFAULT_DOMAIN))
+            }
             _ => Err(SemanticError::invalid_vector_access(
                 vector_access,
                 symbol_type,
@@ -420,6 +428,27 @@ impl AlgebraicGraph {
         }
     }
 
+    fn insert_random_access(
+        &mut self,
+        symbol_table: &SymbolTable,
+        index: usize,
+    ) -> Result<ExprDetails, SemanticError> {
+        // constraint target for random values defaults to the second trace segment.
+        // TODO: make this more general, so random values from further trace segments can be
+        // used. This requires having a way to describe different sets of randomness in
+        // the AirScript syntax.
+        if index >= symbol_table.random_values_num() as usize {
+            return Err(SemanticError::IndexOutOfRange(format!(
+                "Random value index {} is greater than or equal to the total number of random values ({}).", 
+                index,
+                symbol_table.random_values_num()
+            )));
+        }
+        let trace_segment = 1;
+        let node_index = self.insert_op(Operation::RandomValue(index, 0));
+        Ok((node_index, trace_segment, DEFAULT_DOMAIN))
+    }
+
     /// Insert the operation and return its node index. If an identical node already exists, return
     /// that index instead.
     fn insert_op(&mut self, op: Operation) -> NodeIndex {
@@ -467,9 +496,10 @@ pub enum Operation {
     /// value is the length of the column's periodic cycle. The periodic value made available from
     /// the specified column is based on the current row of the trace.
     PeriodicColumn(usize, usize),
-    /// A random value provided by the verifier. The inner value is the index of this random value
-    /// in the array of all random values.
-    RandomValue(usize),
+    /// A random value provided by the verifier. The first inner value is the index of this random
+    /// value in the array of all random values and the second is value index of random value in
+    /// case it represented by array, e.g. `rand: [a, b[4]]`.
+    RandomValue(usize, usize),
     /// Negation operation applied to the node with the specified index.
     Neg(NodeIndex),
     /// Addition operation applied to the nodes with the specified indices.

@@ -10,6 +10,9 @@ public_inputs:
     stack_inputs: [16]
     stack_outputs: [16]
 
+random_values:
+    rand: [1]
+
 periodic_columns:
     k0: [1, 1, 1, 1, 1, 1, 1, 0]
 

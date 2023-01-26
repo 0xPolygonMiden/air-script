@@ -20,6 +20,27 @@ fn boundary_constraints() {
 }
 
 #[test]
+fn test_test() {
+    let source = "
+    trace_columns:
+        main: [a, b[12]]
+    public_inputs:
+        stack_inputs: [16]
+    random_values:
+        rand: [c, d]
+    integrity_constraints:
+        enf a' = a + 1
+    boundary_constraints:
+        enf a.first = (c + stack_inputs[0]) * 2
+        enf a.last = 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed).unwrap();
+    println!("{:?}", result.boundary_stmts);
+    // assert!(result.is_ok());
+}
+
+#[test]
 fn boundary_constraints_with_constants() {
     let source = "
     const A = 123
