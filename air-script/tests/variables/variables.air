@@ -14,7 +14,7 @@ periodic_columns:
     k0: [1, 1, 1, 1, 1, 1, 1, 0]
 
 boundary_constraints:
-    enf a.first = stack_inputs[0]
+    enf a.first = 0
     enf a.last = 1
     
 integrity_constraints:

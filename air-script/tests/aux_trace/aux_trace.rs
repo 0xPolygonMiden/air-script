@@ -71,19 +71,18 @@ impl Air for AuxiliaryAir {
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxTraceRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
         result.push(Assertion::single(0, 0, E::from(1_u64)));
+        result.push(Assertion::single(0, self.last_step(), E::from(1_u64)));
         result.push(Assertion::single(1, 0, aux_rand_elements.get_segment_elements(0)[0]));
-        let last_step = self.last_step();
-        result.push(Assertion::single(0, last_step, E::from(1_u64)));
-        result.push(Assertion::single(1, last_step, E::from(1_u64)));
+        result.push(Assertion::single(1, self.last_step(), E::from(1_u64)));
         result
     }
 
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let current = frame.current();
         let next = frame.next();
-        result[0] = next[0] - (current[1] + current[2]);
-        result[1] = next[1] - (current[2] + next[0]);
-        result[2] = current[2] - (current[0] + current[1]);
+        result[0] = current[2] - (current[0] + current[1]);
+        result[1] = next[0] - (current[1] + current[2]);
+        result[2] = next[1] - (current[2] + next[0]);
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])

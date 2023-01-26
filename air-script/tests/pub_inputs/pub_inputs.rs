@@ -76,11 +76,10 @@ impl Air for PubInputsAir {
         result.push(Assertion::single(1, 0, self.stack_inputs[1]));
         result.push(Assertion::single(2, 0, self.stack_inputs[2]));
         result.push(Assertion::single(3, 0, self.stack_inputs[3]));
-        let last_step = self.last_step();
-        result.push(Assertion::single(0, last_step, self.stack_outputs[0]));
-        result.push(Assertion::single(1, last_step, self.stack_outputs[1]));
-        result.push(Assertion::single(2, last_step, self.stack_outputs[2]));
-        result.push(Assertion::single(3, last_step, self.stack_outputs[3]));
+        result.push(Assertion::single(0, self.last_step(), self.stack_outputs[0]));
+        result.push(Assertion::single(1, self.last_step(), self.stack_outputs[1]));
+        result.push(Assertion::single(2, self.last_step(), self.stack_outputs[2]));
+        result.push(Assertion::single(3, self.last_step(), self.stack_outputs[3]));
         result
     }
 
