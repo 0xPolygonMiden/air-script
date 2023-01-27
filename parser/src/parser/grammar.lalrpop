@@ -173,14 +173,19 @@ BoundaryExpr: Expression = {
 }
 
 BoundaryFactor: Expression = {
-    <lexpr: BoundaryFactor> "*" <rexpr: BoundaryAtom> =>
+    <lexpr: BoundaryFactor> "*" <rexpr: BoundaryExponent> =>
         Expression::Mul(Box::new(lexpr), Box::new(rexpr)),
+    BoundaryExponent
+}
+
+BoundaryExponent: Expression = {
+    <lexpr: BoundaryExponent> "^" <rexpr: BoundaryAtom> =>
+        Expression::Exp(Box::new(lexpr), Box::new(rexpr)),
     BoundaryAtom
 }
 
 BoundaryAtom: Expression = {
     "(" <BoundaryExpr> ")",
-    <lexpr: BoundaryAtom> "^" <num: Num_u64> => Expression::Exp(Box::new(lexpr), num),
     "$rand" <idx: Index> => Expression::Rand(idx),
     <n: Num_u64> => Expression::Const(n),
     <ident: Identifier> => Expression::Elem(ident),
@@ -238,14 +243,19 @@ IntegrityExpr: Expression = {
 }
 
 IntegrityFactor: Expression = {
-    <lexpr: IntegrityFactor> "*" <rexpr: IntegrityAtom> =>
+    <lexpr: IntegrityFactor> "*" <rexpr: IntegrityExponent> =>
         Expression::Mul(Box::new(lexpr), Box::new(rexpr)),
+    IntegrityExponent
+}
+
+IntegrityExponent: Expression = {
+    <lexpr: IntegrityExponent> "^" <rexpr: IntegrityAtom> =>
+        Expression::Exp(Box::new(lexpr), Box::new(rexpr)),
     IntegrityAtom
 }
 
 IntegrityAtom: Expression = {
     "(" <IntegrityExpr> ")",
-    <lexpr: IntegrityAtom> "^" <num: Num_u64> => Expression::Exp(Box::new(lexpr), num),
     "$rand" <idx: Index> => Expression::Rand(idx),
     <col_access: IndexedTraceAccess> => Expression::IndexedTraceAccess(col_access),
     <n: Num_u64> => Expression::Const(n),

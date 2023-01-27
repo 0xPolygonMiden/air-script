@@ -20,5 +20,5 @@ pub enum Expression {
     Add(Box<Expression>, Box<Expression>),
     Sub(Box<Expression>, Box<Expression>),
     Mul(Box<Expression>, Box<Expression>),
-    Exp(Box<Expression>, u64),
+    Exp(Box<Expression>, Box<Expression>),
 }

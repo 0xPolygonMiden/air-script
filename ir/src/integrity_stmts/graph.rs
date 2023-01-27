@@ -171,7 +171,12 @@ impl AlgebraicGraph {
                 let (lhs, trace_segment, domain) =
                     self.insert_expr(symbol_table, *lhs, variable_roots)?;
                 // add exponent subexpression.
-                let node_index = self.insert_op(Operation::Exp(lhs, rhs as usize));
+                let node_index = if let Expression::Const(rhs) = *rhs {
+                    self.insert_op(Operation::Exp(lhs, rhs as usize))
+                } else {
+                    todo!()
+                };
+
                 Ok((node_index, trace_segment, domain))
             }
         }
@@ -480,6 +485,7 @@ pub enum Operation {
     Mul(NodeIndex, NodeIndex),
     /// Exponentiation operation applied to the node with the specified index, using the provided
     /// value as the power.
+    /// TODO: Support non const exponents.
     Exp(NodeIndex, usize),
 }
 
