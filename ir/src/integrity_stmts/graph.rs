@@ -3,8 +3,9 @@ use super::{
     SemanticError, SymbolTable, VariableRoots,
 };
 use crate::{
-    symbol_table::IdentifierType, ConstantType, Expression, Identifier, IndexedTraceAccess,
-    MatrixAccess, NamedTraceAccess, TraceSegment, VariableType, VectorAccess,
+    symbol_table::{validate_random_access, IdentifierType},
+    ConstantType, Expression, Identifier, IndexedTraceAccess, MatrixAccess, NamedTraceAccess,
+    TraceSegment, VariableType, VectorAccess,
 };
 
 // CONSTANTS
@@ -361,12 +362,7 @@ impl AlgebraicGraph {
                 )));
                 Ok((node_index, trace_segment, DEFAULT_DOMAIN))
             }
-            IdentifierType::RandomValue(offset, size) => {
-                if vector_access.idx() >= *size {
-                    return Err(SemanticError::IndexOutOfRange(format!(
-                        "Index {} of the array type random value is greater than or equal to the length of this value ({})", vector_access.idx(), size
-                    )));
-                }
+            IdentifierType::RandomValue(offset, _size) => {
                 let trace_segment = 1;
                 let node_index =
                     self.insert_op(Operation::RandomValue(*offset, vector_access.idx()));
@@ -428,6 +424,10 @@ impl AlgebraicGraph {
         }
     }
 
+    /// Adds a random value to the graph and returns the [ExprDetails] of the inserted expression.
+    ///
+    /// # Errors
+    /// Returns an error if the index is out-of-range in random values vector.
     fn insert_random_access(
         &mut self,
         symbol_table: &SymbolTable,
@@ -437,13 +437,7 @@ impl AlgebraicGraph {
         // TODO: make this more general, so random values from further trace segments can be
         // used. This requires having a way to describe different sets of randomness in
         // the AirScript syntax.
-        if index >= symbol_table.random_values_num() as usize {
-            return Err(SemanticError::IndexOutOfRange(format!(
-                "Random value index {} is greater than or equal to the total number of random values ({}).", 
-                index,
-                symbol_table.random_values_num()
-            )));
-        }
+        validate_random_access(index, symbol_table.random_values_num())?;
         let trace_segment = 1;
         let node_index = self.insert_op(Operation::RandomValue(index, 0));
         Ok((node_index, trace_segment, DEFAULT_DOMAIN))

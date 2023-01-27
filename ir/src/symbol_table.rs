@@ -278,6 +278,16 @@ impl SymbolTable {
                     ))
                 }
             }
+            IdentifierType::RandomValue(_offset, size) => {
+                if vector_access.idx() >= *size {
+                    Err(SemanticError::vector_access_out_of_bounds(
+                        vector_access,
+                        *size,
+                    ))
+                } else {
+                    Ok(symbol_type)
+                }
+            }
             _ => Err(SemanticError::invalid_vector_access(
                 vector_access,
                 symbol_type,
@@ -397,6 +407,19 @@ fn validate_matrix_access(
             matrix_row_len,
             matrix_col_len,
         ));
+    }
+    Ok(())
+}
+
+// Not sure that this func should be here. It's just a check that don't even use symbol_table.
+// Maybe it's better to move it to some "helper" file? But it checks data that belong to the
+// symbol_table.
+/// Checks that index provided into random value is valid and returns an error otherwise.
+pub fn validate_random_access(index: usize, random_values_num: u16) -> Result<(), SemanticError> {
+    if index >= random_values_num as usize {
+        return Err(SemanticError::IndexOutOfRange(format!(
+            "Random value index {index} is greater than or equal to the total number of random values ({random_values_num})."
+        )));
     }
     Ok(())
 }
