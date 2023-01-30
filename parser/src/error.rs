@@ -10,8 +10,9 @@ pub enum Error {
 pub enum ParseError {
     InvalidInt(String),
     InvalidTraceCols(String),
-    MissingMainTraceCols(String),
     InvalidConst(String),
+    InvalidRandomValues(String),
+    MissingMainTraceCols(String),
     MissingBoundaryConstraint(String),
     MissingIntegrityConstraint(String),
 }

@@ -31,15 +31,15 @@ use super::Identifier;
 /// created [RandomValues] instance will look like
 ///
 /// `RandomValues{name: "rand", size: 2, bindings: [RandBinding{name: "a", size: 1}, RandBinding{name: "b", size: 12}]}`
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RandomValues {
     name: Identifier,
-    size: usize,
+    size: u64,
     bindings: Vec<RandBinding>,
 }
 
 impl RandomValues {
-    pub(crate) fn new(name: Identifier, size: usize, bindings: Vec<RandBinding>) -> Self {
+    pub(crate) fn new(name: Identifier, size: u64, bindings: Vec<RandBinding>) -> Self {
         Self {
             name,
             size,
@@ -52,7 +52,7 @@ impl RandomValues {
         name
     }
 
-    pub fn size(&self) -> usize {
+    pub fn size(&self) -> u64 {
         self.size
     }
 
@@ -62,14 +62,14 @@ impl RandomValues {
 }
 
 /// Declaration of a random value used in [RandomValues]. It is represented by a named identifier and its size.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RandBinding {
     name: Identifier,
-    size: usize,
+    size: u64,
 }
 
 impl RandBinding {
-    pub(crate) fn new(name: Identifier, size: usize) -> Self {
+    pub(crate) fn new(name: Identifier, size: u64) -> Self {
         Self { name, size }
     }
 
@@ -78,7 +78,7 @@ impl RandBinding {
         name
     }
 
-    pub fn size(&self) -> usize {
+    pub fn size(&self) -> u64 {
         self.size
     }
 }

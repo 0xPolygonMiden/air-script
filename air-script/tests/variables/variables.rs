@@ -92,6 +92,6 @@ impl Air for VariablesAir {
     {
         let current = aux_frame.current();
         let next = aux_frame.next();
-        result[0] = next[0] - ((current[0]) * (current[3]));
+        result[0] = next[0] - ((current[0]) * (current[3] + aux_rand_elements.get_segment_elements(0)[0]));
     }
 }

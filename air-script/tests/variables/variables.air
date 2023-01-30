@@ -35,5 +35,5 @@ integrity_constraints:
     # c = a * b when s = 1.
     enf s * (c - a * b) = o[0][0] - o[0][1] - o[1][0]
 
-    # the auxiliary column contains the product of values of c.
-    enf p' = p * c
+    # the auxiliary column contains the product of values of c offset by a random value.
+    enf p' = p * (c + $rand[0])

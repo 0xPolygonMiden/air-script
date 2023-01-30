@@ -5,8 +5,9 @@ use crate::{
         Constant, ConstantType, Expression, Identifier, Variable, VariableType,
         RandomValues, RandBinding, Source, SourceSection, Trace, TraceCols, PublicInput, 
         PeriodicColumn, IndexedTraceAccess, NamedTraceAccess, MatrixAccess, VectorAccess
-    }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
-    InvalidConst, MissingBoundaryConstraint, MissingIntegrityConstraint}}, lexer::Token
+    }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, InvalidRandomValues, 
+    MissingMainTraceCols, InvalidConst, MissingBoundaryConstraint, MissingIntegrityConstraint}}, 
+    lexer::Token
 };
 use std::str::FromStr;
 use lalrpop_util::ParseError;
@@ -123,18 +124,34 @@ PeriodicColumn: PeriodicColumn = {
 // ================================================================================================
 
 RandomValues: RandomValues = {
-    "random_values" ":" <rand_values: RandValues> => rand_values
+    "random_values" ":" <rand_values: ListElems<RandValuesDecl>> =>? match rand_values.len() {
+        1 => Ok(rand_values[0].clone()),
+        _ => Err(ParseError::User{
+            error: Error::ParseError(
+                InvalidRandomValues("No more than one set of random values can be declared".to_string())
+            )
+        })
+    }
 }
 
-RandValues: RandomValues = {
-    <name: Identifier> ":" <index: Index> => RandomValues::new(name, index, vec![]),
-    <name: Identifier> ":" "[" "]" => RandomValues::new(name, 0, vec![]),
-    <name: Identifier> ":" "[" <rand_vec: CommaElems<RandElem>> "]" => RandomValues::new(name, rand_vec.iter().map(|v| v.size()).sum::<usize>(), rand_vec)
+RandValuesDecl: RandomValues = {
+    <name: Identifier> ":" <size: Size> => RandomValues::new(name, size, vec![]),
+    <_name: Identifier> ":" "[" "]" =>? Err(
+        ParseError::User{
+            error: Error::ParseError(
+                InvalidRandomValues(
+                    "Random Values section cannot be empty".to_string()
+                )
+            )
+        }
+    ),
+    <name: Identifier> ":" "[" <rand_vec: CommaElems<RandElem>> "]" => RandomValues::new(name, rand_vec.iter().map(|v| v.size()).sum(), rand_vec)
+
 }
 
 RandElem: RandBinding = {
     <name: Identifier> => RandBinding::new(name, 1),
-    <name: Identifier> <index: Index> => RandBinding::new(name, index)
+    <name: Identifier> <size: Size> => RandBinding::new(name, size)
 }
 
 // BOUNDARY STATEMENTS
@@ -279,6 +296,14 @@ IntegrityAtom: Expression = {
 
 CommaElems<T>: Vec<T> = {
     <e:T> <v:("," <T>)*> => {
+        let mut v = v;
+        v.insert(0, e);
+        v
+    }
+}
+
+ListElems<T>: Vec<T> = {
+    <e:T> <v: T*> => {
         let mut v = v;
         v.insert(0, e);
         v
