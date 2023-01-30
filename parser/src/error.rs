@@ -8,11 +8,11 @@ pub enum Error {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParseError {
-    InvalidInt(String),
-    InvalidTraceCols(String),
     InvalidConst(String),
+    InvalidInt(String),
     InvalidRandomValues(String),
-    MissingMainTraceCols(String),
+    InvalidTraceCols(String),
     MissingBoundaryConstraint(String),
     MissingIntegrityConstraint(String),
+    MissingMainTraceCols(String),
 }

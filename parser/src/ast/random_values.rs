@@ -30,7 +30,7 @@ use super::Identifier;
 ///
 /// created [RandomValues] instance will look like
 ///
-/// `RandomValues{name: "rand", size: 2, bindings: [RandBinding{name: "a", size: 1}, RandBinding{name: "b", size: 12}]}`
+/// `RandomValues{name: "rand", size: 13, bindings: [RandBinding{name: "a", size: 1}, RandBinding{name: "b", size: 12}]}`
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RandomValues {
     name: Identifier,
@@ -61,7 +61,8 @@ impl RandomValues {
     }
 }
 
-/// Declaration of a random value used in [RandomValues]. It is represented by a named identifier and its size.
+/// Declaration of a random value binding used in [RandomValues]. It is represented by a named
+/// identifier and its size.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RandBinding {
     name: Identifier,

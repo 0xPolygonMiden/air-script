@@ -124,7 +124,7 @@ PeriodicColumn: PeriodicColumn = {
 // ================================================================================================
 
 RandomValues: RandomValues = {
-    "random_values" ":" <rand_values: ListElems<RandValuesDecl>> =>? match rand_values.len() {
+    "random_values" ":" <rand_values: RandValuesDecl+> =>? match rand_values.len() {
         1 => Ok(rand_values[0].clone()),
         _ => Err(ParseError::User{
             error: Error::ParseError(
@@ -146,7 +146,6 @@ RandValuesDecl: RandomValues = {
         }
     ),
     <name: Identifier> ":" "[" <rand_vec: CommaElems<RandElem>> "]" => RandomValues::new(name, rand_vec.iter().map(|v| v.size()).sum(), rand_vec)
-
 }
 
 RandElem: RandBinding = {
@@ -296,14 +295,6 @@ IntegrityAtom: Expression = {
 
 CommaElems<T>: Vec<T> = {
     <e:T> <v:("," <T>)*> => {
-        let mut v = v;
-        v.insert(0, e);
-        v
-    }
-}
-
-ListElems<T>: Vec<T> = {
-    <e:T> <v: T*> => {
         let mut v = v;
         v.insert(0, e);
         v
