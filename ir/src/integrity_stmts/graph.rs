@@ -437,7 +437,7 @@ impl AlgebraicGraph {
         // TODO: make this more general, so random values from further trace segments can be
         // used. This requires having a way to describe different sets of randomness in
         // the AirScript syntax.
-        validate_random_access(index, symbol_table.random_values_num())?;
+        validate_random_access(index, symbol_table.num_random_values())?;
         let trace_segment = 1;
         let node_index = self.insert_op(Operation::RandomValue(index, 0));
         Ok((node_index, trace_segment, DEFAULT_DOMAIN))

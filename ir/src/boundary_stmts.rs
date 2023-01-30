@@ -200,7 +200,7 @@ fn validate_expression(symbol_table: &SymbolTable, expr: &Expression) -> Result<
             validate_expression(symbol_table, rhs)
         }
         Expression::Exp(lhs, _) => validate_expression(symbol_table, lhs),
-        Expression::Rand(index) => validate_random_access(*index, symbol_table.random_values_num()),
+        Expression::Rand(index) => validate_random_access(*index, symbol_table.num_random_values()),
         _ => Ok(()),
     }
 }

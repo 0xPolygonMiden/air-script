@@ -49,7 +49,7 @@ pub(super) struct SymbolTable {
 
     /// Number of random values. For array initialized in `rand: [n]` form it will be `n`, and for
     /// `rand: [a, b[n], c, ...]` it will be length of the array.
-    random_values_num: u16,
+    num_random_values: u16,
 
     /// A map of all declared identifiers from their name (the key) to their type.
     identifiers: BTreeMap<String, IdentifierType>,
@@ -165,13 +165,9 @@ impl SymbolTable {
     ) -> Result<(), SemanticError> {
         // TODO: add name of random values vector to the identifiers. For now it can be called only
         // by `$rand`
-        if values.size() > 0 {
-            self.random_values_num = values.size() as u16;
-        } else {
-            self.random_values_num = values.values().len() as u16;
-            for (idx, value) in values.values().iter().enumerate() {
-                self.insert_symbol(value.name(), IdentifierType::RandomValue(idx, value.size()))?;
-            }
+        self.num_random_values = values.size() as u16;
+        for (idx, value) in values.bindings().iter().enumerate() {
+            self.insert_symbol(value.name(), IdentifierType::RandomValue(idx, value.size()))?;
         }
         Ok(())
     }
@@ -224,8 +220,8 @@ impl SymbolTable {
         &self.segment_widths
     }
 
-    pub(super) fn random_values_num(&self) -> u16 {
-        self.random_values_num
+    pub(super) fn num_random_values(&self) -> u16 {
+        self.num_random_values
     }
 
     /// Checks that the specified name and index are a valid reference to a declared public input
