@@ -167,7 +167,10 @@ impl SymbolTable {
         // by `$rand`
         self.num_random_values = values.size() as u16;
         for (idx, value) in values.bindings().iter().enumerate() {
-            self.insert_symbol(value.name(), IdentifierType::RandomValue(idx, value.size()))?;
+            self.insert_symbol(
+                value.name(),
+                IdentifierType::RandomValue(idx, value.size() as usize),
+            )?;
         }
         Ok(())
     }

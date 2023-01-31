@@ -63,7 +63,7 @@ impl AlgebraicGraph {
     fn accumulate_degree(&self, cycles: &mut BTreeMap<usize, usize>, index: &NodeIndex) -> usize {
         // recursively walk the subgraph and compute the degree from the operation and child nodes
         match self.node(index).op() {
-            Operation::Constant(_) | Operation::RandomValue(_, _) => 0,
+            Operation::Constant(_) | Operation::RandomValue(_) => 0,
             Operation::TraceElement(_) => 1,
             Operation::PeriodicColumn(index, cycle_len) => {
                 cycles.insert(*index, *cycle_len);
@@ -279,7 +279,7 @@ impl AlgebraicGraph {
             }
             IdentifierType::RandomValue(offset, _size) => {
                 let trace_segment = 1;
-                let node_index = self.insert_op(Operation::RandomValue(*offset, 0));
+                let node_index = self.insert_op(Operation::RandomValue(*offset));
                 Ok((node_index, trace_segment, DEFAULT_DOMAIN))
             }
             IdentifierType::IntegrityVariable(integrity_variable) => {
@@ -365,7 +365,7 @@ impl AlgebraicGraph {
             IdentifierType::RandomValue(offset, _size) => {
                 let trace_segment = 1;
                 let node_index =
-                    self.insert_op(Operation::RandomValue(*offset, vector_access.idx()));
+                    self.insert_op(Operation::RandomValue(*offset + vector_access.idx()));
                 Ok((node_index, trace_segment, DEFAULT_DOMAIN))
             }
             _ => Err(SemanticError::invalid_vector_access(
@@ -439,7 +439,7 @@ impl AlgebraicGraph {
         // the AirScript syntax.
         validate_random_access(index, symbol_table.num_random_values())?;
         let trace_segment = 1;
-        let node_index = self.insert_op(Operation::RandomValue(index, 0));
+        let node_index = self.insert_op(Operation::RandomValue(index));
         Ok((node_index, trace_segment, DEFAULT_DOMAIN))
     }
 
@@ -490,10 +490,9 @@ pub enum Operation {
     /// value is the length of the column's periodic cycle. The periodic value made available from
     /// the specified column is based on the current row of the trace.
     PeriodicColumn(usize, usize),
-    /// A random value provided by the verifier. The first inner value is the index of this random
-    /// value in the array of all random values and the second is value index of random value in
-    /// case it represented by array, e.g. `rand: [a, b[4]]`.
-    RandomValue(usize, usize),
+    /// A random value provided by the verifier. The inner value is the index of this random value
+    /// in the array of all random values.
+    RandomValue(usize),
     /// Negation operation applied to the node with the specified index.
     Neg(NodeIndex),
     /// Addition operation applied to the nodes with the specified indices.

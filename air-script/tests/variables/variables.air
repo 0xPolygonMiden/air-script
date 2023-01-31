@@ -10,9 +10,6 @@ public_inputs:
     stack_inputs: [16]
     stack_outputs: [16]
 
-random_values:
-    rand: [1]
-
 periodic_columns:
     k0: [1, 1, 1, 1, 1, 1, 1, 0]
 
@@ -39,4 +36,4 @@ integrity_constraints:
     enf s * (c - a * b) = o[0][0] - o[0][1] - o[1][0]
 
     # the auxiliary column contains the product of values of c offset by a random value.
-    enf p' = p * (c + $rand[0])
+    enf p' = p * c
