@@ -161,6 +161,7 @@ impl AlgebraicGraph {
                     lhs.domain(),
                 ))
             }
+            Expression::ListFolding(_) => todo!(),
         }
     }
 
@@ -228,7 +229,6 @@ impl AlgebraicGraph {
                 let lhs_base = self.accumulate_degree(cycles, lhs);
                 lhs_base * rhs
             }
-            Expression::ListFolding(_) => todo!(),
         }
     }
 

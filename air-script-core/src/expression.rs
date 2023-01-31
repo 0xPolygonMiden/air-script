@@ -28,7 +28,6 @@ pub enum Expression {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ListFoldingType {
-    Expr(ListComprehension),
     Sum(ListComprehension),
     Prod(ListComprehension),
 }
