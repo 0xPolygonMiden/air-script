@@ -49,7 +49,7 @@ impl ListComprehension {
     }
 
     /// Returns the context of the list comprehension.
-    pub fn context(&self) -> &Vec<(Identifier, Iterable)> {
+    pub fn context(&self) -> &[(Identifier, Iterable)] {
         &self.context
     }
 }

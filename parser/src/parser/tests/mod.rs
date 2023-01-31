@@ -14,6 +14,7 @@ mod comments;
 mod constants;
 mod identifiers;
 mod integrity_constraints;
+mod list_comprehension;
 mod periodic_columns;
 mod pub_inputs;
 mod sections;
