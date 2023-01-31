@@ -91,6 +91,14 @@ pub enum Token {
     #[token("$rand")]
     Rand,
 
+    // LIST COMPREHENSION KEYWORDS
+    // --------------------------------------------------------------------------------------------
+    #[token("for")]
+    For,
+
+    #[token("in")]
+    In,
+
     // GENERAL KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Keyword to signify that a constraint needs to be enforced
@@ -138,6 +146,9 @@ pub enum Token {
 
     #[token(")")]
     Rparen,
+
+    #[token("..")]
+    Range,
 
     // UNDEFINED TOKENS AND TOKENS TO IGNORE
     // --------------------------------------------------------------------------------------------

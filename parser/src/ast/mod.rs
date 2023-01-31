@@ -1,6 +1,6 @@
 pub(crate) use air_script_core::{
-    Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, MatrixAccess,
-    NamedTraceAccess, Variable, VariableType, VectorAccess,
+    Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, Iterable,
+    ListComprehension, MatrixAccess, NamedTraceAccess, Range, Variable, VariableType, VectorAccess,
 };
 
 pub mod pub_inputs;
