@@ -1,4 +1,4 @@
-use super::{Expression, Identifier};
+use super::{Expression, Identifier, Range};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Variable {
@@ -25,4 +25,38 @@ pub enum VariableType {
     Scalar(Expression),
     Vector(Vec<Expression>),
     Matrix(Vec<Vec<Expression>>),
+    ListComprehension(ListComprehension),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ListComprehension {
+    expression: Expression,
+    context: Vec<(Identifier, Iterable)>,
+}
+
+impl ListComprehension {
+    /// Creates a new list comprehension.
+    pub fn new(expression: Expression, context: Vec<(Identifier, Iterable)>) -> Self {
+        Self {
+            expression,
+            context,
+        }
+    }
+
+    /// Returns the expression that is evaluated for each member of the list.
+    pub fn expression(&self) -> &Expression {
+        &self.expression
+    }
+
+    /// Returns the context of the list comprehension.
+    pub fn context(&self) -> &Vec<(Identifier, Iterable)> {
+        &self.context
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Iterable {
+    Identifier(Identifier),
+    Range(Range),
+    Slice(Identifier, Range),
 }

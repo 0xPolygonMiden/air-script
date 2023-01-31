@@ -1,5 +1,5 @@
 mod access;
-pub use access::{MatrixAccess, VectorAccess};
+pub use access::{MatrixAccess, Range, VectorAccess};
 
 mod constant;
 pub use constant::{Constant, ConstantType};
@@ -14,4 +14,4 @@ mod trace;
 pub use trace::{IndexedTraceAccess, NamedTraceAccess, TraceSegment};
 
 mod variable;
-pub use variable::{Variable, VariableType};
+pub use variable::{Iterable, ListComprehension, Variable, VariableType};
