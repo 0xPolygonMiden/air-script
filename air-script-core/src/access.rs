@@ -58,3 +58,23 @@ impl MatrixAccess {
         self.col_idx
     }
 }
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Range {
+    start: usize,
+    end: usize,
+}
+
+impl Range {
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+
+    pub fn start(&self) -> usize {
+        self.start
+    }
+
+    pub fn end(&self) -> usize {
+        self.end
+    }
+}

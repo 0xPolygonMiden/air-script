@@ -2,11 +2,13 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt}, 
         integrity_constraints::{IntegrityConstraint, IntegrityStmt},
-        Constant, ConstantType, Expression, Identifier, Variable, VariableType,
-        Source, SourceSection, Trace, TraceCols, PublicInput, PeriodicColumn, 
-        IndexedTraceAccess, NamedTraceAccess, MatrixAccess, VectorAccess
+        Constant, ConstantType, Expression, Identifier, Variable, VariableType, ListComprehension,
+        Iterable, Source, SourceSection, Trace, TraceCols,
+        PublicInput, PeriodicColumn, IndexedTraceAccess, NamedTraceAccess, Range, MatrixAccess,
+        VectorAccess
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
-    InvalidConst, MissingBoundaryConstraint, MissingIntegrityConstraint}}, lexer::Token
+    InvalidConst, InvalidListComprehension, MissingBoundaryConstraint,
+    MissingIntegrityConstraint}}, lexer::Token
 };
 use std::str::FromStr;
 use lalrpop_util::ParseError;
@@ -155,6 +157,8 @@ BoundaryVariableType: VariableType = {
         VariableType::Vector(vector_value),
     "[" <matrix_value: CommaElems<Vector<BoundaryExpr>>> "]" =>
         VariableType::Matrix(matrix_value),
+    "[" <list_comprehension: ListComprehension<BoundaryExpr>> "]" =>
+        VariableType::ListComprehension(list_comprehension),
 }
 
 Boundary: Boundary = {
@@ -190,7 +194,7 @@ BoundaryAtom: Expression = {
     <n: Num_u64> => Expression::Const(n),
     <ident: Identifier> => Expression::Elem(ident),
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
-    <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access)
+    <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access),
 }
 
 // INTEGRITY CONSTRAINTS
@@ -230,6 +234,8 @@ IntegrityVariableType: VariableType = {
         VariableType::Vector(vector_value),
     "[" <matrix_value: CommaElems<Vector<IntegrityExpr>>> "]" =>
         VariableType::Matrix(matrix_value),
+    "[" <list_comprehension: ListComprehension<IntegrityExpr>> "]" =>
+        VariableType::ListComprehension(list_comprehension),
 }
 
 // --- INTEGRITY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
@@ -262,7 +268,7 @@ IntegrityAtom: Expression = {
     <ident: Identifier> => Expression::Elem(ident),
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access),
-    <trace_access: NamedTraceAccessWithOffset> => Expression::NamedTraceAccess(trace_access)
+    <trace_access: NamedTraceAccessWithOffset> => Expression::NamedTraceAccess(trace_access),
 }
 
 // ATOMS
@@ -277,11 +283,7 @@ CommaElems<T>: Vec<T> = {
 }
 
 Vector<T>: Vec<T> = {
-    "[" <e:T> <v:("," <T>)*> "]" => {
-        let mut v = v;
-        v.insert(0, e);
-        v
-    }
+    "[" <elems: CommaElems<T>> "]" => elems
 }
 
 Size: u64 = {
@@ -318,6 +320,39 @@ IndexedTraceAccess: IndexedTraceAccess = {
     "$aux" <idx: Index> "'" => IndexedTraceAccess::new(1, idx, 1),
 }
 
+ListComprehension<T>: ListComprehension = {
+    <expr: T> "for" <members: Members> "in" <iterables: Iterables> =>?
+        if members.len() != iterables.len() {
+            Err(ParseError::User {
+                error: Error::ParseError(InvalidListComprehension(
+                    "Number of members and iterables must match".to_string()
+                ))
+            })
+        } else {
+            Ok(ListComprehension::new(expr, members.into_iter().zip(iterables).collect::<Vec<_>>()))
+        }
+}
+
+Members: Vec<Identifier> = {
+    <member: Identifier> => vec![member],
+    "(" <members: CommaElems<Identifier>> ")" => members
+}
+
+Iterables: Vec<Iterable> = {
+    <iterable: Iterable> => vec![iterable],
+    "(" <iterables: CommaElems<Iterable>> ")" => iterables
+}
+
+Iterable: Iterable = {
+    <ident: Identifier> => Iterable::Identifier(ident),
+    <range: Range> => Iterable::Range(range),
+    <ident: Identifier> "[" <range: Range> "]" => Iterable::Slice(ident, range)
+}
+
+Range: Range = {
+    <start: Num_u64> ".." <end: Num_u64> => Range::new(start as usize, end as usize)
+}
+
 Identifier: Identifier = {
     <n:identifier> => Identifier(n.to_string())
 }
@@ -341,6 +376,8 @@ extern {
         r"[0-9]+" => Token::Num(<String>),
         "def" => Token::Def,
         "let" => Token::Let,
+        "for" => Token::For,
+        "in" => Token::In,
         "const" => Token::Const,
         "trace_columns" => Token::TraceColumns,
         "main" => Token::MainDecl,
@@ -368,5 +405,6 @@ extern {
         "(" => Token::Lparen,
         ")" => Token::Rparen,
         "." => Token::Dot,
+        ".." => Token::Range,
     }
 }
