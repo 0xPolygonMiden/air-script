@@ -13,22 +13,22 @@ pub enum BoundaryStmt {
 /// Stores the expression corresponding to the boundary constraint.
 #[derive(Debug, Eq, PartialEq)]
 pub struct BoundaryConstraint {
-    column: NamedTraceAccess,
+    access: NamedTraceAccess,
     boundary: Boundary,
     value: Expression,
 }
 
 impl BoundaryConstraint {
-    pub fn new(column: NamedTraceAccess, boundary: Boundary, value: Expression) -> Self {
+    pub fn new(access: NamedTraceAccess, boundary: Boundary, value: Expression) -> Self {
         Self {
-            column,
+            access,
             boundary,
             value,
         }
     }
 
-    pub fn column(&self) -> &NamedTraceAccess {
-        &self.column
+    pub fn access(&self) -> &NamedTraceAccess {
+        &self.access
     }
 
     pub fn boundary(&self) -> Boundary {

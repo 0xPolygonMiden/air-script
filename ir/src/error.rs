@@ -1,4 +1,4 @@
-use super::{MatrixAccess, NamedTraceAccess, VectorAccess};
+use super::{MatrixAccess, VectorAccess};
 use crate::symbol_table::IdentifierType;
 
 #[derive(Debug)]
@@ -7,6 +7,7 @@ pub enum SemanticError {
     IndexOutOfRange(String),
     InvalidConstant(String),
     InvalidConstraint(String),
+    InvalidConstraintDomain(String),
     InvalidIdentifier(String),
     InvalidPeriodicColumn(String),
     InvalidUsage(String),
@@ -46,15 +47,6 @@ impl SemanticError {
             access.idx(),
             access.name(),
             vector_len
-        ))
-    }
-
-    pub(super) fn trace_access_out_of_bounds(access: &NamedTraceAccess, size: usize) -> Self {
-        Self::IndexOutOfRange(format!(
-            "Out-of-range index {} in trace {} of length {}",
-            access.idx(),
-            access.name(),
-            size
         ))
     }
 

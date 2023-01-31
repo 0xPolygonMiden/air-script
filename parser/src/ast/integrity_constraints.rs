@@ -21,9 +21,11 @@ impl IntegrityConstraint {
         Self { lhs, rhs }
     }
 
-    /// Clones the left and right internal expressions and creates a single new expression that
-    /// represents the integrity constraint when it is equal to zero.
-    pub fn expr(&self) -> Expression {
-        Expression::Sub(Box::new(self.lhs.clone()), Box::new(self.rhs.clone()))
+    pub fn lhs(&self) -> &Expression {
+        &self.lhs
+    }
+
+    pub fn rhs(&self) -> &Expression {
+        &self.rhs
     }
 }

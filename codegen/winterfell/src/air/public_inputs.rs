@@ -1,5 +1,4 @@
-use super::Scope;
-use ir::AirIR;
+use super::{AirIR, Scope};
 
 /// Updates the provided scope with a public inputs.
 pub(super) fn add_public_inputs_struct(scope: &mut Scope, ir: &AirIR) {

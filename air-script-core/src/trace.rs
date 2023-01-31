@@ -10,7 +10,7 @@ pub type TraceSegment = u8;
 /// of the column within that trace segment, and `row_offset` specifies the offset from the current
 /// row. For example, an element in the "next" row of the "main" trace would be specified by
 /// a trace_segment of 0 and a row_offset of 1.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct IndexedTraceAccess {
     trace_segment: TraceSegment,
     col_idx: usize,
