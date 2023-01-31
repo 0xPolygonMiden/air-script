@@ -1,4 +1,6 @@
-use super::{Identifier, IndexedTraceAccess, MatrixAccess, NamedTraceAccess, VectorAccess};
+use super::{
+    Identifier, IndexedTraceAccess, ListComprehension, MatrixAccess, NamedTraceAccess, VectorAccess,
+};
 
 /// Arithmetic expressions for evaluation of constraints.
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -21,4 +23,12 @@ pub enum Expression {
     Sub(Box<Expression>, Box<Expression>),
     Mul(Box<Expression>, Box<Expression>),
     Exp(Box<Expression>, Box<Expression>),
+    ListFolding(ListFoldingType),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ListFoldingType {
+    Expr(ListComprehension),
+    Sum(ListComprehension),
+    Prod(ListComprehension),
 }
