@@ -7,7 +7,7 @@ use super::{
 // ================================================================================================
 
 #[test]
-fn random_values_fixed_list_default_name() {
+fn random_values_fixed_list() {
     let source = "
     random_values:
         rand: [15]";
@@ -37,18 +37,14 @@ fn random_values_ident_vector() {
 }
 
 #[test]
-fn random_values_ident_vector_custom_name() {
+fn random_values_custom_name() {
     let source = "
     random_values:
-        alphas: [a, b[12], c]";
+        alphas: [14]";
     let expected = Source(vec![RandomValues(RandomValues::new(
         Identifier("alphas".to_string()),
         14,
-        vec![
-            RandBinding::new(Identifier("a".to_string()), 1),
-            RandBinding::new(Identifier("b".to_string()), 12),
-            RandBinding::new(Identifier("c".to_string()), 1),
-        ],
+        vec![],
     ))]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -69,8 +65,7 @@ fn random_values_multiple_declaration_error() {
     let source = "
     random_values:
         rand: [12]
-        alphas: [a, b[2]]
-        betas: [c[12], d]";
+        alphas: [a, b[2]]";
     let error = Error::ParseError(ParseError::InvalidRandomValues(
         "No more than one set of random values can be declared".to_string(),
     ));

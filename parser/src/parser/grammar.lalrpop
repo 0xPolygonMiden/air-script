@@ -138,7 +138,7 @@ RandomValues: RandomValues = {
 
 RandValuesDecl: RandomValues = {
     <name: Identifier> ":" <size: Size> => RandomValues::new(name, size, vec![]),
-    <_name: Identifier> ":" "[" "]" =>? Err(
+    <Identifier> ":" "[" "]" =>? Err(
         ParseError::User{
             error: Error::ParseError(
                 InvalidRandomValues(
