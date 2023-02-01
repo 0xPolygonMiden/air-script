@@ -99,6 +99,14 @@ pub enum Token {
     #[token("in")]
     In,
 
+    /// Used to declare sum list folding operation in the AIR constraints module.
+    #[token("sum")]
+    Sum,
+
+    /// Used to declare prod list folding operation in the AIR constraints module.
+    #[token("prod")]
+    Prod,
+
     // GENERAL KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Keyword to signify that a constraint needs to be enforced

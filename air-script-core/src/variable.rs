@@ -30,7 +30,7 @@ pub enum VariableType {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ListComprehension {
-    expression: Expression,
+    expression: Box<Expression>,
     context: Vec<(Identifier, Iterable)>,
 }
 
@@ -38,7 +38,7 @@ impl ListComprehension {
     /// Creates a new list comprehension.
     pub fn new(expression: Expression, context: Vec<(Identifier, Iterable)>) -> Self {
         Self {
-            expression,
+            expression: Box::new(expression),
             context,
         }
     }

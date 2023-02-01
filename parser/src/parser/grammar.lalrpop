@@ -2,9 +2,9 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt}, 
         integrity_constraints::{IntegrityConstraint, IntegrityStmt},
-        Constant, ConstantType, Expression, Identifier, Variable, VariableType, ListComprehension,
-        Iterable, Source, SourceSection, Trace, TraceCols,
-        PublicInput, PeriodicColumn, IndexedTraceAccess, NamedTraceAccess, Range, MatrixAccess,
+        Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, Iterable,
+        ListComprehension, ListFoldingType, MatrixAccess, NamedTraceAccess, PeriodicColumn,
+        PublicInput, Range, Source, SourceSection, Trace, TraceCols, Variable, VariableType,
         VectorAccess
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
     InvalidConst, InvalidListComprehension, MissingBoundaryConstraint,
@@ -195,6 +195,7 @@ BoundaryAtom: Expression = {
     <ident: Identifier> => Expression::Elem(ident),
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access),
+    <list_folding_type: ListFoldingType<BoundaryExpr>> => Expression::ListFolding(list_folding_type),
 }
 
 // INTEGRITY CONSTRAINTS
@@ -269,6 +270,8 @@ IntegrityAtom: Expression = {
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access),
     <trace_access: NamedTraceAccessWithOffset> => Expression::NamedTraceAccess(trace_access),
+    <list_folding_type: ListFoldingType<IntegrityExpr>> =>
+        Expression::ListFolding(list_folding_type),
 }
 
 // ATOMS
@@ -333,6 +336,13 @@ ListComprehension<T>: ListComprehension = {
         }
 }
 
+ListFoldingType<T>: ListFoldingType = {
+    "sum" "(" "[" <list_comprehension: ListComprehension<T>> "]" ")" =>
+        ListFoldingType::Sum(list_comprehension),
+    "prod" "(" "[" <list_comprehension: ListComprehension<T>> "]" ")" =>
+        ListFoldingType::Prod(list_comprehension),
+}
+
 Members: Vec<Identifier> = {
     <member: Identifier> => vec![member],
     "(" <members: CommaElems<Identifier>> ")" => members
@@ -378,6 +388,8 @@ extern {
         "let" => Token::Let,
         "for" => Token::For,
         "in" => Token::In,
+        "sum" => Token::Sum,
+        "prod" => Token::Prod,
         "const" => Token::Const,
         "trace_columns" => Token::TraceColumns,
         "main" => Token::MainDecl,

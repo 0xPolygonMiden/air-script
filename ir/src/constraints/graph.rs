@@ -161,6 +161,7 @@ impl AlgebraicGraph {
                     lhs.domain(),
                 ))
             }
+            Expression::ListFolding(_) => todo!(),
         }
     }
 
