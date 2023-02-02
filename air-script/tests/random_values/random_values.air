@@ -1,0 +1,18 @@
+def RandomValuesAir
+
+trace_columns:
+    main: [a, b]
+    aux: [c, d]
+
+public_inputs:
+    stack_inputs: [16]
+
+random_values:
+    rand: [x, y[14], z]
+
+integrity_constraints:
+    enf c' = z - $rand[0] + y[2]
+
+boundary_constraints:
+    enf c.first = $rand[5] + y[2] + z
+    enf c.last = x + $rand[15] + y[10]

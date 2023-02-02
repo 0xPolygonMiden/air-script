@@ -48,7 +48,7 @@ pub(super) struct SymbolTable {
     segment_widths: Vec<u16>,
 
     /// Number of random values. For array initialized in `rand: [n]` form it will be `n`, and for
-    /// `rand: [a, b[n], c, ...]` it will be length of the array.
+    /// `rand: [a, b[n], c, ...]` it will be length of the flattened array.
     num_random_values: u16,
 
     /// A map of all declared identifiers from their name (the key) to their type.

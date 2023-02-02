@@ -7,9 +7,6 @@ trace_columns:
 public_inputs:
     stack_inputs: [16]
 
-random_values:
-    rand: [2]
-
 boundary_constraints:
     enf a.first = 1
     enf b.first = 1
@@ -17,8 +14,8 @@ boundary_constraints:
     enf p0.first = 1
     enf p0.last = 1
 
-    # auxiliary boundary constraint with a random value
-    enf p1.first = $rand[0]
+    # auxiliary boundary constraint
+    enf p1.first = 1
     enf p1.last = 1
   
 integrity_constraints:
@@ -26,6 +23,6 @@ integrity_constraints:
     enf b' = c + a'
     enf c = a + b
 
-    # integrity constraints against the auxiliary trace with random values
-    enf p0' = p0 * (a + $rand[0] + b + $rand[1])
-    enf p1 = p1' * (c + $rand[0])
+    # integrity constraints against the auxiliary trace
+    enf p0' = p0 * (a + b)
+    enf p1 = p1' * c
