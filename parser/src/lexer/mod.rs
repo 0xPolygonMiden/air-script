@@ -63,6 +63,14 @@ pub enum Token {
     #[token("periodic_columns")]
     PeriodicColumns,
 
+    /// Keyword to declare random values section in the AIR constraints module.
+    #[token("random_values")]
+    RandomValues,
+
+    /// A reserved keyword for accessing random values provided by the verifier.
+    #[token("$rand")]
+    Rand,
+
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Marks the beginning of boundary constraints section in the constraints file.
@@ -86,10 +94,6 @@ pub enum Token {
     /// A modifier for identifiers used to indicate the next row.
     #[token("'")]
     Next,
-
-    /// A reserved keyword for accessing random values provided by the verifier.
-    #[token("$rand")]
-    Rand,
 
     // LIST COMPREHENSION KEYWORDS
     // --------------------------------------------------------------------------------------------

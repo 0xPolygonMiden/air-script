@@ -4,9 +4,10 @@ use crate::{
         integrity_constraints::{IntegrityConstraint, IntegrityStmt},
         Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, Iterable,
         ListComprehension, ListFoldingType, MatrixAccess, NamedTraceAccess, PeriodicColumn,
-        PublicInput, Range, Source, SourceSection, Trace, TraceCols, Variable, VariableType,
-        VectorAccess
-    }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, MissingMainTraceCols,
+        PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, Trace, TraceCols, 
+        Variable, VariableType, VectorAccess
+    }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, InvalidRandomValues,
+    MissingMainTraceCols,
     InvalidConst, InvalidListComprehension, MissingBoundaryConstraint,
     MissingIntegrityConstraint}}, lexer::Token
 };
@@ -28,6 +29,7 @@ SourceSection: SourceSection = {
     Trace => SourceSection::Trace(<>),
     PublicInputs => SourceSection::PublicInputs(<>),
     PeriodicColumns => SourceSection::PeriodicColumns(<>),
+    RandomValues => SourceSection::RandomValues(<>),
     BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
     IntegrityConstraints => SourceSection::IntegrityConstraints(<>),
 }
@@ -118,6 +120,39 @@ PeriodicColumns: Vec<PeriodicColumn> = {
 PeriodicColumn: PeriodicColumn = {
     <name: Identifier> ":" "[" <values: CommaElems<Num_u64>> "]" =>
         PeriodicColumn::new(name, values),
+}
+
+// RANDOM VALUES
+// ================================================================================================
+
+RandomValues: RandomValues = {
+    "random_values" ":" <rand_values: RandValuesDecl+> =>? match rand_values.len() {
+        1 => Ok(rand_values[0].clone()),
+        _ => Err(ParseError::User{
+            error: Error::ParseError(
+                InvalidRandomValues("No more than one set of random values can be declared".to_string())
+            )
+        })
+    }
+}
+
+RandValuesDecl: RandomValues = {
+    <name: Identifier> ":" <size: Size> => RandomValues::new(name, size, vec![]),
+    <Identifier> ":" "[" "]" =>? Err(
+        ParseError::User{
+            error: Error::ParseError(
+                InvalidRandomValues(
+                    "Random Values section cannot be empty".to_string()
+                )
+            )
+        }
+    ),
+    <name: Identifier> ":" "[" <rand_vec: CommaElems<RandElem>> "]" => RandomValues::new(name, rand_vec.iter().map(|v| v.size()).sum(), rand_vec)
+}
+
+RandElem: RandBinding = {
+    <name: Identifier> => RandBinding::new(name, 1),
+    <name: Identifier> <size: Size> => RandBinding::new(name, size)
 }
 
 // BOUNDARY STATEMENTS
@@ -396,6 +431,7 @@ extern {
         "aux" => Token::AuxDecl,
         "public_inputs" => Token::PublicInputs,
         "periodic_columns" => Token::PeriodicColumns,
+        "random_values" => Token::RandomValues,
         "boundary_constraints" => Token::BoundaryConstraints,
         "first" => Token::First,
         "last" => Token::Last,
