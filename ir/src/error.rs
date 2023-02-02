@@ -9,6 +9,7 @@ pub enum SemanticError {
     InvalidConstraint(String),
     InvalidConstraintDomain(String),
     InvalidIdentifier(String),
+    InvalidListComprehension(String),
     InvalidPeriodicColumn(String),
     InvalidUsage(String),
     MissingDeclaration(String),

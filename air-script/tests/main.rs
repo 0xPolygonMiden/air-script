@@ -109,3 +109,13 @@ fn indexed_trace_access() {
     let expected = expect_file!["indexed_trace_access/indexed_trace_access.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn list_comprehension() {
+    let generated_air = Test::new("tests/list_comprehension/list_comprehension.air".to_string())
+        .transpile()
+        .unwrap();
+
+    let expected = expect_file!["list_comprehension/list_comprehension.rs"];
+    expected.assert_eq(&generated_air);
+}

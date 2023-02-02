@@ -682,3 +682,28 @@ fn err_variable_matrix_invalid_access() {
     let result = AirIR::from_source(&parsed);
     assert!(result.is_err());
 }
+
+#[test]
+fn list_comprehension() {
+    let source = "
+    def TraceColGroupAir
+
+    trace_columns:
+        main: [clk, fmp[2], ctx]
+        aux: [a, b, c[3]]
+
+    public_inputs:
+        stack_inputs: [16]
+
+    integrity_constraints:
+        let x = [fmp for fmp in fmp]
+        enf clk = x[0]
+    
+    boundary_constraints:
+        enf c[2].first = 0";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
+
+    println!("{:?}", result);
+}

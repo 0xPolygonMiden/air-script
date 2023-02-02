@@ -6,6 +6,7 @@ use super::{
 use std::collections::BTreeMap;
 
 mod constraint;
+use air_script_core::{Iterable, ListComprehension};
 pub use constraint::{ConstraintDomain, ConstraintRoot};
 
 mod degree;
@@ -34,14 +35,21 @@ struct ExprDetails {
     root_idx: NodeIndex,
     trace_segment: TraceSegment,
     domain: ConstraintDomain,
+    exp_evaluated_value: Option<usize>,
 }
 
 impl ExprDetails {
-    fn new(root_idx: NodeIndex, trace_segment: TraceSegment, domain: ConstraintDomain) -> Self {
+    fn new(
+        root_idx: NodeIndex,
+        trace_segment: TraceSegment,
+        domain: ConstraintDomain,
+        exp_evaluated_value: Option<usize>,
+    ) -> Self {
         Self {
             root_idx,
             trace_segment,
             domain,
+            exp_evaluated_value,
         }
     }
 
@@ -55,6 +63,80 @@ impl ExprDetails {
 
     fn domain(&self) -> ConstraintDomain {
         self.domain
+    }
+
+    fn exp_evaluated_value(&self) -> Option<usize> {
+        self.exp_evaluated_value
+    }
+}
+
+pub struct ExprContext {
+    expression_type: ExpressionType,
+    list_comprehension_context: ListComprehensionContext,
+    is_exponent: bool,
+}
+
+impl ExprContext {
+    pub fn new(
+        expression_type: ExpressionType,
+        list_comprehension_context: ListComprehensionContext,
+        is_exponent: bool,
+    ) -> Self {
+        Self {
+            expression_type,
+            list_comprehension_context,
+            is_exponent,
+        }
+    }
+
+    pub fn expression_type(&self) -> &ExpressionType {
+        &self.expression_type
+    }
+
+    pub fn list_comprehension_context(&self) -> &ListComprehensionContext {
+        &self.list_comprehension_context
+    }
+
+    pub fn is_exponent(&self) -> bool {
+        self.is_exponent
+    }
+
+    pub fn set_list_comprehension_context(
+        &mut self,
+        list_comprehension_context: ListComprehensionContext,
+    ) {
+        self.list_comprehension_context = list_comprehension_context
+    }
+
+    pub fn set_exponent(&mut self, is_exponent: bool) {
+        self.is_exponent = is_exponent;
+    }
+}
+
+pub enum ExpressionType {
+    BoundaryVariable,
+    IntegrityVariable,
+    BoundaryConstraint,
+    IntegrityConstraint,
+}
+
+#[derive(Default)]
+pub struct ListComprehensionContext {
+    context: Vec<(Identifier, Iterable)>,
+    idx: usize,
+}
+
+impl ListComprehensionContext {
+    pub fn new(context: Vec<(Identifier, Iterable)>, idx: usize) -> Self {
+        Self { context, idx }
+    }
+
+    pub fn context(&self) -> &[(Identifier, Iterable)] {
+        &self.context
+    }
+
+    pub fn idx(&self) -> usize {
+        self.idx
     }
 }
 
@@ -210,6 +292,11 @@ impl Constraints {
                     constraint.lhs(),
                     &mut self.variable_roots,
                     ConstraintDomain::EveryRow,
+                    &mut ExprContext::new(
+                        ExpressionType::IntegrityConstraint,
+                        ListComprehensionContext::default(),
+                        false,
+                    ),
                 )?;
 
                 // add the right hand side expression to the graph.
@@ -218,12 +305,20 @@ impl Constraints {
                     constraint.rhs(),
                     &mut self.variable_roots,
                     ConstraintDomain::EveryRow,
+                    &mut ExprContext::new(
+                        ExpressionType::IntegrityConstraint,
+                        ListComprehensionContext::default(),
+                        false,
+                    ),
                 )?;
 
                 // merge the two sides of the expression into a constraint.
                 self.insert_constraint(symbol_table, lhs, rhs)?
             }
             IntegrityStmt::Variable(variable) => {
+                if let VariableType::ListComprehension(list_comprehension) = variable.value() {
+                    self.validate_list_comprehension(symbol_table, list_comprehension)?;
+                }
                 symbol_table.insert_integrity_variable(variable)?
             }
         }
@@ -262,6 +357,11 @@ impl Constraints {
                     constraint.value(),
                     &mut self.variable_roots,
                     domain,
+                    &mut ExprContext::new(
+                        ExpressionType::BoundaryConstraint,
+                        ListComprehensionContext::default(),
+                        false,
+                    ),
                 )?;
 
                 debug_assert!(lhs.domain() == rhs.domain());
@@ -311,5 +411,62 @@ impl Constraints {
         }
 
         Ok(())
+    }
+
+    // --- HELPERS --------------------------------------------------------------------------------
+
+    fn validate_list_comprehension(
+        &self,
+        symbol_table: &mut SymbolTable,
+        list_comprehension: &ListComprehension,
+    ) -> Result<(), SemanticError> {
+        let expected_iterable_len =
+            self.iterable_length(symbol_table, &list_comprehension.context()[0].1)?;
+        for (_, iterable) in list_comprehension.context().iter().skip(1) {
+            let iterable_len = self.iterable_length(symbol_table, iterable)?;
+            if iterable_len != expected_iterable_len {
+                return Err(SemanticError::InvalidListComprehension(
+                    "All iterables in a list comprehension must have the same length".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn iterable_length(
+        &self,
+        symbol_table: &SymbolTable,
+        iterable: &Iterable,
+    ) -> Result<usize, SemanticError> {
+        match iterable {
+            Iterable::Identifier(ident) => {
+                let ident_type = symbol_table.get_type(ident.name())?;
+                match ident_type {
+                    IdentifierType::IntegrityVariable(var_type) => {
+                        match var_type.value() {
+                            VariableType::Vector(vector) => Ok(vector.len()),
+                            VariableType::ListComprehension(_) =>
+                            // TODO: change error
+                            {
+                                Err(SemanticError::InvalidListComprehension(
+                                    "List comprehensions cannot be used as list indices"
+                                        .to_string(),
+                                ))
+                            }
+                            _ => Err(SemanticError::InvalidListComprehension(
+                                "List comprehensions cannot be used as list indices".to_string(),
+                            )),
+                        }
+                    }
+                    IdentifierType::PublicInput(size) => Ok(*size),
+                    IdentifierType::TraceColumns(trace_columns) => Ok(trace_columns.size()),
+                    // TODO: change error
+                    _ => Err(SemanticError::InvalidListComprehension(
+                        "List comprehensions cannot be used as list indices".to_string(),
+                    )),
+                }
+            }
+            Iterable::Range(range) | Iterable::Slice(_, range) => Ok(range.end() - range.start()),
+        }
     }
 }

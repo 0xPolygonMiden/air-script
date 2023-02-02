@@ -3,6 +3,7 @@ use super::{
     MatrixAccess, PeriodicColumns, PublicInputs, SemanticError, TraceSegment, Variable,
     VariableType, VectorAccess, MIN_CYCLE_LENGTH,
 };
+
 use parser::ast::{PeriodicColumn, PublicInput, TraceCols};
 use std::fmt::Display;
 
@@ -229,14 +230,20 @@ impl SymbolTable {
                 Ok(symbol_type)
             }
             IdentifierType::IntegrityVariable(integrity_variable) => {
-                if let VariableType::Vector(vector) = integrity_variable.value() {
-                    validate_vector_access(vector_access, vector.len())?;
-                    Ok(symbol_type)
-                } else {
-                    Err(SemanticError::invalid_vector_access(
+                match integrity_variable.value() {
+                    VariableType::Vector(vector) => {
+                        validate_vector_access(vector_access, vector.len())?;
+                        Ok(symbol_type)
+                    }
+                    VariableType::ListComprehension(_list_comprehension) => {
+                        // TODO: check that the index is in the range of the list comprehension
+                        // validate_list_comprehension_access(vector_access, list_comprehension)?;
+                        Ok(symbol_type)
+                    }
+                    _ => Err(SemanticError::invalid_vector_access(
                         vector_access,
                         symbol_type,
-                    ))
+                    )),
                 }
             }
             IdentifierType::TraceColumns(trace_columns) => {
