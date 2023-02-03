@@ -697,7 +697,7 @@ fn list_comprehension() {
 
     integrity_constraints:
         let x = [fmp for fmp in fmp]
-        enf clk = x[0]
+        enf clk = x[2]
     
     boundary_constraints:
         enf c[2].first = 0";

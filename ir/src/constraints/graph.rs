@@ -396,6 +396,37 @@ impl AlgebraicGraph {
                 Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain, None))
             }
             IdentifierType::TraceColumns(columns) => {
+                if !context.list_comprehension_context.context().is_empty() {
+                    for (member, iterable) in context.list_comprehension_context.context().iter() {
+                        if member.name() == ident {
+                            if let Iterable::Identifier(ident) = iterable {
+                                let iterable_type = symbol_table.get_type(ident.name())?;
+                                match iterable_type {
+                                    IdentifierType::TraceColumns(columns) => {
+                                        let trace_segment = columns.trace_segment();
+                                        let trace_access = IndexedTraceAccess::new(
+                                            trace_segment,
+                                            columns.offset() + context.list_comprehension_context().idx(),
+                                            CURRENT_ROW,
+                                        );
+                                        let node_index =
+                                            self.insert_op(Operation::TraceElement(trace_access));
+                                        return Ok(ExprDetails::new(
+                                            node_index,
+                                            trace_segment,
+                                            domain,
+                                            None,
+                                        ));
+                                    }
+                                    // TODO: Add support for other iterable types.
+                                    // TODO: Add support for list comprehensions in list comprehensions.
+                                    // TODO: Add support for next ([x' - x for x in a])
+                                    _ => todo!(),
+                                }
+                            }
+                        }
+                    }
+                }
                 let trace_segment = columns.trace_segment();
                 let trace_access =
                     IndexedTraceAccess::new(trace_segment, columns.offset(), CURRENT_ROW);
@@ -413,7 +444,7 @@ impl AlgebraicGraph {
                                         let trace_segment = columns.trace_segment();
                                         let trace_access = IndexedTraceAccess::new(
                                             trace_segment,
-                                            columns.offset(),
+                                            columns.offset() + context.list_comprehension_context().idx(),
                                             CURRENT_ROW,
                                         );
                                         let node_index =
