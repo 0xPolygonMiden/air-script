@@ -112,14 +112,14 @@ fn indexed_trace_access() {
 
 #[test]
 fn random_values() {
-    let generated_air = Test::new("tests/random_values/random_values.air".to_string())
+    let generated_air = Test::new("tests/random_values/random_values_simple.air".to_string())
         .transpile()
         .unwrap();
 
     let expected = expect_file!["random_values/random_values.rs"];
     expected.assert_eq(&generated_air);
 
-    let generated_air = Test::new("tests/random_values/random_values_simple.air".to_string())
+    let generated_air = Test::new("tests/random_values/random_values_bindings.air".to_string())
         .transpile()
         .unwrap();
 

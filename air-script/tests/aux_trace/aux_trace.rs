@@ -72,7 +72,7 @@ impl Air for AuxiliaryAir {
         let mut result = Vec::new();
         result.push(Assertion::single(0, 0, E::from(1_u64)));
         result.push(Assertion::single(0, self.last_step(), E::from(1_u64)));
-        result.push(Assertion::single(1, 0, E::from(1_u64)));
+        result.push(Assertion::single(1, 0, aux_rand_elements.get_segment_elements(0)[0]));
         result.push(Assertion::single(1, self.last_step(), E::from(1_u64)));
         result
     }
@@ -91,7 +91,7 @@ impl Air for AuxiliaryAir {
     {
         let current = aux_frame.current();
         let next = aux_frame.next();
-        result[0] = next[0] - ((current[0]) * (current[0] + current[1]));
-        result[1] = current[1] - ((next[1]) * (current[2]));
+        result[0] = next[0] - ((current[0]) * (current[0] + aux_rand_elements.get_segment_elements(0)[0] + current[1] + aux_rand_elements.get_segment_elements(0)[1]));
+        result[1] = current[1] - ((next[1]) * (current[2] + aux_rand_elements.get_segment_elements(0)[0]));
     }
 }

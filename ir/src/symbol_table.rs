@@ -280,14 +280,14 @@ impl SymbolTable {
                     ))
                 }
             }
-            IdentifierType::RandomValue(_offset, size) => {
-                if vector_access.idx() >= *size {
+            IdentifierType::RandomValue(_, size) => {
+                if vector_access.idx() < *size {
+                    Ok(symbol_type)
+                } else {
                     Err(SemanticError::vector_access_out_of_bounds(
                         vector_access,
                         *size,
                     ))
-                } else {
-                    Ok(symbol_type)
                 }
             }
             _ => Err(SemanticError::invalid_vector_access(

@@ -8,11 +8,11 @@ public_inputs:
     stack_inputs: [16]
 
 random_values:
-    rand: [x, y[14], z]
-
-integrity_constraints:
-    enf c' = z - $rand[0] + y[2]
+    alphas: [x, y[14], z]
 
 boundary_constraints:
     enf c.first = $rand[5] + y[2] + z
     enf c.last = x + $rand[15] + y[10]
+
+integrity_constraints:
+    enf c' = z - $rand[0] + y[2]

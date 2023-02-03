@@ -108,18 +108,12 @@ impl AlgebraicGraph {
                 default_domain,
             ),
             Expression::Rand(index) => {
-                // constraint target for random values defaults to the second trace segment.
+                // The constraint target for random values defaults to the second (auxiliary) trace
+                // segment.
                 // TODO: make this more general, so random values from further trace segments can be
                 // used. This requires having a way to describe different sets of randomness in
                 // the AirScript syntax.
-                if *index >= symbol_table.num_random_values() as usize {
-                    return Err(SemanticError::IndexOutOfRange(format!(
-                        "Random value index {} is greater than or equal to the total number of random values ({}).", 
-                        index,
-                        symbol_table.num_random_values()
-                    )));
-                }
-                self.insert_random_value(*index, default_domain, AUX_SEGMENT)
+                self.insert_random_value(symbol_table, *index, default_domain, AUX_SEGMENT)
             }
             Expression::IndexedTraceAccess(column_access) => {
                 self.insert_indexed_trace_access(symbol_table, column_access)
@@ -278,6 +272,25 @@ impl AlgebraicGraph {
         Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
     }
 
+    fn insert_random_value(
+        &mut self,
+        symbol_table: &SymbolTable,
+        index: usize,
+        domain: ConstraintDomain,
+        trace_segment: u8,
+    ) -> Result<ExprDetails, SemanticError> {
+        if index >= symbol_table.num_random_values() as usize {
+            return Err(SemanticError::IndexOutOfRange(format!(
+                "Random value index {} is greater than or equal to the total number of random values ({}).", 
+                index,
+                symbol_table.num_random_values()
+            )));
+        }
+
+        let node_index = self.insert_op(Operation::RandomValue(index));
+        Ok(ExprDetails::new(node_index, trace_segment, domain))
+    }
+
     /// Looks up the specified variable value in the variable roots and returns the expression
     /// details if it is found. Otherwise, inserts the variable expression into the graph, adds it
     /// to the variable roots, and returns the resulting expression details.
@@ -335,8 +348,8 @@ impl AlgebraicGraph {
         Ok(ExprDetails::new(node_index, trace_segment, domain))
     }
 
-    /// Adds a trace column, periodic column, named constant or a variable to the graph and returns
-    /// the [ExprDetails] of the inserted expression.
+    /// Adds a trace column, periodic column, random value, named constant or a variable to the
+    /// graph and returns the [ExprDetails] of the inserted expression.
     ///
     /// # Errors
     /// Returns an error if the identifier is not present in the symbol table or is not a supported
@@ -353,8 +366,8 @@ impl AlgebraicGraph {
             IdentifierType::Constant(ConstantType::Scalar(_)) => {
                 self.insert_constant(ConstantValue::Scalar(ident.to_string()), domain)
             }
-            IdentifierType::RandomValue(offset, _size) => {
-                self.insert_random_value(*offset, domain, AUX_SEGMENT)
+            IdentifierType::RandomValue(offset, _) => {
+                self.insert_random_value(symbol_table, *offset, domain, AUX_SEGMENT)
             }
             IdentifierType::IntegrityVariable(integrity_variable) => {
                 if let VariableType::Scalar(variable_expr) = integrity_variable.value() {
@@ -434,9 +447,12 @@ impl AlgebraicGraph {
             IdentifierType::PublicInput(_) => {
                 unimplemented!("TODO: add support for public inputs.")
             }
-            IdentifierType::RandomValue(offset, _size) => {
-                self.insert_random_value(*offset + vector_access.idx(), domain, AUX_SEGMENT)
-            }
+            IdentifierType::RandomValue(offset, _) => self.insert_random_value(
+                symbol_table,
+                *offset + vector_access.idx(),
+                domain,
+                AUX_SEGMENT,
+            ),
             _ => Err(SemanticError::invalid_vector_access(
                 vector_access,
                 symbol_type,
@@ -482,16 +498,6 @@ impl AlgebraicGraph {
                 symbol_type,
             )),
         }
-    }
-
-    fn insert_random_value(
-        &mut self,
-        index: usize,
-        domain: ConstraintDomain,
-        trace_segment: u8,
-    ) -> Result<ExprDetails, SemanticError> {
-        let node_index = self.insert_op(Operation::RandomValue(index));
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
     }
 }
 

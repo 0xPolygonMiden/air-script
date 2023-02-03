@@ -10,9 +10,9 @@ public_inputs:
 random_values:
     rand: [16]
 
-integrity_constraints:
-    enf c' = $rand[15] - $rand[0] + $rand[3]
-
 boundary_constraints:
     enf c.first = $rand[5] + $rand[3] + $rand[15]
     enf c.last = $rand[0] + $rand[15] + $rand[11]
+
+integrity_constraints:
+    enf c' = $rand[15] - $rand[0] + $rand[3]
