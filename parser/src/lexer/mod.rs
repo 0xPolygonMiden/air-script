@@ -67,8 +67,8 @@ pub enum Token {
     #[token("random_values")]
     RandomValues,
 
-    /// A reserved keyword for accessing random values provided by the verifier.
-    #[token("$rand")]
+    /// A reserved symbol for accessing random values provided by the verifier.
+    #[token("$")]
     Rand,
 
     // BOUNDARY CONSTRAINT KEYWORDS

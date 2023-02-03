@@ -22,7 +22,7 @@ pub(super) enum IdentifierType {
     IntegrityVariable(Variable),
     /// an identifier for random value, containing its index in the random values array and its
     /// length if this value is an array. For non-array random values second parameter is always 1.
-    RandomValue(usize, usize),
+    RandomValuesBinding(usize, usize),
 }
 
 impl Display for IdentifierType {
@@ -35,7 +35,7 @@ impl Display for IdentifierType {
                 write!(f, "TraceColumns in segment {}", columns.trace_segment())
             }
             Self::IntegrityVariable(_) => write!(f, "IntegrityVariable"),
-            Self::RandomValue(_, _) => write!(f, "RandomValue"),
+            Self::RandomValuesBinding(_, _) => write!(f, "RandomValue"),
         }
     }
 }
@@ -164,14 +164,18 @@ impl SymbolTable {
         &mut self,
         values: &RandomValues,
     ) -> Result<(), SemanticError> {
-        // TODO: add name of random values vector to the identifiers. For now it can be called only
-        // by `$rand`
         self.num_random_values = values.size() as u16;
         let mut offset = 0;
+        // add the name of the random values array to the symbol table
+        self.insert_symbol(
+            values.name(),
+            IdentifierType::RandomValuesBinding(offset, values.size() as usize),
+        )?;
+        // add the named random value bindings to the symbol table
         for value in values.bindings() {
             self.insert_symbol(
                 value.name(),
-                IdentifierType::RandomValue(offset, value.size() as usize),
+                IdentifierType::RandomValuesBinding(offset, value.size() as usize),
             )?;
             offset += value.size() as usize;
         }
@@ -280,7 +284,7 @@ impl SymbolTable {
                     ))
                 }
             }
-            IdentifierType::RandomValue(_, size) => {
+            IdentifierType::RandomValuesBinding(_, size) => {
                 if vector_access.idx() < *size {
                     Ok(symbol_type)
                 } else {

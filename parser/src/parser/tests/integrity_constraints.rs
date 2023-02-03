@@ -89,7 +89,7 @@ fn integrity_constraint_with_random_value() {
         IntegrityConstraint::new(
             Add(
                 Box::new(Elem(Identifier("a".to_string()))),
-                Box::new(Rand(1)),
+                Box::new(Rand(Identifier("rand".to_string()), 1)),
             ),
             Const(0),
         ),
