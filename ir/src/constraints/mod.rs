@@ -14,6 +14,9 @@ pub use degree::IntegrityConstraintDegree;
 mod graph;
 pub use graph::{AlgebraicGraph, ConstantValue, NodeIndex, Operation, VariableValue};
 
+mod utils;
+pub use utils::generate_graph_vis;
+
 // TYPES
 // ================================================================================================
 type VariableRoots = BTreeMap<VariableValue, ExprDetails>;

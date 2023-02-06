@@ -1,4 +1,4 @@
-use crate::AirIR;
+use crate::{AirIR, constraints::generate_graph_vis};
 use parser::parse;
 
 #[test]
@@ -16,6 +16,7 @@ fn boundary_constraints() {
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::from_source(&parsed);
+    println!("{}", generate_graph_vis(&result.as_ref().unwrap()));
     assert!(result.is_ok());
 }
 
