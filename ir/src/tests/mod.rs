@@ -380,7 +380,7 @@ fn transition_constraints_using_parens() {
 }
 
 #[test]
-fn random_values_fixed_list() {
+fn random_values_indexed_access() {
     let source = "
     trace_columns:
         main: [a, b[12]]
@@ -422,7 +422,7 @@ fn random_values_custom_name() {
 }
 
 #[test]
-fn random_values_ident_vector() {
+fn random_values_named_access() {
     let source = "
     trace_columns:
         main: [a, b[12]]

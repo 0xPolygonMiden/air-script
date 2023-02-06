@@ -35,7 +35,7 @@ impl Display for IdentifierType {
                 write!(f, "TraceColumns in segment {}", columns.trace_segment())
             }
             Self::IntegrityVariable(_) => write!(f, "IntegrityVariable"),
-            Self::RandomValuesBinding(_, _) => write!(f, "RandomValue"),
+            Self::RandomValuesBinding(_, _) => write!(f, "RandomValuesBinding"),
         }
     }
 }
