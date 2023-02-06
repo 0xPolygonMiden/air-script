@@ -74,11 +74,12 @@ impl AirIR {
                 ast::SourceSection::Trace(columns) => {
                     // process & validate the main trace columns
                     symbol_table.insert_trace_columns(0, &columns.main_cols)?;
+                    validator.exists("main_trace_columns");
                     if !columns.aux_cols.is_empty() {
                         // process & validate the auxiliary trace columns
                         symbol_table.insert_trace_columns(1, &columns.aux_cols)?;
+                        validator.exists("aux_trace_columns");
                     }
-                    validator.exists("trace_columns");
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
                     // process & validate the public inputs
@@ -91,6 +92,7 @@ impl AirIR {
                 }
                 ast::SourceSection::RandomValues(values) => {
                     symbol_table.insert_random_values(values)?;
+                    validator.exists("random_values");
                 }
                 _ => {}
             }

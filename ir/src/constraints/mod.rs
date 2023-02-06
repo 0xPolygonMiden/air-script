@@ -12,7 +12,9 @@ mod degree;
 pub use degree::IntegrityConstraintDegree;
 
 mod graph;
-pub use graph::{AlgebraicGraph, ConstantValue, NodeIndex, Operation, VariableValue};
+pub use graph::{
+    AlgebraicGraph, ConstantValue, NodeIndex, Operation, VariableValue, DEFAULT_SEGMENT,
+};
 
 // TYPES
 // ================================================================================================
@@ -264,6 +266,13 @@ impl Constraints {
                     domain,
                 )?;
 
+                // check that random values are not used against main columns
+                if self.contains_rand_value(&rhs.root_idx())
+                    && lhs.trace_segment() == DEFAULT_SEGMENT
+                {
+                    return Err(SemanticError::InvalidUsage("Random values cannot be used in boundary constraints defined against main trace columns".to_string()));
+                }
+
                 debug_assert!(lhs.domain() == rhs.domain());
 
                 // merge the two sides of the expression into a constraint.
@@ -311,5 +320,19 @@ impl Constraints {
         }
 
         Ok(())
+    }
+
+    /// Checks whether the expression contains a Random Value
+    fn contains_rand_value(&self, index: &NodeIndex) -> bool {
+        match self.graph.node(index).op() {
+            Operation::RandomValue(_) => true,
+            Operation::Add(index_l, index_r)
+            | Operation::Sub(index_l, index_r)
+            | Operation::Mul(index_l, index_r) => {
+                self.contains_rand_value(index_l) || self.contains_rand_value(index_r)
+            }
+            Operation::Exp(index, _) => self.contains_rand_value(index),
+            _ => false,
+        }
     }
 }

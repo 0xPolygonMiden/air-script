@@ -500,6 +500,47 @@ fn error_random_values_out_of_bounds() {
 }
 
 #[test]
+fn err_random_values_without_aux_cols() {
+    let source = "
+    trace_columns:
+        main: [a, b[12]]
+    public_inputs:
+        stack_inputs: [16]
+    random_values:
+        rand: [16]
+    boundary_constraints:
+        enf a.first = 2
+        enf a.last = 1
+    integrity_constraints:
+        enf a' = a + 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_err());
+}
+
+#[test]
+fn err_random_values_in_bc_against_main_cols() {
+    let source = "
+    trace_columns:
+        main: [a, b[12]]
+        aux: [c, d]
+    public_inputs:
+        stack_inputs: [16]
+    random_values:
+        rand: [16]
+    boundary_constraints:
+        enf a.first = $rand[10] * 2
+        enf b[2].last = 1
+    integrity_constraints:
+        enf c' = $rand[3] + 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_err());
+}
+
+#[test]
 fn err_bc_invalid_vector_access() {
     let source = "
     const A = 123

@@ -10,7 +10,7 @@ use super::{
 /// The offset of the "current" row during constraint evaluation.
 const CURRENT_ROW: usize = 0;
 /// The default segment against which a constraint is applied is the main trace segment.
-const DEFAULT_SEGMENT: TraceSegment = 0;
+pub const DEFAULT_SEGMENT: TraceSegment = 0;
 /// The auxiliary trace segment.
 const AUX_SEGMENT: TraceSegment = 1;
 
