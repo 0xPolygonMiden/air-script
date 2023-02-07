@@ -1,6 +1,6 @@
 use super::{
-    build_parse_test, Error, Identifier, ParseError, RandBinding, RandomValues, Source,
-    SourceSection::*,
+    build_parse_test, Error, Expression::*, Identifier, IntegrityConstraint, IntegrityStmt::*,
+    ParseError, RandBinding, RandomValues, Source, SourceSection, SourceSection::*,
 };
 
 // RANDOM VALUES
@@ -70,4 +70,21 @@ fn random_values_multiple_declaration_error() {
         "No more than one set of random values can be declared".to_string(),
     ));
     build_parse_test!(source).expect_error(error)
+}
+
+#[test]
+fn random_values_index_access() {
+    let source = "
+    integrity_constraints:
+        enf a + $alphas[1] = 0";
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
+        IntegrityConstraint::new(
+            Add(
+                Box::new(Elem(Identifier("a".to_string()))),
+                Box::new(Rand(Identifier("alphas".to_string()), 1)),
+            ),
+            Const(0),
+        ),
+    )])]);
+    build_parse_test!(source).expect_ast(expected);
 }

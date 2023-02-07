@@ -225,7 +225,7 @@ BoundaryExponent: Expression = {
 
 BoundaryAtom: Expression = {
     "(" <BoundaryExpr> ")",
-    "$rand" <idx: Index> => Expression::Rand(idx),
+    "$" <ident: Identifier> <idx: Index> => Expression::Rand(ident, idx),
     <n: Num_u64> => Expression::Const(n),
     <ident: Identifier> => Expression::Elem(ident),
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
@@ -298,8 +298,8 @@ IntegrityExponent: Expression = {
 
 IntegrityAtom: Expression = {
     "(" <IntegrityExpr> ")",
-    "$rand" <idx: Index> => Expression::Rand(idx),
     <col_access: IndexedTraceAccess> => Expression::IndexedTraceAccess(col_access),
+    "$" <ident: Identifier> <idx: Index> => Expression::Rand(ident, idx),
     <n: Num_u64> => Expression::Const(n),
     <ident: Identifier> => Expression::Elem(ident),
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
@@ -436,9 +436,9 @@ extern {
         "first" => Token::First,
         "last" => Token::Last,
         "integrity_constraints" => Token::IntegrityConstraints,
-        "$rand" => Token::Rand,
         "$main" => Token::MainAccess,
         "$aux" => Token::AuxAccess,
+        "$" => Token::Rand,
         "enf" => Token::Enf,
         "'" => Token::Next,
         "=" => Token::Equal,

@@ -59,3 +59,26 @@ random_values:
     ];
     expect_valid_tokenization(source, tokens);
 }
+
+#[test]
+fn random_values_index_access() {
+    let source = "
+    integrity_constraints:
+        enf a + $alphas[1] = 0";
+
+    let tokens = vec![
+        Token::IntegrityConstraints,
+        Token::Colon,
+        Token::Enf,
+        Token::Ident("a".to_string()),
+        Token::Plus,
+        Token::Rand,
+        Token::Ident("alphas".to_string()),
+        Token::Lsqb,
+        Token::Num("1".to_string()),
+        Token::Rsqb,
+        Token::Equal,
+        Token::Num("0".to_string()),
+    ];
+    expect_valid_tokenization(source, tokens);
+}

@@ -3,7 +3,7 @@ use super::{
     MatrixAccess, PeriodicColumns, PublicInputs, SemanticError, TraceSegment, Variable,
     VariableType, VectorAccess, MIN_CYCLE_LENGTH,
 };
-use parser::ast::{PeriodicColumn, PublicInput, TraceCols};
+use parser::ast::{PeriodicColumn, PublicInput, RandomValues, TraceCols};
 use std::fmt::Display;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -20,6 +20,9 @@ pub(super) enum IdentifierType {
     PeriodicColumn(usize, usize),
     /// an identifier for an integrity variable, containing its name and value
     IntegrityVariable(Variable),
+    /// an identifier for random value, containing its index in the random values array and its
+    /// length if this value is an array. For non-array random values second parameter is always 1.
+    RandomValuesBinding(usize, usize),
 }
 
 impl Display for IdentifierType {
@@ -32,6 +35,7 @@ impl Display for IdentifierType {
                 write!(f, "TraceColumns in segment {}", columns.trace_segment())
             }
             Self::IntegrityVariable(_) => write!(f, "IntegrityVariable"),
+            Self::RandomValuesBinding(_, _) => write!(f, "RandomValuesBinding"),
         }
     }
 }
@@ -42,6 +46,10 @@ impl Display for IdentifierType {
 pub(super) struct SymbolTable {
     /// Vector in which index is trace segment and value is number of columns in this segment
     segment_widths: Vec<u16>,
+
+    /// Number of random values. For array initialized in `rand: [n]` form it will be `n`, and for
+    /// `rand: [a, b[n], c, ...]` it will be length of the flattened array.
+    num_random_values: u16,
 
     /// A map of all declared identifiers from their name (the key) to their type.
     identifiers: BTreeMap<String, IdentifierType>,
@@ -151,6 +159,29 @@ impl SymbolTable {
         Ok(())
     }
 
+    /// Adds all random values by their identifier names and array length.
+    pub(super) fn insert_random_values(
+        &mut self,
+        values: &RandomValues,
+    ) -> Result<(), SemanticError> {
+        self.num_random_values = values.size() as u16;
+        let mut offset = 0;
+        // add the name of the random values array to the symbol table
+        self.insert_symbol(
+            values.name(),
+            IdentifierType::RandomValuesBinding(offset, values.size() as usize),
+        )?;
+        // add the named random value bindings to the symbol table
+        for value in values.bindings() {
+            self.insert_symbol(
+                value.name(),
+                IdentifierType::RandomValuesBinding(offset, value.size() as usize),
+            )?;
+            offset += value.size() as usize;
+        }
+        Ok(())
+    }
+
     /// Inserts an integrity variable into the symbol table.
     pub(super) fn insert_integrity_variable(
         &mut self,
@@ -197,6 +228,10 @@ impl SymbolTable {
 
     pub(super) fn segment_widths(&self) -> &Vec<u16> {
         &self.segment_widths
+    }
+
+    pub(super) fn num_random_values(&self) -> u16 {
+        self.num_random_values
     }
 
     /// Checks that the specified name and index are a valid reference to a declared public input
@@ -246,6 +281,16 @@ impl SymbolTable {
                     Err(SemanticError::vector_access_out_of_bounds(
                         vector_access,
                         trace_columns.size(),
+                    ))
+                }
+            }
+            IdentifierType::RandomValuesBinding(_, size) => {
+                if vector_access.idx() < *size {
+                    Ok(symbol_type)
+                } else {
+                    Err(SemanticError::vector_access_out_of_bounds(
+                        vector_access,
+                        *size,
                     ))
                 }
             }

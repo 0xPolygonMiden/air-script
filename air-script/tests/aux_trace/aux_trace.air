@@ -7,6 +7,9 @@ trace_columns:
 public_inputs:
     stack_inputs: [16]
 
+random_values:
+    rand: [2]
+
 boundary_constraints:
     enf a.first = 1
     enf b.first = 1

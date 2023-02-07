@@ -16,9 +16,9 @@ pub enum Expression {
     MatrixAccess(MatrixAccess),
     IndexedTraceAccess(IndexedTraceAccess),
     NamedTraceAccess(NamedTraceAccess),
-    /// Represents a random value provided by the verifier. The inner value is the index of this
-    /// random value in the array of all random values.
-    Rand(usize),
+    /// Represents a random value provided by the verifier. The first inner value is the name of
+    /// the random values array and the second is the index of this random value in that array
+    Rand(Identifier, usize),
     Add(Box<Expression>, Box<Expression>),
     Sub(Box<Expression>, Box<Expression>),
     Mul(Box<Expression>, Box<Expression>),

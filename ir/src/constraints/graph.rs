@@ -107,14 +107,19 @@ impl AlgebraicGraph {
                 variable_roots,
                 default_domain,
             ),
-            Expression::Rand(index) => {
+            Expression::Rand(name, index) => {
                 // The constraint target for random values defaults to the second (auxiliary) trace
                 // segment.
                 // TODO: make this more general, so random values from further trace segments can be
                 // used. This requires having a way to describe different sets of randomness in
                 // the AirScript syntax.
-                let node_index = self.insert_op(Operation::RandomValue(*index));
-                Ok(ExprDetails::new(node_index, AUX_SEGMENT, default_domain))
+                self.insert_random_access(
+                    symbol_table,
+                    name.name(),
+                    *index,
+                    AUX_SEGMENT,
+                    default_domain,
+                )
             }
             Expression::IndexedTraceAccess(column_access) => {
                 self.insert_indexed_trace_access(symbol_table, column_access)
@@ -273,6 +278,27 @@ impl AlgebraicGraph {
         Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
     }
 
+    /// Inserts random value with specified index into the graph and returns the resulting
+    /// expression details.
+    fn insert_random_value(
+        &mut self,
+        symbol_table: &SymbolTable,
+        index: usize,
+        trace_segment: u8,
+        domain: ConstraintDomain,
+    ) -> Result<ExprDetails, SemanticError> {
+        if index >= symbol_table.num_random_values() as usize {
+            return Err(SemanticError::IndexOutOfRange(format!(
+                "Random value index {} is greater than or equal to the total number of random values ({}).", 
+                index,
+                symbol_table.num_random_values()
+            )));
+        }
+
+        let node_index = self.insert_op(Operation::RandomValue(index));
+        Ok(ExprDetails::new(node_index, trace_segment, domain))
+    }
+
     /// Looks up the specified variable value in the variable roots and returns the expression
     /// details if it is found. Otherwise, inserts the variable expression into the graph, adds it
     /// to the variable roots, and returns the resulting expression details.
@@ -330,8 +356,8 @@ impl AlgebraicGraph {
         Ok(ExprDetails::new(node_index, trace_segment, domain))
     }
 
-    /// Adds a trace column, periodic column, named constant or a variable to the graph and returns
-    /// the [ExprDetails] of the inserted expression.
+    /// Adds a trace column, periodic column, random value, named constant or a variable to the
+    /// graph and returns the [ExprDetails] of the inserted expression.
     ///
     /// # Errors
     /// Returns an error if the identifier is not present in the symbol table or is not a supported
@@ -347,6 +373,9 @@ impl AlgebraicGraph {
         match elem_type {
             IdentifierType::Constant(ConstantType::Scalar(_)) => {
                 self.insert_constant(ConstantValue::Scalar(ident.to_string()), domain)
+            }
+            IdentifierType::RandomValuesBinding(offset, _) => {
+                self.insert_random_value(symbol_table, *offset, AUX_SEGMENT, domain)
             }
             IdentifierType::IntegrityVariable(integrity_variable) => {
                 if let VariableType::Scalar(variable_expr) = integrity_variable.value() {
@@ -426,6 +455,12 @@ impl AlgebraicGraph {
             IdentifierType::PublicInput(_) => {
                 unimplemented!("TODO: add support for public inputs.")
             }
+            IdentifierType::RandomValuesBinding(offset, _) => self.insert_random_value(
+                symbol_table,
+                *offset + vector_access.idx(),
+                AUX_SEGMENT,
+                domain,
+            ),
             _ => Err(SemanticError::invalid_vector_access(
                 vector_access,
                 symbol_type,
@@ -470,6 +505,35 @@ impl AlgebraicGraph {
                 matrix_access,
                 symbol_type,
             )),
+        }
+    }
+
+    /// Inserts random value by index access into the graph and returns the resulting
+    /// expression details.
+    ///
+    /// # Errors
+    /// Returns an error if the identifier is not present in the symbol table or is not a supported
+    /// type.
+    ///
+    /// # Example
+    /// This function inserts values like `$alphas[3]`, having `name` as `alphas` and `index` as
+    /// `3`
+    fn insert_random_access(
+        &mut self,
+        symbol_table: &SymbolTable,
+        name: &str,
+        index: usize,
+        trace_segment: u8,
+        domain: ConstraintDomain,
+    ) -> Result<ExprDetails, SemanticError> {
+        let elem_type = symbol_table.get_type(name)?;
+        match elem_type {
+            IdentifierType::RandomValuesBinding(_, _) => {
+                self.insert_random_value(symbol_table, index, trace_segment, domain)
+            }
+            _ => Err(SemanticError::InvalidUsage(format!(
+                "Identifier {name} was declared as a {elem_type} not as a random values"
+            ))),
         }
     }
 }

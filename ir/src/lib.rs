@@ -89,6 +89,9 @@ impl AirIR {
                     // process & validate the periodic columns
                     symbol_table.insert_periodic_columns(columns)?;
                 }
+                ast::SourceSection::RandomValues(values) => {
+                    symbol_table.insert_random_values(values)?;
+                }
                 _ => {}
             }
         }
