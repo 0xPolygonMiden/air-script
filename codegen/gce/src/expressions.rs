@@ -123,9 +123,9 @@ impl<'a> ExpressionsHandler<'a> {
                     .ok_or_else(|| {
                         ConstraintEvaluationError::operation_not_found(root.node_index().index())
                     })?;
-                // if a same constraint is found twice, this means that it is used for both first
-                // and last row of the column, so we should add this expression to the expressions
-                // array again.
+                // if we found index twice, put the corresponding expression in the expressions
+                // array again. It means that we have equal boundary constraints for both first
+                // and last domains (e.g. a.first = 1 and a.last = 1)
                 if outputs.contains(index) {
                     expressions.push(expressions[*index].clone());
                     outputs.push(expressions.len() - 1);

@@ -64,7 +64,7 @@ impl CodeGenerator {
         file.write_all(format!("\t\"constants\": {:?},\n", self.constants).as_bytes())?;
         file.write_all(format!("\t\"expressions\": [\n\t\t{}", self.expressions[0]).as_bytes())?;
         for expr in self.expressions.iter().skip(1) {
-            file.write_all(format!(",\n\t\t{}", expr).as_bytes())?;
+            file.write_all(format!(",\n\t\t{expr}").as_bytes())?;
         }
         file.write_all("\n\t],\n".as_bytes())?;
         file.write_all(format!("\t\"outputs\": {:?}\n", self.outputs).as_bytes())?;
