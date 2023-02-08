@@ -1,0 +1,17 @@
+{
+	"num_polys": 6,
+	"num_variables": 32,
+	"constants": [],
+	"expressions": [
+		{"op": "ADD", "lhs": {"type": "VAR", "index": 21}, "rhs": {"type": "VAR", "index": 19}},
+		{"op": "ADD", "lhs": {"type": "EXPR", "index": 0}, "rhs": {"type": "VAR", "index": 31}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 2}, "rhs": {"type": "EXPR", "index": 1}},
+		{"op": "ADD", "lhs": {"type": "VAR", "index": 16}, "rhs": {"type": "VAR", "index": 31}},
+		{"op": "ADD", "lhs": {"type": "EXPR", "index": 3}, "rhs": {"type": "VAR", "index": 27}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 2}, "rhs": {"type": "EXPR", "index": 4}},
+		{"op": "SUB", "lhs": {"type": "VAR", "index": 31}, "rhs": {"type": "VAR", "index": 16}},
+		{"op": "ADD", "lhs": {"type": "EXPR", "index": 6}, "rhs": {"type": "VAR", "index": 19}},
+		{"op": "SUB", "lhs": {"type": "POL_NEXT", "index": 2}, "rhs": {"type": "EXPR", "index": 7}}
+	],
+	"outputs": [2, 5, 8]
+}

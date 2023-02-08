@@ -81,6 +81,15 @@ pub fn get_constant_index_by_matrix_access(
     get_constant_index_by_value(value, constants)
 }
 
-pub fn get_random_value_index(ir: &AirIR, rand_index: usize) -> usize {
+pub fn get_random_value_index(ir: &AirIR, rand_index: &usize) -> usize {
     ir.public_inputs().iter().map(|v| v.1).sum::<usize>() + rand_index
+}
+
+pub fn get_public_input_index(ir: &AirIR, name: &String, public_index: &usize) -> usize {
+    ir.public_inputs()
+        .iter()
+        .take_while(|v| v.0 != *name)
+        .map(|v| v.1)
+        .sum::<usize>()
+        + public_index
 }

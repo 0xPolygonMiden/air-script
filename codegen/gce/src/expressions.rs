@@ -2,7 +2,8 @@ use super::error::ConstraintEvaluationError;
 use super::{
     utils::{
         get_constant_index_by_matrix_access, get_constant_index_by_name,
-        get_constant_index_by_value, get_constant_index_by_vector_access, get_random_value_index,
+        get_constant_index_by_value, get_constant_index_by_vector_access, get_public_input_index,
+        get_random_value_index,
     },
     ExpressionJson, ExpressionOperation, NodeReference, NodeType,
 };
@@ -42,7 +43,6 @@ impl<'a> ExpressionsHandler<'a> {
         // the column is .first constraint and second is .last constraint (in the boundary section, not
         // entire array)
         let mut expressions = Vec::new();
-
         for (index, node) in self.ir.constraint_graph().nodes().iter().enumerate() {
             match node.op() {
                 Operation::Add(l, r) => {
@@ -123,6 +123,9 @@ impl<'a> ExpressionsHandler<'a> {
                     .ok_or_else(|| {
                         ConstraintEvaluationError::operation_not_found(root.node_index().index())
                     })?;
+                // if a same constraint is found twice, this means that it is used for both first
+                // and last row of the column, so we should add this expression to the expressions
+                // array again.
                 if outputs.contains(index) {
                     expressions.push(expressions[*index].clone());
                     outputs.push(expressions.len() - 1);
@@ -267,7 +270,14 @@ impl<'a> ExpressionsHandler<'a> {
                 }
             }
             RandomValue(rand_index) => {
-                let index = get_random_value_index(self.ir, *rand_index);
+                let index = get_random_value_index(self.ir, rand_index);
+                Ok(NodeReference {
+                    node_type: NodeType::Var,
+                    index,
+                })
+            }
+            PublicInput(name, public_index) => {
+                let index = get_public_input_index(self.ir, name, public_index);
                 Ok(NodeReference {
                     node_type: NodeType::Var,
                     index,
@@ -275,11 +285,6 @@ impl<'a> ExpressionsHandler<'a> {
             }
 
             PeriodicColumn(_column, _length) => todo!(),
-
-            // Currently it can only be `Neg`
-            _ => Err(ConstraintEvaluationError::InvalidOperation(
-                "Invalid transition constraint operation".to_string(),
-            )),
         }
     }
 
