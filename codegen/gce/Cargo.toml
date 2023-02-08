@@ -1,0 +1,17 @@
+[package]
+name = "air-codegen-gce"
+version = "0.1.0"
+description="Code generation for the generic constraint evaluation format."
+authors = ["miden contributors"]
+readme="README.md"
+license = "MIT"
+repository = "https://github.com/0xPolygonMiden/air-script"
+categories = ["compilers", "cryptography"]
+keywords = ["air", "stark", "winterfell", "zero-knowledge", "zkp"]
+edition = "2021"
+rust-version = "1.65"
+
+[dependencies]
+air-script-core = {package = "air-script-core", path="../../air-script-core", version="0.1.0" }
+ir = {package = "air-ir", path="../../ir", version="0.1.0" }
+codegen = "0.2.0"

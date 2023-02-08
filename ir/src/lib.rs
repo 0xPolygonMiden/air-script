@@ -40,6 +40,7 @@ pub type BoundaryConstraintsMap = BTreeMap<usize, Expression>;
 pub struct AirIR {
     air_name: String,
     segment_widths: Vec<u16>,
+    num_random_values: u16,
     constants: Constants,
     public_inputs: PublicInputs,
     periodic_columns: PeriodicColumns,
@@ -120,7 +121,7 @@ impl AirIR {
             }
         }
 
-        let (segment_widths, constants, public_inputs, periodic_columns) =
+        let (segment_widths, num_random_values, constants, public_inputs, periodic_columns) =
             symbol_table.into_declarations();
 
         // validate sections
@@ -129,6 +130,7 @@ impl AirIR {
         Ok(Self {
             air_name: air_name.to_string(),
             segment_widths,
+            num_random_values,
             constants,
             public_inputs,
             periodic_columns,
@@ -144,6 +146,10 @@ impl AirIR {
 
     pub fn constants(&self) -> &Constants {
         &self.constants
+    }
+
+    pub fn num_random_values(&self) -> u16 {
+        self.num_random_values
     }
 
     pub fn segment_widths(&self) -> &Vec<u16> {
