@@ -111,6 +111,7 @@ impl Codegen for Operation {
                     ElemType::Ext => format!("({lhs}).exp(E::PositiveInteger::from({r_idx}_u64))"),
                 }
             }
+            Operation::DomainValue => unreachable!(), // we don't return a result yet.
         }
     }
 }

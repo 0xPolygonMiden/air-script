@@ -24,6 +24,7 @@ pub enum Expression {
     Mul(Box<Expression>, Box<Expression>),
     Exp(Box<Expression>, Box<Expression>),
     ListFolding(ListFoldingType),
+    DomainValue,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

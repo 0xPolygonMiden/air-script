@@ -225,6 +225,23 @@ fn integrity_constraint_with_indexed_trace_access() {
 }
 
 #[test]
+fn integrity_constraint_with_domain_value() {
+    let source = "
+    integrity_constraints:
+        enf a' = a + $x";
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
+        IntegrityConstraint::new(
+            NamedTraceAccess(NamedTraceAccess::new(Identifier("a".to_string()), 0, 1)),
+            Add(
+                Box::new(Elem(Identifier("a".to_string()))),
+                Box::new(DomainValue),
+            ),
+        ),
+    )])]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
 fn err_missing_integrity_constraint() {
     let source = "
     integrity_constraints:

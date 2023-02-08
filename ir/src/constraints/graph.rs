@@ -166,6 +166,14 @@ impl AlgebraicGraph {
                     lhs.domain(),
                 ))
             }
+            Expression::DomainValue => {
+                let node_index = self.insert_op(Operation::DomainValue);
+                Ok(ExprDetails::new(
+                    node_index,
+                    DEFAULT_SEGMENT,
+                    default_domain,
+                ))
+            }
             Expression::ListFolding(_) => todo!(),
         }
     }
@@ -234,6 +242,7 @@ impl AlgebraicGraph {
                 let lhs_base = self.accumulate_degree(cycles, lhs);
                 lhs_base * rhs
             }
+            Operation::DomainValue => todo!(),
         }
     }
 
@@ -582,6 +591,7 @@ pub enum Operation {
     /// value as the power.
     /// TODO: Support non const exponents.
     Exp(NodeIndex, usize),
+    DomainValue,
 }
 
 #[derive(Debug, Eq, PartialEq)]

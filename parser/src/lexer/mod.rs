@@ -71,6 +71,10 @@ pub enum Token {
     #[token("$")]
     Rand,
 
+    /// Represents the domain value at a row.
+    #[token("$x")]
+    DomainValue,
+
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Marks the beginning of boundary constraints section in the constraints file.
