@@ -214,7 +214,6 @@ impl AlgebraicGraph {
                 cycles.insert(*index, *cycle_len);
                 0
             }
-            Operation::Neg(index) => self.accumulate_degree(cycles, index),
             Operation::Add(lhs, rhs) => {
                 let lhs_base = self.accumulate_degree(cycles, lhs);
                 let rhs_base = self.accumulate_degree(cycles, rhs);
@@ -570,8 +569,6 @@ pub enum Operation {
     /// A random value provided by the verifier. The inner value is the index of this random value
     /// in the array of all random values.
     RandomValue(usize),
-    /// Negation operation applied to the node with the specified index.
-    Neg(NodeIndex),
     /// Addition operation applied to the nodes with the specified indices.
     Add(NodeIndex, NodeIndex),
     /// Subtraction operation applied to the nodes with the specified indices.
