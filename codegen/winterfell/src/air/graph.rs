@@ -83,10 +83,6 @@ impl Codegen for Operation {
             Operation::RandomValue(idx) => {
                 format!("aux_rand_elements.get_segment_elements(0)[{idx}]")
             }
-            Operation::Neg(idx) => {
-                let str = idx.to_string(ir, elem_type);
-                format!("- ({str})")
-            }
             Operation::Add(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(ir, elem_type);
                 let rhs = r_idx.to_string(ir, elem_type);
