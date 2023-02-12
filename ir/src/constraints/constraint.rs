@@ -1,9 +1,41 @@
-use super::{Boundary, NodeIndex, SemanticError};
+use super::{Boundary, NodeIndex, SemanticError, TraceSegment};
+use std::fmt::Display;
+
+/// [ConstrainedBoundary] represents the location within the trace where a boundary constraint is
+/// applied. It identifies the trace segment, the trace column index, and the [ConstraintDomain].
+/// The [ConstraintDomain] is assumed to be a valid boundary, either FirstRow or LastRow.
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
+pub struct ConstrainedBoundary {
+    trace_segment: TraceSegment,
+    col_idx: usize,
+    domain: ConstraintDomain,
+}
+
+impl ConstrainedBoundary {
+    pub fn new(trace_segment: TraceSegment, col_idx: usize, domain: ConstraintDomain) -> Self {
+        debug_assert!(domain == ConstraintDomain::FirstRow || domain == ConstraintDomain::LastRow);
+        Self {
+            trace_segment,
+            col_idx,
+            domain,
+        }
+    }
+}
+
+impl Display for ConstrainedBoundary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} of column {} in segment {}",
+            self.domain, self.col_idx, self.trace_segment
+        )
+    }
+}
 
 /// A [ConstraintRoot] represents the entry node of a subgraph within the [AlgebraicGraph]
 /// representing a constraint. It also contains the [ConstraintDomain] for the constraint, which is
 /// the domain against which the constraint should be applied.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ConstraintRoot {
     index: NodeIndex,
     domain: ConstraintDomain,
@@ -32,7 +64,7 @@ impl ConstraintRoot {
 /// constraints). When the constraint is applied to a frame the inner value specifies the size of
 /// the frame. For example, for a transition constraint that is applied against the current and next
 /// rows, the frame size will be 2.
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Ord, PartialOrd)]
 pub enum ConstraintDomain {
     FirstRow,          // for boundary constraints against the first row
     LastRow,           // for boundary constraints against the last row
@@ -87,6 +119,19 @@ impl From<Boundary> for ConstraintDomain {
         match boundary {
             Boundary::First => ConstraintDomain::FirstRow,
             Boundary::Last => ConstraintDomain::LastRow,
+        }
+    }
+}
+
+impl Display for ConstraintDomain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConstraintDomain::FirstRow => write!(f, "the first row"),
+            ConstraintDomain::LastRow => write!(f, "the last row"),
+            ConstraintDomain::EveryRow => write!(f, "every row"),
+            ConstraintDomain::EveryFrame(size) => {
+                write!(f, "every frame of {size} consecutive rows")
+            }
         }
     }
 }

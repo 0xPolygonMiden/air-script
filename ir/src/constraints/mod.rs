@@ -1,11 +1,12 @@
 use super::{
     symbol_table::IdentifierType, Boundary, BoundaryStmt, ConstantType, Expression, Identifier,
-    IndexedTraceAccess, IntegrityStmt, MatrixAccess, NamedTraceAccess, SemanticError, SymbolTable,
-    TraceSegment, VariableType, VectorAccess,
+    IndexedTraceAccess, IntegrityStmt, MatrixAccess, SemanticError, SymbolTable, TraceSegment,
+    VariableType, VectorAccess,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 mod constraint;
+use constraint::ConstrainedBoundary;
 pub use constraint::{ConstraintDomain, ConstraintRoot};
 
 mod degree;
@@ -93,6 +94,10 @@ pub(super) struct Constraints {
     /// vector or a matrix, a new root is added with a key equal to the [VariableValue] of the
     /// element.
     variable_roots: VariableRoots,
+
+    /// A set of all boundaries which have been constrained. This is used to ensure that no more
+    /// than one constraint is defined at any given boundary.
+    constrained_boundaries: BTreeSet<ConstrainedBoundary>,
 }
 
 impl Constraints {
@@ -105,6 +110,7 @@ impl Constraints {
             transition_constraints: vec![Vec::new(); num_trace_segments],
             graph: AlgebraicGraph::default(),
             variable_roots: BTreeMap::new(),
+            constrained_boundaries: BTreeSet::new(),
         }
     }
 
@@ -248,17 +254,28 @@ impl Constraints {
     ) -> Result<(), SemanticError> {
         match stmt {
             BoundaryStmt::Constraint(constraint) => {
+                let trace_access = symbol_table.get_trace_access_by_name(constraint.access())?;
                 let domain = constraint.boundary().into();
-                // add the trace access at the specified boundary to the graph.
-                // TODO: need to validate that only one constraint is specified against this column and boundary
-                let lhs = self.graph.insert_named_trace_access(
-                    symbol_table,
-                    constraint.access(),
+                let constrained_boundary = ConstrainedBoundary::new(
+                    trace_access.trace_segment(),
+                    trace_access.col_idx(),
                     domain,
-                )?;
+                );
+                // add the boundary to the set of constrained boundaries.
+                if !self.constrained_boundaries.insert(constrained_boundary) {
+                    // raise an error if the same boundary was previously constrained
+                    return Err(SemanticError::TooManyConstraints(format!(
+                        "A constraint was already defined at {constrained_boundary}",
+                    )));
+                }
+
+                // add the trace access at the specified boundary to the graph.
+                let lhs = self
+                    .graph
+                    .insert_trace_access(symbol_table, &trace_access, domain)?;
 
                 // add its expression to the constraints graph.
-                // TODO: need to validate the expression.
+                // TODO: need to validate public inputs in the expression when they are restored.
                 let rhs = self.graph.insert_expr(
                     symbol_table,
                     constraint.value(),
@@ -266,14 +283,13 @@ impl Constraints {
                     domain,
                 )?;
 
-                // check that random values are not used against main columns
-                if self.contains_rand_value(&rhs.root_idx())
-                    && lhs.trace_segment() == DEFAULT_SEGMENT
-                {
-                    return Err(SemanticError::InvalidUsage("Random values cannot be used in boundary constraints defined against main trace columns".to_string()));
+                // ensure that the inferred trace segment of the rhs expression can be applied to
+                // column against which the boundary constraint is applied.
+                // trace segment inference defaults to the lowest segment (the main trace) and is
+                // adjusted according to the use of random values and trace columns.
+                if lhs.trace_segment() < rhs.trace_segment() {
+                    return Err(SemanticError::InvalidUsage("Random values cannot be used in boundary constraints defined against prior trace segments".to_string()));
                 }
-
-                debug_assert!(lhs.domain() == rhs.domain());
 
                 // merge the two sides of the expression into a constraint.
                 self.insert_constraint(symbol_table, lhs, rhs)?
@@ -320,19 +336,5 @@ impl Constraints {
         }
 
         Ok(())
-    }
-
-    /// Checks whether the expression contains a Random Value
-    fn contains_rand_value(&self, index: &NodeIndex) -> bool {
-        match self.graph.node(index).op() {
-            Operation::RandomValue(_) => true,
-            Operation::Add(index_l, index_r)
-            | Operation::Sub(index_l, index_r)
-            | Operation::Mul(index_l, index_r) => {
-                self.contains_rand_value(index_l) || self.contains_rand_value(index_r)
-            }
-            Operation::Exp(index, _) => self.contains_rand_value(index),
-            _ => false,
-        }
     }
 }

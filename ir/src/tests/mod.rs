@@ -124,9 +124,7 @@ fn err_ic_trace_cols_access_out_of_bounds() {
     assert!(result.is_err());
 }
 
-/// TODO: add validation for boundary constraints, then turn this test on.
 #[test]
-#[ignore]
 fn err_bc_trace_cols_access_out_of_bounds() {
     // out of bounds in boundary constraints
     let source = "
@@ -137,11 +135,10 @@ fn err_bc_trace_cols_access_out_of_bounds() {
         main: [clk, a[4]]
     public_inputs:
         stack_inputs: [16]
-    integrity_constraints:
-        enf a[0]' = a[0] - 1
     boundary_constraints:
         enf a[4].first = A
-        enf clk.last = B[0] + C[0][1]";
+    integrity_constraints:
+        enf a[0]' = a[0] - 1";
 
     let parsed = parse(source).expect("Parsing failed");
 
@@ -256,20 +253,18 @@ fn err_bc_empty_or_omitted() {
     assert!(result.is_err());
 }
 
-/// TODO: add validation for boundary constraints, then turn this test on.
 #[test]
-#[ignore]
 fn err_bc_duplicate_first() {
     let source = "
     trace_columns:
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    integrity_constraints:
-        enf clk' = clk + 1
     boundary_constraints:
         enf clk.first = 0
-        enf clk.first = 1";
+        enf clk.first = 1
+    integrity_constraints:
+        enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::from_source(&parsed);
@@ -277,24 +272,23 @@ fn err_bc_duplicate_first() {
     assert!(result.is_err());
 }
 
-/// TODO: add validation for boundary constraints, then turn this test on.
 #[test]
-#[ignore]
 fn err_bc_duplicate_last() {
     let source = "
     trace_columns:
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    integrity_constraints:
-        enf clk' = clk + 1
     boundary_constraints:
         enf clk.last = 0
-        enf clk.last = 1";
+        enf clk.last = 1
+    integrity_constraints:
+        enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
 
-    assert!(AirIR::from_source(&parsed).is_err());
+    assert!(result.is_err());
 }
 
 #[test]
