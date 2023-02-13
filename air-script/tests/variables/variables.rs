@@ -43,7 +43,7 @@ impl Air for VariablesAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::with_cycles(1, vec![8]), TransitionConstraintDegree::new(3)];
+        let main_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::with_cycles(1, vec![8]), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(3)];
         let aux_degrees = vec![TransitionConstraintDegree::new(2)];
         let num_main_assertions = 2;
         let num_aux_assertions = 0;
@@ -80,8 +80,8 @@ impl Air for VariablesAir {
         let current = frame.current();
         let next = frame.next();
         result[0] = (current[0]).exp(E::PositiveInteger::from(2_u64)) - (current[0]);
-        result[1] = (E::from(1_u64) - (current[0])) * (current[3] - (current[1]) + current[2]) - ((E::from(2_u64)) * (E::from(3_u64)) - (current[0]));
-        result[2] = (periodic_values[0]) * (next[0] - (current[0])) - (E::from(0_u64));
+        result[1] = (periodic_values[0]) * (next[0] - (current[0])) - (E::from(0_u64));
+        result[2] = (E::from(1_u64) - (current[0])) * (current[3] - (current[1]) + current[2]) - ((E::from(2_u64)) * (E::from(3_u64)) - (current[0]));
         result[3] = (current[0]) * (current[3] - ((current[1]) * (current[2]))) - (next[0] - (E::from(3_u64)) - (E::from(4_u64) - (E::from(2_u64))));
     }
 
