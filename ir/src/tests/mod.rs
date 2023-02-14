@@ -40,20 +40,17 @@ fn boundary_constraints_with_constants() {
     assert!(result.is_ok());
 }
 
-/// This test is ignored because it is not yet supported.
-/// TODO: add public inputs to the constraint graph.
 #[test]
-#[ignore]
 fn boundary_constraints_with_public_inputs() {
     let source = "
     trace_columns:
         main: [clk]
     public_inputs:
         stack_inputs: [16]
-    integrity_constraints:
-        enf clk' = clk - 1
     boundary_constraints:
-        enf a.first = stack_inputs[0]^3";
+        enf clk.first = stack_inputs[0]^3
+    integrity_constraints:
+        enf clk' = clk - 1";
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::from_source(&parsed);

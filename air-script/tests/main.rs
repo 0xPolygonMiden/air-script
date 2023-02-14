@@ -36,10 +36,7 @@ fn periodic_columns() {
     expected.assert_eq(&generated_air);
 }
 
-/// TODO: restore this test after public inputs are re-implemented for boundary constraints in the
-/// graph
 #[test]
-#[ignore]
 fn pub_inputs() {
     let generated_air = Test::new("tests/pub_inputs/pub_inputs.air".to_string())
         .transpile()
