@@ -195,7 +195,7 @@ impl AlgebraicGraph {
     fn accumulate_degree(&self, cycles: &mut BTreeMap<usize, usize>, index: &NodeIndex) -> usize {
         // recursively walk the subgraph and compute the degree from the operation and child nodes
         match self.node(index).op() {
-            Operation::Constant(_) | Operation::RandomValue(_) => 0,
+            Operation::Constant(_) | Operation::RandomValue(_) | Operation::PublicInput(_, _) => 0,
             Operation::TraceElement(_) => 1,
             Operation::PeriodicColumn(index, cycle_len) => {
                 cycles.insert(*index, *cycle_len);
@@ -398,7 +398,11 @@ impl AlgebraicGraph {
                 Ok(ExprDetails::new(node_index, trace_segment, domain))
             }
             IdentifierType::PublicInput(_) => {
-                unimplemented!("TODO: add support for public inputs.")
+                let node_index = self.insert_op(Operation::PublicInput(
+                    vector_access.name().to_string(),
+                    vector_access.idx(),
+                ));
+                Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
             }
             IdentifierType::RandomValuesBinding(offset, _) => self.insert_random_value(
                 symbol_table,
@@ -512,6 +516,9 @@ pub enum Operation {
     /// value is the length of the column's periodic cycle. The periodic value made available from
     /// the specified column is based on the current row of the trace.
     PeriodicColumn(usize, usize),
+    /// An identifier for a public input declared by the specified name and accessed at the
+    /// specified index.
+    PublicInput(String, usize),
     /// A random value provided by the verifier. The inner value is the index of this random value
     /// in the array of all random values.
     RandomValue(usize),

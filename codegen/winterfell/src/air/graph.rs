@@ -80,6 +80,9 @@ impl Codegen for Operation {
             Operation::PeriodicColumn(col_idx, _) => {
                 format!("periodic_values[{col_idx}]")
             }
+            Operation::PublicInput(ident, idx) => {
+                format!("self.{ident}[{idx}]")
+            }
             Operation::RandomValue(idx) => {
                 format!("aux_rand_elements.get_segment_elements(0)[{idx}]")
             }
