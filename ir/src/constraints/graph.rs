@@ -1,7 +1,7 @@
 use super::{
     BTreeMap, ConstantType, ConstraintDomain, ExprDetails, Expression, Identifier, IdentifierType,
-    IndexedTraceAccess, IntegrityConstraintDegree, MatrixAccess, NamedTraceAccess, SemanticError,
-    SymbolTable, TraceSegment, VariableRoots, VariableType, VectorAccess,
+    IndexedTraceAccess, IntegrityConstraintDegree, MatrixAccess, SemanticError, SymbolTable,
+    TraceSegment, VariableRoots, VariableType, VectorAccess,
 };
 
 // CONSTANTS
@@ -122,13 +122,12 @@ impl AlgebraicGraph {
                 )
             }
             Expression::IndexedTraceAccess(column_access) => {
-                self.insert_indexed_trace_access(symbol_table, column_access)
+                self.insert_trace_access(symbol_table, column_access, default_domain)
             }
-            Expression::NamedTraceAccess(trace_access) => self.insert_named_trace_access(
-                symbol_table,
-                trace_access,
-                ConstraintDomain::from(trace_access.row_offset()),
-            ),
+            Expression::NamedTraceAccess(trace_access) => {
+                let trace_access = symbol_table.get_trace_access_by_name(trace_access)?;
+                self.insert_trace_access(symbol_table, &trace_access, default_domain)
+            }
             Expression::Add(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
@@ -170,36 +169,24 @@ impl AlgebraicGraph {
         }
     }
 
-    /// Converts a [NamedTraceAccess] element into an [IndexedTraceAccess] by its identifier name,
-    /// trace segment, and row offset, then adds it to the graph.
+    /// Adds a trace element access to the graph and returns the node index, trace segment, and row
+    /// offset.
     ///
     /// # Errors
     /// Returns an error if:
-    /// - The identifier was not declared as a trace column type.
-    pub(super) fn insert_named_trace_access(
+    /// - The column index of the trace access is greater than overall number of columns in segment.
+    /// - The segment of the trace access is greater than the number of segments.
+    pub(super) fn insert_trace_access(
         &mut self,
         symbol_table: &SymbolTable,
-        trace_access: &NamedTraceAccess,
+        trace_access: &IndexedTraceAccess,
         domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
-        let elem_type = symbol_table.get_type(trace_access.name())?;
-        match elem_type {
-            IdentifierType::TraceColumns(columns) => {
-                let trace_segment = columns.trace_segment();
-                let trace_access = IndexedTraceAccess::new(
-                    trace_segment,
-                    columns.offset() + trace_access.idx(),
-                    trace_access.row_offset(),
-                );
-                let node_index = self.insert_op(Operation::TraceElement(trace_access));
-                Ok(ExprDetails::new(node_index, trace_segment, domain))
-            }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as a {} not as a trace column",
-                trace_access.name(),
-                elem_type
-            ))),
-        }
+        symbol_table.validate_trace_access(trace_access)?;
+
+        let trace_segment = trace_access.trace_segment();
+        let node_index = self.insert_op(Operation::TraceElement(*trace_access));
+        Ok(ExprDetails::new(node_index, trace_segment, domain))
     }
 
     // --- HELPERS --------------------------------------------------------------------------------
@@ -286,13 +273,7 @@ impl AlgebraicGraph {
         trace_segment: u8,
         domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
-        if index >= symbol_table.num_random_values() as usize {
-            return Err(SemanticError::IndexOutOfRange(format!(
-                "Random value index {} is greater than or equal to the total number of random values ({}).", 
-                index,
-                symbol_table.num_random_values()
-            )));
-        }
+        symbol_table.validate_rand_access(index)?;
 
         let node_index = self.insert_op(Operation::RandomValue(index));
         Ok(ExprDetails::new(node_index, trace_segment, domain))
@@ -318,41 +299,6 @@ impl AlgebraicGraph {
             variable_roots.insert(variable_value, expr);
             Ok(expr)
         }
-    }
-
-    /// Adds a trace element access to the graph and returns the node index, trace segment, and row
-    /// offset.
-    ///
-    /// # Errors
-    /// Returns an error if:
-    /// - The identifier is greater than overall number of columns in segment.
-    /// - The segment is greater than the number of segments.
-    fn insert_indexed_trace_access(
-        &mut self,
-        symbol_table: &SymbolTable,
-        trace_access: &IndexedTraceAccess,
-    ) -> Result<ExprDetails, SemanticError> {
-        let segment_idx = trace_access.trace_segment() as usize;
-        if segment_idx > symbol_table.segment_widths().len() {
-            return Err(SemanticError::IndexOutOfRange(format!(
-                "Segment index {} is greater than the number of segments in the trace ({}).",
-                segment_idx,
-                symbol_table.segment_widths().len()
-            )));
-        }
-        if trace_access.col_idx() as u16 >= symbol_table.segment_widths()[segment_idx] {
-            return Err(SemanticError::IndexOutOfRange(format!(
-                "Out-of-range index {} in trace segment {} of length {}",
-                trace_access.col_idx(),
-                trace_access.trace_segment(),
-                symbol_table.segment_widths()[segment_idx]
-            )));
-        }
-
-        let trace_segment = trace_access.trace_segment();
-        let domain = ConstraintDomain::from(trace_access.row_offset());
-        let node_index = self.insert_op(Operation::TraceElement(*trace_access));
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
     }
 
     /// Adds a trace column, periodic column, random value, named constant or a variable to the

@@ -1,7 +1,7 @@
 use super::{
     trace_columns::TraceColumns, BTreeMap, Constant, ConstantType, Constants, Identifier,
-    MatrixAccess, PeriodicColumns, PublicInputs, SemanticError, TraceSegment, Variable,
-    VariableType, VectorAccess, MIN_CYCLE_LENGTH,
+    IndexedTraceAccess, MatrixAccess, NamedTraceAccess, PeriodicColumns, PublicInputs,
+    SemanticError, TraceSegment, Variable, VariableType, VectorAccess, MIN_CYCLE_LENGTH,
 };
 use parser::ast::{PeriodicColumn, PublicInput, RandomValues, TraceCols};
 use std::fmt::Display;
@@ -212,6 +212,16 @@ impl SymbolTable {
         self.segment_widths.len() + 1
     }
 
+    /// Returns a vector containing the widths of all trace segments.
+    pub(super) fn segment_widths(&self) -> &Vec<u16> {
+        &self.segment_widths
+    }
+
+    /// Returns the number of random values that were specified for this AIR.
+    pub(super) fn num_random_values(&self) -> u16 {
+        self.num_random_values
+    }
+
     /// Returns the type associated with the specified identifier name.
     ///
     /// # Errors
@@ -226,12 +236,41 @@ impl SymbolTable {
         }
     }
 
-    pub(super) fn segment_widths(&self) -> &Vec<u16> {
-        &self.segment_widths
-    }
+    /// Looks up a [NamedTraceAccess] by its identifier name and returns an equivalent
+    /// [IndexedTraceAccess].
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - the identifier was not in the symbol table.
+    /// - the identifier was not declared as a trace column binding.
+    pub(super) fn get_trace_access_by_name(
+        &self,
+        trace_access: &NamedTraceAccess,
+    ) -> Result<IndexedTraceAccess, SemanticError> {
+        let elem_type = self.get_type(trace_access.name())?;
+        match elem_type {
+            IdentifierType::TraceColumns(columns) => {
+                if trace_access.idx() >= columns.size() {
+                    return Err(SemanticError::IndexOutOfRange(format!(
+                        "Out-of-range index '{}' while accessing named trace column group '{}' of length {}",
+                        trace_access.idx(),
+                        trace_access.name(),
+                        columns.size()
+                    )));
+                }
 
-    pub(super) fn num_random_values(&self) -> u16 {
-        self.num_random_values
+                Ok(IndexedTraceAccess::new(
+                    columns.trace_segment(),
+                    columns.offset() + trace_access.idx(),
+                    trace_access.row_offset(),
+                ))
+            }
+            _ => Err(SemanticError::InvalidUsage(format!(
+                "Identifier {} was declared as a {} not as a trace column",
+                trace_access.name(),
+                elem_type
+            ))),
+        }
     }
 
     /// Checks that the specified name and index are a valid reference to a declared public input
@@ -335,6 +374,51 @@ impl SymbolTable {
                 symbol_type,
             )),
         }
+    }
+
+    /// Checks that the specified trace access is valid, i.e. that it references a declared trace
+    /// segment and the index is within the bounds of the declared segment width.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - the specified trace segment is out of range.
+    /// - the specified column index is out of range.
+    pub(super) fn validate_trace_access(
+        &self,
+        trace_access: &IndexedTraceAccess,
+    ) -> Result<(), SemanticError> {
+        let segment_idx = trace_access.trace_segment() as usize;
+        if segment_idx > self.segment_widths().len() {
+            return Err(SemanticError::IndexOutOfRange(format!(
+                "Segment index '{}' is greater than the number of segments in the trace ({}).",
+                segment_idx,
+                self.segment_widths().len()
+            )));
+        }
+        if trace_access.col_idx() as u16 >= self.segment_widths()[segment_idx] {
+            return Err(SemanticError::IndexOutOfRange(format!(
+                "Out-of-range index '{}' in trace segment '{}' of length {}",
+                trace_access.col_idx(),
+                trace_access.trace_segment(),
+                self.segment_widths()[segment_idx]
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Checks that the specified random value access index is valid, i.e. that it is in range of
+    /// the number of declared random values.
+    pub(super) fn validate_rand_access(&self, index: usize) -> Result<(), SemanticError> {
+        if index >= usize::from(self.num_random_values()) {
+            return Err(SemanticError::IndexOutOfRange(format!(
+                "Random value index {} is greater than or equal to the total number of random values ({}).", 
+                index,
+                self.num_random_values()
+            )));
+        }
+
+        Ok(())
     }
 }
 
