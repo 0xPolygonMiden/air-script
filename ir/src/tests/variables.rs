@@ -122,6 +122,30 @@ fn ic_with_variables() {
 }
 
 #[test]
+fn ic_variables_access_vector_from_matrix() {
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    integrity_constraints:
+        let a = [[1, 2], [3, 4]]
+        let b = a[1]
+        let c = b
+        let d = [a[0], a[1], b]
+        let e = d
+        enf clk' = c[0] + e[2][0] + e[0][1]
+    boundary_constraints:
+        enf clk.first = 7
+        enf clk.last = 8";
+
+    let parsed = parse(source).expect("Parsing failed");
+
+    let result = AirIR::new(&parsed);
+    assert!(result.is_ok());
+}
+
+#[test]
 fn err_bc_variable_access_before_declaration() {
     let source = "
     const A = [[2, 3], [1, 0]]
