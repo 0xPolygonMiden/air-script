@@ -1,3 +1,5 @@
+use ir::IndexedTraceAccess;
+
 use super::{AirIR, ConstantValue, ElemType, IntegrityConstraintDegree, NodeIndex, Operation};
 
 // RUST STRING GENERATION FOR THE CONSTRAINT GRAPH
@@ -26,6 +28,26 @@ impl Codegen for IntegrityConstraintDegree {
                 cycles
             )
         }
+    }
+}
+
+impl Codegen for IndexedTraceAccess {
+    fn to_string(&self, _ir: &AirIR, _elem_type: ElemType) -> String {
+        let frame = if let 0 = self.trace_segment() {
+            "main"
+        } else {
+            "aux"
+        };
+        let row_offset = match self.row_offset() {
+            0 => {
+                format!("current[{}]", self.col_idx())
+            }
+            1 => {
+                format!("next[{}]", self.col_idx())
+            }
+            _ => panic!("Winterfell doesn't support row offsets greater than 1."),
+        };
+        format!("{}_{}", frame, row_offset)
     }
 }
 
@@ -68,15 +90,7 @@ impl Codegen for Operation {
                     matrix_access.col_idx()
                 ),
             },
-            Operation::TraceElement(trace_access) => match trace_access.row_offset() {
-                0 => {
-                    format!("current[{}]", trace_access.col_idx())
-                }
-                1 => {
-                    format!("next[{}]", trace_access.col_idx())
-                }
-                _ => panic!("Winterfell doesn't support row offsets greater than 1."),
-            },
+            Operation::TraceElement(trace_access) => trace_access.to_string(ir, elem_type),
             Operation::PeriodicColumn(col_idx, _) => {
                 format!("periodic_values[{col_idx}]")
             }
