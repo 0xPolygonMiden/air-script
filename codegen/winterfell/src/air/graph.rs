@@ -47,7 +47,7 @@ impl Codegen for IndexedTraceAccess {
             }
             _ => panic!("Winterfell doesn't support row offsets greater than 1."),
         };
-        format!("{}_{}", frame, row_offset)
+        format!("{frame}_{row_offset}")
     }
 }
 
