@@ -73,17 +73,19 @@ impl Air for TraceColGroupAir {
     }
 
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
-        let current = frame.current();
-        let next = frame.next();
-        result[0] = next[2] - (current[2] + E::from(1_u64));
-        result[1] = next[1] - (current[1] - (E::from(1_u64)));
+        let main_current = frame.current();
+        let main_next = frame.next();
+        result[0] = main_next[2] - (main_current[2] + E::from(1_u64));
+        result[1] = main_next[1] - (main_current[1] - (E::from(1_u64)));
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
     where F: FieldElement<BaseField = Felt>,
           E: FieldElement<BaseField = Felt> + ExtensionOf<F>,
     {
-        let current = aux_frame.current();
-        let next = aux_frame.next();
+        let main_current = main_frame.current();
+        let main_next = main_frame.next();
+        let aux_current = aux_frame.current();
+        let aux_next = aux_frame.next();
     }
 }

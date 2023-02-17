@@ -16,8 +16,8 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
         .arg("result", "&mut [E]");
 
     // declare current and next trace row arrays.
-    evaluate_transition.line("let current = frame.current();");
-    evaluate_transition.line("let next = frame.next();");
+    evaluate_transition.line("let main_current = frame.current();");
+    evaluate_transition.line("let main_next = frame.next();");
 
     // output the constraints.
     add_constraints(evaluate_transition, ir, 0);
@@ -40,8 +40,10 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
         .bound("E", "FieldElement<BaseField = Felt> + ExtensionOf<F>");
 
     // declare current and next trace row arrays.
-    evaluate_aux_transition.line("let current = aux_frame.current();");
-    evaluate_aux_transition.line("let next = aux_frame.next();");
+    evaluate_aux_transition.line("let main_current = main_frame.current();");
+    evaluate_aux_transition.line("let main_next = main_frame.next();");
+    evaluate_aux_transition.line("let aux_current = aux_frame.current();");
+    evaluate_aux_transition.line("let aux_next = aux_frame.next();");
 
     // output the constraints.
     add_constraints(evaluate_aux_transition, ir, 1);
