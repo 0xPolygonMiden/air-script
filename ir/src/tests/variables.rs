@@ -1,18 +1,114 @@
 use super::{parse, AirIR};
 
 #[test]
-fn integrity_constraints_with_variables() {
+fn bc_scalar_variable() {
     let source = "
-    const A = 123
-    const B = [1, 2, 3]
-    const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns:
         main: [clk]
     public_inputs:
         stack_inputs: [16]
     boundary_constraints:
-        enf clk.first = A
-        enf clk.last = B[0] + C[0][1]
+        let a = 1 + 8
+        enf clk.first = a
+    integrity_constraints:
+        enf clk' = clk + 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn bc_vector_variable() {
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        let b = [1, 5]
+        enf clk.first = b[0]
+    integrity_constraints:
+        enf clk' = clk + 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn bc_with_variables() {
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        let a = 1 + 8
+        let b = [a, a*a]
+        enf clk.first = a + b[0]
+
+        let c = [[b[0], b[1]], [clk, 2^2]]
+        enf clk.last = c[1][1]
+
+    integrity_constraints:
+        enf clk' = clk + 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn bc_variable_in_both_domains() {
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        let a = 1 + 8
+        enf clk.first = a
+        enf clk.last = a
+    integrity_constraints:
+        enf clk' = clk + 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn err_bc_variable_ref_next() {
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        let a = clk'
+        enf clk.first = 0
+        enf clk.last = a
+    integrity_constraints:
+        enf clk' = clk + 1";
+
+    assert!(parse(source).is_err());
+}
+
+#[test]
+fn ic_with_variables() {
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        enf clk.first = 0
+        enf clk.last = 1
     integrity_constraints:
         let a = 1
         let b = [a, a*a]
@@ -66,7 +162,65 @@ fn err_ic_variable_access_before_declaration() {
 }
 
 #[test]
-fn err_variable_vector_invalid_access() {
+fn err_variable_def_in_other_section() {
+    let source = "
+    const A = [[2, 3], [1, 0]]
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        let a = 1
+        enf clk.first = 0
+        enf clk.last = 1
+    integrity_constraints:
+        enf clk' = clk + a";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
+    println!("{result:?}");
+    assert!(result.is_err());
+
+    let source = "
+    const A = [[2, 3], [1, 0]]
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    integrity_constraints:
+        let a = 1
+        enf clk' = clk + 1
+    boundary_constraints:
+        enf clk.first = 0
+        enf clk.last = a";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_err());
+}
+
+#[test]
+fn err_bc_variable_vector_invalid_access() {
+    let source = "
+    const A = [[2, 3], [1, 0]]
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        let a = [1, 2]
+        enf clk.first = a[2]
+        enf clk.last = 1
+    integrity_constraints:
+        enf clk' = clk + 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_err());
+}
+
+#[test]
+fn err_ic_variable_vector_invalid_access() {
     let source = "
     const A = [[2, 3], [1, 0]]
     trace_columns:
@@ -86,9 +240,43 @@ fn err_variable_vector_invalid_access() {
 }
 
 #[test]
-fn err_variable_matrix_invalid_access() {
+fn err_bc_variable_matrix_invalid_access() {
     let source = "
-    const A = [[2, 3], [1, 0]]
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        let a = [[1, 2, 3], [4, 5, 6]]
+        enf clk.first = a[1][3]
+        enf clk.last = 1
+    integrity_constraints:
+        enf clk' = clk + 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_err());
+
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        let a = [[1, 2, 3], [4, 5, 6]]
+        enf clk.first = 0
+        enf clk.last = a[2][0]
+    integrity_constraints:
+        enf clk' = clk + 1";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::from_source(&parsed);
+    assert!(result.is_err());
+}
+
+#[test]
+fn err_ic_variable_matrix_invalid_access() {
+    let source = "
     trace_columns:
         main: [clk]
     public_inputs:
@@ -105,7 +293,6 @@ fn err_variable_matrix_invalid_access() {
     assert!(result.is_err());
 
     let source = "
-    const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
     public_inputs:
