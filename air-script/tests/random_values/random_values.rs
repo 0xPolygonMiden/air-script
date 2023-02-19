@@ -86,6 +86,6 @@ impl Air for RandomValuesAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
-        result[0] = aux_next[0] - (aux_rand_elements.get_segment_elements(0)[15] - (aux_rand_elements.get_segment_elements(0)[0]) + aux_rand_elements.get_segment_elements(0)[3]);
+        result[0] = aux_next[0] - (aux_rand_elements.get_segment_elements(0)[15] - aux_rand_elements.get_segment_elements(0)[0] + aux_rand_elements.get_segment_elements(0)[3]);
     }
 }
