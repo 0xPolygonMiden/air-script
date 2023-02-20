@@ -39,34 +39,23 @@ impl SourceValidator {
     pub fn check(&self) -> Result<(), SemanticError> {
         // make sure trace_columns are declared.
         if !self.main_trace_columns_exists {
-            return Err(SemanticError::MissingDeclaration(
-                "trace_columns section is missing".to_string(),
-            ));
+            return Err(SemanticError::missing_trace_columns_declaration());
         }
         // make sure public_inputs are declared.
         if !self.public_inputs_exists {
-            return Err(SemanticError::MissingDeclaration(
-                "public_inputs section is missing".to_string(),
-            ));
+            return Err(SemanticError::missing_public_inputs_declaration());
         }
         // make sure boundary_constraints are declared.
         if !self.boundary_constraints_exists {
-            return Err(SemanticError::MissingDeclaration(
-                "boundary_constraints section is missing".to_string(),
-            ));
+            return Err(SemanticError::missing_boundary_constraints_declaration());
         }
         // make sure integrity_constraints are declared.
         if !self.integrity_constraints_exists {
-            return Err(SemanticError::MissingDeclaration(
-                "integrity_constraints section is missing".to_string(),
-            ));
+            return Err(SemanticError::missing_integrity_constraints_declaration());
         }
         // make sure random_values are declared only if aux trace columns are declared
         if !self.aux_trace_columns_exists && self.random_values_exists {
-            return Err(SemanticError::MissingDeclaration(
-                "random_values section requires aux_trace_columns section, which is missing"
-                    .to_string(),
-            ));
+            return Err(SemanticError::has_random_values_but_missing_aux_trace_columns_declaration());
         }
 
         Ok(())
