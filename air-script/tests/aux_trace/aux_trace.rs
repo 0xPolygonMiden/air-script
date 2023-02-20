@@ -40,7 +40,7 @@ impl Air for AuxiliaryAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1)];
+        let main_degrees = vec![TransitionConstraintDegree::new(3), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1)];
         let aux_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2)];
         let num_main_assertions = 2;
         let num_aux_assertions = 4;
@@ -80,7 +80,7 @@ impl Air for AuxiliaryAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = main_next[0] - (main_current[1] + main_current[2]);
+        result[0] = main_next[0] - (main_current[1] + main_current[0] * main_current[1] * main_current[2]);
         result[1] = main_next[1] - (main_current[2] + main_next[0]);
         result[2] = main_current[2] - (main_current[0] + main_current[1]);
     }
@@ -93,7 +93,7 @@ impl Air for AuxiliaryAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
-        result[0] = aux_next[0] - (aux_current[0] * (main_current[0] + aux_rand_elements.get_segment_elements(0)[0] + main_current[1] + aux_rand_elements.get_segment_elements(0)[1]));
-        result[1] = aux_current[1] - (aux_next[1] * (main_current[2] + aux_rand_elements.get_segment_elements(0)[0]));
+        result[0] = aux_next[0] - aux_current[0] * (main_current[0] + aux_rand_elements.get_segment_elements(0)[0] + main_current[1] + aux_rand_elements.get_segment_elements(0)[1]);
+        result[1] = aux_current[1] - aux_next[1] * (main_current[2] + aux_rand_elements.get_segment_elements(0)[0]);
     }
 }
