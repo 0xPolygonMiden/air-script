@@ -100,9 +100,9 @@ impl Codegen for Operation {
             Operation::RandomValue(idx) => {
                 format!("aux_rand_elements.get_segment_elements(0)[{idx}]")
             }
-            Operation::Add(l_idx, r_idx) => binary_op_to_string(l_idx, r_idx, ir, '+', elem_type),
-            Operation::Sub(l_idx, r_idx) => binary_op_to_string(l_idx, r_idx, ir, '-', elem_type),
-            Operation::Mul(l_idx, r_idx) => binary_op_to_string(l_idx, r_idx, ir, '*', elem_type),
+            Operation::Add(_, _) => binary_op_to_string(ir, self, elem_type),
+            Operation::Sub(_, _) => binary_op_to_string(ir, self, elem_type),
+            Operation::Mul(_, _) => binary_op_to_string(ir, self, elem_type),
             Operation::Exp(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(ir, elem_type);
                 let lhs = if is_leaf(l_idx, ir) {
@@ -128,41 +128,35 @@ fn is_leaf(idx: &NodeIndex, ir: &AirIR) -> bool {
 }
 
 /// Returns a string representation of a binary operation.
-fn binary_op_to_string(
-    l_idx: &NodeIndex,
-    r_idx: &NodeIndex,
-    ir: &AirIR,
-    binary_op: char,
-    elem_type: ElemType,
-) -> String {
-    match binary_op {
-        '+' => {
+fn binary_op_to_string(ir: &AirIR, op: &Operation, elem_type: ElemType) -> String {
+    match op {
+        Operation::Add(l_idx, r_idx) => {
             let lhs = l_idx.to_string(ir, elem_type);
             let rhs = r_idx.to_string(ir, elem_type);
             format!("{lhs} + {rhs}")
         }
-        '-' => {
+        Operation::Sub(l_idx, r_idx) => {
             let lhs = l_idx.to_string(ir, elem_type);
-            let rhs = if is_leaf(r_idx, ir) {
-                r_idx.to_string(ir, elem_type)
-            } else {
+            let rhs = if ir.constraint_graph().node(r_idx).op().precedence() <= op.precedence() {
                 format!("({})", r_idx.to_string(ir, elem_type))
+            } else {
+                r_idx.to_string(ir, elem_type)
             };
             format!("{lhs} - {rhs}")
         }
-        '*' => {
-            let lhs = if is_leaf(l_idx, ir) {
-                l_idx.to_string(ir, elem_type)
-            } else {
+        Operation::Mul(l_idx, r_idx) => {
+            let lhs = if ir.constraint_graph().node(l_idx).op().precedence() < op.precedence() {
                 format!("({})", l_idx.to_string(ir, elem_type))
-            };
-            let rhs = if is_leaf(r_idx, ir) {
-                r_idx.to_string(ir, elem_type)
             } else {
+                l_idx.to_string(ir, elem_type)
+            };
+            let rhs = if ir.constraint_graph().node(r_idx).op().precedence() < op.precedence() {
                 format!("({})", r_idx.to_string(ir, elem_type))
+            } else {
+                r_idx.to_string(ir, elem_type)
             };
             format!("{lhs} * {rhs}")
         }
-        _ => panic!("Unsupported binary operation."),
+        _ => panic!("unsupported operation"),
     }
 }

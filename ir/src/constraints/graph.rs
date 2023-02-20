@@ -534,6 +534,17 @@ pub enum Operation {
     Exp(NodeIndex, usize),
 }
 
+impl Operation {
+    pub fn precedence(&self) -> usize {
+        match self {
+            Operation::Add(_, _) => 1,
+            Operation::Sub(_, _) => 2,
+            Operation::Mul(_, _) => 3,
+            _ => 4,
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub enum ConstantValue {
     Inline(u64),
