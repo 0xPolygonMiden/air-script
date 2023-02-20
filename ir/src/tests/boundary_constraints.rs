@@ -3,6 +3,8 @@ use super::{parse, AirIR};
 #[test]
 fn boundary_constraints() {
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     public_inputs:
@@ -21,6 +23,8 @@ fn boundary_constraints() {
 #[test]
 fn err_bc_duplicate_first() {
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     public_inputs:
@@ -40,6 +44,8 @@ fn err_bc_duplicate_first() {
 #[test]
 fn err_bc_duplicate_last() {
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     public_inputs:

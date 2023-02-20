@@ -3,6 +3,8 @@ use super::{parse, AirIR};
 #[test]
 fn bc_with_public_inputs() {
     let source = "
+    def TestAir
+    
     trace_columns:
         main: [clk]
     public_inputs:

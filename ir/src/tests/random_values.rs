@@ -3,6 +3,8 @@ use super::{parse, AirIR};
 #[test]
 fn random_values_indexed_access() {
     let source = "
+    def TestAir
+
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -24,6 +26,8 @@ fn random_values_indexed_access() {
 #[test]
 fn random_values_custom_name() {
     let source = "
+    def TestAir
+
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -45,6 +49,8 @@ fn random_values_custom_name() {
 #[test]
 fn random_values_named_access() {
     let source = "
+    def TestAir
+
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -66,6 +72,8 @@ fn random_values_named_access() {
 #[test]
 fn err_random_values_out_of_bounds() {
     let source_fixed_list = "
+    def TestAir
+
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -84,6 +92,8 @@ fn err_random_values_out_of_bounds() {
     assert!(result.is_err());
 
     let source_ident_vector_sub_vec = "
+    def TestAir
+
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -102,6 +112,8 @@ fn err_random_values_out_of_bounds() {
     assert!(result.is_err());
 
     let source_ident_vector_index = "
+    def TestAir
+
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -123,6 +135,8 @@ fn err_random_values_out_of_bounds() {
 #[test]
 fn err_random_values_without_aux_cols() {
     let source = "
+    def TestAir
+
     trace_columns:
         main: [a, b[12]]
     public_inputs:
@@ -143,6 +157,8 @@ fn err_random_values_without_aux_cols() {
 #[test]
 fn err_random_values_in_bc_against_main_cols() {
     let source = "
+    def TestAir
+    
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]

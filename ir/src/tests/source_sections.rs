@@ -4,6 +4,8 @@ use super::{parse, AirIR};
 fn err_trace_cols_empty_or_omitted() {
     // if trace columns is empty, an error should be returned at parser level.
     let source = "
+    def TestAir
+    
     trace_columns:
     public_inputs:
         stack_inputs: [16]
@@ -16,6 +18,8 @@ fn err_trace_cols_empty_or_omitted() {
 
     // returns an error if trace columns declaration is missing
     let source = "
+    def TestAir
+
     public_inputs:
         stack_inputs: [16]
     boundary_constraints:
@@ -36,6 +40,8 @@ fn err_trace_cols_empty_or_omitted() {
 fn err_pub_inputs_empty_or_omitted() {
     // if public inputs are empty, an error should be returned at parser level.
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     public_inputs:
@@ -48,6 +54,8 @@ fn err_pub_inputs_empty_or_omitted() {
 
     // if public inputs are omitted, an error should be returned at IR level.
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     boundary_constraints:
@@ -64,6 +72,8 @@ fn err_pub_inputs_empty_or_omitted() {
 fn err_bc_empty_or_omitted() {
     // if boundary constraints are empty, an error should be returned at parser level.
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     public_inputs:
@@ -76,6 +86,8 @@ fn err_bc_empty_or_omitted() {
 
     // if boundary constraints are omitted, an error should be returned at IR level.
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     public_inputs:
@@ -92,6 +104,8 @@ fn err_bc_empty_or_omitted() {
 fn err_ic_empty_or_omitted() {
     // if integrity constraints are empty, an error should be returned at parser level.
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     public_inputs:
@@ -104,6 +118,8 @@ fn err_ic_empty_or_omitted() {
 
     // if integrity constraints are omitted, an error should be returned at IR level.
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     public_inputs:

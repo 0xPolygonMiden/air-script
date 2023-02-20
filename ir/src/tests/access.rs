@@ -3,6 +3,8 @@ use super::{parse, AirIR};
 #[test]
 fn err_bc_invalid_vector_access() {
     let source = "
+    def TestAir
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -24,6 +26,8 @@ fn err_bc_invalid_vector_access() {
 #[test]
 fn err_bc_invalid_matrix_access() {
     let source = "
+    def TestAir
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -42,6 +46,8 @@ fn err_bc_invalid_matrix_access() {
     assert!(result.is_err());
 
     let source = "
+    def TestAir
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -63,6 +69,8 @@ fn err_bc_invalid_matrix_access() {
 #[test]
 fn err_ic_invalid_vector_access() {
     let source = "
+    def TestAir
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -84,6 +92,8 @@ fn err_ic_invalid_vector_access() {
 #[test]
 fn err_ic_invalid_matrix_access() {
     let source = "
+    def TestAir
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -102,6 +112,8 @@ fn err_ic_invalid_matrix_access() {
     assert!(result.is_err());
 
     let source = "
+    def TestAir
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]

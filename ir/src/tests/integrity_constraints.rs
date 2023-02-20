@@ -3,6 +3,8 @@ use super::{parse, AirIR};
 #[test]
 fn integrity_constraints() {
     let source = "
+    def TestAir
+    
     trace_columns:
         main: [clk]
     public_inputs:
@@ -21,6 +23,8 @@ fn integrity_constraints() {
 #[test]
 fn ic_using_parens() {
     let source = "
+    def TestAir
+    
     trace_columns:
         main: [clk]
     public_inputs:
@@ -39,6 +43,8 @@ fn ic_using_parens() {
 #[test]
 fn ic_op_mul() {
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     public_inputs:
@@ -56,6 +62,8 @@ fn ic_op_mul() {
 #[test]
 fn ic_op_exp() {
     let source = "
+    def TestAir
+
     trace_columns:
         main: [clk]
     public_inputs:

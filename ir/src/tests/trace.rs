@@ -3,6 +3,8 @@ use super::{parse, AirIR};
 #[test]
 fn trace_columns_index_access() {
     let source = "
+    def TestAir
+    
     trace_columns:
         main: [a, b]
         aux: [c, d]
@@ -22,6 +24,8 @@ fn trace_columns_index_access() {
 #[test]
 fn trace_cols_groups() {
     let source = "
+    def TestAir
+    
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -44,6 +48,8 @@ fn trace_cols_groups() {
 #[test]
 fn err_bc_column_undeclared() {
     let source = "
+    def TestAir
+    
     trace_columns:
         main: [ctx]
     public_inputs:
@@ -63,6 +69,8 @@ fn err_bc_column_undeclared() {
 #[test]
 fn err_ic_column_undeclared() {
     let source = "
+    def TestAir
+    
     trace_columns:
         main: [ctx]
     public_inputs:
@@ -82,6 +90,8 @@ fn err_ic_column_undeclared() {
 fn err_bc_trace_cols_access_out_of_bounds() {
     // out of bounds in boundary constraints
     let source = "
+    def TestAir
+    
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -104,6 +114,8 @@ fn err_bc_trace_cols_access_out_of_bounds() {
 fn err_ic_trace_cols_access_out_of_bounds() {
     // out of bounds in integrity constraints
     let source = "
+    def TestAir
+    
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]

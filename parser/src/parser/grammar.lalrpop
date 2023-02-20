@@ -20,9 +20,49 @@ grammar;
 // ================================================================================================
 
 pub Source: Source = {
-    SourceSection* => Source(<>)
+    <source_sections: SourceSection*> =>? {
+        if !matches!(source_sections[0], SourceSection::AirDef(_)) {
+            return Err(ParseError::User {
+                error: Error::ParseError(
+                    InvalidInt("AIR definition must be the first section".to_string())
+                )
+            });
+        }
+        if matches!(source_sections[1], SourceSection::Constant(_)) {
+            let mut non_const_found = false;
+            for section in source_sections.iter().skip(2) {
+                match section {
+                    SourceSection::Constant(_) => {
+                        if non_const_found {
+                            return Err(ParseError::User {
+                                error: Error::ParseError(
+                                    InvalidConst("Constant declarations must be placed after the AIR definition and before other source sections".to_string())
+                                )
+                            });
+                        }
+                    },
+                    _ => {
+                        non_const_found = true;
+                    }
+                }
+            }
+        } else {
+            for section in source_sections.iter().skip(2) {
+                match section {
+                    SourceSection::Constant(_) => {
+                        return Err(ParseError::User {
+                            error: Error::ParseError(
+                                InvalidConst("Constant declarations must be placed after the AIR definition and before other source sections".to_string())
+                            )
+                        });
+                    },
+                    _ => (),
+                }
+            }
+        }
+        Ok(Source(source_sections))
+    }
 }
-
 SourceSection: SourceSection = {
     AirDef => SourceSection::AirDef(<>),
     Constant => SourceSection::Constant(<>),

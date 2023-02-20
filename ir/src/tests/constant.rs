@@ -3,6 +3,8 @@ use super::{parse, AirIR};
 #[test]
 fn bc_with_constants() {
     let source = "
+    def TestAir
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -24,6 +26,8 @@ fn bc_with_constants() {
 #[test]
 fn ic_with_constants() {
     let source = "
+    def TestAir
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -45,6 +49,8 @@ fn ic_with_constants() {
 #[test]
 fn err_invalid_matrix_const() {
     let source = "
+    def TestAir
+
     const A = [[2, 3], [1, 0, 2]]
     trace_columns:
         main: [clk]

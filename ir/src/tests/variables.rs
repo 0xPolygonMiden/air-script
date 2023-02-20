@@ -3,6 +3,8 @@ use super::{parse, AirIR};
 #[test]
 fn integrity_constraints_with_variables() {
     let source = "
+    def TestAir
+    
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -28,6 +30,8 @@ fn integrity_constraints_with_variables() {
 #[test]
 fn err_bc_variable_access_before_declaration() {
     let source = "
+    def TestAir
+    
     const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
@@ -48,6 +52,8 @@ fn err_bc_variable_access_before_declaration() {
 #[test]
 fn err_ic_variable_access_before_declaration() {
     let source = "
+    def TestAir
+    
     const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
@@ -68,6 +74,8 @@ fn err_ic_variable_access_before_declaration() {
 #[test]
 fn err_variable_vector_invalid_access() {
     let source = "
+    def TestAir
+    
     const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
@@ -88,6 +96,8 @@ fn err_variable_vector_invalid_access() {
 #[test]
 fn err_variable_matrix_invalid_access() {
     let source = "
+    def TestAir
+    
     const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
@@ -105,6 +115,8 @@ fn err_variable_matrix_invalid_access() {
     assert!(result.is_err());
 
     let source = "
+    def TestAir
+    
     const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
