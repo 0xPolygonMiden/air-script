@@ -1,7 +1,7 @@
 use super::{
     symbol_table::IdentifierType, Boundary, BoundaryStmt, ConstantType, Expression, Identifier,
-    IndexedTraceAccess, IntegrityStmt, MatrixAccess, SemanticError, SymbolTable, TraceSegment,
-    VariableType, VectorAccess,
+    IndexedTraceAccess, IntegrityStmt, MatrixAccess, Scope, SemanticError, SymbolTable,
+    TraceSegment, VariableType, VectorAccess,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -19,7 +19,7 @@ pub use graph::{
 
 // TYPES
 // ================================================================================================
-type VariableRoots = BTreeMap<VariableValue, ExprDetails>;
+type VariableRoots = BTreeMap<(Scope, VariableValue), ExprDetails>;
 
 // CONSTANTS
 // ================================================================================================
@@ -232,7 +232,7 @@ impl Constraints {
                 self.insert_constraint(symbol_table, lhs, rhs)?
             }
             IntegrityStmt::Variable(variable) => {
-                symbol_table.insert_integrity_variable(variable)?
+                symbol_table.insert_variable(Scope::IntegrityConstraints, variable)?
             }
         }
 
@@ -294,8 +294,8 @@ impl Constraints {
                 // merge the two sides of the expression into a constraint.
                 self.insert_constraint(symbol_table, lhs, rhs)?
             }
-            BoundaryStmt::Variable(_variable) => {
-                unimplemented!("TODO: add support for boundary variables")
+            BoundaryStmt::Variable(variable) => {
+                symbol_table.insert_variable(Scope::BoundaryConstraints, variable)?
             }
         }
 
