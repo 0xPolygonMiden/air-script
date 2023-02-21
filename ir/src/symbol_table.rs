@@ -18,8 +18,8 @@ pub(super) enum IdentifierType {
     /// an identifier for a periodic column, containing its index out of all periodic columns and
     /// its cycle length in that order.
     PeriodicColumn(usize, usize),
-    /// an identifier for an integrity variable, containing its name and value
-    IntegrityVariable(Variable),
+    /// an identifier for a variable, containing its scope (boundary or integrity), name, and value
+    Variable(Scope, Variable),
     /// an identifier for random value, containing its index in the random values array and its
     /// length if this value is an array. For non-array random values second parameter is always 1.
     RandomValuesBinding(usize, usize),
@@ -34,10 +34,17 @@ impl Display for IdentifierType {
             Self::TraceColumns(columns) => {
                 write!(f, "TraceColumns in segment {}", columns.trace_segment())
             }
-            Self::IntegrityVariable(_) => write!(f, "IntegrityVariable"),
+            Self::Variable(Scope::BoundaryConstraints, _) => write!(f, "BoundaryVariable"),
+            Self::Variable(Scope::IntegrityConstraints, _) => write!(f, "IntegrityVariable"),
             Self::RandomValuesBinding(_, _) => write!(f, "RandomValuesBinding"),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+pub(super) enum Scope {
+    BoundaryConstraints,
+    IntegrityConstraints,
 }
 
 /// SymbolTable for identifiers to track their types and information and enforce uniqueness of
@@ -182,14 +189,15 @@ impl SymbolTable {
         Ok(())
     }
 
-    /// Inserts an integrity variable into the symbol table.
-    pub(super) fn insert_integrity_variable(
+    /// Inserts a boundary or integrity variable into the symbol table.
+    pub(super) fn insert_variable(
         &mut self,
+        scope: Scope,
         variable: &Variable,
     ) -> Result<(), SemanticError> {
         self.insert_symbol(
             variable.name(),
-            IdentifierType::IntegrityVariable(variable.clone()),
+            IdentifierType::Variable(scope, variable.clone()),
         )?;
         Ok(())
     }
@@ -302,8 +310,8 @@ impl SymbolTable {
                 validate_vector_access(vector_access, vector.len())?;
                 Ok(symbol_type)
             }
-            IdentifierType::IntegrityVariable(integrity_variable) => {
-                if let VariableType::Vector(vector) = integrity_variable.value() {
+            IdentifierType::Variable(_, variable) => {
+                if let VariableType::Vector(vector) = variable.value() {
                     validate_vector_access(vector_access, vector.len())?;
                     Ok(symbol_type)
                 } else {
@@ -358,8 +366,8 @@ impl SymbolTable {
                 validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                 Ok(symbol_type)
             }
-            IdentifierType::IntegrityVariable(transition_variable) => {
-                if let VariableType::Matrix(matrix) = transition_variable.value() {
+            IdentifierType::Variable(_, variable) => {
+                if let VariableType::Matrix(matrix) = variable.value() {
                     validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                     Ok(symbol_type)
                 } else {
