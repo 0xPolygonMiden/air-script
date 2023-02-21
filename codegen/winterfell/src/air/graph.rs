@@ -100,30 +100,63 @@ impl Codegen for Operation {
             Operation::RandomValue(idx) => {
                 format!("aux_rand_elements.get_segment_elements(0)[{idx}]")
             }
-            Operation::Add(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(ir, elem_type);
-                let rhs = r_idx.to_string(ir, elem_type);
-
-                format!("{lhs} + {rhs}")
-            }
-            Operation::Sub(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(ir, elem_type);
-                let rhs = r_idx.to_string(ir, elem_type);
-
-                format!("{lhs} - ({rhs})")
-            }
-            Operation::Mul(l_idx, r_idx) => {
-                let lhs = l_idx.to_string(ir, elem_type);
-                let rhs = r_idx.to_string(ir, elem_type);
-                format!("({lhs}) * ({rhs})")
-            }
+            Operation::Add(_, _) => binary_op_to_string(ir, self, elem_type),
+            Operation::Sub(_, _) => binary_op_to_string(ir, self, elem_type),
+            Operation::Mul(_, _) => binary_op_to_string(ir, self, elem_type),
             Operation::Exp(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(ir, elem_type);
+                let lhs = if is_leaf(l_idx, ir) {
+                    lhs
+                } else {
+                    format!("({lhs})")
+                };
                 match elem_type {
-                    ElemType::Base => format!("({lhs}).exp(Felt::new({r_idx}))"),
-                    ElemType::Ext => format!("({lhs}).exp(E::PositiveInteger::from({r_idx}_u64))"),
+                    ElemType::Base => format!("{lhs}.exp(Felt::new({r_idx}))"),
+                    ElemType::Ext => format!("{lhs}.exp(E::PositiveInteger::from({r_idx}_u64))"),
                 }
             }
         }
+    }
+}
+
+/// Returns true if the operation at the specified node index is a leaf node in the constraint graph.
+fn is_leaf(idx: &NodeIndex, ir: &AirIR) -> bool {
+    !matches!(
+        ir.constraint_graph().node(idx).op(),
+        Operation::Add(_, _) | Operation::Sub(_, _) | Operation::Mul(_, _) | Operation::Exp(_, _)
+    )
+}
+
+/// Returns a string representation of a binary operation.
+fn binary_op_to_string(ir: &AirIR, op: &Operation, elem_type: ElemType) -> String {
+    match op {
+        Operation::Add(l_idx, r_idx) => {
+            let lhs = l_idx.to_string(ir, elem_type);
+            let rhs = r_idx.to_string(ir, elem_type);
+            format!("{lhs} + {rhs}")
+        }
+        Operation::Sub(l_idx, r_idx) => {
+            let lhs = l_idx.to_string(ir, elem_type);
+            let rhs = if ir.constraint_graph().node(r_idx).op().precedence() <= op.precedence() {
+                format!("({})", r_idx.to_string(ir, elem_type))
+            } else {
+                r_idx.to_string(ir, elem_type)
+            };
+            format!("{lhs} - {rhs}")
+        }
+        Operation::Mul(l_idx, r_idx) => {
+            let lhs = if ir.constraint_graph().node(l_idx).op().precedence() < op.precedence() {
+                format!("({})", l_idx.to_string(ir, elem_type))
+            } else {
+                l_idx.to_string(ir, elem_type)
+            };
+            let rhs = if ir.constraint_graph().node(r_idx).op().precedence() < op.precedence() {
+                format!("({})", r_idx.to_string(ir, elem_type))
+            } else {
+                r_idx.to_string(ir, elem_type)
+            };
+            format!("{lhs} * {rhs}")
+        }
+        _ => panic!("unsupported operation"),
     }
 }

@@ -77,16 +77,16 @@ impl Air for ConstantsAir {
     fn get_assertions(&self) -> Vec<Assertion<Felt>> {
         let mut result = Vec::new();
         result.push(Assertion::single(0, 0, A));
-        result.push(Assertion::single(1, 0, A + (B[0]) * (C[0][1])));
-        result.push(Assertion::single(2, 0, (B[0] - (C[1][1])) * (A)));
-        result.push(Assertion::single(3, 0, A + B[0] - (B[1]) + C[0][0] - (C[0][1]) + C[1][0] - (C[1][1])));
+        result.push(Assertion::single(1, 0, A + B[0] * C[0][1]));
+        result.push(Assertion::single(2, 0, (B[0] - C[1][1]) * A));
+        result.push(Assertion::single(3, 0, A + B[0] - B[1] + C[0][0] - C[0][1] + C[1][0] - C[1][1]));
         result
     }
 
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxTraceRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(0, 0, E::from(A) + (E::from(B[0])) * (E::from(C[0][1]))));
-        result.push(Assertion::single(0, self.last_step(), E::from(A) - ((E::from(B[1])) * (E::from(C[0][0])))));
+        result.push(Assertion::single(0, 0, E::from(A) + E::from(B[0]) * E::from(C[0][1])));
+        result.push(Assertion::single(0, self.last_step(), E::from(A) - E::from(B[1]) * E::from(C[0][0])));
         result
     }
 
@@ -94,8 +94,8 @@ impl Air for ConstantsAir {
         let main_current = frame.current();
         let main_next = frame.next();
         result[0] = main_next[0] - (main_current[0] + E::from(A));
-        result[1] = main_next[1] - ((E::from(B[0])) * (main_current[1]));
-        result[2] = main_next[2] - ((E::from(C[0][0]) + E::from(B[0])) * (main_current[2]));
+        result[1] = main_next[1] - E::from(B[0]) * main_current[1];
+        result[2] = main_next[2] - (E::from(C[0][0]) + E::from(B[0])) * main_current[2];
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
@@ -106,7 +106,7 @@ impl Air for ConstantsAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
-        result[0] = aux_next[0] - (aux_current[0] + E::from(A) + (E::from(B[0])) * (E::from(C[0][1])));
-        result[1] = aux_current[0] - (E::from(A) + (E::from(B[1])) * (E::from(C[1][1])));
+        result[0] = aux_next[0] - (aux_current[0] + E::from(A) + E::from(B[0]) * E::from(C[0][1]));
+        result[1] = aux_current[0] - (E::from(A) + E::from(B[1]) * E::from(C[1][1]));
     }
 }

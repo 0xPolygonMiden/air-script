@@ -79,10 +79,10 @@ impl Air for VariablesAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = (main_current[0]).exp(E::PositiveInteger::from(2_u64)) - (main_current[0]);
-        result[1] = (periodic_values[0]) * (main_next[0] - (main_current[0])) - (E::from(0_u64));
-        result[2] = (E::from(1_u64) - (main_current[0])) * (main_current[3] - (main_current[1]) + main_current[2]) - ((E::from(2_u64)) * (E::from(3_u64)) - (main_current[0]));
-        result[3] = (main_current[0]) * (main_current[3] - ((main_current[1]) * (main_current[2]))) - (main_next[0] - (E::from(3_u64)) - (E::from(4_u64) - (E::from(2_u64))));
+        result[0] = main_current[0].exp(E::PositiveInteger::from(2_u64)) - main_current[0];
+        result[1] = periodic_values[0] * (main_next[0] - main_current[0]) - E::from(0_u64);
+        result[2] = (E::from(1_u64) - main_current[0]) * (main_current[3] - main_current[1] + main_current[2]) - (E::from(2_u64) * E::from(3_u64) - main_current[0]);
+        result[3] = main_current[0] * (main_current[3] - main_current[1] * main_current[2]) - (main_next[0] - E::from(3_u64) - (E::from(4_u64) - E::from(2_u64)));
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
@@ -93,6 +93,6 @@ impl Air for VariablesAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
-        result[0] = aux_next[0] - ((aux_current[0]) * (main_current[3] + aux_rand_elements.get_segment_elements(0)[0]));
+        result[0] = aux_next[0] - aux_current[0] * (main_current[3] + aux_rand_elements.get_segment_elements(0)[0]);
     }
 }

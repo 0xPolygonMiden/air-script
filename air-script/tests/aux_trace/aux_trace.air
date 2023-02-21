@@ -22,7 +22,7 @@ boundary_constraints:
     enf p1.last = 1
   
 integrity_constraints:
-    enf a' = b + c
+    enf a' = b + a * b * c
     enf b' = c + a'
     enf c = a + b
 
