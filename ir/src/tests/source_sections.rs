@@ -25,7 +25,7 @@ fn err_trace_cols_empty_or_omitted() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::from_source(&parsed);
+    let result = AirIR::new(&parsed);
 
     // this fails before the check for missing trace columns declaration since the clk column
     // used in constraints is not declared.
@@ -56,7 +56,7 @@ fn err_pub_inputs_empty_or_omitted() {
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::from_source(&parsed);
+    let result = AirIR::new(&parsed);
     assert!(result.is_err());
 }
 
@@ -84,7 +84,7 @@ fn err_bc_empty_or_omitted() {
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::from_source(&parsed);
+    let result = AirIR::new(&parsed);
     assert!(result.is_err());
 }
 
@@ -112,6 +112,6 @@ fn err_ic_empty_or_omitted() {
         enf clk.first = 0";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::from_source(&parsed);
+    let result = AirIR::new(&parsed);
     assert!(result.is_err());
 }

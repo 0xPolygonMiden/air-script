@@ -44,5 +44,5 @@ integrity_constraints:
     enf s * (c - a * b) = 0
 
     # the auxiliary column contains the product of values of c offset by a random value.
-    enf p' = p * (c + \$rand[0])
+    enf p' = p * (c + $rand[0])
 ```
