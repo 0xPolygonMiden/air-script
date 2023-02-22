@@ -1,6 +1,6 @@
 use super::{
     BTreeMap, ConstantType, ConstraintDomain, ExprDetails, Expression, Identifier, IdentifierType,
-    IndexedTraceAccess, IntegrityConstraintDegree, MatrixAccess, SemanticError, SymbolTable,
+    IndexedTraceAccess, IntegrityConstraintDegree, MatrixAccess, Scope, SemanticError, SymbolTable,
     TraceSegment, VariableRoots, VariableType, VectorAccess,
 };
 
@@ -287,17 +287,44 @@ impl AlgebraicGraph {
         symbol_table: &SymbolTable,
         variable_roots: &mut VariableRoots,
         domain: ConstraintDomain,
+        scope: Scope,
         variable_value: VariableValue,
         variable_expr: &Expression,
     ) -> Result<ExprDetails, SemanticError> {
-        if let Some(expr) = variable_roots.get(&variable_value) {
-            // If the variable has already been inserted, return the existing expression details.
-            Ok(*expr)
-        } else {
-            // Otherwise, insert the variable expression and create a new variable root.
-            let expr = self.insert_expr(symbol_table, variable_expr, variable_roots, domain)?;
-            variable_roots.insert(variable_value, expr);
-            Ok(expr)
+        // The scope of the variable must be valid for the constraint domain.
+        match (scope, domain) {
+            (
+                Scope::BoundaryConstraints,
+                ConstraintDomain::FirstRow | ConstraintDomain::LastRow,
+            )
+            | (
+                Scope::IntegrityConstraints,
+                ConstraintDomain::EveryRow | ConstraintDomain::EveryFrame(_),
+            ) => {
+                let key = (scope, variable_value);
+                if let Some(expr) = variable_roots.get(&key) {
+                    match scope {
+                        Scope::BoundaryConstraints => {
+                            // TODO: deal with boundary conflict properly
+                            Ok(ExprDetails::new(
+                                expr.root_idx(),
+                                expr.trace_segment(),
+                                domain,
+                            ))
+                        }
+                        Scope::IntegrityConstraints => Ok(*expr),
+                    }
+                } else {
+                    // Otherwise, insert the variable expression and create a new variable root.
+                    let expr =
+                        self.insert_expr(symbol_table, variable_expr, variable_roots, domain)?;
+                    variable_roots.insert(key, expr);
+                    Ok(expr)
+                }
+            }
+            (_, _) => Err(SemanticError::OutOfScope(format!(
+                "Variable {variable_value:?} is out of scope",
+            ))),
         }
     }
 
@@ -322,12 +349,13 @@ impl AlgebraicGraph {
             IdentifierType::RandomValuesBinding(offset, _) => {
                 self.insert_random_value(symbol_table, *offset, AUX_SEGMENT, domain)
             }
-            IdentifierType::IntegrityVariable(integrity_variable) => {
-                if let VariableType::Scalar(variable_expr) = integrity_variable.value() {
+            IdentifierType::Variable(scope, variable) => {
+                if let VariableType::Scalar(variable_expr) = variable.value() {
                     self.insert_variable(
                         symbol_table,
                         variable_roots,
                         domain,
+                        *scope,
                         VariableValue::Scalar(ident.to_string()),
                         variable_expr,
                     )
@@ -371,12 +399,13 @@ impl AlgebraicGraph {
             IdentifierType::Constant(ConstantType::Vector(_)) => {
                 self.insert_constant(ConstantValue::Vector(vector_access.clone()), domain)
             }
-            IdentifierType::IntegrityVariable(integrity_variable) => {
-                if let VariableType::Vector(vector) = integrity_variable.value() {
+            IdentifierType::Variable(scope, variable) => {
+                if let VariableType::Vector(vector) = variable.value() {
                     self.insert_variable(
                         symbol_table,
                         variable_roots,
                         domain,
+                        *scope,
                         VariableValue::Vector(vector_access.clone()),
                         &vector[vector_access.idx()],
                     )
@@ -434,12 +463,13 @@ impl AlgebraicGraph {
             IdentifierType::Constant(ConstantType::Matrix(_)) => {
                 self.insert_constant(ConstantValue::Matrix(matrix_access.clone()), domain)
             }
-            IdentifierType::IntegrityVariable(integrity_variable) => {
-                if let VariableType::Matrix(matrix) = integrity_variable.value() {
+            IdentifierType::Variable(scope, variable) => {
+                if let VariableType::Matrix(matrix) = variable.value() {
                     self.insert_variable(
                         symbol_table,
                         variable_roots,
                         domain,
+                        *scope,
                         VariableValue::Matrix(matrix_access.clone()),
                         &matrix[matrix_access.row_idx()][matrix_access.col_idx()],
                     )

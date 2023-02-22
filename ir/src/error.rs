@@ -12,6 +12,7 @@ pub enum SemanticError {
     InvalidPeriodicColumn(String),
     InvalidUsage(String),
     MissingDeclaration(String),
+    OutOfScope(String),
     TooManyConstraints(String),
 }
 
