@@ -57,7 +57,7 @@ impl TranspileCmd {
         }
         let parsed = parsed.unwrap();
 
-        let ir = AirIR::from_source(&parsed);
+        let ir = AirIR::new(&parsed);
         if let Err(err) = ir {
             return Err(format!("{err:?}"));
         }

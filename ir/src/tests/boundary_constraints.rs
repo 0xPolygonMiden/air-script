@@ -14,7 +14,7 @@ fn boundary_constraints() {
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::from_source(&parsed);
+    let result = AirIR::new(&parsed);
     assert!(result.is_ok());
 }
 
@@ -32,7 +32,7 @@ fn err_bc_duplicate_first() {
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::from_source(&parsed);
+    let result = AirIR::new(&parsed);
 
     assert!(result.is_err());
 }
@@ -51,7 +51,7 @@ fn err_bc_duplicate_last() {
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::from_source(&parsed);
+    let result = AirIR::new(&parsed);
 
     assert!(result.is_err());
 }

@@ -17,7 +17,7 @@ fn bc_with_constants() {
         enf clk' = clk - 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::from_source(&parsed);
+    let result = AirIR::new(&parsed);
     assert!(result.is_ok());
 }
 
@@ -38,7 +38,7 @@ fn ic_with_constants() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::from_source(&parsed);
+    let result = AirIR::new(&parsed);
     assert!(result.is_ok());
 }
 
@@ -57,6 +57,6 @@ fn err_invalid_matrix_const() {
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::from_source(&parsed);
+    let result = AirIR::new(&parsed);
     assert!(result.is_err());
 }

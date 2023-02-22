@@ -59,7 +59,6 @@ impl Codegen for NodeIndex {
 }
 
 impl Codegen for Operation {
-    // TODO: Only add parentheses in Add and Mul if the expression is an arithmetic operation.
     fn to_string(&self, ir: &AirIR, elem_type: ElemType) -> String {
         match self {
             Operation::Constant(ConstantValue::Inline(value)) => match elem_type {

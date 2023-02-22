@@ -22,13 +22,13 @@ use air_script::{parse, AirIR, CodeGenerator};
 let ast = parse(source.as_str()).expect("Parsing failed");
 
 // process the AST to get a Result containing the AirIR or an Error
-let ir = AirIR::from_source(&ast).expect("AIR is invalid");
+let ir = AirIR::new(&ast).expect("AIR is invalid");
 
 // generate Rust code targeting the Winterfell prover
 let rust_code = CodeGenerator::new(&ir);
 ```
 
-There are several example `.air` files written in AirScript which can be found in the `examples/` directory.
+An example of an AIR defined in AirScript can be found in the `examples/` directory.
 
 To run the full transpilation pipeline, the CLI can be used for convenience.
 
