@@ -50,7 +50,7 @@ impl AirIR {
     // --- CONSTRUCTOR ----------------------------------------------------------------------------
 
     /// Consumes the provided source and generates a matching AirIR.
-    pub fn from_source(source: &ast::Source) -> Result<Self, SemanticError> {
+    pub fn new(source: &ast::Source) -> Result<Self, SemanticError> {
         let ast::Source(source) = source;
 
         // set a default name.
