@@ -16,6 +16,16 @@ It must:
 - Continue with a string that does not begin with a number.
 - End with a newline.
 
+## Constant declarations
+
+Constants can be declared using the `const` keyword, followed by an identifier with uppercase letters only, an `=` sign and a value. For example:
+
+```
+const FOO = 42
+```
+
+Constants are conventionally declared at the top of the module just after Air name definition section. Constants may be used in any `boundary_constraints` or `integrity_constraints` sections.
+
 ## Source sections
 
 All source sections must:
@@ -38,6 +48,7 @@ Valid keywords for type declaration sections are the following:
 - `trace_columns`
 - `public_inputs`
 - `periodic_columns`
+- `random_values`
 
 Valid keywords for constraint description sections are the following:
 
