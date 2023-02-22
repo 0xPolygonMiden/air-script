@@ -7,6 +7,9 @@ trace_columns:
 public_inputs:
     stack_inputs: [16]
 
+random_values:
+    rand: [2]
+
 boundary_constraints:
     enf a.first = 1
     enf b.first = 1
@@ -18,11 +21,11 @@ boundary_constraints:
     enf p1.first = $rand[0]
     enf p1.last = 1
   
-transition_constraints:
-    enf a' = b + c
+integrity_constraints:
+    enf a' = b + a * b * c
     enf b' = c + a'
     enf c = a + b
 
-    # transition constraints against the auxiliary trace with random values
+    # integrity constraints against the auxiliary trace with random values
     enf p0' = p0 * (a + $rand[0] + b + $rand[1])
     enf p1 = p1' * (c + $rand[0])

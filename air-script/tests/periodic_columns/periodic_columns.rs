@@ -1,6 +1,8 @@
 use winter_air::{Air, AirContext, Assertion, AuxTraceRandElements, EvaluationFrame, ProofOptions as WinterProofOptions, TransitionConstraintDegree, TraceInfo};
-use winter_math::{fields, ExtensionOf, FieldElement};
-use winter_utils::{collections, ByteWriter, Serializable};
+use winter_math::fields::f64::BaseElement as Felt;
+use winter_math::{ExtensionOf, FieldElement};
+use winter_utils::collections::Vec;
+use winter_utils::{ByteWriter, Serializable};
 
 pub struct PublicInputs {
     stack_inputs: [Felt; 16],
@@ -39,7 +41,7 @@ impl Air for PeriodicColumnsAir {
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
         let main_degrees = vec![TransitionConstraintDegree::with_cycles(1, vec![4]), TransitionConstraintDegree::with_cycles(1, vec![8])];
-        let aux_degrees = Vec::new();
+        let aux_degrees = vec![];
         let num_main_assertions = 1;
         let num_aux_assertions = 0;
 
@@ -71,17 +73,19 @@ impl Air for PeriodicColumnsAir {
     }
 
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
-        let current = frame.current();
-        let next = frame.next();
-        result[0] = (periodic_values[0]) * (current[1] + current[2]) - (E::from(0_u64));
-        result[1] = (periodic_values[1]) * (next[0] - (current[0])) - (E::from(0_u64));
+        let main_current = frame.current();
+        let main_next = frame.next();
+        result[0] = periodic_values[0] * (main_current[1] + main_current[2]) - E::from(0_u64);
+        result[1] = periodic_values[1] * (main_next[0] - main_current[0]) - E::from(0_u64);
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
     where F: FieldElement<BaseField = Felt>,
           E: FieldElement<BaseField = Felt> + ExtensionOf<F>,
     {
-        let current = aux_frame.current();
-        let next = aux_frame.next();
+        let main_current = main_frame.current();
+        let main_next = main_frame.next();
+        let aux_current = aux_frame.current();
+        let aux_next = aux_frame.next();
     }
 }

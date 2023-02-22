@@ -1,43 +1,43 @@
-use super::Identifier;
+use super::{Expression, NamedTraceAccess, Variable};
 use std::fmt::Display;
 
-// BOUNDARY CONSTRAINTS
+// BOUNDARY STATEMENTS
 // ================================================================================================
 
-/// Stores the boundary constraints to be enforced on the trace column values.
-#[derive(Debug, PartialEq)]
-pub struct BoundaryConstraints {
-    pub boundary_constraints: Vec<BoundaryConstraint>,
+#[derive(Debug, Eq, PartialEq)]
+pub enum BoundaryStmt {
+    Constraint(BoundaryConstraint),
+    Variable(Variable),
 }
 
 /// Stores the expression corresponding to the boundary constraint.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct BoundaryConstraint {
-    column: Identifier,
+    access: NamedTraceAccess,
     boundary: Boundary,
-    value: BoundaryExpr,
+    value: Expression,
 }
 
 impl BoundaryConstraint {
-    pub fn new(column: Identifier, boundary: Boundary, value: BoundaryExpr) -> Self {
+    pub fn new(access: NamedTraceAccess, boundary: Boundary, value: Expression) -> Self {
         Self {
-            column,
+            access,
             boundary,
             value,
         }
     }
 
-    pub fn column(&self) -> &str {
-        &self.column.0
+    pub fn access(&self) -> &NamedTraceAccess {
+        &self.access
     }
 
     pub fn boundary(&self) -> Boundary {
         self.boundary
     }
 
-    /// Returns a clone of the constraint's value expression.
-    pub fn value(&self) -> BoundaryExpr {
-        self.value.clone()
+    /// Returns the constraint's value expression.
+    pub fn value(&self) -> &Expression {
+        &self.value
     }
 }
 
@@ -55,20 +55,4 @@ impl Display for Boundary {
             Boundary::Last => write!(f, "last boundary"),
         }
     }
-}
-
-/// Arithmetic expressions for evaluation of boundary constraints.
-#[derive(Debug, PartialEq, Clone)]
-pub enum BoundaryExpr {
-    Const(u64),
-    /// Reference to a public input element, identified by the name of a public input array and the
-    /// index of the cell.
-    PubInput(Identifier, usize),
-    /// Represents a random value provided by the verifier. The inner value is the index of this
-    /// random value in the array of all random values.
-    Rand(usize),
-    Add(Box<BoundaryExpr>, Box<BoundaryExpr>),
-    Sub(Box<BoundaryExpr>, Box<BoundaryExpr>),
-    Mul(Box<BoundaryExpr>, Box<BoundaryExpr>),
-    Exp(Box<BoundaryExpr>, u64),
 }

@@ -8,16 +8,19 @@ use std::fs;
 
 mod utils;
 
+mod arithmetic_ops;
 mod boundary_constraints;
+mod comments;
+mod constants;
+mod identifiers;
+mod integrity_constraints;
+mod list_comprehension;
 mod periodic_columns;
 mod pub_inputs;
+mod random_values;
 mod sections;
 mod trace_columns;
-mod transition_constraints;
-
-mod comments;
-mod expressions;
-mod identifiers;
+mod variables;
 
 // FULL AIR FILE
 // ================================================================================================
@@ -31,35 +34,39 @@ fn full_air_file() {
         SourceSection::AirDef(Identifier("SystemAir".to_string())),
         // trace_columns:
         //     main: [clk, fmp, ctx]
-        SourceSection::TraceCols(TraceCols {
+        SourceSection::Trace(Trace {
             main_cols: vec![
-                Identifier("clk".to_string()),
-                Identifier("fmp".to_string()),
-                Identifier("ctx".to_string()),
+                TraceCols::new(Identifier("clk".to_string()), 1),
+                TraceCols::new(Identifier("fmp".to_string()), 1),
+                TraceCols::new(Identifier("ctx".to_string()), 1),
             ],
             aux_cols: vec![],
         }),
-        // transition_constraints:
+        // integrity_constraints:
         //     enf clk' = clk + 1
-        SourceSection::TransitionConstraints(TransitionConstraints {
-            transition_constraints: vec![TransitionConstraint::new(
+        SourceSection::IntegrityConstraints(vec![IntegrityStmt::Constraint(
+            IntegrityConstraint::new(
                 // clk' = clk + 1
-                TransitionExpr::Next(Identifier("clk".to_string())),
-                TransitionExpr::Add(
-                    Box::new(TransitionExpr::Var(Identifier("clk".to_string()))),
-                    Box::new(TransitionExpr::Const(1)),
+                Expression::NamedTraceAccess(NamedTraceAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                    1,
+                )),
+                Expression::Add(
+                    Box::new(Expression::Elem(Identifier("clk".to_string()))),
+                    Box::new(Expression::Const(1)),
                 ),
-            )],
-        }),
+            ),
+        )]),
         // boundary_constraints:
         //     enf clk.first = 0
-        SourceSection::BoundaryConstraints(BoundaryConstraints {
-            boundary_constraints: vec![BoundaryConstraint::new(
-                Identifier("clk".to_string()),
+        SourceSection::BoundaryConstraints(vec![BoundaryStmt::Constraint(
+            BoundaryConstraint::new(
+                NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
                 Boundary::First,
-                BoundaryExpr::Const(0),
-            )],
-        }),
+                Expression::Const(0),
+            ),
+        )]),
     ]);
     build_parse_test!(source.as_str()).expect_ast(expected);
 }

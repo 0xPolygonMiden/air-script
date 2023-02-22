@@ -1,5 +1,4 @@
-use super::Scope;
-use ir::AirIR;
+use super::{AirIR, Scope};
 
 /// Updates the provided scope with a public inputs.
 pub(super) fn add_public_inputs_struct(scope: &mut Scope, ir: &AirIR) {
@@ -8,7 +7,7 @@ pub(super) fn add_public_inputs_struct(scope: &mut Scope, ir: &AirIR) {
     let pub_inputs_struct = scope.new_struct(name).vis("pub");
 
     for (pub_input, pub_input_size) in ir.public_inputs() {
-        pub_inputs_struct.field(pub_input, format!("[Felt; {}]", pub_input_size));
+        pub_inputs_struct.field(pub_input, format!("[Felt; {pub_input_size}]"));
     }
 
     // add the public inputs implementation block
@@ -27,7 +26,7 @@ pub(super) fn add_public_inputs_struct(scope: &mut Scope, ir: &AirIR) {
         .ret("Self")
         .line(format!("Self {{ {} }}", pub_inputs_values.join(", ")));
     for (pub_input, pub_input_size) in ir.public_inputs() {
-        new_fn.arg(pub_input, format!("[Felt; {}]", pub_input_size));
+        new_fn.arg(pub_input, format!("[Felt; {pub_input_size}]"));
     }
 
     add_serializable_impl(scope, pub_inputs_values)
@@ -42,9 +41,6 @@ fn add_serializable_impl(scope: &mut Scope, pub_input_values: Vec<String>) {
         .arg_ref_self()
         .arg("target", "&mut W");
     for pub_input_value in pub_input_values {
-        write_into_fn.line(format!(
-            "target.write(self.{}.as_slice());",
-            pub_input_value
-        ));
+        write_into_fn.line(format!("target.write(self.{pub_input_value}.as_slice());"));
     }
 }

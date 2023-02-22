@@ -13,6 +13,6 @@ periodic_columns:
 boundary_constraints:
     enf a.first = 0
 
-transition_constraints:
+integrity_constraints:
     enf k0 * (b + c) = 0
     enf k1 * (a' - a) = 0

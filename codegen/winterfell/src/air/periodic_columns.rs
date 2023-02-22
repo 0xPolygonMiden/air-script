@@ -1,5 +1,4 @@
-use super::{AirIR, Impl};
-use ir::PeriodicColumns;
+use super::{AirIR, Impl, PeriodicColumns};
 
 pub(super) fn add_fn_get_periodic_column_values(impl_ref: &mut Impl, ir: &AirIR) {
     // define the function.
@@ -23,7 +22,7 @@ impl Codegen for PeriodicColumns {
         for column in self {
             let mut rows = vec![];
             for row in column {
-                rows.push(format!("Felt::new({})", row));
+                rows.push(format!("Felt::new({row})"));
             }
             columns.push(format!("vec![{}]", rows.join(", ")));
         }

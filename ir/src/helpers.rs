@@ -2,29 +2,35 @@ use crate::error::SemanticError;
 
 /// Struct to help with validation of AIR source.
 pub(super) struct SourceValidator {
-    trace_columns_exists: bool,
+    main_trace_columns_exists: bool,
+    aux_trace_columns_exists: bool,
     public_inputs_exists: bool,
     boundary_constraints_exists: bool,
-    transition_constraints_exists: bool,
+    integrity_constraints_exists: bool,
+    random_values_exists: bool,
 }
 
 impl SourceValidator {
     pub fn new() -> Self {
         SourceValidator {
-            trace_columns_exists: false,
+            main_trace_columns_exists: false,
+            aux_trace_columns_exists: false,
             public_inputs_exists: false,
             boundary_constraints_exists: false,
-            transition_constraints_exists: false,
+            integrity_constraints_exists: false,
+            random_values_exists: false,
         }
     }
 
     /// If the declaration exists, sets corresponding boolean flag to true.
     pub fn exists(&mut self, section: &str) {
         match section {
-            "trace_columns" => self.trace_columns_exists = true,
+            "main_trace_columns" => self.main_trace_columns_exists = true,
+            "aux_trace_columns" => self.aux_trace_columns_exists = true,
             "public_inputs" => self.public_inputs_exists = true,
             "boundary_constraints" => self.boundary_constraints_exists = true,
-            "transition_constraints" => self.transition_constraints_exists = true,
+            "integrity_constraints" => self.integrity_constraints_exists = true,
+            "random_values" => self.random_values_exists = true,
             _ => unreachable!(),
         }
     }
@@ -32,7 +38,7 @@ impl SourceValidator {
     /// Returns a SemanticError if any of the required declarations are missing.
     pub fn check(&self) -> Result<(), SemanticError> {
         // make sure trace_columns are declared.
-        if !self.trace_columns_exists {
+        if !self.main_trace_columns_exists {
             return Err(SemanticError::MissingDeclaration(
                 "trace_columns section is missing".to_string(),
             ));
@@ -49,10 +55,17 @@ impl SourceValidator {
                 "boundary_constraints section is missing".to_string(),
             ));
         }
-        // make sure transition_constraints are declared.
-        if !self.transition_constraints_exists {
+        // make sure integrity_constraints are declared.
+        if !self.integrity_constraints_exists {
             return Err(SemanticError::MissingDeclaration(
-                "transition_constraints section is missing".to_string(),
+                "integrity_constraints section is missing".to_string(),
+            ));
+        }
+        // make sure random_values are declared only if aux trace columns are declared
+        if !self.aux_trace_columns_exists && self.random_values_exists {
+            return Err(SemanticError::MissingDeclaration(
+                "random_values section requires aux_trace_columns section, which is missing"
+                    .to_string(),
             ));
         }
 

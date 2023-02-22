@@ -14,36 +14,47 @@ The parser is split into 3 modules:
 
 The IR is where semantic checking is done and where optimizations will be done in the future.
 
-A directed acyclic graph called `AlgebraicGraph` is responsible for efficiently representing all transition constraints, identifying their type (main or auxiliary), and computing their degrees.
+A directed acyclic graph called `AlgebraicGraph` is responsible for efficiently representing all boundary and integrity constraints, identifying their domain (i.e. the rows they should be applied to), identifying their trace segment (main or auxiliary), and computing their degrees.
 
-Currently, the checks in the IR are very minimal and cover the following simple cases.
+### Building the graph
+While building the graph, the IR associates the following information with each constraint:
+- For integrity constraints, identifies the trace segment and the type of the integrity constraint (transition or validity) based on the constraint expression.
+  - Constraints referencing the auxiliary trace columns or using random values are identified as constraints against the auxiliary trace (trace segment 1). All other constraints are identified as constraints against the main trace (trace segment 0).
+  - Constraints referencing the "next" indicator are identified as transition constraints. All other constraints are identified as validity constraints.
+- For boundary constraints, identifies the trace segment and constraint domain (first or last row) based on the trace column and the boundary to which the constraint is applied.
 
-### Identifiers
+### Error checking
+Currently, error checking in the IR covers the following cases
+
+#### Identifiers
 
 - Prevent duplicate identifier declarations.
 - Prevent usage of undeclared identifiers.
 
-### Periodic columns
+#### Periodic columns
 
 - Ensure the cycle length of periodic columns is valid (greater than the minimum and a power of two).
 
-### Boundary constraints
+#### Boundary constraints
 
 - Prevent multiple constraints against the same column at the same boundary.
 - Ensure boundary constraint expressions contain valid identifier references by:
-  - preventing periodic columns from being used by boundary constraints.
-  - ensuring valid indices for public inputs.
-- Identify boundary constraint types (main or auxiliary), based on the trace column to which the constraint is applied.
+  - Preventing periodic columns from being used by boundary constraints.
+  - Ensuring valid indices for vector accesses (e.g. for public inputs, random values, vector constants or vector variables) or matrix accesses (e.g. for matrix constants or matrix variables).
+  - Ensuring valid identifier types for vector and matrix accesses.
 
-### Transition constraints
+#### Integrity constraints
 
-- Ensure transition constraints contain valid identifier references by:
+- Ensure integrity constraints contain valid identifier references by:
   - Preventing public inputs from being used.
   - Preventing "next" indicators from being applied to anything other than trace columns.
-- Identify transition constraint types (main or auxiliary) based on the constraint expression.
-  - Constraints referencing the auxiliary trace or using random values are identified as constraints against the auxiliary trace.
-  - All other constraints are identified as constraints against the main trace.
+  - Ensuring valid indices for vector accesses (e.g. for public inputs, random values, vector constants or vector variables) or matrix accesses (e.g. for matrix constants or matrix variables).
+  - Ensuring valid identifier types for vector and matrix accesses.
 
 ## Winterfell Codegen
 
 The `codegen/winterfell` crate provides a code generator for a Rust implementation of the [Winterfell prover's](https://github.com/novifinancial/winterfell) `Air` trait from an instance of an AirScript `IR`.
+
+## AirScript Core
+
+The `air-script-core` crate contains commonly used constants and structs used by the other crates.

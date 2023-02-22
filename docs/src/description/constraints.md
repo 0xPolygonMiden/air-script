@@ -13,12 +13,12 @@ A boundary constraint definition must:
 1. start with a block indentation and the `enf` keyword to indicate that the constraint must be _enforced_.
 2. continue by specifying a column identifier with a boundary accessor, e.g. `a.first` or `a.last`.
 3. continue with `=`
-4. continue with a right-hand-size "value" expression that evaluates to the required value of the specified column at the specified boundary. The expression may include numbers, trace columns, public inputs, random values, and any of the available [operations](./syntax.md#operations).
+4. continue with a right-hand-side "value" expression that evaluates to the required value of the specified column at the specified boundary. The expression may include numbers, named constants, variables, public inputs, random values, and any of the available [operations](./syntax.md#operations).
 5. end with a newline.
 
 ### Simple example of boundary constraints
 
-The following is a simple example of a valid `boundary_constraints` block:
+The following is a simple example of a valid `boundary_constraints` source section:
 
 ```
 def BoundaryConstraintsExample
@@ -39,7 +39,7 @@ boundary_constraints:
     enf p.first = 1
     enf p.last = 1
 
-transition_constraints:
+integrity_constraints:
     <omitted for brevity>
 ```
 
@@ -49,11 +49,11 @@ Boundary constraints can access public input values and random values provided b
 
 To use public inputs, the public input must be declared in the `public_inputs` source section. They can be accessed using array indexing syntax, as described by the [accessor syntax rules](./syntax.md#section-specific-accessors).
 
-Random values can be accessed by using array indexing syntax on the `$rand` built-in, as described by the [accessor syntax rules](./syntax.md#section-specific-accessors).
+To use random values, they must be declared in the `random_values` source section. Random values are defined by an identifier which is bound to a fixed-length array (e.g. `rand: [16]`), but it is additionally possible to bind identifiers to specific random values or groups of values (e.g. `rand: [a, b[14], c]`). Random values can be accessed by using `$` followed by the array identifier and the index of the value (e.g. `$rand[10]`) or by using the name of the bound random value or group along with the index of the value within the group (e.g. `a` or `b[5]`), as described by the [accessor syntax rules](./syntax.md#section-specific-accessors).
 
 ### Example of boundary constraints with public inputs and random values
 
-The following is an example of a valid `boundary_constraints` block that uses public inputs and random values:
+The following is an example of a valid `boundary_constraints` source section that uses public inputs and random values:
 
 ```
 def BoundaryConstraintsExample
@@ -79,34 +79,62 @@ boundary_constraints:
     enf b.first = a + $rand[0]
     enf p1.first = (stack_inputs[2] + $rand[0]) * (stack_inputs[3] + $rand[1])
 
-transition_constraints:
+integrity_constraints:
     <omitted for brevity>
 ```
 
-## Transition constraints (`transition_constraints`)
+### Intermediate variables
 
-The `transition_constraints` section consists of expressions describing constraints that must be true at each row of the execution trace in order for the proof to be valid.
+Boundary constraints can use intermediate variables to express more complex constraints. Intermediate variables are declared using the `let` keyword, as described in the [variables section](./variables.md).
 
-**Transition constraints are required.** The `transition_constraints` section must be defined and contain at least one transition constraint.
+### Example of boundary constraints with intermediate variables
 
-Transition constraints that are defined against auxiliary columns or that use random values from the built-in `$rand` array will be identified as auxiliary constraints.
+The following is an example of a valid `boundary_constraints` source section that uses intermediate variables:
 
-A transition constraint definition must:
+```
+def BoundaryConstraintsExample
+
+trace_columns:
+    main: [a, b]
+    aux: [p0, p1]
+
+public_inputs:
+    <omitted for brevity>
+
+boundary_constraints:
+    # this is an auxiliary constraint that uses intermediate variables.
+    let x = $rand[0]
+    let y = $rand[1]
+    enf p1.first = x * y
+
+integrity_constraints:
+    <omitted for brevity>
+```
+
+## Integrity constraints (`integrity_constraints`)
+
+The `integrity_constraints` section consists of expressions describing constraints that must be true at each row of the execution trace in order for the proof to be valid.
+
+**Integrity constraints are required.** The `integrity_constraints` section must be defined and contain at least one integrity constraint.
+
+Integrity constraints that are defined against auxiliary columns or that use random values from the built-in `$rand` array will be identified as auxiliary constraints.
+
+An integrity constraint definition must:
 
 1. start with a block indentation and the `enf` keyword to indicate that the constraint must be _enforced_.
-2. continue with an equality expression that describes the constraint. The expression may include numbers, trace columns, periodic columns, random values, and any of the available [operations](./syntax.md#operations).
+2. continue with an equality expression that describes the constraint. The expression may include numbers, constants, variables, trace columns, periodic columns, random values, and any of the available [operations](./syntax.md#operations).
 3. end with a newline.
 
 ### Current and next rows
 
-Transition constraints have access to values in the "current" row of the trace to which the constraint is being applied, as well as the "next" row of the trace. The value of a trace column in the next row is specified with the `'` postfix operator, as described by the [accessor syntax rules](./syntax.md#section-specific-accessors).
+Integrity constraints have access to values in the "current" row of the trace to which the constraint is being applied, as well as the "next" row of the trace. The value of a trace column in the next row is specified with the `'` postfix operator, as described by the [accessor syntax rules](./syntax.md#section-specific-accessors).
 
-### Simple example of transition constraints
+### Simple example of integrity constraints
 
-The following is a simple example of a valid `transition_constraints` block using values from the current and next rows of the main and auxiliary traces:
+The following is a simple example of a valid `integrity_constraints` source section using values from the current and next rows of the main and auxiliary traces:
 
 ```
-def TransitionConstraintsExample
+def IntegrityConstraintsExample
 
 trace_columns:
     main: [a, b]
@@ -118,7 +146,7 @@ public_inputs:
 boundary_constraints:
     <omitted for brevity>
 
-transition_constraints:
+integrity_constraints:
     # these are main constraints. they both express the same constraint.
     enf a' = a + 1
     enf b' - b - 1 = 0
@@ -129,18 +157,18 @@ transition_constraints:
 
 ### Periodic columns and random values
 
-Transition constraints can access the value of any periodic column in the current row, as well as random values provided by the verifier.
+Integrity constraints can access the value of any periodic column in the current row, as well as random values provided by the verifier.
 
 To use periodic column values, the periodic column must be declared in the `periodic_columns` source section. The value in the current row can then be accessed by using the defined identifier of the periodic column.
 
 Random values can be accessed by using array indexing syntax on the `$rand` built-in, as described by the [accessor syntax rules](./syntax.md#section-specific-accessors).
 
-### Example of transition constraints with periodic columns and random values
+### Example of integrity constraints with periodic columns and random values
 
-The following is an example of a valid `transition_constraints` block that uses periodic columns and random values:
+The following is an example of a valid `integrity_constraints` source section that uses periodic columns and random values:
 
 ```
-def TransitionConstraintsExample
+def IntegrityConstraintsExample
 
 trace_columns:
     main: [a, b]
@@ -155,7 +183,7 @@ periodic_columns:
 boundary_constraints:
     <omitted for brevity>
 
-transition_constraints:
+integrity_constraints:
     # this is a main constraint that uses a periodic column.
     enf a' = k * a
 
@@ -165,4 +193,35 @@ transition_constraints:
     # these are auxiliary constraints that use random values from the verifier.
     enf b = a + $rand[0]
     enf p1 = k * (a + $rand[0]) * (b + $rand[1])
+```
+
+### Intermediate variables
+
+Integrity constraints can use intermediate variables to express more complex constraints. Intermediate variables are declared using the `let` keyword, as described in the [variables section](./variables.md).
+
+### Example of integrity constraints with intermediate variables
+
+The following is an example of a valid `integrity_constraints` source section that uses intermediate variables:
+
+```
+def IntegrityConstraintsExample
+
+trace_columns:
+    main: [a, b]
+    aux: [p0, p1]
+
+public_inputs:
+    <omitted for brevity>
+
+periodic_columns:
+    k: [1, 1, 1, 0]
+
+boundary_constraints:
+    <omitted for brevity>
+
+integrity_constraints:
+    # this is an auxiliary constraint that uses intermediate variables.
+    let x = a + $rand[0]
+    let y = b + $rand[1]
+    enf p1 = k * x * y
 ```

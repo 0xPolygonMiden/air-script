@@ -22,13 +22,13 @@ use air_script::{parse, AirIR, CodeGenerator};
 let ast = parse(source.as_str()).expect("Parsing failed");
 
 // process the AST to get a Result containing the AirIR or an Error
-let ir = AirIR::from_source(&ast).expect("AIR is invalid");
+let ir = AirIR::new(&ast).expect("AIR is invalid");
 
 // generate Rust code targeting the Winterfell prover
 let rust_code = CodeGenerator::new(&ir);
 ```
 
-There are several example `.air` files written in AirScript which can be found in the `examples/` directory.
+An example of an AIR defined in AirScript can be found in the `examples/` directory.
 
 To run the full transpilation pipeline, the CLI can be used for convenience.
 
@@ -45,10 +45,10 @@ cargo build --release
 Then, run the `airc` target with the `transpile` option and specify your input file with `-i`. For example:
 
 ```
-./target/release/airc transpile -i examples/system.air
+./target/release/airc transpile -i examples/example.air
 ```
 
-When no output destination is specified, the output file will use the path and name of the input file, replacing the `.air` extension with `.rs`. For the above example, `examples/system.rs` will contain the generated output.
+When no output destination is specified, the output file will use the path and name of the input file, replacing the `.air` extension with `.rs`. For the above example, `examples/example.rs` will contain the generated output.
 
 You can use the `help` option to see other available options.
 

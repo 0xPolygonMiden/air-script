@@ -3,11 +3,15 @@ use crate::{
     lexer::{Lexer, Token},
 };
 
+mod arithmetic_ops;
 mod boundary_constraints;
-mod expressions;
+mod constants;
 mod identifiers;
+mod list_comprehension;
 mod periodic_columns;
 mod pub_inputs;
+mod random_values;
+mod variables;
 
 // TEST HELPERS
 // ================================================================================================

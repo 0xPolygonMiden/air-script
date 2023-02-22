@@ -17,7 +17,7 @@ Example usage:
 let ast = parse(source.as_str()).expect("Parsing failed");
 
 // process the AST to get a Result containing the AirIR or an Error
-let ir = AirIR::from_source(&ast).expect("AIR is invalid");
+let ir = AirIR::new(&ast).expect("AIR is invalid");
 
 // generate Rust code targeting the Winterfell prover
 let rust_code = CodeGenerator::new(&ir);

@@ -27,17 +27,33 @@ pub enum Token {
     #[token("def")]
     Def,
 
+    /// Used to declare intermediate variables in the AIR constraints module.
+    #[token("let")]
+    Let,
+
+    /// Used to declare constants in the AIR constraints module.
+    #[token("const")]
+    Const,
+
     /// Used to declare trace columns section in the AIR constraints module.
     #[token("trace_columns")]
-    TraceColumnns,
+    TraceColumns,
 
     /// Used to declare main trace columns.
     #[token("main")]
-    Main,
+    MainDecl,
 
     /// Used to declare aux trace columns.
     #[token("aux")]
-    Aux,
+    AuxDecl,
+
+    /// A reserved keyword for accessing main columns by index
+    #[token("$main")]
+    MainAccess,
+
+    /// A reserved keyword for accessing aux columns by index
+    #[token("$aux")]
+    AuxAccess,
 
     /// Keyword to declare the public inputs declaration section for the AIR.
     #[token("public_inputs")]
@@ -46,6 +62,14 @@ pub enum Token {
     /// Keyword to declare the periodic columns declaration section for the AIR.
     #[token("periodic_columns")]
     PeriodicColumns,
+
+    /// Keyword to declare random values section in the AIR constraints module.
+    #[token("random_values")]
+    RandomValues,
+
+    /// A reserved symbol for accessing random values provided by the verifier.
+    #[token("$")]
+    Rand,
 
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
@@ -61,19 +85,31 @@ pub enum Token {
     #[token("last")]
     Last,
 
-    // TRANSITION CONSTRAINT KEYWORDS
+    // INTEGRITY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
-    /// Marks the beginning of transition constraints section in the constraints file.
-    #[token("transition_constraints")]
-    TransitionConstraints,
+    /// Marks the beginning of integrity constraints section in the constraints file.
+    #[token("integrity_constraints")]
+    IntegrityConstraints,
 
     /// A modifier for identifiers used to indicate the next row.
     #[token("'")]
     Next,
 
-    /// A reserved keyword for accessing random values provided by the verifier.
-    #[token("$rand")]
-    Rand,
+    // LIST COMPREHENSION KEYWORDS
+    // --------------------------------------------------------------------------------------------
+    #[token("for")]
+    For,
+
+    #[token("in")]
+    In,
+
+    /// Used to declare sum list folding operation in the AIR constraints module.
+    #[token("sum")]
+    Sum,
+
+    /// Used to declare prod list folding operation in the AIR constraints module.
+    #[token("prod")]
+    Prod,
 
     // GENERAL KEYWORDS
     // --------------------------------------------------------------------------------------------
@@ -122,6 +158,9 @@ pub enum Token {
 
     #[token(")")]
     Rparen,
+
+    #[token("..")]
+    Range,
 
     // UNDEFINED TOKENS AND TOKENS TO IGNORE
     // --------------------------------------------------------------------------------------------

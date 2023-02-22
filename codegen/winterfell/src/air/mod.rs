@@ -1,5 +1,12 @@
 use super::{AirIR, Impl, Scope};
-use ir::TransitionConstraintDegree;
+use air_script_core::{Constant, ConstantType, IndexedTraceAccess};
+use ir::{
+    constraints::{AlgebraicGraph, ConstantValue, ConstraintDomain, Operation},
+    IntegrityConstraintDegree, NodeIndex, PeriodicColumns,
+};
+
+mod constants;
+use constants::add_constants;
 
 mod public_inputs;
 use public_inputs::add_public_inputs_struct;
@@ -7,11 +14,23 @@ use public_inputs::add_public_inputs_struct;
 mod periodic_columns;
 use periodic_columns::add_fn_get_periodic_column_values;
 
+mod graph;
+use graph::Codegen;
+
 mod boundary_constraints;
 use boundary_constraints::{add_fn_get_assertions, add_fn_get_aux_assertions};
 
 mod transition_constraints;
 use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_transition};
+
+// HELPER TYPES
+// ================================================================================================
+
+#[derive(Debug, Clone, Copy)]
+pub enum ElemType {
+    Base,
+    Ext,
+}
 
 // HELPERS TO GENERATE AN IMPLEMENTATION OF THE WINTERFELL AIR TRAIT
 // ================================================================================================
@@ -19,6 +38,11 @@ use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_tra
 /// Updates the provided scope with a new Air struct and Winterfell Air trait implementation
 /// which are equivalent the provided AirIR.
 pub(super) fn add_air(scope: &mut Scope, ir: &AirIR) {
+    // add constant declarations. Check required to avoid adding extra line during codegen.
+    if !ir.constants().is_empty() {
+        add_constants(scope, ir);
+    }
+
     // add the Public Inputs struct and its base implementation.
     add_public_inputs_struct(scope, ir);
 
@@ -41,7 +65,7 @@ fn add_air_struct(scope: &mut Scope, ir: &AirIR, name: &str) {
 
     // add public inputs
     for (pub_input, pub_input_size) in ir.public_inputs() {
-        air_struct.field(pub_input, format!("[Felt; {}]", pub_input_size));
+        air_struct.field(pub_input, format!("[Felt; {pub_input_size}]"));
     }
 
     // add the custom Air implementation block
@@ -97,27 +121,23 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &AirIR) {
         .arg("options", "WinterProofOptions")
         .ret("Self");
 
-    // define the transition constraint degrees of the main trace `main_degrees`.
-    let mut main_degrees: Vec<String> = Vec::new();
-    for degree in ir.main_degrees().iter() {
-        main_degrees.push(degree.to_string(false));
-    }
-    new.line(format!(
-        "let main_degrees = vec![{}];",
-        main_degrees.join(", ")
-    ));
+    // define the integrity constraint degrees of the main trace `main_degrees`.
+    add_constraint_degrees(new, ir, 0, "main_degrees");
 
-    // define the transition constraint degrees of the aux trace `aux_degrees`.
-    new.line("let aux_degrees = Vec::new();");
+    // define the integrity constraint degrees of the aux trace `aux_degrees`.
+    add_constraint_degrees(new, ir, 1, "aux_degrees");
 
     // define the number of main trace boundary constraints `num_main_assertions`.
     new.line(format!(
         "let num_main_assertions = {};",
-        ir.num_main_assertions()
+        ir.num_boundary_constraints(0)
     ));
 
     // define the number of aux trace boundary constraints `num_aux_assertions`.
-    new.line("let num_aux_assertions = 0;");
+    new.line(format!(
+        "let num_aux_assertions = {};",
+        ir.num_boundary_constraints(1)
+    ));
 
     // define the context.
     let context = "
@@ -136,36 +156,25 @@ let context = AirContext::new_multi_segment(
     // get public inputs
     let mut pub_inputs = Vec::new();
     for (pub_input, _) in ir.public_inputs() {
-        pub_inputs.push(format!("{}: public_inputs.{}", pub_input, pub_input));
+        pub_inputs.push(format!("{pub_input}: public_inputs.{pub_input}"));
     }
     // return initialized Self.
     new.line(format!("Self {{ context, {} }}", pub_inputs.join(", ")));
 }
 
-// RUST STRING GENERATION
-// ================================================================================================
-
-/// Code generation trait for generating Rust code strings from boundary constraint expressions.
-pub trait Codegen {
-    fn to_string(&self, is_aux_constraint: bool) -> String;
-}
-
-impl Codegen for TransitionConstraintDegree {
-    fn to_string(&self, _is_aux_constraint: bool) -> String {
-        if self.cycles().is_empty() {
-            format!("TransitionConstraintDegree::new({})", self.base())
-        } else {
-            let cycles = self
-                .cycles()
-                .iter()
-                .map(|cycle_len| cycle_len.to_string())
-                .collect::<Vec<String>>()
-                .join(", ");
-            format!(
-                "TransitionConstraintDegree::with_cycles({}, vec![{}])",
-                self.base(),
-                cycles
-            )
-        }
-    }
+/// Iterates through the degrees of the integrity constraints in the IR, and appends a line of
+/// generated code to the function body that declares all of the constraint degrees.
+fn add_constraint_degrees(
+    func_body: &mut codegen::Function,
+    ir: &AirIR,
+    trace_segment: u8,
+    decl_name: &str,
+) {
+    let degrees = ir
+        .validity_constraint_degrees(trace_segment)
+        .iter()
+        .chain(ir.transition_constraint_degrees(trace_segment).iter())
+        .map(|degree| degree.to_string(ir, ElemType::Ext))
+        .collect::<Vec<_>>();
+    func_body.line(format!("let {decl_name} = vec![{}];", degrees.join(", ")));
 }

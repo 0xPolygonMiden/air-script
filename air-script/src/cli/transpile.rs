@@ -53,13 +53,13 @@ impl TranspileCmd {
         // parse the input file to the internal representation
         let parsed = parse(source.as_str());
         if let Err(err) = parsed {
-            return Err(format!("{:?}", err));
+            return Err(format!("{err:?}"));
         }
         let parsed = parsed.unwrap();
 
-        let ir = AirIR::from_source(&parsed);
+        let ir = AirIR::new(&parsed);
         if let Err(err) = ir {
-            return Err(format!("{:?}", err));
+            return Err(format!("{err:?}"));
         }
         let ir = ir.unwrap();
 
@@ -69,7 +69,7 @@ impl TranspileCmd {
         // write transpiled output to the output path
         let result = fs::write(output_path.clone(), codegen.generate());
         if let Err(err) = result {
-            return Err(format!("{:?}", err));
+            return Err(format!("{err:?}"));
         }
 
         println!("Success! Transpiled to {}", output_path.display());
