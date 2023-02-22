@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/constraints.html" class="active"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.5.</strong> AirScript Example</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/constraints.html" class="active"><strong aria-hidden="true">2.5.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.6.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.7.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html"><strong aria-hidden="true">2.8.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -156,11 +156,11 @@
 <li>start with a block indentation and the <code>enf</code> keyword to indicate that the constraint must be <em>enforced</em>.</li>
 <li>continue by specifying a column identifier with a boundary accessor, e.g. <code>a.first</code> or <code>a.last</code>.</li>
 <li>continue with <code>=</code></li>
-<li>continue with a right-hand-size &quot;value&quot; expression that evaluates to the required value of the specified column at the specified boundary. The expression may include numbers, trace columns, public inputs, random values, and any of the available <a href="./syntax.html#operations">operations</a>.</li>
+<li>continue with a right-hand-side &quot;value&quot; expression that evaluates to the required value of the specified column at the specified boundary. The expression may include numbers, named constants, variables, public inputs, random values, and any of the available <a href="./syntax.html#operations">operations</a>.</li>
 <li>end with a newline.</li>
 </ol>
 <h3 id="simple-example-of-boundary-constraints"><a class="header" href="#simple-example-of-boundary-constraints">Simple example of boundary constraints</a></h3>
-<p>The following is a simple example of a valid <code>boundary_constraints</code> block:</p>
+<p>The following is a simple example of a valid <code>boundary_constraints</code> source section:</p>
 <pre><code>def BoundaryConstraintsExample
 
 trace_columns:
@@ -185,9 +185,9 @@ integrity_constraints:
 <h3 id="public-inputs-and-random-values"><a class="header" href="#public-inputs-and-random-values">Public inputs and random values</a></h3>
 <p>Boundary constraints can access public input values and random values provided by the verifier in their value expressions.</p>
 <p>To use public inputs, the public input must be declared in the <code>public_inputs</code> source section. They can be accessed using array indexing syntax, as described by the <a href="./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
-<p>Random values can be accessed by using array indexing syntax on the <code>$rand</code> built-in, as described by the <a href="./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
+<p>To use random values, they must be declared in the <code>random_values</code> source section. Random values are defined by an identifier which is bound to a fixed-length array (e.g. <code>rand: [16]</code>), but it is additionally possible to bind identifiers to specific random values or groups of values (e.g. <code>rand: [a, b[14], c]</code>). Random values can be accessed by using <code>$</code> followed by the array identifier and the index of the value (e.g. <code>$rand[10]</code>) or by using the name of the bound random value or group along with the index of the value within the group (e.g. <code>a</code> or <code>b[5]</code>), as described by the <a href="./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
 <h3 id="example-of-boundary-constraints-with-public-inputs-and-random-values"><a class="header" href="#example-of-boundary-constraints-with-public-inputs-and-random-values">Example of boundary constraints with public inputs and random values</a></h3>
-<p>The following is an example of a valid <code>boundary_constraints</code> block that uses public inputs and random values:</p>
+<p>The following is an example of a valid <code>boundary_constraints</code> source section that uses public inputs and random values:</p>
 <pre><code>def BoundaryConstraintsExample
 
 trace_columns:
@@ -214,6 +214,28 @@ boundary_constraints:
 integrity_constraints:
     &lt;omitted for brevity&gt;
 </code></pre>
+<h3 id="intermediate-variables"><a class="header" href="#intermediate-variables">Intermediate variables</a></h3>
+<p>Boundary constraints can use intermediate variables to express more complex constraints. Intermediate variables are declared using the <code>let</code> keyword, as described in the <a href="./variables.html">variables section</a>.</p>
+<h3 id="example-of-boundary-constraints-with-intermediate-variables"><a class="header" href="#example-of-boundary-constraints-with-intermediate-variables">Example of boundary constraints with intermediate variables</a></h3>
+<p>The following is an example of a valid <code>boundary_constraints</code> source section that uses intermediate variables:</p>
+<pre><code>def BoundaryConstraintsExample
+
+trace_columns:
+    main: [a, b]
+    aux: [p0, p1]
+
+public_inputs:
+    &lt;omitted for brevity&gt;
+
+boundary_constraints:
+    # this is an auxiliary constraint that uses intermediate variables.
+    let x = $rand[0]
+    let y = $rand[1]
+    enf p1.first = x * y
+
+integrity_constraints:
+    &lt;omitted for brevity&gt;
+</code></pre>
 <h2 id="integrity-constraints-integrity_constraints"><a class="header" href="#integrity-constraints-integrity_constraints">Integrity constraints (<code>integrity_constraints</code>)</a></h2>
 <p>The <code>integrity_constraints</code> section consists of expressions describing constraints that must be true at each row of the execution trace in order for the proof to be valid.</p>
 <p><strong>Integrity constraints are required.</strong> The <code>integrity_constraints</code> section must be defined and contain at least one integrity constraint.</p>
@@ -221,13 +243,13 @@ integrity_constraints:
 <p>An integrity constraint definition must:</p>
 <ol>
 <li>start with a block indentation and the <code>enf</code> keyword to indicate that the constraint must be <em>enforced</em>.</li>
-<li>continue with an equality expression that describes the constraint. The expression may include numbers, trace columns, periodic columns, random values, and any of the available <a href="./syntax.html#operations">operations</a>.</li>
+<li>continue with an equality expression that describes the constraint. The expression may include numbers, constants, variables, trace columns, periodic columns, random values, and any of the available <a href="./syntax.html#operations">operations</a>.</li>
 <li>end with a newline.</li>
 </ol>
 <h3 id="current-and-next-rows"><a class="header" href="#current-and-next-rows">Current and next rows</a></h3>
 <p>Integrity constraints have access to values in the &quot;current&quot; row of the trace to which the constraint is being applied, as well as the &quot;next&quot; row of the trace. The value of a trace column in the next row is specified with the <code>'</code> postfix operator, as described by the <a href="./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
 <h3 id="simple-example-of-integrity-constraints"><a class="header" href="#simple-example-of-integrity-constraints">Simple example of integrity constraints</a></h3>
-<p>The following is a simple example of a valid <code>integrity_constraints</code> block using values from the current and next rows of the main and auxiliary traces:</p>
+<p>The following is a simple example of a valid <code>integrity_constraints</code> source section using values from the current and next rows of the main and auxiliary traces:</p>
 <pre><code>def IntegrityConstraintsExample
 
 trace_columns:
@@ -253,7 +275,7 @@ integrity_constraints:
 <p>To use periodic column values, the periodic column must be declared in the <code>periodic_columns</code> source section. The value in the current row can then be accessed by using the defined identifier of the periodic column.</p>
 <p>Random values can be accessed by using array indexing syntax on the <code>$rand</code> built-in, as described by the <a href="./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
 <h3 id="example-of-integrity-constraints-with-periodic-columns-and-random-values"><a class="header" href="#example-of-integrity-constraints-with-periodic-columns-and-random-values">Example of integrity constraints with periodic columns and random values</a></h3>
-<p>The following is an example of a valid <code>integrity_constraints</code> block that uses periodic columns and random values:</p>
+<p>The following is an example of a valid <code>integrity_constraints</code> source section that uses periodic columns and random values:</p>
 <pre><code>def IntegrityConstraintsExample
 
 trace_columns:
@@ -280,12 +302,37 @@ integrity_constraints:
     enf b = a + $rand[0]
     enf p1 = k * (a + $rand[0]) * (b + $rand[1])
 </code></pre>
+<h3 id="intermediate-variables-1"><a class="header" href="#intermediate-variables-1">Intermediate variables</a></h3>
+<p>Integrity constraints can use intermediate variables to express more complex constraints. Intermediate variables are declared using the <code>let</code> keyword, as described in the <a href="./variables.html">variables section</a>.</p>
+<h3 id="example-of-integrity-constraints-with-intermediate-variables"><a class="header" href="#example-of-integrity-constraints-with-intermediate-variables">Example of integrity constraints with intermediate variables</a></h3>
+<p>The following is an example of a valid <code>integrity_constraints</code> source section that uses intermediate variables:</p>
+<pre><code>def IntegrityConstraintsExample
+
+trace_columns:
+    main: [a, b]
+    aux: [p0, p1]
+
+public_inputs:
+    &lt;omitted for brevity&gt;
+
+periodic_columns:
+    k: [1, 1, 1, 0]
+
+boundary_constraints:
+    &lt;omitted for brevity&gt;
+
+integrity_constraints:
+    # this is an auxiliary constraint that uses intermediate variables.
+    let x = a + $rand[0]
+    let y = b + $rand[1]
+    enf p1 = k * x * y
+</code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../description/declarations.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../description/variables.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -299,7 +346,7 @@ integrity_constraints:
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../description/declarations.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../description/variables.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

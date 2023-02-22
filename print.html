@@ -82,7 +82,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.5.</strong> AirScript Example</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.5.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.6.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.7.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.8.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -150,14 +150,35 @@
 <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
 <p>Polygon Miden's AirScript is designed to make it simple to describe AIR constraints and generate efficient and accurate code in the required target language. The code for AirScript can be found <a href="https://github.com/0xPolygonMiden/air-script/">here</a>.</p>
 <h2 id="current-version"><a class="header" href="#current-version">Current Version</a></h2>
-<p>Currently, AirScript is on version 0.1, which supports a simple syntax for describing air constraints and generation of Rust code targeting the <a href="https://github.com/novifinancial/winterfell">Winterfell prover</a>.</p>
-<p>The simplified version of the language is based on <a href="https://github.com/maticnetwork/miden/discussions/254">this discussion</a>, but only includes the following:</p>
+<p>Currently, AirScript is on version 0.2, which supports a simple syntax for describing air constraints and generation of Rust code targeting the <a href="https://github.com/novifinancial/winterfell">Winterfell prover</a>.</p>
+<p>The language is based on <a href="https://github.com/maticnetwork/miden/discussions/254">this discussion</a>, and includes features to write ~90% of the constraints required for Miden albeit with some limitations.</p>
+<p>AirScript includes the following features:</p>
 <ul>
-<li>declaring trace columns for main and auxiliary traces as a vector (e.g. <code>main: [a, b, c]</code> but not <code>main[a, b, c[2]]</code>)</li>
-<li>declaring public inputs where each public input is a named vector (e.g. <code>stack_inputs: [16]</code>)</li>
-<li>declaring periodic columns</li>
-<li>enforcing boundary constraints for main and auxiliary traces using trace columns, public inputs, and inline scalar constants</li>
-<li>enforcing transition constraints for main and auxiliary traces using trace columns, periodic columns, and inline scalar constants</li>
+<li>
+<p><strong>Trace Columns</strong>: Users can declare trace columns for main and auxiliary traces as individual columns or groups of columns (e.g. <code>main: [a, b, c[3], d]</code> where <code>a</code>, <code>b</code>, and <code>d</code> are single columns and <code>c</code> refers to a group of 3 columns)</p>
+</li>
+<li>
+<p><strong>Public Inputs</strong>: Users can declare public inputs where each public input is a named vector (e.g. <code>stack_inputs: [16]</code>)</p>
+</li>
+<li>
+<p><strong>Periodic Columns</strong>: Users can declare periodic columns (e.g. <code>k0: [1, 0, 0, 0]</code>)</p>
+</li>
+<li>
+<p><strong>Random Values</strong>: Users can define random values provided by the verifier (e.g. <code>alphas: [x, y[14], z]</code> or <code>rand: [16]</code>)</p>
+</li>
+<li>
+<p><strong>Boundary Constraints</strong>: Users can enfore boundary constraints on main and auxiliary trace columns using public inputs, random values, constants and variables.</p>
+</li>
+<li>
+<p><strong>Integrity Constraints</strong>: Users can enforce integrity constraints on main and auxiliary trace columns using trace columns, periodic columns, random values, constants and variables.</p>
+</li>
+<li>
+<p><strong>Constants</strong>: Users can declare module level constants. Constants can be scalars, vectors or matrices.
+(e.g. <code>const A = 123</code>, <code>const B = [1, 2, 3]</code>, <code>const C = [[1, 2, 3], [4, 5, 6]]</code>)</p>
+</li>
+<li>
+<p><strong>Variables</strong>: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. <code>let x = k * c[1]'</code>, <code>let y = [k * c[1], l * c[2], m * c[3]]</code> or <code>let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]]</code>)</p>
+</li>
 </ul>
 <p>The language will be specified in detail in the rest of this book.</p>
 <h3 id="cli"><a class="header" href="#cli">CLI</a></h3>
@@ -176,15 +197,8 @@
 <ul>
 <li>more advanced language functionality for better ergonomics and modularity, such as:
 <ul>
-<li>modules and imports</li>
-<li>variable declarations (e.g. <code>let x = k1 * c[1]'</code>)</li>
-<li>named constants (e.g. in a <code>constants</code> section), including:
-<ul>
-<li>vector constants</li>
-<li>matrix constants</li>
-</ul>
-</li>
 <li>python-style list comprehension (and other &quot;convenience&quot; syntax)</li>
+<li>modules and imports</li>
 <li>support for functions</li>
 <li>support for evaluators</li>
 <li>support for selectors</li>
@@ -192,7 +206,8 @@
 </li>
 <li>optimizations, such as:
 <ul>
-<li>removing unnecessary nodes from the <code>AlgebraicGraph</code> of integrity constraints</li>
+<li>constant folding</li>
+<li>removing unnecessary nodes from the <code>AlgebraicGraph</code> of boundary and integrity constraints</li>
 <li>combining integrity constraints with mutually exclusive selectors to reduce the total number of constraints</li>
 </ul>
 </li>
@@ -210,47 +225,22 @@
 <li><a href="description/./syntax.html">Syntax overview</a></li>
 <li><a href="description/./structure.html">File structure</a></li>
 <li><a href="description/./declarations.html">Type declarations</a></li>
+<li><a href="description/./variables.html">Variables</a></li>
 <li><a href="description/./constraints.html">Constraint descriptions</a></li>
 <li><a href="description/./example.html">AirScript example</a></li>
+<li><a href="description/./keywords.html">Keywords</a></li>
+<li><a href="description/./appendix.html">Appendix</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
-<h1 id="reserved-keywords-and-basic-types"><a class="header" href="#reserved-keywords-and-basic-types">Reserved keywords and basic types</a></h1>
-<p>This page specifies the basic syntax, types, and keywords of AirScript.</p>
-<h2 id="keywords"><a class="header" href="#keywords">Keywords</a></h2>
-<p>AirScript defines the following keywords:</p>
-<ul>
-<li><code>\$rand</code>: used to access random values provided by the verifier.</li>
-<li><code>def</code>: used to <a href="description/./structure.html">define the name</a> of an AirScript module.</li>
-<li><code>boundary_constraints</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./constraints.html#boundary_constraints">boundary constraints are described</a>.
-<ul>
-<li><code>first</code>: used to access the value of a trace column at the first row of the trace. <em>It may only be used when defining boundary constraints.</em></li>
-<li><code>last</code>: used to access the value of a trace column at the last row of the trace. <em>It may only be used when defining boundary constraints.</em></li>
-</ul>
-</li>
-<li><code>enf</code>: used to describe a single <a href="description/./constraints.html">constraint</a>.</li>
-<li><code>public_inputs</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">public inputs are declared</a>. <em>They may only be referenced when defining boundary constraints.</em></li>
-<li><code>periodic_columns</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">periodic columns are declared</a>. <em>They may only be referenced when defining integrity constraints.</em></li>
-<li><code>trace_columns</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">execution trace is described</a>.
-<ul>
-<li><code>main</code>: used to declare the main execution trace.</li>
-<li><code>aux</code>: used to declare the auxiliary execution trace.</li>
-</ul>
-</li>
-<li><code>integrity_constraints</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./constraints.html#integrity_constraints">integrity constraints are described</a>.</li>
-</ul>
-<h2 id="built-in-variables"><a class="header" href="#built-in-variables">Built-in variables</a></h2>
-<p>Built-in variables are identified by the starting character <code>\$</code>.</p>
-<h3 id="rand"><a class="header" href="#rand">$rand</a></h3>
-<p>Currently, the only built-in is <code>\$rand</code>, which is used to get random values provided by the verifier.</p>
-<p>These random values may be accessed by using the indexing operator on <code>\$rand</code>. For example, <code>\$rand[i]</code> provides the <code>ith</code> random value.</p>
-<p>Random values may only be accessed within source sections for constraints, i.e. the <a href="description/./constraints.html#boundary-constraints-boundary_constraints"><code>boundary_constraints</code> section</a> and the <a href="description/./constraints.html#integrity-constraints-integrity_constraints"><code>integrity_constraints</code> section</a>.</p>
+<h1 id="syntax-overview"><a class="header" href="#syntax-overview">Syntax Overview</a></h1>
+<p>This page specifies the basic syntax and types.</p>
 <h2 id="delimiters-and-special-characters"><a class="header" href="#delimiters-and-special-characters">Delimiters and special characters</a></h2>
 <ul>
 <li><code>:</code> is used as a delimiter when declaring <a href="description/./structure.html#source-sections">source sections</a> and <a href="description/./declarations.html">types</a></li>
 <li><code>.</code> is used to access a boundary on a trace column, e.g. <code>a.first</code> or <code>a.last</code></li>
 <li><code>[</code> and <code>]</code> are used for defining arrays in <a href="description/./declarations.html">type declarations</a> and for indexing in <a href="description/./constraints.html">constraint descriptions</a></li>
 <li><code>,</code> is used as a delimiter for defining arrays in <a href="description/./declarations.html">type declarations</a></li>
-<li><code>\$</code> is used to indicate a special built-in value. Currently, it is only used with <code>\$rand</code> for accessing random values.</li>
+<li><code>$</code> is used to access random values or built-in variables by their identifier. For example, the column at index <code>i</code> in the main execution trace can be accessed by <code>$main[i]</code>.</li>
 </ul>
 <h2 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h2>
 <p>Valid identifiers are strings that start with a letter <code>a-z</code> or <code>A-Z</code> followed by any combination of letters, digits <code>0-9</code> or an underscore <code>_</code>.</p>
@@ -329,6 +319,11 @@ integrity_constraints:
 <li>Continue with a string that does not begin with a number.</li>
 <li>End with a newline.</li>
 </ul>
+<h2 id="constant-declarations"><a class="header" href="#constant-declarations">Constant declarations</a></h2>
+<p>Constants can be declared using the <code>const</code> keyword, followed by an identifier with uppercase letters only, an <code>=</code> sign and a value. For example:</p>
+<pre><code>const FOO = 42
+</code></pre>
+<p>Constants are conventionally declared at the top of the module just after Air name definition section. Constants may be used in any <code>boundary_constraints</code> or <code>integrity_constraints</code> sections.</p>
 <h2 id="source-sections"><a class="header" href="#source-sections">Source sections</a></h2>
 <p>All source sections must:</p>
 <ul>
@@ -347,6 +342,7 @@ trace_columns:
 <li><code>trace_columns</code></li>
 <li><code>public_inputs</code></li>
 <li><code>periodic_columns</code></li>
+<li><code>random_values</code></li>
 </ul>
 <p>Valid keywords for constraint description sections are the following:</p>
 <ul>
@@ -356,23 +352,31 @@ trace_columns:
 <p>By convention, type declaration sections precede constraint description sections, although this is not a requirement of the language.</p>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="type-declaration-sections"><a class="header" href="#type-declaration-sections">Type declaration sections</a></h1>
-<h2 id="trace-columns-trace_columns"><a class="header" href="#trace-columns-trace_columns">Trace columns (<code>trace_columns</code>)</a></h2>
-<p>A <code>trace_columns</code> section contains declarations for <code>main</code> trace columns or <code>aux</code> (auxiliary) trace columns.</p>
-<p>The <code>main</code> and <code>aux</code> declarations define the shape of the main and auxiliary execution traces respectively and declare identifiers which can be used to refer to each of the columns in that trace.</p>
-<p><strong>A <code>trace_columns</code> section with a <code>main</code> declaration is required for an AIR defined in AirScript to be valid.</strong> The <code>aux</code> declaration is optional, but if it is defined then it must follow the <code>main</code> declaration.</p>
-<p>The following is a valid <code>trace_columns</code> block:</p>
-<pre><code>trace_columns:
-    main: [a, b, c]
-    aux: [d, e]
+<h2 id="constants-const"><a class="header" href="#constants-const">Constants (<code>const</code>)</a></h2>
+<p>Constants can be optionally declared with the const keyword at the top of an AirScript module just below the declaration of the module name. They can be scalars, vectors or matrices. Constant names must contain only uppercase letters.</p>
+<p>Each constant is defined by an identifier and a value in the following format:</p>
+<pre><code>const FOO = 123
+const BAR = [1, 2, 3]
+const BAZ = [[1, 2, 3], [4, 5, 6]]
 </code></pre>
-<p>In the above example, the main execution trace for the AIR has 3 columns which can be referenced by <code>a</code>, <code>b</code>, and <code>c</code>. Internally, these identifiers will reference the trace columns with indices 0, 1, and 2 respectively. Similarly, the auxiliary execution trace has 2 columns which can be referenced by <code>d</code> and <code>e</code>.</p>
+<p>In the above example, <code>FOO</code> is a constant of type scalar with value <code>123</code>, BAR is a constant of type vector with value <code>[1, 2, 3]</code>, and BAZ is a constant of type matrix with value <code>[[1, 2, 3], [4, 5, 6]]</code>.</p>
+<h2 id="execution-trace-trace_columns"><a class="header" href="#execution-trace-trace_columns">Execution trace (<code>trace_columns</code>)</a></h2>
+<p>A <code>trace_columns</code> section contains declarations for <code>main</code> trace columns or <code>aux</code> (auxiliary) trace columns.</p>
+<p>The <code>main</code> and <code>aux</code> declarations define the shape of the main and auxiliary execution traces respectively and define identifiers which can be used to refer to each of the columns or a group of columns in that trace. The columns can also be referred using the built-in variables <code>$main</code> and <code>$aux</code> and the index of the column in the respective trace.</p>
+<p><strong>A <code>trace_columns</code> section with a <code>main</code> declaration is required for an AIR defined in AirScript to be valid.</strong> The <code>aux</code> declaration is optional, but if it is defined then it must follow the <code>main</code> declaration.</p>
+<p>The following is a valid <code>trace_columns</code> source section:</p>
+<pre><code>trace_columns:
+    main: [a, b, c[3], d]
+    aux: [e, f]
+</code></pre>
+<p>In the above example, the main execution trace for the AIR has 6 columns with 4 column bindings, where the identifiers <code>a</code>, <code>b</code>, and <code>d</code> are each bound to a single column and <code>c</code> refers to a group of 3 columns. Single columns can be referenced using their identifiers (e.g. <code>a</code>, <code>b</code> and <code>d</code>) and columns in a group (e.g. <code>c</code>) can be referenced using the identifier <code>c</code> and the index of the column within the group <code>c</code> (<code>c[0]</code>, <code>c[1]</code> and <code>c[2]</code>). Similarly, the auxiliary execution trace has 2 columns which can be referenced by <code>e</code> and <code>f</code>.</p>
 <h2 id="public-inputs-public_inputs"><a class="header" href="#public-inputs-public_inputs">Public inputs (<code>public_inputs</code>)</a></h2>
 <p>A <code>public_inputs</code> section contains declarations for public inputs. Currently, each public input must be provided as a vector of a fixed size, but there is no limit to how many of them can be declared within the <code>public_inputs</code> section.</p>
 <p><strong>Public inputs are required.</strong> There must be at least one pubic input declared.</p>
 <p>Each public input is described by an identifier and an array length (<code>n</code>) in the following format:</p>
 <pre><code>identifier: [n]
 </code></pre>
-<p>The following is an example of a valid <code>public_inputs</code> block:</p>
+<p>The following is an example of a valid <code>public_inputs</code> source section:</p>
 <pre><code>public_inputs:
     program_hash: [4]
     stack_inputs: [16]
@@ -380,7 +384,7 @@ trace_columns:
 </code></pre>
 <p>In the above example, the public input <code>program_hash</code> is an array of length <code>4</code>. <code>stack_inputs</code> and <code>stack_outputs</code> are both arrays of length <code>16</code>.</p>
 <p>Public inputs can be referenced by <a href="description/./constraints.html#boundary_constraints">boundary constraints</a> by using the identifier and an index. For example, the 3rd element of the <code>program_hash</code> declared above would be referenced as <code>program_hash[2]</code>.</p>
-<h2 id="periodic-columns-periodic_columns"><a class="header" href="#periodic-columns-periodic_columns">Periodic columns (<code>periodic_columns</code>)</a></h2>
+<h2 id="periodic-columns-periodic_columns"><a class="header" href="#periodic-columns-periodic_columns">Periodic Columns (<code>periodic_columns</code>)</a></h2>
 <p>A <code>periodic_columns</code> section contains declarations for periodic columns used in the description and evaluation of integrity constraints. Each periodic column declares an array of periodic values which can then be referenced by the declared identifier.</p>
 <p>There is no limit to how many of them can be declared within the <code>periodic_columns</code> section.</p>
 <p><strong>Periodic columns are optional.</strong> It is equally valid to define an empty <code>periodic_columns</code> section or to omit the <code>periodic_columns</code> section declaration entirely.</p>
@@ -388,7 +392,7 @@ trace_columns:
 <pre><code>identifier: [i, j, k, n]
 </code></pre>
 <p>The length of each of the array must be a power of two which is greater than or equal to <code>2</code>.</p>
-<p>The following is an example of a valid <code>periodic_columns</code> block:</p>
+<p>The following is an example of a valid <code>periodic_columns</code> source section:</p>
 <pre><code>periodic_columns:
     k0: [0, 0, 0, 1]
     k1: [1, 1, 1, 1, 1, 1, 1, 0]
@@ -396,6 +400,61 @@ trace_columns:
 <p>In the above example, <code>k0</code> declares a periodic column with a cycle of length <code>4</code>, and <code>k1</code> declares a periodic column with a cycle of length <code>8</code>.</p>
 <p>Periodic columns can be referenced by <a href="description/./constraints.html#integrity_constraints">integrity constraints</a> by using the column's identifier.</p>
 <p>When constraints are evaluated, these periodic values always refer to the value of the column in the current row. For example, when evaluating an integrity constraint such as <code>enf k0 * a = 0</code>, <code>k0</code> would be evaluated as <code>0</code> in rows <code>0</code>, <code>1</code>, <code>2</code> of the trace and as <code>1</code> in row <code>3</code>, and then the cycle would repeat. Attempting to refer to the &quot;next&quot; row of a periodic column, such as by <code>k0'</code>, is invalid and will cause a <code>ParseError</code>.</p>
+<h2 id="random-values-random_values"><a class="header" href="#random-values-random_values">Random values (<code>random_values</code>)</a></h2>
+<p>A <code>random_values</code> section contains declarations for random values provided by the verifier. Random values can be accessed by the named identifier for the whole array or by named bindings to single or grouped random values within the array.</p>
+<p><strong>Random values are optional.</strong> However if the section is declared then it cannot be empty and it can only contain a single declaration.</p>
+<p>The following is an example of a valid <code>random_values</code> source section:</p>
+<pre><code>random_values:
+    rand: [4]
+</code></pre>
+<p>In the above example, <code>rand</code> is a random value array of length <code>4</code>. Random values can be accessed using <code>$</code> followed by the name of the array and the index of the value. For example, <code>$rand[2]</code> would refer to the third random value in the array.</p>
+<p>The following is an example of a valid <code>random_values</code> section with named bindings to particular random values and groups of random values:</p>
+<pre><code>random_values:
+    rand: [a, b, c[2]]
+</code></pre>
+<p>In the above example, <code>rand</code> is a random value array of length <code>4</code> and <code>a</code> and <code>b</code> are individual random value bindings and <code>c</code> is a binding referring to a group of 2 random values. In this case, random values can be accessed similarly (e.g. <code>$rand[2]</code>) or using named bindings (e.g. <code>a</code> or <code>c[0]</code>). Here, <code>$rand[2]</code> and <code>c[0]</code> refer to the same random value.</p>
+<div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
+<h1 id="local-variables-and-built-in-variables"><a class="header" href="#local-variables-and-built-in-variables">Local Variables and Built-in Variables</a></h1>
+<p>This section describes the syntax for declaring local variables and built-in variables.</p>
+<h2 id="variables"><a class="header" href="#variables">Variables</a></h2>
+<p>In AirScript, variables can be declared in <code>boundary_constraints</code> and <code>integrity_constraints</code> sections and can contain any expression that would be valid within that source section. Variables can be of type scalar, vector or matrix. In the example below, <code>x</code> is a variable of type <code>scalar</code>, <code>y</code> is a variable of type <code>vector</code> and <code>z</code> is a variable of type <code>matrix</code>.</p>
+<pre><code>def VariablesExample
+
+const A = 1
+const B = 2
+
+trace_columns:
+    main: [a, b, c, d]
+    aux: [e, f]
+
+public_inputs:
+    stack_inputs: [16]
+
+random_values:
+    rand: [16]
+
+boundary_constraints:
+    let x = stack_inputs[0] + stack_inputs[1]   
+    let y = [$rand[0], $rand[1]]  
+    enf e.first = x + y[0] + y[1]
+
+integrity_constraints:
+    let z = [
+        [a + b, c + d],
+        [A * a, B * b]
+    ]
+    enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1]
+</code></pre>
+<h2 id="built-in-variables"><a class="header" href="#built-in-variables">Built-in variables</a></h2>
+<p>Built-in variables are identified by the starting character <code>$</code>. There are two built-in variables:</p>
+<h3 id="main"><a class="header" href="#main">$main</a></h3>
+<p><code>$main</code> is used to access columns in the <a href="description/./appendix.html#main-vs-auxiliary-execution-trace-segments-main-and-aux">main execution trace</a>.</p>
+<p>These columns may be accessed by using the indexing operator on <code>$main</code>. For example, <code>$main[i]</code> provides the <code>(i+1)th</code> column in the main execution trace.</p>
+<p>Columns using the <code>$main</code> built-in may only be accessed within source sections for integrity constraints, i.e. the <a href="description/./constraints.html#integrity-constraints-integrity_constraints"><code>integrity_constraints</code> section</a>.</p>
+<h3 id="aux"><a class="header" href="#aux">$aux</a></h3>
+<p><code>$aux</code> is used to access columns in the <a href="description/./appendix.html#main-vs-auxiliary-execution-trace-segments-main-and-aux">auxiliary execution trace</a>.</p>
+<p>These columns may be accessed by using the indexing operator on <code>$aux</code>. For example, <code>$aux[i]</code> provides the <code>(i+1)th</code> column in the auxiliary execution trace.</p>
+<p>Columns using the <code>$aux</code> built-in may only be accessed within source sections for integrity constraints, i.e. the <a href="description/./constraints.html#integrity-constraints-integrity_constraints"><code>integrity_constraints</code> section</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="constraint-description-sections"><a class="header" href="#constraint-description-sections">Constraint description sections</a></h1>
 <h2 id="boundary-constraints-boundary_constraints"><a class="header" href="#boundary-constraints-boundary_constraints">Boundary constraints (<code>boundary_constraints</code>)</a></h2>
@@ -407,11 +466,11 @@ trace_columns:
 <li>start with a block indentation and the <code>enf</code> keyword to indicate that the constraint must be <em>enforced</em>.</li>
 <li>continue by specifying a column identifier with a boundary accessor, e.g. <code>a.first</code> or <code>a.last</code>.</li>
 <li>continue with <code>=</code></li>
-<li>continue with a right-hand-size &quot;value&quot; expression that evaluates to the required value of the specified column at the specified boundary. The expression may include numbers, trace columns, public inputs, random values, and any of the available <a href="description/./syntax.html#operations">operations</a>.</li>
+<li>continue with a right-hand-side &quot;value&quot; expression that evaluates to the required value of the specified column at the specified boundary. The expression may include numbers, named constants, variables, public inputs, random values, and any of the available <a href="description/./syntax.html#operations">operations</a>.</li>
 <li>end with a newline.</li>
 </ol>
 <h3 id="simple-example-of-boundary-constraints"><a class="header" href="#simple-example-of-boundary-constraints">Simple example of boundary constraints</a></h3>
-<p>The following is a simple example of a valid <code>boundary_constraints</code> block:</p>
+<p>The following is a simple example of a valid <code>boundary_constraints</code> source section:</p>
 <pre><code>def BoundaryConstraintsExample
 
 trace_columns:
@@ -436,9 +495,9 @@ integrity_constraints:
 <h3 id="public-inputs-and-random-values"><a class="header" href="#public-inputs-and-random-values">Public inputs and random values</a></h3>
 <p>Boundary constraints can access public input values and random values provided by the verifier in their value expressions.</p>
 <p>To use public inputs, the public input must be declared in the <code>public_inputs</code> source section. They can be accessed using array indexing syntax, as described by the <a href="description/./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
-<p>Random values can be accessed by using array indexing syntax on the <code>$rand</code> built-in, as described by the <a href="description/./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
+<p>To use random values, they must be declared in the <code>random_values</code> source section. Random values are defined by an identifier which is bound to a fixed-length array (e.g. <code>rand: [16]</code>), but it is additionally possible to bind identifiers to specific random values or groups of values (e.g. <code>rand: [a, b[14], c]</code>). Random values can be accessed by using <code>$</code> followed by the array identifier and the index of the value (e.g. <code>$rand[10]</code>) or by using the name of the bound random value or group along with the index of the value within the group (e.g. <code>a</code> or <code>b[5]</code>), as described by the <a href="description/./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
 <h3 id="example-of-boundary-constraints-with-public-inputs-and-random-values"><a class="header" href="#example-of-boundary-constraints-with-public-inputs-and-random-values">Example of boundary constraints with public inputs and random values</a></h3>
-<p>The following is an example of a valid <code>boundary_constraints</code> block that uses public inputs and random values:</p>
+<p>The following is an example of a valid <code>boundary_constraints</code> source section that uses public inputs and random values:</p>
 <pre><code>def BoundaryConstraintsExample
 
 trace_columns:
@@ -465,6 +524,28 @@ boundary_constraints:
 integrity_constraints:
     &lt;omitted for brevity&gt;
 </code></pre>
+<h3 id="intermediate-variables"><a class="header" href="#intermediate-variables">Intermediate variables</a></h3>
+<p>Boundary constraints can use intermediate variables to express more complex constraints. Intermediate variables are declared using the <code>let</code> keyword, as described in the <a href="description/./variables.html">variables section</a>.</p>
+<h3 id="example-of-boundary-constraints-with-intermediate-variables"><a class="header" href="#example-of-boundary-constraints-with-intermediate-variables">Example of boundary constraints with intermediate variables</a></h3>
+<p>The following is an example of a valid <code>boundary_constraints</code> source section that uses intermediate variables:</p>
+<pre><code>def BoundaryConstraintsExample
+
+trace_columns:
+    main: [a, b]
+    aux: [p0, p1]
+
+public_inputs:
+    &lt;omitted for brevity&gt;
+
+boundary_constraints:
+    # this is an auxiliary constraint that uses intermediate variables.
+    let x = $rand[0]
+    let y = $rand[1]
+    enf p1.first = x * y
+
+integrity_constraints:
+    &lt;omitted for brevity&gt;
+</code></pre>
 <h2 id="integrity-constraints-integrity_constraints"><a class="header" href="#integrity-constraints-integrity_constraints">Integrity constraints (<code>integrity_constraints</code>)</a></h2>
 <p>The <code>integrity_constraints</code> section consists of expressions describing constraints that must be true at each row of the execution trace in order for the proof to be valid.</p>
 <p><strong>Integrity constraints are required.</strong> The <code>integrity_constraints</code> section must be defined and contain at least one integrity constraint.</p>
@@ -472,13 +553,13 @@ integrity_constraints:
 <p>An integrity constraint definition must:</p>
 <ol>
 <li>start with a block indentation and the <code>enf</code> keyword to indicate that the constraint must be <em>enforced</em>.</li>
-<li>continue with an equality expression that describes the constraint. The expression may include numbers, trace columns, periodic columns, random values, and any of the available <a href="description/./syntax.html#operations">operations</a>.</li>
+<li>continue with an equality expression that describes the constraint. The expression may include numbers, constants, variables, trace columns, periodic columns, random values, and any of the available <a href="description/./syntax.html#operations">operations</a>.</li>
 <li>end with a newline.</li>
 </ol>
 <h3 id="current-and-next-rows"><a class="header" href="#current-and-next-rows">Current and next rows</a></h3>
 <p>Integrity constraints have access to values in the &quot;current&quot; row of the trace to which the constraint is being applied, as well as the &quot;next&quot; row of the trace. The value of a trace column in the next row is specified with the <code>'</code> postfix operator, as described by the <a href="description/./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
 <h3 id="simple-example-of-integrity-constraints"><a class="header" href="#simple-example-of-integrity-constraints">Simple example of integrity constraints</a></h3>
-<p>The following is a simple example of a valid <code>integrity_constraints</code> block using values from the current and next rows of the main and auxiliary traces:</p>
+<p>The following is a simple example of a valid <code>integrity_constraints</code> source section using values from the current and next rows of the main and auxiliary traces:</p>
 <pre><code>def IntegrityConstraintsExample
 
 trace_columns:
@@ -504,7 +585,7 @@ integrity_constraints:
 <p>To use periodic column values, the periodic column must be declared in the <code>periodic_columns</code> source section. The value in the current row can then be accessed by using the defined identifier of the periodic column.</p>
 <p>Random values can be accessed by using array indexing syntax on the <code>$rand</code> built-in, as described by the <a href="description/./syntax.html#section-specific-accessors">accessor syntax rules</a>.</p>
 <h3 id="example-of-integrity-constraints-with-periodic-columns-and-random-values"><a class="header" href="#example-of-integrity-constraints-with-periodic-columns-and-random-values">Example of integrity constraints with periodic columns and random values</a></h3>
-<p>The following is an example of a valid <code>integrity_constraints</code> block that uses periodic columns and random values:</p>
+<p>The following is an example of a valid <code>integrity_constraints</code> source section that uses periodic columns and random values:</p>
 <pre><code>def IntegrityConstraintsExample
 
 trace_columns:
@@ -530,6 +611,31 @@ integrity_constraints:
     # these are auxiliary constraints that use random values from the verifier.
     enf b = a + $rand[0]
     enf p1 = k * (a + $rand[0]) * (b + $rand[1])
+</code></pre>
+<h3 id="intermediate-variables-1"><a class="header" href="#intermediate-variables-1">Intermediate variables</a></h3>
+<p>Integrity constraints can use intermediate variables to express more complex constraints. Intermediate variables are declared using the <code>let</code> keyword, as described in the <a href="description/./variables.html">variables section</a>.</p>
+<h3 id="example-of-integrity-constraints-with-intermediate-variables"><a class="header" href="#example-of-integrity-constraints-with-intermediate-variables">Example of integrity constraints with intermediate variables</a></h3>
+<p>The following is an example of a valid <code>integrity_constraints</code> source section that uses intermediate variables:</p>
+<pre><code>def IntegrityConstraintsExample
+
+trace_columns:
+    main: [a, b]
+    aux: [p0, p1]
+
+public_inputs:
+    &lt;omitted for brevity&gt;
+
+periodic_columns:
+    k: [1, 1, 1, 0]
+
+boundary_constraints:
+    &lt;omitted for brevity&gt;
+
+integrity_constraints:
+    # this is an auxiliary constraint that uses intermediate variables.
+    let x = a + $rand[0]
+    let y = b + $rand[1]
+    enf p1 = k * x * y
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="example-air-in-airscript"><a class="header" href="#example-air-in-airscript">Example AIR in AirScript</a></h1>
@@ -575,8 +681,42 @@ integrity_constraints:
     enf s * (c - a * b) = 0
 
     # the auxiliary column contains the product of values of c offset by a random value.
-    enf p' = p * (c + \$rand[0])
+    enf p' = p * (c + $rand[0])
 </code></pre>
+<div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
+<h1 id="keywords"><a class="header" href="#keywords">Keywords</a></h1>
+<p>AirScript defines the following keywords:</p>
+<ul>
+<li><code>boundary_constraints</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./constraints.html#boundary_constraints">boundary constraints are described</a>.
+<ul>
+<li><code>first</code>: used to access the value of a trace column at the first row of the trace. <em>It may only be used when defining boundary constraints.</em></li>
+<li><code>last</code>: used to access the value of a trace column at the last row of the trace. <em>It may only be used when defining boundary constraints.</em></li>
+</ul>
+</li>
+<li><code>const</code>: used to declare <a href="description/./declarations.html#constant-constant">constants</a>.</li>
+<li><code>def</code>: used to <a href="description/./structure.html">define the name</a> of an AirScript module.</li>
+<li><code>enf</code>: used to describe a single <a href="description/./constraints.html">constraint</a>.</li>
+<li><code>integrity_constraints</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./constraints.html#integrity_constraints">integrity constraints are described</a>.</li>
+<li><code>let</code>: used to declare intermediate variables in the boundary_constraints or integrity_constraints source sections.</li>
+<li><code>periodic_columns</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">periodic columns are declared</a>. <em>They may only be referenced when defining integrity constraints.</em></li>
+<li><code>public_inputs</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">public inputs are declared</a>. <em>They may only be referenced when defining boundary constraints.</em></li>
+<li><code>random_values</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">random values are described</a>.</li>
+<li><code>trace_columns</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">execution trace is described</a>. <em>They may only be referenced when defining integrity constraints.</em>
+<ul>
+<li><code>main</code>: used to declare the main execution trace.</li>
+<li><code>aux</code>: used to declare the auxiliary execution trace.</li>
+</ul>
+</li>
+<li><code>$&lt;identifier&gt;</code>: used to access random values provided by the verifier.</li>
+<li><code>$main</code>: used to access columns in the main execution trace by index.</li>
+<li><code>$aux</code>: used to access columns in the auxiliary execution trace by index.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
+<h1 id="appendix"><a class="header" href="#appendix">Appendix</a></h1>
+<p>This appendix contains additional information about some concepts that are not covered in the main documentation.</p>
+<h2 id="main-vs-auxiliary-execution-trace-segments-main-and-aux"><a class="header" href="#main-vs-auxiliary-execution-trace-segments-main-and-aux">Main vs. auxiliary execution trace segments (<code>main</code> and <code>aux</code>)</a></h2>
+<p>With Randomized AIRs, the construction of the execution trace can be split into multiple rounds, with the verifier providing new randomness between rounds. In the first round, before any random values are available, the Prover builds the first segment of the execution trace, which we refer to as the <code>main</code> trace (using Winterfell terminology). Additional trace segments can be built after the prover has committed to the first execution trace segment. When building auxiliary trace segments, the prover has access to the extra randomness sent by the verifier (in the non-interactive version of the protocol, this randomness is derived from the previous trace segment commitments). We refer to these as auxiliary trace segments (using Winterfell terminology again), and we call the first one the <code>aux</code> segment in AirScript and throughout this documentation.</p>
+<p>Miden VM only makes use of one auxiliary trace segment, and in Winterfell the number of auxiliary trace segments is currently limited to one. Therefore, AirScript currently only supports the main execution trace called <code>main</code> and a single auxiliary trace segment called <code>aux</code>.</p>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="language-implementation"><a class="header" href="#language-implementation">Language Implementation</a></h1>
 <p>This is a high-level overview of the implementation.</p>
@@ -589,45 +729,55 @@ integrity_constraints:
 </ul>
 <h2 id="ir"><a class="header" href="#ir">IR</a></h2>
 <p>The IR is where semantic checking is done and where optimizations will be done in the future.</p>
-<p>A directed acyclic graph called <code>AlgebraicGraph</code> is responsible for efficiently representing all integrity constraints, identifying their type (main or auxiliary), and computing their degrees.</p>
-<p>Currently, the checks in the IR are very minimal and cover the following simple cases.</p>
-<h3 id="identifiers-1"><a class="header" href="#identifiers-1">Identifiers</a></h3>
+<p>A directed acyclic graph called <code>AlgebraicGraph</code> is responsible for efficiently representing all boundary and integrity constraints, identifying their domain (i.e. the rows they should be applied to), identifying their trace segment (main or auxiliary), and computing their degrees.</p>
+<h3 id="building-the-graph"><a class="header" href="#building-the-graph">Building the graph</a></h3>
+<p>While building the graph, the IR associates the following information with each constraint:</p>
+<ul>
+<li>For integrity constraints, identifies the trace segment and the type of the integrity constraint (transition or validity) based on the constraint expression.
+<ul>
+<li>Constraints referencing the auxiliary trace columns or using random values are identified as constraints against the auxiliary trace (trace segment 1). All other constraints are identified as constraints against the main trace (trace segment 0).</li>
+<li>Constraints referencing the &quot;next&quot; indicator are identified as transition constraints. All other constraints are identified as validity constraints.</li>
+</ul>
+</li>
+<li>For boundary constraints, identifies the trace segment and constraint domain (first or last row) based on the trace column and the boundary to which the constraint is applied.</li>
+</ul>
+<h3 id="error-checking"><a class="header" href="#error-checking">Error checking</a></h3>
+<p>Currently, error checking in the IR covers the following cases</p>
+<h4 id="identifiers-1"><a class="header" href="#identifiers-1">Identifiers</a></h4>
 <ul>
 <li>Prevent duplicate identifier declarations.</li>
 <li>Prevent usage of undeclared identifiers.</li>
 </ul>
-<h3 id="periodic-columns"><a class="header" href="#periodic-columns">Periodic columns</a></h3>
+<h4 id="periodic-columns"><a class="header" href="#periodic-columns">Periodic columns</a></h4>
 <ul>
 <li>Ensure the cycle length of periodic columns is valid (greater than the minimum and a power of two).</li>
 </ul>
-<h3 id="boundary-constraints-1"><a class="header" href="#boundary-constraints-1">Boundary constraints</a></h3>
+<h4 id="boundary-constraints-1"><a class="header" href="#boundary-constraints-1">Boundary constraints</a></h4>
 <ul>
 <li>Prevent multiple constraints against the same column at the same boundary.</li>
 <li>Ensure boundary constraint expressions contain valid identifier references by:
 <ul>
-<li>preventing periodic columns from being used by boundary constraints.</li>
-<li>ensuring valid indices for public inputs.</li>
+<li>Preventing periodic columns from being used by boundary constraints.</li>
+<li>Ensuring valid indices for vector accesses (e.g. for public inputs, random values, vector constants or vector variables) or matrix accesses (e.g. for matrix constants or matrix variables).</li>
+<li>Ensuring valid identifier types for vector and matrix accesses.</li>
 </ul>
 </li>
-<li>Identify boundary constraint types (main or auxiliary), based on the trace column to which the constraint is applied.</li>
 </ul>
-<h3 id="integrity-constraints-1"><a class="header" href="#integrity-constraints-1">Integrity constraints</a></h3>
+<h4 id="integrity-constraints-1"><a class="header" href="#integrity-constraints-1">Integrity constraints</a></h4>
 <ul>
 <li>Ensure integrity constraints contain valid identifier references by:
 <ul>
 <li>Preventing public inputs from being used.</li>
 <li>Preventing &quot;next&quot; indicators from being applied to anything other than trace columns.</li>
-</ul>
-</li>
-<li>Identify integrity constraint types (main or auxiliary) based on the constraint expression.
-<ul>
-<li>Constraints referencing the auxiliary trace or using random values are identified as constraints against the auxiliary trace.</li>
-<li>All other constraints are identified as constraints against the main trace.</li>
+<li>Ensuring valid indices for vector accesses (e.g. for public inputs, random values, vector constants or vector variables) or matrix accesses (e.g. for matrix constants or matrix variables).</li>
+<li>Ensuring valid identifier types for vector and matrix accesses.</li>
 </ul>
 </li>
 </ul>
 <h2 id="winterfell-codegen"><a class="header" href="#winterfell-codegen">Winterfell Codegen</a></h2>
 <p>The <code>codegen/winterfell</code> crate provides a code generator for a Rust implementation of the <a href="https://github.com/novifinancial/winterfell">Winterfell prover's</a> <code>Air</code> trait from an instance of an AirScript <code>IR</code>.</p>
+<h2 id="airscript-core"><a class="header" href="#airscript-core">AirScript Core</a></h2>
+<p>The <code>air-script-core</code> crate contains commonly used constants and structs used by the other crates.</p>
 
                     </main>
 

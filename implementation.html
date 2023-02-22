@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.5.</strong> AirScript Example</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html" class="active"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.5.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.6.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.7.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.8.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html" class="active"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -157,51 +157,61 @@
 </ul>
 <h2 id="ir"><a class="header" href="#ir">IR</a></h2>
 <p>The IR is where semantic checking is done and where optimizations will be done in the future.</p>
-<p>A directed acyclic graph called <code>AlgebraicGraph</code> is responsible for efficiently representing all integrity constraints, identifying their type (main or auxiliary), and computing their degrees.</p>
-<p>Currently, the checks in the IR are very minimal and cover the following simple cases.</p>
-<h3 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h3>
+<p>A directed acyclic graph called <code>AlgebraicGraph</code> is responsible for efficiently representing all boundary and integrity constraints, identifying their domain (i.e. the rows they should be applied to), identifying their trace segment (main or auxiliary), and computing their degrees.</p>
+<h3 id="building-the-graph"><a class="header" href="#building-the-graph">Building the graph</a></h3>
+<p>While building the graph, the IR associates the following information with each constraint:</p>
+<ul>
+<li>For integrity constraints, identifies the trace segment and the type of the integrity constraint (transition or validity) based on the constraint expression.
+<ul>
+<li>Constraints referencing the auxiliary trace columns or using random values are identified as constraints against the auxiliary trace (trace segment 1). All other constraints are identified as constraints against the main trace (trace segment 0).</li>
+<li>Constraints referencing the &quot;next&quot; indicator are identified as transition constraints. All other constraints are identified as validity constraints.</li>
+</ul>
+</li>
+<li>For boundary constraints, identifies the trace segment and constraint domain (first or last row) based on the trace column and the boundary to which the constraint is applied.</li>
+</ul>
+<h3 id="error-checking"><a class="header" href="#error-checking">Error checking</a></h3>
+<p>Currently, error checking in the IR covers the following cases</p>
+<h4 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h4>
 <ul>
 <li>Prevent duplicate identifier declarations.</li>
 <li>Prevent usage of undeclared identifiers.</li>
 </ul>
-<h3 id="periodic-columns"><a class="header" href="#periodic-columns">Periodic columns</a></h3>
+<h4 id="periodic-columns"><a class="header" href="#periodic-columns">Periodic columns</a></h4>
 <ul>
 <li>Ensure the cycle length of periodic columns is valid (greater than the minimum and a power of two).</li>
 </ul>
-<h3 id="boundary-constraints"><a class="header" href="#boundary-constraints">Boundary constraints</a></h3>
+<h4 id="boundary-constraints"><a class="header" href="#boundary-constraints">Boundary constraints</a></h4>
 <ul>
 <li>Prevent multiple constraints against the same column at the same boundary.</li>
 <li>Ensure boundary constraint expressions contain valid identifier references by:
 <ul>
-<li>preventing periodic columns from being used by boundary constraints.</li>
-<li>ensuring valid indices for public inputs.</li>
+<li>Preventing periodic columns from being used by boundary constraints.</li>
+<li>Ensuring valid indices for vector accesses (e.g. for public inputs, random values, vector constants or vector variables) or matrix accesses (e.g. for matrix constants or matrix variables).</li>
+<li>Ensuring valid identifier types for vector and matrix accesses.</li>
 </ul>
 </li>
-<li>Identify boundary constraint types (main or auxiliary), based on the trace column to which the constraint is applied.</li>
 </ul>
-<h3 id="integrity-constraints"><a class="header" href="#integrity-constraints">Integrity constraints</a></h3>
+<h4 id="integrity-constraints"><a class="header" href="#integrity-constraints">Integrity constraints</a></h4>
 <ul>
 <li>Ensure integrity constraints contain valid identifier references by:
 <ul>
 <li>Preventing public inputs from being used.</li>
 <li>Preventing &quot;next&quot; indicators from being applied to anything other than trace columns.</li>
-</ul>
-</li>
-<li>Identify integrity constraint types (main or auxiliary) based on the constraint expression.
-<ul>
-<li>Constraints referencing the auxiliary trace or using random values are identified as constraints against the auxiliary trace.</li>
-<li>All other constraints are identified as constraints against the main trace.</li>
+<li>Ensuring valid indices for vector accesses (e.g. for public inputs, random values, vector constants or vector variables) or matrix accesses (e.g. for matrix constants or matrix variables).</li>
+<li>Ensuring valid identifier types for vector and matrix accesses.</li>
 </ul>
 </li>
 </ul>
 <h2 id="winterfell-codegen"><a class="header" href="#winterfell-codegen">Winterfell Codegen</a></h2>
 <p>The <code>codegen/winterfell</code> crate provides a code generator for a Rust implementation of the <a href="https://github.com/novifinancial/winterfell">Winterfell prover's</a> <code>Air</code> trait from an instance of an AirScript <code>IR</code>.</p>
+<h2 id="airscript-core"><a class="header" href="#airscript-core">AirScript Core</a></h2>
+<p>The <code>air-script-core</code> crate contains commonly used constants and structs used by the other crates.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="description/example.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="description/appendix.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -212,7 +222,7 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="description/example.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="description/appendix.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

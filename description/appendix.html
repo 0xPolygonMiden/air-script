@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Syntax overview - AirScript by Polygon Miden</title>
+        <title>Appendix - AirScript by Polygon Miden</title>
 
 
         <!-- Custom HTML head -->
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html" class="active"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.5.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.6.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.7.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html"><strong aria-hidden="true">2.8.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.5.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.6.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.7.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html" class="active"><strong aria-hidden="true">2.8.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -146,90 +146,21 @@
                 <div id="content" class="content">
                     <main>
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
-<h1 id="syntax-overview"><a class="header" href="#syntax-overview">Syntax Overview</a></h1>
-<p>This page specifies the basic syntax and types.</p>
-<h2 id="delimiters-and-special-characters"><a class="header" href="#delimiters-and-special-characters">Delimiters and special characters</a></h2>
-<ul>
-<li><code>:</code> is used as a delimiter when declaring <a href="./structure.html#source-sections">source sections</a> and <a href="./declarations.html">types</a></li>
-<li><code>.</code> is used to access a boundary on a trace column, e.g. <code>a.first</code> or <code>a.last</code></li>
-<li><code>[</code> and <code>]</code> are used for defining arrays in <a href="./declarations.html">type declarations</a> and for indexing in <a href="./constraints.html">constraint descriptions</a></li>
-<li><code>,</code> is used as a delimiter for defining arrays in <a href="./declarations.html">type declarations</a></li>
-<li><code>$</code> is used to access random values or built-in variables by their identifier. For example, the column at index <code>i</code> in the main execution trace can be accessed by <code>$main[i]</code>.</li>
-</ul>
-<h2 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h2>
-<p>Valid identifiers are strings that start with a letter <code>a-z</code> or <code>A-Z</code> followed by any combination of letters, digits <code>0-9</code> or an underscore <code>_</code>.</p>
-<h2 id="numbers"><a class="header" href="#numbers">Numbers</a></h2>
-<p>The only supported numbers are integers, and all integers are parsed as u64. Using a number larger than 2^64 - 1 will result in a <code>ParseError</code>.</p>
-<h2 id="operations"><a class="header" href="#operations">Operations</a></h2>
-<p>The following operations are supported in <a href="./constraints.html">constraint descriptions</a> with the specified syntax:</p>
-<ul>
-<li>Equality (<code>a = b</code>)</li>
-<li>Addition (<code>a + b</code>)</li>
-<li>Subtraction (<code>a - b</code>)</li>
-<li>Multiplication (<code>a * b</code>)</li>
-<li>Exponentiation by a constant integer x (<code>a^x</code>)</li>
-</ul>
-<p>The following operations are <strong>not supported</strong>:</p>
-<ul>
-<li>Negation</li>
-<li>Division</li>
-<li>Inversion</li>
-</ul>
-<h3 id="parentheses-and-complex-expressions"><a class="header" href="#parentheses-and-complex-expressions">Parentheses and complex expressions</a></h3>
-<p>Parentheses (<code>(</code> and <code>)</code>) are supported and can be included in any expression except exponentiation, where complex expressions are not allowed.</p>
-<p>The following is allowed:</p>
-<pre><code>a * (b + c)
-</code></pre>
-<p>The following is not allowed:</p>
-<pre><code>a^(2 + 3)
-</code></pre>
-<h2 id="section-specific-accessors"><a class="header" href="#section-specific-accessors">Section-specific accessors</a></h2>
-<p>These accessors may only be used in the specified <a href="./structure.html">source section</a> in which they are described below.</p>
-<h3 id="boundary-constraints"><a class="header" href="#boundary-constraints"><a href="./constraints.html#boundary_constraints">Boundary constraints</a></a></h3>
-<p>The following accessors may only be applied to trace columns when they are in boundary constraint definitions.</p>
-<ul>
-<li>First boundary (<code>.first</code>): accesses the trace column's value in the first row. It is only supported in <a href="./constraints.html#boundary_constraints">boundary constraint descriptions</a></li>
-<li>Last boundary (<code>.last</code>): accesses the trace column's value in the last row. It is only supported in <a href="./constraints.html#boundary_constraints">boundary constraint descriptions</a></li>
-</ul>
-<p>The following accessor may only be applied to public inputs declared in <code>public_inputs</code> when they are referenced in boundary constraint definitions.</p>
-<ul>
-<li>Indexing (<code>input_name[i]</code>): public inputs may be accessed by using the indexing operator on the declared identifier name with an index value that is less than the declared size of its array.</li>
-</ul>
-<p>Here is an example of usage of first and last boundaries and a public input within a boundary constraint:</p>
-<pre><code>trace_columns:
-    main: [a]
-
-public_inputs:
-    stack_inputs: [4]
-    stack_outputs: [4]
-
-boundary_constraints:
-    enf a.first = stack_inputs[0]
-    enf a.last = stack_outputs[0]
-</code></pre>
-<h3 id="integrity-constraints"><a class="header" href="#integrity-constraints"><a href="./constraints.html#integrity_constraints">Integrity constraints</a></a></h3>
-<p>The following accessor may only be applied to trace columns when they are referenced in integrity constraint definitions.</p>
-<ul>
-<li>Next Row (<code>a'</code>): <code>'</code> is a postfix operator that indicates the value of the specified trace column in the next row. It is only supported in <a href="./constraints.html#integrity_constraints">integrity constraint descriptions</a>.</li>
-</ul>
-<p>Here is an example of usage of the Next Row operator within an integrity constraint:</p>
-<pre><code>trace_columns:
-  main: [a]
-  aux: [p]
-
-integrity_constraints:
-  enf p' = p * a
-</code></pre>
+<h1 id="appendix"><a class="header" href="#appendix">Appendix</a></h1>
+<p>This appendix contains additional information about some concepts that are not covered in the main documentation.</p>
+<h2 id="main-vs-auxiliary-execution-trace-segments-main-and-aux"><a class="header" href="#main-vs-auxiliary-execution-trace-segments-main-and-aux">Main vs. auxiliary execution trace segments (<code>main</code> and <code>aux</code>)</a></h2>
+<p>With Randomized AIRs, the construction of the execution trace can be split into multiple rounds, with the verifier providing new randomness between rounds. In the first round, before any random values are available, the Prover builds the first segment of the execution trace, which we refer to as the <code>main</code> trace (using Winterfell terminology). Additional trace segments can be built after the prover has committed to the first execution trace segment. When building auxiliary trace segments, the prover has access to the extra randomness sent by the verifier (in the non-interactive version of the protocol, this randomness is derived from the previous trace segment commitments). We refer to these as auxiliary trace segments (using Winterfell terminology again), and we call the first one the <code>aux</code> segment in AirScript and throughout this documentation.</p>
+<p>Miden VM only makes use of one auxiliary trace segment, and in Winterfell the number of auxiliary trace segments is currently limited to one. Therefore, AirScript currently only supports the main execution trace called <code>main</code> and a single auxiliary trace segment called <code>aux</code>.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../description/main.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../description/keywords.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next" href="../description/structure.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../implementation.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -239,11 +170,11 @@ integrity_constraints:
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../description/main.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../description/keywords.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next" href="../description/structure.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="../implementation.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

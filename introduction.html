@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html" class="active"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.5.</strong> AirScript Example</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html" class="active"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.5.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.6.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.7.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.8.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -149,14 +149,35 @@
 <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
 <p>Polygon Miden's AirScript is designed to make it simple to describe AIR constraints and generate efficient and accurate code in the required target language. The code for AirScript can be found <a href="https://github.com/0xPolygonMiden/air-script/">here</a>.</p>
 <h2 id="current-version"><a class="header" href="#current-version">Current Version</a></h2>
-<p>Currently, AirScript is on version 0.1, which supports a simple syntax for describing air constraints and generation of Rust code targeting the <a href="https://github.com/novifinancial/winterfell">Winterfell prover</a>.</p>
-<p>The simplified version of the language is based on <a href="https://github.com/maticnetwork/miden/discussions/254">this discussion</a>, but only includes the following:</p>
+<p>Currently, AirScript is on version 0.2, which supports a simple syntax for describing air constraints and generation of Rust code targeting the <a href="https://github.com/novifinancial/winterfell">Winterfell prover</a>.</p>
+<p>The language is based on <a href="https://github.com/maticnetwork/miden/discussions/254">this discussion</a>, and includes features to write ~90% of the constraints required for Miden albeit with some limitations.</p>
+<p>AirScript includes the following features:</p>
 <ul>
-<li>declaring trace columns for main and auxiliary traces as a vector (e.g. <code>main: [a, b, c]</code> but not <code>main[a, b, c[2]]</code>)</li>
-<li>declaring public inputs where each public input is a named vector (e.g. <code>stack_inputs: [16]</code>)</li>
-<li>declaring periodic columns</li>
-<li>enforcing boundary constraints for main and auxiliary traces using trace columns, public inputs, and inline scalar constants</li>
-<li>enforcing transition constraints for main and auxiliary traces using trace columns, periodic columns, and inline scalar constants</li>
+<li>
+<p><strong>Trace Columns</strong>: Users can declare trace columns for main and auxiliary traces as individual columns or groups of columns (e.g. <code>main: [a, b, c[3], d]</code> where <code>a</code>, <code>b</code>, and <code>d</code> are single columns and <code>c</code> refers to a group of 3 columns)</p>
+</li>
+<li>
+<p><strong>Public Inputs</strong>: Users can declare public inputs where each public input is a named vector (e.g. <code>stack_inputs: [16]</code>)</p>
+</li>
+<li>
+<p><strong>Periodic Columns</strong>: Users can declare periodic columns (e.g. <code>k0: [1, 0, 0, 0]</code>)</p>
+</li>
+<li>
+<p><strong>Random Values</strong>: Users can define random values provided by the verifier (e.g. <code>alphas: [x, y[14], z]</code> or <code>rand: [16]</code>)</p>
+</li>
+<li>
+<p><strong>Boundary Constraints</strong>: Users can enfore boundary constraints on main and auxiliary trace columns using public inputs, random values, constants and variables.</p>
+</li>
+<li>
+<p><strong>Integrity Constraints</strong>: Users can enforce integrity constraints on main and auxiliary trace columns using trace columns, periodic columns, random values, constants and variables.</p>
+</li>
+<li>
+<p><strong>Constants</strong>: Users can declare module level constants. Constants can be scalars, vectors or matrices.
+(e.g. <code>const A = 123</code>, <code>const B = [1, 2, 3]</code>, <code>const C = [[1, 2, 3], [4, 5, 6]]</code>)</p>
+</li>
+<li>
+<p><strong>Variables</strong>: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. <code>let x = k * c[1]'</code>, <code>let y = [k * c[1], l * c[2], m * c[3]]</code> or <code>let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]]</code>)</p>
+</li>
 </ul>
 <p>The language will be specified in detail in the rest of this book.</p>
 <h3 id="cli"><a class="header" href="#cli">CLI</a></h3>
@@ -175,15 +196,8 @@
 <ul>
 <li>more advanced language functionality for better ergonomics and modularity, such as:
 <ul>
-<li>modules and imports</li>
-<li>variable declarations (e.g. <code>let x = k1 * c[1]'</code>)</li>
-<li>named constants (e.g. in a <code>constants</code> section), including:
-<ul>
-<li>vector constants</li>
-<li>matrix constants</li>
-</ul>
-</li>
 <li>python-style list comprehension (and other &quot;convenience&quot; syntax)</li>
+<li>modules and imports</li>
 <li>support for functions</li>
 <li>support for evaluators</li>
 <li>support for selectors</li>
@@ -191,7 +205,8 @@
 </li>
 <li>optimizations, such as:
 <ul>
-<li>removing unnecessary nodes from the <code>AlgebraicGraph</code> of integrity constraints</li>
+<li>constant folding</li>
+<li>removing unnecessary nodes from the <code>AlgebraicGraph</code> of boundary and integrity constraints</li>
 <li>combining integrity constraints with mutually exclusive selectors to reduce the total number of constraints</li>
 </ul>
 </li>
