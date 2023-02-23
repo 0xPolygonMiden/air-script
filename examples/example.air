@@ -13,6 +13,9 @@ public_inputs:
 periodic_columns:
     k0: [1, 1, 1, 1, 1, 1, 1, 0]
 
+random_values:
+    rand: [1]
+
 boundary_constraints:
     # define boundary constraints against the main trace at the first row of the trace.
     enf a.first = stack_inputs[0]
