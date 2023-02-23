@@ -129,25 +129,25 @@ impl SemanticError {
     }
 
     pub(super) fn missing_trace_columns_declaration() -> Self {
-        return Self::missing_declaration("trace_declaration");
+        Self::missing_declaration("trace_declaration")
     }
 
     pub(super) fn missing_public_inputs_declaration() -> Self {
-        return Self::missing_declaration("public_inputs");
+        Self::missing_declaration("public_inputs")
     }
 
     pub(super) fn missing_boundary_constraints_declaration() -> Self {
-        return Self::missing_declaration("boundary_constraints");
+        Self::missing_declaration("boundary_constraints")
     }
 
     pub(super) fn missing_integrity_constraints_declaration() -> Self {
-        return Self::missing_declaration("integrity_constraints");
+        Self::missing_declaration("integrity_constraints")
     }
 
     pub(super) fn has_random_values_but_missing_aux_trace_columns_declaration() -> Self {
-        SemanticError::MissingDeclaration(format!(
-            "random_values section requires aux_trace_columns section, which is missing"
-        ))
+        SemanticError::MissingDeclaration(
+            "random_values section requires aux_trace_columns section, which is missing".to_string()
+        )
     }
 
     pub(super) fn illegal_identifer_type(ident_name: &str, ident_type: &IdentifierType) -> Self {
@@ -217,12 +217,12 @@ impl SemanticError {
     }
 
     pub(super) fn random_value_in_constraint_against_prior_trace_segment() -> Self {
-        SemanticError::InvalidUsage(format!(
-            "Random values cannot be used in boundary constraints defined against prior trace segments"
-        ))
+        SemanticError::InvalidUsage(
+            "Random values cannot be used in boundary constraints defined against prior trace segments".to_string()
+        )
     }
 
     pub(super) fn constraint_against_undeclared_trace_segment() -> Self {
-        SemanticError::InvalidConstraint(format!("Constraint against undeclared trace segment"))
+        SemanticError::InvalidConstraint("Constraint against undeclared trace segment".to_string())
     }
 }
