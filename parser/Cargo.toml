@@ -1,6 +1,6 @@
 [package]
 name = "air-parser"
-version = "0.1.0"
+version = "0.2.0"
 description="Parser for the AirScript language"
 authors = ["miden contributors"]
 readme="README.md"
@@ -14,7 +14,7 @@ rust-version = "1.65"
 lalrpop = "0.19.7"
 
 [dependencies]
-air-script-core = {package = "air-script-core", path="../air-script-core", version="0.1.0" }
+air-script-core = { package = "air-script-core", path="../air-script-core", version="0.2.0" }
 lalrpop-util = { version = "0.19.7" }
 logos = "0.12.0"
 regex = "1"
