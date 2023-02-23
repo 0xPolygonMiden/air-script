@@ -65,7 +65,7 @@ fn add_assertions(func_body: &mut codegen::Function, ir: &AirIR, trace_segment: 
             "result.push(Assertion::single({}, {}, {}));",
             trace_access.col_idx(),
             domain_to_str(constraint.domain()),
-            expr_root.to_string(ir, elem_type)
+            expr_root.to_string(ir, elem_type, trace_segment)
         );
         func_body.line(assertion);
     }

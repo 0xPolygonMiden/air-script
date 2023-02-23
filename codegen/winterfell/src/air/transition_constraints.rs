@@ -61,7 +61,9 @@ fn add_constraints(func_body: &mut codegen::Function, ir: &AirIR, trace_segment:
         func_body.line(format!(
             "result[{}] = {};",
             idx,
-            constraint.node_index().to_string(ir, ElemType::Ext)
+            constraint
+                .node_index()
+                .to_string(ir, ElemType::Ext, trace_segment)
         ));
     }
 }
