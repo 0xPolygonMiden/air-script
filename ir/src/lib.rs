@@ -6,7 +6,7 @@ pub use parser::ast::{self, Boundary, BoundaryStmt, IntegrityStmt, PublicInput};
 use std::collections::BTreeMap;
 
 mod symbol_table;
-use symbol_table::{Scope, SymbolTable};
+use symbol_table::{IdentifierType, Scope, SymbolTable};
 
 pub mod constraints;
 use constraints::{AlgebraicGraph, ConstraintRoot, Constraints, MIN_CYCLE_LENGTH};
