@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (2023-02-22)
+## 0.2.0 (2023-02-23)
 
 - Added support for named constants (scalars, vectors, and matrices).
 - Added support for intermediate variables in `boundary_constraints` and `integrity_constraints` sections (scalars, vectors, and matrices).
