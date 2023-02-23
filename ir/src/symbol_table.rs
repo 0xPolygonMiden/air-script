@@ -421,15 +421,12 @@ fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
     let cycle = column.values().len();
 
     if !cycle.is_power_of_two() {
-        return Err(SemanticError::InvalidPeriodicColumn(format!(
-            "cycle length must be a power of two, but was {cycle} for cycle {name}"
-        )));
+        return Err(SemanticError::cycle_length_not_power_of_two(cycle, name)
+        );
     }
 
     if cycle < MIN_CYCLE_LENGTH {
-        return Err(SemanticError::InvalidPeriodicColumn(format!(
-            "cycle length must be at least {MIN_CYCLE_LENGTH}, but was {cycle} for cycle {name}"
-        )));
+        return Err(SemanticError::cycle_length_too_small(cycle, name));
     }
 
     Ok(())
@@ -444,10 +441,7 @@ fn validate_constant(constant: &Constant) -> Result<(), SemanticError> {
             if matrix.iter().skip(1).all(|row| row.len() == row_len) {
                 Ok(())
             } else {
-                Err(SemanticError::InvalidConstant(format!(
-                    "The matrix value of constant {} is invalid",
-                    constant.name()
-                )))
+                Err(SemanticError::invalid_matrix_constant(constant))
             }
         }
         _ => Ok(()),

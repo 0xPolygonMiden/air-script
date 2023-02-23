@@ -1,4 +1,4 @@
-use super::{MatrixAccess, VectorAccess, NamedTraceAccess, IndexedTraceAccess};
+use super::{MatrixAccess, VectorAccess, NamedTraceAccess, IndexedTraceAccess, Constant, MIN_CYCLE_LENGTH, constraints::ConstraintDomain, constraints::ConstrainedBoundary};
 
 use crate::symbol_table::IdentifierType;
 
@@ -128,7 +128,7 @@ impl SemanticError {
         ))
     }
 
-    // --- MISSING DECLARATION ERRORS -------------------------------------------------------------
+    // --- DECLARATION ERRORS ---------------------------------------------------------------------
 
     fn missing_declaration(
         missing_section: &str
@@ -164,6 +164,16 @@ impl SemanticError {
         ))
     }
 
+    pub(super) fn illegal_identifer_type(
+        ident_name: &str,
+        ident_type: &IdentifierType
+    ) -> Self {
+        SemanticError::InvalidUsage(format!(
+            "Identifier {ident_name} was declared as a {ident_type} which is not a supported type."
+        ))
+    }
+
+    
     // --- ILLEGAL IDENTIFIER ERRORS --------------------------------------------------------------
 
     pub(super) fn duplicate_identifer(
@@ -197,7 +207,58 @@ impl SemanticError {
     pub(super) fn cycle_length_not_power_of_two(
         length: usize,
         cycle_name: &str
-    ) -> 
+    ) -> Self {
+        SemanticError::InvalidPeriodicColumn(format!(
+            "cycle length must be a power of two, but was {length} for cycle {cycle_name}"
+        ))
+    }
         
-    
+    pub(super) fn cycle_length_too_small(
+        length: usize,
+        cycle_name: &str
+    ) -> Self {
+        SemanticError::InvalidPeriodicColumn(format!(
+            "cycle length must be at least {MIN_CYCLE_LENGTH}, but was {length} for cycle {cycle_name}"
+        ))
+    }
+
+    pub(super) fn invalid_matrix_constant(
+        constant: &Constant
+    ) -> Self {
+        SemanticError::InvalidConstant(format!(
+            "The matrix value of constant {} is invalid",
+            constant.name()
+        ))
+    }
+
+    // --- INVALID CONSTRAINT ERRORS --------------------------------------------------------------
+
+    pub(super) fn incompatible_constraint(
+        base: &ConstraintDomain,
+        other: &ConstraintDomain
+    ) -> Self {
+        SemanticError::InvalidConstraintDomain(format!(
+            "The specified constraint domain {other:?} is not compatible with the base domain {base:?}"
+        ))
+    }
+
+    pub(super) fn constraint_already_defined(
+        boundary: &ConstrainedBoundary
+    ) -> Self {
+        SemanticError::TooManyConstraints(format!(
+            "A constraint was already defined at {boundary}"
+        ))
+    }
+
+    pub(super) fn random_value_in_constraint_against_prior_trace_segment() -> Self {
+        SemanticError::InvalidUsage(format!(
+            "Random values cannot be used in boundary constraints defined against prior trace segments"
+        ))
+    }
+
+    pub(super) fn constraint_against_undeclared_trace_segment() -> Self {
+        SemanticError::InvalidConstraint(format!(
+            "Constraint against undeclared trace segment"
+        ))
+    }
 }

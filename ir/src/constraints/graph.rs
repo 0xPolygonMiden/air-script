@@ -332,9 +332,7 @@ impl AlgebraicGraph {
                         variable_expr,
                     )
                 } else {
-                    Err(SemanticError::InvalidUsage(format!(
-                        "Identifier {ident} was declared as a {elem_type} which is not a supported type."
-                    )))
+                    Err(SemanticError::illegal_identifer_type(ident, elem_type))
                 }
             }
             IdentifierType::PeriodicColumn(index, cycle_len) => {
@@ -348,9 +346,7 @@ impl AlgebraicGraph {
                 let node_index = self.insert_op(Operation::TraceElement(trace_access));
                 Ok(ExprDetails::new(node_index, trace_segment, domain))
             }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {ident} was declared as a {elem_type} which is not a supported type."
-            ))),
+            _ => Err(SemanticError::illegal_identifer_type(ident, elem_type)),
         }
     }
 
@@ -480,9 +476,7 @@ impl AlgebraicGraph {
             IdentifierType::RandomValuesBinding(_, _) => {
                 self.insert_random_value(symbol_table, index, trace_segment, domain)
             }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {name} was declared as a {elem_type} not as a random values"
-            ))),
+            _ => Err(SemanticError::illegal_identifer_type(name, elem_type))
         }
     }
 }
