@@ -264,7 +264,9 @@ impl Constraints {
                 // add the boundary to the set of constrained boundaries.
                 if !self.constrained_boundaries.insert(constrained_boundary) {
                     // raise an error if the same boundary was previously constrained
-                    return Err(SemanticError::constraint_already_defined(&constrained_boundary));
+                    return Err(SemanticError::constraint_already_defined(
+                        &constrained_boundary,
+                    ));
                 }
 
                 // add the trace access at the specified boundary to the graph.
@@ -286,7 +288,9 @@ impl Constraints {
                 // trace segment inference defaults to the lowest segment (the main trace) and is
                 // adjusted according to the use of random values and trace columns.
                 if lhs.trace_segment() < rhs.trace_segment() {
-                    return Err(SemanticError::random_value_in_constraint_against_prior_trace_segment());
+                    return Err(
+                        SemanticError::random_value_in_constraint_against_prior_trace_segment(),
+                    );
                 }
 
                 // merge the two sides of the expression into a constraint.

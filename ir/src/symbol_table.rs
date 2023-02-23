@@ -88,8 +88,9 @@ impl SymbolTable {
             .identifiers
             .insert(ident_name.to_owned(), ident_type.clone());
         match result {
-            Some(prev_type) =>
-                Err(SemanticError::duplicate_identifer(ident_name, ident_type, prev_type)),
+            Some(prev_type) => Err(SemanticError::duplicate_identifer(
+                ident_name, ident_type, prev_type,
+            )),
             None => Ok(()),
         }
     }
@@ -258,7 +259,7 @@ impl SymbolTable {
                 if trace_access.idx() >= columns.size() {
                     return Err(SemanticError::named_trace_column_access_out_of_bounds(
                         trace_access,
-                        columns.size()
+                        columns.size(),
                     ));
                 }
 
@@ -270,7 +271,7 @@ impl SymbolTable {
             }
             _ => Err(SemanticError::illegal_trace_column_identifier(
                 trace_access.name(),
-                elem_type
+                elem_type,
             )),
         }
     }
@@ -393,13 +394,13 @@ impl SymbolTable {
         if segment_idx > self.segment_widths().len() {
             return Err(SemanticError::indexed_trace_access_out_of_bounds(
                 trace_access,
-                self.segment_widths().len()
+                self.segment_widths().len(),
             ));
         }
         if trace_access.col_idx() as u16 >= self.segment_widths()[segment_idx] {
             return Err(SemanticError::indexed_trace_column_access_out_of_bounds(
                 trace_access,
-                self.segment_widths()[segment_idx]
+                self.segment_widths()[segment_idx],
             ));
         }
 
@@ -412,7 +413,7 @@ impl SymbolTable {
         if index >= usize::from(self.num_random_values()) {
             return Err(SemanticError::random_value_access_out_of_bounds(
                 index,
-                self.num_random_values()
+                self.num_random_values(),
             ));
         }
 
@@ -429,8 +430,7 @@ fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
     let cycle = column.values().len();
 
     if !cycle.is_power_of_two() {
-        return Err(SemanticError::cycle_length_not_power_of_two(cycle, name)
-        );
+        return Err(SemanticError::cycle_length_not_power_of_two(cycle, name));
     }
 
     if cycle < MIN_CYCLE_LENGTH {

@@ -506,7 +506,7 @@ impl AlgebraicGraph {
             IdentifierType::RandomValuesBinding(_, _) => {
                 self.insert_random_value(symbol_table, index, trace_segment, domain)
             }
-            _ => Err(SemanticError::illegal_identifer_type(name, elem_type))
+            _ => Err(SemanticError::illegal_identifer_type(name, elem_type)),
         }
     }
 }

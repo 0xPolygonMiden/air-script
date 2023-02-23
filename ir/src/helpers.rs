@@ -55,7 +55,9 @@ impl SourceValidator {
         }
         // make sure random_values are declared only if aux trace columns are declared
         if !self.aux_trace_columns_exists && self.random_values_exists {
-            return Err(SemanticError::has_random_values_but_missing_aux_trace_columns_declaration());
+            return Err(
+                SemanticError::has_random_values_but_missing_aux_trace_columns_declaration(),
+            );
         }
 
         Ok(())

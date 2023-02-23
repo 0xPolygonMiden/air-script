@@ -1,4 +1,7 @@
-use super::{MatrixAccess, VectorAccess, NamedTraceAccess, IndexedTraceAccess, Constant, MIN_CYCLE_LENGTH, constraints::ConstraintDomain, constraints::ConstrainedBoundary};
+use super::{
+    constraints::ConstrainedBoundary, constraints::ConstraintDomain, Constant, IndexedTraceAccess,
+    MatrixAccess, NamedTraceAccess, VectorAccess, MIN_CYCLE_LENGTH,
+};
 
 use crate::symbol_table::IdentifierType;
 
@@ -18,7 +21,6 @@ pub enum SemanticError {
 }
 
 impl SemanticError {
-
     // --- INVALID ACCESS ERRORS ------------------------------------------------------------------
 
     pub(super) fn invalid_vector_access(
@@ -46,10 +48,7 @@ impl SemanticError {
         ))
     }
 
-    pub(super) fn vector_access_out_of_bounds(
-        access: &VectorAccess,
-        vector_len: usize
-    ) -> Self {
+    pub(super) fn vector_access_out_of_bounds(access: &VectorAccess, vector_len: usize) -> Self {
         Self::IndexOutOfRange(format!(
             "Out-of-range index {} in vector constant {} of length {}",
             access.idx(),
@@ -58,10 +57,7 @@ impl SemanticError {
         ))
     }
 
-    pub(super) fn public_inputs_out_of_bounds(
-        access: &VectorAccess,
-        size: usize
-    ) -> Self {
+    pub(super) fn public_inputs_out_of_bounds(access: &VectorAccess, size: usize) -> Self {
         SemanticError::IndexOutOfRange(format!(
             "Out-of-range index {} in public input {} of length {}",
             access.idx(),
@@ -99,7 +95,7 @@ impl SemanticError {
 
     pub(super) fn indexed_trace_access_out_of_bounds(
         access: &IndexedTraceAccess,
-        size: usize
+        size: usize,
     ) -> Self {
         SemanticError::IndexOutOfRange(format!(
             "Segment index '{}' is greater than the number of segments in the trace ({}).",
@@ -110,7 +106,7 @@ impl SemanticError {
 
     pub(super) fn indexed_trace_column_access_out_of_bounds(
         access: &IndexedTraceAccess,
-        segment_width: u16
+        segment_width: u16,
     ) -> Self {
         SemanticError::IndexOutOfRange(format!(
             "Out-of-range index '{}' in trace segment '{}' of length {}",
@@ -120,10 +116,7 @@ impl SemanticError {
         ))
     }
 
-    pub(super) fn random_value_access_out_of_bounds(
-        index: usize,
-        size: u16
-    ) -> Self {
+    pub(super) fn random_value_access_out_of_bounds(index: usize, size: u16) -> Self {
         SemanticError::IndexOutOfRange(format!(
             "Random value index {index} is greater than or equal to the total number of random values ({size})."
         ))
@@ -131,101 +124,77 @@ impl SemanticError {
 
     // --- DECLARATION ERRORS ---------------------------------------------------------------------
 
-    fn missing_declaration(
-        missing_section: &str
-    ) -> Self {
-        SemanticError::MissingDeclaration(format!(
-            "{missing_section} section is missing"))
+    fn missing_declaration(missing_section: &str) -> Self {
+        SemanticError::MissingDeclaration(format!("{missing_section} section is missing"))
     }
 
-    pub(super) fn missing_trace_columns_declaration(
-    ) -> Self {
+    pub(super) fn missing_trace_columns_declaration() -> Self {
         return Self::missing_declaration("trace_declaration");
     }
 
-    pub(super) fn missing_public_inputs_declaration(
-    ) -> Self {
+    pub(super) fn missing_public_inputs_declaration() -> Self {
         return Self::missing_declaration("public_inputs");
     }
 
-    pub(super) fn missing_boundary_constraints_declaration(
-    ) -> Self {
+    pub(super) fn missing_boundary_constraints_declaration() -> Self {
         return Self::missing_declaration("boundary_constraints");
     }
 
-    pub(super) fn missing_integrity_constraints_declaration(
-    ) -> Self {
+    pub(super) fn missing_integrity_constraints_declaration() -> Self {
         return Self::missing_declaration("integrity_constraints");
     }
 
-    pub(super) fn has_random_values_but_missing_aux_trace_columns_declaration(
-    ) -> Self {
+    pub(super) fn has_random_values_but_missing_aux_trace_columns_declaration() -> Self {
         SemanticError::MissingDeclaration(format!(
             "random_values section requires aux_trace_columns section, which is missing"
         ))
     }
 
-    pub(super) fn illegal_identifer_type(
-        ident_name: &str,
-        ident_type: &IdentifierType
-    ) -> Self {
+    pub(super) fn illegal_identifer_type(ident_name: &str, ident_type: &IdentifierType) -> Self {
         SemanticError::InvalidUsage(format!(
             "Identifier {ident_name} was declared as a {ident_type} which is not a supported type."
         ))
     }
 
-    
     // --- ILLEGAL IDENTIFIER ERRORS --------------------------------------------------------------
 
     pub(super) fn duplicate_identifer(
         ident_name: &str,
         ident_type: IdentifierType,
-        prev_type: IdentifierType
+        prev_type: IdentifierType,
     ) -> Self {
         SemanticError::DuplicateIdentifier(format!(
             "Cannot declare {ident_name} as a {ident_type}, since it was already defined as a {prev_type}"))
     }
 
-    pub(super) fn undeclared_identifier(
-        ident_name: &str
-    ) -> Self {
-        SemanticError::InvalidIdentifier(format!(
-            "Identifier {ident_name} was not declared"
-        ))
+    pub(super) fn undeclared_identifier(ident_name: &str) -> Self {
+        SemanticError::InvalidIdentifier(format!("Identifier {ident_name} was not declared"))
     }
 
     pub(super) fn illegal_trace_column_identifier(
         ident_name: &str,
-        ident_type: &IdentifierType
+        ident_type: &IdentifierType,
     ) -> Self {
         SemanticError::InvalidUsage(format!(
             "Identifier {ident_name} was declared as a {ident_type} not as a trace column"
         ))
     }
-    
+
     // --- ILLEGAL VALUE ERRORS -------------------------------------------------------------------
 
-    pub(super) fn cycle_length_not_power_of_two(
-        length: usize,
-        cycle_name: &str
-    ) -> Self {
+    pub(super) fn cycle_length_not_power_of_two(length: usize, cycle_name: &str) -> Self {
         SemanticError::InvalidPeriodicColumn(format!(
             "cycle length must be a power of two, but was {length} for cycle {cycle_name}"
         ))
     }
-        
-    pub(super) fn cycle_length_too_small(
-        length: usize,
-        cycle_name: &str
-    ) -> Self {
+
+    pub(super) fn cycle_length_too_small(length: usize, cycle_name: &str) -> Self {
         SemanticError::InvalidPeriodicColumn(format!(
             "cycle length must be at least {MIN_CYCLE_LENGTH}, but was {length} for cycle {cycle_name}"
         ))
     }
 
-    pub(super) fn invalid_matrix_constant(
-        constant: &Constant
-    ) -> Self {
+    pub(super) fn invalid_matrix_constant(constant: &Constant) -> Self {
         SemanticError::InvalidConstant(format!(
             "The matrix value of constant {} is invalid",
             constant.name()
@@ -236,19 +205,15 @@ impl SemanticError {
 
     pub(super) fn incompatible_constraint(
         base: &ConstraintDomain,
-        other: &ConstraintDomain
+        other: &ConstraintDomain,
     ) -> Self {
         SemanticError::InvalidConstraintDomain(format!(
             "The specified constraint domain {other:?} is not compatible with the base domain {base:?}"
         ))
     }
 
-    pub(super) fn constraint_already_defined(
-        boundary: &ConstrainedBoundary
-    ) -> Self {
-        SemanticError::TooManyConstraints(format!(
-            "A constraint was already defined at {boundary}"
-        ))
+    pub(super) fn constraint_already_defined(boundary: &ConstrainedBoundary) -> Self {
+        SemanticError::TooManyConstraints(format!("A constraint was already defined at {boundary}"))
     }
 
     pub(super) fn random_value_in_constraint_against_prior_trace_segment() -> Self {
@@ -258,8 +223,6 @@ impl SemanticError {
     }
 
     pub(super) fn constraint_against_undeclared_trace_segment() -> Self {
-        SemanticError::InvalidConstraint(format!(
-            "Constraint against undeclared trace segment"
-        ))
+        SemanticError::InvalidConstraint(format!("Constraint against undeclared trace segment"))
     }
 }
