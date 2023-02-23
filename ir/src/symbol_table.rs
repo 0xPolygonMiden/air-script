@@ -88,9 +88,8 @@ impl SymbolTable {
             .identifiers
             .insert(ident_name.to_owned(), ident_type.clone());
         match result {
-            Some(prev_type) => Err(SemanticError::DuplicateIdentifier(format!(
-                "Cannot declare {ident_name} as a {ident_type}, since it was already defined as a {prev_type}"
-            ))),
+            Some(prev_type) =>
+                Err(SemanticError::duplicate_identifer(ident_name, ident_type, prev_type)),
             None => Ok(()),
         }
     }
@@ -238,9 +237,7 @@ impl SymbolTable {
         if let Some(ident_type) = self.identifiers.get(name) {
             Ok(ident_type)
         } else {
-            Err(SemanticError::InvalidIdentifier(format!(
-                "Identifier {name} was not declared"
-            )))
+            Err(SemanticError::undeclared_identifier(name))
         }
     }
 
@@ -259,12 +256,10 @@ impl SymbolTable {
         match elem_type {
             IdentifierType::TraceColumns(columns) => {
                 if trace_access.idx() >= columns.size() {
-                    return Err(SemanticError::IndexOutOfRange(format!(
-                        "Out-of-range index '{}' while accessing named trace column group '{}' of length {}",
-                        trace_access.idx(),
-                        trace_access.name(),
+                    return Err(SemanticError::named_trace_column_access_out_of_bounds(
+                        trace_access,
                         columns.size()
-                    )));
+                    ));
                 }
 
                 Ok(IndexedTraceAccess::new(
@@ -273,11 +268,10 @@ impl SymbolTable {
                     trace_access.row_offset(),
                 ))
             }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {} was declared as a {} not as a trace column",
+            _ => Err(SemanticError::illegal_trace_column_identifier(
                 trace_access.name(),
                 elem_type
-            ))),
+            )),
         }
     }
 
@@ -397,19 +391,16 @@ impl SymbolTable {
     ) -> Result<(), SemanticError> {
         let segment_idx = trace_access.trace_segment() as usize;
         if segment_idx > self.segment_widths().len() {
-            return Err(SemanticError::IndexOutOfRange(format!(
-                "Segment index '{}' is greater than the number of segments in the trace ({}).",
-                segment_idx,
+            return Err(SemanticError::indexed_trace_access_out_of_bounds(
+                trace_access,
                 self.segment_widths().len()
-            )));
+            ));
         }
         if trace_access.col_idx() as u16 >= self.segment_widths()[segment_idx] {
-            return Err(SemanticError::IndexOutOfRange(format!(
-                "Out-of-range index '{}' in trace segment '{}' of length {}",
-                trace_access.col_idx(),
-                trace_access.trace_segment(),
+            return Err(SemanticError::indexed_trace_column_access_out_of_bounds(
+                trace_access,
                 self.segment_widths()[segment_idx]
-            )));
+            ));
         }
 
         Ok(())
@@ -419,11 +410,10 @@ impl SymbolTable {
     /// the number of declared random values.
     pub(super) fn validate_rand_access(&self, index: usize) -> Result<(), SemanticError> {
         if index >= usize::from(self.num_random_values()) {
-            return Err(SemanticError::IndexOutOfRange(format!(
-                "Random value index {} is greater than or equal to the total number of random values ({}).", 
+            return Err(SemanticError::random_value_access_out_of_bounds(
                 index,
                 self.num_random_values()
-            )));
+            ));
         }
 
         Ok(())
@@ -439,15 +429,12 @@ fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
     let cycle = column.values().len();
 
     if !cycle.is_power_of_two() {
-        return Err(SemanticError::InvalidPeriodicColumn(format!(
-            "cycle length must be a power of two, but was {cycle} for cycle {name}"
-        )));
+        return Err(SemanticError::cycle_length_not_power_of_two(cycle, name)
+        );
     }
 
     if cycle < MIN_CYCLE_LENGTH {
-        return Err(SemanticError::InvalidPeriodicColumn(format!(
-            "cycle length must be at least {MIN_CYCLE_LENGTH}, but was {cycle} for cycle {name}"
-        )));
+        return Err(SemanticError::cycle_length_too_small(cycle, name));
     }
 
     Ok(())
@@ -462,10 +449,7 @@ fn validate_constant(constant: &Constant) -> Result<(), SemanticError> {
             if matrix.iter().skip(1).all(|row| row.len() == row_len) {
                 Ok(())
             } else {
-                Err(SemanticError::InvalidConstant(format!(
-                    "The matrix value of constant {} is invalid",
-                    constant.name()
-                )))
+                Err(SemanticError::invalid_matrix_constant(constant))
             }
         }
         _ => Ok(()),
