@@ -1,14 +1,15 @@
 use super::{
-    BTreeMap, ConstantType, ConstraintDomain, ExprDetails, Expression, Identifier, IdentifierType,
-    IndexedTraceAccess, IntegrityConstraintDegree, MatrixAccess, Scope, SemanticError, SymbolTable,
-    TraceSegment, VariableRoots, VariableType, VectorAccess,
+    list_comprehension::unfold_lc, BTreeMap, ConstantType, ConstraintDomain, ExprDetails,
+    Expression, Identifier, IdentifierType, IndexedTraceAccess, IntegrityConstraintDegree,
+    ListFoldingType, MatrixAccess, Scope, SemanticError, SymbolTable, TraceSegment, VariableRoots,
+    VariableType, VectorAccess,
 };
 
 // CONSTANTS
 // ================================================================================================
 
 /// The offset of the "current" row during constraint evaluation.
-const CURRENT_ROW: usize = 0;
+pub const CURRENT_ROW: usize = 0;
 /// The default segment against which a constraint is applied is the main trace segment.
 pub const DEFAULT_SEGMENT: TraceSegment = 0;
 /// The auxiliary trace segment.
@@ -156,7 +157,10 @@ impl AlgebraicGraph {
                 let node_index = if let Expression::Const(rhs) = **rhs {
                     self.insert_op(Operation::Exp(lhs.root_idx(), rhs as usize))
                 } else {
-                    todo!()
+                    Err(SemanticError::InvalidUsage(
+                        "Non const exponents are only allowed inside list comprehensions"
+                            .to_string(),
+                    ))?
                 };
 
                 Ok(ExprDetails::new(
@@ -165,7 +169,9 @@ impl AlgebraicGraph {
                     lhs.domain(),
                 ))
             }
-            Expression::ListFolding(_) => todo!(),
+            Expression::ListFolding(lf_type) => {
+                self.insert_list_folding(symbol_table, lf_type, variable_roots, default_domain)
+            }
         }
     }
 
@@ -427,6 +433,11 @@ impl AlgebraicGraph {
                 Ok(ExprDetails::new(node_index, trace_segment, domain))
             }
             IdentifierType::PublicInput(_) => {
+                if !domain.is_boundary() {
+                    return Err(SemanticError::InvalidUsage(
+                        "Public inputs cannot be accessed in integrity constraints.".to_string(),
+                    ));
+                }
                 let node_index = self.insert_op(Operation::PublicInput(
                     vector_access.name().to_string(),
                     vector_access.idx(),
@@ -513,6 +524,42 @@ impl AlgebraicGraph {
             _ => Err(SemanticError::InvalidUsage(format!(
                 "Identifier {name} was declared as a {elem_type} not as a random values"
             ))),
+        }
+    }
+
+    /// Inserts a list folding expression into the graph and returns the resulting expression
+    /// details.
+    ///
+    /// # Errors
+    /// - Panics if the list is empty.
+    /// - Returns an error if the list cannot be unfolded properly.
+    fn insert_list_folding(
+        &mut self,
+        symbol_table: &SymbolTable,
+        lf_type: &ListFoldingType,
+        variable_roots: &mut VariableRoots,
+        domain: ConstraintDomain,
+    ) -> Result<ExprDetails, SemanticError> {
+        match lf_type {
+            ListFoldingType::Sum(lc) | ListFoldingType::Prod(lc) => {
+                let list = unfold_lc(lc, symbol_table)?;
+                assert!(
+                    !list.is_empty(),
+                    "List on which list folding is applied is empty."
+                );
+
+                let mut acc = self.insert_expr(symbol_table, &list[0], variable_roots, domain)?;
+                for elem in list.iter().skip(1) {
+                    let expr = self.insert_expr(symbol_table, elem, variable_roots, domain)?;
+                    let op = match lf_type {
+                        ListFoldingType::Sum(_) => Operation::Add(acc.root_idx(), expr.root_idx()),
+                        ListFoldingType::Prod(_) => Operation::Mul(acc.root_idx(), expr.root_idx()),
+                    };
+                    acc = self.insert_bin_op(&acc, &expr, op)?;
+                }
+
+                Ok(acc)
+            }
         }
     }
 }
