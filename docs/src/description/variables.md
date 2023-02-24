@@ -34,6 +34,38 @@ integrity_constraints:
     enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1]
 ```
 
+### Syntax restriction for local variables
+Currently, it is not possible to:
+
+1. Create matrices containing both arrays and references to arrays.
+
+    Example:
+
+    ```
+    ...
+    boundary_constraints:
+        let a = [1, 2]
+        let b = [a, [3, 4]]  <-- b consists of array `[3, 4]` and reference to array `a`
+        enf ...
+    ...
+    ```
+2. Create variables with list comprehension for which the source array is a plain array, a matrix row, or a range in matrix row.
+
+    Example: 
+
+    ```
+    ...
+    integrity_constraints:
+        let a = [[1, 2], [3, 4]]
+        let b = [5, 6]
+        let c = 7
+        let d = [e for e in [8, c, b[0], a[0][1]]]  <-- source array is a plain array
+        let f = [g for g in a[1]]  <-- source is a matirx row
+        let h = [i for i in a[0][0..2]]  <-- source is a range in matrix row
+        enf ...
+    ...
+    ```
+
 ## Built-in variables
 
 Built-in variables are identified by the starting character `$`. There are two built-in variables:

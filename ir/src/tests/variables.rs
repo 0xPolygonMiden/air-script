@@ -128,21 +128,43 @@ fn ic_variables_access_vector_from_matrix() {
         main: [clk]
     public_inputs:
         stack_inputs: [16]
+    boundary_constraints:
+        enf clk.first = 7
+        enf clk.last = 8
     integrity_constraints:
         let a = [[1, 2], [3, 4]]
         let b = a[1]
         let c = b
         let d = [a[0], a[1], b]
         let e = d
-        enf clk' = c[0] + e[2][0] + e[0][1]
-    boundary_constraints:
-        enf clk.first = 7
-        enf clk.last = 8";
+        enf clk' = c[0] + e[2][0] + e[0][1]";
 
     let parsed = parse(source).expect("Parsing failed");
 
     let result = AirIR::new(&parsed);
     assert!(result.is_ok());
+}
+
+// We can not parse matrix variable that consists of array and non-array elements
+#[test]
+fn err_ic_variables_access_vector_from_matrix() {
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        enf clk.first = 7
+        enf clk.last = 8
+    integrity_constraints:
+        let a = [[1, 2, 3, 4], [5, 6, 7, 8]]
+        let b = [9, 10]
+        let c = 12
+        let c = [a[0], [11, c, b[1], a[1][0]]]
+        d = [[11, c, b[1], a[1][0]], a[0]]
+        enf clk' = c[0][0] + d[1][1]";
+
+    parse(source).expect_err("Parsing failed");
 }
 
 #[test]

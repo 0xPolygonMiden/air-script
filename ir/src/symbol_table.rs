@@ -311,11 +311,11 @@ impl SymbolTable {
                 Ok(symbol_type)
             }
             IdentifierType::Variable(_, variable) => match variable.value() {
+                VariableType::Scalar(_) => Ok(symbol_type),
                 VariableType::Vector(vector) => {
                     validate_vector_access(vector_access, vector.len())?;
                     Ok(symbol_type)
                 }
-                VariableType::Scalar(_) => Ok(symbol_type),
                 _ => Err(SemanticError::invalid_vector_access(
                     vector_access,
                     symbol_type,
@@ -367,12 +367,12 @@ impl SymbolTable {
                 Ok(symbol_type)
             }
             IdentifierType::Variable(_, variable) => match variable.value() {
+                VariableType::Scalar(_) => Ok(symbol_type),
+                VariableType::Vector(_) => Ok(symbol_type),
                 VariableType::Matrix(matrix) => {
                     validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                     Ok(symbol_type)
                 }
-                VariableType::Vector(_) => Ok(symbol_type),
-                VariableType::Scalar(_) => Ok(symbol_type),
                 _ => Err(SemanticError::invalid_matrix_access(
                     matrix_access,
                     symbol_type,
