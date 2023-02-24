@@ -123,3 +123,14 @@ fn random_values() {
     let expected = expect_file!["random_values/random_values.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn list_comprehension() {
+    // TODO: Improve this test to include more complicated expressions
+    let generated_air = Test::new("tests/list_comprehension/list_comprehension.air".to_string())
+        .transpile()
+        .unwrap();
+
+    let expected = expect_file!["list_comprehension/list_comprehension.rs"];
+    expected.assert_eq(&generated_air);
+}
