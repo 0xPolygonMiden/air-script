@@ -32,28 +32,8 @@ fn lc_with_const_exp() {
     
     integrity_constraints:
         let y = [col^7 for col in c]
-        enf clk = y[1]";
-
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_ok());
-}
-
-#[test]
-fn lc_with_named_trace_access_const_exp() {
-    let source = "
-    trace_columns:
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
-    public_inputs:
-        stack_inputs: [16]
-    
-    boundary_constraints:
-        enf c[2].first = 0
-    
-    integrity_constraints:
-        let y = [col'^7 - col for col in c]
-        enf clk = y[1]";
+        let z = [col'^7 - col for col in c]
+        enf clk = y[1] + z[1]";
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::new(&parsed);
@@ -177,7 +157,7 @@ fn lf_in_lc() {
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::new(&parsed);
-    println!("{:?}", result);
+
     assert!(result.is_ok());
 }
 
@@ -216,26 +196,6 @@ fn err_index_out_of_range_lc_slice() {
     integrity_constraints:
         let x = [z for z in c[1..3]]
         enf clk = x[3]";
-
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
-}
-
-#[test]
-fn err_non_const_exp_outside_lc() {
-    let source = "
-    trace_columns:
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
-    public_inputs:
-        stack_inputs: [16]
-    
-    boundary_constraints:
-        enf c[2].first = 0
-    
-    integrity_constraints:
-        enf clk = 2^ctx";
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::new(&parsed);

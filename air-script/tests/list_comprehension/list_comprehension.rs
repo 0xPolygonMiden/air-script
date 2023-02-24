@@ -86,11 +86,11 @@ impl Air for ListComprehensionAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
-        result[0] = aux_current[0] - main_current[0] * E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * aux_current[7];
-        result[1] = aux_current[0] - main_current[0] * (aux_next[4] - aux_next[8]);
-        result[2] = aux_current[2] - main_current[0] * (aux_current[5] - aux_current[10]);
+        result[0] = aux_current[0] - E::from(main_current[0]) * E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * aux_current[7];
+        result[1] = aux_current[0] - E::from(main_current[0]) * (aux_next[4] - aux_next[8]);
+        result[2] = aux_current[2] - E::from(main_current[0]) * (aux_current[5] - aux_current[10]);
         result[3] = aux_current[0] - (E::from(0_u64) + aux_current[1] - aux_current[4] - aux_current[8] + E::from(1_u64) + aux_current[2] - aux_current[5] - aux_current[9] + E::from(2_u64) + aux_current[3] - aux_current[6] - aux_current[10]);
         result[4] = aux_current[7] - (aux_current[4] * aux_current[8] + aux_current[5] * aux_current[9] + aux_current[6] * aux_current[10] + aux_current[7] * aux_current[11] + (aux_current[4] + aux_current[8]) * (aux_current[5] + aux_current[9]) * (aux_current[6] + aux_current[10]) * (aux_current[7] + aux_current[11]));
-        result[5] = aux_current[0] * main_current[0] - (main_current[1] + aux_current[4] * aux_current[8] + aux_current[5] * aux_current[9] + aux_current[6] * aux_current[10] + aux_current[7] * aux_current[11] + aux_current[4] * aux_current[8] + aux_current[5] * aux_current[9] + aux_current[6] * aux_current[10] + aux_current[7] * aux_current[11]);
+        result[5] = aux_current[0] * E::from(main_current[0]) - (E::from(main_current[1]) + aux_current[4] * aux_current[8] + aux_current[5] * aux_current[9] + aux_current[6] * aux_current[10] + aux_current[7] * aux_current[11] + aux_current[4] * aux_current[8] + aux_current[5] * aux_current[9] + aux_current[6] * aux_current[10] + aux_current[7] * aux_current[11]);
     }
 }

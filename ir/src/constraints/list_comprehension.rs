@@ -145,14 +145,15 @@ fn parse_named_trace_access(
                             named_trace_access.row_offset(),
                         )))
                     }
-                    _ => Err(SemanticError::InvalidListComprehension(
-                        "Iterable should be a trace column".to_string(),
-                    ))?,
+                    _ => Err(SemanticError::InvalidListComprehension(format!(
+                        "Iterable {ident} should contain trace columns"
+                    )))?,
                 }
             }
-            Iterable::Range(_) => Err(SemanticError::InvalidListComprehension(
-                "Iterable cannot be of range type here".to_string(),
-            )),
+            Iterable::Range(_) => Err(SemanticError::InvalidListComprehension(format!(
+                "Iterable cannot be of type Range for named trace access {}",
+                named_trace_access.name()
+            ))),
             Iterable::Slice(ident, range) => {
                 let ident_type = symbol_table.get_type(ident.name())?;
                 match ident_type {
@@ -164,9 +165,9 @@ fn parse_named_trace_access(
                             named_trace_access.row_offset(),
                         )))
                     }
-                    _ => Err(SemanticError::InvalidListComprehension(
-                        "Iterable should be a trace column".to_string(),
-                    ))?,
+                    _ => Err(SemanticError::InvalidListComprehension(format!(
+                        "Iterable {ident} should contain trace columns"
+                    )))?,
                 }
             }
         },
@@ -239,15 +240,16 @@ fn get_iterable_len(
             match ident_type {
                 IdentifierType::Variable(_, var_type) => match var_type.value() {
                     VariableType::Vector(vector) => Ok(vector.len()),
-                    _ => Err(SemanticError::InvalidListComprehension(
-                        "List comprehensions only allowed for vector variables.".to_string(),
-                    )),
+                    _ => Err(SemanticError::InvalidListComprehension(format!(
+                        "Variable {} should be a vector for a valid list comprehension.",
+                        ident.name()
+                    ))),
                 },
                 IdentifierType::PublicInput(size) => Ok(*size),
                 IdentifierType::TraceColumns(trace_columns) => Ok(trace_columns.size()),
-                _ => Err(SemanticError::InvalidListComprehension(
-                    "IdentifierType {ident_type} not supported for list comprehensions".to_string(),
-                )),
+                _ => Err(SemanticError::InvalidListComprehension(format!(
+                    "IdentifierType {ident_type} not supported for list comprehensions"
+                ))),
             }
         }
         Iterable::Range(range) | Iterable::Slice(_, range) => Ok(range.end() - range.start()),
@@ -263,9 +265,9 @@ fn validate_access(i: usize, size: usize) -> Result<(), SemanticError> {
     if i < size {
         Ok(())
     } else {
-        Err(SemanticError::IndexOutOfRange(
-            "Invalid access index used in list comprehension".to_string(),
-        ))
+        Err(SemanticError::IndexOutOfRange(format!(
+            "Invalid access index {i} used in list comprehension"
+        )))
     }
 }
 
@@ -288,7 +290,7 @@ fn build_iterable_context(lc: &ListComprehension) -> Result<IterableContext, Sem
     Ok(iterable_context)
 }
 
-/// Builds an [Expression] from a given identifier.
+/// Builds an [Expression] from a given identifier and the index i at which it is being accessed.
 ///
 /// # Errors
 /// - Returns an error if the identifier is not of type in set:
@@ -317,9 +319,9 @@ fn build_ident_expression(
                     Ok(vector[i].clone())
                 }
                 // TODO: Handle matrix access
-                _ => Err(SemanticError::InvalidListComprehension(
-                    "Iterables should be vectors".to_string(),
-                ))?,
+                _ => Err(SemanticError::InvalidListComprehension(format!(
+                    "Iterable {ident} should be a vector"
+                )))?,
             }
         }
         IdentifierType::PublicInput(size) => {
@@ -337,7 +339,7 @@ fn build_ident_expression(
             )))
         }
         _ => Err(SemanticError::InvalidListComprehension(
-            "Invalid type for a vector".to_string(),
+            "{ident_type} is an invalid type for a vector".to_string(),
         ))?,
     }
 }
@@ -371,9 +373,9 @@ fn build_slice_ident_expression(
                     Ok(vector[range_start + i].clone())
                 }
                 // TODO: Handle matrix access
-                _ => Err(SemanticError::InvalidListComprehension(
-                    "Iterables should be vectors".to_string(),
-                ))?,
+                _ => Err(SemanticError::InvalidListComprehension(format!(
+                    "Variable {ident} should be a vector for a valid list comprehension"
+                )))?,
             }
         }
         IdentifierType::PublicInput(size) => {
@@ -391,7 +393,7 @@ fn build_slice_ident_expression(
             )))
         }
         _ => Err(SemanticError::InvalidListComprehension(
-            "Invalid type for a vector".to_string(),
+            "{ident_type} is an invalid type for a vector".to_string(),
         ))?,
     }
 }

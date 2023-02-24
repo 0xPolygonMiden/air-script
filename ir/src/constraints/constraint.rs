@@ -104,7 +104,10 @@ impl ConstraintDomain {
 
     /// Returns true if this domain is a boundary domain (FirstRow or LastRow).
     pub fn is_boundary(&self) -> bool {
-        *self == ConstraintDomain::FirstRow || *self == ConstraintDomain::LastRow
+        matches!(
+            *self,
+            ConstraintDomain::FirstRow | ConstraintDomain::LastRow
+        )
     }
 }
 
