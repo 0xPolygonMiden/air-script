@@ -1,6 +1,6 @@
 [package]
 name = "air-codegen-gce"
-version = "0.1.0"
+version = "0.2.0"
 description="Code generation for the generic constraint evaluation format."
 authors = ["miden contributors"]
 readme="README.md"

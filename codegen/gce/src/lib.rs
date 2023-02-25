@@ -1,13 +1,14 @@
-use ir::{
-    constraints::{ConstantValue, Operation},
-    AirIR,
-};
-
 pub use air_script_core::{
     Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, MatrixAccess,
     NamedTraceAccess, TraceSegment, Variable, VariableType, VectorAccess,
 };
+use ir::{
+    constraints::{ConstantValue, Operation},
+    AirIR,
+};
 use std::fmt::Display;
+use std::fs::File;
+use std::io::Write;
 
 mod error;
 use error::ConstraintEvaluationError;
@@ -15,13 +16,10 @@ use error::ConstraintEvaluationError;
 mod utils;
 
 mod expressions;
-use expressions::ExpressionsHandler;
+use expressions::GceBuilder;
 
-use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::Write;
-
-/// Holds data for JSON generation
+/// CodeGenerator is used to generate a JSON file with generic constraint evaluation. The generated
+/// file contains the data used for GPU acceleration.
 #[derive(Default, Debug)]
 pub struct CodeGenerator {
     num_polys: u16,
@@ -33,18 +31,13 @@ pub struct CodeGenerator {
 
 impl CodeGenerator {
     pub fn new(ir: &AirIR, extension_degree: u8) -> Result<Self, ConstraintEvaluationError> {
-        // maps indexes in Node vector in AlgebraicGraph and in `expressions` JSON array
-        let mut expressions_map = BTreeMap::new();
-
         let num_polys = set_num_polys(ir, extension_degree);
         let num_variables = set_num_variables(ir);
         let constants = set_constants(ir);
 
-        let mut expressions_handler = ExpressionsHandler::new(ir, &constants, &mut expressions_map);
-
-        let mut expressions = expressions_handler.get_expressions()?;
-        // vector of `expressions` indexes
-        let outputs = expressions_handler.get_outputs(&mut expressions)?;
+        let mut gce_builder = GceBuilder::new();
+        gce_builder.build(ir, &constants)?;
+        let (expressions, outputs) = gce_builder.into_gce()?;
 
         Ok(CodeGenerator {
             num_polys,
@@ -173,13 +166,18 @@ fn set_constants(ir: &AirIR) -> Vec<u64> {
     constants
 }
 
-/// Stroes node type required in [NodeReference] struct
+/// Stores the node type required by the [NodeReference] struct.
 #[derive(Debug, Clone)]
 pub enum NodeType {
+    // Refers to the value in the trace column at the specified `index` in the current row.
     Pol,
+    // Refers to the value in the trace column at the specified `index` in the next row.
     PolNext,
+    // Refers to a public input or a random value at the specified `index`.
     Var,
+    // Refers to a constant at the specified `index`.
     Const,
+    // Refers to a previously defined expression at the specified index.
     Expr,
 }
 
@@ -212,7 +210,8 @@ impl Display for ExpressionOperation {
     }
 }
 
-/// Stores data used in JSON generation
+/// Stores the reference to the node using the type of the node and index in related array of
+/// nodes.
 #[derive(Debug, Clone)]
 pub struct NodeReference {
     pub node_type: NodeType,
@@ -229,7 +228,8 @@ impl Display for NodeReference {
     }
 }
 
-/// Stores data used in JSON generation
+/// Stores the expression node using the expression operation and references to the left and rigth
+/// nodes.
 #[derive(Clone, Debug)]
 pub struct ExpressionJson {
     pub op: ExpressionOperation,
