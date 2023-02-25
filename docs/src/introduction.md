@@ -27,6 +27,9 @@ AirScript includes the following features:
 
 - **Variables**: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. `let x = k * c[1]'`, `let y = [k * c[1], l * c[2], m * c[3]]` or `let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]]`)
 
+The language also includes some convenience syntax like list comprehension and list folding to make writing constraints easier.
+(e.g. `let x = [k * c for (k, c) in (k, c[1..4])]`, `let y = sum([k * c for (k, c) in (k, c[1..4])])`)
+
 The language will be specified in detail in the rest of this book.
 
 ### CLI
