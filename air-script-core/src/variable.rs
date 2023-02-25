@@ -41,6 +41,7 @@ impl Display for VariableType {
             Self::Vector(_) => write!(f, "vector"),
             Self::Matrix(_) => write!(f, "matrix"),
             Self::ListComprehension(_) => write!(f, "list comprehension"),
+            Self::Tuple(_) => write!(f, "tuple"),
         }
     }
 }

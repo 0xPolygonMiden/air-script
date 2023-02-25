@@ -74,6 +74,21 @@ pub enum Token {
     /// Keyword to declare the evaluator function section in the AIR constraints module.
     #[token("ev")]
     EvaluatorFunction,
+    
+    #[token("fn")]
+    Function,
+
+    #[token("return")]
+    Return,
+
+    #[token("scalar")]
+    Scalar,
+
+    #[token("vector")]
+    Vector,
+
+    #[token("matrix")]
+    Matrix,
 
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
@@ -179,6 +194,9 @@ pub enum Token {
 
     #[token(")")]
     Rparen,
+
+    #[token("->")]
+    Rarrow,
 
     #[token("..")]
     Range,

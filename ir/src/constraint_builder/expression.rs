@@ -70,6 +70,7 @@ impl ConstraintBuilder {
                 Ok(node_index)
             }
             Expression::Exp(lhs, rhs) => self.insert_exp_op(lhs, rhs),
+            Expression::FunctionCall(_, _) => todo!(),
         }
     }
 

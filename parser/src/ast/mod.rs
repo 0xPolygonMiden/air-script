@@ -23,6 +23,9 @@ pub use random_values::*;
 pub mod evaluator_function;
 pub use evaluator_function::*;
 
+pub mod function;
+pub use function::*;
+
 // AST
 // ================================================================================================
 
@@ -51,7 +54,12 @@ pub struct Source(pub Vec<SourceSection>);
 pub enum SourceSection {
     AirDef(Identifier),
     Constant(Constant),
+<<<<<<< HEAD
     Trace(Vec<Vec<TraceBinding>>),
+=======
+    Function(Function),
+    Trace(Trace),
+>>>>>>> ff57150 (feat(parser): add functions to parser)
     PublicInputs(Vec<PublicInput>),
     PeriodicColumns(Vec<PeriodicColumn>),
     RandomValues(RandomValues),

@@ -2,11 +2,12 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
-        build_trace_bindings, Constant, ConstantType, ComprehensionContext,
-        Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier, TraceAccess, Iterable,
-        ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, PeriodicColumn,
-        PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, TraceBinding,
-        TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType, VectorAccess
+        build_trace_bindings, ArgumentType, Constant, ConstantType, ComprehensionContext,
+        Expression, EvaluatorFunction, EvaluatorFunctionCall, Function, FunctionArgument, 
+        FunctionBody, Identifier, TraceAccess, Iterable, ListComprehension, ListFoldingType,
+        ListFoldingValueType, MatrixAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues,
+        Range, ReturnType, Source, SourceSection, TraceBinding, TraceBindingAccess,
+        TraceBindingAccessSize, Variable, VariableType, VectorAccess
     }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
@@ -24,6 +25,7 @@ pub Source: Source = {
 SourceSection: SourceSection = {
     AirDef => SourceSection::AirDef(<>),
     Constant => SourceSection::Constant(<>),
+    Function => SourceSection::Function(<>),
     Trace => SourceSection::Trace(<>),
     PublicInputs => SourceSection::PublicInputs(<>),
     PeriodicColumns => SourceSection::PeriodicColumns(<>),
@@ -94,6 +96,50 @@ ConstName: Identifier = {
             ))
         })
     }
+}
+
+// FUNCTIONS
+// ================================================================================================
+Function: Function = {
+    "fn" <function_name: Identifier> "(" <args: FunctionArguments> ")" "->"
+        <return_types: ReturnTypes> ":" <body: FunctionBody> =>
+            Function::new(function_name, args, return_types, body),
+}
+
+FunctionArguments: Vec<FunctionArgument> = {
+    CommaElems<FunctionArgument> => <>,
+}
+
+ReturnTypes: Vec<ReturnType> = {
+    <return_type: ReturnType> => vec![return_type],
+    "(" <return_types: CommaElems<ReturnType>> ")" => return_types,
+}
+
+FunctionArgument: FunctionArgument = {
+    <name: Identifier> ":" <argument_type: ArgumentType> => FunctionArgument::new(name, argument_type),
+}
+
+ArgumentType: ArgumentType = {
+    "scalar" => ArgumentType::Scalar,
+    "vector" <size: Size> => ArgumentType::Vector(size),
+    "matrix" <row_size: Size> <col_size: Size> => ArgumentType::Matrix(row_size, col_size),
+}
+
+ReturnType: ReturnType = {
+    "scalar" => ReturnType::Scalar,
+    "vector" <size: Size> => ReturnType::Vector(size),
+    "matrix" <row_size: Size> <col_size: Size> => ReturnType::Matrix(row_size, col_size),
+}
+
+FunctionBody: FunctionBody = {
+    <integrity_variables: IntegrityVariable*>
+    "return" <return_stmts: ReturnStmts> =>
+        FunctionBody::new(integrity_variables, return_stmts),
+}
+
+ReturnStmts: Vec<VariableType> = {
+    <return_stmt: IntegrityVariableType> => vec![return_stmt],
+    <return_stmts: Tuple<IntegrityVariableType>> => return_stmts,
 }
 
 // PUBLIC INPUTS
@@ -327,6 +373,11 @@ IntegrityConstraintWithSelector: IntegrityStmt = {
         IntegrityStmt::Constraint(ConstraintType::Evaluator(evaluator_fn_call), Some(selectors)),
 }
 
+IntegrityVariable: IntegrityStmt = {
+    "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
+        IntegrityStmt::Variable(Variable::new(name, integrity_variable_type)),
+}
+
 IntegrityVariableType: VariableType = {
     <scalar_value: IntegrityExpr> =>
         VariableType::Scalar(scalar_value),
@@ -403,6 +454,8 @@ IntegrityAtom: Expression = {
     <trace_access: TraceBindingAccessWithOffset> => Expression::TraceBindingAccess(trace_access),
     <list_folding_type: ListFoldingType<IntegrityExpr>> =>
         Expression::ListFolding(list_folding_type),
+    <function_name: Identifier> "(" <args: CommaElems<IntegrityVariableType>> ")" =>
+        Expression::FunctionCall(function_name, args),
 }
 
 // ATOMS
@@ -527,7 +580,7 @@ Range: Range = {
 }
 
 Identifier: Identifier = {
-    <n:identifier> => Identifier(n.to_string())
+    <n: identifier> => Identifier(n.to_string())
 }
 
 Num_u64: u64 = {
@@ -548,6 +601,11 @@ extern {
         identifier => Token::Ident(<String>),
         r"[0-9]+" => Token::Num(<String>),
         "def" => Token::Def,
+        "fn" => Token::Function,
+        "return" => Token::Return,
+        "scalar" => Token::Scalar,
+        "vector" => Token::Vector,
+        "matrix" => Token::Matrix,
         "let" => Token::Let,
         "for" => Token::For,
         "in" => Token::In,
@@ -587,6 +645,7 @@ extern {
         "(" => Token::Lparen,
         ")" => Token::Rparen,
         "." => Token::Dot,
+        "->" => Token::Rarrow,
         ".." => Token::Range,
     }
 }
