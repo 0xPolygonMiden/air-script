@@ -30,6 +30,7 @@ pub enum VariableType {
     Scalar(Expression),
     Vector(Vec<Expression>),
     Matrix(Vec<Vec<Expression>>),
+    Tuple(Vec<Expression>),
     ListComprehension(ListComprehension),
 }
 
