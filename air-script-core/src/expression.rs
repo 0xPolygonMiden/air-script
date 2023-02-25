@@ -1,6 +1,7 @@
 use super::{
     Identifier, IndexedTraceAccess, ListComprehension, MatrixAccess, NamedTraceAccess, VectorAccess,
 };
+use crate::VariableType;
 
 /// Arithmetic expressions for evaluation of constraints.
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -24,6 +25,7 @@ pub enum Expression {
     Mul(Box<Expression>, Box<Expression>),
     Exp(Box<Expression>, Box<Expression>),
     ListFolding(ListFoldingType),
+    FunctionCall(Identifier, Vec<VariableType>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
