@@ -1,13 +1,20 @@
 use super::{
-    trace_columns::TraceColumns, BTreeMap, Constant, ConstantType, Constants, Identifier,
-    IndexedTraceAccess, MatrixAccess, NamedTraceAccess, PeriodicColumns, PublicInputs,
-    SemanticError, TraceSegment, Variable, VariableType, VectorAccess, MIN_CYCLE_LENGTH,
+    ast, BTreeMap, Constant, ConstantType, Declarations, Identifier, IndexedTraceAccess,
+    MatrixAccess, NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType,
+    VectorAccess, MIN_CYCLE_LENGTH,
 };
-use parser::ast::{PeriodicColumn, PublicInput, RandomValues, TraceCols};
 use std::fmt::Display;
 
+mod trace_columns;
+use trace_columns::TraceColumns;
+
+// TYPES
+// ================================================================================================
+
+/// TODO: docs
+/// TODO: get rid of need to make this public to the crate
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub(super) enum IdentifierType {
+pub(crate) enum IdentifierType {
     /// an identifier for a constant, containing its type and value
     Constant(ConstantType),
     /// an identifier for a trace column, containing trace column information with its trace
@@ -41,36 +48,33 @@ impl Display for IdentifierType {
     }
 }
 
+// TODO: get rid of need to make this public
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-pub(super) enum Scope {
+pub(crate) enum Scope {
     BoundaryConstraints,
     IntegrityConstraints,
 }
+
+// TODO: get rid of need to make this public
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum VariableValue {
+    Scalar(String),
+    Vector(VectorAccess),
+    Matrix(MatrixAccess),
+}
+
+// SYMBOL TABLE
+// ================================================================================================
 
 /// SymbolTable for identifiers to track their types and information and enforce uniqueness of
 /// identifiers.
 #[derive(Default, Debug)]
 pub struct SymbolTable {
-    /// Vector in which index is trace segment and value is number of columns in this segment
-    segment_widths: Vec<u16>,
-
-    /// Number of random values. For array initialized in `rand: [n]` form it will be `n`, and for
-    /// `rand: [a, b[n], c, ...]` it will be length of the flattened array.
-    num_random_values: u16,
-
     /// A map of all declared identifiers from their name (the key) to their type.
     identifiers: BTreeMap<String, IdentifierType>,
 
-    /// A vector of constants declared in the AirScript module.
-    constants: Constants,
-
-    /// A map of the Air's periodic columns using the index of the column within the declared
-    /// periodic columns as the key and the vector of periodic values as the value
-    periodic_columns: PeriodicColumns,
-
-    /// A vector of public inputs with each value as a tuple of input identifier and it's array
-    /// size.
-    public_inputs: PublicInputs,
+    /// TODO: docs
+    declarations: Declarations,
 }
 
 impl SymbolTable {
@@ -97,12 +101,13 @@ impl SymbolTable {
 
     // --- PUBLIC MUTATORS ------------------------------------------------------------------------
 
-    /// Add all constants by their identifiers and values.
+    /// Add a constant by its identifier and value.
     pub(super) fn insert_constant(&mut self, constant: &Constant) -> Result<(), SemanticError> {
-        let Identifier(name) = &constant.name();
         validate_constant(constant)?;
+
+        let Identifier(name) = &constant.name();
         self.insert_symbol(name, IdentifierType::Constant(constant.value().clone()))?;
-        self.constants.push(constant.clone());
+        self.declarations.add_constant(constant.clone());
 
         Ok(())
     }
@@ -111,12 +116,8 @@ impl SymbolTable {
     pub(super) fn insert_trace_columns(
         &mut self,
         trace_segment: TraceSegment,
-        trace: &[TraceCols],
+        trace: &[ast::TraceCols],
     ) -> Result<(), SemanticError> {
-        if trace_segment >= self.segment_widths.len() as u8 {
-            self.segment_widths.resize(trace_segment as usize + 1, 0);
-        }
-
         let mut col_idx = 0;
         for trace_cols in trace {
             let trace_columns =
@@ -127,7 +128,18 @@ impl SymbolTable {
             )?;
             col_idx += trace_cols.size() as usize;
         }
-        self.segment_widths[trace_segment as usize] = col_idx as u16;
+
+        if col_idx > u16::MAX.into() {
+            return Err(SemanticError::InvalidTraceSegment(format!(
+                "Trace segment {} has {} columns, but the maximum number of columns is {}",
+                trace_segment,
+                col_idx,
+                u16::MAX
+            )));
+        }
+
+        self.declarations
+            .set_trace_segment_width(usize::from(trace_segment), col_idx as u16);
 
         Ok(())
     }
@@ -135,12 +147,12 @@ impl SymbolTable {
     /// Adds all public inputs by their identifier names and array length.
     pub(super) fn insert_public_inputs(
         &mut self,
-        public_inputs: &[PublicInput],
+        public_inputs: &[ast::PublicInput],
     ) -> Result<(), SemanticError> {
         for input in public_inputs.iter() {
             self.insert_symbol(input.name(), IdentifierType::PublicInput(input.size()))?;
-            self.public_inputs
-                .push((input.name().to_string(), input.size()));
+            self.declarations
+                .add_public_input((input.name().to_string(), input.size()));
         }
 
         Ok(())
@@ -150,7 +162,7 @@ impl SymbolTable {
     /// periodic columns, and the lengths of their periodic cycles.
     pub(super) fn insert_periodic_columns(
         &mut self,
-        columns: &[PeriodicColumn],
+        columns: &[ast::PeriodicColumn],
     ) -> Result<(), SemanticError> {
         for (index, column) in columns.iter().enumerate() {
             validate_cycles(column)?;
@@ -160,7 +172,7 @@ impl SymbolTable {
                 column.name(),
                 IdentifierType::PeriodicColumn(index, values.len()),
             )?;
-            self.periodic_columns.push(values);
+            self.declarations.add_periodic_column(values);
         }
 
         Ok(())
@@ -169,9 +181,10 @@ impl SymbolTable {
     /// Adds all random values by their identifier names and array length.
     pub(super) fn insert_random_values(
         &mut self,
-        values: &RandomValues,
+        values: &ast::RandomValues,
     ) -> Result<(), SemanticError> {
-        self.num_random_values = values.size() as u16;
+        self.declarations
+            .set_num_random_values(values.size() as u16);
         let mut offset = 0;
         // add the name of the random values array to the symbol table
         self.insert_symbol(
@@ -204,37 +217,22 @@ impl SymbolTable {
 
     /// Consumes this symbol table and returns the information required for declaring constants,
     /// public inputs, periodic columns and columns amount for the AIR.
-    pub(super) fn into_declarations(self) -> (Vec<u16>, Constants, PublicInputs, PeriodicColumns) {
-        (
-            self.segment_widths,
-            self.constants,
-            self.public_inputs,
-            self.periodic_columns,
-        )
+    pub(super) fn into_declarations(self) -> Declarations {
+        self.declarations
     }
 
     // --- ACCESSORS ------------------------------------------------------------------------------
 
     /// Gets the number of trace segments that were specified for this AIR.
     pub(super) fn num_trace_segments(&self) -> usize {
-        self.segment_widths.len() + 1
-    }
-
-    /// Returns a vector containing the widths of all trace segments.
-    pub(super) fn segment_widths(&self) -> &Vec<u16> {
-        &self.segment_widths
-    }
-
-    /// Returns the number of random values that were specified for this AIR.
-    pub(super) fn num_random_values(&self) -> u16 {
-        self.num_random_values
+        self.declarations.num_trace_segments()
     }
 
     /// Returns the type associated with the specified identifier name.
     ///
     /// # Errors
     /// Returns an error if the identifier was not in the symbol table.
-    pub(super) fn get_type(&self, name: &str) -> Result<&IdentifierType, SemanticError> {
+    pub(crate) fn get_type(&self, name: &str) -> Result<&IdentifierType, SemanticError> {
         if let Some(ident_type) = self.identifiers.get(name) {
             Ok(ident_type)
         } else {
@@ -249,7 +247,7 @@ impl SymbolTable {
     /// Returns an error if:
     /// - the identifier was not in the symbol table.
     /// - the identifier was not declared as a trace column binding.
-    pub(super) fn get_trace_access_by_name(
+    pub(crate) fn get_trace_access_by_name(
         &self,
         trace_access: &NamedTraceAccess,
     ) -> Result<IndexedTraceAccess, SemanticError> {
@@ -285,7 +283,7 @@ impl SymbolTable {
     /// - Returns an error if the identifier is not associated with a vector access type.
     /// - Returns an error if the index is not in the declared public input array.
     /// - Returns an error if the index is greater than the vector's length.
-    pub(super) fn access_vector_element(
+    pub(crate) fn access_vector_element(
         &self,
         vector_access: &VectorAccess,
     ) -> Result<&IdentifierType, SemanticError> {
@@ -351,7 +349,7 @@ impl SymbolTable {
     /// - Returns an error if the identifier is not associated with a matrix access type.
     /// - Returns an error if the row index is greater than the matrix row length.
     /// - Returns an error if the column index is greater than the matrix column length.
-    pub(super) fn access_matrix_element(
+    pub(crate) fn access_matrix_element(
         &self,
         matrix_access: &MatrixAccess,
     ) -> Result<&IdentifierType, SemanticError> {
@@ -386,21 +384,17 @@ impl SymbolTable {
     /// Returns an error if:
     /// - the specified trace segment is out of range.
     /// - the specified column index is out of range.
-    pub(super) fn validate_trace_access(
+    pub(crate) fn validate_trace_access(
         &self,
         trace_access: &IndexedTraceAccess,
     ) -> Result<(), SemanticError> {
-        let segment_idx = trace_access.trace_segment() as usize;
-        if segment_idx > self.segment_widths().len() {
-            return Err(SemanticError::trace_segment_access_out_of_bounds(
-                trace_access,
-                self.segment_widths().len(),
-            ));
-        }
-        if trace_access.col_idx() as u16 >= self.segment_widths()[segment_idx] {
+        let trace_segment = usize::from(trace_access.trace_segment());
+        let trace_segment_width = self.declarations.trace_segment_width(trace_segment)?;
+
+        if trace_access.col_idx() as u16 >= trace_segment_width {
             return Err(SemanticError::indexed_trace_column_access_out_of_bounds(
                 trace_access,
-                self.segment_widths()[segment_idx],
+                trace_segment_width,
             ));
         }
 
@@ -409,11 +403,11 @@ impl SymbolTable {
 
     /// Checks that the specified random value access index is valid, i.e. that it is in range of
     /// the number of declared random values.
-    pub(super) fn validate_rand_access(&self, index: usize) -> Result<(), SemanticError> {
-        if index >= usize::from(self.num_random_values()) {
+    pub(crate) fn validate_rand_access(&self, index: usize) -> Result<(), SemanticError> {
+        if index >= usize::from(self.declarations.num_random_values()) {
             return Err(SemanticError::random_value_access_out_of_bounds(
                 index,
-                self.num_random_values(),
+                self.declarations.num_random_values(),
             ));
         }
 
@@ -425,7 +419,7 @@ impl SymbolTable {
 // ================================================================================================
 
 /// Validates the cycle length of the specified periodic column.
-fn validate_cycles(column: &PeriodicColumn) -> Result<(), SemanticError> {
+fn validate_cycles(column: &ast::PeriodicColumn) -> Result<(), SemanticError> {
     let name = column.name();
     let cycle = column.values().len();
 

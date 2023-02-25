@@ -2,7 +2,7 @@ use super::{AirIR, Impl, Scope};
 use air_script_core::{Constant, ConstantType, IndexedTraceAccess};
 use ir::{
     constraints::{AlgebraicGraph, ConstantValue, ConstraintDomain, Operation},
-    IntegrityConstraintDegree, NodeIndex, PeriodicColumns,
+    IntegrityConstraintDegree, NodeIndex, PeriodicColumn,
 };
 
 mod constants;

@@ -1,19 +1,9 @@
 use super::{
     build_list_from_list_folding_value, BTreeMap, ConstantType, ConstraintDomain, ExprDetails,
     Expression, Identifier, IdentifierType, IndexedTraceAccess, IntegrityConstraintDegree,
-    ListFoldingType, MatrixAccess, Scope, SemanticError, SymbolTable, TraceSegment, VariableRoots,
-    VariableType, VectorAccess,
+    ListFoldingType, MatrixAccess, Scope, SemanticError, SymbolTable, VariableRoots, VariableType,
+    VariableValue, VectorAccess, AUX_SEGMENT, CURRENT_ROW, DEFAULT_SEGMENT,
 };
-
-// CONSTANTS
-// ================================================================================================
-
-/// The offset of the "current" row during constraint evaluation.
-pub const CURRENT_ROW: usize = 0;
-/// The default segment against which a constraint is applied is the main trace segment.
-pub const DEFAULT_SEGMENT: TraceSegment = 0;
-/// The auxiliary trace segment.
-const AUX_SEGMENT: TraceSegment = 1;
 
 // ALGEBRAIC GRAPH
 // ================================================================================================
@@ -63,7 +53,7 @@ impl AlgebraicGraph {
     ///
     /// TODO: we can optimize this in the future in the case where lhs or rhs equals zero to just
     /// return the other expression.
-    pub(super) fn merge_equal_exprs(
+    pub(crate) fn merge_equal_exprs(
         &mut self,
         lhs: &ExprDetails,
         rhs: &ExprDetails,
@@ -77,7 +67,7 @@ impl AlgebraicGraph {
 
     /// Adds the expression to the graph and returns the [ExprDetails] of the constraint.
     /// Expressions are added recursively to reuse existing matching nodes.
-    pub(super) fn insert_expr(
+    pub(crate) fn insert_expr(
         &mut self,
         symbol_table: &SymbolTable,
         expr: &Expression,
@@ -182,7 +172,7 @@ impl AlgebraicGraph {
     /// Returns an error if:
     /// - The column index of the trace access is greater than overall number of columns in segment.
     /// - The segment of the trace access is greater than the number of segments.
-    pub(super) fn insert_trace_access(
+    pub(crate) fn insert_trace_access(
         &mut self,
         symbol_table: &SymbolTable,
         trace_access: &IndexedTraceAccess,
@@ -479,7 +469,7 @@ impl AlgebraicGraph {
             }
             IdentifierType::RandomValuesBinding(offset, _) => self.insert_random_value(
                 symbol_table,
-                *offset + vector_access.idx(),
+                offset + vector_access.idx(),
                 AUX_SEGMENT,
                 domain,
             ),
@@ -713,13 +703,6 @@ impl Operation {
 #[derive(Debug, Eq, PartialEq)]
 pub enum ConstantValue {
     Inline(u64),
-    Scalar(String),
-    Vector(VectorAccess),
-    Matrix(MatrixAccess),
-}
-
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub enum VariableValue {
     Scalar(String),
     Vector(VectorAccess),
     Matrix(MatrixAccess),

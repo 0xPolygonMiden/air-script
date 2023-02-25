@@ -1,12 +1,8 @@
 use super::{
-    build_list_from_list_folding_value, graph::CURRENT_ROW, IdentifierType, SemanticError,
-    SymbolTable,
+    build_list_from_list_folding_value, BTreeMap, Expression, Identifier, IdentifierType,
+    IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
+    NamedTraceAccess, SemanticError, SymbolTable, VariableType, VectorAccess, CURRENT_ROW,
 };
-use air_script_core::{
-    Expression, Identifier, IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType,
-    ListFoldingValueType, NamedTraceAccess, VariableType, VectorAccess,
-};
-use std::collections::BTreeMap;
 
 /// Maps each identifier in the list comprehension to its corresponding [Iterable].
 /// For e.g. if the list comprehension is:

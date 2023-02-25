@@ -1,34 +1,39 @@
 pub use air_script_core::{
-    Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, ListFoldingType,
-    ListFoldingValueType, MatrixAccess, NamedTraceAccess, TraceSegment, Variable, VariableType,
-    VectorAccess,
+    Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, Iterable,
+    ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, NamedTraceAccess,
+    TraceSegment, Variable, VariableType, VectorAccess,
 };
-pub use parser::ast::{self, Boundary, BoundaryStmt, IntegrityStmt, PublicInput};
-use std::collections::BTreeMap;
+pub use parser::ast;
+use std::collections::{BTreeMap, BTreeSet};
 
-mod symbol_table;
-use symbol_table::{IdentifierType, Scope, SymbolTable};
+pub mod constraint_builder;
+// TODO: remove most of these imports
+use constraint_builder::{
+    build_list_from_list_folding_value, ConstraintBuilder, ExprDetails, VariableRoots,
+};
 
 pub mod constraints;
-use constraints::{AlgebraicGraph, ConstraintRoot, Constraints, MIN_CYCLE_LENGTH};
+use constraints::{
+    AlgebraicGraph, ConstrainedBoundary, ConstraintDomain, ConstraintRoot, Constraints,
+    CURRENT_ROW, MIN_CYCLE_LENGTH,
+};
 pub use constraints::{IntegrityConstraintDegree, NodeIndex};
 
-mod trace_columns;
+pub mod declarations;
+use declarations::Declarations;
+pub use declarations::{PeriodicColumn, PublicInput};
 
-mod error;
-use error::SemanticError;
+mod symbol_table;
+use symbol_table::{IdentifierType, Scope, SymbolTable, VariableValue};
 
-mod helpers;
-use helpers::SourceValidator;
+mod validation;
+use validation::{SemanticError, SourceValidator};
 
 #[cfg(test)]
 mod tests;
 
 // TYPE ALIASES
 // ================================================================================================
-pub type Constants = Vec<Constant>;
-pub type PublicInputs = Vec<(String, usize)>;
-pub type PeriodicColumns = Vec<Vec<u64>>;
 pub type BoundaryConstraintsMap = BTreeMap<usize, Expression>;
 
 // AIR IR
@@ -40,10 +45,7 @@ pub type BoundaryConstraintsMap = BTreeMap<usize, Expression>;
 #[derive(Default, Debug)]
 pub struct AirIR {
     air_name: String,
-    segment_widths: Vec<u16>,
-    constants: Constants,
-    public_inputs: PublicInputs,
-    periodic_columns: PeriodicColumns,
+    declarations: Declarations,
     constraints: Constraints,
 }
 
@@ -100,20 +102,18 @@ impl AirIR {
         }
 
         // then process the constraints & validate them against the symbol table.
-        let num_trace_segments = symbol_table.num_trace_segments();
-        let mut constraints = Constraints::new(num_trace_segments);
-
+        let mut constraint_builder = ConstraintBuilder::new(symbol_table);
         for section in source {
             match section {
                 ast::SourceSection::BoundaryConstraints(stmts) => {
                     for stmt in stmts {
-                        constraints.insert_boundary_stmt(&mut symbol_table, stmt)?
+                        constraint_builder.insert_boundary_stmt(stmt)?
                     }
                     validator.exists("boundary_constraints");
                 }
                 ast::SourceSection::IntegrityConstraints(stmts) => {
                     for stmt in stmts {
-                        constraints.insert_integrity_stmt(&mut symbol_table, stmt)?
+                        constraint_builder.insert_integrity_stmt(stmt)?
                     }
                     validator.exists("integrity_constraints");
                 }
@@ -121,42 +121,38 @@ impl AirIR {
             }
         }
 
-        let (segment_widths, constants, public_inputs, periodic_columns) =
-            symbol_table.into_declarations();
+        let (declarations, constraints) = constraint_builder.into_air();
 
         // validate sections
         validator.check()?;
 
         Ok(Self {
             air_name: air_name.to_string(),
-            segment_widths,
-            constants,
-            public_inputs,
-            periodic_columns,
+            declarations,
             constraints,
         })
     }
 
-    // --- PUBLIC ACCESSORS -----------------------------------------------------------------------
+    // --- PUBLIC ACCESSORS FOR DECLARATIONS ------------------------------------------------------
 
     pub fn air_name(&self) -> &str {
         &self.air_name
     }
 
-    pub fn constants(&self) -> &Constants {
-        &self.constants
+    pub fn constants(&self) -> &[Constant] {
+        self.declarations.constants()
     }
 
-    pub fn segment_widths(&self) -> &Vec<u16> {
-        &self.segment_widths
+    pub fn periodic_columns(&self) -> &[PeriodicColumn] {
+        self.declarations.periodic_columns()
     }
 
-    pub fn public_inputs(&self) -> &PublicInputs {
-        &self.public_inputs
+    pub fn public_inputs(&self) -> &[PublicInput] {
+        self.declarations.public_inputs()
     }
 
-    pub fn periodic_columns(&self) -> &PeriodicColumns {
-        &self.periodic_columns
+    pub fn trace_segment_widths(&self) -> &[u16] {
+        self.declarations.trace_segment_widths()
     }
 
     // --- PUBLIC ACCESSORS FOR BOUNDARY CONSTRAINTS ----------------------------------------------
