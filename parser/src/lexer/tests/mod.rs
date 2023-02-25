@@ -6,6 +6,7 @@ use crate::{
 mod arithmetic_ops;
 mod boundary_constraints;
 mod constants;
+mod functions;
 mod identifiers;
 mod list_comprehension;
 mod periodic_columns;
