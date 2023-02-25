@@ -71,6 +71,21 @@ pub enum Token {
     #[token("$")]
     Rand,
 
+    #[token("fn")]
+    Function,
+
+    #[token("return")]
+    Return,
+
+    #[token("scalar")]
+    Scalar,
+
+    #[token("vector")]
+    Vector,
+
+    #[token("matrix")]
+    Matrix,
+
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Marks the beginning of boundary constraints section in the constraints file.
@@ -158,6 +173,9 @@ pub enum Token {
 
     #[token(")")]
     Rparen,
+
+    #[token("->")]
+    Rarrow,
 
     #[token("..")]
     Range,

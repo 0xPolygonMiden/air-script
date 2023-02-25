@@ -19,6 +19,9 @@ pub use integrity_constraints::*;
 pub mod random_values;
 pub use random_values::*;
 
+pub mod function;
+pub use function::*;
+
 // AST
 // ================================================================================================
 
@@ -45,6 +48,7 @@ pub struct Source(pub Vec<SourceSection>);
 pub enum SourceSection {
     AirDef(Identifier),
     Constant(Constant),
+    Function(Function),
     Trace(Trace),
     PublicInputs(Vec<PublicInput>),
     PeriodicColumns(Vec<PeriodicColumn>),

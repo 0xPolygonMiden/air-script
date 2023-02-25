@@ -166,6 +166,7 @@ impl AlgebraicGraph {
                 ))
             }
             Expression::ListFolding(_) => todo!(),
+            Expression::FunctionCall(_, _) => todo!(),
         }
     }
 
