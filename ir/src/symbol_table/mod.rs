@@ -8,6 +8,9 @@ use std::fmt::Display;
 mod trace_columns;
 use trace_columns::TraceColumns;
 
+mod access_validation;
+use access_validation::ValidateIdentifierAccess;
+
 // TYPES
 // ================================================================================================
 
@@ -78,6 +81,14 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
+    /// Consumes this symbol table and returns the information required for declaring constants,
+    /// public inputs, periodic columns and columns amount for the AIR.
+    pub(super) fn into_declarations(self) -> Declarations {
+        self.declarations
+    }
+
+    // --- MUTATORS -------------------------------------------------------------------------------
+
     /// Adds a declared identifier to the symbol table using the identifier as the key and the
     /// type the identifier represents as the value.
     ///
@@ -98,8 +109,6 @@ impl SymbolTable {
             None => Ok(()),
         }
     }
-
-    // --- PUBLIC MUTATORS ------------------------------------------------------------------------
 
     /// Add a constant by its identifier and value.
     pub(super) fn insert_constant(&mut self, constant: &Constant) -> Result<(), SemanticError> {
@@ -215,12 +224,6 @@ impl SymbolTable {
         Ok(())
     }
 
-    /// Consumes this symbol table and returns the information required for declaring constants,
-    /// public inputs, periodic columns and columns amount for the AIR.
-    pub(super) fn into_declarations(self) -> Declarations {
-        self.declarations
-    }
-
     // --- ACCESSORS ------------------------------------------------------------------------------
 
     /// Gets the number of trace segments that were specified for this AIR.
@@ -247,31 +250,20 @@ impl SymbolTable {
     /// Returns an error if:
     /// - the identifier was not in the symbol table.
     /// - the identifier was not declared as a trace column binding.
+    /// TODO: update docs
     pub(crate) fn get_trace_access_by_name(
         &self,
         trace_access: &NamedTraceAccess,
     ) -> Result<IndexedTraceAccess, SemanticError> {
-        let elem_type = self.get_type(trace_access.name())?;
-        match elem_type {
-            IdentifierType::TraceColumns(columns) => {
-                if trace_access.idx() >= columns.size() {
-                    return Err(SemanticError::named_trace_column_access_out_of_bounds(
-                        trace_access,
-                        columns.size(),
-                    ));
-                }
+        let symbol_type = self.get_type(trace_access.name())?;
+        trace_access.validate(symbol_type)?;
 
-                Ok(IndexedTraceAccess::new(
-                    columns.trace_segment(),
-                    columns.offset() + trace_access.idx(),
-                    trace_access.row_offset(),
-                ))
-            }
-            _ => Err(SemanticError::not_a_trace_column_identifier(
-                trace_access.name(),
-                elem_type,
-            )),
-        }
+        let IdentifierType::TraceColumns(columns) = symbol_type else { unreachable!("validation of named trace access failed.") };
+        Ok(IndexedTraceAccess::new(
+            columns.trace_segment(),
+            columns.offset() + trace_access.idx(),
+            trace_access.row_offset(),
+        ))
     }
 
     /// Checks that the specified name and index are a valid reference to a declared public input
@@ -283,62 +275,15 @@ impl SymbolTable {
     /// - Returns an error if the identifier is not associated with a vector access type.
     /// - Returns an error if the index is not in the declared public input array.
     /// - Returns an error if the index is greater than the vector's length.
+    /// TODO: update docs
     pub(crate) fn access_vector_element(
         &self,
         vector_access: &VectorAccess,
     ) -> Result<&IdentifierType, SemanticError> {
         let symbol_type = self.get_type(vector_access.name())?;
-        match symbol_type {
-            IdentifierType::PublicInput(size) => {
-                if vector_access.idx() < *size {
-                    Ok(symbol_type)
-                } else {
-                    Err(SemanticError::public_inputs_out_of_bounds(
-                        vector_access,
-                        *size,
-                    ))
-                }
-            }
-            IdentifierType::Constant(ConstantType::Vector(vector)) => {
-                validate_vector_access(vector_access, vector.len())?;
-                Ok(symbol_type)
-            }
-            IdentifierType::Variable(_, variable) => match variable.value() {
-                VariableType::Scalar(_) => Ok(symbol_type),
-                VariableType::Vector(vector) => {
-                    validate_vector_access(vector_access, vector.len())?;
-                    Ok(symbol_type)
-                }
-                _ => Err(SemanticError::invalid_vector_access(
-                    vector_access,
-                    symbol_type,
-                )),
-            },
-            IdentifierType::TraceColumns(trace_columns) => {
-                if vector_access.idx() < trace_columns.size() {
-                    Ok(symbol_type)
-                } else {
-                    Err(SemanticError::vector_access_out_of_bounds(
-                        vector_access,
-                        trace_columns.size(),
-                    ))
-                }
-            }
-            IdentifierType::RandomValuesBinding(_, size) => {
-                if vector_access.idx() < *size {
-                    Ok(symbol_type)
-                } else {
-                    Err(SemanticError::vector_access_out_of_bounds(
-                        vector_access,
-                        *size,
-                    ))
-                }
-            }
-            _ => Err(SemanticError::invalid_vector_access(
-                vector_access,
-                symbol_type,
-            )),
-        }
+        vector_access.validate(symbol_type)?;
+
+        Ok(symbol_type)
     }
 
     /// Checks that the specified name and index are a valid reference to a matrix constant and
@@ -349,33 +294,18 @@ impl SymbolTable {
     /// - Returns an error if the identifier is not associated with a matrix access type.
     /// - Returns an error if the row index is greater than the matrix row length.
     /// - Returns an error if the column index is greater than the matrix column length.
+    /// TODO: update docs
     pub(crate) fn access_matrix_element(
         &self,
         matrix_access: &MatrixAccess,
     ) -> Result<&IdentifierType, SemanticError> {
         let symbol_type = self.get_type(matrix_access.name())?;
-        match symbol_type {
-            IdentifierType::Constant(ConstantType::Matrix(matrix)) => {
-                validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
-                Ok(symbol_type)
-            }
-            IdentifierType::Variable(_, variable) => match variable.value() {
-                VariableType::Scalar(_) | VariableType::Vector(_) => Ok(symbol_type),
-                VariableType::Matrix(matrix) => {
-                    validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
-                    Ok(symbol_type)
-                }
-                _ => Err(SemanticError::invalid_matrix_access(
-                    matrix_access,
-                    symbol_type,
-                )),
-            },
-            _ => Err(SemanticError::invalid_matrix_access(
-                matrix_access,
-                symbol_type,
-            )),
-        }
+        matrix_access.validate(symbol_type)?;
+
+        Ok(symbol_type)
     }
+
+    // --- VALIDATION -----------------------------------------------------------------------------
 
     /// Checks that the specified trace access is valid, i.e. that it references a declared trace
     /// segment and the index is within the bounds of the declared segment width.
@@ -450,41 +380,4 @@ fn validate_constant(constant: &Constant) -> Result<(), SemanticError> {
         }
         _ => Ok(()),
     }
-}
-
-/// Checks that the specified vector access index is valid and returns an error otherwise.
-fn validate_vector_access(
-    vector_access: &VectorAccess,
-    vector_len: usize,
-) -> Result<(), SemanticError> {
-    if vector_access.idx() >= vector_len {
-        return Err(SemanticError::vector_access_out_of_bounds(
-            vector_access,
-            vector_len,
-        ));
-    }
-    Ok(())
-}
-
-/// Checks that the specified matrix access indices are valid and returns an error otherwise.
-fn validate_matrix_access(
-    matrix_access: &MatrixAccess,
-    matrix_row_len: usize,
-    matrix_col_len: usize,
-) -> Result<(), SemanticError> {
-    if matrix_access.row_idx() >= matrix_row_len {
-        return Err(SemanticError::matrix_access_out_of_bounds(
-            matrix_access,
-            matrix_row_len,
-            matrix_col_len,
-        ));
-    }
-    if matrix_access.col_idx() >= matrix_col_len {
-        return Err(SemanticError::matrix_access_out_of_bounds(
-            matrix_access,
-            matrix_row_len,
-            matrix_col_len,
-        ));
-    }
-    Ok(())
 }
