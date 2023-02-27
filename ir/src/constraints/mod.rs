@@ -1,7 +1,7 @@
 use super::{
     symbol_table::IdentifierType, Boundary, BoundaryStmt, ConstantType, Expression, Identifier,
-    IndexedTraceAccess, IntegrityStmt, MatrixAccess, Scope, SemanticError, SymbolTable,
-    TraceSegment, VariableType, VectorAccess,
+    IndexedTraceAccess, IntegrityStmt, ListFoldingType, MatrixAccess, Scope, SemanticError,
+    SymbolTable, TraceSegment, Variable, VariableType, VectorAccess,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,6 +16,9 @@ mod graph;
 pub use graph::{
     AlgebraicGraph, ConstantValue, NodeIndex, Operation, VariableValue, DEFAULT_SEGMENT,
 };
+
+mod list_comprehension;
+use list_comprehension::unfold_lc;
 
 // TYPES
 // ================================================================================================
@@ -232,7 +235,18 @@ impl Constraints {
                 self.insert_constraint(symbol_table, lhs, rhs)?
             }
             IntegrityStmt::Variable(variable) => {
-                symbol_table.insert_variable(Scope::IntegrityConstraints, variable)?
+                if let VariableType::ListComprehension(list_comprehension) = variable.value() {
+                    let vector = unfold_lc(list_comprehension, symbol_table)?;
+                    symbol_table.insert_variable(
+                        Scope::IntegrityConstraints,
+                        &Variable::new(
+                            Identifier(variable.name().to_string()),
+                            VariableType::Vector(vector),
+                        ),
+                    )?
+                } else {
+                    symbol_table.insert_variable(Scope::IntegrityConstraints, variable)?
+                }
             }
         }
 

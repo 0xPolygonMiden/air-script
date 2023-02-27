@@ -50,7 +50,7 @@ pub(super) enum Scope {
 /// SymbolTable for identifiers to track their types and information and enforce uniqueness of
 /// identifiers.
 #[derive(Default, Debug)]
-pub(super) struct SymbolTable {
+pub struct SymbolTable {
     /// Vector in which index is trace segment and value is number of columns in this segment
     segment_widths: Vec<u16>,
 

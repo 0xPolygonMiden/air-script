@@ -54,6 +54,12 @@ impl ListComprehension {
     }
 }
 
+/// Contains values to be iterated over in a list comprehension.
+///
+/// For e.g. in the list comprehension \[x + y + z for (x, y, z) in (x, 0..5, z\[1..6\])\],
+/// `x` is an Iterable of type Identifier representing the vector to iterate over,
+/// `0..5` is an Iterable of type Range representing the range to iterate over,
+/// `z[1..6]` is an Iterable of type Slice representing the slice of the vector z to iterate over.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Iterable {
     Identifier(Identifier),

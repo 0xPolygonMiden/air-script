@@ -13,7 +13,7 @@ pub struct ConstrainedBoundary {
 
 impl ConstrainedBoundary {
     pub fn new(trace_segment: TraceSegment, col_idx: usize, domain: ConstraintDomain) -> Self {
-        debug_assert!(domain == ConstraintDomain::FirstRow || domain == ConstraintDomain::LastRow);
+        debug_assert!(domain.is_boundary());
         Self {
             trace_segment,
             col_idx,
@@ -100,6 +100,14 @@ impl ConstraintDomain {
                 "The specified constraint domain {other:?} is not compatible with the base domain {self:?}",
             ))),
         }
+    }
+
+    /// Returns true if this domain is a boundary domain (FirstRow or LastRow).
+    pub fn is_boundary(&self) -> bool {
+        matches!(
+            *self,
+            ConstraintDomain::FirstRow | ConstraintDomain::LastRow
+        )
     }
 }
 
