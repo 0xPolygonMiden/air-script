@@ -4,9 +4,9 @@ use winter_math::{ExtensionOf, FieldElement};
 use winter_utils::collections::Vec;
 use winter_utils::{ByteWriter, Serializable};
 
-const A: Felt = Felt::new(1);
-const B: [Felt; 2] = [Felt::new(0), Felt::new(1)];
-const C: [[Felt; 2]; 2] = [[Felt::new(1), Felt::new(2)], [Felt::new(2), Felt::new(0)]];
+const A: Felt = Felt::ONE;
+const B: [Felt; 2] = [Felt::ZERO, Felt::ONE];
+const C: [[Felt; 2]; 2] = [[Felt::ONE, Felt::new(2)], [Felt::new(2), Felt::ZERO]];
 
 pub struct PublicInputs {
     program_hash: [Felt; 4],

@@ -40,14 +40,24 @@ trait Codegen {
 impl Codegen for Constant {
     fn to_string(&self) -> String {
         match self.value() {
-            ConstantType::Scalar(scalar_const) => {
-                format!("Felt::new({scalar_const})")
-            }
+            ConstantType::Scalar(scalar_const) => match scalar_const {
+                0 => "Felt::ZERO".to_string(),
+                1 => "Felt::ONE".to_string(),
+                _ => {
+                    format!("Felt::new({scalar_const})")
+                }
+            },
             ConstantType::Vector(vector_const) => format!(
                 "[{}]",
                 vector_const
                     .iter()
-                    .map(|val| format!("Felt::new({val})"))
+                    .map(|val| match val {
+                        0 => "Felt::ZERO".to_string(),
+                        1 => "Felt::ONE".to_string(),
+                        _ => {
+                            format!("Felt::new({val})")
+                        }
+                    })
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -57,7 +67,13 @@ impl Codegen for Constant {
                     rows.push(format!(
                         "[{}]",
                         row.iter()
-                            .map(|val| format!("Felt::new({val})"))
+                            .map(|val| match val {
+                                0 => "Felt::ZERO".to_string(),
+                                1 => "Felt::ONE".to_string(),
+                                _ => {
+                                    format!("Felt::new({val})")
+                                }
+                            })
                             .collect::<Vec<String>>()
                             .join(", "),
                     ))

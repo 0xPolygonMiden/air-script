@@ -58,12 +58,12 @@ impl Air for BitwiseAir {
     }
 
     fn get_periodic_column_values(&self) -> Vec<Vec<Felt>> {
-        vec![vec![Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(0)], vec![Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(0)]]
+        vec![vec![Felt::ONE, Felt::ZERO, Felt::ZERO, Felt::ZERO, Felt::ZERO, Felt::ZERO, Felt::ZERO, Felt::ZERO], vec![Felt::ONE, Felt::ONE, Felt::ONE, Felt::ONE, Felt::ONE, Felt::ONE, Felt::ONE, Felt::ZERO]]
     }
 
     fn get_assertions(&self) -> Vec<Assertion<Felt>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(13, 0, Felt::new(0)));
+        result.push(Assertion::single(13, 0, Felt::ZERO));
         result
     }
 
@@ -75,23 +75,23 @@ impl Air for BitwiseAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = main_current[0].exp(E::PositiveInteger::from(2_u64)) - main_current[0] - E::from(0_u64);
-        result[1] = periodic_values[1] * (main_next[0] - main_current[0]) - E::from(0_u64);
-        result[2] = main_current[3].exp(E::PositiveInteger::from(2_u64)) - main_current[3] - E::from(0_u64);
-        result[3] = main_current[4].exp(E::PositiveInteger::from(2_u64)) - main_current[4] - E::from(0_u64);
-        result[4] = main_current[5].exp(E::PositiveInteger::from(2_u64)) - main_current[5] - E::from(0_u64);
-        result[5] = main_current[6].exp(E::PositiveInteger::from(2_u64)) - main_current[6] - E::from(0_u64);
-        result[6] = main_current[7].exp(E::PositiveInteger::from(2_u64)) - main_current[7] - E::from(0_u64);
-        result[7] = main_current[8].exp(E::PositiveInteger::from(2_u64)) - main_current[8] - E::from(0_u64);
-        result[8] = main_current[9].exp(E::PositiveInteger::from(2_u64)) - main_current[9] - E::from(0_u64);
-        result[9] = main_current[10].exp(E::PositiveInteger::from(2_u64)) - main_current[10] - E::from(0_u64);
-        result[10] = periodic_values[0] * (main_current[1] - (E::from(2_u64).exp(E::PositiveInteger::from(0_u64)) * main_current[3] + E::from(2_u64).exp(E::PositiveInteger::from(1_u64)) * main_current[4] + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * main_current[5] + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * main_current[6])) - E::from(0_u64);
-        result[11] = periodic_values[0] * (main_current[2] - (E::from(2_u64).exp(E::PositiveInteger::from(0_u64)) * main_current[7] + E::from(2_u64).exp(E::PositiveInteger::from(1_u64)) * main_current[8] + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * main_current[9] + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * main_current[10])) - E::from(0_u64);
-        result[12] = periodic_values[1] * (main_next[1] - (main_current[1] * E::from(16_u64) + E::from(2_u64).exp(E::PositiveInteger::from(0_u64)) * main_current[3] + E::from(2_u64).exp(E::PositiveInteger::from(1_u64)) * main_current[4] + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * main_current[5] + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * main_current[6])) - E::from(0_u64);
-        result[13] = periodic_values[1] * (main_next[2] - (main_current[2] * E::from(16_u64) + E::from(2_u64).exp(E::PositiveInteger::from(0_u64)) * main_current[7] + E::from(2_u64).exp(E::PositiveInteger::from(1_u64)) * main_current[8] + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * main_current[9] + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * main_current[10])) - E::from(0_u64);
-        result[14] = periodic_values[0] * main_current[11] - E::from(0_u64);
-        result[15] = periodic_values[1] * (main_current[12] - main_next[11]) - E::from(0_u64);
-        result[16] = (E::from(1_u64) - main_current[0]) * (main_current[12] - (main_current[11] * E::from(16_u64) + E::from(2_u64).exp(E::PositiveInteger::from(0_u64)) * main_current[3] * main_current[7] + E::from(2_u64).exp(E::PositiveInteger::from(1_u64)) * main_current[4] * main_current[8] + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * main_current[5] * main_current[9] + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * main_current[6] * main_current[10])) + main_current[0] * (main_current[12] - (main_current[11] * E::from(16_u64) + E::from(2_u64).exp(E::PositiveInteger::from(0_u64)) * (main_current[3] + main_current[7] - E::from(2_u64) * main_current[3] * main_current[7]) + E::from(2_u64).exp(E::PositiveInteger::from(1_u64)) * (main_current[4] + main_current[8] - E::from(2_u64) * main_current[4] * main_current[8]) + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * (main_current[5] + main_current[9] - E::from(2_u64) * main_current[5] * main_current[9]) + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * (main_current[6] + main_current[10] - E::from(2_u64) * main_current[6] * main_current[10]))) - E::from(0_u64);
+        result[0] = main_current[0].exp(E::PositiveInteger::from(2_u64)) - main_current[0] - E::ZERO;
+        result[1] = periodic_values[1] * (main_next[0] - main_current[0]) - E::ZERO;
+        result[2] = main_current[3].exp(E::PositiveInteger::from(2_u64)) - main_current[3] - E::ZERO;
+        result[3] = main_current[4].exp(E::PositiveInteger::from(2_u64)) - main_current[4] - E::ZERO;
+        result[4] = main_current[5].exp(E::PositiveInteger::from(2_u64)) - main_current[5] - E::ZERO;
+        result[5] = main_current[6].exp(E::PositiveInteger::from(2_u64)) - main_current[6] - E::ZERO;
+        result[6] = main_current[7].exp(E::PositiveInteger::from(2_u64)) - main_current[7] - E::ZERO;
+        result[7] = main_current[8].exp(E::PositiveInteger::from(2_u64)) - main_current[8] - E::ZERO;
+        result[8] = main_current[9].exp(E::PositiveInteger::from(2_u64)) - main_current[9] - E::ZERO;
+        result[9] = main_current[10].exp(E::PositiveInteger::from(2_u64)) - main_current[10] - E::ZERO;
+        result[10] = periodic_values[0] * (main_current[1] - (E::ONE * main_current[3] + E::from(2_u64) * main_current[4] + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * main_current[5] + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * main_current[6])) - E::ZERO;
+        result[11] = periodic_values[0] * (main_current[2] - (E::ONE * main_current[7] + E::from(2_u64) * main_current[8] + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * main_current[9] + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * main_current[10])) - E::ZERO;
+        result[12] = periodic_values[1] * (main_next[1] - (main_current[1] * E::from(16_u64) + E::ONE * main_current[3] + E::from(2_u64) * main_current[4] + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * main_current[5] + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * main_current[6])) - E::ZERO;
+        result[13] = periodic_values[1] * (main_next[2] - (main_current[2] * E::from(16_u64) + E::ONE * main_current[7] + E::from(2_u64) * main_current[8] + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * main_current[9] + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * main_current[10])) - E::ZERO;
+        result[14] = periodic_values[0] * main_current[11] - E::ZERO;
+        result[15] = periodic_values[1] * (main_current[12] - main_next[11]) - E::ZERO;
+        result[16] = (E::ONE - main_current[0]) * (main_current[12] - (main_current[11] * E::from(16_u64) + E::ONE * main_current[3] * main_current[7] + E::from(2_u64) * main_current[4] * main_current[8] + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * main_current[5] * main_current[9] + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * main_current[6] * main_current[10])) + main_current[0] * (main_current[12] - (main_current[11] * E::from(16_u64) + E::ONE * (main_current[3] + main_current[7] - E::from(2_u64) * main_current[3] * main_current[7]) + E::from(2_u64) * (main_current[4] + main_current[8] - E::from(2_u64) * main_current[4] * main_current[8]) + E::from(2_u64).exp(E::PositiveInteger::from(2_u64)) * (main_current[5] + main_current[9] - E::from(2_u64) * main_current[5] * main_current[9]) + E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * (main_current[6] + main_current[10] - E::from(2_u64) * main_current[6] * main_current[10]))) - E::ZERO;
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])

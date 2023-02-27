@@ -63,17 +63,17 @@ impl Air for AuxiliaryAir {
 
     fn get_assertions(&self) -> Vec<Assertion<Felt>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(0, 0, Felt::new(1)));
-        result.push(Assertion::single(1, 0, Felt::new(1)));
+        result.push(Assertion::single(0, 0, Felt::ONE));
+        result.push(Assertion::single(1, 0, Felt::ONE));
         result
     }
 
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxTraceRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(0, 0, E::from(1_u64)));
-        result.push(Assertion::single(0, self.last_step(), E::from(1_u64)));
+        result.push(Assertion::single(0, 0, E::ONE));
+        result.push(Assertion::single(0, self.last_step(), E::ONE));
         result.push(Assertion::single(1, 0, aux_rand_elements.get_segment_elements(0)[0]));
-        result.push(Assertion::single(1, self.last_step(), E::from(1_u64)));
+        result.push(Assertion::single(1, self.last_step(), E::ONE));
         result
     }
 

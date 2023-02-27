@@ -22,7 +22,17 @@ impl Codegen for PeriodicColumns {
         for column in self {
             let mut rows = vec![];
             for row in column {
-                rows.push(format!("Felt::new({row})"));
+                match row {
+                    0 => {
+                        rows.push("Felt::ZERO".to_string());
+                    }
+                    1 => {
+                        rows.push("Felt::ONE".to_string());
+                    }
+                    _ => {
+                        rows.push(format!("Felt::new({row})"));
+                    }
+                }
             }
             columns.push(format!("vec![{}]", rows.join(", ")));
         }

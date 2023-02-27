@@ -65,6 +65,14 @@ impl Codegen for NodeIndex {
 impl Codegen for Operation {
     fn to_string(&self, ir: &AirIR, elem_type: ElemType, trace_segment: u8) -> String {
         match self {
+            Operation::Constant(ConstantValue::Inline(0)) => match elem_type {
+                ElemType::Base => "Felt::ZERO".to_string(),
+                ElemType::Ext => "E::ZERO".to_string(),
+            },
+            Operation::Constant(ConstantValue::Inline(1)) => match elem_type {
+                ElemType::Base => "Felt::ONE".to_string(),
+                ElemType::Ext => "E::ONE".to_string(),
+            },
             Operation::Constant(ConstantValue::Inline(value)) => match elem_type {
                 ElemType::Base => format!("Felt::new({value})"),
                 ElemType::Ext => format!("E::from({value}_u64)"),
@@ -115,9 +123,19 @@ impl Codegen for Operation {
                 } else {
                     format!("({lhs})")
                 };
-                match elem_type {
-                    ElemType::Base => format!("{lhs}.exp(Felt::new({r_idx}))"),
-                    ElemType::Ext => format!("{lhs}.exp(E::PositiveInteger::from({r_idx}_u64))"),
+                match r_idx {
+                    0 => match elem_type {
+                        // x^0 = 1
+                        ElemType::Base => "Felt::ONE".to_string(),
+                        ElemType::Ext => "E::ONE".to_string(),
+                    },
+                    1 => lhs, // x^1 = x
+                    _ => match elem_type {
+                        ElemType::Base => format!("{lhs}.exp(Felt::new({r_idx}))"),
+                        ElemType::Ext => {
+                            format!("{lhs}.exp(E::PositiveInteger::from({r_idx}_u64))")
+                        }
+                    },
                 }
             }
         }
