@@ -1,46 +1,42 @@
-def BitwiseAir
+mod BitwiseAir
 
-# Enforces that column must be binary
-ev check_binary(main: [a]):
-    enf a^2 - a = 0
-
-# Returns value aggregated from limbs
-fn aggregate(limb: vector[4]) -> scalar:
-    return sum([2^i * a for (i, a) in (0..4, limb)])
-
-
-public_inputs:
-    stack_inputs: [16]
-
-trace_columns:
-    main: [s, a, b, a_limb[4], b_limb[4], zp, z, dummy]
+### Declarations ##################################################################################
 
 periodic_columns:
     k0: [1, 0, 0, 0, 0, 0, 0, 0]
     k1: [1, 1, 1, 1, 1, 1, 1, 0]
 
-boundary_constraints:
-    # This is a dummy trace column to satisfy requirement of at least one boundary constraint.
-    enf dummy.first = 0
+### Helper functions/evaluators ###################################################################
 
-integrity_constraints:
+# Enforces that column must be binary.
+ev is_binary(main: [a]):
+    enf a^2 - a = 0
+
+# Returns value aggregated from limbs.
+fn aggregate(limb: vector[4]) -> scalar:
+    return sum([2^i * a for (i, a) in (0..4, limb)])
+
+# Enforces that the bitwise selector is valid.
+ev bitwise_selector(main: [s]):
     # Enforce that selector must be binary
-    enf check_binary([s])
+    enf is_binary([s])
 
     # Enforce that selector should stay the same throughout the cycle.
     enf s' = s when k1
 
+#! Enforces that the input to the bitwise chiplet is decomposed into limbs correctly.
+ev input_decomposition(main:[a, b, a_limb[4], b_limb[4]]):
     # Enforce that the input is decomposed into valid bits
-    enf check_binary([a]) for a in a_limb
-    enf check_binary([b]) for b in b_limb 
+    enf is_binary([a]) for a in a_limb
+    enf is_binary([b]) for b in b_limb 
 
     # Enforce that the value in the first row of column `a` of the current 8-row cycle should be 
     # the aggregation of the decomposed bit columns `a_limb`.
-    enf a = aggregate([a_limb]) when k0
+    enf a = aggregate(a_limb) when k0
 
     # Enforce that the value in the first row of column `b` of the current 8-row cycle should be 
     # the aggregation of the decomposed bit columns `b_limb`.
-    enf b = aggregate([b_limb]) when k0
+    enf b = aggregate(b_limb) when k0
 
     # Enforce that for all rows in an 8-row cycle, except for the last one, the values in a and b
     # columns are increased by the values contained in the individual bit columns a_limb and 
@@ -48,12 +44,15 @@ integrity_constraints:
     enf a' = a * 16 + a_aggr when k1
     enf b' = b * 16 + b_aggr when k1
 
+# Enforces that the output of the bitwise operation is aggregated correctly from the decomposed
+# limbs.
+ev output_aggregation(main: [s, a, b, a_limb[4], b_limb[4], zp, z]):
     # Enforce that in the first row, the aggregated output value of the previous row should be 0.
     enf zp = 0 when k0
 
     # Enforce that for each row except the last, the aggregated output value must equal the
     # previous aggregated output value in the next row.
-    enf z = zp' when k1
+    enf zp' = z when k1
 
     # Enforce that for all rows the value in the z column is computed by multiplying the previous
     # output value (from the zp column in the current row) by 16 and then adding it to the bitwise
@@ -68,3 +67,11 @@ integrity_constraints:
     match enf:
         z = zp * 16 + a_xor_b when s
         z = zp * 16 + a_and_b when !s
+
+### Bitwise Chiplet Air Constraints ###############################################################
+
+# Enforces the constraints on the bitwise chiplet, given the columns of the bitwise execution trace.
+ev bitwise_chiplet(main: [s, a, b, a_limb[4], b_limb[4], zp, z]):
+    enf bitwise_selector([s])
+    enf input_decomposition([a, b, a_limb, b_limb])
+    enf output_aggregation([s, a, b, a_limb, b_limb, zp, z])
