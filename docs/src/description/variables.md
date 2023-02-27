@@ -44,8 +44,10 @@ Currently, it is not possible to:
     ```
     ...
     boundary_constraints:
-        let a = [1, 2]
-        let b = [a, [3, 4]]  <-- `b` consists of array `[3, 4]` and reference to array `a`
+        let a = [[1,2], [3,4]]  # <-- this is allowed
+        let b = [1, 2]
+        let c = [a[1], b]  # <-- this is allowed
+        let d = [b, [3, 4]]  # <-- this is not allowed, because `d` consists of array `[3, 4]` and reference to array `b`
         enf ...
     ...
     ```
@@ -59,9 +61,9 @@ Currently, it is not possible to:
         let a = [[1, 2], [3, 4]]
         let b = [5, 6]
         let c = 7
-        let d = [e for e in [8, c, b[0], a[0][1]]]  <-- source array is a plain array
-        let f = [g for g in a[1]]  <-- source is a matirx row
-        let h = [i for i in a[0][0..2]]  <-- source is a range in matrix row
+        let d = [e for e in [8, 9, 10]]  # <-- source array is an inlined vector
+        let f = [g for g in a[1]]  # <-- source is a matrix row
+        let h = [i for i in a[0][0..2]]  # <-- source is a range in matrix row
         enf ...
     ...
     ```

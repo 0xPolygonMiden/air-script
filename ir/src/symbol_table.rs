@@ -367,8 +367,7 @@ impl SymbolTable {
                 Ok(symbol_type)
             }
             IdentifierType::Variable(_, variable) => match variable.value() {
-                VariableType::Scalar(_) => Ok(symbol_type),
-                VariableType::Vector(_) => Ok(symbol_type),
+                VariableType::Scalar(_) | VariableType::Vector(_) => Ok(symbol_type),
                 VariableType::Matrix(matrix) => {
                     validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                     Ok(symbol_type)

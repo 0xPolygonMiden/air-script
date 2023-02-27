@@ -146,8 +146,9 @@ fn ic_variables_access_vector_from_matrix() {
 }
 
 #[test]
-fn err_ic_variables_access_vector_from_matrix() {
-    // We can not parse matrix variable that consists of inlined vector and scalar elements
+fn err_ic_variables_vector_with_inlined_vector() {
+    // We can not parse matrix variable that consists of inlined vector and scalar elements.
+    // Variable `d` is parsed as a vector and can not contain inlined vectors.
     let source = "
     trace_columns:
         main: [clk]
@@ -157,12 +158,29 @@ fn err_ic_variables_access_vector_from_matrix() {
         enf clk.first = 7
         enf clk.last = 8
     integrity_constraints:
-        let a = [[1, 2, 3, 4], [5, 6, 7, 8]]
-        let b = [9, 10]
-        let c = 12
-        let c = [a[0], [11, c, b[1], a[1][0]]]
-        d = [[11, c, b[1], a[1][0]], a[0]]
-        enf clk' = c[0][0] + d[1][1]";
+        let a = [[1, 2], [3, 4]]
+        let d = [a[0], [3, 4]]
+        enf clk' = d[0][0]";
+
+    parse(source).expect_err("Parsing failed");
+}
+
+#[test]
+fn err_ic_variables_matrix_with_vector_reference() {
+    // We can not parse matrix variable that consists of inlined vector and scalar elements
+    // Variable `d` is parsed as a matrix and can not contain references to vectors.
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        enf clk.first = 7
+        enf clk.last = 8
+    integrity_constraints:
+        let a = [[1, 2], [3, 4]]
+        let d = [[3, 4], a[0]]
+        enf clk' = d[0][0]";
 
     parse(source).expect_err("Parsing failed");
 }
