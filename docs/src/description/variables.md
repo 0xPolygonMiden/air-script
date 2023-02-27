@@ -45,11 +45,11 @@ Currently, it is not possible to:
     ...
     boundary_constraints:
         let a = [1, 2]
-        let b = [a, [3, 4]]  <-- b consists of array `[3, 4]` and reference to array `a`
+        let b = [a, [3, 4]]  <-- `b` consists of array `[3, 4]` and reference to array `a`
         enf ...
     ...
     ```
-2. Create variables with list comprehension for which the source array is a plain array, a matrix row, or a range in matrix row.
+2. Create variables with list comprehension for which the source array is a inlined vector, a matrix row, or a range in matrix row.
 
     Example: 
 

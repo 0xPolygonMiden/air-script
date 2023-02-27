@@ -145,9 +145,9 @@ fn ic_variables_access_vector_from_matrix() {
     assert!(result.is_ok());
 }
 
-// We can not parse matrix variable that consists of array and non-array elements
 #[test]
 fn err_ic_variables_access_vector_from_matrix() {
+    // We can not parse matrix variable that consists of inlined vector and scalar elements
     let source = "
     trace_columns:
         main: [clk]
