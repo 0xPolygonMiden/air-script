@@ -1,6 +1,6 @@
 use super::{
     constraints::{ConstrainedBoundary, ConstraintDomain},
-    Constant, IdentifierType, IndexedTraceAccess, MatrixAccess, NamedTraceAccess, TraceSegment,
+    Constant, IndexedTraceAccess, MatrixAccess, NamedTraceAccess, SymbolType, TraceSegment,
     VectorAccess, MIN_CYCLE_LENGTH,
 };
 

@@ -1,6 +1,6 @@
 use super::{
-    Constant, ConstrainedBoundary, ConstraintDomain, IdentifierType, IndexedTraceAccess,
-    MatrixAccess, NamedTraceAccess, TraceSegment, VectorAccess, MIN_CYCLE_LENGTH,
+    Constant, ConstrainedBoundary, ConstraintDomain, IndexedTraceAccess, MatrixAccess,
+    NamedTraceAccess, SymbolType, TraceSegment, VectorAccess, MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]
@@ -24,10 +24,7 @@ pub enum SemanticError {
 impl SemanticError {
     // --- INVALID ACCESS ERRORS ------------------------------------------------------------------
 
-    pub(crate) fn invalid_vector_access(
-        access: &VectorAccess,
-        symbol_type: &IdentifierType,
-    ) -> Self {
+    pub(crate) fn invalid_vector_access(access: &VectorAccess, symbol_type: &SymbolType) -> Self {
         Self::InvalidUsage(format!(
             "Vector Access {}[{}] was declared as a {} which is not a supported type.",
             access.name(),
@@ -36,10 +33,7 @@ impl SemanticError {
         ))
     }
 
-    pub(crate) fn invalid_matrix_access(
-        access: &MatrixAccess,
-        symbol_type: &IdentifierType,
-    ) -> Self {
+    pub(crate) fn invalid_matrix_access(access: &MatrixAccess, symbol_type: &SymbolType) -> Self {
         SemanticError::InvalidUsage(format!(
             "Matrix Access {}[{}][{}] was declared as a {} which is not a supported type.",
             access.name(),
@@ -142,8 +136,8 @@ impl SemanticError {
 
     pub(crate) fn duplicate_identifer(
         ident_name: &str,
-        ident_type: IdentifierType,
-        prev_type: IdentifierType,
+        ident_type: &SymbolType,
+        prev_type: &SymbolType,
     ) -> Self {
         SemanticError::DuplicateIdentifier(format!(
             "Cannot declare {ident_name} as a {ident_type}, since it was already defined as a {prev_type}"))
@@ -176,19 +170,13 @@ impl SemanticError {
 
     // --- TYPE ERRORS ----------------------------------------------------------------------------
 
-    pub(crate) fn unsupported_identifer_type(
-        ident_name: &str,
-        ident_type: &IdentifierType,
-    ) -> Self {
+    pub(crate) fn unsupported_identifer_type(ident_name: &str, ident_type: &SymbolType) -> Self {
         SemanticError::InvalidUsage(format!(
             "Identifier {ident_name} was declared as a {ident_type} which is not a supported type."
         ))
     }
 
-    pub(crate) fn not_a_trace_column_identifier(
-        ident_name: &str,
-        ident_type: &IdentifierType,
-    ) -> Self {
+    pub(crate) fn not_a_trace_column_identifier(ident_name: &str, ident_type: &SymbolType) -> Self {
         SemanticError::InvalidUsage(format!(
             "Identifier {ident_name} was declared as a {ident_type} not as a trace column"
         ))
@@ -223,7 +211,7 @@ impl SemanticError {
 
     pub(crate) fn invalid_list_folding(
         lf_value_type: &air_script_core::ListFoldingValueType,
-        symbol_type: &IdentifierType,
+        symbol_type: &SymbolType,
     ) -> SemanticError {
         SemanticError::InvalidListFolding(format!(
             "Symbol type {symbol_type} is not supported for list folding value type {lf_value_type:?}",

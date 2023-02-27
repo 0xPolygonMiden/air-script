@@ -3,7 +3,10 @@ use super::{
     MatrixAccess, NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType,
     VectorAccess, MIN_CYCLE_LENGTH,
 };
-use std::fmt::Display;
+
+mod symbol;
+use symbol::Symbol;
+pub(crate) use symbol::{Scope, SymbolType};
 
 mod trace_columns;
 use trace_columns::TraceColumns;
@@ -13,50 +16,6 @@ use access_validation::ValidateIdentifierAccess;
 
 // TYPES
 // ================================================================================================
-
-/// TODO: docs
-/// TODO: get rid of need to make this public to the crate
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) enum IdentifierType {
-    /// an identifier for a constant, containing its type and value
-    Constant(ConstantType),
-    /// an identifier for a trace column, containing trace column information with its trace
-    /// segment, its size and its offset.
-    TraceColumns(TraceColumns),
-    /// an identifier for a public input, containing the size of the public input array
-    PublicInput(usize),
-    /// an identifier for a periodic column, containing its index out of all periodic columns and
-    /// its cycle length in that order.
-    PeriodicColumn(usize, usize),
-    /// an identifier for a variable, containing its scope (boundary or integrity), name, and value
-    Variable(Scope, Variable),
-    /// an identifier for random value, containing its index in the random values array and its
-    /// length if this value is an array. For non-array random values second parameter is always 1.
-    RandomValuesBinding(usize, usize),
-}
-
-impl Display for IdentifierType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Constant(_) => write!(f, "Constant"),
-            Self::PublicInput(_) => write!(f, "PublicInput"),
-            Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
-            Self::TraceColumns(columns) => {
-                write!(f, "TraceColumns in segment {}", columns.trace_segment())
-            }
-            Self::Variable(Scope::BoundaryConstraints, _) => write!(f, "BoundaryVariable"),
-            Self::Variable(Scope::IntegrityConstraints, _) => write!(f, "IntegrityVariable"),
-            Self::RandomValuesBinding(_, _) => write!(f, "RandomValuesBinding"),
-        }
-    }
-}
-
-// TODO: get rid of need to make this public
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-pub(crate) enum Scope {
-    BoundaryConstraints,
-    IntegrityConstraints,
-}
 
 // TODO: get rid of need to make this public
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -74,7 +33,7 @@ pub enum VariableValue {
 #[derive(Default, Debug)]
 pub struct SymbolTable {
     /// A map of all declared identifiers from their name (the key) to their type.
-    identifiers: BTreeMap<String, IdentifierType>,
+    symbols: BTreeMap<(String, Scope), Symbol>,
 
     /// TODO: docs
     declarations: Declarations,
@@ -89,33 +48,52 @@ impl SymbolTable {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    /// Adds a declared identifier to the symbol table using the identifier as the key and the
-    /// type the identifier represents as the value.
+    /// Adds a declared identifier to the symbol table using the identifier and scope as the key and
+    /// the symbol as the value, where the symbol contains relevant details like scope and type.
     ///
     /// # Errors
-    /// It returns an error if the identifier already existed in the table.
+    /// It returns an error if the identifier already existed in the table in the same scope or the
+    /// global scope.
     fn insert_symbol(
         &mut self,
-        ident_name: &str,
-        ident_type: IdentifierType,
+        name: &str,
+        scope: Scope,
+        symbol_type: SymbolType,
     ) -> Result<(), SemanticError> {
-        let result = self
-            .identifiers
-            .insert(ident_name.to_owned(), ident_type.clone());
-        match result {
-            Some(prev_type) => Err(SemanticError::duplicate_identifer(
-                ident_name, ident_type, prev_type,
-            )),
-            None => Ok(()),
+        let symbol = Symbol::new(name.to_string(), scope, symbol_type);
+
+        // check if the identifier was already defined in the global scope.
+        if let Some(global_sym) = self.symbols.get(&(name.to_owned(), Scope::Global)) {
+            // TODO: update error to "{name} was already defined as a {type} in the {scope}",
+            return Err(SemanticError::duplicate_identifer(
+                symbol.name(),
+                symbol.symbol_type(),
+                global_sym.symbol_type(),
+            ));
         }
+        // insert the identifier or return an error if it was already defined in the specified scope.
+        if let Some(symbol) = self.symbols.insert((name.to_owned(), scope), symbol) {
+            // TODO: update error to "{name} was already defined as a {type} in the {scope}",
+            return Err(SemanticError::duplicate_identifer(
+                symbol.name(),
+                symbol.symbol_type(),
+                symbol.symbol_type(),
+            ));
+        }
+
+        Ok(())
     }
 
     /// Add a constant by its identifier and value.
+    /// TODO: consume constants instead of cloning them
     pub(super) fn insert_constant(&mut self, constant: &Constant) -> Result<(), SemanticError> {
-        validate_constant(constant)?;
-
         let Identifier(name) = &constant.name();
-        self.insert_symbol(name, IdentifierType::Constant(constant.value().clone()))?;
+        validate_constant(constant)?;
+        self.insert_symbol(
+            name,
+            Scope::Global,
+            SymbolType::Constant(constant.value().clone()),
+        )?;
         self.declarations.add_constant(constant.clone());
 
         Ok(())
@@ -133,7 +111,8 @@ impl SymbolTable {
                 TraceColumns::new(trace_segment, col_idx, trace_cols.size() as usize);
             self.insert_symbol(
                 trace_cols.name(),
-                IdentifierType::TraceColumns(trace_columns),
+                Scope::Global,
+                SymbolType::TraceColumns(trace_columns),
             )?;
             col_idx += trace_cols.size() as usize;
         }
@@ -159,7 +138,11 @@ impl SymbolTable {
         public_inputs: &[ast::PublicInput],
     ) -> Result<(), SemanticError> {
         for input in public_inputs.iter() {
-            self.insert_symbol(input.name(), IdentifierType::PublicInput(input.size()))?;
+            self.insert_symbol(
+                input.name(),
+                Scope::BoundaryConstraints,
+                SymbolType::PublicInput(input.size()),
+            )?;
             self.declarations
                 .add_public_input((input.name().to_string(), input.size()));
         }
@@ -179,7 +162,8 @@ impl SymbolTable {
 
             self.insert_symbol(
                 column.name(),
-                IdentifierType::PeriodicColumn(index, values.len()),
+                Scope::IntegrityConstraints,
+                SymbolType::PeriodicColumn(index, values.len()),
             )?;
             self.declarations.add_periodic_column(values);
         }
@@ -194,32 +178,48 @@ impl SymbolTable {
     ) -> Result<(), SemanticError> {
         self.declarations
             .set_num_random_values(values.size() as u16);
+
         let mut offset = 0;
         // add the name of the random values array to the symbol table
         self.insert_symbol(
             values.name(),
-            IdentifierType::RandomValuesBinding(offset, values.size() as usize),
+            Scope::Global,
+            SymbolType::RandomValuesBinding(offset, values.size() as usize),
         )?;
         // add the named random value bindings to the symbol table
         for value in values.bindings() {
             self.insert_symbol(
                 value.name(),
-                IdentifierType::RandomValuesBinding(offset, value.size() as usize),
+                Scope::Global,
+                SymbolType::RandomValuesBinding(offset, value.size() as usize),
             )?;
             offset += value.size() as usize;
         }
         Ok(())
     }
 
-    /// Inserts a boundary or integrity variable into the symbol table.
-    pub(super) fn insert_variable(
+    /// Inserts a boundary variable into the symbol table.
+    pub(super) fn insert_boundary_variable(
         &mut self,
-        scope: Scope,
         variable: &Variable,
     ) -> Result<(), SemanticError> {
         self.insert_symbol(
             variable.name(),
-            IdentifierType::Variable(scope, variable.clone()),
+            Scope::BoundaryConstraints,
+            SymbolType::Variable(variable.value().clone()),
+        )?;
+        Ok(())
+    }
+
+    /// Inserts an integrity variable into the symbol table.
+    pub(super) fn insert_integrity_variable(
+        &mut self,
+        variable: &Variable,
+    ) -> Result<(), SemanticError> {
+        self.insert_symbol(
+            variable.name(),
+            Scope::IntegrityConstraints,
+            SymbolType::Variable(variable.value().clone()),
         )?;
         Ok(())
     }
@@ -231,13 +231,18 @@ impl SymbolTable {
         self.declarations.num_trace_segments()
     }
 
-    /// Returns the type associated with the specified identifier name.
+    /// Returns the symbol associated with the specified identifier and validated for the specified
+    /// constraint domain.
     ///
     /// # Errors
     /// Returns an error if the identifier was not in the symbol table.
-    pub(crate) fn get_type(&self, name: &str) -> Result<&IdentifierType, SemanticError> {
-        if let Some(ident_type) = self.identifiers.get(name) {
-            Ok(ident_type)
+    pub(super) fn get_symbol(&self, name: &str, scope: Scope) -> Result<&Symbol, SemanticError> {
+        if let Some(symbol) = self
+            .symbols
+            .get(&(name.to_owned(), scope))
+            .or_else(|| self.symbols.get(&(name.to_owned(), Scope::Global)))
+        {
+            Ok(symbol)
         } else {
             Err(SemanticError::undeclared_identifier(name))
         }
@@ -255,10 +260,10 @@ impl SymbolTable {
         &self,
         trace_access: &NamedTraceAccess,
     ) -> Result<IndexedTraceAccess, SemanticError> {
-        let symbol_type = self.get_type(trace_access.name())?;
-        trace_access.validate(symbol_type)?;
+        let symbol = self.get_symbol(trace_access.name(), Scope::Global)?;
+        trace_access.validate(symbol)?;
 
-        let IdentifierType::TraceColumns(columns) = symbol_type else { unreachable!("validation of named trace access failed.") };
+        let SymbolType::TraceColumns(columns) = symbol.symbol_type() else { unreachable!("validation of named trace access failed.") };
         Ok(IndexedTraceAccess::new(
             columns.trace_segment(),
             columns.offset() + trace_access.idx(),
@@ -279,11 +284,12 @@ impl SymbolTable {
     pub(crate) fn access_vector_element(
         &self,
         vector_access: &VectorAccess,
-    ) -> Result<&IdentifierType, SemanticError> {
-        let symbol_type = self.get_type(vector_access.name())?;
-        vector_access.validate(symbol_type)?;
+        scope: Scope,
+    ) -> Result<&Symbol, SemanticError> {
+        let symbol = self.get_symbol(vector_access.name(), scope)?;
+        vector_access.validate(symbol)?;
 
-        Ok(symbol_type)
+        Ok(symbol)
     }
 
     /// Checks that the specified name and index are a valid reference to a matrix constant and
@@ -298,11 +304,12 @@ impl SymbolTable {
     pub(crate) fn access_matrix_element(
         &self,
         matrix_access: &MatrixAccess,
-    ) -> Result<&IdentifierType, SemanticError> {
-        let symbol_type = self.get_type(matrix_access.name())?;
-        matrix_access.validate(symbol_type)?;
+        scope: Scope,
+    ) -> Result<&Symbol, SemanticError> {
+        let symbol = self.get_symbol(matrix_access.name(), scope)?;
+        matrix_access.validate(symbol)?;
 
-        Ok(symbol_type)
+        Ok(symbol)
     }
 
     // --- VALIDATION -----------------------------------------------------------------------------
