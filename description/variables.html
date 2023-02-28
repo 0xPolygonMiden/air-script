@@ -177,6 +177,38 @@ integrity_constraints:
     ]
     enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1]
 </code></pre>
+<h3 id="syntax-restriction-for-local-variables"><a class="header" href="#syntax-restriction-for-local-variables">Syntax restriction for local variables</a></h3>
+<p>Currently, it is not possible to:</p>
+<ol>
+<li>
+<p>Create matrices containing both arrays and references to arrays.</p>
+<p>Example:</p>
+<pre><code>...
+boundary_constraints:
+    let a = [[1,2], [3,4]]  # &lt;-- this is allowed
+    let b = [1, 2]
+    let c = [a[1], b]  # &lt;-- this is allowed
+    let d = [b, [3, 4]]  # &lt;-- this is not allowed, because `d` consists of array `[3, 4]` and reference to array `b`
+    enf ...
+...
+</code></pre>
+</li>
+<li>
+<p>Create variables with list comprehension for which the source array is a inlined vector, a matrix row, or a range in matrix row.</p>
+<p>Example: </p>
+<pre><code>...
+integrity_constraints:
+    let a = [[1, 2], [3, 4]]
+    let b = [5, 6]
+    let c = 7
+    let d = [e for e in [8, 9, 10]]  # &lt;-- source array is an inlined vector
+    let f = [g for g in a[1]]  # &lt;-- source is a matrix row
+    let h = [i for i in a[0][0..2]]  # &lt;-- source is a range in matrix row
+    enf ...
+...
+</code></pre>
+</li>
+</ol>
 <h2 id="built-in-variables"><a class="header" href="#built-in-variables">Built-in variables</a></h2>
 <p>Built-in variables are identified by the starting character <code>$</code>. There are two built-in variables:</p>
 <h3 id="main"><a class="header" href="#main">$main</a></h3>
