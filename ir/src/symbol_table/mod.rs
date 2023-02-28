@@ -8,11 +8,12 @@ mod symbol;
 use symbol::Symbol;
 pub(crate) use symbol::{Scope, SymbolType};
 
+mod symbol_access;
+pub(crate) use symbol_access::SymbolAccess;
+use symbol_access::ValidateIdentifierAccess;
+
 mod trace_columns;
 use trace_columns::TraceColumns;
-
-mod access_validation;
-use access_validation::ValidateIdentifierAccess;
 
 // TYPES
 // ================================================================================================
@@ -285,11 +286,9 @@ impl SymbolTable {
         &self,
         vector_access: &VectorAccess,
         scope: Scope,
-    ) -> Result<&Symbol, SemanticError> {
+    ) -> Result<SymbolAccess, SemanticError> {
         let symbol = self.get_symbol(vector_access.name(), scope)?;
-        vector_access.validate(symbol)?;
-
-        Ok(symbol)
+        SymbolAccess::from_vector_access(symbol, vector_access)
     }
 
     /// Checks that the specified name and index are a valid reference to a matrix constant and
@@ -305,11 +304,9 @@ impl SymbolTable {
         &self,
         matrix_access: &MatrixAccess,
         scope: Scope,
-    ) -> Result<&Symbol, SemanticError> {
+    ) -> Result<SymbolAccess, SemanticError> {
         let symbol = self.get_symbol(matrix_access.name(), scope)?;
-        matrix_access.validate(symbol)?;
-
-        Ok(symbol)
+        SymbolAccess::from_matrix_access(symbol, matrix_access)
     }
 
     // --- VALIDATION -----------------------------------------------------------------------------
