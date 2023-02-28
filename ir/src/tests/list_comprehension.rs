@@ -119,49 +119,6 @@ fn lc_with_multiple_lists() {
 }
 
 #[test]
-fn list_folding() {
-    let source = "
-    trace_columns:
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
-    public_inputs:
-        stack_inputs: [16]
-    boundary_constraints:
-        enf c[2].first = 0
-    integrity_constraints:
-        let x = sum([c * d for (c, d) in (c, d)])
-        let y = prod([c + d for (c, d) in (c, d)])    
-        enf clk = x";
-
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_ok());
-}
-
-#[test]
-fn lf_in_lc() {
-    let source = "
-    trace_columns:
-        main: [clk, fmp[4], ctx]
-        aux: [a, b, c[4], d[4]]
-    public_inputs:
-        stack_inputs: [16]
-    
-    boundary_constraints:
-        enf c[2].first = 0
-    
-    integrity_constraints:
-        let x = sum([c * d for (c, d) in (c, d)])
-        let y = [m + x for m in fmp]
-        enf clk = y[0]";
-
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-
-    assert!(result.is_ok());
-}
-
-#[test]
 fn err_index_out_of_range_lc_ident() {
     let source = "
     trace_columns:
