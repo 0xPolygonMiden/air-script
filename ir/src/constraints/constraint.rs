@@ -96,9 +96,7 @@ impl ConstraintDomain {
                 Ok(ConstraintDomain::EveryFrame(*a.max(b)))
             }
             // otherwise, the domains are not compatible.
-            _ => Err(SemanticError::InvalidConstraintDomain(format!(
-                "The specified constraint domain {other:?} is not compatible with the base domain {self:?}",
-            ))),
+            _ => Err(SemanticError::incompatible_constraint_domains(self, other)),
         }
     }
 

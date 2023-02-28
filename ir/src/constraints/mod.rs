@@ -6,7 +6,7 @@ use super::{
 use std::collections::{BTreeMap, BTreeSet};
 
 mod constraint;
-use constraint::ConstrainedBoundary;
+pub use constraint::ConstrainedBoundary;
 pub use constraint::{ConstraintDomain, ConstraintRoot};
 
 mod degree;
@@ -278,9 +278,9 @@ impl Constraints {
                 // add the boundary to the set of constrained boundaries.
                 if !self.constrained_boundaries.insert(constrained_boundary) {
                     // raise an error if the same boundary was previously constrained
-                    return Err(SemanticError::TooManyConstraints(format!(
-                        "A constraint was already defined at {constrained_boundary}",
-                    )));
+                    return Err(SemanticError::boundary_already_constrained(
+                        &constrained_boundary,
+                    ));
                 }
 
                 // add the trace access at the specified boundary to the graph.
@@ -302,7 +302,7 @@ impl Constraints {
                 // trace segment inference defaults to the lowest segment (the main trace) and is
                 // adjusted according to the use of random values and trace columns.
                 if lhs.trace_segment() < rhs.trace_segment() {
-                    return Err(SemanticError::InvalidUsage("Random values cannot be used in boundary constraints defined against prior trace segments".to_string()));
+                    return Err(SemanticError::trace_segment_mismatch(&lhs.trace_segment()));
                 }
 
                 // merge the two sides of the expression into a constraint.
@@ -330,8 +330,8 @@ impl Constraints {
 
         // the constraint should not be against an undeclared trace segment.
         if symbol_table.num_trace_segments() <= trace_segment {
-            return Err(SemanticError::InvalidConstraint(
-                "Constraint against undeclared trace segment".to_string(),
+            return Err(SemanticError::trace_segment_mismatch(
+                &constraint.trace_segment,
             ));
         }
 
