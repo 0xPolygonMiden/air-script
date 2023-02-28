@@ -1,7 +1,10 @@
-use super::{graph::CURRENT_ROW, IdentifierType, SemanticError, SymbolTable};
+use super::{
+    build_list_from_list_folding_value, graph::CURRENT_ROW, IdentifierType, SemanticError,
+    SymbolTable,
+};
 use air_script_core::{
     Expression, Identifier, IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType,
-    NamedTraceAccess, VariableType, VectorAccess,
+    ListFoldingValueType, NamedTraceAccess, VariableType, VectorAccess,
 };
 use std::collections::BTreeMap;
 
@@ -185,9 +188,17 @@ fn parse_list_folding(
     i: usize,
 ) -> Result<Expression, SemanticError> {
     match lf_type {
-        ListFoldingType::Sum(lc) | ListFoldingType::Prod(lc) => {
-            let iterable_context = build_iterable_context(lc)?;
-            let list = unfold_lc(lc, symbol_table)?;
+        ListFoldingType::Sum(lf_value_type) | ListFoldingType::Prod(lf_value_type) => {
+            let list = build_list_from_list_folding_value(lf_value_type, symbol_table)?;
+            let iterable_context =
+                if let ListFoldingValueType::ListComprehension(lc) = lf_value_type {
+                    build_iterable_context(lc)?
+                } else {
+                    BTreeMap::new()
+                };
+            if list.is_empty() {
+                return Err(SemanticError::list_folding_empty_list(lf_value_type));
+            }
             let mut acc = parse_lc_expr(expression, &iterable_context, symbol_table, i)?;
             for elem in list.iter().skip(1) {
                 let expr = parse_lc_expr(elem, &iterable_context, symbol_table, i)?;
