@@ -310,17 +310,17 @@ impl SymbolTable {
                 validate_vector_access(vector_access, vector.len())?;
                 Ok(symbol_type)
             }
-            IdentifierType::Variable(_, variable) => {
-                if let VariableType::Vector(vector) = variable.value() {
+            IdentifierType::Variable(_, variable) => match variable.value() {
+                VariableType::Scalar(_) => Ok(symbol_type),
+                VariableType::Vector(vector) => {
                     validate_vector_access(vector_access, vector.len())?;
                     Ok(symbol_type)
-                } else {
-                    Err(SemanticError::invalid_vector_access(
-                        vector_access,
-                        symbol_type,
-                    ))
                 }
-            }
+                _ => Err(SemanticError::invalid_vector_access(
+                    vector_access,
+                    symbol_type,
+                )),
+            },
             IdentifierType::TraceColumns(trace_columns) => {
                 if vector_access.idx() < trace_columns.size() {
                     Ok(symbol_type)
@@ -366,17 +366,17 @@ impl SymbolTable {
                 validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                 Ok(symbol_type)
             }
-            IdentifierType::Variable(_, variable) => {
-                if let VariableType::Matrix(matrix) = variable.value() {
+            IdentifierType::Variable(_, variable) => match variable.value() {
+                VariableType::Scalar(_) | VariableType::Vector(_) => Ok(symbol_type),
+                VariableType::Matrix(matrix) => {
                     validate_matrix_access(matrix_access, matrix.len(), matrix[0].len())?;
                     Ok(symbol_type)
-                } else {
-                    Err(SemanticError::invalid_matrix_access(
-                        matrix_access,
-                        symbol_type,
-                    ))
                 }
-            }
+                _ => Err(SemanticError::invalid_matrix_access(
+                    matrix_access,
+                    symbol_type,
+                )),
+            },
             _ => Err(SemanticError::invalid_matrix_access(
                 matrix_access,
                 symbol_type,
