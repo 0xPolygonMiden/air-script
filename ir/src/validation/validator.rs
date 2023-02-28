@@ -1,7 +1,7 @@
-use crate::error::SemanticError;
+use super::SemanticError;
 
 /// Struct to help with validation of AIR source.
-pub(super) struct SourceValidator {
+pub(crate) struct SourceValidator {
     main_trace_columns_exists: bool,
     aux_trace_columns_exists: bool,
     public_inputs_exists: bool,

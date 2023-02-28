@@ -1,6 +1,6 @@
 use super::{
-    graph::CURRENT_ROW, list_comprehension::unfold_lc, ConstantType, Expression, IdentifierType,
-    IndexedTraceAccess, ListFoldingValueType, SemanticError, SymbolTable, VariableType,
+    list_comprehension::unfold_lc, ConstantType, Expression, IdentifierType, IndexedTraceAccess,
+    ListFoldingValueType, SemanticError, SymbolTable, VariableType, CURRENT_ROW,
 };
 
 // LIST FOLDING

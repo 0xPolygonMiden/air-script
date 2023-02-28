@@ -1,71 +1,31 @@
 use super::{
-    symbol_table::IdentifierType, Boundary, BoundaryStmt, ConstantType, Expression, Identifier,
-    IndexedTraceAccess, IntegrityStmt, ListFoldingType, ListFoldingValueType, MatrixAccess, Scope,
-    SemanticError, SymbolTable, TraceSegment, Variable, VariableType, VectorAccess,
+    ast::Boundary, build_list_from_list_folding_value, ConstantType, ExprDetails, Expression,
+    Identifier, IdentifierType, IndexedTraceAccess, ListFoldingType, MatrixAccess, Scope,
+    SemanticError, SymbolTable, TraceSegment, VariableRoots, VariableType, VariableValue,
+    VectorAccess,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 mod constraint;
-pub use constraint::ConstrainedBoundary;
-pub use constraint::{ConstraintDomain, ConstraintRoot};
+pub use constraint::{ConstrainedBoundary, ConstraintDomain, ConstraintRoot};
 
 mod degree;
 pub use degree::IntegrityConstraintDegree;
 
 mod graph;
-pub use graph::{
-    AlgebraicGraph, ConstantValue, NodeIndex, Operation, VariableValue, DEFAULT_SEGMENT,
-};
-
-mod list_folding;
-use list_folding::build_list_from_list_folding_value;
-
-mod list_comprehension;
-use list_comprehension::unfold_lc;
-
-// TYPES
-// ================================================================================================
-type VariableRoots = BTreeMap<(Scope, VariableValue), ExprDetails>;
+pub use graph::{AlgebraicGraph, ConstantValue, NodeIndex, Operation};
 
 // CONSTANTS
 // ================================================================================================
 
-pub const MIN_CYCLE_LENGTH: usize = 2;
-
-// HELPER STRUCTS
-// ================================================================================================
-
-/// A struct containing the node index that is the root of the expression, the trace segment to
-/// which the expression is applied, and the constraint domain against which any constraint
-/// containing this expression must be applied.
-#[derive(Debug, Copy, Clone)]
-struct ExprDetails {
-    root_idx: NodeIndex,
-    trace_segment: TraceSegment,
-    domain: ConstraintDomain,
-}
-
-impl ExprDetails {
-    fn new(root_idx: NodeIndex, trace_segment: TraceSegment, domain: ConstraintDomain) -> Self {
-        Self {
-            root_idx,
-            trace_segment,
-            domain,
-        }
-    }
-
-    fn root_idx(&self) -> NodeIndex {
-        self.root_idx
-    }
-
-    fn trace_segment(&self) -> TraceSegment {
-        self.trace_segment
-    }
-
-    fn domain(&self) -> ConstraintDomain {
-        self.domain
-    }
-}
+/// The default segment against which a constraint is applied is the main trace segment.
+const DEFAULT_SEGMENT: TraceSegment = 0;
+/// The auxiliary trace segment.
+const AUX_SEGMENT: TraceSegment = 1;
+/// The offset of the "current" row during constraint evaluation.
+pub(super) const CURRENT_ROW: usize = 0;
+/// TODO: docs
+pub(super) const MIN_CYCLE_LENGTH: usize = 2;
 
 // CONSTRAINTS
 // ================================================================================================
@@ -78,7 +38,7 @@ impl ExprDetails {
 /// be specified by a vector in transition_constraints[0] containing a [ConstraintRoot] in the graph
 /// for each constraint against the main trace.
 #[derive(Default, Debug)]
-pub(super) struct Constraints {
+pub(crate) struct Constraints {
     /// Constraint roots for all boundary constraints against the execution trace, by trace segment,
     /// where boundary constraints are any constraints that apply to either the first or the last
     /// row of the trace.
@@ -95,28 +55,18 @@ pub(super) struct Constraints {
 
     /// A directed acyclic graph which represents all of the constraints and their subexpressions.
     graph: AlgebraicGraph,
-
-    /// Variable roots for the variables used in integrity constraints. For each element in a
-    /// vector or a matrix, a new root is added with a key equal to the [VariableValue] of the
-    /// element.
-    variable_roots: VariableRoots,
-
-    /// A set of all boundaries which have been constrained. This is used to ensure that no more
-    /// than one constraint is defined at any given boundary.
-    constrained_boundaries: BTreeSet<ConstrainedBoundary>,
 }
 
 impl Constraints {
     // --- CONSTRUCTOR ----------------------------------------------------------------------------
 
+    /// TODO: these constraint vectors should be initialized to the proper length
     pub fn new(num_trace_segments: usize) -> Self {
         Self {
             boundary_constraints: vec![Vec::new(); num_trace_segments],
             validity_constraints: vec![Vec::new(); num_trace_segments],
             transition_constraints: vec![Vec::new(); num_trace_segments],
             graph: AlgebraicGraph::default(),
-            variable_roots: BTreeMap::new(),
-            constrained_boundaries: BTreeSet::new(),
         }
     }
 
@@ -203,144 +153,48 @@ impl Constraints {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    /// Adds the provided parsed integrity statement to the graph. The statement can either be a
-    /// variable defined in the integrity constraints section or an integrity constraint.
-    ///
-    /// In case the statement is a variable, it is added to the symbol table.
-    ///
-    /// In case the statement is a constraint, the constraint is turned into a subgraph which is
-    /// added to the [AlgebraicGraph] (reusing any existing nodes). The index of its entry node
-    /// is then saved in the validity_constraints or transition_constraints matrices.
-    pub(super) fn insert_integrity_stmt(
+    // TODO: get rid of this
+    pub(super) fn insert_expr(
         &mut self,
-        symbol_table: &mut SymbolTable,
-        stmt: &IntegrityStmt,
-    ) -> Result<(), SemanticError> {
-        match stmt {
-            IntegrityStmt::Constraint(constraint) => {
-                // add the left hand side expression to the graph.
-                let lhs = self.graph.insert_expr(
-                    symbol_table,
-                    constraint.lhs(),
-                    &mut self.variable_roots,
-                    ConstraintDomain::EveryRow,
-                )?;
-
-                // add the right hand side expression to the graph.
-                let rhs = self.graph.insert_expr(
-                    symbol_table,
-                    constraint.rhs(),
-                    &mut self.variable_roots,
-                    ConstraintDomain::EveryRow,
-                )?;
-
-                // merge the two sides of the expression into a constraint.
-                self.insert_constraint(symbol_table, lhs, rhs)?
-            }
-            IntegrityStmt::Variable(variable) => {
-                if let VariableType::ListComprehension(list_comprehension) = variable.value() {
-                    let vector = unfold_lc(list_comprehension, symbol_table)?;
-                    symbol_table.insert_variable(
-                        Scope::IntegrityConstraints,
-                        &Variable::new(
-                            Identifier(variable.name().to_string()),
-                            VariableType::Vector(vector),
-                        ),
-                    )?
-                } else {
-                    symbol_table.insert_variable(Scope::IntegrityConstraints, variable)?
-                }
-            }
-        }
-
-        Ok(())
+        symbol_table: &SymbolTable,
+        expr: &Expression,
+        variable_roots: &mut VariableRoots,
+        default_domain: ConstraintDomain,
+    ) -> Result<ExprDetails, SemanticError> {
+        self.graph
+            .insert_expr(symbol_table, expr, variable_roots, default_domain)
     }
 
-    /// Adds the provided parsed boundary statement to the graph. The statement can either be a
-    /// variable defined in the boundary constraints section or a boundary constraint expression.
-    ///
-    /// In case the statement is a variable, it is added to the symbol table.
-    ///
-    /// In case the statement is a constraint, the constraint is turned into a subgraph which is
-    /// added to the [AlgebraicGraph] (reusing any existing nodes). The index of its entry node
-    /// is then saved in the boundary_constraints matrix.
-    pub(super) fn insert_boundary_stmt(
+    // TODO: get rid of this
+    pub(super) fn insert_trace_access(
         &mut self,
-        symbol_table: &mut SymbolTable,
-        stmt: &BoundaryStmt,
-    ) -> Result<(), SemanticError> {
-        match stmt {
-            BoundaryStmt::Constraint(constraint) => {
-                let trace_access = symbol_table.get_trace_access_by_name(constraint.access())?;
-                let domain = constraint.boundary().into();
-                let constrained_boundary = ConstrainedBoundary::new(
-                    trace_access.trace_segment(),
-                    trace_access.col_idx(),
-                    domain,
-                );
-                // add the boundary to the set of constrained boundaries.
-                if !self.constrained_boundaries.insert(constrained_boundary) {
-                    // raise an error if the same boundary was previously constrained
-                    return Err(SemanticError::boundary_already_constrained(
-                        &constrained_boundary,
-                    ));
-                }
-
-                // add the trace access at the specified boundary to the graph.
-                let lhs = self
-                    .graph
-                    .insert_trace_access(symbol_table, &trace_access, domain)?;
-
-                // add its expression to the constraints graph.
-                // TODO: need to validate public inputs in the expression when they are restored.
-                let rhs = self.graph.insert_expr(
-                    symbol_table,
-                    constraint.value(),
-                    &mut self.variable_roots,
-                    domain,
-                )?;
-
-                // ensure that the inferred trace segment of the rhs expression can be applied to
-                // column against which the boundary constraint is applied.
-                // trace segment inference defaults to the lowest segment (the main trace) and is
-                // adjusted according to the use of random values and trace columns.
-                if lhs.trace_segment() < rhs.trace_segment() {
-                    return Err(SemanticError::trace_segment_mismatch(&lhs.trace_segment()));
-                }
-
-                // merge the two sides of the expression into a constraint.
-                self.insert_constraint(symbol_table, lhs, rhs)?
-            }
-            BoundaryStmt::Variable(variable) => {
-                symbol_table.insert_variable(Scope::BoundaryConstraints, variable)?
-            }
-        }
-
-        Ok(())
+        symbol_table: &SymbolTable,
+        trace_access: &IndexedTraceAccess,
+        domain: ConstraintDomain,
+    ) -> Result<ExprDetails, SemanticError> {
+        self.graph
+            .insert_trace_access(symbol_table, trace_access, domain)
     }
 
-    /// Takes two expressions which are expected to be equal and merges them into a constraint (a
-    /// subtree in the graph that must be equal to zero for a particular domain). The constraint is
-    /// then saved in the appropriate constraint list (boundary, validity, or transition).
-    fn insert_constraint(
+    // TODO: get rid of this
+    pub(super) fn merge_equal_exprs(
         &mut self,
-        symbol_table: &mut SymbolTable,
-        lhs: ExprDetails,
-        rhs: ExprDetails,
-    ) -> Result<(), SemanticError> {
-        let constraint = self.graph.merge_equal_exprs(&lhs, &rhs)?;
-        let trace_segment = constraint.trace_segment as usize;
+        lhs: &ExprDetails,
+        rhs: &ExprDetails,
+    ) -> Result<ExprDetails, SemanticError> {
+        self.graph.merge_equal_exprs(lhs, rhs)
+    }
 
-        // the constraint should not be against an undeclared trace segment.
-        if symbol_table.num_trace_segments() <= trace_segment {
-            return Err(SemanticError::trace_segment_mismatch(
-                &constraint.trace_segment,
-            ));
-        }
+    pub(super) fn insert_constraint(
+        &mut self,
+        node_idx: NodeIndex,
+        trace_segment: usize,
+        domain: ConstraintDomain,
+    ) {
+        let constraint_root = ConstraintRoot::new(node_idx, domain);
 
-        let constraint_root = ConstraintRoot::new(constraint.root_idx(), constraint.domain());
         // add the constraint to the appropriate set of constraints.
-        match constraint.domain() {
+        match domain {
             ConstraintDomain::FirstRow | ConstraintDomain::LastRow => {
                 self.boundary_constraints[trace_segment].push(constraint_root);
             }
@@ -351,7 +205,5 @@ impl Constraints {
                 self.transition_constraints[trace_segment].push(constraint_root);
             }
         }
-
-        Ok(())
     }
 }
