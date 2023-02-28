@@ -13,6 +13,7 @@ pub enum SemanticError {
     InvalidConstraintDomain(String),
     InvalidIdentifier(String),
     InvalidListComprehension(String),
+    InvalidListFolding(String),
     InvalidPeriodicColumn(String),
     InvalidUsage(String),
     MissingDeclaration(String),
@@ -207,6 +208,12 @@ impl SemanticError {
         ))
     }
 
+    pub(super) fn invalid_trace_binding(ident: &str) -> SemanticError {
+        SemanticError::InvalidUsage(format!(
+            "Expected {ident} to be a binding to a single trace column."
+        ))
+    }
+
     // --- INVALID CONSTRAINT ERRORS --------------------------------------------------------------
 
     pub(super) fn incompatible_constraint_domains(
@@ -225,6 +232,23 @@ impl SemanticError {
     pub(super) fn trace_segment_mismatch(segment: &TraceSegment) -> Self {
         SemanticError::InvalidUsage(format!(
             "The constraint expression cannot be enforced against trace segment {segment}"
+        ))
+    }
+
+    pub(super) fn invalid_list_folding(
+        lf_value_type: &air_script_core::ListFoldingValueType,
+        symbol_type: &IdentifierType,
+    ) -> SemanticError {
+        SemanticError::InvalidListFolding(format!(
+            "Symbol type {symbol_type} is not supported for list folding value type {lf_value_type:?}",
+        ))
+    }
+
+    pub(super) fn list_folding_empty_list(
+        lf_value_type: &air_script_core::ListFoldingValueType,
+    ) -> SemanticError {
+        SemanticError::InvalidListFolding(format!(
+            "List folding value cannot be an empty list. {lf_value_type:?} represents an empty list.",
         ))
     }
 }

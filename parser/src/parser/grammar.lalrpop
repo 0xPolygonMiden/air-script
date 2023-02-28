@@ -3,9 +3,9 @@ use crate::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt}, 
         integrity_constraints::{IntegrityConstraint, IntegrityStmt},
         Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, Iterable,
-        ListComprehension, ListFoldingType, MatrixAccess, NamedTraceAccess, PeriodicColumn,
-        PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, Trace, TraceCols, 
-        Variable, VariableType, VectorAccess
+        ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, NamedTraceAccess,
+        PeriodicColumn, PublicInput, RandBinding, RandomValues, Range, Source, SourceSection,
+        Trace, TraceCols, Variable, VariableType, VectorAccess
     }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, InvalidRandomValues,
     MissingMainTraceCols,
     InvalidConst, InvalidListComprehension, MissingBoundaryConstraint,
@@ -372,10 +372,17 @@ ListComprehension<T>: ListComprehension = {
 }
 
 ListFoldingType<T>: ListFoldingType = {
-    "sum" "(" "[" <list_comprehension: ListComprehension<T>> "]" ")" =>
-        ListFoldingType::Sum(list_comprehension),
-    "prod" "(" "[" <list_comprehension: ListComprehension<T>> "]" ")" =>
-        ListFoldingType::Prod(list_comprehension),
+    "sum" "(" <list_folding_value_type: ListFoldingValueType<T>> ")" =>
+        ListFoldingType::Sum(list_folding_value_type),
+    "prod" "(" <list_folding_value_type: ListFoldingValueType<T>> ")" =>
+        ListFoldingType::Prod(list_folding_value_type),
+}
+
+ListFoldingValueType<T>: ListFoldingValueType = {
+    <name: Identifier> => ListFoldingValueType::Identifier(name),
+    <vector: Vector<T>> => ListFoldingValueType::Vector(vector),
+    "[" <list_comprehension: ListComprehension<T>> "]" =>
+        ListFoldingValueType::ListComprehension(list_comprehension)
 }
 
 Members: Vec<Identifier> = {

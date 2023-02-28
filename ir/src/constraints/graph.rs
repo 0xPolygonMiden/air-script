@@ -1,5 +1,5 @@
 use super::{
-    list_comprehension::unfold_lc, BTreeMap, ConstantType, ConstraintDomain, ExprDetails,
+    build_list_from_list_folding_value, BTreeMap, ConstantType, ConstraintDomain, ExprDetails,
     Expression, Identifier, IdentifierType, IndexedTraceAccess, IntegrityConstraintDegree,
     ListFoldingType, MatrixAccess, Scope, SemanticError, SymbolTable, TraceSegment, VariableRoots,
     VariableType, VectorAccess,
@@ -374,6 +374,9 @@ impl AlgebraicGraph {
                 Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
             }
             IdentifierType::TraceColumns(columns) => {
+                if columns.size() != 1 {
+                    return Err(SemanticError::invalid_trace_binding(ident));
+                }
                 let trace_segment = columns.trace_segment();
                 let trace_access =
                     IndexedTraceAccess::new(trace_segment, columns.offset(), CURRENT_ROW);
@@ -627,12 +630,11 @@ impl AlgebraicGraph {
         domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
         match lf_type {
-            ListFoldingType::Sum(lc) | ListFoldingType::Prod(lc) => {
-                let list = unfold_lc(lc, symbol_table)?;
-                assert!(
-                    !list.is_empty(),
-                    "List on which list folding is applied is empty."
-                );
+            ListFoldingType::Sum(lf_value_type) | ListFoldingType::Prod(lf_value_type) => {
+                let list = build_list_from_list_folding_value(lf_value_type, symbol_table)?;
+                if list.is_empty() {
+                    return Err(SemanticError::list_folding_empty_list(lf_value_type));
+                }
 
                 let mut acc = self.insert_expr(symbol_table, &list[0], variable_roots, domain)?;
                 for elem in list.iter().skip(1) {

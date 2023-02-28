@@ -122,3 +122,21 @@ fn err_ic_trace_cols_access_out_of_bounds() {
     let result = AirIR::new(&parsed);
     assert!(result.is_err());
 }
+
+#[test]
+fn err_ic_trace_cols_group_used_as_scalar() {
+    let source = "
+    trace_columns:
+        main: [clk, a[4]]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        enf a[1].first = 0
+    integrity_constraints:
+        enf a[0]' = a + clk";
+
+    let parsed = parse(source).expect("Parsing failed");
+
+    let result = AirIR::new(&parsed);
+    assert!(result.is_err());
+}

@@ -1,7 +1,7 @@
 use super::{
     symbol_table::IdentifierType, Boundary, BoundaryStmt, ConstantType, Expression, Identifier,
-    IndexedTraceAccess, IntegrityStmt, ListFoldingType, MatrixAccess, Scope, SemanticError,
-    SymbolTable, TraceSegment, Variable, VariableType, VectorAccess,
+    IndexedTraceAccess, IntegrityStmt, ListFoldingType, ListFoldingValueType, MatrixAccess, Scope,
+    SemanticError, SymbolTable, TraceSegment, Variable, VariableType, VectorAccess,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,6 +16,9 @@ mod graph;
 pub use graph::{
     AlgebraicGraph, ConstantValue, NodeIndex, Operation, VariableValue, DEFAULT_SEGMENT,
 };
+
+mod list_folding;
+use list_folding::build_list_from_list_folding_value;
 
 mod list_comprehension;
 use list_comprehension::unfold_lc;

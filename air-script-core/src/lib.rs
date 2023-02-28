@@ -5,7 +5,7 @@ mod constant;
 pub use constant::{Constant, ConstantType};
 
 mod expression;
-pub use expression::{Expression, ListFoldingType};
+pub use expression::{Expression, ListFoldingType, ListFoldingValueType};
 
 mod identifier;
 pub use identifier::Identifier;
