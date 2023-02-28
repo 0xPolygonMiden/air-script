@@ -204,9 +204,12 @@ impl SymbolTable {
 
     /// Consumes this symbol table and returns the information required for declaring constants,
     /// public inputs, periodic columns and columns amount for the AIR.
-    pub(super) fn into_declarations(self) -> (Vec<u16>, Constants, PublicInputs, PeriodicColumns) {
+    pub(super) fn into_declarations(
+        self,
+    ) -> (Vec<u16>, u16, Constants, PublicInputs, PeriodicColumns) {
         (
             self.segment_widths,
+            self.num_random_values,
             self.constants,
             self.public_inputs,
             self.periodic_columns,

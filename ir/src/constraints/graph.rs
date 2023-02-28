@@ -44,6 +44,10 @@ impl AlgebraicGraph {
         &self.nodes[index.0]
     }
 
+    pub fn nodes(&self) -> &Vec<Node> {
+        &self.nodes
+    }
+
     /// Returns the degree of the subgraph which has the specified node as its tip.
     pub fn degree(&self, index: &NodeIndex) -> IntegrityConstraintDegree {
         let mut cycles: BTreeMap<usize, usize> = BTreeMap::new();
@@ -653,6 +657,12 @@ impl AlgebraicGraph {
 /// Reference to a node in a graph by its index in the nodes vector of the graph struct.
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
 pub struct NodeIndex(usize);
+
+impl NodeIndex {
+    pub fn index(&self) -> usize {
+        self.0
+    }
+}
 
 #[derive(Debug)]
 pub struct Node {

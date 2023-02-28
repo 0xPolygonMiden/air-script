@@ -1,0 +1,13 @@
+{
+	"num_polys": 14,
+	"num_variables": 16,
+	"constants": [1, 0],
+	"expressions": [
+		{"op": "ADD", "lhs": {"type": "POL", "index": 2}, "rhs": {"type": "CONST", "index": 0}},
+		{"op": "SUB", "lhs": {"type": "POL_NEXT", "index": 2}, "rhs": {"type": "EXPR", "index": 0}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 1}, "rhs": {"type": "CONST", "index": 0}},
+		{"op": "SUB", "lhs": {"type": "POL_NEXT", "index": 1}, "rhs": {"type": "EXPR", "index": 2}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 8}, "rhs": {"type": "CONST", "index": 1}}
+	],
+	"outputs": [1, 3, 4]
+}

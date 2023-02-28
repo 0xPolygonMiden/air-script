@@ -1,0 +1,18 @@
+{
+	"num_polys": 4,
+	"num_variables": 32,
+	"constants": [],
+	"expressions": [
+		{"op": "SUB", "lhs": {"type": "POL", "index": 0}, "rhs": {"type": "VAR", "index": 4}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 1}, "rhs": {"type": "VAR", "index": 5}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 2}, "rhs": {"type": "VAR", "index": 6}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 3}, "rhs": {"type": "VAR", "index": 7}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 0}, "rhs": {"type": "VAR", "index": 8}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 1}, "rhs": {"type": "VAR", "index": 9}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 2}, "rhs": {"type": "VAR", "index": 10}},
+		{"op": "SUB", "lhs": {"type": "POL", "index": 3}, "rhs": {"type": "VAR", "index": 11}},
+		{"op": "ADD", "lhs": {"type": "POL", "index": 1}, "rhs": {"type": "POL", "index": 2}},
+		{"op": "SUB", "lhs": {"type": "POL_NEXT", "index": 0}, "rhs": {"type": "EXPR", "index": 8}}
+	],
+	"outputs": [0, 1, 2, 3, 4, 5, 6, 7, 9]
+}
