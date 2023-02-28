@@ -51,19 +51,10 @@ impl SemanticError {
 
     pub(crate) fn vector_access_out_of_bounds(access: &VectorAccess, vector_len: usize) -> Self {
         Self::IndexOutOfRange(format!(
-            "Out-of-range index {} in vector constant {} of length {}",
+            "Out-of-range index {} in vector {} of length {}",
             access.idx(),
             access.name(),
             vector_len
-        ))
-    }
-
-    pub(crate) fn public_inputs_out_of_bounds(access: &VectorAccess, size: usize) -> Self {
-        SemanticError::IndexOutOfRange(format!(
-            "Out-of-range index {} in public input {} of length {}",
-            access.idx(),
-            access.name(),
-            size
         ))
     }
 
@@ -73,7 +64,7 @@ impl SemanticError {
         matrix_col_len: usize,
     ) -> Self {
         SemanticError::IndexOutOfRange(format!(
-            "Out-of-range index [{}][{}] in matrix constant {} of dimensions ({}, {})",
+            "Out-of-range index [{}][{}] in matrix {} of dimensions ({}, {})",
             access.row_idx(),
             access.col_idx(),
             access.name(),

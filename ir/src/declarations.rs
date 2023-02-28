@@ -70,7 +70,7 @@ impl Declarations {
         if trace_segment > self.num_trace_segments() {
             return Err(SemanticError::trace_segment_access_out_of_bounds(
                 trace_segment,
-                self.trace_segment_widths().len(),
+                self.num_trace_segments(),
             ));
         }
 
