@@ -24,7 +24,7 @@ use declarations::Declarations;
 pub use declarations::{PeriodicColumn, PublicInput};
 
 mod symbol_table;
-use symbol_table::{Scope, SymbolTable, SymbolType, VariableValue};
+use symbol_table::{AccessType, Scope, Symbol, SymbolAccess, SymbolTable, SymbolType};
 
 mod validation;
 use validation::{SemanticError, SourceValidator};

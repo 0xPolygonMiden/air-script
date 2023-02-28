@@ -1,9 +1,9 @@
 use super::{
     ast, BTreeMap, BTreeSet, ConstantType, ConstrainedBoundary, ConstraintDomain, Constraints,
-    Declarations, Expression, Identifier, IdentifierType, IndexedTraceAccess, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, NamedTraceAccess, NodeIndex, Scope,
-    SemanticError, SymbolTable, TraceSegment, Variable, VariableType, VariableValue, VectorAccess,
-    CURRENT_ROW,
+    Declarations, Expression, Identifier, IndexedTraceAccess, Iterable, ListComprehension,
+    ListFoldingType, ListFoldingValueType, NamedTraceAccess, NodeIndex, Scope, SemanticError,
+    Symbol, SymbolAccess, SymbolTable, SymbolType, TraceSegment, Variable, VariableType,
+    VectorAccess, CURRENT_ROW,
 };
 
 mod expression_details;
@@ -20,7 +20,7 @@ pub(crate) use list_folding::build_list_from_list_folding_value;
 // TYPES
 // ================================================================================================
 
-pub(crate) type VariableRoots = BTreeMap<(Scope, VariableValue), ExprDetails>;
+pub(crate) type VariableRoots = BTreeMap<SymbolAccess, ExprDetails>;
 
 // CONSTRAINT BUILDER
 // ================================================================================================
@@ -118,9 +118,10 @@ impl ConstraintBuilder {
                 // merge the two sides of the expression into a constraint.
                 self.insert_constraint(lhs, rhs)?
             }
-            ast::BoundaryStmt::Variable(variable) => self
-                .symbol_table
-                .insert_variable(Scope::BoundaryConstraints, variable)?,
+            ast::BoundaryStmt::Variable(variable) => {
+                //  TODO: deal with expression at this stage?
+                self.symbol_table.insert_boundary_variable(variable)?
+            }
         }
 
         Ok(())
@@ -160,18 +161,15 @@ impl ConstraintBuilder {
                 self.insert_constraint(lhs, rhs)?
             }
             ast::IntegrityStmt::Variable(variable) => {
+                //  TODO: deal with expression at this stage?
                 if let VariableType::ListComprehension(list_comprehension) = variable.value() {
                     let vector = unfold_lc(list_comprehension, &self.symbol_table)?;
-                    self.symbol_table.insert_variable(
-                        Scope::IntegrityConstraints,
-                        &Variable::new(
-                            Identifier(variable.name().to_string()),
-                            VariableType::Vector(vector),
-                        ),
-                    )?
+                    self.symbol_table.insert_integrity_variable(&Variable::new(
+                        Identifier(variable.name().to_string()),
+                        VariableType::Vector(vector),
+                    ))?
                 } else {
-                    self.symbol_table
-                        .insert_variable(Scope::IntegrityConstraints, variable)?
+                    self.symbol_table.insert_integrity_variable(variable)?
                 }
             }
         }

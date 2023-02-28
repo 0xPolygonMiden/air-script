@@ -1,6 +1,6 @@
 use super::{
-    list_comprehension::unfold_lc, ConstantType, Expression, IdentifierType, IndexedTraceAccess,
-    ListFoldingValueType, SemanticError, SymbolTable, VariableType, CURRENT_ROW,
+    list_comprehension::unfold_lc, ConstantType, Expression, IndexedTraceAccess,
+    ListFoldingValueType, Scope, SemanticError, SymbolTable, SymbolType, VariableType, CURRENT_ROW,
 };
 
 // LIST FOLDING
@@ -19,22 +19,22 @@ pub fn build_list_from_list_folding_value(
 ) -> Result<Vec<Expression>, SemanticError> {
     match lf_value_type {
         ListFoldingValueType::Identifier(ident) => {
-            let symbol_type = symbol_table.get_type(ident.name())?;
-            match symbol_type {
-                IdentifierType::Constant(ConstantType::Vector(list)) => {
+            let symbol = symbol_table.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+            match symbol.symbol_type() {
+                SymbolType::Constant(ConstantType::Vector(list)) => {
                     Ok(list.iter().map(|value| Expression::Const(*value)).collect())
                 }
-                IdentifierType::Variable(_, integrity_variable) => {
-                    if let VariableType::Vector(list) = integrity_variable.value() {
+                SymbolType::Variable(variable_type) => {
+                    if let VariableType::Vector(list) = variable_type {
                         Ok(list.clone())
                     } else {
                         Err(SemanticError::invalid_list_folding(
                             lf_value_type,
-                            symbol_type,
+                            symbol.symbol_type(),
                         ))
                     }
                 }
-                IdentifierType::TraceColumns(columns) => {
+                SymbolType::TraceColumns(columns) => {
                     if columns.size() > 1 {
                         let trace_segment = columns.trace_segment();
                         Ok((0..columns.size())
@@ -49,13 +49,13 @@ pub fn build_list_from_list_folding_value(
                     } else {
                         Err(SemanticError::invalid_list_folding(
                             lf_value_type,
-                            symbol_type,
+                            symbol.symbol_type(),
                         ))
                     }
                 }
                 _ => Err(SemanticError::invalid_list_folding(
                     lf_value_type,
-                    symbol_type,
+                    symbol.symbol_type(),
                 )),
             }
         }

@@ -5,26 +5,14 @@ use super::{
 };
 
 mod symbol;
-use symbol::Symbol;
-pub(crate) use symbol::{Scope, SymbolType};
+pub(crate) use symbol::{Scope, Symbol, SymbolType};
 
 mod symbol_access;
-pub(crate) use symbol_access::SymbolAccess;
 use symbol_access::ValidateIdentifierAccess;
+pub(crate) use symbol_access::{AccessType, SymbolAccess};
 
 mod trace_columns;
 use trace_columns::TraceColumns;
-
-// TYPES
-// ================================================================================================
-
-// TODO: get rid of need to make this public
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub enum VariableValue {
-    Scalar(String),
-    Vector(VectorAccess),
-    Matrix(MatrixAccess),
-}
 
 // SYMBOL TABLE
 // ================================================================================================
@@ -270,6 +258,11 @@ impl SymbolTable {
             columns.offset() + trace_access.idx(),
             trace_access.row_offset(),
         ))
+    }
+
+    /// TODO: update docs
+    pub(crate) fn access_identifier(&self, symbol: &Symbol) -> Result<SymbolAccess, SemanticError> {
+        SymbolAccess::from_symbol(symbol)
     }
 
     /// Checks that the specified name and index are a valid reference to a declared public input

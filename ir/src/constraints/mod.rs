@@ -1,8 +1,7 @@
 use super::{
-    ast::Boundary, build_list_from_list_folding_value, ConstantType, ExprDetails, Expression,
-    Identifier, IdentifierType, IndexedTraceAccess, ListFoldingType, MatrixAccess, Scope,
-    SemanticError, SymbolTable, TraceSegment, VariableRoots, VariableType, VariableValue,
-    VectorAccess,
+    ast::Boundary, build_list_from_list_folding_value, AccessType, ConstantType, ExprDetails,
+    Expression, Identifier, IndexedTraceAccess, ListFoldingType, MatrixAccess, SemanticError,
+    SymbolAccess, SymbolTable, SymbolType, TraceSegment, VariableRoots, VariableType, VectorAccess,
 };
 use std::collections::BTreeMap;
 

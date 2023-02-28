@@ -1,7 +1,7 @@
 use super::{
-    build_list_from_list_folding_value, BTreeMap, Expression, Identifier, IdentifierType,
-    IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
-    NamedTraceAccess, SemanticError, SymbolTable, VariableType, VectorAccess, CURRENT_ROW,
+    build_list_from_list_folding_value, BTreeMap, Expression, Identifier, IndexedTraceAccess,
+    Iterable, ListComprehension, ListFoldingType, ListFoldingValueType, NamedTraceAccess, Scope,
+    SemanticError, Symbol, SymbolTable, SymbolType, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 /// Maps each identifier in the list comprehension to its corresponding [Iterable].
@@ -101,13 +101,13 @@ fn parse_elem(
         None => Ok(Expression::Elem(ident.clone())),
         Some(iterable_type) => match iterable_type {
             Iterable::Identifier(ident) => {
-                let ident_type = symbol_table.get_type(ident.name())?;
-                build_ident_expression(ident, ident_type, i)
+                let symbol = symbol_table.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                build_ident_expression(symbol, i)
             }
             Iterable::Range(range) => Ok(Expression::Const((range.start() + i) as u64)),
             Iterable::Slice(ident, range) => {
-                let ident_type = symbol_table.get_type(ident.name())?;
-                build_slice_ident_expression(ident, ident_type, range.start(), i)
+                let symbol = symbol_table.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                build_slice_ident_expression(symbol, range.start(), i)
             }
         },
     }
@@ -134,9 +134,9 @@ fn parse_named_trace_access(
         None => Ok(Expression::NamedTraceAccess(named_trace_access.clone())),
         Some(iterable_type) => match iterable_type {
             Iterable::Identifier(ident) => {
-                let ident_type = symbol_table.get_type(ident.name())?;
-                match ident_type {
-                    IdentifierType::TraceColumns(size) => {
+                let symbol = symbol_table.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                match symbol.symbol_type() {
+                    SymbolType::TraceColumns(size) => {
                         validate_access(i, size.size())?;
                         Ok(Expression::NamedTraceAccess(NamedTraceAccess::new(
                             ident.clone(),
@@ -154,9 +154,9 @@ fn parse_named_trace_access(
                 named_trace_access.name()
             ))),
             Iterable::Slice(ident, range) => {
-                let ident_type = symbol_table.get_type(ident.name())?;
-                match ident_type {
-                    IdentifierType::TraceColumns(trace_columns) => {
+                let symbol = symbol_table.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                match symbol.symbol_type() {
+                    SymbolType::TraceColumns(trace_columns) => {
                         validate_access(i, trace_columns.size())?;
                         Ok(Expression::NamedTraceAccess(NamedTraceAccess::new(
                             ident.clone(),
@@ -243,19 +243,20 @@ fn get_iterable_len(
 ) -> Result<usize, SemanticError> {
     match iterable {
         Iterable::Identifier(ident) => {
-            let ident_type = symbol_table.get_type(ident.name())?;
-            match ident_type {
-                IdentifierType::Variable(_, var_type) => match var_type.value() {
+            let symbol = symbol_table.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+            match symbol.symbol_type() {
+                SymbolType::Variable(variable_type) => match variable_type {
                     VariableType::Vector(vector) => Ok(vector.len()),
                     _ => Err(SemanticError::InvalidListComprehension(format!(
                         "Variable {} should be a vector for a valid list comprehension.",
-                        ident.name()
+                        symbol.name()
                     ))),
                 },
-                IdentifierType::PublicInput(size) => Ok(*size),
-                IdentifierType::TraceColumns(trace_columns) => Ok(trace_columns.size()),
+                SymbolType::PublicInput(size) => Ok(*size),
+                SymbolType::TraceColumns(trace_columns) => Ok(trace_columns.size()),
                 _ => Err(SemanticError::InvalidListComprehension(format!(
-                    "IdentifierType {ident_type} not supported for list comprehensions"
+                    "SymbolType {} not supported for list comprehensions",
+                    symbol.symbol_type()
                 ))),
             }
         }
@@ -304,13 +305,9 @@ fn build_iterable_context(lc: &ListComprehension) -> Result<IterableContext, Sem
 ///  { IntegrityVariable, PublicInput, TraceColumns, RandomValuesBinding }
 /// - Returns an error if the access index is greater than the size of the vector.
 /// - Returns an error if the identifier is not a vector in the symbol table if it's a variable.
-fn build_ident_expression(
-    ident: &Identifier,
-    ident_type: &IdentifierType,
-    i: usize,
-) -> Result<Expression, SemanticError> {
-    match ident_type {
-        IdentifierType::TraceColumns(trace_columns) => {
+fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, SemanticError> {
+    match symbol.symbol_type() {
+        SymbolType::TraceColumns(trace_columns) => {
             validate_access(i, trace_columns.size())?;
             let trace_segment = trace_columns.trace_segment();
             Ok(Expression::IndexedTraceAccess(IndexedTraceAccess::new(
@@ -319,29 +316,31 @@ fn build_ident_expression(
                 CURRENT_ROW,
             )))
         }
-        IdentifierType::Variable(_, var_type) => {
-            match var_type.value() {
+        SymbolType::Variable(variable_type) => {
+            match variable_type {
                 VariableType::Vector(vector) => {
                     validate_access(i, vector.len())?;
                     Ok(vector[i].clone())
                 }
                 // TODO: Handle matrix access
                 _ => Err(SemanticError::InvalidListComprehension(format!(
-                    "Iterable {ident} should be a vector"
+                    "Iterable {} should be a vector",
+                    symbol.name()
                 )))?,
             }
         }
-        IdentifierType::PublicInput(size) => {
+        // TODO: replace these accesses with SymbolAccess
+        SymbolType::PublicInput(size) => {
             validate_access(i, *size)?;
             Ok(Expression::VectorAccess(VectorAccess::new(
-                ident.clone(),
+                Identifier(symbol.name().to_string()),
                 i,
             )))
         }
-        IdentifierType::RandomValuesBinding(_, size) => {
+        SymbolType::RandomValuesBinding(_, size) => {
             validate_access(i, *size)?;
             Ok(Expression::VectorAccess(VectorAccess::new(
-                ident.clone(),
+                Identifier(symbol.name().to_string()),
                 i,
             )))
         }
@@ -359,43 +358,44 @@ fn build_ident_expression(
 /// - Returns an error if the access index is greater than the size of the vector.
 /// - Returns an error if the identifier is not a vector in the symbol table if it's a variable.
 fn build_slice_ident_expression(
-    ident: &Identifier,
-    ident_type: &IdentifierType,
+    symbol: &Symbol,
     range_start: usize,
     i: usize,
 ) -> Result<Expression, SemanticError> {
-    match ident_type {
-        IdentifierType::TraceColumns(trace_columns) => {
+    match symbol.symbol_type() {
+        SymbolType::TraceColumns(trace_columns) => {
             validate_access(i, trace_columns.size())?;
             Ok(Expression::NamedTraceAccess(NamedTraceAccess::new(
-                ident.clone(),
+                Identifier(symbol.name().to_string()),
                 range_start + i,
                 CURRENT_ROW,
             )))
         }
-        IdentifierType::Variable(_, var_type) => {
-            match var_type.value() {
+        SymbolType::Variable(variable) => {
+            match variable {
                 VariableType::Vector(vector) => {
                     validate_access(i, vector.len())?;
                     Ok(vector[range_start + i].clone())
                 }
                 // TODO: Handle matrix access
                 _ => Err(SemanticError::InvalidListComprehension(format!(
-                    "Variable {ident} should be a vector for a valid list comprehension"
+                    "Variable {} should be a vector for a valid list comprehension",
+                    symbol.name()
                 )))?,
             }
         }
-        IdentifierType::PublicInput(size) => {
+        // TODO: replace these accesses with SymbolAccess
+        SymbolType::PublicInput(size) => {
             validate_access(i, *size)?;
             Ok(Expression::VectorAccess(VectorAccess::new(
-                ident.clone(),
+                Identifier(symbol.name().to_string()),
                 range_start + i,
             )))
         }
-        IdentifierType::RandomValuesBinding(_, size) => {
+        SymbolType::RandomValuesBinding(_, size) => {
             validate_access(i, *size)?;
             Ok(Expression::VectorAccess(VectorAccess::new(
-                ident.clone(),
+                Identifier(symbol.name().to_string()),
                 range_start + i,
             )))
         }

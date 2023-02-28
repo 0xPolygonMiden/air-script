@@ -1,10 +1,10 @@
-use crate::{constraints::ConstraintDomain, validation::SemanticError};
+use crate::constraints::ConstraintDomain;
 
 use super::{ConstantType, TraceColumns, VariableType};
 use std::fmt::Display;
 
 /// Symbol information for a constant, variable, trace column, periodic column, or public input.
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct Symbol {
     name: String,
     scope: Scope,
@@ -26,34 +26,6 @@ impl Symbol {
 
     pub fn symbol_type(&self) -> &SymbolType {
         &self.symbol_type
-    }
-
-    pub(super) fn scope(&self) -> Scope {
-        self.scope
-    }
-
-    pub fn validate_scope(&self, domain: &ConstraintDomain) -> Result<(), SemanticError> {
-        match self.scope {
-            Scope::BoundaryConstraints => {
-                if domain.is_integrity() {
-                    return Err(SemanticError::OutOfScope(format!(
-                        "Symbol {} is only allowed in the scope of boundary constraints",
-                        self.name
-                    )));
-                }
-            }
-            Scope::IntegrityConstraints => {
-                if domain.is_boundary() {
-                    return Err(SemanticError::OutOfScope(format!(
-                        "Symbol {} is only allowed in the scope of integrity constraints",
-                        self.name
-                    )));
-                }
-            }
-            Scope::Global => {}
-        }
-
-        Ok(())
     }
 }
 
@@ -86,7 +58,7 @@ impl Display for Scope {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) enum SymbolType {
     /// an identifier for a constant, containing its type and value
     Constant(ConstantType),

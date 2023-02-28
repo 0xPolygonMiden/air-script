@@ -4,7 +4,8 @@ use super::{
 };
 
 /// TODO: docs
-enum AccessType {
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub(crate) enum AccessType {
     Default,
     Vector(usize),
     /// TODO: docs (row, then column)
@@ -12,13 +13,22 @@ enum AccessType {
 }
 
 /// TODO: docs
-/// TODO: do these references live long enough? If symbols end up in the graph, then no.
-pub(crate) struct SymbolAccess<'a> {
-    symbol: &'a Symbol,
+/// TODO: make symbol a reference? do these references live long enough? If symbols end up in the graph, then no.
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub(crate) struct SymbolAccess {
+    symbol: Symbol,
     access_type: AccessType,
 }
 
-impl<'a> SymbolAccess<'a> {
+impl SymbolAccess {
+    /// TODO: docs
+    pub fn from_symbol(symbol: &Symbol) -> Result<Self, SemanticError> {
+        Ok(Self {
+            symbol: symbol.clone(),
+            access_type: AccessType::Default,
+        })
+    }
+
     /// TODO: docs
     pub fn from_vector_access(
         symbol: &Symbol,
@@ -27,7 +37,7 @@ impl<'a> SymbolAccess<'a> {
         vector_access.validate(symbol)?;
 
         Ok(Self {
-            symbol,
+            symbol: symbol.clone(),
             access_type: AccessType::Vector(vector_access.idx()),
         })
     }
@@ -40,7 +50,7 @@ impl<'a> SymbolAccess<'a> {
         matrix_access.validate(symbol)?;
 
         Ok(Self {
-            symbol,
+            symbol: symbol.clone(),
             access_type: AccessType::Matrix(matrix_access.row_idx(), matrix_access.col_idx()),
         })
     }

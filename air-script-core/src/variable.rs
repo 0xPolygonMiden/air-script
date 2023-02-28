@@ -20,7 +20,7 @@ impl Variable {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum VariableType {
     Scalar(Expression),
     Vector(Vec<Expression>),
@@ -28,7 +28,7 @@ pub enum VariableType {
     ListComprehension(ListComprehension),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ListComprehension {
     expression: Box<Expression>,
     context: Vec<(Identifier, Iterable)>,
@@ -60,7 +60,7 @@ impl ListComprehension {
 /// `x` is an Iterable of type Identifier representing the vector to iterate over,
 /// `0..5` is an Iterable of type Range representing the range to iterate over,
 /// `z[1..6]` is an Iterable of type Slice representing the slice of the vector z to iterate over.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Iterable {
     Identifier(Identifier),
     Range(Range),
