@@ -68,7 +68,7 @@ impl Air for ListComprehensionAir {
 
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxTraceRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(6, 0, E::from(0_u64)));
+        result.push(Assertion::single(6, 0, E::ZERO));
         result
     }
 
@@ -89,6 +89,6 @@ impl Air for ListComprehensionAir {
         result[0] = aux_current[0] - E::from(main_current[0]) * E::from(2_u64).exp(E::PositiveInteger::from(3_u64)) * aux_current[7];
         result[1] = aux_current[0] - E::from(main_current[0]) * (aux_next[4] - aux_next[8]);
         result[2] = aux_current[2] - E::from(main_current[0]) * (aux_current[5] - aux_current[10]);
-        result[3] = aux_current[0] - (E::from(0_u64) + aux_current[1] - aux_current[4] - aux_current[8] + E::from(1_u64) + aux_current[2] - aux_current[5] - aux_current[9] + E::from(2_u64) + aux_current[3] - aux_current[6] - aux_current[10]);
+        result[3] = aux_current[0] - (E::ZERO + aux_current[1] - aux_current[4] - aux_current[8] + E::ONE + aux_current[2] - aux_current[5] - aux_current[9] + E::from(2_u64) + aux_current[3] - aux_current[6] - aux_current[10]);
     }
 }

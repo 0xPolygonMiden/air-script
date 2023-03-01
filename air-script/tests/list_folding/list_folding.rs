@@ -68,7 +68,7 @@ impl Air for ListFoldingAir {
 
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxTraceRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(7, 0, E::from(0_u64)));
+        result.push(Assertion::single(7, 0, E::ZERO));
         result
     }
 

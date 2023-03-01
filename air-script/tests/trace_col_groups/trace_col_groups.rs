@@ -68,15 +68,15 @@ impl Air for TraceColGroupAir {
 
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxTraceRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(4, 0, E::from(0_u64)));
+        result.push(Assertion::single(4, 0, E::ZERO));
         result
     }
 
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = main_next[2] - (main_current[2] + E::from(1_u64));
-        result[1] = main_next[1] - (main_current[1] - E::from(1_u64));
+        result[0] = main_next[2] - (main_current[2] + E::ONE);
+        result[1] = main_next[1] - (main_current[1] - E::ONE);
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
