@@ -7,12 +7,11 @@ pub use parser::ast;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod constraint_builder;
-// TODO: remove most of these imports
-use constraint_builder::{ConstraintBuilder, ExprDetails, VariableRoots};
+use constraint_builder::{ConstraintBuilder, AUX_SEGMENT, DEFAULT_SEGMENT};
 
 pub mod constraints;
 use constraints::{
-    AlgebraicGraph, ConstrainedBoundary, ConstraintDomain, ConstraintRoot, Constraints,
+    AlgebraicGraph, ConstrainedBoundary, ConstraintDomain, ConstraintRoot, Constraints, Operation,
     CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
 pub use constraints::{IntegrityConstraintDegree, NodeIndex};
@@ -22,7 +21,8 @@ use declarations::Declarations;
 pub use declarations::{PeriodicColumn, PublicInput};
 
 mod symbol_table;
-use symbol_table::{AccessType, SymbolAccess, SymbolTable, SymbolType};
+use symbol_table::{AccessType, Symbol, SymbolAccess, SymbolTable, SymbolType};
+pub use symbol_table::{ConstantValue, Value};
 
 mod validation;
 use validation::{SemanticError, SourceValidator};

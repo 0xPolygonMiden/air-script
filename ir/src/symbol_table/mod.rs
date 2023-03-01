@@ -2,7 +2,7 @@ use super::{
     ast, BTreeMap, Constant, ConstantType, Declarations, Expression, Identifier,
     IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
     MatrixAccess, NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType,
-    VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
+    VectorAccess, AUX_SEGMENT, CURRENT_ROW, DEFAULT_SEGMENT, MIN_CYCLE_LENGTH,
 };
 
 mod list_comprehension;
@@ -17,6 +17,9 @@ pub(crate) use symbol_access::{AccessType, SymbolAccess};
 
 mod trace_columns;
 use trace_columns::TraceColumns;
+
+mod value;
+pub use value::{ConstantValue, Value};
 
 // SYMBOL TABLE
 // ================================================================================================
@@ -216,7 +219,6 @@ impl SymbolTable {
 
         match variable_type {
             VariableType::ListComprehension(list_comprehension) => {
-                // TODO: consume this list comprehension
                 let vector = self.unfold_lc(&list_comprehension)?;
                 self.insert_symbol(
                     name,
@@ -269,7 +271,7 @@ impl SymbolTable {
     /// - the identifier was not declared as a trace column binding.
     /// TODO: update docs
     pub(crate) fn get_trace_access_by_name(
-        &self,
+        &mut self,
         trace_access: &NamedTraceAccess,
     ) -> Result<IndexedTraceAccess, SemanticError> {
         let symbol = self.get_symbol(trace_access.name(), Scope::Global)?;
@@ -281,48 +283,6 @@ impl SymbolTable {
             columns.offset() + trace_access.idx(),
             trace_access.row_offset(),
         ))
-    }
-
-    /// TODO: update docs
-    pub(crate) fn access_identifier(&self, symbol: &Symbol) -> Result<SymbolAccess, SemanticError> {
-        SymbolAccess::from_symbol(symbol)
-    }
-
-    /// Checks that the specified name and index are a valid reference to a declared public input
-    /// or a vector constant and returns the symbol type. If it's not a valid reference, an error
-    /// is returned.
-    ///
-    /// # Errors
-    /// - Returns an error if the identifier is not in the symbol table.
-    /// - Returns an error if the identifier is not associated with a vector access type.
-    /// - Returns an error if the index is not in the declared public input array.
-    /// - Returns an error if the index is greater than the vector's length.
-    /// TODO: update docs
-    pub(crate) fn access_vector_element(
-        &self,
-        vector_access: &VectorAccess,
-        scope: Scope,
-    ) -> Result<SymbolAccess, SemanticError> {
-        let symbol = self.get_symbol(vector_access.name(), scope)?;
-        SymbolAccess::from_vector_access(symbol, vector_access)
-    }
-
-    /// Checks that the specified name and index are a valid reference to a matrix constant and
-    /// returns the symbol type. If it's not a valid reference, an error is returned.
-    ///
-    /// # Errors
-    /// - Returns an error if the identifier is not in the symbol table.
-    /// - Returns an error if the identifier is not associated with a matrix access type.
-    /// - Returns an error if the row index is greater than the matrix row length.
-    /// - Returns an error if the column index is greater than the matrix column length.
-    /// TODO: update docs
-    pub(crate) fn access_matrix_element(
-        &self,
-        matrix_access: &MatrixAccess,
-        scope: Scope,
-    ) -> Result<SymbolAccess, SemanticError> {
-        let symbol = self.get_symbol(matrix_access.name(), scope)?;
-        SymbolAccess::from_matrix_access(symbol, matrix_access)
     }
 
     // --- VALIDATION -----------------------------------------------------------------------------

@@ -357,6 +357,7 @@ fn err_bc_variable_matrix_invalid_access() {
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::new(parsed);
+    println!("{result:?}");
     assert!(result.is_err());
 }
 

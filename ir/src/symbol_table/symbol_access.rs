@@ -1,7 +1,21 @@
 use super::{
-    ConstantType, MatrixAccess, NamedTraceAccess, SemanticError, Symbol, SymbolType, VariableType,
-    VectorAccess,
+    ConstantType, MatrixAccess, NamedTraceAccess, SemanticError, Symbol, SymbolType, TraceSegment,
+    Value, VariableType, VectorAccess,
 };
+
+pub(crate) struct AccessDetails {
+    value: Value,
+    trace_segment: TraceSegment,
+}
+
+impl AccessDetails {
+    pub fn new(value: Value, trace_segment: TraceSegment) -> Self {
+        Self {
+            value,
+            trace_segment,
+        }
+    }
+}
 
 /// TODO: docs
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -21,6 +35,13 @@ pub(crate) struct SymbolAccess {
 }
 
 impl SymbolAccess {
+    pub fn new(symbol: Symbol, access_type: AccessType) -> Self {
+        Self {
+            symbol,
+            access_type,
+        }
+    }
+
     /// TODO: docs
     pub fn from_symbol(symbol: &Symbol) -> Result<Self, SemanticError> {
         Ok(Self {
@@ -29,31 +50,31 @@ impl SymbolAccess {
         })
     }
 
-    /// TODO: docs
-    pub fn from_vector_access(
-        symbol: &Symbol,
-        vector_access: &VectorAccess,
-    ) -> Result<Self, SemanticError> {
-        vector_access.validate(symbol)?;
+    // /// TODO: docs
+    // pub fn from_vector_access(
+    //     symbol: &Symbol,
+    //     vector_access: &VectorAccess,
+    // ) -> Result<Self, SemanticError> {
+    //     vector_access.validate(symbol)?;
 
-        Ok(Self {
-            symbol: symbol.clone(),
-            access_type: AccessType::Vector(vector_access.idx()),
-        })
-    }
+    //     Ok(Self {
+    //         symbol: symbol.clone(),
+    //         access_type: AccessType::Vector(vector_access.idx()),
+    //     })
+    // }
 
-    /// TODO: docs
-    pub fn from_matrix_access(
-        symbol: &Symbol,
-        matrix_access: &MatrixAccess,
-    ) -> Result<Self, SemanticError> {
-        matrix_access.validate(symbol)?;
+    // /// TODO: docs
+    // pub fn from_matrix_access(
+    //     symbol: &Symbol,
+    //     matrix_access: &MatrixAccess,
+    // ) -> Result<Self, SemanticError> {
+    //     matrix_access.validate(symbol)?;
 
-        Ok(Self {
-            symbol: symbol.clone(),
-            access_type: AccessType::Matrix(matrix_access.row_idx(), matrix_access.col_idx()),
-        })
-    }
+    //     Ok(Self {
+    //         symbol: symbol.clone(),
+    //         access_type: AccessType::Matrix(matrix_access.row_idx(), matrix_access.col_idx()),
+    //     })
+    // }
 
     pub fn symbol(&self) -> &Symbol {
         &self.symbol
@@ -97,78 +118,78 @@ impl ValidateIdentifierAccess for NamedTraceAccess {
     }
 }
 
-/// Checks that the specified vector access is valid and returns an error otherwise.
-impl ValidateIdentifierAccess for VectorAccess {
-    /// TODO: docs (errors)
-    fn validate(&self, symbol: &Symbol) -> Result<(), SemanticError> {
-        let vector_len = match symbol.symbol_type() {
-            SymbolType::Constant(ConstantType::Vector(vector)) => vector.len(),
-            SymbolType::PublicInput(size) => *size,
-            SymbolType::RandomValuesBinding(_, size) => *size,
-            SymbolType::TraceColumns(trace_columns) => trace_columns.size(),
-            SymbolType::Variable(variable) => {
-                match variable {
-                    // TODO: scalar can be ok; check this symbol in the future
-                    VariableType::Scalar(_) => return Ok(()),
-                    VariableType::Vector(vector) => vector.len(),
-                    _ => {
-                        return Err(SemanticError::invalid_vector_access(
-                            self,
-                            symbol.symbol_type(),
-                        ))
-                    }
-                }
-            }
-            _ => {
-                return Err(SemanticError::invalid_vector_access(
-                    self,
-                    symbol.symbol_type(),
-                ))
-            }
-        };
+// /// Checks that the specified vector access is valid and returns an error otherwise.
+// impl ValidateIdentifierAccess for VectorAccess {
+//     /// TODO: docs (errors)
+//     fn validate(&self, symbol: &Symbol) -> Result<(), SemanticError> {
+//         let vector_len = match symbol.symbol_type() {
+//             SymbolType::Constant(ConstantType::Vector(vector)) => vector.len(),
+//             SymbolType::PublicInput(size) => *size,
+//             SymbolType::RandomValuesBinding(_, size) => *size,
+//             SymbolType::TraceColumns(trace_columns) => trace_columns.size(),
+//             SymbolType::Variable(variable) => {
+//                 match variable {
+//                     // TODO: scalar can be ok; check this symbol in the future
+//                     VariableType::Scalar(_) => return Ok(()),
+//                     VariableType::Vector(vector) => vector.len(),
+//                     _ => {
+//                         return Err(SemanticError::invalid_vector_access(
+//                             self,
+//                             symbol.symbol_type(),
+//                         ))
+//                     }
+//                 }
+//             }
+//             _ => {
+//                 return Err(SemanticError::invalid_vector_access(
+//                     self,
+//                     symbol.symbol_type(),
+//                 ))
+//             }
+//         };
 
-        if self.idx() >= vector_len {
-            return Err(SemanticError::vector_access_out_of_bounds(self, vector_len));
-        }
+//         if self.idx() >= vector_len {
+//             return Err(SemanticError::vector_access_out_of_bounds(self, vector_len));
+//         }
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
-/// Checks that the specified matrix access is valid and returns an error otherwise.
-impl ValidateIdentifierAccess for MatrixAccess {
-    /// TODO: docs (errors)
-    fn validate(&self, symbol: &Symbol) -> Result<(), SemanticError> {
-        let (row_len, col_len) = match symbol.symbol_type() {
-            SymbolType::Constant(ConstantType::Matrix(matrix)) => (matrix.len(), matrix[0].len()),
+// /// Checks that the specified matrix access is valid and returns an error otherwise.
+// impl ValidateIdentifierAccess for MatrixAccess {
+//     /// TODO: docs (errors)
+//     fn validate(&self, symbol: &Symbol) -> Result<(), SemanticError> {
+//         let (row_len, col_len) = match symbol.symbol_type() {
+//             SymbolType::Constant(ConstantType::Matrix(matrix)) => (matrix.len(), matrix[0].len()),
 
-            SymbolType::Variable(variable) => {
-                match variable {
-                    // TODO: scalar & vector can be ok; check this symbol in the future
-                    VariableType::Scalar(_) | VariableType::Vector(_) => return Ok(()),
-                    VariableType::Matrix(matrix) => (matrix.len(), matrix[0].len()),
-                    _ => {
-                        return Err(SemanticError::invalid_matrix_access(
-                            self,
-                            symbol.symbol_type(),
-                        ))
-                    }
-                }
-            }
-            _ => {
-                return Err(SemanticError::invalid_matrix_access(
-                    self,
-                    symbol.symbol_type(),
-                ))
-            }
-        };
+//             SymbolType::Variable(variable) => {
+//                 match variable {
+//                     // TODO: scalar & vector can be ok; check this symbol in the future
+//                     VariableType::Scalar(_) | VariableType::Vector(_) => return Ok(()),
+//                     VariableType::Matrix(matrix) => (matrix.len(), matrix[0].len()),
+//                     _ => {
+//                         return Err(SemanticError::invalid_matrix_access(
+//                             self,
+//                             symbol.symbol_type(),
+//                         ))
+//                     }
+//                 }
+//             }
+//             _ => {
+//                 return Err(SemanticError::invalid_matrix_access(
+//                     self,
+//                     symbol.symbol_type(),
+//                 ))
+//             }
+//         };
 
-        if self.row_idx() >= row_len || self.col_idx() >= col_len {
-            return Err(SemanticError::matrix_access_out_of_bounds(
-                self, row_len, col_len,
-            ));
-        }
+//         if self.row_idx() >= row_len || self.col_idx() >= col_len {
+//             return Err(SemanticError::matrix_access_out_of_bounds(
+//                 self, row_len, col_len,
+//             ));
+//         }
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }

@@ -1,9 +1,4 @@
-use super::{
-     AccessType, BTreeMap, ConstantType, ConstraintDomain,
-    ExprDetails, Expression, Identifier, IndexedTraceAccess, IntegrityConstraintDegree,
-    ListFoldingType, MatrixAccess, SemanticError, SymbolAccess, SymbolTable, SymbolType,
-    VariableRoots, VariableType, VectorAccess, AUX_SEGMENT, CURRENT_ROW, DEFAULT_SEGMENT,
-};
+use super::{BTreeMap, IntegrityConstraintDegree, Value};
 
 // ALGEBRAIC GRAPH
 // ================================================================================================
@@ -48,141 +43,21 @@ impl AlgebraicGraph {
 
     // --- PUBLIC MUTATORS ------------------------------------------------------------------------
 
-    /// Combines two subgraphs representing equal subexpressions and returns the [ExprDetails] of
-    /// the new subgraph.
-    ///
-    /// TODO: we can optimize this in the future in the case where lhs or rhs equals zero to just
-    /// return the other expression.
-    pub(crate) fn merge_equal_exprs(
-        &mut self,
-        lhs: &ExprDetails,
-        rhs: &ExprDetails,
-    ) -> Result<ExprDetails, SemanticError> {
-        let node_index = self.insert_op(Operation::Sub(lhs.root_idx(), rhs.root_idx()));
-        let trace_segment = lhs.trace_segment().max(rhs.trace_segment());
-        let domain = lhs.domain().merge(&rhs.domain())?;
-
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
-    }
-
-    /// Adds the expression to the graph and returns the [ExprDetails] of the constraint.
-    /// Expressions are added recursively to reuse existing matching nodes.
-    pub(crate) fn insert_expr(
-        &mut self,
-        symbol_table: &SymbolTable,
-        expr: &Expression,
-        variable_roots: &mut VariableRoots,
-        default_domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        match expr {
-            Expression::Const(value) => {
-                let node_index = self.insert_op(Operation::Constant(ConstantValue::Inline(*value)));
-                Ok(ExprDetails::new(
-                    node_index,
-                    DEFAULT_SEGMENT,
-                    default_domain,
-                ))
-            }
-            Expression::Elem(Identifier(ident)) => {
-                self.insert_symbol_access(symbol_table, ident, variable_roots, default_domain)
-            }
-            Expression::VectorAccess(vector_access) => self.insert_vector_access(
-                symbol_table,
-                vector_access,
-                variable_roots,
-                default_domain,
-            ),
-            Expression::MatrixAccess(matrix_access) => self.insert_matrix_access(
-                symbol_table,
-                matrix_access,
-                variable_roots,
-                default_domain,
-            ),
-            Expression::Rand(name, index) => {
-                // The constraint target for random values defaults to the second (auxiliary) trace
-                // segment.
-                // TODO: make this more general, so random values from further trace segments can be
-                // used. This requires having a way to describe different sets of randomness in
-                // the AirScript syntax.
-                self.insert_random_access(
-                    symbol_table,
-                    name.name(),
-                    *index,
-                    AUX_SEGMENT,
-                    default_domain,
-                )
-            }
-            Expression::IndexedTraceAccess(column_access) => {
-                self.insert_trace_access(symbol_table, column_access, default_domain)
-            }
-            Expression::NamedTraceAccess(trace_access) => {
-                let trace_access = symbol_table.get_trace_access_by_name(trace_access)?;
-                self.insert_trace_access(symbol_table, &trace_access, default_domain)
-            }
-            Expression::Add(lhs, rhs) => {
-                // add both subexpressions.
-                let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
-                let rhs = self.insert_expr(symbol_table, rhs, variable_roots, default_domain)?;
-                // add the expression.
-                self.insert_bin_op(&lhs, &rhs, Operation::Add(lhs.root_idx(), rhs.root_idx()))
-            }
-            Expression::Sub(lhs, rhs) => {
-                // add both subexpressions.
-                let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
-                let rhs = self.insert_expr(symbol_table, rhs, variable_roots, default_domain)?;
-                // add the expression.
-                self.insert_bin_op(&lhs, &rhs, Operation::Sub(lhs.root_idx(), rhs.root_idx()))
-            }
-            Expression::Mul(lhs, rhs) => {
-                // add both subexpressions.
-                let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
-                let rhs = self.insert_expr(symbol_table, rhs, variable_roots, default_domain)?;
-                // add the expression.
-                self.insert_bin_op(&lhs, &rhs, Operation::Mul(lhs.root_idx(), rhs.root_idx()))
-            }
-            Expression::Exp(lhs, rhs) => {
-                // add base subexpression.
-                let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
-                // add exponent subexpression.
-                let node_index = if let Expression::Const(rhs) = **rhs {
-                    self.insert_op(Operation::Exp(lhs.root_idx(), rhs as usize))
-                } else {
-                    Err(SemanticError::InvalidUsage(
-                        "Non const exponents are only allowed inside list comprehensions"
-                            .to_string(),
-                    ))?
-                };
-
-                Ok(ExprDetails::new(
-                    node_index,
-                    lhs.trace_segment(),
-                    lhs.domain(),
-                ))
-            }
-            Expression::ListFolding(lf_type) => {
-                self.insert_list_folding(symbol_table, lf_type, variable_roots, default_domain)
-            }
-        }
-    }
-
-    /// Adds a trace element access to the graph and returns the node index, trace segment, and row
-    /// offset.
-    ///
-    /// # Errors
-    /// Returns an error if:
-    /// - The column index of the trace access is greater than overall number of columns in segment.
-    /// - The segment of the trace access is greater than the number of segments.
-    pub(crate) fn insert_trace_access(
-        &mut self,
-        symbol_table: &SymbolTable,
-        trace_access: &IndexedTraceAccess,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        symbol_table.validate_trace_access(trace_access)?;
-
-        let trace_segment = trace_access.trace_segment();
-        let node_index = self.insert_op(Operation::TraceElement(*trace_access));
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
+    /// Insert the operation and return its node index. If an identical node already exists, return
+    /// that index instead.
+    pub(super) fn insert_op(&mut self, op: Operation) -> NodeIndex {
+        self.nodes.iter().position(|n| *n.op() == op).map_or_else(
+            || {
+                // create a new node.
+                let index = self.nodes.len();
+                self.nodes.push(Node { op });
+                NodeIndex(index)
+            },
+            |index| {
+                // return the existing node's index.
+                NodeIndex(index)
+            },
+        )
     }
 
     // --- HELPERS --------------------------------------------------------------------------------
@@ -191,12 +66,14 @@ impl AlgebraicGraph {
     fn accumulate_degree(&self, cycles: &mut BTreeMap<usize, usize>, index: &NodeIndex) -> usize {
         // recursively walk the subgraph and compute the degree from the operation and child nodes
         match self.node(index).op() {
-            Operation::Constant(_) | Operation::RandomValue(_) | Operation::PublicInput(_, _) => 0,
-            Operation::TraceElement(_) => 1,
-            Operation::PeriodicColumn(index, cycle_len) => {
-                cycles.insert(*index, *cycle_len);
-                0
-            }
+            Operation::Value(value) => match value {
+                Value::Constant(_) | Value::RandomValue(_) | Value::PublicInput(_, _) => 0,
+                Value::TraceElement(_) => 1,
+                Value::PeriodicColumn(index, cycle_len) => {
+                    cycles.insert(*index, *cycle_len);
+                    0
+                }
+            },
             Operation::Add(lhs, rhs) => {
                 let lhs_base = self.accumulate_degree(cycles, lhs);
                 let rhs_base = self.accumulate_degree(cycles, rhs);
@@ -215,359 +92,6 @@ impl AlgebraicGraph {
             Operation::Exp(lhs, rhs) => {
                 let lhs_base = self.accumulate_degree(cycles, lhs);
                 lhs_base * rhs
-            }
-        }
-    }
-
-    /// Insert the operation and return its node index. If an identical node already exists, return
-    /// that index instead.
-    fn insert_op(&mut self, op: Operation) -> NodeIndex {
-        self.nodes.iter().position(|n| *n.op() == op).map_or_else(
-            || {
-                // create a new node.
-                let index = self.nodes.len();
-                self.nodes.push(Node { op });
-                NodeIndex(index)
-            },
-            |index| {
-                // return the existing node's index.
-                NodeIndex(index)
-            },
-        )
-    }
-
-    /// Inserts a binary operation into the graph and returns the resulting expression details.
-    fn insert_bin_op(
-        &mut self,
-        lhs: &ExprDetails,
-        rhs: &ExprDetails,
-        op: Operation,
-    ) -> Result<ExprDetails, SemanticError> {
-        let node_index = self.insert_op(op);
-        let trace_segment = lhs.trace_segment().max(rhs.trace_segment());
-        let domain = lhs.domain().merge(&rhs.domain())?;
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
-    }
-
-    /// Inserts the specified constant value into the graph and returns the resulting expression
-    /// details.
-    fn insert_constant(
-        &mut self,
-        constant: ConstantValue,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        let node_index = self.insert_op(Operation::Constant(constant));
-        Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
-    }
-
-    /// Inserts random value with specified index into the graph and returns the resulting
-    /// expression details.
-    fn insert_random_value(
-        &mut self,
-        symbol_table: &SymbolTable,
-        index: usize,
-        trace_segment: u8,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        symbol_table.validate_rand_access(index)?;
-
-        let node_index = self.insert_op(Operation::RandomValue(index));
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
-    }
-
-    /// Looks up the specified variable value in the variable roots and returns the expression
-    /// details if it is found. Otherwise, inserts the variable expression into the graph, adds it
-    /// to the variable roots, and returns the resulting expression details.
-    fn insert_variable(
-        &mut self,
-        symbol_table: &SymbolTable,
-        variable_roots: &mut VariableRoots,
-        symbol_access: &SymbolAccess,
-        variable_type: &VariableType,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        // TODO: deal with boundary conflict properly
-        if let Some(expr_details) = variable_roots.get(symbol_access) {
-            Ok(*expr_details)
-        } else {
-            // Otherwise, insert the variable expression and create a new variable root.
-            // TODO: remove these expression clones
-            let expr = match (variable_type, symbol_access.access_type()) {
-                (VariableType::Scalar(expr), AccessType::Default) => expr.clone(),
-                (VariableType::Scalar(expr), AccessType::Vector(idx)) => match expr {
-                    Expression::Elem(elem) => {
-                        Expression::VectorAccess(VectorAccess::new(elem.clone(), *idx))
-                    }
-                    Expression::VectorAccess(matrix_row_access) => {
-                        Expression::MatrixAccess(MatrixAccess::new(
-                            Identifier(matrix_row_access.name().to_string()),
-                            matrix_row_access.idx(),
-                            *idx,
-                        ))
-                    }
-                    _ => {
-                        // TODO: replace this error
-                        // return  Err(SemanticError::invalid_vector_access(
-                        //     vector_access,
-                        //     symbol_access.symbol().symbol_type(),
-                        // ))
-                        return Err(SemanticError::InvalidUsage(format!(
-                            "Invalid variable access for variable type {variable_type:?} and symbol access {symbol_access:?}",
-                        )));
-                    }
-                },
-                (VariableType::Scalar(Expression::Elem(elem)), AccessType::Matrix(row_idx, col_idx)) => {
-                    Expression::MatrixAccess(MatrixAccess::new(
-                        elem.clone(),
-                        *row_idx,
-                        *col_idx,
-                    ))
-                }
-                (VariableType::Vector(expr_vector), AccessType::Vector(idx)) => expr_vector[*idx].clone(),
-                (VariableType::Vector(expr_vector), AccessType::Matrix(row_idx, col_idx)) => match &expr_vector[*row_idx] {
-                    Expression::Elem(elem) => {
-                        Expression::VectorAccess(VectorAccess::new(elem.clone(), *col_idx))
-                    }
-                    Expression::VectorAccess(matrix_row_access) => {
-                        Expression::MatrixAccess(MatrixAccess::new(
-                            Identifier(matrix_row_access.name().to_string()),
-                            matrix_row_access.idx(),
-                            *col_idx,
-                        ))
-                    }
-                    _ => 
-                        // TODO: replace this error
-                        // Err(SemanticError::invalid_matrix_access(
-                        //     matrix_access,
-                        //     symbol_access.symbol().symbol_type(),
-                        // )),
-                        return Err(SemanticError::InvalidUsage(format!(
-                        "Invalid variable access for variable type {variable_type:?} and symbol access {symbol_access:?}",
-                    )))
-                }
-                (VariableType::Matrix(expr_matrix), AccessType::Matrix(row_idx, col_idx)) => {
-                    expr_matrix[*row_idx][*col_idx].clone()
-                }
-                _ => {
-                    // TODO: update this error
-                    return Err(SemanticError::InvalidUsage(format!(
-                        "Invalid variable access for variable type {variable_type:?} and symbol access {symbol_access:?}",
-                    )));
-                }
-            };
-            let expr_details = self.insert_expr(symbol_table, &expr, variable_roots, domain)?;
-            variable_roots.insert((*symbol_access).clone(), expr_details);
-            Ok(expr_details)
-        }
-    }
-
-    /// Adds a trace column, periodic column, random value, named constant or a variable to the
-    /// graph and returns the [ExprDetails] of the inserted expression.
-    ///
-    /// # Errors
-    /// Returns an error if the identifier is not present in the symbol table or is not a supported
-    /// type.
-    fn insert_symbol_access(
-        &mut self,
-        symbol_table: &SymbolTable,
-        ident: &str,
-        variable_roots: &mut VariableRoots,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        let symbol = symbol_table.get_symbol(ident, domain.into())?;
-        match symbol.symbol_type() {
-            SymbolType::Constant(ConstantType::Scalar(_)) => {
-                self.insert_constant(ConstantValue::Scalar(ident.to_string()), domain)
-            }
-            SymbolType::RandomValuesBinding(offset, _) => {
-                self.insert_random_value(symbol_table, *offset, AUX_SEGMENT, domain)
-            }
-            SymbolType::Variable(variable_type) => {
-                let symbol_access = symbol_table.access_identifier(symbol)?;
-                self.insert_variable(
-                    symbol_table,
-                    variable_roots,
-                    &symbol_access,
-                    variable_type,
-                    domain,
-                )
-            }
-            SymbolType::PeriodicColumn(index, cycle_len) => {
-                let node_index = self.insert_op(Operation::PeriodicColumn(*index, *cycle_len));
-                Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
-            }
-            SymbolType::TraceColumns(columns) => {
-                if columns.size() != 1 {
-                    return Err(SemanticError::invalid_trace_binding(ident));
-                }
-                let trace_segment = columns.trace_segment();
-                let trace_access =
-                    IndexedTraceAccess::new(trace_segment, columns.offset(), CURRENT_ROW);
-                let node_index = self.insert_op(Operation::TraceElement(trace_access));
-                Ok(ExprDetails::new(node_index, trace_segment, domain))
-            }
-            _ => Err(SemanticError::unsupported_identifer_type(
-                ident,
-                symbol.symbol_type(),
-            )),
-        }
-    }
-
-    /// Validates and adds a vector access to the graph and returns the [ExprDetails] of the
-    /// inserted expression.
-    ///
-    /// # Errors
-    /// Returns an error if the identifier's value is not of a supported type.
-    fn insert_vector_access(
-        &mut self,
-        symbol_table: &SymbolTable,
-        vector_access: &VectorAccess,
-        variable_roots: &mut VariableRoots,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        let symbol_access = symbol_table.access_vector_element(vector_access, domain.into())?;
-        match symbol_access.symbol().symbol_type() {
-            SymbolType::Constant(ConstantType::Vector(_)) => {
-                self.insert_constant(ConstantValue::Vector(vector_access.clone()), domain)
-            }
-            SymbolType::Variable(variable_type) => {
-                self.insert_variable(
-                    symbol_table,
-                    variable_roots,
-                    &symbol_access,
-                    variable_type,
-                    domain,
-                )
-            }
-            SymbolType::TraceColumns(columns) => {
-                let trace_segment = columns.trace_segment();
-                let trace_access = IndexedTraceAccess::new(
-                    trace_segment,
-                    columns.offset() + vector_access.idx(),
-                    CURRENT_ROW,
-                );
-                let node_index = self.insert_op(Operation::TraceElement(trace_access));
-                Ok(ExprDetails::new(node_index, trace_segment, domain))
-            }
-            SymbolType::PublicInput(_) => {
-                if !domain.is_boundary() {
-                    return Err(SemanticError::InvalidUsage(
-                        "Public inputs cannot be accessed in integrity constraints.".to_string(),
-                    ));
-                }
-                let node_index = self.insert_op(Operation::PublicInput(
-                    vector_access.name().to_string(),
-                    vector_access.idx(),
-                ));
-                Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
-            }
-            SymbolType::RandomValuesBinding(offset, _) => self.insert_random_value(
-                symbol_table,
-                offset + vector_access.idx(),
-                AUX_SEGMENT,
-                domain,
-            ),
-            _ => Err(SemanticError::invalid_vector_access(
-                vector_access,
-                symbol_access.symbol().symbol_type(),
-            )),
-        }
-    }
-
-    /// Validates and adds a matrix access to the graph and returns the [ExprDetails] of the
-    /// inserted expression.
-    ///
-    /// # Errors
-    /// Returns an error if the identifier's value is not of a supported type.
-    fn insert_matrix_access(
-        &mut self,
-        symbol_table: &SymbolTable,
-        matrix_access: &MatrixAccess,
-        variable_roots: &mut VariableRoots,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        let symbol_access = symbol_table.access_matrix_element(matrix_access, domain.into())?;
-        match symbol_access.symbol().symbol_type() {
-            SymbolType::Constant(ConstantType::Matrix(_)) => {
-                self.insert_constant(ConstantValue::Matrix(matrix_access.clone()), domain)
-            }
-            SymbolType::Variable(variable_type) => {
-                self.insert_variable(
-                    symbol_table,
-                    variable_roots,
-                    &symbol_access,
-                    variable_type,
-                    domain,
-                )
-            }
-            _ => Err(SemanticError::invalid_matrix_access(
-                matrix_access,
-                symbol_access.symbol().symbol_type(),
-            )),
-        }
-    }
-
-    /// Inserts random value by index access into the graph and returns the resulting
-    /// expression details.
-    ///
-    /// # Errors
-    /// Returns an error if the identifier is not present in the symbol table or is not a supported
-    /// type.
-    ///
-    /// # Example
-    /// This function inserts values like `$alphas[3]`, having `name` as `alphas` and `index` as
-    /// `3`
-    fn insert_random_access(
-        &mut self,
-        symbol_table: &SymbolTable,
-        name: &str,
-        index: usize,
-        trace_segment: u8,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        let symbol = symbol_table.get_symbol(name, domain.into())?;
-        match symbol.symbol_type() {
-            SymbolType::RandomValuesBinding(_, _) => {
-                self.insert_random_value(symbol_table, index, trace_segment, domain)
-            }
-            _ => Err(SemanticError::unsupported_identifer_type(
-                name,
-                symbol.symbol_type(),
-            )),
-        }
-    }
-
-    /// Inserts a list folding expression into the graph and returns the resulting expression
-    /// details.
-    ///
-    /// # Errors
-    /// - Panics if the list is empty.
-    /// - Returns an error if the list cannot be unfolded properly.
-    fn insert_list_folding(
-        &mut self,
-        symbol_table: &SymbolTable,
-        lf_type: &ListFoldingType,
-        variable_roots: &mut VariableRoots,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        match lf_type {
-            ListFoldingType::Sum(lf_value_type) | ListFoldingType::Prod(lf_value_type) => {
-                let list = symbol_table.build_list_from_list_folding_value(lf_value_type)?;
-                if list.is_empty() {
-                    return Err(SemanticError::list_folding_empty_list(lf_value_type));
-                }
-
-                let mut acc = self.insert_expr(symbol_table, &list[0], variable_roots, domain)?;
-                for elem in list.iter().skip(1) {
-                    let expr = self.insert_expr(symbol_table, elem, variable_roots, domain)?;
-                    let op = match lf_type {
-                        ListFoldingType::Sum(_) => Operation::Add(acc.root_idx(), expr.root_idx()),
-                        ListFoldingType::Prod(_) => Operation::Mul(acc.root_idx(), expr.root_idx()),
-                    };
-                    acc = self.insert_bin_op(&acc, &expr, op)?;
-                }
-
-                Ok(acc)
             }
         }
     }
@@ -592,22 +116,7 @@ impl Node {
 /// An integrity constraint operation or value reference.
 #[derive(Debug, Eq, PartialEq)]
 pub enum Operation {
-    /// An inlined or named constant with identifier and access indices.
-    Constant(ConstantValue),
-    /// An identifier for an element in the trace segment, column, and row offset specified by the
-    /// [IndexedTraceAccess]
-    TraceElement(IndexedTraceAccess),
-    /// An identifier for a periodic value from a specified periodic column. The first inner value
-    /// is the index of the periodic column within the declared periodic columns. The second inner
-    /// value is the length of the column's periodic cycle. The periodic value made available from
-    /// the specified column is based on the current row of the trace.
-    PeriodicColumn(usize, usize),
-    /// An identifier for a public input declared by the specified name and accessed at the
-    /// specified index.
-    PublicInput(String, usize),
-    /// A random value provided by the verifier. The inner value is the index of this random value
-    /// in the array of all random values.
-    RandomValue(usize),
+    Value(Value),
     /// Addition operation applied to the nodes with the specified indices.
     Add(NodeIndex, NodeIndex),
     /// Subtraction operation applied to the nodes with the specified indices.
@@ -629,12 +138,4 @@ impl Operation {
             _ => 4,
         }
     }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum ConstantValue {
-    Inline(u64),
-    Scalar(String),
-    Vector(VectorAccess),
-    Matrix(MatrixAccess),
 }

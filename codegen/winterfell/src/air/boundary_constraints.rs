@@ -2,7 +2,7 @@ use core::panic;
 
 use super::{
     AirIR, AlgebraicGraph, Codegen, ConstraintDomain, ElemType, Impl, IndexedTraceAccess,
-    NodeIndex, Operation,
+    NodeIndex, Operation, Value,
 };
 
 // HELPERS TO GENERATE THE WINTERFELL BOUNDARY CONSTRAINT METHODS
@@ -97,7 +97,7 @@ pub fn split_boundary_constraint(
     let node = graph.node(index);
     match node.op() {
         Operation::Sub(lhs, rhs) => {
-            if let Operation::TraceElement(trace_access) = graph.node(lhs).op() {
+            if let Operation::Value(Value::TraceElement(trace_access)) = graph.node(lhs).op() {
                 debug_assert!(trace_access.row_offset() == 0);
                 (*trace_access, *rhs)
             } else {

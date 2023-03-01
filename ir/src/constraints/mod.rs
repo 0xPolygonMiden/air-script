@@ -1,8 +1,4 @@
-use super::{
-    ast::Boundary, AccessType, ConstantType, ExprDetails, Expression, Identifier,
-    IndexedTraceAccess, ListFoldingType, MatrixAccess, SemanticError, SymbolAccess, SymbolTable,
-    SymbolType, TraceSegment, VariableRoots, VariableType, VectorAccess,
-};
+use super::{ast::Boundary, SemanticError, TraceSegment, Value};
 use std::collections::BTreeMap;
 
 mod constraint;
@@ -12,15 +8,11 @@ mod degree;
 pub use degree::IntegrityConstraintDegree;
 
 mod graph;
-pub use graph::{AlgebraicGraph, ConstantValue, NodeIndex, Operation};
+pub use graph::{AlgebraicGraph, NodeIndex, Operation};
 
 // CONSTANTS
 // ================================================================================================
 
-/// The default segment against which a constraint is applied is the main trace segment.
-const DEFAULT_SEGMENT: TraceSegment = 0;
-/// The auxiliary trace segment.
-const AUX_SEGMENT: TraceSegment = 1;
 /// The offset of the "current" row during constraint evaluation.
 pub(super) const CURRENT_ROW: usize = 0;
 /// TODO: docs
@@ -152,36 +144,8 @@ impl Constraints {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    // TODO: get rid of this
-    pub(super) fn insert_expr(
-        &mut self,
-        symbol_table: &SymbolTable,
-        expr: &Expression,
-        variable_roots: &mut VariableRoots,
-        default_domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        self.graph
-            .insert_expr(symbol_table, expr, variable_roots, default_domain)
-    }
-
-    // TODO: get rid of this
-    pub(super) fn insert_trace_access(
-        &mut self,
-        symbol_table: &SymbolTable,
-        trace_access: &IndexedTraceAccess,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        self.graph
-            .insert_trace_access(symbol_table, trace_access, domain)
-    }
-
-    // TODO: get rid of this
-    pub(super) fn merge_equal_exprs(
-        &mut self,
-        lhs: &ExprDetails,
-        rhs: &ExprDetails,
-    ) -> Result<ExprDetails, SemanticError> {
-        self.graph.merge_equal_exprs(lhs, rhs)
+    pub(super) fn insert_graph_node(&mut self, op: Operation) -> NodeIndex {
+        self.graph.insert_op(op)
     }
 
     pub(super) fn insert_constraint(

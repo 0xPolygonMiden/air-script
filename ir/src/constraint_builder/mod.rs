@@ -1,16 +1,27 @@
 use super::{
-    ast, BTreeMap, BTreeSet, ConstrainedBoundary, ConstraintDomain, Constraints, Declarations,
-    NodeIndex, SemanticError, SymbolAccess, SymbolTable, TraceSegment,
+    ast, AccessType, BTreeMap, BTreeSet, ConstantValue, ConstrainedBoundary, ConstraintDomain,
+    Constraints, Declarations, Expression, Identifier, IndexedTraceAccess, ListFoldingType,
+    MatrixAccess, NodeIndex, Operation, SemanticError, SymbolAccess, SymbolTable, SymbolType,
+    TraceSegment, Value, VariableType, VectorAccess, CURRENT_ROW,
 };
 
+mod expression;
+
 mod expression_details;
-// TODO: get rid of the need to make this public
-pub(crate) use expression_details::ExprDetails;
+use expression_details::ExprDetails;
+
+// CONSTANTS
+// ================================================================================================
+
+/// The default segment against which a constraint is applied is the main trace segment.
+pub(super) const DEFAULT_SEGMENT: TraceSegment = 0;
+/// The auxiliary trace segment.
+pub(super) const AUX_SEGMENT: TraceSegment = 1;
 
 // TYPES
 // ================================================================================================
 
-pub(crate) type VariableRoots = BTreeMap<SymbolAccess, ExprDetails>;
+type VariableRoots = BTreeMap<SymbolAccess, ExprDetails>;
 
 // CONSTRAINT BUILDER
 // ================================================================================================
@@ -83,19 +94,10 @@ impl ConstraintBuilder {
                 }
 
                 // add the trace access at the specified boundary to the graph.
-                let lhs = self.constraints.insert_trace_access(
-                    &self.symbol_table,
-                    &trace_access,
-                    domain,
-                )?;
+                let lhs = self.insert_trace_access(&trace_access, domain)?;
 
                 // add its expression to the constraints graph.
-                let rhs = self.constraints.insert_expr(
-                    &self.symbol_table,
-                    constraint.value(),
-                    &mut self.variable_roots,
-                    domain,
-                )?;
+                let rhs = self.insert_expr(constraint.value(), domain)?;
 
                 // ensure that the inferred trace segment of the rhs expression can be applied to
                 // column against which the boundary constraint is applied.
@@ -128,23 +130,15 @@ impl ConstraintBuilder {
         &mut self,
         stmt: ast::IntegrityStmt,
     ) -> Result<(), SemanticError> {
+        let default_domain = ConstraintDomain::EveryRow;
+
         match stmt {
             ast::IntegrityStmt::Constraint(constraint) => {
                 // add the left hand side expression to the graph.
-                let lhs = self.constraints.insert_expr(
-                    &self.symbol_table,
-                    constraint.lhs(),
-                    &mut self.variable_roots,
-                    ConstraintDomain::EveryRow,
-                )?;
+                let lhs = self.insert_expr(constraint.lhs(), default_domain)?;
 
                 // add the right hand side expression to the graph.
-                let rhs = self.constraints.insert_expr(
-                    &self.symbol_table,
-                    constraint.rhs(),
-                    &mut self.variable_roots,
-                    ConstraintDomain::EveryRow,
-                )?;
+                let rhs = self.insert_expr(constraint.rhs(), default_domain)?;
 
                 // merge the two sides of the expression into a constraint.
                 self.insert_constraint(lhs, rhs)?
@@ -165,7 +159,7 @@ impl ConstraintBuilder {
         lhs: ExprDetails,
         rhs: ExprDetails,
     ) -> Result<(), SemanticError> {
-        let constraint = self.constraints.merge_equal_exprs(&lhs, &rhs)?;
+        let constraint = self.merge_equal_exprs(&lhs, &rhs)?;
         let trace_segment = constraint.trace_segment() as usize;
 
         // the constraint should not be against an undeclared trace segment.

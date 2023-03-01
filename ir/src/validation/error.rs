@@ -1,6 +1,6 @@
 use super::{
     Constant, ConstrainedBoundary, ConstraintDomain, IndexedTraceAccess, MatrixAccess,
-    NamedTraceAccess, SymbolType, TraceSegment, VectorAccess, MIN_CYCLE_LENGTH,
+    NamedTraceAccess, Symbol, SymbolType, TraceSegment, VectorAccess, MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]
@@ -24,22 +24,49 @@ pub enum SemanticError {
 impl SemanticError {
     // --- INVALID ACCESS ERRORS ------------------------------------------------------------------
 
-    pub(crate) fn invalid_vector_access(access: &VectorAccess, symbol_type: &SymbolType) -> Self {
+    pub(crate) fn invalid_public_input_usage(name: &str) -> Self {
         Self::InvalidUsage(format!(
-            "Vector Access {}[{}] was declared as a {} which is not a supported type.",
-            access.name(),
-            access.idx(),
-            symbol_type
+            "Public input '{name}' can only be accessed by index.",
         ))
     }
 
-    pub(crate) fn invalid_matrix_access(access: &MatrixAccess, symbol_type: &SymbolType) -> Self {
+    pub(crate) fn invalid_periodic_column_usage(name: &str) -> Self {
+        // TODO: update message
+        Self::InvalidUsage(format!(
+            "Public input '{name}' can only be accessed by index.",
+        ))
+    }
+
+    pub(crate) fn invalid_random_value_usage(name: &str) -> Self {
+        // TODO: update message
+        Self::InvalidUsage(format!(
+            "Public input '{name}' can only be accessed by index.",
+        ))
+    }
+
+    pub(crate) fn invalid_trace_access(name: &str) -> Self {
+        // TODO: update message
+        Self::InvalidUsage(format!(
+            "Public input '{name}' can only be accessed by index.",
+        ))
+    }
+
+    pub(crate) fn invalid_vector_access(symbol: &Symbol, idx: usize) -> Self {
+        Self::InvalidUsage(format!(
+            "Vector Access {}[{}] was declared as a {} which is not a supported type.",
+            symbol.name(),
+            idx,
+            symbol.symbol_type()
+        ))
+    }
+
+    pub(crate) fn invalid_matrix_access(symbol: &Symbol, row_idx: usize, col_idx: usize) -> Self {
         SemanticError::InvalidUsage(format!(
             "Matrix Access {}[{}][{}] was declared as a {} which is not a supported type.",
-            access.name(),
-            access.row_idx(),
-            access.col_idx(),
-            symbol_type
+            symbol.name(),
+            row_idx,
+            col_idx,
+            symbol.symbol_type()
         ))
     }
 
