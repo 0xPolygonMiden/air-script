@@ -28,6 +28,13 @@ pub enum Expression {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ListFoldingType {
-    Sum(ListComprehension),
-    Prod(ListComprehension),
+    Sum(ListFoldingValueType),
+    Prod(ListFoldingValueType),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ListFoldingValueType {
+    Identifier(Identifier),
+    Vector(Vec<Expression>),
+    ListComprehension(ListComprehension),
 }

@@ -1,19 +1,9 @@
 use super::{
-    list_comprehension::unfold_lc, BTreeMap, ConstantType, ConstraintDomain, ExprDetails,
+    build_list_from_list_folding_value, BTreeMap, ConstantType, ConstraintDomain, ExprDetails,
     Expression, Identifier, IdentifierType, IndexedTraceAccess, IntegrityConstraintDegree,
-    ListFoldingType, MatrixAccess, Scope, SemanticError, SymbolTable, TraceSegment, VariableRoots,
-    VariableType, VectorAccess,
+    ListFoldingType, MatrixAccess, Scope, SemanticError, SymbolTable, VariableRoots, VariableType,
+    VariableValue, VectorAccess, AUX_SEGMENT, CURRENT_ROW, DEFAULT_SEGMENT,
 };
-
-// CONSTANTS
-// ================================================================================================
-
-/// The offset of the "current" row during constraint evaluation.
-pub const CURRENT_ROW: usize = 0;
-/// The default segment against which a constraint is applied is the main trace segment.
-pub const DEFAULT_SEGMENT: TraceSegment = 0;
-/// The auxiliary trace segment.
-const AUX_SEGMENT: TraceSegment = 1;
 
 // ALGEBRAIC GRAPH
 // ================================================================================================
@@ -63,7 +53,7 @@ impl AlgebraicGraph {
     ///
     /// TODO: we can optimize this in the future in the case where lhs or rhs equals zero to just
     /// return the other expression.
-    pub(super) fn merge_equal_exprs(
+    pub(crate) fn merge_equal_exprs(
         &mut self,
         lhs: &ExprDetails,
         rhs: &ExprDetails,
@@ -77,7 +67,7 @@ impl AlgebraicGraph {
 
     /// Adds the expression to the graph and returns the [ExprDetails] of the constraint.
     /// Expressions are added recursively to reuse existing matching nodes.
-    pub(super) fn insert_expr(
+    pub(crate) fn insert_expr(
         &mut self,
         symbol_table: &SymbolTable,
         expr: &Expression,
@@ -182,7 +172,7 @@ impl AlgebraicGraph {
     /// Returns an error if:
     /// - The column index of the trace access is greater than overall number of columns in segment.
     /// - The segment of the trace access is greater than the number of segments.
-    pub(super) fn insert_trace_access(
+    pub(crate) fn insert_trace_access(
         &mut self,
         symbol_table: &SymbolTable,
         trace_access: &IndexedTraceAccess,
@@ -366,9 +356,7 @@ impl AlgebraicGraph {
                         variable_expr,
                     )
                 } else {
-                    Err(SemanticError::InvalidUsage(format!(
-                        "Identifier {ident} was declared as a {elem_type} which is not a supported type."
-                    )))
+                    Err(SemanticError::unsupported_identifer_type(ident, elem_type))
                 }
             }
             IdentifierType::PeriodicColumn(index, cycle_len) => {
@@ -376,15 +364,16 @@ impl AlgebraicGraph {
                 Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
             }
             IdentifierType::TraceColumns(columns) => {
+                if columns.size() != 1 {
+                    return Err(SemanticError::invalid_trace_binding(ident));
+                }
                 let trace_segment = columns.trace_segment();
                 let trace_access =
                     IndexedTraceAccess::new(trace_segment, columns.offset(), CURRENT_ROW);
                 let node_index = self.insert_op(Operation::TraceElement(trace_access));
                 Ok(ExprDetails::new(node_index, trace_segment, domain))
             }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {ident} was declared as a {elem_type} which is not a supported type."
-            ))),
+            _ => Err(SemanticError::unsupported_identifer_type(ident, elem_type)),
         }
     }
 
@@ -405,23 +394,57 @@ impl AlgebraicGraph {
             IdentifierType::Constant(ConstantType::Vector(_)) => {
                 self.insert_constant(ConstantValue::Vector(vector_access.clone()), domain)
             }
-            IdentifierType::Variable(scope, variable) => {
-                if let VariableType::Vector(vector) = variable.value() {
-                    self.insert_variable(
-                        symbol_table,
-                        variable_roots,
-                        domain,
-                        *scope,
-                        VariableValue::Vector(vector_access.clone()),
-                        &vector[vector_access.idx()],
-                    )
-                } else {
-                    Err(SemanticError::invalid_vector_access(
-                        vector_access,
-                        symbol_type,
-                    ))
+            IdentifierType::Variable(scope, variable) => match variable.value() {
+                VariableType::Scalar(matrix_vector_access_expr) => {
+                    match matrix_vector_access_expr {
+                        Expression::Elem(elem) => {
+                            let equal_vector_access = Expression::VectorAccess(VectorAccess::new(
+                                elem.clone(),
+                                vector_access.idx(),
+                            ));
+                            self.insert_variable(
+                                symbol_table,
+                                variable_roots,
+                                domain,
+                                *scope,
+                                VariableValue::Vector(vector_access.clone()),
+                                &equal_vector_access,
+                            )
+                        }
+                        Expression::VectorAccess(matrix_row_access) => {
+                            let matrix_access = Expression::MatrixAccess(MatrixAccess::new(
+                                Identifier(matrix_row_access.name().to_string()),
+                                matrix_row_access.idx(),
+                                vector_access.idx(),
+                            ));
+                            self.insert_variable(
+                                symbol_table,
+                                variable_roots,
+                                domain,
+                                *scope,
+                                VariableValue::Vector(vector_access.clone()),
+                                &matrix_access,
+                            )
+                        }
+                        _ => Err(SemanticError::invalid_vector_access(
+                            vector_access,
+                            symbol_type,
+                        )),
+                    }
                 }
-            }
+                VariableType::Vector(vector) => self.insert_variable(
+                    symbol_table,
+                    variable_roots,
+                    domain,
+                    *scope,
+                    VariableValue::Vector(vector_access.clone()),
+                    &vector[vector_access.idx()],
+                ),
+                _ => Err(SemanticError::invalid_vector_access(
+                    vector_access,
+                    symbol_type,
+                )),
+            },
             IdentifierType::TraceColumns(columns) => {
                 let trace_segment = columns.trace_segment();
                 let trace_access = IndexedTraceAccess::new(
@@ -446,7 +469,7 @@ impl AlgebraicGraph {
             }
             IdentifierType::RandomValuesBinding(offset, _) => self.insert_random_value(
                 symbol_table,
-                *offset + vector_access.idx(),
+                offset + vector_access.idx(),
                 AUX_SEGMENT,
                 domain,
             ),
@@ -474,23 +497,81 @@ impl AlgebraicGraph {
             IdentifierType::Constant(ConstantType::Matrix(_)) => {
                 self.insert_constant(ConstantValue::Matrix(matrix_access.clone()), domain)
             }
-            IdentifierType::Variable(scope, variable) => {
-                if let VariableType::Matrix(matrix) = variable.value() {
-                    self.insert_variable(
-                        symbol_table,
-                        variable_roots,
-                        domain,
-                        *scope,
-                        VariableValue::Matrix(matrix_access.clone()),
-                        &matrix[matrix_access.row_idx()][matrix_access.col_idx()],
-                    )
-                } else {
-                    Err(SemanticError::invalid_matrix_access(
-                        matrix_access,
-                        symbol_type,
-                    ))
+            IdentifierType::Variable(scope, variable) => match variable.value() {
+                VariableType::Scalar(scalar) => {
+                    if let Expression::Elem(elem) = scalar {
+                        let equal_matrix_access = Expression::MatrixAccess(MatrixAccess::new(
+                            elem.clone(),
+                            matrix_access.row_idx(),
+                            matrix_access.col_idx(),
+                        ));
+                        self.insert_variable(
+                            symbol_table,
+                            variable_roots,
+                            domain,
+                            *scope,
+                            VariableValue::Matrix(matrix_access.clone()),
+                            &equal_matrix_access,
+                        )
+                    } else {
+                        Err(SemanticError::invalid_matrix_access(
+                            matrix_access,
+                            symbol_type,
+                        ))
+                    }
                 }
-            }
+                VariableType::Vector(vector) => {
+                    let vec_elem = &vector[matrix_access.row_idx()];
+                    match vec_elem {
+                        Expression::Elem(elem) => {
+                            let vector_access = Expression::VectorAccess(VectorAccess::new(
+                                elem.clone(),
+                                matrix_access.col_idx(),
+                            ));
+                            self.insert_variable(
+                                symbol_table,
+                                variable_roots,
+                                domain,
+                                *scope,
+                                VariableValue::Matrix(matrix_access.clone()),
+                                &vector_access,
+                            )
+                        }
+                        Expression::VectorAccess(matrix_row_access) => {
+                            let internal_matrix_access =
+                                Expression::MatrixAccess(MatrixAccess::new(
+                                    Identifier(matrix_row_access.name().to_string()),
+                                    matrix_row_access.idx(),
+                                    matrix_access.col_idx(),
+                                ));
+                            self.insert_variable(
+                                symbol_table,
+                                variable_roots,
+                                domain,
+                                *scope,
+                                VariableValue::Matrix(matrix_access.clone()),
+                                &internal_matrix_access,
+                            )
+                        }
+                        _ => Err(SemanticError::invalid_matrix_access(
+                            matrix_access,
+                            symbol_type,
+                        )),
+                    }
+                }
+                VariableType::Matrix(matrix) => self.insert_variable(
+                    symbol_table,
+                    variable_roots,
+                    domain,
+                    *scope,
+                    VariableValue::Matrix(matrix_access.clone()),
+                    &matrix[matrix_access.row_idx()][matrix_access.col_idx()],
+                ),
+                _ => Err(SemanticError::invalid_matrix_access(
+                    matrix_access,
+                    symbol_type,
+                )),
+            },
             _ => Err(SemanticError::invalid_matrix_access(
                 matrix_access,
                 symbol_type,
@@ -521,9 +602,7 @@ impl AlgebraicGraph {
             IdentifierType::RandomValuesBinding(_, _) => {
                 self.insert_random_value(symbol_table, index, trace_segment, domain)
             }
-            _ => Err(SemanticError::InvalidUsage(format!(
-                "Identifier {name} was declared as a {elem_type} not as a random values"
-            ))),
+            _ => Err(SemanticError::unsupported_identifer_type(name, elem_type)),
         }
     }
 
@@ -541,12 +620,11 @@ impl AlgebraicGraph {
         domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
         match lf_type {
-            ListFoldingType::Sum(lc) | ListFoldingType::Prod(lc) => {
-                let list = unfold_lc(lc, symbol_table)?;
-                assert!(
-                    !list.is_empty(),
-                    "List on which list folding is applied is empty."
-                );
+            ListFoldingType::Sum(lf_value_type) | ListFoldingType::Prod(lf_value_type) => {
+                let list = build_list_from_list_folding_value(lf_value_type, symbol_table)?;
+                if list.is_empty() {
+                    return Err(SemanticError::list_folding_empty_list(lf_value_type));
+                }
 
                 let mut acc = self.insert_expr(symbol_table, &list[0], variable_roots, domain)?;
                 for elem in list.iter().skip(1) {
@@ -625,13 +703,6 @@ impl Operation {
 #[derive(Debug, Eq, PartialEq)]
 pub enum ConstantValue {
     Inline(u64),
-    Scalar(String),
-    Vector(VectorAccess),
-    Matrix(MatrixAccess),
-}
-
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub enum VariableValue {
     Scalar(String),
     Vector(VectorAccess),
     Matrix(MatrixAccess),

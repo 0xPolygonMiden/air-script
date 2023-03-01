@@ -122,6 +122,70 @@ fn ic_with_variables() {
 }
 
 #[test]
+fn ic_variables_access_vector_from_matrix() {
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        enf clk.first = 7
+        enf clk.last = 8
+    integrity_constraints:
+        let a = [[1, 2], [3, 4]]
+        let b = a[1]
+        let c = b
+        let d = [a[0], a[1], b]
+        let e = d
+        enf clk' = c[0] + e[2][0] + e[0][1]";
+
+    let parsed = parse(source).expect("Parsing failed");
+
+    let result = AirIR::new(&parsed);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn err_ic_variables_vector_with_inlined_vector() {
+    // We can not parse matrix variable that consists of inlined vector and scalar elements.
+    // Variable `d` is parsed as a vector and can not contain inlined vectors.
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        enf clk.first = 7
+        enf clk.last = 8
+    integrity_constraints:
+        let a = [[1, 2], [3, 4]]
+        let d = [a[0], [3, 4]]
+        enf clk' = d[0][0]";
+
+    parse(source).expect_err("Parsing failed");
+}
+
+#[test]
+fn err_ic_variables_matrix_with_vector_reference() {
+    // We can not parse matrix variable that consists of inlined vector and scalar elements
+    // Variable `d` is parsed as a matrix and can not contain references to vectors.
+    let source = "
+    trace_columns:
+        main: [clk]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        enf clk.first = 7
+        enf clk.last = 8
+    integrity_constraints:
+        let a = [[1, 2], [3, 4]]
+        let d = [[3, 4], a[0]]
+        enf clk' = d[0][0]";
+
+    parse(source).expect_err("Parsing failed");
+}
+
+#[test]
 fn err_bc_variable_access_before_declaration() {
     let source = "
     const A = [[2, 3], [1, 0]]

@@ -40,3 +40,13 @@ fn err_invalid_matrix_element() {
     let a = [[1, 2], [3, [4, 5]]]";
     build_parse_test!(source).expect_unrecognized_token();
 }
+
+#[test]
+fn err_matrix_variable_from_vector_and_reference() {
+    let source = "integrity_constraints:
+    let a = [[1, 2], [3, 4]]
+    let b = [5, 6]
+    let c = [b, [7, 8]]
+    let d = [[7, 8], a[0]]";
+    build_parse_test!(source).expect_unrecognized_token();
+}

@@ -15,6 +15,7 @@ mod constants;
 mod identifiers;
 mod integrity_constraints;
 mod list_comprehension;
+mod list_folding;
 mod periodic_columns;
 mod pub_inputs;
 mod random_values;
