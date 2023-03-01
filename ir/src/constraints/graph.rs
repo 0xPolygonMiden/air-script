@@ -1,5 +1,5 @@
 use super::{
-    build_list_from_list_folding_value, AccessType, BTreeMap, ConstantType, ConstraintDomain,
+     AccessType, BTreeMap, ConstantType, ConstraintDomain,
     ExprDetails, Expression, Identifier, IndexedTraceAccess, IntegrityConstraintDegree,
     ListFoldingType, MatrixAccess, SemanticError, SymbolAccess, SymbolTable, SymbolType,
     VariableRoots, VariableType, VectorAccess, AUX_SEGMENT, CURRENT_ROW, DEFAULT_SEGMENT,
@@ -552,7 +552,7 @@ impl AlgebraicGraph {
     ) -> Result<ExprDetails, SemanticError> {
         match lf_type {
             ListFoldingType::Sum(lf_value_type) | ListFoldingType::Prod(lf_value_type) => {
-                let list = build_list_from_list_folding_value(lf_value_type, symbol_table)?;
+                let list = symbol_table.build_list_from_list_folding_value(lf_value_type)?;
                 if list.is_empty() {
                     return Err(SemanticError::list_folding_empty_list(lf_value_type));
                 }

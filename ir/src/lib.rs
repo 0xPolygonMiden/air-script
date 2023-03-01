@@ -8,9 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub mod constraint_builder;
 // TODO: remove most of these imports
-use constraint_builder::{
-    build_list_from_list_folding_value, ConstraintBuilder, ExprDetails, VariableRoots,
-};
+use constraint_builder::{ConstraintBuilder, ExprDetails, VariableRoots};
 
 pub mod constraints;
 use constraints::{
@@ -24,7 +22,7 @@ use declarations::Declarations;
 pub use declarations::{PeriodicColumn, PublicInput};
 
 mod symbol_table;
-use symbol_table::{AccessType, Scope, Symbol, SymbolAccess, SymbolTable, SymbolType};
+use symbol_table::{AccessType, SymbolAccess, SymbolTable, SymbolType};
 
 mod validation;
 use validation::{SemanticError, SourceValidator};

@@ -1,21 +1,11 @@
 use super::{
-    ast, BTreeMap, BTreeSet, ConstantType, ConstrainedBoundary, ConstraintDomain, Constraints,
-    Declarations, Expression, Identifier, IndexedTraceAccess, Iterable, ListComprehension,
-    ListFoldingType, ListFoldingValueType, NamedTraceAccess, NodeIndex, Scope, SemanticError,
-    Symbol, SymbolAccess, SymbolTable, SymbolType, TraceSegment, Variable, VariableType,
-    VectorAccess, CURRENT_ROW,
+    ast, BTreeMap, BTreeSet, ConstrainedBoundary, ConstraintDomain, Constraints, Declarations,
+    NodeIndex, SemanticError, SymbolAccess, SymbolTable, TraceSegment,
 };
 
 mod expression_details;
 // TODO: get rid of the need to make this public
 pub(crate) use expression_details::ExprDetails;
-
-mod list_comprehension;
-// TODO: get rid of the need to make this public
-pub(crate) use list_comprehension::unfold_lc;
-
-mod list_folding;
-pub(crate) use list_folding::build_list_from_list_folding_value;
 
 // TYPES
 // ================================================================================================
@@ -119,7 +109,6 @@ impl ConstraintBuilder {
                 self.insert_constraint(lhs, rhs)?
             }
             ast::BoundaryStmt::Variable(variable) => {
-                //  TODO: deal with expression at this stage?
                 self.symbol_table.insert_boundary_variable(variable)?
             }
         }
@@ -161,16 +150,7 @@ impl ConstraintBuilder {
                 self.insert_constraint(lhs, rhs)?
             }
             ast::IntegrityStmt::Variable(variable) => {
-                //  TODO: deal with expression at this stage?
-                if let VariableType::ListComprehension(list_comprehension) = variable.value() {
-                    let vector = unfold_lc(list_comprehension, &self.symbol_table)?;
-                    self.symbol_table.insert_integrity_variable(Variable::new(
-                        Identifier(variable.name().to_string()),
-                        VariableType::Vector(vector),
-                    ))?
-                } else {
-                    self.symbol_table.insert_integrity_variable(variable)?
-                }
+                self.symbol_table.insert_integrity_variable(variable)?
             }
         }
 

@@ -1,8 +1,12 @@
 use super::{
-    ast, BTreeMap, Constant, ConstantType, Declarations, IndexedTraceAccess, MatrixAccess,
-    NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType, VectorAccess,
-    MIN_CYCLE_LENGTH,
+    ast, BTreeMap, Constant, ConstantType, Declarations, Expression, Identifier,
+    IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
+    MatrixAccess, NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType,
+    VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
+
+mod list_comprehension;
+mod list_folding;
 
 mod symbol;
 pub(crate) use symbol::{Scope, Symbol, SymbolType};
@@ -208,12 +212,27 @@ impl SymbolTable {
         &mut self,
         variable: Variable,
     ) -> Result<(), SemanticError> {
-        let (name, value) = variable.into_parts();
-        self.insert_symbol(
-            name,
-            Scope::IntegrityConstraints,
-            SymbolType::Variable(value),
-        )?;
+        let (name, variable_type) = variable.into_parts();
+
+        match variable_type {
+            VariableType::ListComprehension(list_comprehension) => {
+                // TODO: consume this list comprehension
+                let vector = self.unfold_lc(&list_comprehension)?;
+                self.insert_symbol(
+                    name,
+                    Scope::IntegrityConstraints,
+                    SymbolType::Variable(VariableType::Vector(vector)),
+                )?;
+            }
+            _ => {
+                self.insert_symbol(
+                    name,
+                    Scope::IntegrityConstraints,
+                    SymbolType::Variable(variable_type),
+                )?;
+            }
+        }
+
         Ok(())
     }
 
