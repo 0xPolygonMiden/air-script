@@ -71,7 +71,7 @@ impl ConstraintBuilder {
     /// is then saved in the boundary_constraints matrix.
     pub(super) fn insert_boundary_stmt(
         &mut self,
-        stmt: &ast::BoundaryStmt,
+        stmt: ast::BoundaryStmt,
     ) -> Result<(), SemanticError> {
         match stmt {
             ast::BoundaryStmt::Constraint(constraint) => {
@@ -137,7 +137,7 @@ impl ConstraintBuilder {
     /// is then saved in the validity_constraints or transition_constraints matrices.
     pub(super) fn insert_integrity_stmt(
         &mut self,
-        stmt: &ast::IntegrityStmt,
+        stmt: ast::IntegrityStmt,
     ) -> Result<(), SemanticError> {
         match stmt {
             ast::IntegrityStmt::Constraint(constraint) => {
@@ -164,7 +164,7 @@ impl ConstraintBuilder {
                 //  TODO: deal with expression at this stage?
                 if let VariableType::ListComprehension(list_comprehension) = variable.value() {
                     let vector = unfold_lc(list_comprehension, &self.symbol_table)?;
-                    self.symbol_table.insert_integrity_variable(&Variable::new(
+                    self.symbol_table.insert_integrity_variable(Variable::new(
                         Identifier(variable.name().to_string()),
                         VariableType::Vector(vector),
                     ))?

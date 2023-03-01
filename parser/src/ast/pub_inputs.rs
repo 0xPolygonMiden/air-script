@@ -27,4 +27,8 @@ impl PublicInput {
     pub fn size(&self) -> usize {
         self.size
     }
+
+    pub fn into_parts(self) -> (String, usize) {
+        (self.name.into_name(), self.size)
+    }
 }

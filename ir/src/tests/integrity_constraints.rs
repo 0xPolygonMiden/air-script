@@ -14,7 +14,7 @@ fn integrity_constraints() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -32,7 +32,7 @@ fn ic_using_parens() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -49,7 +49,7 @@ fn ic_op_mul() {
         enf clk' * clk = 1";
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -66,7 +66,7 @@ fn ic_op_exp() {
         enf clk'^2 - clk = 1";
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -87,6 +87,6 @@ fn err_non_const_exp_outside_lc() {
         enf clk = 2^ctx";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }

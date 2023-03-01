@@ -15,7 +15,7 @@ fn trace_columns_index_access() {
         enf $aux[0]^3 - $aux[1]' = 0";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -37,7 +37,7 @@ fn trace_cols_groups() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -56,7 +56,7 @@ fn err_bc_column_undeclared() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -74,7 +74,7 @@ fn err_ic_column_undeclared() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -96,7 +96,7 @@ fn err_bc_trace_cols_access_out_of_bounds() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -119,7 +119,7 @@ fn err_ic_trace_cols_access_out_of_bounds() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -137,6 +137,6 @@ fn err_ic_trace_cols_group_used_as_scalar() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }

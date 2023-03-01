@@ -1,7 +1,7 @@
 use super::{
-    ast, BTreeMap, Constant, ConstantType, Declarations, Identifier, IndexedTraceAccess,
-    MatrixAccess, NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType,
-    VectorAccess, MIN_CYCLE_LENGTH,
+    ast, BTreeMap, Constant, ConstantType, Declarations, IndexedTraceAccess, MatrixAccess,
+    NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType, VectorAccess,
+    MIN_CYCLE_LENGTH,
 };
 
 mod symbol;
@@ -45,28 +45,28 @@ impl SymbolTable {
     /// global scope.
     fn insert_symbol(
         &mut self,
-        name: &str,
+        name: String,
         scope: Scope,
         symbol_type: SymbolType,
     ) -> Result<(), SemanticError> {
-        let symbol = Symbol::new(name.to_string(), scope, symbol_type);
-
         // check if the identifier was already defined in the global scope.
-        if let Some(global_sym) = self.symbols.get(&(name.to_owned(), Scope::Global)) {
+        if let Some(global_sym) = self.symbols.get(&(name.clone(), Scope::Global)) {
             // TODO: update error to "{name} was already defined as a {type} in the {scope}",
             return Err(SemanticError::duplicate_identifer(
-                symbol.name(),
-                symbol.symbol_type(),
+                &name,
+                &symbol_type,
                 global_sym.symbol_type(),
             ));
         }
+
         // insert the identifier or return an error if it was already defined in the specified scope.
-        if let Some(symbol) = self.symbols.insert((name.to_owned(), scope), symbol) {
+        let symbol = Symbol::new(name.clone(), scope, symbol_type);
+        if let Some(prev_symbol) = self.symbols.insert((name, scope), symbol.clone()) {
             // TODO: update error to "{name} was already defined as a {type} in the {scope}",
             return Err(SemanticError::duplicate_identifer(
                 symbol.name(),
                 symbol.symbol_type(),
-                symbol.symbol_type(),
+                prev_symbol.symbol_type(),
             ));
         }
 
@@ -75,15 +75,12 @@ impl SymbolTable {
 
     /// Add a constant by its identifier and value.
     /// TODO: consume constants instead of cloning them
-    pub(super) fn insert_constant(&mut self, constant: &Constant) -> Result<(), SemanticError> {
-        let Identifier(name) = &constant.name();
-        validate_constant(constant)?;
-        self.insert_symbol(
-            name,
-            Scope::Global,
-            SymbolType::Constant(constant.value().clone()),
-        )?;
+    pub(super) fn insert_constant(&mut self, constant: Constant) -> Result<(), SemanticError> {
+        validate_constant(&constant)?;
         self.declarations.add_constant(constant.clone());
+
+        let (name, constant_type) = constant.into_parts();
+        self.insert_symbol(name, Scope::Global, SymbolType::Constant(constant_type))?;
 
         Ok(())
     }
@@ -99,7 +96,7 @@ impl SymbolTable {
             let trace_columns =
                 TraceColumns::new(trace_segment, col_idx, trace_cols.size() as usize);
             self.insert_symbol(
-                trace_cols.name(),
+                trace_cols.name().to_string(),
                 Scope::Global,
                 SymbolType::TraceColumns(trace_columns),
             )?;
@@ -124,16 +121,16 @@ impl SymbolTable {
     /// Adds all public inputs by their identifier names and array length.
     pub(super) fn insert_public_inputs(
         &mut self,
-        public_inputs: &[ast::PublicInput],
+        public_inputs: Vec<ast::PublicInput>,
     ) -> Result<(), SemanticError> {
-        for input in public_inputs.iter() {
+        for input in public_inputs.into_iter() {
+            let (name, size) = input.into_parts();
             self.insert_symbol(
-                input.name(),
+                name.clone(),
                 Scope::BoundaryConstraints,
-                SymbolType::PublicInput(input.size()),
+                SymbolType::PublicInput(size),
             )?;
-            self.declarations
-                .add_public_input((input.name().to_string(), input.size()));
+            self.declarations.add_public_input((name, size));
         }
 
         Ok(())
@@ -143,14 +140,14 @@ impl SymbolTable {
     /// periodic columns, and the lengths of their periodic cycles.
     pub(super) fn insert_periodic_columns(
         &mut self,
-        columns: &[ast::PeriodicColumn],
+        columns: Vec<ast::PeriodicColumn>,
     ) -> Result<(), SemanticError> {
-        for (index, column) in columns.iter().enumerate() {
-            validate_cycles(column)?;
-            let values = column.values().to_vec();
+        for (index, column) in columns.into_iter().enumerate() {
+            validate_cycles(&column)?;
 
+            let (name, values) = column.into_parts();
             self.insert_symbol(
-                column.name(),
+                name,
                 Scope::IntegrityConstraints,
                 SymbolType::PeriodicColumn(index, values.len()),
             )?;
@@ -163,39 +160,45 @@ impl SymbolTable {
     /// Adds all random values by their identifier names and array length.
     pub(super) fn insert_random_values(
         &mut self,
-        values: &ast::RandomValues,
+        rand_values: ast::RandomValues,
     ) -> Result<(), SemanticError> {
-        self.declarations
-            .set_num_random_values(values.size() as u16);
+        let (name, num_values, bindings) = rand_values.into_parts();
 
         let mut offset = 0;
         // add the name of the random values array to the symbol table
         self.insert_symbol(
-            values.name(),
+            name,
             Scope::Global,
-            SymbolType::RandomValuesBinding(offset, values.size() as usize),
+            SymbolType::RandomValuesBinding(offset, num_values as usize),
         )?;
+
         // add the named random value bindings to the symbol table
-        for value in values.bindings() {
+        for binding in bindings {
+            let (name, size) = binding.into_parts();
             self.insert_symbol(
-                value.name(),
+                name,
                 Scope::Global,
-                SymbolType::RandomValuesBinding(offset, value.size() as usize),
+                SymbolType::RandomValuesBinding(offset, size as usize),
             )?;
-            offset += value.size() as usize;
+            offset += size as usize;
         }
+
+        // TODO: check this type coercion
+        self.declarations.set_num_random_values(num_values as u16);
+
         Ok(())
     }
 
     /// Inserts a boundary variable into the symbol table.
     pub(super) fn insert_boundary_variable(
         &mut self,
-        variable: &Variable,
+        variable: Variable,
     ) -> Result<(), SemanticError> {
+        let (name, value) = variable.into_parts();
         self.insert_symbol(
-            variable.name(),
+            name,
             Scope::BoundaryConstraints,
-            SymbolType::Variable(variable.value().clone()),
+            SymbolType::Variable(value),
         )?;
         Ok(())
     }
@@ -203,12 +206,13 @@ impl SymbolTable {
     /// Inserts an integrity variable into the symbol table.
     pub(super) fn insert_integrity_variable(
         &mut self,
-        variable: &Variable,
+        variable: Variable,
     ) -> Result<(), SemanticError> {
+        let (name, value) = variable.into_parts();
         self.insert_symbol(
-            variable.name(),
+            name,
             Scope::IntegrityConstraints,
-            SymbolType::Variable(variable.value().clone()),
+            SymbolType::Variable(value),
         )?;
         Ok(())
     }

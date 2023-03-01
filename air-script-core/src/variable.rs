@@ -18,6 +18,10 @@ impl Variable {
     pub fn value(&self) -> &VariableType {
         &self.value
     }
+
+    pub fn into_parts(self) -> (String, VariableType) {
+        (self.name.into_name(), self.value)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
