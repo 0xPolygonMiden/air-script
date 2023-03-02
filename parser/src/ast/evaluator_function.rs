@@ -1,7 +1,7 @@
 use super::{Identifier, IntegrityStmt, TraceCols};
 
-/// Evaluator functions take description of the main and auxiliary traces as input, and returns
-/// integrity constraints that are enforced on those trace columns.
+/// Evaluator functions take descriptions of the main and auxiliary traces as input, and enforce
+/// integrity constraints on those trace columns.
 #[derive(Debug, Eq, PartialEq)]
 pub struct EvaluatorFunction {
     name: Identifier,
@@ -45,6 +45,17 @@ impl EvaluatorFunction {
     pub fn integrity_stmts(&self) -> &[IntegrityStmt] {
         &self.integrity_stmts
     }
+
+    /// Returns the name, main trace columns, auxiliary trace columns, and integrity statements
+    /// of the evaluator function.
+    pub fn into_parts(self) -> (String, Vec<TraceCols>, Vec<TraceCols>, Vec<IntegrityStmt>) {
+        (
+            self.name.into_name(),
+            self.main_trace,
+            self.aux_trace,
+            self.integrity_stmts,
+        )
+    }
 }
 
 /// Evaluator function call is used to invoke an evaluator function. It takes a list of trace
@@ -69,5 +80,10 @@ impl EvaluatorFunctionCall {
     /// Returns the arguments of the evaluator function.
     pub fn args(&self) -> &Vec<Vec<TraceCols>> {
         &self.args
+    }
+
+    /// Returns the name and arguments of the evaluator function.
+    pub fn into_parts(self) -> (String, Vec<Vec<TraceCols>>) {
+        (self.name.into_name(), self.args)
     }
 }

@@ -39,8 +39,8 @@ pub struct Source(pub Vec<SourceSection>);
 ///   elements specified. The array length is expected to be a power of 2, but this is not checked
 ///   during parsing.
 /// - RandomValues: Random Values represent the randomness sent by the Verifier.
-/// - EvaluatorFunction: Evaluator Functions take description of the main and auxiliary traces as
-///   input, and returns integrity constraints that are enforced on those trace columns.
+/// - EvaluatorFunction: Evaluator Functions take descriptions of the main and auxiliary traces as
+///   input, and enforce integrity constraints on those trace columns.
 /// - BoundaryConstraints: Boundary Constraints to be enforced on the boundaries of columns defined
 ///   in the TraceCols section. Currently there are two types of boundaries, First and Last
 ///   representing the first and last rows of the column.

@@ -18,3 +18,11 @@ pub enum ParseError {
     MissingIntegrityConstraint(String),
     MissingMainTraceCols(String),
 }
+
+impl ParseError {
+    pub fn missing_integrity_constraint() -> Self {
+        ParseError::MissingIntegrityConstraint(
+            "Declaration of at least one integrity constraint is required".to_string(),
+        )
+    }
+}

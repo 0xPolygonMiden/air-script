@@ -6,9 +6,7 @@ use crate::{
         IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
         MatrixAccess, NamedTraceAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues,
         Range, Source, SourceSection, Trace, TraceCols, Variable, VariableType, VectorAccess
-    }, error::{Error, ParseError::{InvalidEvaluatorFunction, InvalidInt, InvalidTraceCols,
-    InvalidRandomValues, MissingMainTraceCols, InvalidConst, InvalidListComprehension,
-    MissingBoundaryConstraint, MissingIntegrityConstraint}}, lexer::Token
+    }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
 use lalrpop_util::ParseError;
@@ -159,60 +157,27 @@ RandElem: RandBinding = {
 // ================================================================================================
 
 EvaluatorFunction: EvaluatorFunction = {
-    "ev" <evaluator_fn_name: Identifier>
-        "(" <main_cols: MainCols?> <cols_separator: (",")?> <aux_cols: AuxCols?> ")" ":"
-        <integrity_stmts: IntegrityStmt+> =>? {
-            // TODO: Figure out a cleaner way to do these checks
-            if main_cols.is_none() && aux_cols.is_none() {
-                return Err(ParseError::User {
-                    error: Error::ParseError(
-                        InvalidEvaluatorFunction(
-                            "Declaration of at least one main or auxiliary column is required in evaluator function".to_string()
-                        )
-                    )
-                });
-            }
-            if main_cols.is_some() && aux_cols.is_some() && cols_separator.is_none() {
-                return Err(ParseError::User {
-                    error: Error::ParseError(
-                        InvalidEvaluatorFunction(
-                            "Comma is required between main and auxiliary columns in evaluator function".to_string()
-                        )
-                    )
-                });
-            }
-            if (main_cols.is_none() || aux_cols.is_none()) && cols_separator.is_some() {
-                return Err(ParseError::User {
-                    error: Error::ParseError(
-                        InvalidEvaluatorFunction(
-                            "Invalid use of comma separator in evaluator function call arguments".to_string()
-                        )
-                    )
-                });
-            }
-            let main_cols = main_cols.unwrap_or_default();
-            let aux_cols = aux_cols.unwrap_or_default();
-            
-            // check if at least one integrity constraint is defined
-            let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
-                IntegrityStmt::Constraint(_) | IntegrityStmt::EvaluatorFunctionCall(_) => true,
-                _ => false,
-            });
-            if !integrity_constraints_exist {
-                return Err(ParseError::User {
-                    error: Error::ParseError(
-                        MissingIntegrityConstraint(
-                            "Declaration of at least one integrity constraint or evaluator function call is required".to_string()
-                        )
-                    )
-                });
-            }
-            Ok(EvaluatorFunction::new(
+    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainCols> "," <aux_cols: AuxCols> ")" ":"
+        <integrity_stmts: IntegrityStmts> => 
+            EvaluatorFunction::new(
                 evaluator_fn_name,
                 main_cols,
                 aux_cols,
-                integrity_stmts))
-        }
+                integrity_stmts),
+    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainCols> ")" ":"
+        <integrity_stmts: IntegrityStmts> => 
+            EvaluatorFunction::new(
+                evaluator_fn_name,
+                main_cols,
+                Vec::new(),
+                integrity_stmts),
+    "ev" <evaluator_fn_name: Identifier> "(" <aux_cols: AuxCols> ")" ":"
+        <integrity_stmts: IntegrityStmts> =>
+            EvaluatorFunction::new(
+                evaluator_fn_name,
+                Vec::new(),
+                aux_cols,
+                integrity_stmts),
 }
 
 
@@ -298,7 +263,11 @@ BoundaryAtom: Expression = {
 // ================================================================================================
 
 IntegrityConstraints: Vec<IntegrityStmt> = {
-    "integrity_constraints" ":" <integrity_stmts: IntegrityStmt+> =>? {
+    "integrity_constraints" ":" <integrity_stmts: IntegrityStmts> => integrity_stmts
+}
+
+IntegrityStmts: Vec<IntegrityStmt> = {
+    <integrity_stmts: IntegrityStmt+> =>? {
         // check if at least one integrity constraint is defined
         let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
             IntegrityStmt::Constraint(_) | IntegrityStmt::EvaluatorFunctionCall(_) => true,
@@ -308,7 +277,7 @@ IntegrityConstraints: Vec<IntegrityStmt> = {
             return Err(ParseError::User {
                 error: Error::ParseError(
                     MissingIntegrityConstraint(
-                        "Declaration of at least one integrity constraint or evaluator function call is required".to_string()
+                        "Declaration of at least one integrity constraint is required".to_string()
                     )
                 )
             });
