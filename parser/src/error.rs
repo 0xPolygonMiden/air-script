@@ -9,6 +9,7 @@ pub enum Error {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParseError {
     InvalidConst(String),
+    InvalidEvaluatorFunction(String),
     InvalidInt(String),
     InvalidListComprehension(String),
     InvalidRandomValues(String),
