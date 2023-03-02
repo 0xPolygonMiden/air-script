@@ -1,4 +1,4 @@
-use super::{EvaluatorFunctionCall, Expression, Variable};
+use super::{EvaluatorFunctionCall, Expression, Identifier, Iterable, Variable};
 
 // INTEGRITY STATEMENTS
 // ================================================================================================
@@ -6,6 +6,7 @@ use super::{EvaluatorFunctionCall, Expression, Variable};
 #[derive(Debug, Eq, PartialEq)]
 pub enum IntegrityStmt {
     Constraint(ConstraintType, Option<Expression>),
+    ConstraintComprehension(IntegrityConstraintComprehension),
     Variable(Variable),
 }
 
@@ -36,5 +37,30 @@ impl IntegrityConstraint {
     /// Returns the right-hand side of the integrity constraint.
     pub fn rhs(&self) -> &Expression {
         &self.rhs
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct IntegrityConstraintComprehension {
+    lhs: Expression,
+    rhs: Expression,
+    context: Vec<(Identifier, Iterable)>,
+}
+
+impl IntegrityConstraintComprehension {
+    pub fn new(lhs: Expression, rhs: Expression, context: Vec<(Identifier, Iterable)>) -> Self {
+        Self { lhs, rhs, context }
+    }
+
+    pub fn lhs(&self) -> &Expression {
+        &self.lhs
+    }
+
+    pub fn rhs(&self) -> &Expression {
+        &self.rhs
+    }
+
+    pub fn context(&self) -> &[(Identifier, Iterable)] {
+        &self.context
     }
 }

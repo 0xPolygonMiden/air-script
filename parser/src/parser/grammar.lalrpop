@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
-        integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
+        boundary_constraints::{Boundary, BoundaryConstraintComprehension, BoundaryConstraint, BoundaryStmt},
+        integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityConstraintComprehension, IntegrityStmt},
         Constant, ConstantType, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
         IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
         MatrixAccess, NamedTraceAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues,
@@ -210,6 +210,11 @@ BoundaryStmt: BoundaryStmt = {
         BoundaryStmt::Variable(Variable::new(name, boundary_variable_type)),
     "enf" <column: NamedTraceAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
         BoundaryStmt::Constraint(BoundaryConstraint::new(column, boundary, value)),
+    "enf" <column: NamedTraceAccess> "." <boundary: Boundary> "="
+        <comprehension: ListComprehension<BoundaryExpr>> => BoundaryStmt::ConstraintComprehension(
+            BoundaryConstraintComprehension::new(column, boundary, comprehension.expression().clone(),
+            (*comprehension.context()).to_vec())
+        ),
 }
 
 BoundaryVariableType: VariableType = {
@@ -293,6 +298,11 @@ IntegrityStmtGroup: Vec<IntegrityStmt> = {
     "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
         vec![IntegrityStmt::Variable(Variable::new(name, integrity_variable_type))],
     "enf" <integrity_constraint: IntegrityConstraintExpr> => vec![integrity_constraint],
+    "enf" <lhs: IntegrityExpr> "=" <comprehension: ListComprehension<IntegrityExpr>> =>
+        IntegrityStmt::ConstraintComprehension(
+            IntegrityConstraintComprehension::new(lhs, comprehension.expression().clone(),
+            (*comprehension.context()).to_vec())
+        ),
     "match" "enf" ":" <integrity_stmts: IntegrityConstraintExpr+> => integrity_stmts
 }
 
