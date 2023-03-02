@@ -71,6 +71,10 @@ pub enum Token {
     #[token("$")]
     Rand,
 
+    /// Keyword to declare the evaluator function section in the AIR constraints module.
+    #[token("ev")]
+    EvaluatorFunction,
+
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Marks the beginning of boundary constraints section in the constraints file.
