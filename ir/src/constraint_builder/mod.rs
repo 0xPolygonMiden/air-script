@@ -1,8 +1,8 @@
 use super::{
-    ast, AccessType, BTreeMap, BTreeSet, ConstantValue, ConstrainedBoundary, ConstraintDomain,
-    Constraints, Declarations, Expression, Identifier, IndexedTraceAccess, ListFoldingType,
-    MatrixAccess, NodeIndex, Operation, SemanticError, Symbol, SymbolAccess, SymbolTable,
-    SymbolType, TraceSegment, Value, VariableType, VectorAccess, CURRENT_ROW,
+    ast, AccessType, BTreeSet, ConstantValue, ConstrainedBoundary, ConstraintDomain, Constraints,
+    Declarations, Expression, Identifier, IndexedTraceAccess, ListFoldingType, MatrixAccess,
+    NodeIndex, Operation, SemanticError, Symbol, SymbolTable, SymbolType, TraceSegment, Value,
+    VariableType, VectorAccess,
 };
 
 mod expression;
@@ -20,11 +20,6 @@ pub(super) const DEFAULT_SEGMENT: TraceSegment = 0;
 /// The auxiliary trace segment.
 pub(super) const AUX_SEGMENT: TraceSegment = 1;
 
-// TYPES
-// ================================================================================================
-
-type VariableRoots = BTreeMap<SymbolAccess, ExprDetails>;
-
 // CONSTRAINT BUILDER
 // ================================================================================================
 
@@ -38,11 +33,6 @@ pub(super) struct ConstraintBuilder {
     /// than one constraint is defined at any given boundary.
     constrained_boundaries: BTreeSet<ConstrainedBoundary>,
 
-    /// Variable roots for the variables used in integrity constraints. For each element in a
-    /// vector or a matrix, a new root is added with a key equal to the [VariableValue] of the
-    /// element.
-    variable_roots: VariableRoots,
-
     // TODO: docs
     constraints: Constraints,
 }
@@ -53,7 +43,6 @@ impl ConstraintBuilder {
         Self {
             symbol_table,
             constrained_boundaries: BTreeSet::new(),
-            variable_roots: VariableRoots::default(),
             constraints,
         }
     }

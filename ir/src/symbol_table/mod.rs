@@ -2,7 +2,7 @@ use super::{
     ast, BTreeMap, Constant, ConstantType, Declarations, Expression, Identifier,
     IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
     MatrixAccess, NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType,
-    VectorAccess, AUX_SEGMENT, CURRENT_ROW, DEFAULT_SEGMENT, MIN_CYCLE_LENGTH,
+    VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
 
 mod list_comprehension;
@@ -12,8 +12,8 @@ mod symbol;
 pub(crate) use symbol::{Scope, Symbol, SymbolType};
 
 mod symbol_access;
+pub(crate) use symbol_access::AccessType;
 use symbol_access::ValidateIdentifierAccess;
-pub(crate) use symbol_access::{AccessType, SymbolAccess};
 
 mod trace_columns;
 use trace_columns::TraceColumns;
@@ -81,7 +81,6 @@ impl SymbolTable {
     }
 
     /// Add a constant by its identifier and value.
-    /// TODO: consume constants instead of cloning them
     pub(super) fn insert_constant(&mut self, constant: Constant) -> Result<(), SemanticError> {
         validate_constant(&constant)?;
         self.declarations.add_constant(constant.clone());
@@ -305,19 +304,6 @@ impl SymbolTable {
             return Err(SemanticError::indexed_trace_column_access_out_of_bounds(
                 trace_access,
                 trace_segment_width,
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// Checks that the specified random value access index is valid, i.e. that it is in range of
-    /// the number of declared random values.
-    pub(crate) fn validate_rand_access(&self, index: usize) -> Result<(), SemanticError> {
-        if index >= usize::from(self.declarations.num_random_values()) {
-            return Err(SemanticError::random_value_access_out_of_bounds(
-                index,
-                self.declarations.num_random_values(),
             ));
         }
 

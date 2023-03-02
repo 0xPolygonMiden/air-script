@@ -1,7 +1,7 @@
 use super::{
     AccessType, ConstantValue, ConstraintBuilder, ConstraintDomain, ExprDetails, Expression,
-    Identifier, IndexedTraceAccess, ListFoldingType, MatrixAccess, Operation, SemanticError,
-    SymbolAccess, SymbolType, Value, VariableType, VectorAccess, DEFAULT_SEGMENT,
+    IndexedTraceAccess, ListFoldingType, Operation, SemanticError, SymbolType, Value, AUX_SEGMENT,
+    DEFAULT_SEGMENT,
 };
 
 impl ConstraintBuilder {
@@ -34,30 +34,20 @@ impl ConstraintBuilder {
     ) -> Result<ExprDetails, SemanticError> {
         match expr {
             // --- INLINE VALUES ------------------------------------------------------------------
-            Expression::Const(value) => {
-                // TODO: restore insert_constant function
-                let node_index =
-                    self.constraints
-                        .insert_graph_node(Operation::Value(Value::Constant(
-                            ConstantValue::Inline(*value),
-                        )));
-                Ok(ExprDetails::new(
-                    node_index,
-                    DEFAULT_SEGMENT,
-                    default_domain,
-                ))
-            }
+            Expression::Const(value) => self.insert_inline_constant(*value, default_domain),
+
+            // --- TRACE ACCESS REFERENCE ---------------------------------------------------------
             Expression::IndexedTraceAccess(trace_access) => {
                 self.insert_trace_access(trace_access, default_domain)
+            }
+            Expression::NamedTraceAccess(trace_access) => {
+                let trace_access = self.symbol_table.get_trace_access_by_name(trace_access)?;
+                self.insert_trace_access(&trace_access, default_domain)
             }
 
             // --- IDENTIFIER EXPRESSIONS ---------------------------------------------------------
             Expression::Elem(ident) => {
                 self.insert_symbol_access(ident.name(), AccessType::Default, default_domain)
-            }
-            Expression::NamedTraceAccess(trace_access) => {
-                let access_type = AccessType::Vector(trace_access.idx());
-                self.insert_symbol_access(trace_access.name(), access_type, default_domain)
             }
             Expression::Rand(ident, index) => {
                 let access_type = AccessType::Vector(*index);
@@ -96,31 +86,57 @@ impl ConstraintBuilder {
                 // add the expression.
                 self.insert_bin_op(&lhs, &rhs, Operation::Mul(lhs.root_idx(), rhs.root_idx()))
             }
-            Expression::Exp(lhs, rhs) => {
-                // add base subexpression.
-                let lhs = self.insert_expr(lhs, default_domain)?;
-                // add exponent subexpression.
-                let node_index = if let Expression::Const(rhs) = **rhs {
-                    self.constraints
-                        .insert_graph_node(Operation::Exp(lhs.root_idx(), rhs as usize))
-                } else {
-                    Err(SemanticError::InvalidUsage(
-                        "Non const exponents are only allowed inside list comprehensions"
-                            .to_string(),
-                    ))?
-                };
-
-                Ok(ExprDetails::new(
-                    node_index,
-                    lhs.trace_segment(),
-                    lhs.domain(),
-                ))
-            }
+            Expression::Exp(lhs, rhs) => self.insert_exp_op(lhs, rhs, default_domain),
         }
     }
 
+    // --- INLINE VALUES --------------------------------------------------------------------------
+
+    /// Inserts the specified constant value into the graph and returns the resulting expression
+    /// details.
+    fn insert_inline_constant(
+        &mut self,
+        value: u64,
+        domain: ConstraintDomain,
+    ) -> Result<ExprDetails, SemanticError> {
+        let node_index = self
+            .constraints
+            .insert_graph_node(Operation::Value(Value::Constant(ConstantValue::Inline(
+                value,
+            ))));
+        Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
+    }
+
+    // --- TRACE ACCESS REFERENCE -----------------------------------------------------------------
+
+    /// Adds a trace element access to the graph and returns the node index, trace segment, and row
+    /// offset.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - The column index of the trace access is greater than overall number of columns in segment.
+    /// - The segment of the trace access is greater than the number of segments.
+    /// TODO: update docs
+    pub(super) fn insert_trace_access(
+        &mut self,
+        trace_access: &IndexedTraceAccess,
+        domain: ConstraintDomain,
+    ) -> Result<ExprDetails, SemanticError> {
+        self.symbol_table.validate_trace_access(trace_access)?;
+
+        let trace_segment = trace_access.trace_segment();
+        let node_index = self
+            .constraints
+            .insert_graph_node(Operation::Value(Value::TraceElement(*trace_access)));
+        let domain = domain.merge_with_offset(trace_access.row_offset())?;
+
+        Ok(ExprDetails::new(node_index, trace_segment, domain))
+    }
+
+    // --- OPERATOR EXPRESSIONS -----------------------------------------------------------------
+
     /// Inserts a binary operation into the graph and returns the resulting expression details.
-    pub(super) fn insert_bin_op(
+    fn insert_bin_op(
         &mut self,
         lhs: &ExprDetails,
         rhs: &ExprDetails,
@@ -133,25 +149,30 @@ impl ConstraintBuilder {
         Ok(ExprDetails::new(node_index, trace_segment, domain))
     }
 
-    /// Adds a trace element access to the graph and returns the node index, trace segment, and row
-    /// offset.
-    ///
-    /// # Errors
-    /// Returns an error if:
-    /// - The column index of the trace access is greater than overall number of columns in segment.
-    /// - The segment of the trace access is greater than the number of segments.
-    pub(super) fn insert_trace_access(
+    // TODO: docs
+    fn insert_exp_op(
         &mut self,
-        trace_access: &IndexedTraceAccess,
+        lhs: &Expression,
+        rhs: &Expression,
         domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
-        self.symbol_table.validate_trace_access(trace_access)?;
+        // add base subexpression.
+        let lhs = self.insert_expr(lhs, domain)?;
+        // add exponent subexpression.
+        let node_index = if let Expression::Const(rhs) = *rhs {
+            self.constraints
+                .insert_graph_node(Operation::Exp(lhs.root_idx(), rhs as usize))
+        } else {
+            Err(SemanticError::InvalidUsage(
+                "Non const exponents are only allowed inside list comprehensions".to_string(),
+            ))?
+        };
 
-        let trace_segment = trace_access.trace_segment();
-        let node_index = self
-            .constraints
-            .insert_graph_node(Operation::Value(Value::TraceElement(*trace_access)));
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
+        Ok(ExprDetails::new(
+            node_index,
+            lhs.trace_segment(),
+            lhs.domain(),
+        ))
     }
 
     // --- IDENTIFIER EXPRESSIONS -----------------------------------------------------------------
@@ -162,7 +183,7 @@ impl ConstraintBuilder {
     /// # Errors
     /// Returns an error if the identifier is not present in the symbol table or is not a supported
     /// type.
-    pub(super) fn insert_symbol_access(
+    fn insert_symbol_access(
         &mut self,
         name: &str,
         access_type: AccessType,
@@ -181,7 +202,16 @@ impl ConstraintBuilder {
             _ => {
                 // all other symbol types indicate we're accessing a value or group of values.
                 let value = symbol.access_value(access_type)?;
-                let trace_segment = symbol.trace_segment();
+                // trace segment and constraint domain are inferred from the value type
+                let (trace_segment, domain) = match value {
+                    Value::RandomValue(_) => (AUX_SEGMENT, domain),
+                    Value::TraceElement(trace_access) => {
+                        let trace_segment = trace_access.trace_segment();
+                        let domain = domain.merge_with_offset(trace_access.row_offset())?;
+                        (trace_segment, domain)
+                    }
+                    _ => (DEFAULT_SEGMENT, domain),
+                };
 
                 // add a value node in the graph.
                 let node_index = self.constraints.insert_graph_node(Operation::Value(value));
@@ -198,7 +228,7 @@ impl ConstraintBuilder {
     /// # Errors
     /// - Panics if the list is empty.
     /// - Returns an error if the list cannot be unfolded properly.
-    pub(super) fn insert_list_folding(
+    fn insert_list_folding(
         &mut self,
         lf_type: &ListFoldingType,
         domain: ConstraintDomain,

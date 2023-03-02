@@ -7,7 +7,7 @@ pub use parser::ast;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod constraint_builder;
-use constraint_builder::{ConstraintBuilder, AUX_SEGMENT, DEFAULT_SEGMENT};
+use constraint_builder::ConstraintBuilder;
 
 pub mod constraints;
 use constraints::{
@@ -21,7 +21,7 @@ use declarations::Declarations;
 pub use declarations::{PeriodicColumn, PublicInput};
 
 mod symbol_table;
-use symbol_table::{AccessType, Symbol, SymbolAccess, SymbolTable, SymbolType};
+use symbol_table::{AccessType, Symbol, SymbolTable, SymbolType};
 pub use symbol_table::{ConstantValue, Value};
 
 mod validation;

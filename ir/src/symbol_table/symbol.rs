@@ -1,7 +1,6 @@
 use super::{
     AccessType, ConstantType, ConstantValue, Identifier, IndexedTraceAccess, MatrixAccess,
-    SemanticError, TraceColumns, TraceSegment, Value, VariableType, VectorAccess, AUX_SEGMENT,
-    CURRENT_ROW, DEFAULT_SEGMENT,
+    SemanticError, TraceColumns, Value, VariableType, VectorAccess, CURRENT_ROW,
 };
 use crate::constraints::ConstraintDomain;
 use std::fmt::Display;
@@ -27,38 +26,8 @@ impl Symbol {
         &self.name
     }
 
-    fn scope(&self) -> &Scope {
-        &self.scope
-    }
-
     pub fn symbol_type(&self) -> &SymbolType {
         &self.symbol_type
-    }
-
-    fn validate_scope(&self, usage_scope: Scope) -> Result<(), SemanticError> {
-        if self.scope != Scope::Global && self.scope != usage_scope {
-            return Err(SemanticError::OutOfScope(format!(
-                "Symbol {} is not available in {}",
-                self.name(),
-                usage_scope
-            )));
-        }
-
-        Ok(())
-    }
-
-    // TODO: docs
-    pub fn trace_segment(&self) -> TraceSegment {
-        match self.symbol_type() {
-            // The constraint target for random values defaults to the second (auxiliary) trace
-            // segment.
-            // TODO: make this more general, so random values from further trace segments can be
-            // used. This requires having a way to describe different sets of randomness in
-            // the AirScript syntax.
-            SymbolType::RandomValuesBinding(_, _) => AUX_SEGMENT,
-            SymbolType::TraceColumns(columns) => columns.trace_segment(),
-            _ => DEFAULT_SEGMENT,
-        }
     }
 
     // TODO: maybe refactor this to simplify; maybe a trait that operates by SymbolType?
@@ -134,23 +103,20 @@ impl Symbol {
         self.validate_access(&access_type)?;
 
         match self.symbol_type() {
-            SymbolType::Constant(_) => match access_type {
-                // TODO: maybe simplify this
-                AccessType::Default => Ok(Value::Constant(ConstantValue::Scalar(
-                    self.name().to_string(),
-                ))),
-                AccessType::Vector(idx) => {
-                    // TODO: maybe simplify this
-                    let access_ref = VectorAccess::new(Identifier(self.name().to_string()), idx);
-                    Ok(Value::Constant(ConstantValue::Vector(access_ref)))
+            SymbolType::Constant(_) => {
+                let name = self.name().to_string();
+                match access_type {
+                    AccessType::Default => Ok(Value::Constant(ConstantValue::Scalar(name))),
+                    AccessType::Vector(idx) => {
+                        let access = VectorAccess::new(Identifier(name), idx);
+                        Ok(Value::Constant(ConstantValue::Vector(access)))
+                    }
+                    AccessType::Matrix(row_idx, col_idx) => {
+                        let access = MatrixAccess::new(Identifier(name), row_idx, col_idx);
+                        Ok(Value::Constant(ConstantValue::Matrix(access)))
+                    }
                 }
-                AccessType::Matrix(row_idx, col_idx) => {
-                    // TODO: maybe simplify this
-                    let access_ref =
-                        MatrixAccess::new(Identifier(self.name().to_string()), row_idx, col_idx);
-                    Ok(Value::Constant(ConstantValue::Matrix(access_ref)))
-                }
-            },
+            }
             SymbolType::PeriodicColumn(index, cycle_len) => match access_type {
                 AccessType::Default => Ok(Value::PeriodicColumn(*index, *cycle_len)),
                 _ => Err(SemanticError::invalid_periodic_column_usage(self.name())),
@@ -162,7 +128,6 @@ impl Symbol {
                 _ => Err(SemanticError::invalid_public_input_usage(self.name())),
             },
             SymbolType::RandomValuesBinding(offset, _) => match access_type {
-                // TODO: return AUX_SEGMENT
                 AccessType::Default => Ok(Value::RandomValue(*offset)),
                 AccessType::Vector(idx) => {
                     let offset = offset + idx;
@@ -170,27 +135,37 @@ impl Symbol {
                 }
                 _ => Err(SemanticError::invalid_random_value_usage(self.name())),
             },
-            SymbolType::TraceColumns(columns) => match access_type {
-                AccessType::Default => {
-                    // TODO: this should be checked somewhere else
-                    if columns.size() != 1 {
-                        return Err(SemanticError::invalid_trace_binding(self.name()));
+            SymbolType::TraceColumns(columns) => {
+                // symbol accesses at rows other than the first are identified by the parser as
+                // [NamedTraceAccess] and handled differently, so this case will only occur for
+                // trace column accesses at the current row.
+                // TODO: can we handle this differently so it's more explicit & get rid of this comment?
+                let row_offset = CURRENT_ROW;
+                match access_type {
+                    AccessType::Default => {
+                        // TODO: this should be checked somewhere else
+                        if columns.size() != 1 {
+                            return Err(SemanticError::invalid_trace_binding(self.name()));
+                        }
+                        let trace_segment = columns.trace_segment();
+                        let trace_access =
+                            IndexedTraceAccess::new(trace_segment, columns.offset(), row_offset);
+                        Ok(Value::TraceElement(trace_access))
                     }
-                    let trace_segment = columns.trace_segment();
-                    let trace_access =
-                        IndexedTraceAccess::new(trace_segment, columns.offset(), CURRENT_ROW);
-                    Ok(Value::TraceElement(trace_access))
+                    AccessType::Vector(idx) => {
+                        let trace_segment = columns.trace_segment();
+                        let trace_access = IndexedTraceAccess::new(
+                            trace_segment,
+                            columns.offset() + idx,
+                            row_offset,
+                        );
+                        Ok(Value::TraceElement(trace_access))
+                    }
+                    _ => Err(SemanticError::invalid_trace_access(self.name())),
                 }
-                AccessType::Vector(idx) => {
-                    let trace_segment = columns.trace_segment();
-                    let trace_access =
-                        IndexedTraceAccess::new(trace_segment, columns.offset() + idx, CURRENT_ROW);
-                    Ok(Value::TraceElement(trace_access))
-                }
-                _ => Err(SemanticError::invalid_trace_access(self.name())),
-            },
-            SymbolType::Variable(variable_type) => {
-                todo!()
+            }
+            SymbolType::Variable(_) => {
+                unreachable!("Variable values cannot be accessed directly, since they reference expressions which must be added to the graph");
             }
         }
     }

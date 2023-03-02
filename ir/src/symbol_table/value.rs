@@ -1,4 +1,4 @@
-use super::{IndexedTraceAccess, MatrixAccess, TraceSegment, VectorAccess};
+use super::{IndexedTraceAccess, MatrixAccess, VectorAccess};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Value {
@@ -26,9 +26,4 @@ pub enum ConstantValue {
     Scalar(String),
     Vector(VectorAccess),
     Matrix(MatrixAccess),
-}
-
-pub struct ValueDetails {
-    value: Value,
-    trace_segment: TraceSegment,
 }

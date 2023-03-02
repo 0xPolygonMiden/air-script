@@ -89,6 +89,20 @@ impl ConstraintDomain {
         )
     }
 
+    pub fn merge_with_offset(self, trace_row_offset: usize) -> Result<Self, SemanticError> {
+        // infer the domain of the constraint
+        let domain = if self.is_integrity() {
+            self.merge(&trace_row_offset.into())?
+        } else if trace_row_offset != 0 {
+            // TODO ERROR: boundary domain with row offset
+            todo!()
+        } else {
+            self
+        };
+
+        Ok(domain)
+    }
+
     /// Combines two compatible [ConstraintDomain]s into a single [ConstraintDomain] that represents
     /// the maximum of the two. For example, if one domain is [ConstraintDomain::EveryFrame(2)] and
     /// the other is [ConstraintDomain::EveryFrame(3)], then the result will be
@@ -96,7 +110,7 @@ impl ConstraintDomain {
     ///
     /// # Errors
     /// Domains for boundary constraints (FirstRow and LastRow) cannot be merged with other domains.
-    pub fn merge(&self, other: &ConstraintDomain) -> Result<ConstraintDomain, SemanticError> {
+    pub fn merge(&self, other: &ConstraintDomain) -> Result<Self, SemanticError> {
         if self == other {
             return Ok(*other);
         }
