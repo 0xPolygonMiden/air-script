@@ -1,4 +1,4 @@
-use super::{Expression, NamedTraceAccess, Variable};
+use super::{Expression, Identifier, Iterable, NamedTraceAccess, Variable};
 use std::fmt::Display;
 
 // BOUNDARY STATEMENTS
@@ -7,6 +7,7 @@ use std::fmt::Display;
 #[derive(Debug, Eq, PartialEq)]
 pub enum BoundaryStmt {
     Constraint(BoundaryConstraint),
+    ConstraintComprehension(BoundaryConstraintComprehension),
     Variable(Variable),
 }
 
@@ -54,5 +55,47 @@ impl Display for Boundary {
             Boundary::First => write!(f, "first boundary"),
             Boundary::Last => write!(f, "last boundary"),
         }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct BoundaryConstraintComprehension {
+    access: NamedTraceAccess,
+    boundary: Boundary,
+    expr: Expression,
+    context: Vec<(Identifier, Iterable)>,
+}
+
+impl BoundaryConstraintComprehension {
+    pub fn new(
+        access: NamedTraceAccess,
+        boundary: Boundary,
+        expr: Expression,
+        context: Vec<(Identifier, Iterable)>,
+    ) -> Self {
+        Self {
+            access,
+            boundary,
+            expr,
+            context,
+        }
+    }
+
+    pub fn access(&self) -> &NamedTraceAccess {
+        &self.access
+    }
+
+    pub fn boundary(&self) -> Boundary {
+        self.boundary
+    }
+
+    /// Returns the expression that is evaluated for each member of the list.
+    pub fn expression(&self) -> &Expression {
+        &self.expr
+    }
+
+    /// Returns the context of the boundary constraint comprehension.
+    pub fn context(&self) -> &[(Identifier, Iterable)] {
+        &self.context
     }
 }
