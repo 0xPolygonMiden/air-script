@@ -1,14 +1,16 @@
 use super::{
     ast, AccessType, BTreeMap, BTreeSet, ConstantValue, ConstrainedBoundary, ConstraintDomain,
     Constraints, Declarations, Expression, Identifier, IndexedTraceAccess, ListFoldingType,
-    MatrixAccess, NodeIndex, Operation, SemanticError, SymbolAccess, SymbolTable, SymbolType,
-    TraceSegment, Value, VariableType, VectorAccess, CURRENT_ROW,
+    MatrixAccess, NodeIndex, Operation, SemanticError, Symbol, SymbolAccess, SymbolTable,
+    SymbolType, TraceSegment, Value, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 mod expression;
 
 mod expression_details;
 use expression_details::ExprDetails;
+
+mod variables;
 
 // CONSTANTS
 // ================================================================================================

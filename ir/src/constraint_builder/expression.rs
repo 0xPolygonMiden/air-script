@@ -1,7 +1,7 @@
 use super::{
-    AccessType, ConstraintBuilder, ConstraintDomain, ExprDetails,ConstantValue,
-    Expression, Identifier, IndexedTraceAccess, ListFoldingType, MatrixAccess, Operation,
-    SemanticError, SymbolAccess, SymbolType, VariableType, VectorAccess, DEFAULT_SEGMENT, Value
+    AccessType, ConstantValue, ConstraintBuilder, ConstraintDomain, ExprDetails, Expression,
+    Identifier, IndexedTraceAccess, ListFoldingType, MatrixAccess, Operation, SemanticError,
+    SymbolAccess, SymbolType, Value, VariableType, VectorAccess, DEFAULT_SEGMENT,
 };
 
 impl ConstraintBuilder {
@@ -36,9 +36,11 @@ impl ConstraintBuilder {
             // --- INLINE VALUES ------------------------------------------------------------------
             Expression::Const(value) => {
                 // TODO: restore insert_constant function
-                let node_index = self
-                    .constraints
-                    .insert_graph_node(Operation::Value(Value::Constant(ConstantValue::Inline(*value))));
+                let node_index =
+                    self.constraints
+                        .insert_graph_node(Operation::Value(Value::Constant(
+                            ConstantValue::Inline(*value),
+                        )));
                 Ok(ExprDetails::new(
                     node_index,
                     DEFAULT_SEGMENT,
@@ -52,7 +54,7 @@ impl ConstraintBuilder {
             // --- IDENTIFIER EXPRESSIONS ---------------------------------------------------------
             Expression::Elem(ident) => {
                 self.insert_symbol_access(ident.name(), AccessType::Default, default_domain)
-            },
+            }
             Expression::NamedTraceAccess(trace_access) => {
                 let access_type = AccessType::Vector(trace_access.idx());
                 self.insert_symbol_access(trace_access.name(), access_type, default_domain)
@@ -66,7 +68,8 @@ impl ConstraintBuilder {
                 self.insert_symbol_access(vector_access.name(), access_type, default_domain)
             }
             Expression::MatrixAccess(matrix_access) => {
-                let access_type = AccessType::Matrix(matrix_access.row_idx(), matrix_access.col_idx());
+                let access_type =
+                    AccessType::Matrix(matrix_access.row_idx(), matrix_access.col_idx());
                 self.insert_symbol_access(matrix_access.name(), access_type, default_domain)
             }
             Expression::ListFolding(lf_type) => self.insert_list_folding(lf_type, default_domain),
@@ -170,89 +173,10 @@ impl ConstraintBuilder {
 
         match symbol.symbol_type() {
             SymbolType::Variable(variable_type) => {
-                symbol.validate_access(&access_type)?;
                 // this symbol refers to an expression or group of expressions
-                let symbol_access = SymbolAccess::new(symbol.clone(), access_type);
-                // self.insert_variable(symbol_access, variable_type, domain)
-                
-                if let Some(expr_details) = self.variable_roots.get(&symbol_access) {
-                    // TODO: deal with boundary conflict properly
-                    if expr_details.domain().is_boundary() {
-                        Ok(ExprDetails::new(expr_details.root_idx(), expr_details.trace_segment(), domain))
-                    } else {
-                        Ok(*expr_details)
-                    }
-                } else {
-                    // Otherwise, insert the variable expression and create a new variable root.
-                    let expr = match (variable_type, symbol_access.access_type()) {
-                        (VariableType::Scalar(expr), AccessType::Default) => expr.clone(),
-                        (VariableType::Scalar(expr), AccessType::Vector(idx)) => match expr {
-                            Expression::Elem(elem) => {
-                                Expression::VectorAccess(VectorAccess::new(elem.clone(), *idx))
-                            }
-                            Expression::VectorAccess(matrix_row_access) => {
-                                Expression::MatrixAccess(MatrixAccess::new(
-                                    Identifier(matrix_row_access.name().to_string()),
-                                    matrix_row_access.idx(),
-                                    *idx,
-                                ))
-                            }
-                            _ => {
-                                // TODO: replace this error
-                                // return  Err(SemanticError::invalid_vector_access(
-                                //     vector_access,
-                                //     symbol_access.symbol().symbol_type(),
-                                // ))
-                                return Err(SemanticError::InvalidUsage(format!(
-                                    "Invalid variable access for variable type {variable_type:?} and symbol access {symbol_access:?}",
-                                )));
-                            }
-                        },
-                        (VariableType::Scalar(Expression::Elem(elem)), AccessType::Matrix(row_idx, col_idx)) => {
-                            Expression::MatrixAccess(MatrixAccess::new(
-                                elem.clone(),
-                                *row_idx,
-                                *col_idx,
-                            ))
-                        }
-                        (VariableType::Vector(expr_vector), AccessType::Vector(idx)) => expr_vector[*idx].clone(),
-                        (VariableType::Vector(expr_vector), AccessType::Matrix(row_idx, col_idx)) => match &expr_vector[*row_idx] {
-                            Expression::Elem(elem) => {
-                                Expression::VectorAccess(VectorAccess::new(elem.clone(), *col_idx))
-                            }
-                            Expression::VectorAccess(matrix_row_access) => {
-                                Expression::MatrixAccess(MatrixAccess::new(
-                                    Identifier(matrix_row_access.name().to_string()),
-                                    matrix_row_access.idx(),
-                                    *col_idx,
-                                ))
-                            }
-                            _ => 
-                                // TODO: replace this error
-                                // Err(SemanticError::invalid_matrix_access(
-                                //     matrix_access,
-                                //     symbol_access.symbol().symbol_type(),
-                                // )),
-                                return Err(SemanticError::InvalidUsage(format!(
-                                "Invalid variable access for variable type {variable_type:?} and symbol access {symbol_access:?}",
-                            )))
-                        }
-                        (VariableType::Matrix(expr_matrix), AccessType::Matrix(row_idx, col_idx)) => {
-                            expr_matrix[*row_idx][*col_idx].clone()
-                        }
-                        _ => {
-                            // TODO: update this error
-                            return Err(SemanticError::InvalidUsage(format!(
-                                "Invalid variable access for variable type {variable_type:?} and symbol access {symbol_access:?}",
-                            )));
-                        }
-                    };
-
-                    let expr_details = self.insert_expr( &expr, domain)?;
-                    self.variable_roots.insert(symbol_access, expr_details);
-
-                    Ok(expr_details)
-                }
+                // TODO: restore VariableRoots - maybe attach this info to the symbol table?
+                let expr = self.get_variable_expr(symbol, access_type, variable_type)?;
+                self.insert_expr(&expr, domain)
             }
             _ => {
                 // all other symbol types indicate we're accessing a value or group of values.
@@ -260,102 +184,11 @@ impl ConstraintBuilder {
                 let trace_segment = symbol.trace_segment();
 
                 // add a value node in the graph.
-                let node_index = self
-                .constraints
-                .insert_graph_node(Operation::Value(value));
-        
+                let node_index = self.constraints.insert_graph_node(Operation::Value(value));
+
                 // TODO: fix ExprDetails segment and domain
                 Ok(ExprDetails::new(node_index, trace_segment, domain))
             }
-        }
-    }
-    
-    /// Looks up the specified variable value in the variable roots and returns the expression
-    /// details if it is found. Otherwise, inserts the variable expression into the graph, adds it
-    /// to the variable roots, and returns the resulting expression details.
-    pub(super) fn insert_variable(
-        &mut self,
-        symbol_access: SymbolAccess,
-        variable_type: &VariableType,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        if let Some(expr_details) = self.variable_roots.get(&symbol_access) {
-            // TODO: deal with boundary conflict properly
-            if expr_details.domain().is_boundary() {
-                Ok(ExprDetails::new(expr_details.root_idx(), expr_details.trace_segment(), domain))
-            } else {
-                Ok(*expr_details)
-            }
-        } else {
-            // Otherwise, insert the variable expression and create a new variable root.
-            let expr = match (variable_type, symbol_access.access_type()) {
-                (VariableType::Scalar(expr), AccessType::Default) => expr.clone(),
-                (VariableType::Scalar(expr), AccessType::Vector(idx)) => match expr {
-                    Expression::Elem(elem) => {
-                        Expression::VectorAccess(VectorAccess::new(elem.clone(), *idx))
-                    }
-                    Expression::VectorAccess(matrix_row_access) => {
-                        Expression::MatrixAccess(MatrixAccess::new(
-                            Identifier(matrix_row_access.name().to_string()),
-                            matrix_row_access.idx(),
-                            *idx,
-                        ))
-                    }
-                    _ => {
-                        // TODO: replace this error
-                        // return  Err(SemanticError::invalid_vector_access(
-                        //     vector_access,
-                        //     symbol_access.symbol().symbol_type(),
-                        // ))
-                        return Err(SemanticError::InvalidUsage(format!(
-                            "Invalid variable access for variable type {variable_type:?} and symbol access {symbol_access:?}",
-                        )));
-                    }
-                },
-                (VariableType::Scalar(Expression::Elem(elem)), AccessType::Matrix(row_idx, col_idx)) => {
-                    Expression::MatrixAccess(MatrixAccess::new(
-                        elem.clone(),
-                        *row_idx,
-                        *col_idx,
-                    ))
-                }
-                (VariableType::Vector(expr_vector), AccessType::Vector(idx)) => expr_vector[*idx].clone(),
-                (VariableType::Vector(expr_vector), AccessType::Matrix(row_idx, col_idx)) => match &expr_vector[*row_idx] {
-                    Expression::Elem(elem) => {
-                        Expression::VectorAccess(VectorAccess::new(elem.clone(), *col_idx))
-                    }
-                    Expression::VectorAccess(matrix_row_access) => {
-                        Expression::MatrixAccess(MatrixAccess::new(
-                            Identifier(matrix_row_access.name().to_string()),
-                            matrix_row_access.idx(),
-                            *col_idx,
-                        ))
-                    }
-                    _ => 
-                        // TODO: replace this error
-                        // Err(SemanticError::invalid_matrix_access(
-                        //     matrix_access,
-                        //     symbol_access.symbol().symbol_type(),
-                        // )),
-                        return Err(SemanticError::InvalidUsage(format!(
-                        "Invalid variable access for variable type {variable_type:?} and symbol access {symbol_access:?}",
-                    )))
-                }
-                (VariableType::Matrix(expr_matrix), AccessType::Matrix(row_idx, col_idx)) => {
-                    expr_matrix[*row_idx][*col_idx].clone()
-                }
-                _ => {
-                    // TODO: update this error
-                    return Err(SemanticError::InvalidUsage(format!(
-                        "Invalid variable access for variable type {variable_type:?} and symbol access {symbol_access:?}",
-                    )));
-                }
-            };
-
-            let expr_details = self.insert_expr( &expr, domain)?;
-            self.variable_roots.insert(symbol_access, expr_details);
-
-            Ok(expr_details)
         }
     }
 
