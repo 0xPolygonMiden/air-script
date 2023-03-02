@@ -1,15 +1,14 @@
 use crate::{
     ast::{
-        boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt}, 
+        boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
         integrity_constraints::{IntegrityConstraint, IntegrityStmt},
-        Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, Iterable,
-        ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, NamedTraceAccess,
-        PeriodicColumn, PublicInput, RandBinding, RandomValues, Range, Source, SourceSection,
-        Trace, TraceCols, Variable, VariableType, VectorAccess
-    }, error::{Error, ParseError::{InvalidInt, InvalidTraceCols, InvalidRandomValues,
-    MissingMainTraceCols,
-    InvalidConst, InvalidListComprehension, MissingBoundaryConstraint,
-    MissingIntegrityConstraint}}, lexer::Token
+        Constant, ConstantType, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
+        IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
+        MatrixAccess, NamedTraceAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues,
+        Range, Source, SourceSection, Trace, TraceCols, Variable, VariableType, VectorAccess
+    }, error::{Error, ParseError::{InvalidEvaluatorFunction, InvalidInt, InvalidTraceCols,
+    InvalidRandomValues, MissingMainTraceCols, InvalidConst, InvalidListComprehension,
+    MissingBoundaryConstraint, MissingIntegrityConstraint}}, lexer::Token
 };
 use std::str::FromStr;
 use lalrpop_util::ParseError;
@@ -30,6 +29,7 @@ SourceSection: SourceSection = {
     PublicInputs => SourceSection::PublicInputs(<>),
     PeriodicColumns => SourceSection::PeriodicColumns(<>),
     RandomValues => SourceSection::RandomValues(<>),
+    EvaluatorFunction => SourceSection::EvaluatorFunction(<>),
     BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
     IntegrityConstraints => SourceSection::IntegrityConstraints(<>),
 }
@@ -155,6 +155,67 @@ RandElem: RandBinding = {
     <name: Identifier> <size: Size> => RandBinding::new(name, size)
 }
 
+// EVALUATOR FUNCTIONS
+// ================================================================================================
+
+EvaluatorFunction: EvaluatorFunction = {
+    "ev" <evaluator_fn_name: Identifier>
+        "(" <main_cols: MainCols?> <cols_separator: (",")?> <aux_cols: AuxCols?> ")" ":"
+        <integrity_stmts: IntegrityStmt+> =>? {
+            // TODO: Figure out a cleaner way to do these checks
+            if main_cols.is_none() && aux_cols.is_none() {
+                return Err(ParseError::User {
+                    error: Error::ParseError(
+                        InvalidEvaluatorFunction(
+                            "Declaration of at least one main or auxiliary column is required in evaluator function".to_string()
+                        )
+                    )
+                });
+            }
+            if main_cols.is_some() && aux_cols.is_some() && cols_separator.is_none() {
+                return Err(ParseError::User {
+                    error: Error::ParseError(
+                        InvalidEvaluatorFunction(
+                            "Comma is required between main and auxiliary columns in evaluator function".to_string()
+                        )
+                    )
+                });
+            }
+            if (main_cols.is_none() || aux_cols.is_none()) && cols_separator.is_some() {
+                return Err(ParseError::User {
+                    error: Error::ParseError(
+                        InvalidEvaluatorFunction(
+                            "Invalid use of comma separator in evaluator function call arguments".to_string()
+                        )
+                    )
+                });
+            }
+            let main_cols = main_cols.unwrap_or_default();
+            let aux_cols = aux_cols.unwrap_or_default();
+            
+            // check if at least one integrity constraint is defined
+            let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
+                IntegrityStmt::Constraint(_) | IntegrityStmt::EvaluatorFunctionCall(_) => true,
+                _ => false,
+            });
+            if !integrity_constraints_exist {
+                return Err(ParseError::User {
+                    error: Error::ParseError(
+                        MissingIntegrityConstraint(
+                            "Declaration of at least one integrity constraint or evaluator function call is required".to_string()
+                        )
+                    )
+                });
+            }
+            Ok(EvaluatorFunction::new(
+                evaluator_fn_name,
+                main_cols,
+                aux_cols,
+                integrity_stmts))
+        }
+}
+
+
 // BOUNDARY STATEMENTS
 // ================================================================================================
 
@@ -179,10 +240,10 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
 }
 
 BoundaryStmt: BoundaryStmt = {
-    "enf" <column: NamedTraceAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
-        BoundaryStmt::Constraint(BoundaryConstraint::new(column, boundary, value)),
     "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
         BoundaryStmt::Variable(Variable::new(name, boundary_variable_type)),
+    "enf" <column: NamedTraceAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
+        BoundaryStmt::Constraint(BoundaryConstraint::new(column, boundary, value)),
 }
 
 BoundaryVariableType: VariableType = {
@@ -240,14 +301,14 @@ IntegrityConstraints: Vec<IntegrityStmt> = {
     "integrity_constraints" ":" <integrity_stmts: IntegrityStmt+> =>? {
         // check if at least one integrity constraint is defined
         let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
-            IntegrityStmt::Constraint(_) => true,
+            IntegrityStmt::Constraint(_) | IntegrityStmt::EvaluatorFunctionCall(_) => true,
             _ => false,
         });
         if !integrity_constraints_exist {
             return Err(ParseError::User {
                 error: Error::ParseError(
                     MissingIntegrityConstraint(
-                        "Declaration of at least one integrity constraint is required".to_string()
+                        "Declaration of at least one integrity constraint or evaluator function call is required".to_string()
                     )
                 )
             });
@@ -257,10 +318,12 @@ IntegrityConstraints: Vec<IntegrityStmt> = {
 }
 
 IntegrityStmt: IntegrityStmt = {
-    "enf" <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
-        IntegrityStmt::Constraint(IntegrityConstraint::new(lhs, rhs)),
     "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
         IntegrityStmt::Variable(Variable::new(name, integrity_variable_type)),
+    "enf" <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
+        IntegrityStmt::Constraint(IntegrityConstraint::new(lhs, rhs)),
+    "enf" <evaluator_fn_call: EvaluatorFunctionCall> =>
+        IntegrityStmt::EvaluatorFunctionCall(evaluator_fn_call),
 }
 
 IntegrityVariableType: VariableType = {
@@ -272,6 +335,21 @@ IntegrityVariableType: VariableType = {
         VariableType::Matrix(matrix_value),
     "[" <list_comprehension: ListComprehension<IntegrityExpr>> "]" =>
         VariableType::ListComprehension(list_comprehension),
+}
+
+EvaluatorFunctionCall: EvaluatorFunctionCall = {
+    <ident: Identifier> "(" <args: CommaElems<Vector<TraceCols>>> ")" =>? {
+        if args.len() > 2 {
+            return Err(ParseError::User {
+                error: Error::ParseError(
+                    InvalidEvaluatorFunction(
+                        "Evaluator function call must have 1 or 2 arguments".to_string()
+                    )
+                )
+            });
+        }
+        Ok(EvaluatorFunctionCall::new(ident, args))
+    }
 }
 
 // --- INTEGRITY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
@@ -314,6 +392,14 @@ IntegrityAtom: Expression = {
 
 CommaElems<T>: Vec<T> = {
     <e:T> <v:("," <T>)*> => {
+        let mut v = v;
+        v.insert(0, e);
+        v
+    }
+}
+
+Tuple<T>: Vec<T> = {
+    "(" <e:T> <v:("," <T>)+> ")" => {
         let mut v = v;
         v.insert(0, e);
         v
@@ -446,6 +532,7 @@ extern {
         "$main" => Token::MainAccess,
         "$aux" => Token::AuxAccess,
         "$" => Token::Rand,
+        "ev" => Token::EvaluatorFunction,
         "enf" => Token::Enf,
         "'" => Token::Next,
         "=" => Token::Equal,
