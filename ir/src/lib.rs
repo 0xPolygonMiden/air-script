@@ -21,7 +21,7 @@ use declarations::Declarations;
 pub use declarations::{PeriodicColumn, PublicInput};
 
 mod symbol_table;
-use symbol_table::{AccessType, Scope, Symbol, SymbolTable, SymbolType};
+use symbol_table::{AccessType, Symbol, SymbolTable, SymbolType};
 pub use symbol_table::{ConstantValue, Value};
 
 mod validation;
@@ -113,12 +113,8 @@ impl AirIR {
 
         // process the variable & constraint statements, and validate them against the symbol table.
         let mut constraint_builder = ConstraintBuilder::new(symbol_table);
-        for stmt in boundary_stmts.into_iter() {
-            constraint_builder.insert_boundary_stmt(stmt)?
-        }
-        for stmt in integrity_stmts.into_iter() {
-            constraint_builder.insert_integrity_stmt(stmt)?
-        }
+        constraint_builder.insert_boundary_constraints(boundary_stmts)?;
+        constraint_builder.insert_integrity_constraints(integrity_stmts)?;
 
         let (declarations, constraints) = constraint_builder.into_air();
 

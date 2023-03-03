@@ -1,7 +1,7 @@
 use super::{
     BTreeMap, ConstraintBuilder, Expression, Identifier, IndexedTraceAccess, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, NamedTraceAccess, Scope,
-    SemanticError, Symbol, SymbolType, VariableType, VectorAccess, CURRENT_ROW,
+    ListComprehension, ListFoldingType, ListFoldingValueType, NamedTraceAccess, SemanticError,
+    Symbol, SymbolType, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 /// Maps each identifier in the list comprehension to its corresponding [Iterable].
@@ -97,16 +97,12 @@ impl ConstraintBuilder {
             None => Ok(Expression::Elem(ident.clone())),
             Some(iterable_type) => match iterable_type {
                 Iterable::Identifier(ident) => {
-                    let symbol = self
-                        .symbol_table
-                        .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                    let symbol = self.symbol_table.get_symbol(ident.name())?;
                     build_ident_expression(symbol, i)
                 }
                 Iterable::Range(range) => Ok(Expression::Const((range.start() + i) as u64)),
                 Iterable::Slice(ident, range) => {
-                    let symbol = self
-                        .symbol_table
-                        .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                    let symbol = self.symbol_table.get_symbol(ident.name())?;
                     build_slice_ident_expression(symbol, range.start(), i)
                 }
             },
@@ -134,9 +130,7 @@ impl ConstraintBuilder {
             None => Ok(Expression::NamedTraceAccess(named_trace_access.clone())),
             Some(iterable_type) => match iterable_type {
                 Iterable::Identifier(ident) => {
-                    let symbol = self
-                        .symbol_table
-                        .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                    let symbol = self.symbol_table.get_symbol(ident.name())?;
                     match symbol.symbol_type() {
                         SymbolType::TraceColumns(size) => {
                             validate_access(i, size.size())?;
@@ -156,9 +150,7 @@ impl ConstraintBuilder {
                     named_trace_access.name()
                 ))),
                 Iterable::Slice(ident, range) => {
-                    let symbol = self
-                        .symbol_table
-                        .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                    let symbol = self.symbol_table.get_symbol(ident.name())?;
                     match symbol.symbol_type() {
                         SymbolType::TraceColumns(trace_columns) => {
                             validate_access(i, trace_columns.size())?;
@@ -241,9 +233,7 @@ impl ConstraintBuilder {
     fn get_iterable_len(&self, iterable: &Iterable) -> Result<usize, SemanticError> {
         match iterable {
             Iterable::Identifier(ident) => {
-                let symbol = self
-                    .symbol_table
-                    .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                let symbol = self.symbol_table.get_symbol(ident.name())?;
                 match symbol.symbol_type() {
                     SymbolType::Variable(variable_type) => match variable_type {
                         VariableType::Vector(vector) => Ok(vector.len()),

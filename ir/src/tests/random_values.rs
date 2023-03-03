@@ -158,5 +158,6 @@ fn err_random_values_in_bc_against_main_cols() {
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::new(parsed);
+    println!("{result:?}");
     assert!(result.is_err());
 }

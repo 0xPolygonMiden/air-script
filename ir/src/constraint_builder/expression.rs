@@ -157,8 +157,7 @@ impl ConstraintBuilder {
         name: &str,
         access_type: AccessType,
     ) -> Result<NodeIndex, SemanticError> {
-        let current_scope = domain.into();
-        let symbol = self.symbol_table.get_symbol(name, current_scope)?;
+        let symbol = self.symbol_table.get_symbol(name)?;
 
         match symbol.symbol_type() {
             SymbolType::Variable(variable_type) => {
@@ -169,7 +168,7 @@ impl ConstraintBuilder {
             }
             _ => {
                 // all other symbol types indicate we're accessing a value or group of values.
-                let value = symbol.access_value(access_type)?;
+                let value = symbol.get_value(access_type)?;
 
                 // add a value node in the graph.
                 let node_index = self.constraints.insert_graph_node(Operation::Value(value));

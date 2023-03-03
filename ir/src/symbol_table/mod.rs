@@ -5,7 +5,7 @@ use super::{
 };
 
 mod symbol;
-pub(crate) use symbol::{Scope, Symbol, SymbolType};
+pub(crate) use symbol::{Symbol, SymbolType};
 
 mod symbol_access;
 pub(crate) use symbol_access::AccessType;
@@ -25,7 +25,10 @@ pub use value::{ConstantValue, Value};
 #[derive(Default, Debug)]
 pub struct SymbolTable {
     /// A map of all declared identifiers from their name (the key) to their type.
-    symbols: BTreeMap<(String, Scope), Symbol>,
+    symbols: BTreeMap<String, Symbol>,
+
+    /// TODO: docs
+    variables: Vec<String>,
 
     /// TODO: docs
     declarations: Declarations,
@@ -40,6 +43,14 @@ impl SymbolTable {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
+    /// TODO: docs
+    pub(crate) fn clear_variables(&mut self) {
+        for variable in self.variables.iter() {
+            self.symbols.remove(variable);
+        }
+        self.variables.clear();
+    }
+
     /// Adds a declared identifier to the symbol table using the identifier and scope as the key and
     /// the symbol as the value, where the symbol contains relevant details like scope and type.
     ///
@@ -49,28 +60,20 @@ impl SymbolTable {
     fn insert_symbol(
         &mut self,
         name: String,
-        scope: Scope,
         symbol_type: SymbolType,
     ) -> Result<(), SemanticError> {
-        // check if the identifier was already defined in the global scope.
-        if let Some(global_sym) = self.symbols.get(&(name.clone(), Scope::Global)) {
-            // TODO: update error to "{name} was already defined as a {type} in the {scope}",
+        // insert the identifier or return an error if it was already defined.
+        let symbol = Symbol::new(name.clone(), symbol_type.clone());
+
+        if let Some(symbol) = self.symbols.insert(name.clone(), symbol) {
             return Err(SemanticError::duplicate_identifer(
                 &name,
                 &symbol_type,
-                global_sym.symbol_type(),
-            ));
-        }
-
-        // insert the identifier or return an error if it was already defined in the specified scope.
-        let symbol = Symbol::new(name.clone(), scope, symbol_type);
-        if let Some(prev_symbol) = self.symbols.insert((name, scope), symbol.clone()) {
-            // TODO: update error to "{name} was already defined as a {type} in the {scope}",
-            return Err(SemanticError::duplicate_identifer(
-                symbol.name(),
                 symbol.symbol_type(),
-                prev_symbol.symbol_type(),
             ));
+        } else if matches!(symbol_type, SymbolType::Variable(_)) {
+            // track variables so we can clear them out when we are done with them
+            self.variables.push(name);
         }
 
         Ok(())
@@ -82,7 +85,7 @@ impl SymbolTable {
         self.declarations.add_constant(constant.clone());
 
         let (name, constant_type) = constant.into_parts();
-        self.insert_symbol(name, Scope::Global, SymbolType::Constant(constant_type))?;
+        self.insert_symbol(name, SymbolType::Constant(constant_type))?;
 
         Ok(())
     }
@@ -99,7 +102,6 @@ impl SymbolTable {
                 TraceColumns::new(trace_segment, col_idx, trace_cols.size() as usize);
             self.insert_symbol(
                 trace_cols.name().to_string(),
-                Scope::Global,
                 SymbolType::TraceColumns(trace_columns),
             )?;
             col_idx += trace_cols.size() as usize;
@@ -127,11 +129,7 @@ impl SymbolTable {
     ) -> Result<(), SemanticError> {
         for input in public_inputs.into_iter() {
             let (name, size) = input.into_parts();
-            self.insert_symbol(
-                name.clone(),
-                Scope::BoundaryConstraints,
-                SymbolType::PublicInput(size),
-            )?;
+            self.insert_symbol(name.clone(), SymbolType::PublicInput(size))?;
             self.declarations.add_public_input((name, size));
         }
 
@@ -148,11 +146,7 @@ impl SymbolTable {
             validate_cycles(&column)?;
 
             let (name, values) = column.into_parts();
-            self.insert_symbol(
-                name,
-                Scope::IntegrityConstraints,
-                SymbolType::PeriodicColumn(index, values.len()),
-            )?;
+            self.insert_symbol(name, SymbolType::PeriodicColumn(index, values.len()))?;
             self.declarations.add_periodic_column(values);
         }
 
@@ -170,18 +164,13 @@ impl SymbolTable {
         // add the name of the random values array to the symbol table
         self.insert_symbol(
             name,
-            Scope::Global,
             SymbolType::RandomValuesBinding(offset, num_values as usize),
         )?;
 
         // add the named random value bindings to the symbol table
         for binding in bindings {
             let (name, size) = binding.into_parts();
-            self.insert_symbol(
-                name,
-                Scope::Global,
-                SymbolType::RandomValuesBinding(offset, size as usize),
-            )?;
+            self.insert_symbol(name, SymbolType::RandomValuesBinding(offset, size as usize))?;
             offset += size as usize;
         }
 
@@ -197,11 +186,7 @@ impl SymbolTable {
         variable: Variable,
     ) -> Result<(), SemanticError> {
         let (name, value) = variable.into_parts();
-        self.insert_symbol(
-            name,
-            Scope::BoundaryConstraints,
-            SymbolType::Variable(value),
-        )?;
+        self.insert_symbol(name, SymbolType::Variable(value))?;
         Ok(())
     }
 
@@ -211,11 +196,7 @@ impl SymbolTable {
         name: String,
         variable_type: VariableType,
     ) -> Result<(), SemanticError> {
-        self.insert_symbol(
-            name,
-            Scope::IntegrityConstraints,
-            SymbolType::Variable(variable_type),
-        )?;
+        self.insert_symbol(name, SymbolType::Variable(variable_type))?;
 
         Ok(())
     }
@@ -232,12 +213,8 @@ impl SymbolTable {
     ///
     /// # Errors
     /// Returns an error if the identifier was not in the symbol table.
-    pub(super) fn get_symbol(&self, name: &str, scope: Scope) -> Result<&Symbol, SemanticError> {
-        if let Some(symbol) = self
-            .symbols
-            .get(&(name.to_owned(), scope))
-            .or_else(|| self.symbols.get(&(name.to_owned(), Scope::Global)))
-        {
+    pub(super) fn get_symbol(&self, name: &str) -> Result<&Symbol, SemanticError> {
+        if let Some(symbol) = self.symbols.get(name) {
             Ok(symbol)
         } else {
             Err(SemanticError::undeclared_identifier(name))
@@ -256,7 +233,7 @@ impl SymbolTable {
         &mut self,
         trace_access: &NamedTraceAccess,
     ) -> Result<IndexedTraceAccess, SemanticError> {
-        let symbol = self.get_symbol(trace_access.name(), Scope::Global)?;
+        let symbol = self.get_symbol(trace_access.name())?;
         trace_access.validate(symbol)?;
 
         let SymbolType::TraceColumns(columns) = symbol.symbol_type() else { unreachable!("validation of named trace access failed.") };

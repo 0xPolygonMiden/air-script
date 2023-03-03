@@ -1,5 +1,5 @@
 use super::{
-    ConstantType, ConstraintBuilder, Expression, IndexedTraceAccess, ListFoldingValueType, Scope,
+    ConstantType, ConstraintBuilder, Expression, IndexedTraceAccess, ListFoldingValueType,
     SemanticError, SymbolType, VariableType, CURRENT_ROW,
 };
 
@@ -20,9 +20,7 @@ impl ConstraintBuilder {
     ) -> Result<Vec<Expression>, SemanticError> {
         match lf_value_type {
             ListFoldingValueType::Identifier(ident) => {
-                let symbol = self
-                    .symbol_table
-                    .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                let symbol = self.symbol_table.get_symbol(ident.name())?;
                 match symbol.symbol_type() {
                     SymbolType::Constant(ConstantType::Vector(list)) => {
                         Ok(list.iter().map(|value| Expression::Const(*value)).collect())

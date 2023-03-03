@@ -18,6 +18,7 @@ fn bc_with_constants() {
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::new(parsed);
+    println!("{result:?}");
     assert!(result.is_ok());
 }
 
@@ -39,6 +40,7 @@ fn ic_with_constants() {
     let parsed = parse(source).expect("Parsing failed");
 
     let result = AirIR::new(parsed);
+    println!("{result:?}");
     assert!(result.is_ok());
 }
 

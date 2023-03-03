@@ -79,17 +79,27 @@ impl AlgebraicGraph {
                     Ok((DEFAULT_SEGMENT, ConstraintDomain::EveryRow))
                 }
                 Value::RandomValue(_) => Ok((AUX_SEGMENT, default_domain)),
-                Value::TraceElement(trace_access) => Ok((
-                    trace_access.trace_segment(),
-                    trace_access.row_offset().into(),
-                )),
+                Value::TraceElement(trace_access) => {
+                    let domain = if default_domain.is_boundary() {
+                        if trace_access.row_offset() == 0 {
+                            default_domain
+                        } else {
+                            // TODO: update this error
+                            // return Err(SemanticError::incompatible_constraint_domains(base, other))
+                            todo!()
+                        }
+                    } else {
+                        trace_access.row_offset().into()
+                    };
+
+                    Ok((trace_access.trace_segment(), domain))
+                }
             },
             Operation::Add(lhs, rhs) | Operation::Sub(lhs, rhs) | Operation::Mul(lhs, rhs) => {
                 let (lhs_segment, lhs_domain) = self.node_details(lhs, default_domain)?;
                 let (rhs_segment, rhs_domain) = self.node_details(rhs, default_domain)?;
 
                 let trace_segment = lhs_segment.max(rhs_segment);
-                // TODO: get rid of this so this method doesn't need to return result
                 let domain = lhs_domain.merge(&rhs_domain)?;
 
                 Ok((trace_segment, domain))
