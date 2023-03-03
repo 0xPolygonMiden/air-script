@@ -142,6 +142,15 @@ impl Constraints {
         &self.graph
     }
 
+    // TODO: docs
+    pub fn node_details(
+        &self,
+        node_idx: &NodeIndex,
+        default_domain: ConstraintDomain,
+    ) -> Result<(TraceSegment, ConstraintDomain), SemanticError> {
+        self.graph.node_details(node_idx, default_domain)
+    }
+
     // --- MUTATORS -------------------------------------------------------------------------------
 
     pub(super) fn insert_graph_node(&mut self, op: Operation) -> NodeIndex {

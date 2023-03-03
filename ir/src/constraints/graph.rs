@@ -1,4 +1,14 @@
-use super::{BTreeMap, IntegrityConstraintDegree, Value};
+use super::{
+    BTreeMap, ConstraintDomain, IntegrityConstraintDegree, SemanticError, TraceSegment, Value,
+};
+
+// CONSTANTS
+// ================================================================================================
+
+/// The default segment against which a constraint is applied is the main trace segment.
+const DEFAULT_SEGMENT: TraceSegment = 0;
+/// The auxiliary trace segment.
+const AUX_SEGMENT: TraceSegment = 1;
 
 // ALGEBRAIC GRAPH
 // ================================================================================================
@@ -38,6 +48,53 @@ impl AlgebraicGraph {
             IntegrityConstraintDegree::new(base)
         } else {
             IntegrityConstraintDegree::with_cycles(base, cycles.values().cloned().collect())
+        }
+    }
+
+    pub fn node_details(
+        &self,
+        index: &NodeIndex,
+        default_domain: ConstraintDomain,
+    ) -> Result<(TraceSegment, ConstraintDomain), SemanticError> {
+        // recursively walk the subgraph and infer the trace segment and domain
+        match self.node(index).op() {
+            Operation::Value(value) => match value {
+                Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
+                // TODO: need to know whether first row or last row for boundary constraints
+                Value::PublicInput(_, _) => {
+                    if !default_domain.is_boundary() {
+                        // TODO: update this error
+                        // Err(SemanticError::incompatible_constraint_domains(default_domain, other))
+                        todo!()
+                    }
+                    Ok((DEFAULT_SEGMENT, default_domain))
+                }
+                Value::PeriodicColumn(_, _) => {
+                    if !(default_domain.is_integrity()) {
+                        // TODO: update this error
+                        // Err(SemanticError::incompatible_constraint_domains(default_domain, other))
+                        todo!()
+                    }
+                    // the default domain for [IntegrityConstraints] is `EveryRow`
+                    Ok((DEFAULT_SEGMENT, ConstraintDomain::EveryRow))
+                }
+                Value::RandomValue(_) => Ok((AUX_SEGMENT, default_domain)),
+                Value::TraceElement(trace_access) => Ok((
+                    trace_access.trace_segment(),
+                    trace_access.row_offset().into(),
+                )),
+            },
+            Operation::Add(lhs, rhs) | Operation::Sub(lhs, rhs) | Operation::Mul(lhs, rhs) => {
+                let (lhs_segment, lhs_domain) = self.node_details(lhs, default_domain)?;
+                let (rhs_segment, rhs_domain) = self.node_details(rhs, default_domain)?;
+
+                let trace_segment = lhs_segment.max(rhs_segment);
+                // TODO: get rid of this so this method doesn't need to return result
+                let domain = lhs_domain.merge(&rhs_domain)?;
+
+                Ok((trace_segment, domain))
+            }
+            Operation::Exp(lhs, _) => self.node_details(lhs, default_domain),
         }
     }
 

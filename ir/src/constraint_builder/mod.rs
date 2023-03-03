@@ -11,21 +11,10 @@ pub(crate) use constrained_boundary::ConstrainedBoundary;
 
 mod expression;
 
-mod expression_details;
-use expression_details::ExprDetails;
-
 mod list_comprehension;
 mod list_folding;
 
 mod variables;
-
-// CONSTANTS
-// ================================================================================================
-
-/// The default segment against which a constraint is applied is the main trace segment.
-pub(super) const DEFAULT_SEGMENT: TraceSegment = 0;
-/// The auxiliary trace segment.
-pub(super) const AUX_SEGMENT: TraceSegment = 1;
 
 // CONSTRAINT BUILDER
 // ================================================================================================
@@ -92,21 +81,28 @@ impl ConstraintBuilder {
                 }
 
                 // add the trace access at the specified boundary to the graph.
-                let lhs = self.insert_trace_access(&trace_access, domain)?;
+                let lhs = self.insert_trace_access(&trace_access)?;
 
                 // add its expression to the constraints graph.
-                let rhs = self.insert_expr(constraint.value(), domain)?;
+                let rhs = self.insert_expr(constraint.value())?;
 
-                // ensure that the inferred trace segment of the rhs expression can be applied to
-                // column against which the boundary constraint is applied.
-                // trace segment inference defaults to the lowest segment (the main trace) and is
-                // adjusted according to the use of random values and trace columns.
-                if lhs.trace_segment() < rhs.trace_segment() {
-                    return Err(SemanticError::trace_segment_mismatch(lhs.trace_segment()));
-                }
+                // TODO: check trace segment
+                // // ensure that the inferred trace segment of the rhs expression can be applied to
+                // // column against which the boundary constraint is applied.
+                // // trace segment inference defaults to the lowest segment (the main trace) and is
+                // // adjusted according to the use of random values and trace columns.
+                // if lhs.trace_segment() < rhs.trace_segment() {
+                //     return Err(SemanticError::trace_segment_mismatch(lhs.trace_segment()));
+                // }
 
                 // merge the two sides of the expression into a constraint.
-                self.insert_constraint(lhs, rhs)?
+                let root = self.merge_equal_exprs(lhs, rhs)?;
+
+                // get the trace segment and domain of the constraint
+                let (trace_segment, domain) = self.constraints.node_details(&root, domain)?;
+
+                // save the constraint information
+                self.insert_constraint(root, trace_segment, domain)?
             }
             ast::BoundaryStmt::Variable(variable) => {
                 self.symbol_table.insert_boundary_variable(variable)?
@@ -128,18 +124,25 @@ impl ConstraintBuilder {
         &mut self,
         stmt: ast::IntegrityStmt,
     ) -> Result<(), SemanticError> {
-        let default_domain = ConstraintDomain::EveryRow;
-
         match stmt {
             ast::IntegrityStmt::Constraint(constraint) => {
                 // add the left hand side expression to the graph.
-                let lhs = self.insert_expr(constraint.lhs(), default_domain)?;
+                let lhs = self.insert_expr(constraint.lhs())?;
 
                 // add the right hand side expression to the graph.
-                let rhs = self.insert_expr(constraint.rhs(), default_domain)?;
+                let rhs = self.insert_expr(constraint.rhs())?;
 
                 // merge the two sides of the expression into a constraint.
-                self.insert_constraint(lhs, rhs)
+                let root = self.merge_equal_exprs(lhs, rhs)?;
+
+                // get the trace segment and domain of the constraint
+                // the default domain for integrity constraints is `EveryRow`
+                let (trace_segment, domain) = self
+                    .constraints
+                    .node_details(&root, ConstraintDomain::EveryRow)?;
+
+                // save the constraint information
+                self.insert_constraint(root, trace_segment, domain)
             }
             ast::IntegrityStmt::Variable(variable) => {
                 let (name, variable_type) = variable.into_parts();
@@ -163,11 +166,12 @@ impl ConstraintBuilder {
     /// then saved in the appropriate constraint list (boundary, validity, or transition).
     fn insert_constraint(
         &mut self,
-        lhs: ExprDetails,
-        rhs: ExprDetails,
+        root: NodeIndex,
+        trace_segment: TraceSegment,
+        domain: ConstraintDomain,
     ) -> Result<(), SemanticError> {
-        let constraint = self.merge_equal_exprs(&lhs, &rhs)?;
-        let trace_segment = constraint.trace_segment() as usize;
+        // TODO: validate trace segment
+        let trace_segment = trace_segment.into();
 
         // the constraint should not be against an undeclared trace segment.
         if self.symbol_table.num_trace_segments() <= trace_segment {
@@ -177,11 +181,8 @@ impl ConstraintBuilder {
         }
 
         // add the constraint to the constraints
-        self.constraints.insert_constraint(
-            constraint.root_idx(),
-            trace_segment,
-            constraint.domain(),
-        );
+        self.constraints
+            .insert_constraint(root, trace_segment, domain);
 
         Ok(())
     }
