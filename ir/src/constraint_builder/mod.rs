@@ -1,10 +1,13 @@
 use super::{
-    ast, AccessType, BTreeMap, BTreeSet, ConstantType, ConstantValue, ConstrainedBoundary,
-    ConstraintDomain, Constraints, Declarations, Expression, Identifier, IndexedTraceAccess,
-    Iterable, ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess,
-    NamedTraceAccess, NodeIndex, Operation, Scope, SemanticError, Symbol, SymbolTable, SymbolType,
-    TraceSegment, Value, VariableType, VectorAccess, CURRENT_ROW,
+    ast, AccessType, BTreeMap, BTreeSet, ConstantType, ConstantValue, ConstraintDomain,
+    Constraints, Declarations, Expression, Identifier, IndexedTraceAccess, Iterable,
+    ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, NamedTraceAccess,
+    NodeIndex, Operation, Scope, SemanticError, Symbol, SymbolTable, SymbolType, TraceSegment,
+    Value, VariableType, VectorAccess, CURRENT_ROW,
 };
+
+mod constrained_boundary;
+pub(crate) use constrained_boundary::ConstrainedBoundary;
 
 mod expression;
 

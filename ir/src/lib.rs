@@ -7,12 +7,12 @@ pub use parser::ast;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod constraint_builder;
-use constraint_builder::ConstraintBuilder;
+use constraint_builder::{ConstrainedBoundary, ConstraintBuilder};
 
 pub mod constraints;
 use constraints::{
-    AlgebraicGraph, ConstrainedBoundary, ConstraintDomain, ConstraintRoot, Constraints, Operation,
-    CURRENT_ROW, MIN_CYCLE_LENGTH,
+    AlgebraicGraph, ConstraintDomain, ConstraintRoot, Constraints, Operation, CURRENT_ROW,
+    MIN_CYCLE_LENGTH,
 };
 pub use constraints::{IntegrityConstraintDegree, NodeIndex};
 

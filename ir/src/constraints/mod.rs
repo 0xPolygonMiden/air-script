@@ -2,7 +2,7 @@ use super::{ast::Boundary, SemanticError, TraceSegment, Value};
 use std::collections::BTreeMap;
 
 mod constraint;
-pub use constraint::{ConstrainedBoundary, ConstraintDomain, ConstraintRoot};
+pub use constraint::{ConstraintDomain, ConstraintRoot};
 
 mod degree;
 pub use degree::IntegrityConstraintDegree;
