@@ -5,11 +5,14 @@ use super::{
 };
 
 mod symbol;
-pub(crate) use symbol::{Symbol, SymbolType};
+pub(crate) use symbol::Symbol;
 
 mod symbol_access;
-pub(crate) use symbol_access::AccessType;
 use symbol_access::ValidateIdentifierAccess;
+pub(crate) use symbol_access::{AccessType, ValidateAccess};
+
+mod symbol_type;
+pub(crate) use symbol_type::SymbolType;
 
 mod trace_columns;
 use trace_columns::TraceColumns;
@@ -81,10 +84,17 @@ impl SymbolTable {
 
     /// Add a constant by its identifier and value.
     pub(super) fn insert_constant(&mut self, constant: Constant) -> Result<(), SemanticError> {
-        validate_constant(&constant)?;
         self.declarations.add_constant(constant.clone());
-
         let (name, constant_type) = constant.into_parts();
+
+        // check the number of elements in each row are same for a matrix
+        if let ConstantType::Matrix(matrix) = &constant_type {
+            let row_len = matrix[0].len();
+            if matrix.iter().skip(1).any(|row| row.len() != row_len) {
+                return Err(SemanticError::invalid_matrix_constant(&name));
+            }
+        }
+
         self.insert_symbol(name, SymbolType::Constant(constant_type))?;
 
         Ok(())
@@ -290,20 +300,4 @@ fn validate_cycles(column: &ast::PeriodicColumn) -> Result<(), SemanticError> {
     }
 
     Ok(())
-}
-
-/// Checks that the declared value of a constant is valid.
-fn validate_constant(constant: &Constant) -> Result<(), SemanticError> {
-    match constant.value() {
-        // check the number of elements in each row are same for a matrix
-        ConstantType::Matrix(matrix) => {
-            let row_len = matrix[0].len();
-            if matrix.iter().skip(1).all(|row| row.len() == row_len) {
-                Ok(())
-            } else {
-                Err(SemanticError::invalid_matrix_constant(constant))
-            }
-        }
-        _ => Ok(()),
-    }
 }

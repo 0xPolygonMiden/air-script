@@ -163,17 +163,16 @@ impl ConstraintBuilder {
             SymbolType::Variable(variable_type) => {
                 // this symbol refers to an expression or group of expressions
                 // TODO: restore VariableRoots - maybe attach this info to the symbol table?
-                let expr = self.get_variable_expr(symbol, access_type, variable_type)?;
+                let expr = self.get_variable_expr(symbol, &access_type, variable_type)?;
                 self.insert_expr(&expr)
             }
             _ => {
                 // all other symbol types indicate we're accessing a value or group of values.
-                let value = symbol.get_value(access_type)?;
+                let value = symbol.get_value(&access_type)?;
 
                 // add a value node in the graph.
                 let node_index = self.constraints.insert_graph_node(Operation::Value(value));
 
-                // TODO: fix ExprDetails segment and domain
                 Ok(node_index)
             }
         }

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::{Expression, Identifier, Range};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -30,6 +32,17 @@ pub enum VariableType {
     Vector(Vec<Expression>),
     Matrix(Vec<Vec<Expression>>),
     ListComprehension(ListComprehension),
+}
+
+impl Display for VariableType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Scalar(_) => write!(f, "scalar"),
+            Self::Vector(_) => write!(f, "vector"),
+            Self::Matrix(_) => write!(f, "matrix"),
+            Self::ListComprehension(_) => write!(f, "list comprehension"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

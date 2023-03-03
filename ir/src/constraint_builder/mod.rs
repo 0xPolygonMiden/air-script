@@ -2,8 +2,8 @@ use super::{
     ast, AccessType, BTreeMap, BTreeSet, ConstantType, ConstantValue, ConstraintDomain,
     Constraints, Declarations, Expression, Identifier, IndexedTraceAccess, Iterable,
     ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, NamedTraceAccess,
-    NodeIndex, Operation, SemanticError, Symbol, SymbolTable, SymbolType, TraceSegment, Value,
-    VariableType, VectorAccess, CURRENT_ROW,
+    NodeIndex, Operation, SemanticError, Symbol, SymbolTable, SymbolType, TraceSegment,
+    ValidateAccess, Value, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 mod boundary_constraints;
