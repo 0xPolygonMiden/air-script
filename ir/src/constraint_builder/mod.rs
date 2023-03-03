@@ -1,14 +1,18 @@
 use super::{
-    ast, AccessType, BTreeSet, ConstantValue, ConstrainedBoundary, ConstraintDomain, Constraints,
-    Declarations, Expression, Identifier, IndexedTraceAccess, ListFoldingType, MatrixAccess,
-    NodeIndex, Operation, SemanticError, Symbol, SymbolTable, SymbolType, TraceSegment, Value,
-    VariableType, VectorAccess,
+    ast, AccessType, BTreeMap, BTreeSet, ConstantType, ConstantValue, ConstrainedBoundary,
+    ConstraintDomain, Constraints, Declarations, Expression, Identifier, IndexedTraceAccess,
+    Iterable, ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess,
+    NamedTraceAccess, NodeIndex, Operation, Scope, SemanticError, Symbol, SymbolTable, SymbolType,
+    TraceSegment, Value, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 mod expression;
 
 mod expression_details;
 use expression_details::ExprDetails;
+
+mod list_comprehension;
+mod list_folding;
 
 mod variables;
 
@@ -132,14 +136,23 @@ impl ConstraintBuilder {
                 let rhs = self.insert_expr(constraint.rhs(), default_domain)?;
 
                 // merge the two sides of the expression into a constraint.
-                self.insert_constraint(lhs, rhs)?
+                self.insert_constraint(lhs, rhs)
             }
             ast::IntegrityStmt::Variable(variable) => {
-                self.symbol_table.insert_integrity_variable(variable)?
+                let (name, variable_type) = variable.into_parts();
+
+                match variable_type {
+                    VariableType::ListComprehension(list_comprehension) => {
+                        let vector = self.unfold_lc(&list_comprehension)?;
+                        self.symbol_table
+                            .insert_integrity_variable(name, VariableType::Vector(vector))
+                    }
+                    _ => self
+                        .symbol_table
+                        .insert_integrity_variable(name, variable_type),
+                }
             }
         }
-
-        Ok(())
     }
 
     /// Takes two expressions which are expected to be equal and merges them into a constraint (a

@@ -1,12 +1,12 @@
 use super::{
-    ConstantType, Expression, IndexedTraceAccess, ListFoldingValueType, Scope, SemanticError,
-    SymbolTable, SymbolType, VariableType, CURRENT_ROW,
+    ConstantType, ConstraintBuilder, Expression, IndexedTraceAccess, ListFoldingValueType, Scope,
+    SemanticError, SymbolType, VariableType, CURRENT_ROW,
 };
 
 // LIST FOLDING
 // ================================================================================================
 
-impl SymbolTable {
+impl ConstraintBuilder {
     /// Builds a list of expressions from a list folding value. The list folding value can be either a
     /// vector, a list comprehension, or an identifier that refers to a vector.
     ///
@@ -20,7 +20,9 @@ impl SymbolTable {
     ) -> Result<Vec<Expression>, SemanticError> {
         match lf_value_type {
             ListFoldingValueType::Identifier(ident) => {
-                let symbol = self.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                let symbol = self
+                    .symbol_table
+                    .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
                 match symbol.symbol_type() {
                     SymbolType::Constant(ConstantType::Vector(list)) => {
                         Ok(list.iter().map(|value| Expression::Const(*value)).collect())

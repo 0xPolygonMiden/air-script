@@ -1,7 +1,7 @@
 use super::{
-    BTreeMap, Expression, Identifier, IndexedTraceAccess, Iterable, ListComprehension,
-    ListFoldingType, ListFoldingValueType, NamedTraceAccess, Scope, SemanticError, Symbol,
-    SymbolTable, SymbolType, VariableType, VectorAccess, CURRENT_ROW,
+    BTreeMap, ConstraintBuilder, Expression, Identifier, IndexedTraceAccess, Iterable,
+    ListComprehension, ListFoldingType, ListFoldingValueType, NamedTraceAccess, Scope,
+    SemanticError, Symbol, SymbolType, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 /// Maps each identifier in the list comprehension to its corresponding [Iterable].
@@ -11,7 +11,7 @@ use super::{
 /// { x: Identifier(a), y: Identifier(b) }
 type IterableContext = BTreeMap<Identifier, Iterable>;
 
-impl SymbolTable {
+impl ConstraintBuilder {
     /// Unfolds a list comprehension into a vector of expressions.
     ///
     /// # Errors
@@ -97,12 +97,16 @@ impl SymbolTable {
             None => Ok(Expression::Elem(ident.clone())),
             Some(iterable_type) => match iterable_type {
                 Iterable::Identifier(ident) => {
-                    let symbol = self.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                    let symbol = self
+                        .symbol_table
+                        .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
                     build_ident_expression(symbol, i)
                 }
                 Iterable::Range(range) => Ok(Expression::Const((range.start() + i) as u64)),
                 Iterable::Slice(ident, range) => {
-                    let symbol = self.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                    let symbol = self
+                        .symbol_table
+                        .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
                     build_slice_ident_expression(symbol, range.start(), i)
                 }
             },
@@ -130,7 +134,9 @@ impl SymbolTable {
             None => Ok(Expression::NamedTraceAccess(named_trace_access.clone())),
             Some(iterable_type) => match iterable_type {
                 Iterable::Identifier(ident) => {
-                    let symbol = self.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                    let symbol = self
+                        .symbol_table
+                        .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
                     match symbol.symbol_type() {
                         SymbolType::TraceColumns(size) => {
                             validate_access(i, size.size())?;
@@ -150,7 +156,9 @@ impl SymbolTable {
                     named_trace_access.name()
                 ))),
                 Iterable::Slice(ident, range) => {
-                    let symbol = self.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                    let symbol = self
+                        .symbol_table
+                        .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
                     match symbol.symbol_type() {
                         SymbolType::TraceColumns(trace_columns) => {
                             validate_access(i, trace_columns.size())?;
@@ -233,7 +241,9 @@ impl SymbolTable {
     fn get_iterable_len(&self, iterable: &Iterable) -> Result<usize, SemanticError> {
         match iterable {
             Iterable::Identifier(ident) => {
-                let symbol = self.get_symbol(ident.name(), Scope::IntegrityConstraints)?;
+                let symbol = self
+                    .symbol_table
+                    .get_symbol(ident.name(), Scope::IntegrityConstraints)?;
                 match symbol.symbol_type() {
                     SymbolType::Variable(variable_type) => match variable_type {
                         VariableType::Vector(vector) => Ok(vector.len()),
