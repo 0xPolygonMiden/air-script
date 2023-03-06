@@ -15,7 +15,7 @@ fn bc_scalar_variable() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -34,7 +34,7 @@ fn bc_vector_variable() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -58,7 +58,7 @@ fn bc_with_variables() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -78,7 +78,7 @@ fn bc_variable_in_both_domains() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -117,7 +117,7 @@ fn ic_with_variables() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -141,7 +141,7 @@ fn ic_variables_access_vector_from_matrix() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -201,7 +201,7 @@ fn err_bc_variable_access_before_declaration() {
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -221,7 +221,7 @@ fn err_ic_variable_access_before_declaration() {
         let a = 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -241,7 +241,7 @@ fn err_variable_def_in_other_section() {
         enf clk' = clk + a";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     println!("{result:?}");
     assert!(result.is_err());
 
@@ -259,7 +259,7 @@ fn err_variable_def_in_other_section() {
         enf clk.last = a";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -279,7 +279,7 @@ fn err_bc_variable_vector_invalid_access() {
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -299,7 +299,7 @@ fn err_ic_variable_vector_invalid_access() {
         enf clk' = clk + a[2]";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -318,7 +318,7 @@ fn err_bc_variable_matrix_invalid_access() {
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 
     let source = "
@@ -334,7 +334,7 @@ fn err_bc_variable_matrix_invalid_access() {
         enf clk' = clk + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -353,7 +353,7 @@ fn err_ic_variable_matrix_invalid_access() {
         enf clk' = clk + a[1][3]";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 
     let source = "
@@ -369,6 +369,6 @@ fn err_ic_variable_matrix_invalid_access() {
         enf clk' = clk + a[2][0]";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }

@@ -17,7 +17,7 @@ fn err_bc_invalid_vector_access() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -38,7 +38,7 @@ fn err_bc_invalid_matrix_access() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 
     let source = "
@@ -56,7 +56,7 @@ fn err_bc_invalid_matrix_access() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -77,7 +77,7 @@ fn err_ic_invalid_vector_access() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -98,7 +98,7 @@ fn err_ic_invalid_matrix_access() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 
     let source = "
@@ -116,6 +116,6 @@ fn err_ic_invalid_matrix_access() {
 
     let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
