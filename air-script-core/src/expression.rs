@@ -3,7 +3,7 @@ use super::{
 };
 
 /// Arithmetic expressions for evaluation of constraints.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Expression {
     Const(u64),
     /// Represents any named constant or variable.
@@ -26,13 +26,13 @@ pub enum Expression {
     ListFolding(ListFoldingType),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ListFoldingType {
     Sum(ListFoldingValueType),
     Prod(ListFoldingValueType),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ListFoldingValueType {
     Identifier(Identifier),
     Vector(Vec<Expression>),

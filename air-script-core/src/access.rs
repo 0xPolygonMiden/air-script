@@ -59,7 +59,7 @@ impl MatrixAccess {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Range {
     start: usize,
     end: usize,

@@ -10,7 +10,7 @@ pub type TraceSegment = u8;
 /// of the column within that trace segment, and `row_offset` specifies the offset from the current
 /// row. For example, an element in the "next" row of the "main" trace would be specified by
 /// a trace_segment of 0 and a row_offset of 1.
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IndexedTraceAccess {
     trace_segment: TraceSegment,
     col_idx: usize,
@@ -45,7 +45,7 @@ impl IndexedTraceAccess {
 /// [NamedTraceAccess] is used to indicate a column in the trace by specifying its index within a
 /// set of trace columns with the given identifier. If the identifier refers to a single column
 /// then the index is always zero.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NamedTraceAccess {
     name: Identifier,
     idx: usize,
