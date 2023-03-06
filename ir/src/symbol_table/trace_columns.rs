@@ -2,7 +2,7 @@ use super::TraceSegment;
 
 /// Describes columns in the execution trace by the trace segment to which it belongs, it's size
 /// and it's offset.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TraceColumns {
     trace_segment: TraceSegment,
     offset: usize,
