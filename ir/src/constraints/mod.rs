@@ -1,7 +1,7 @@
 use super::{
-    ast::Boundary, build_list_from_list_folding_value, ConstantType, Expression, Identifier,
-    IdentifierType, IndexedTraceAccess, ListFoldingType, MatrixAccess, Scope, SemanticError,
-    SymbolTable, TraceSegment, VariableType, VariableValue, VectorAccess,
+    ast::Boundary, build_list_from_list_folding_value, get_variable_expr, AccessType,
+    ConstantValue, Expression, IndexedTraceAccess, ListFoldingType, SemanticError, SymbolTable,
+    SymbolType, TraceSegment, Value,
 };
 use std::collections::BTreeMap;
 
@@ -12,7 +12,7 @@ mod degree;
 pub use degree::IntegrityConstraintDegree;
 
 mod graph;
-pub use graph::{AlgebraicGraph, ConstantValue, NodeIndex, Operation};
+pub use graph::{AlgebraicGraph, NodeIndex, Operation};
 
 // CONSTANTS
 // ================================================================================================
@@ -157,9 +157,8 @@ impl Constraints {
         &mut self,
         symbol_table: &SymbolTable,
         expr: &Expression,
-        default_domain: ConstraintDomain,
     ) -> Result<NodeIndex, SemanticError> {
-        self.graph.insert_expr(symbol_table, expr, default_domain)
+        self.graph.insert_expr(symbol_table, expr)
     }
 
     // TODO: get rid of this

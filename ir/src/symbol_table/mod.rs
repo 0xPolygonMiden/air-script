@@ -8,8 +8,8 @@ mod symbol;
 pub(crate) use symbol::Symbol;
 
 mod symbol_access;
-pub(crate) use symbol_access::AccessType;
 use symbol_access::ValidateIdentifierAccess;
+pub(crate) use symbol_access::{AccessType, ValidateAccess};
 
 mod symbol_type;
 pub(crate) use symbol_type::SymbolType;
@@ -59,9 +59,6 @@ impl SymbolTable {
             }
         }
 
-        self.insert_symbol(name, SymbolType::Constant(constant_type))?;
-
-        let (name, constant_type) = constant.into_parts();
         self.insert_symbol(name, SymbolType::Constant(constant_type))?;
 
         Ok(())
@@ -216,7 +213,7 @@ impl SymbolTable {
     /// - the identifier was not declared as a trace column binding.
     /// TODO: update docs
     pub(crate) fn get_trace_access_by_name(
-        &mut self,
+        &self,
         trace_access: &NamedTraceAccess,
     ) -> Result<IndexedTraceAccess, SemanticError> {
         let symbol = self.get_symbol(trace_access.name())?;

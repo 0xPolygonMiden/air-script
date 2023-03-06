@@ -1,8 +1,9 @@
 use super::{
-    ast, BTreeMap, BTreeSet, ConstantType, ConstrainedBoundary, ConstraintDomain, Constraints,
-    Declarations, Expression, Identifier, IdentifierType, IndexedTraceAccess, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, NamedTraceAccess, NodeIndex, Scope,
-    SemanticError, SymbolTable, Variable, VariableType, VectorAccess, CURRENT_ROW,
+    ast, AccessType, BTreeMap, BTreeSet, ConstantType, ConstrainedBoundary, ConstraintDomain,
+    Constraints, Declarations, Expression, Identifier, IndexedTraceAccess, Iterable,
+    ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, NamedTraceAccess,
+    NodeIndex, SemanticError, SymbolTable, SymbolType, ValidateAccess, Variable, VariableType,
+    VectorAccess, CURRENT_ROW,
 };
 
 mod list_comprehension;
@@ -11,6 +12,9 @@ pub(crate) use list_comprehension::unfold_lc;
 
 mod list_folding;
 pub(crate) use list_folding::build_list_from_list_folding_value;
+
+mod variables;
+pub(crate) use variables::get_variable_expr;
 
 // CONSTRAINT BUILDER
 // ================================================================================================
@@ -89,9 +93,9 @@ impl ConstraintBuilder {
                );
 
                 // add its expression to the constraints graph.
-                let rhs =
-                    self.constraints
-                        .insert_expr(&self.symbol_table, constraint.value(), domain)?;
+                let rhs = self
+                    .constraints
+                    .insert_expr(&self.symbol_table, constraint.value())?;
                 // get the trace segment and domain of the expression
                 let (rhs_segment, rhs_domain) = self.constraints.node_details(&rhs, domain)?;
 
@@ -115,9 +119,7 @@ impl ConstraintBuilder {
                 // save the constraint information
                 self.insert_constraint(root, lhs_segment.into(), domain)?
             }
-            ast::BoundaryStmt::Variable(variable) => self
-                .symbol_table
-                .insert_variable(Scope::BoundaryConstraints, variable)?,
+            ast::BoundaryStmt::Variable(variable) => self.symbol_table.insert_variable(variable)?,
         }
 
         Ok(())
@@ -138,18 +140,14 @@ impl ConstraintBuilder {
         match stmt {
             ast::IntegrityStmt::Constraint(constraint) => {
                 // add the left hand side expression to the graph.
-                let lhs = self.constraints.insert_expr(
-                    &self.symbol_table,
-                    constraint.lhs(),
-                    ConstraintDomain::EveryRow,
-                )?;
+                let lhs = self
+                    .constraints
+                    .insert_expr(&self.symbol_table, constraint.lhs())?;
 
                 // add the right hand side expression to the graph.
-                let rhs = self.constraints.insert_expr(
-                    &self.symbol_table,
-                    constraint.rhs(),
-                    ConstraintDomain::EveryRow,
-                )?;
+                let rhs = self
+                    .constraints
+                    .insert_expr(&self.symbol_table, constraint.rhs())?;
 
                 // merge the two sides of the expression into a constraint.
                 let root = self.constraints.merge_equal_exprs(lhs, rhs);
@@ -166,16 +164,12 @@ impl ConstraintBuilder {
             ast::IntegrityStmt::Variable(variable) => {
                 if let VariableType::ListComprehension(list_comprehension) = variable.value() {
                     let vector = unfold_lc(list_comprehension, &self.symbol_table)?;
-                    self.symbol_table.insert_variable(
-                        Scope::IntegrityConstraints,
-                        Variable::new(
-                            Identifier(variable.name().to_string()),
-                            VariableType::Vector(vector),
-                        ),
-                    )?
+                    self.symbol_table.insert_variable(Variable::new(
+                        Identifier(variable.name().to_string()),
+                        VariableType::Vector(vector),
+                    ))?
                 } else {
-                    self.symbol_table
-                        .insert_variable(Scope::IntegrityConstraints, variable)?
+                    self.symbol_table.insert_variable(variable)?
                 }
             }
         }
