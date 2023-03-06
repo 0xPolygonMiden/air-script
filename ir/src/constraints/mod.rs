@@ -1,8 +1,7 @@
 use super::{
     ast::Boundary, build_list_from_list_folding_value, ConstantType, ExprDetails, Expression,
     Identifier, IdentifierType, IndexedTraceAccess, ListFoldingType, MatrixAccess, Scope,
-    SemanticError, SymbolTable, TraceSegment, VariableRoots, VariableType, VariableValue,
-    VectorAccess,
+    SemanticError, SymbolTable, TraceSegment, VariableType, VariableValue, VectorAccess,
 };
 use std::collections::BTreeMap;
 
@@ -158,11 +157,9 @@ impl Constraints {
         &mut self,
         symbol_table: &SymbolTable,
         expr: &Expression,
-        variable_roots: &mut VariableRoots,
         default_domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
-        self.graph
-            .insert_expr(symbol_table, expr, variable_roots, default_domain)
+        self.graph.insert_expr(symbol_table, expr, default_domain)
     }
 
     // TODO: get rid of this

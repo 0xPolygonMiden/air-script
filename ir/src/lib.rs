@@ -8,9 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub mod constraint_builder;
 // TODO: remove most of these imports
-use constraint_builder::{
-    build_list_from_list_folding_value, ConstraintBuilder, ExprDetails, VariableRoots,
-};
+use constraint_builder::{build_list_from_list_folding_value, ConstraintBuilder, ExprDetails};
 
 pub mod constraints;
 use constraints::{

@@ -2,8 +2,7 @@ use super::{
     ast, BTreeMap, BTreeSet, ConstantType, ConstrainedBoundary, ConstraintDomain, Constraints,
     Declarations, Expression, Identifier, IdentifierType, IndexedTraceAccess, Iterable,
     ListComprehension, ListFoldingType, ListFoldingValueType, NamedTraceAccess, NodeIndex, Scope,
-    SemanticError, SymbolTable, TraceSegment, Variable, VariableType, VariableValue, VectorAccess,
-    CURRENT_ROW,
+    SemanticError, SymbolTable, TraceSegment, Variable, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 mod expression_details;
@@ -16,11 +15,6 @@ pub(crate) use list_comprehension::unfold_lc;
 
 mod list_folding;
 pub(crate) use list_folding::build_list_from_list_folding_value;
-
-// TYPES
-// ================================================================================================
-
-pub(crate) type VariableRoots = BTreeMap<(Scope, VariableValue), ExprDetails>;
 
 // CONSTRAINT BUILDER
 // ================================================================================================
@@ -35,11 +29,6 @@ pub(super) struct ConstraintBuilder {
     /// than one constraint is defined at any given boundary.
     constrained_boundaries: BTreeSet<ConstrainedBoundary>,
 
-    /// Variable roots for the variables used in integrity constraints. For each element in a
-    /// vector or a matrix, a new root is added with a key equal to the [VariableValue] of the
-    /// element.
-    variable_roots: VariableRoots,
-
     // TODO: docs
     constraints: Constraints,
 }
@@ -50,7 +39,6 @@ impl ConstraintBuilder {
         Self {
             symbol_table,
             constrained_boundaries: BTreeSet::new(),
-            variable_roots: VariableRoots::default(),
             constraints,
         }
     }
@@ -100,12 +88,9 @@ impl ConstraintBuilder {
                 )?;
 
                 // add its expression to the constraints graph.
-                let rhs = self.constraints.insert_expr(
-                    &self.symbol_table,
-                    constraint.value(),
-                    &mut self.variable_roots,
-                    domain,
-                )?;
+                let rhs =
+                    self.constraints
+                        .insert_expr(&self.symbol_table, constraint.value(), domain)?;
 
                 // ensure that the inferred trace segment of the rhs expression can be applied to
                 // column against which the boundary constraint is applied.
@@ -144,7 +129,6 @@ impl ConstraintBuilder {
                 let lhs = self.constraints.insert_expr(
                     &self.symbol_table,
                     constraint.lhs(),
-                    &mut self.variable_roots,
                     ConstraintDomain::EveryRow,
                 )?;
 
@@ -152,7 +136,6 @@ impl ConstraintBuilder {
                 let rhs = self.constraints.insert_expr(
                     &self.symbol_table,
                     constraint.rhs(),
-                    &mut self.variable_roots,
                     ConstraintDomain::EveryRow,
                 )?;
 

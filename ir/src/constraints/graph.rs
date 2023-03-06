@@ -1,8 +1,8 @@
 use super::{
     build_list_from_list_folding_value, BTreeMap, ConstantType, ConstraintDomain, ExprDetails,
     Expression, Identifier, IdentifierType, IndexedTraceAccess, IntegrityConstraintDegree,
-    ListFoldingType, MatrixAccess, Scope, SemanticError, SymbolTable, VariableRoots, VariableType,
-    VariableValue, VectorAccess, AUX_SEGMENT, CURRENT_ROW, DEFAULT_SEGMENT,
+    ListFoldingType, MatrixAccess, Scope, SemanticError, SymbolTable, VariableType, VariableValue,
+    VectorAccess, AUX_SEGMENT, CURRENT_ROW, DEFAULT_SEGMENT,
 };
 
 // ALGEBRAIC GRAPH
@@ -71,7 +71,6 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         expr: &Expression,
-        variable_roots: &mut VariableRoots,
         default_domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
         match expr {
@@ -84,20 +83,14 @@ impl AlgebraicGraph {
                 ))
             }
             Expression::Elem(Identifier(ident)) => {
-                self.insert_symbol_access(symbol_table, ident, variable_roots, default_domain)
+                self.insert_symbol_access(symbol_table, ident, default_domain)
             }
-            Expression::VectorAccess(vector_access) => self.insert_vector_access(
-                symbol_table,
-                vector_access,
-                variable_roots,
-                default_domain,
-            ),
-            Expression::MatrixAccess(matrix_access) => self.insert_matrix_access(
-                symbol_table,
-                matrix_access,
-                variable_roots,
-                default_domain,
-            ),
+            Expression::VectorAccess(vector_access) => {
+                self.insert_vector_access(symbol_table, vector_access, default_domain)
+            }
+            Expression::MatrixAccess(matrix_access) => {
+                self.insert_matrix_access(symbol_table, matrix_access, default_domain)
+            }
             Expression::Rand(name, index) => {
                 // The constraint target for random values defaults to the second (auxiliary) trace
                 // segment.
@@ -121,28 +114,28 @@ impl AlgebraicGraph {
             }
             Expression::Add(lhs, rhs) => {
                 // add both subexpressions.
-                let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
-                let rhs = self.insert_expr(symbol_table, rhs, variable_roots, default_domain)?;
+                let lhs = self.insert_expr(symbol_table, lhs, default_domain)?;
+                let rhs = self.insert_expr(symbol_table, rhs, default_domain)?;
                 // add the expression.
                 self.insert_bin_op(&lhs, &rhs, Operation::Add(lhs.root_idx(), rhs.root_idx()))
             }
             Expression::Sub(lhs, rhs) => {
                 // add both subexpressions.
-                let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
-                let rhs = self.insert_expr(symbol_table, rhs, variable_roots, default_domain)?;
+                let lhs = self.insert_expr(symbol_table, lhs, default_domain)?;
+                let rhs = self.insert_expr(symbol_table, rhs, default_domain)?;
                 // add the expression.
                 self.insert_bin_op(&lhs, &rhs, Operation::Sub(lhs.root_idx(), rhs.root_idx()))
             }
             Expression::Mul(lhs, rhs) => {
                 // add both subexpressions.
-                let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
-                let rhs = self.insert_expr(symbol_table, rhs, variable_roots, default_domain)?;
+                let lhs = self.insert_expr(symbol_table, lhs, default_domain)?;
+                let rhs = self.insert_expr(symbol_table, rhs, default_domain)?;
                 // add the expression.
                 self.insert_bin_op(&lhs, &rhs, Operation::Mul(lhs.root_idx(), rhs.root_idx()))
             }
             Expression::Exp(lhs, rhs) => {
                 // add base subexpression.
-                let lhs = self.insert_expr(symbol_table, lhs, variable_roots, default_domain)?;
+                let lhs = self.insert_expr(symbol_table, lhs, default_domain)?;
                 // add exponent subexpression.
                 let node_index = if let Expression::Const(rhs) = **rhs {
                     self.insert_op(Operation::Exp(lhs.root_idx(), rhs as usize))
@@ -160,7 +153,7 @@ impl AlgebraicGraph {
                 ))
             }
             Expression::ListFolding(lf_type) => {
-                self.insert_list_folding(symbol_table, lf_type, variable_roots, default_domain)
+                self.insert_list_folding(symbol_table, lf_type, default_domain)
             }
         }
     }
@@ -281,7 +274,6 @@ impl AlgebraicGraph {
     fn insert_variable(
         &mut self,
         symbol_table: &SymbolTable,
-        variable_roots: &mut VariableRoots,
         domain: ConstraintDomain,
         scope: Scope,
         variable_value: VariableValue,
@@ -297,26 +289,9 @@ impl AlgebraicGraph {
                 Scope::IntegrityConstraints,
                 ConstraintDomain::EveryRow | ConstraintDomain::EveryFrame(_),
             ) => {
-                let key = (scope, variable_value);
-                if let Some(expr) = variable_roots.get(&key) {
-                    match scope {
-                        Scope::BoundaryConstraints => {
-                            // TODO: deal with boundary conflict properly
-                            Ok(ExprDetails::new(
-                                expr.root_idx(),
-                                expr.trace_segment(),
-                                domain,
-                            ))
-                        }
-                        Scope::IntegrityConstraints => Ok(*expr),
-                    }
-                } else {
-                    // Otherwise, insert the variable expression and create a new variable root.
-                    let expr =
-                        self.insert_expr(symbol_table, variable_expr, variable_roots, domain)?;
-                    variable_roots.insert(key, expr);
-                    Ok(expr)
-                }
+                // insert the variable expression and create a new variable root.
+                let expr = self.insert_expr(symbol_table, variable_expr, domain)?;
+                Ok(expr)
             }
             (_, _) => Err(SemanticError::OutOfScope(format!(
                 "Variable {variable_value:?} is out of scope",
@@ -334,7 +309,6 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         ident: &str,
-        variable_roots: &mut VariableRoots,
         domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
         let elem_type = symbol_table.get_type(ident)?;
@@ -349,7 +323,6 @@ impl AlgebraicGraph {
                 if let VariableType::Scalar(variable_expr) = variable.value() {
                     self.insert_variable(
                         symbol_table,
-                        variable_roots,
                         domain,
                         *scope,
                         VariableValue::Scalar(ident.to_string()),
@@ -386,7 +359,6 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         vector_access: &VectorAccess,
-        variable_roots: &mut VariableRoots,
         domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
         let symbol_type = symbol_table.access_vector_element(vector_access)?;
@@ -404,7 +376,6 @@ impl AlgebraicGraph {
                             ));
                             self.insert_variable(
                                 symbol_table,
-                                variable_roots,
                                 domain,
                                 *scope,
                                 VariableValue::Vector(vector_access.clone()),
@@ -419,7 +390,6 @@ impl AlgebraicGraph {
                             ));
                             self.insert_variable(
                                 symbol_table,
-                                variable_roots,
                                 domain,
                                 *scope,
                                 VariableValue::Vector(vector_access.clone()),
@@ -434,7 +404,6 @@ impl AlgebraicGraph {
                 }
                 VariableType::Vector(vector) => self.insert_variable(
                     symbol_table,
-                    variable_roots,
                     domain,
                     *scope,
                     VariableValue::Vector(vector_access.clone()),
@@ -489,7 +458,6 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         matrix_access: &MatrixAccess,
-        variable_roots: &mut VariableRoots,
         domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
         let symbol_type = symbol_table.access_matrix_element(matrix_access)?;
@@ -507,7 +475,6 @@ impl AlgebraicGraph {
                         ));
                         self.insert_variable(
                             symbol_table,
-                            variable_roots,
                             domain,
                             *scope,
                             VariableValue::Matrix(matrix_access.clone()),
@@ -530,7 +497,6 @@ impl AlgebraicGraph {
                             ));
                             self.insert_variable(
                                 symbol_table,
-                                variable_roots,
                                 domain,
                                 *scope,
                                 VariableValue::Matrix(matrix_access.clone()),
@@ -546,7 +512,6 @@ impl AlgebraicGraph {
                                 ));
                             self.insert_variable(
                                 symbol_table,
-                                variable_roots,
                                 domain,
                                 *scope,
                                 VariableValue::Matrix(matrix_access.clone()),
@@ -561,7 +526,6 @@ impl AlgebraicGraph {
                 }
                 VariableType::Matrix(matrix) => self.insert_variable(
                     symbol_table,
-                    variable_roots,
                     domain,
                     *scope,
                     VariableValue::Matrix(matrix_access.clone()),
@@ -616,7 +580,6 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         lf_type: &ListFoldingType,
-        variable_roots: &mut VariableRoots,
         domain: ConstraintDomain,
     ) -> Result<ExprDetails, SemanticError> {
         match lf_type {
@@ -626,9 +589,9 @@ impl AlgebraicGraph {
                     return Err(SemanticError::list_folding_empty_list(lf_value_type));
                 }
 
-                let mut acc = self.insert_expr(symbol_table, &list[0], variable_roots, domain)?;
+                let mut acc = self.insert_expr(symbol_table, &list[0], domain)?;
                 for elem in list.iter().skip(1) {
-                    let expr = self.insert_expr(symbol_table, elem, variable_roots, domain)?;
+                    let expr = self.insert_expr(symbol_table, elem, domain)?;
                     let op = match lf_type {
                         ListFoldingType::Sum(_) => Operation::Add(acc.root_idx(), expr.root_idx()),
                         ListFoldingType::Prod(_) => Operation::Mul(acc.root_idx(), expr.root_idx()),
