@@ -319,8 +319,8 @@ impl AlgebraicGraph {
             IdentifierType::RandomValuesBinding(offset, _) => {
                 self.insert_random_value(symbol_table, *offset, AUX_SEGMENT, domain)
             }
-            IdentifierType::Variable(scope, variable) => {
-                if let VariableType::Scalar(variable_expr) = variable.value() {
+            IdentifierType::Variable(scope, var_type) => {
+                if let VariableType::Scalar(variable_expr) = var_type {
                     self.insert_variable(
                         symbol_table,
                         domain,
@@ -366,7 +366,7 @@ impl AlgebraicGraph {
             IdentifierType::Constant(ConstantType::Vector(_)) => {
                 self.insert_constant(ConstantValue::Vector(vector_access.clone()), domain)
             }
-            IdentifierType::Variable(scope, variable) => match variable.value() {
+            IdentifierType::Variable(scope, var_type) => match var_type {
                 VariableType::Scalar(matrix_vector_access_expr) => {
                     match matrix_vector_access_expr {
                         Expression::Elem(elem) => {
@@ -465,7 +465,7 @@ impl AlgebraicGraph {
             IdentifierType::Constant(ConstantType::Matrix(_)) => {
                 self.insert_constant(ConstantValue::Matrix(matrix_access.clone()), domain)
             }
-            IdentifierType::Variable(scope, variable) => match variable.value() {
+            IdentifierType::Variable(scope, var_type) => match var_type {
                 VariableType::Scalar(scalar) => {
                     if let Expression::Elem(elem) = scalar {
                         let equal_matrix_access = Expression::MatrixAccess(MatrixAccess::new(

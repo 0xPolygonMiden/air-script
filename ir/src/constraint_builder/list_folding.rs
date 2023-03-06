@@ -24,8 +24,8 @@ pub fn build_list_from_list_folding_value(
                 IdentifierType::Constant(ConstantType::Vector(list)) => {
                     Ok(list.iter().map(|value| Expression::Const(*value)).collect())
                 }
-                IdentifierType::Variable(_, integrity_variable) => {
-                    if let VariableType::Vector(list) = integrity_variable.value() {
+                IdentifierType::Variable(_, var_type) => {
+                    if let VariableType::Vector(list) = var_type {
                         Ok(list.clone())
                     } else {
                         Err(SemanticError::invalid_list_folding(

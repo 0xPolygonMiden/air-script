@@ -29,7 +29,7 @@ pub(crate) enum IdentifierType {
     /// its cycle length in that order.
     PeriodicColumn(usize, usize),
     /// an identifier for a variable, containing its scope (boundary or integrity), name, and value
-    Variable(Scope, Variable),
+    Variable(Scope, VariableType),
     /// an identifier for random value, containing its index in the random values array and its
     /// length if this value is an array. For non-array random values second parameter is always 1.
     RandomValuesBinding(usize, usize),
@@ -219,7 +219,7 @@ impl SymbolTable {
     ) -> Result<(), SemanticError> {
         self.insert_symbol(
             variable.name(),
-            IdentifierType::Variable(scope, variable.clone()),
+            IdentifierType::Variable(scope, variable.value().clone()),
         )?;
         Ok(())
     }
