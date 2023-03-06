@@ -1,7 +1,7 @@
 use super::{
-    build_list_from_list_folding_value, BTreeMap, ConstantType, ConstraintDomain, ExprDetails,
-    Expression, Identifier, IdentifierType, IndexedTraceAccess, IntegrityConstraintDegree,
-    ListFoldingType, MatrixAccess, Scope, SemanticError, SymbolTable, VariableType, VariableValue,
+    build_list_from_list_folding_value, BTreeMap, ConstantType, ConstraintDomain, Expression,
+    Identifier, IdentifierType, IndexedTraceAccess, IntegrityConstraintDegree, ListFoldingType,
+    MatrixAccess, Scope, SemanticError, SymbolTable, TraceSegment, VariableType, VariableValue,
     VectorAccess, AUX_SEGMENT, CURRENT_ROW, DEFAULT_SEGMENT,
 };
 
@@ -46,6 +46,55 @@ impl AlgebraicGraph {
         }
     }
 
+    /// TODO: docs
+    pub fn node_details(
+        &self,
+        index: &NodeIndex,
+        default_domain: ConstraintDomain,
+    ) -> Result<(TraceSegment, ConstraintDomain), SemanticError> {
+        // recursively walk the subgraph and infer the trace segment and domain
+        match self.node(index).op() {
+            Operation::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
+            Operation::PeriodicColumn(_, _) => {
+                if default_domain.is_boundary() {
+                    return Err(SemanticError::invalid_periodic_column_access_in_bc());
+                }
+                // the default domain for [IntegrityConstraints] is `EveryRow`
+                Ok((DEFAULT_SEGMENT, ConstraintDomain::EveryRow))
+            }
+            Operation::PublicInput(_, _) => {
+                if default_domain.is_integrity() {
+                    return Err(SemanticError::invalid_public_input_access_in_ic());
+                }
+                Ok((DEFAULT_SEGMENT, default_domain))
+            }
+            Operation::RandomValue(_) => Ok((AUX_SEGMENT, default_domain)),
+            Operation::TraceElement(trace_access) => {
+                let domain = if default_domain.is_boundary() {
+                    if trace_access.row_offset() == 0 {
+                        default_domain
+                    } else {
+                        return Err(SemanticError::invalid_trace_offset_in_bc(trace_access));
+                    }
+                } else {
+                    trace_access.row_offset().into()
+                };
+
+                Ok((trace_access.trace_segment(), domain))
+            }
+            Operation::Add(lhs, rhs) | Operation::Sub(lhs, rhs) | Operation::Mul(lhs, rhs) => {
+                let (lhs_segment, lhs_domain) = self.node_details(lhs, default_domain)?;
+                let (rhs_segment, rhs_domain) = self.node_details(rhs, default_domain)?;
+
+                let trace_segment = lhs_segment.max(rhs_segment);
+                let domain = lhs_domain.merge(&rhs_domain)?;
+
+                Ok((trace_segment, domain))
+            }
+            Operation::Exp(lhs, _) => self.node_details(lhs, default_domain),
+        }
+    }
+
     // --- PUBLIC MUTATORS ------------------------------------------------------------------------
 
     /// Combines two subgraphs representing equal subexpressions and returns the [ExprDetails] of
@@ -53,16 +102,8 @@ impl AlgebraicGraph {
     ///
     /// TODO: we can optimize this in the future in the case where lhs or rhs equals zero to just
     /// return the other expression.
-    pub(crate) fn merge_equal_exprs(
-        &mut self,
-        lhs: &ExprDetails,
-        rhs: &ExprDetails,
-    ) -> Result<ExprDetails, SemanticError> {
-        let node_index = self.insert_op(Operation::Sub(lhs.root_idx(), rhs.root_idx()));
-        let trace_segment = lhs.trace_segment().max(rhs.trace_segment());
-        let domain = lhs.domain().merge(&rhs.domain())?;
-
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
+    pub(crate) fn merge_equal_exprs(&mut self, lhs: NodeIndex, rhs: NodeIndex) -> NodeIndex {
+        self.insert_op(Operation::Sub(lhs, rhs))
     }
 
     /// Adds the expression to the graph and returns the [ExprDetails] of the constraint.
@@ -72,15 +113,11 @@ impl AlgebraicGraph {
         symbol_table: &SymbolTable,
         expr: &Expression,
         default_domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
+    ) -> Result<NodeIndex, SemanticError> {
         match expr {
             Expression::Const(value) => {
                 let node_index = self.insert_op(Operation::Constant(ConstantValue::Inline(*value)));
-                Ok(ExprDetails::new(
-                    node_index,
-                    DEFAULT_SEGMENT,
-                    default_domain,
-                ))
+                Ok(node_index)
             }
             Expression::Elem(Identifier(ident)) => {
                 self.insert_symbol_access(symbol_table, ident, default_domain)
@@ -97,48 +134,45 @@ impl AlgebraicGraph {
                 // TODO: make this more general, so random values from further trace segments can be
                 // used. This requires having a way to describe different sets of randomness in
                 // the AirScript syntax.
-                self.insert_random_access(
-                    symbol_table,
-                    name.name(),
-                    *index,
-                    AUX_SEGMENT,
-                    default_domain,
-                )
+                self.insert_random_access(symbol_table, name.name(), *index)
             }
             Expression::IndexedTraceAccess(column_access) => {
-                self.insert_trace_access(symbol_table, column_access, default_domain)
+                self.insert_trace_access(symbol_table, column_access)
             }
             Expression::NamedTraceAccess(trace_access) => {
                 let trace_access = symbol_table.get_trace_access_by_name(trace_access)?;
-                self.insert_trace_access(symbol_table, &trace_access, default_domain)
+                self.insert_trace_access(symbol_table, &trace_access)
             }
             Expression::Add(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(symbol_table, lhs, default_domain)?;
                 let rhs = self.insert_expr(symbol_table, rhs, default_domain)?;
                 // add the expression.
-                self.insert_bin_op(&lhs, &rhs, Operation::Add(lhs.root_idx(), rhs.root_idx()))
+                let node_index = self.insert_op(Operation::Add(lhs, rhs));
+                Ok(node_index)
             }
             Expression::Sub(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(symbol_table, lhs, default_domain)?;
                 let rhs = self.insert_expr(symbol_table, rhs, default_domain)?;
                 // add the expression.
-                self.insert_bin_op(&lhs, &rhs, Operation::Sub(lhs.root_idx(), rhs.root_idx()))
+                let node_index = self.insert_op(Operation::Sub(lhs, rhs));
+                Ok(node_index)
             }
             Expression::Mul(lhs, rhs) => {
                 // add both subexpressions.
                 let lhs = self.insert_expr(symbol_table, lhs, default_domain)?;
                 let rhs = self.insert_expr(symbol_table, rhs, default_domain)?;
                 // add the expression.
-                self.insert_bin_op(&lhs, &rhs, Operation::Mul(lhs.root_idx(), rhs.root_idx()))
+                let node_index = self.insert_op(Operation::Mul(lhs, rhs));
+                Ok(node_index)
             }
             Expression::Exp(lhs, rhs) => {
                 // add base subexpression.
                 let lhs = self.insert_expr(symbol_table, lhs, default_domain)?;
                 // add exponent subexpression.
                 let node_index = if let Expression::Const(rhs) = **rhs {
-                    self.insert_op(Operation::Exp(lhs.root_idx(), rhs as usize))
+                    self.insert_op(Operation::Exp(lhs, rhs as usize))
                 } else {
                     Err(SemanticError::InvalidUsage(
                         "Non const exponents are only allowed inside list comprehensions"
@@ -146,11 +180,7 @@ impl AlgebraicGraph {
                     ))?
                 };
 
-                Ok(ExprDetails::new(
-                    node_index,
-                    lhs.trace_segment(),
-                    lhs.domain(),
-                ))
+                Ok(node_index)
             }
             Expression::ListFolding(lf_type) => {
                 self.insert_list_folding(symbol_table, lf_type, default_domain)
@@ -169,13 +199,11 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         trace_access: &IndexedTraceAccess,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
+    ) -> Result<NodeIndex, SemanticError> {
         symbol_table.validate_trace_access(trace_access)?;
 
-        let trace_segment = trace_access.trace_segment();
         let node_index = self.insert_op(Operation::TraceElement(*trace_access));
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
+        Ok(node_index)
     }
 
     // --- HELPERS --------------------------------------------------------------------------------
@@ -229,28 +257,10 @@ impl AlgebraicGraph {
         )
     }
 
-    /// Inserts a binary operation into the graph and returns the resulting expression details.
-    fn insert_bin_op(
-        &mut self,
-        lhs: &ExprDetails,
-        rhs: &ExprDetails,
-        op: Operation,
-    ) -> Result<ExprDetails, SemanticError> {
-        let node_index = self.insert_op(op);
-        let trace_segment = lhs.trace_segment().max(rhs.trace_segment());
-        let domain = lhs.domain().merge(&rhs.domain())?;
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
-    }
-
     /// Inserts the specified constant value into the graph and returns the resulting expression
     /// details.
-    fn insert_constant(
-        &mut self,
-        constant: ConstantValue,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        let node_index = self.insert_op(Operation::Constant(constant));
-        Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
+    fn insert_constant(&mut self, constant: ConstantValue) -> NodeIndex {
+        self.insert_op(Operation::Constant(constant))
     }
 
     /// Inserts random value with specified index into the graph and returns the resulting
@@ -259,13 +269,11 @@ impl AlgebraicGraph {
         &mut self,
         symbol_table: &SymbolTable,
         index: usize,
-        trace_segment: u8,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
+    ) -> Result<NodeIndex, SemanticError> {
         symbol_table.validate_rand_access(index)?;
 
         let node_index = self.insert_op(Operation::RandomValue(index));
-        Ok(ExprDetails::new(node_index, trace_segment, domain))
+        Ok(node_index)
     }
 
     /// Looks up the specified variable value in the variable roots and returns the expression
@@ -278,7 +286,7 @@ impl AlgebraicGraph {
         scope: Scope,
         variable_value: VariableValue,
         variable_expr: &Expression,
-    ) -> Result<ExprDetails, SemanticError> {
+    ) -> Result<NodeIndex, SemanticError> {
         // The scope of the variable must be valid for the constraint domain.
         match (scope, domain) {
             (
@@ -310,14 +318,15 @@ impl AlgebraicGraph {
         symbol_table: &SymbolTable,
         ident: &str,
         domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
+    ) -> Result<NodeIndex, SemanticError> {
         let elem_type = symbol_table.get_type(ident)?;
         match elem_type {
             IdentifierType::Constant(ConstantType::Scalar(_)) => {
-                self.insert_constant(ConstantValue::Scalar(ident.to_string()), domain)
+                let node_index = self.insert_constant(ConstantValue::Scalar(ident.to_string()));
+                Ok(node_index)
             }
             IdentifierType::RandomValuesBinding(offset, _) => {
-                self.insert_random_value(symbol_table, *offset, AUX_SEGMENT, domain)
+                self.insert_random_value(symbol_table, *offset)
             }
             IdentifierType::Variable(scope, var_type) => {
                 if let VariableType::Scalar(variable_expr) = var_type {
@@ -334,17 +343,16 @@ impl AlgebraicGraph {
             }
             IdentifierType::PeriodicColumn(index, cycle_len) => {
                 let node_index = self.insert_op(Operation::PeriodicColumn(*index, *cycle_len));
-                Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
+                Ok(node_index)
             }
             IdentifierType::TraceColumns(columns) => {
                 if columns.size() != 1 {
                     return Err(SemanticError::invalid_trace_binding(ident));
                 }
-                let trace_segment = columns.trace_segment();
                 let trace_access =
-                    IndexedTraceAccess::new(trace_segment, columns.offset(), CURRENT_ROW);
+                    IndexedTraceAccess::new(columns.trace_segment(), columns.offset(), CURRENT_ROW);
                 let node_index = self.insert_op(Operation::TraceElement(trace_access));
-                Ok(ExprDetails::new(node_index, trace_segment, domain))
+                Ok(node_index)
             }
             _ => Err(SemanticError::unsupported_identifer_type(ident, elem_type)),
         }
@@ -360,11 +368,12 @@ impl AlgebraicGraph {
         symbol_table: &SymbolTable,
         vector_access: &VectorAccess,
         domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
+    ) -> Result<NodeIndex, SemanticError> {
         let symbol_type = symbol_table.access_vector_element(vector_access)?;
         match symbol_type {
             IdentifierType::Constant(ConstantType::Vector(_)) => {
-                self.insert_constant(ConstantValue::Vector(vector_access.clone()), domain)
+                let node_index = self.insert_constant(ConstantValue::Vector(vector_access.clone()));
+                Ok(node_index)
             }
             IdentifierType::Variable(scope, var_type) => match var_type {
                 VariableType::Scalar(matrix_vector_access_expr) => {
@@ -415,14 +424,13 @@ impl AlgebraicGraph {
                 )),
             },
             IdentifierType::TraceColumns(columns) => {
-                let trace_segment = columns.trace_segment();
                 let trace_access = IndexedTraceAccess::new(
-                    trace_segment,
+                    columns.trace_segment(),
                     columns.offset() + vector_access.idx(),
                     CURRENT_ROW,
                 );
                 let node_index = self.insert_op(Operation::TraceElement(trace_access));
-                Ok(ExprDetails::new(node_index, trace_segment, domain))
+                Ok(node_index)
             }
             IdentifierType::PublicInput(_) => {
                 if !domain.is_boundary() {
@@ -434,14 +442,11 @@ impl AlgebraicGraph {
                     vector_access.name().to_string(),
                     vector_access.idx(),
                 ));
-                Ok(ExprDetails::new(node_index, DEFAULT_SEGMENT, domain))
+                Ok(node_index)
             }
-            IdentifierType::RandomValuesBinding(offset, _) => self.insert_random_value(
-                symbol_table,
-                offset + vector_access.idx(),
-                AUX_SEGMENT,
-                domain,
-            ),
+            IdentifierType::RandomValuesBinding(offset, _) => {
+                self.insert_random_value(symbol_table, offset + vector_access.idx())
+            }
             _ => Err(SemanticError::invalid_vector_access(
                 vector_access,
                 symbol_type,
@@ -459,11 +464,12 @@ impl AlgebraicGraph {
         symbol_table: &SymbolTable,
         matrix_access: &MatrixAccess,
         domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
+    ) -> Result<NodeIndex, SemanticError> {
         let symbol_type = symbol_table.access_matrix_element(matrix_access)?;
         match symbol_type {
             IdentifierType::Constant(ConstantType::Matrix(_)) => {
-                self.insert_constant(ConstantValue::Matrix(matrix_access.clone()), domain)
+                let node_index = self.insert_constant(ConstantValue::Matrix(matrix_access.clone()));
+                Ok(node_index)
             }
             IdentifierType::Variable(scope, var_type) => match var_type {
                 VariableType::Scalar(scalar) => {
@@ -558,13 +564,11 @@ impl AlgebraicGraph {
         symbol_table: &SymbolTable,
         name: &str,
         index: usize,
-        trace_segment: u8,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
+    ) -> Result<NodeIndex, SemanticError> {
         let elem_type = symbol_table.get_type(name)?;
         match elem_type {
             IdentifierType::RandomValuesBinding(_, _) => {
-                self.insert_random_value(symbol_table, index, trace_segment, domain)
+                self.insert_random_value(symbol_table, index)
             }
             _ => Err(SemanticError::unsupported_identifer_type(name, elem_type)),
         }
@@ -581,7 +585,7 @@ impl AlgebraicGraph {
         symbol_table: &SymbolTable,
         lf_type: &ListFoldingType,
         domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
+    ) -> Result<NodeIndex, SemanticError> {
         match lf_type {
             ListFoldingType::Sum(lf_value_type) | ListFoldingType::Prod(lf_value_type) => {
                 let list = build_list_from_list_folding_value(lf_value_type, symbol_table)?;
@@ -593,10 +597,10 @@ impl AlgebraicGraph {
                 for elem in list.iter().skip(1) {
                     let expr = self.insert_expr(symbol_table, elem, domain)?;
                     let op = match lf_type {
-                        ListFoldingType::Sum(_) => Operation::Add(acc.root_idx(), expr.root_idx()),
-                        ListFoldingType::Prod(_) => Operation::Mul(acc.root_idx(), expr.root_idx()),
+                        ListFoldingType::Sum(_) => Operation::Add(acc, expr),
+                        ListFoldingType::Prod(_) => Operation::Mul(acc, expr),
                     };
-                    acc = self.insert_bin_op(&acc, &expr, op)?;
+                    acc = self.insert_op(op);
                 }
 
                 Ok(acc)

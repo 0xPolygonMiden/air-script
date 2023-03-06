@@ -73,6 +73,22 @@ pub enum ConstraintDomain {
 }
 
 impl ConstraintDomain {
+    /// Returns true if this domain is a boundary domain (FirstRow or LastRow).
+    pub fn is_boundary(&self) -> bool {
+        matches!(
+            *self,
+            ConstraintDomain::FirstRow | ConstraintDomain::LastRow
+        )
+    }
+
+    /// Returns true if this domain is an integrity constraint domain.
+    pub fn is_integrity(&self) -> bool {
+        matches!(
+            *self,
+            ConstraintDomain::EveryRow | ConstraintDomain::EveryFrame(_)
+        )
+    }
+
     /// Combines two compatible [ConstraintDomain]s into a single [ConstraintDomain] that represents
     /// the maximum of the two. For example, if one domain is [ConstraintDomain::EveryFrame(2)] and
     /// the other is [ConstraintDomain::EveryFrame(3)], then the result will be
@@ -98,14 +114,6 @@ impl ConstraintDomain {
             // otherwise, the domains are not compatible.
             _ => Err(SemanticError::incompatible_constraint_domains(self, other)),
         }
-    }
-
-    /// Returns true if this domain is a boundary domain (FirstRow or LastRow).
-    pub fn is_boundary(&self) -> bool {
-        matches!(
-            *self,
-            ConstraintDomain::FirstRow | ConstraintDomain::LastRow
-        )
     }
 }
 
