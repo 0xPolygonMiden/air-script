@@ -9,6 +9,10 @@ impl Identifier {
     pub fn name(&self) -> &str {
         &self.0
     }
+
+    pub fn into_name(self) -> String {
+        self.0
+    }
 }
 
 impl fmt::Display for Identifier {

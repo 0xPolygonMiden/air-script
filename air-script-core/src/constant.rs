@@ -28,6 +28,10 @@ impl Constant {
     pub fn value(&self) -> &ConstantType {
         &self.value
     }
+
+    pub fn into_parts(self) -> (String, ConstantType) {
+        (self.name.into_name(), self.value)
+    }
 }
 
 /// Type of constant. Constants can be of 3 types:
