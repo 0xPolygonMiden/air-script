@@ -1,7 +1,7 @@
 use super::{
-    ast, BTreeMap, Constant, ConstantType, Declarations, Identifier, IndexedTraceAccess,
-    MatrixAccess, NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType,
-    VectorAccess, MIN_CYCLE_LENGTH,
+    ast, BTreeMap, Constant, ConstantType, Declarations, IndexedTraceAccess, MatrixAccess,
+    NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType, VectorAccess,
+    MIN_CYCLE_LENGTH,
 };
 use std::fmt::Display;
 
@@ -96,27 +96,25 @@ impl SymbolTable {
     /// It returns an error if the identifier already existed in the table.
     fn insert_symbol(
         &mut self,
-        ident_name: &str,
+        name: String,
         ident_type: IdentifierType,
     ) -> Result<(), SemanticError> {
-        let result = self
-            .identifiers
-            .insert(ident_name.to_owned(), ident_type.clone());
+        let result = self.identifiers.insert(name.clone(), ident_type.clone());
         match result {
             Some(prev_type) => Err(SemanticError::duplicate_identifer(
-                ident_name, ident_type, prev_type,
+                &name, ident_type, prev_type,
             )),
             None => Ok(()),
         }
     }
 
     /// Add a constant by its identifier and value.
-    pub(super) fn insert_constant(&mut self, constant: &Constant) -> Result<(), SemanticError> {
-        validate_constant(constant)?;
-
-        let Identifier(name) = &constant.name();
-        self.insert_symbol(name, IdentifierType::Constant(constant.value().clone()))?;
+    pub(super) fn insert_constant(&mut self, constant: Constant) -> Result<(), SemanticError> {
+        validate_constant(&constant)?;
         self.declarations.add_constant(constant.clone());
+
+        let (name, constant_type) = constant.into_parts();
+        self.insert_symbol(name, IdentifierType::Constant(constant_type))?;
 
         Ok(())
     }
@@ -132,7 +130,7 @@ impl SymbolTable {
             let trace_columns =
                 TraceColumns::new(trace_segment, col_idx, trace_cols.size() as usize);
             self.insert_symbol(
-                trace_cols.name(),
+                trace_cols.name().to_string(),
                 IdentifierType::TraceColumns(trace_columns),
             )?;
             col_idx += trace_cols.size() as usize;
@@ -156,12 +154,12 @@ impl SymbolTable {
     /// Adds all public inputs by their identifier names and array length.
     pub(super) fn insert_public_inputs(
         &mut self,
-        public_inputs: &[ast::PublicInput],
+        public_inputs: Vec<ast::PublicInput>,
     ) -> Result<(), SemanticError> {
-        for input in public_inputs.iter() {
-            self.insert_symbol(input.name(), IdentifierType::PublicInput(input.size()))?;
-            self.declarations
-                .add_public_input((input.name().to_string(), input.size()));
+        for input in public_inputs.into_iter() {
+            let (name, size) = input.into_parts();
+            self.insert_symbol(name.clone(), IdentifierType::PublicInput(size))?;
+            self.declarations.add_public_input((name, size));
         }
 
         Ok(())
@@ -171,16 +169,12 @@ impl SymbolTable {
     /// periodic columns, and the lengths of their periodic cycles.
     pub(super) fn insert_periodic_columns(
         &mut self,
-        columns: &[ast::PeriodicColumn],
+        columns: Vec<ast::PeriodicColumn>,
     ) -> Result<(), SemanticError> {
-        for (index, column) in columns.iter().enumerate() {
-            validate_cycles(column)?;
-            let values = column.values().to_vec();
-
-            self.insert_symbol(
-                column.name(),
-                IdentifierType::PeriodicColumn(index, values.len()),
-            )?;
+        for (index, column) in columns.into_iter().enumerate() {
+            validate_cycles(&column)?;
+            let (name, values) = column.into_parts();
+            self.insert_symbol(name, IdentifierType::PeriodicColumn(index, values.len()))?;
             self.declarations.add_periodic_column(values);
         }
 
@@ -190,24 +184,30 @@ impl SymbolTable {
     /// Adds all random values by their identifier names and array length.
     pub(super) fn insert_random_values(
         &mut self,
-        values: &ast::RandomValues,
+        rand_values: ast::RandomValues,
     ) -> Result<(), SemanticError> {
-        self.declarations
-            .set_num_random_values(values.size() as u16);
+        let (name, num_values, bindings) = rand_values.into_parts();
+
         let mut offset = 0;
         // add the name of the random values array to the symbol table
         self.insert_symbol(
-            values.name(),
-            IdentifierType::RandomValuesBinding(offset, values.size() as usize),
+            name,
+            IdentifierType::RandomValuesBinding(offset, num_values as usize),
         )?;
+
         // add the named random value bindings to the symbol table
-        for value in values.bindings() {
+        for binding in bindings {
+            let (name, size) = binding.into_parts();
             self.insert_symbol(
-                value.name(),
-                IdentifierType::RandomValuesBinding(offset, value.size() as usize),
+                name,
+                IdentifierType::RandomValuesBinding(offset, size as usize),
             )?;
-            offset += value.size() as usize;
+            offset += size as usize;
         }
+
+        // TODO: check this type coercion
+        self.declarations.set_num_random_values(num_values as u16);
+
         Ok(())
     }
 
@@ -215,12 +215,10 @@ impl SymbolTable {
     pub(super) fn insert_variable(
         &mut self,
         scope: Scope,
-        variable: &Variable,
+        variable: Variable,
     ) -> Result<(), SemanticError> {
-        self.insert_symbol(
-            variable.name(),
-            IdentifierType::Variable(scope, variable.value().clone()),
-        )?;
+        let (name, value) = variable.into_parts();
+        self.insert_symbol(name, IdentifierType::Variable(scope, value))?;
         Ok(())
     }
 
