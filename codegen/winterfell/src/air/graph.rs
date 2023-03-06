@@ -130,12 +130,15 @@ impl Codegen for Operation {
                         ElemType::Ext => "E::ONE".to_string(),
                     },
                     1 => lhs, // x^1 = x
-                    _ => match elem_type {
-                        ElemType::Base => format!("{lhs}.exp(Felt::new({r_idx}))"),
-                        ElemType::Ext => {
-                            format!("{lhs}.exp(E::PositiveInteger::from({r_idx}_u64))")
+                    _ => {
+                        // x^y = (x * x * ... * x)
+                        let mut s = format!("({lhs}");
+                        for _ in 2..=*r_idx {
+                            s.push_str(&format!(" * {lhs}").to_string());
                         }
-                    },
+                        s.push(')');
+                        s
+                    }
                 }
             }
         }
