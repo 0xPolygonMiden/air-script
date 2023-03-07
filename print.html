@@ -71,10 +71,12 @@
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
             var html = document.querySelector('html');
-            var sidebar = 'hidden';
+            var sidebar = null;
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
             }
             html.classList.remove('sidebar-visible');
             html.classList.add("sidebar-" + sidebar);
@@ -82,7 +84,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.5.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.6.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.7.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.8.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/convenience-syntax.html"><strong aria-hidden="true">2.5.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.6.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.7.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.8.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.9.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -180,6 +182,8 @@
 <p><strong>Variables</strong>: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. <code>let x = k * c[1]'</code>, <code>let y = [k * c[1], l * c[2], m * c[3]]</code> or <code>let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]]</code>)</p>
 </li>
 </ul>
+<p>The language also includes some convenience syntax like list comprehension and list folding to make writing constraints easier.
+(e.g. <code>let x = [k * c for (k, c) in (k, c[1..4])]</code>, <code>let y = sum([k * c for (k, c) in (k, c[1..4])])</code>)</p>
 <p>The language will be specified in detail in the rest of this book.</p>
 <h3 id="cli"><a class="header" href="#cli">CLI</a></h3>
 <p>There is a command-line interface available for transpiling AirScript files to Rust. There are also several example <code>.air</code> files written in AirScript which can be found in the <code>examples/</code> directory.</p>
@@ -226,6 +230,7 @@
 <li><a href="description/./structure.html">File structure</a></li>
 <li><a href="description/./declarations.html">Type declarations</a></li>
 <li><a href="description/./variables.html">Variables</a></li>
+<li><a href="description/./convenience-syntax.html">Convenience syntax</a></li>
 <li><a href="description/./constraints.html">Constraint descriptions</a></li>
 <li><a href="description/./example.html">AirScript example</a></li>
 <li><a href="description/./keywords.html">Keywords</a></li>
@@ -488,6 +493,43 @@ integrity_constraints:
 <p>These columns may be accessed by using the indexing operator on <code>$aux</code>. For example, <code>$aux[i]</code> provides the <code>(i+1)th</code> column in the auxiliary execution trace.</p>
 <p>Columns using the <code>$aux</code> built-in may only be accessed within source sections for integrity constraints, i.e. the <a href="description/./constraints.html#integrity-constraints-integrity_constraints"><code>integrity_constraints</code> section</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
+<h1 id="convenience-syntax"><a class="header" href="#convenience-syntax">Convenience syntax</a></h1>
+<p>To make writing constraints easier, AirScript provides a number of syntactic conveniences. These are described in this section.</p>
+<h2 id="list-comprehension"><a class="header" href="#list-comprehension">List comprehension</a></h2>
+<p>List comprehension provides a simple way to create new vectors. It is similar to the list comprehension syntax in Python. The following examples show how to use list comprehension in AirScript.</p>
+<pre><code>let x = [a * 2 for a in b]
+</code></pre>
+<p>This will create a new vector with the same length as <code>b</code> and the value of each element will be twice that of the corresponding element in <code>b</code>.</p>
+<pre><code>let x = [a + b for (a, b) in (c, d)]
+</code></pre>
+<p>This will create a new vector with the same length as <code>c</code> and <code>d</code> and the value of each element will be the sum of the corresponding elements in <code>c</code> and <code>d</code>. This will throw an error if <code>c</code> and <code>d</code> vectors are of unequal lengths.</p>
+<pre><code>let x = [2^i * a for (i, a) in (0..5, b)]
+</code></pre>
+<p>Ranges can also be used as iterables, which makes it easy to refer to an element and its index at the same time. This will create a new vector with length 5 and each element will be the corresponding element in <code>b</code> multiplied by 2 raised to the power of the element's index. This will throw an error if <code>b</code> is not of length 5.</p>
+<pre><code>let x = [m + n + o for (m, n, o) in (a, 0..5, c[0..5])]
+</code></pre>
+<p>Slices can also be used as iterables. This will create a new vector with length 5 and each element will be the sum of the corresponding elements in <code>a</code>, the range 0 to 5, and the first 5 elements of <code>c</code>. This will throw an error if <code>a</code> is not of length 5 or if c is of length less than 5.</p>
+<h2 id="list-folding"><a class="header" href="#list-folding">List folding</a></h2>
+<p>List folding provides syntactic convenience for folding vectors into expressions. It is similar to the list folding syntax in Python. List folding can be applied to vectors, list comprehension or identifiers referring to vectors and list comprehension. The following examples show how to use list folding in AirScript.</p>
+<pre><code>trace_columns:
+    main: [a[5], b, c]
+
+integrity_constraints:
+    let x = sum(a)
+    let y = sum([a[0], a[1], a[2], a[3], a[4]])
+    let z = sum([a * 2 for a in a])
+</code></pre>
+<p>In the above, <code>x</code> and <code>y</code> both represent the sum of all trace column values in the trace column binding <code>a</code>. <code>z</code> represents the sum of all trace column values in the trace column binding <code>a</code> multiplied by <code>2</code>.</p>
+<pre><code>trace_columns:
+    main: [a[5], b, c]
+
+integrity_constraints:
+    let x = prod(a)
+    let y = prod([a[0], a[1], a[2], a[3], a[4]])
+    let z = prod([a + 2 for a in a])
+</code></pre>
+<p>In the above, <code>x</code> and <code>y</code> both represent the product of all trace column values in the trace column binding <code>a</code>. <code>z</code> represents the product of all trace column values in the trace column binding <code>a</code> added by <code>2</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <h1 id="constraint-description-sections"><a class="header" href="#constraint-description-sections">Constraint description sections</a></h1>
 <h2 id="boundary-constraints-boundary_constraints"><a class="header" href="#boundary-constraints-boundary_constraints">Boundary constraints (<code>boundary_constraints</code>)</a></h2>
 <p>The <code>boundary_constraints</code> section consists of expressions describing the expected value of columns in the main or auxiliary traces at the specified boundary. Column boundaries can be selected using boundary accessors. Valid boundary accessors are <code>.first</code>, which selects the first cell of the column to which it is applied, and <code>.last</code>, which selects the last cell of the column column to which it is applied.</p>
@@ -731,8 +773,10 @@ integrity_constraints:
 <li><code>integrity_constraints</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./constraints.html#integrity_constraints">integrity constraints are described</a>.</li>
 <li><code>let</code>: used to declare intermediate variables in the boundary_constraints or integrity_constraints source sections.</li>
 <li><code>periodic_columns</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">periodic columns are declared</a>. <em>They may only be referenced when defining integrity constraints.</em></li>
+<li><code>prod</code>: used to fold a list into a single value by multiplying all of the values in the list together.</li>
 <li><code>public_inputs</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">public inputs are declared</a>. <em>They may only be referenced when defining boundary constraints.</em></li>
 <li><code>random_values</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">random values are described</a>.</li>
+<li><code>sum</code>: used to fold a list into a single value by summing all of the values in the list.</li>
 <li><code>trace_columns</code>: used to declare the <a href="description/./structure.html#source-sections">source section</a> where the <a href="description/./declarations.html">execution trace is described</a>. <em>They may only be referenced when defining integrity constraints.</em>
 <ul>
 <li><code>main</code>: used to declare the main execution trace.</li>

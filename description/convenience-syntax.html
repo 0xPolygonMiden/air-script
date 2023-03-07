@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Language Description - AirScript by Polygon Miden</title>
+        <title>Convenience syntax - AirScript by Polygon Miden</title>
 
 
         <!-- Custom HTML head -->
@@ -83,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html" class="active"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/convenience-syntax.html"><strong aria-hidden="true">2.5.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.6.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.7.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.8.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html"><strong aria-hidden="true">2.9.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/convenience-syntax.html" class="active"><strong aria-hidden="true">2.5.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.6.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.7.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.8.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html"><strong aria-hidden="true">2.9.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -148,28 +148,52 @@
                 <div id="content" class="content">
                     <main>
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
-<h1 id="language-description"><a class="header" href="#language-description">Language Description</a></h1>
-<ul>
-<li><a href="./syntax.html">Syntax overview</a></li>
-<li><a href="./structure.html">File structure</a></li>
-<li><a href="./declarations.html">Type declarations</a></li>
-<li><a href="./variables.html">Variables</a></li>
-<li><a href="./convenience-syntax.html">Convenience syntax</a></li>
-<li><a href="./constraints.html">Constraint descriptions</a></li>
-<li><a href="./example.html">AirScript example</a></li>
-<li><a href="./keywords.html">Keywords</a></li>
-<li><a href="./appendix.html">Appendix</a></li>
-</ul>
+<h1 id="convenience-syntax"><a class="header" href="#convenience-syntax">Convenience syntax</a></h1>
+<p>To make writing constraints easier, AirScript provides a number of syntactic conveniences. These are described in this section.</p>
+<h2 id="list-comprehension"><a class="header" href="#list-comprehension">List comprehension</a></h2>
+<p>List comprehension provides a simple way to create new vectors. It is similar to the list comprehension syntax in Python. The following examples show how to use list comprehension in AirScript.</p>
+<pre><code>let x = [a * 2 for a in b]
+</code></pre>
+<p>This will create a new vector with the same length as <code>b</code> and the value of each element will be twice that of the corresponding element in <code>b</code>.</p>
+<pre><code>let x = [a + b for (a, b) in (c, d)]
+</code></pre>
+<p>This will create a new vector with the same length as <code>c</code> and <code>d</code> and the value of each element will be the sum of the corresponding elements in <code>c</code> and <code>d</code>. This will throw an error if <code>c</code> and <code>d</code> vectors are of unequal lengths.</p>
+<pre><code>let x = [2^i * a for (i, a) in (0..5, b)]
+</code></pre>
+<p>Ranges can also be used as iterables, which makes it easy to refer to an element and its index at the same time. This will create a new vector with length 5 and each element will be the corresponding element in <code>b</code> multiplied by 2 raised to the power of the element's index. This will throw an error if <code>b</code> is not of length 5.</p>
+<pre><code>let x = [m + n + o for (m, n, o) in (a, 0..5, c[0..5])]
+</code></pre>
+<p>Slices can also be used as iterables. This will create a new vector with length 5 and each element will be the sum of the corresponding elements in <code>a</code>, the range 0 to 5, and the first 5 elements of <code>c</code>. This will throw an error if <code>a</code> is not of length 5 or if c is of length less than 5.</p>
+<h2 id="list-folding"><a class="header" href="#list-folding">List folding</a></h2>
+<p>List folding provides syntactic convenience for folding vectors into expressions. It is similar to the list folding syntax in Python. List folding can be applied to vectors, list comprehension or identifiers referring to vectors and list comprehension. The following examples show how to use list folding in AirScript.</p>
+<pre><code>trace_columns:
+    main: [a[5], b, c]
+
+integrity_constraints:
+    let x = sum(a)
+    let y = sum([a[0], a[1], a[2], a[3], a[4]])
+    let z = sum([a * 2 for a in a])
+</code></pre>
+<p>In the above, <code>x</code> and <code>y</code> both represent the sum of all trace column values in the trace column binding <code>a</code>. <code>z</code> represents the sum of all trace column values in the trace column binding <code>a</code> multiplied by <code>2</code>.</p>
+<pre><code>trace_columns:
+    main: [a[5], b, c]
+
+integrity_constraints:
+    let x = prod(a)
+    let y = prod([a[0], a[1], a[2], a[3], a[4]])
+    let z = prod([a + 2 for a in a])
+</code></pre>
+<p>In the above, <code>x</code> and <code>y</code> both represent the product of all trace column values in the trace column binding <code>a</code>. <code>z</code> represents the product of all trace column values in the trace column binding <code>a</code> added by <code>2</code>.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../introduction.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../description/variables.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next" href="../description/syntax.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../description/constraints.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -179,11 +203,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../introduction.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../description/variables.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next" href="../description/syntax.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="../description/constraints.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

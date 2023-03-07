@@ -70,10 +70,12 @@
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
             var html = document.querySelector('html');
-            var sidebar = 'hidden';
+            var sidebar = null;
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
             }
             html.classList.remove('sidebar-visible');
             html.classList.add("sidebar-" + sidebar);
@@ -81,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html" class="active"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.5.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.6.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.7.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.8.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html" class="active"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/structure.html"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/convenience-syntax.html"><strong aria-hidden="true">2.5.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.6.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.7.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.8.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.9.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -179,6 +181,8 @@
 <p><strong>Variables</strong>: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. <code>let x = k * c[1]'</code>, <code>let y = [k * c[1], l * c[2], m * c[3]]</code> or <code>let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]]</code>)</p>
 </li>
 </ul>
+<p>The language also includes some convenience syntax like list comprehension and list folding to make writing constraints easier.
+(e.g. <code>let x = [k * c for (k, c) in (k, c[1..4])]</code>, <code>let y = sum([k * c for (k, c) in (k, c[1..4])])</code>)</p>
 <p>The language will be specified in detail in the rest of this book.</p>
 <h3 id="cli"><a class="header" href="#cli">CLI</a></h3>
 <p>There is a command-line interface available for transpiling AirScript files to Rust. There are also several example <code>.air</code> files written in AirScript which can be found in the <code>examples/</code> directory.</p>
