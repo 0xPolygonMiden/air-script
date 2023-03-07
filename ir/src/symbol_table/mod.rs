@@ -46,6 +46,14 @@ impl SymbolTable {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
+    /// TODO: docs
+    pub(crate) fn clear_variables(&mut self) {
+        for variable in self.variables.iter() {
+            self.symbols.remove(variable);
+        }
+        self.variables.clear();
+    }
+
     /// Add a constant by its identifier and value.
     pub(super) fn insert_constant(&mut self, constant: Constant) -> Result<(), SemanticError> {
         self.declarations.add_constant(constant.clone());

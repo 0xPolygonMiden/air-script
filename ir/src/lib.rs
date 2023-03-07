@@ -117,12 +117,8 @@ impl AirIR {
 
         // process the variable & constraint statements, and validate them against the symbol table.
         let mut constraint_builder = ConstraintBuilder::new(symbol_table);
-        for stmt in boundary_stmts.into_iter() {
-            constraint_builder.insert_boundary_stmt(stmt)?;
-        }
-        for stmt in integrity_stmts.into_iter() {
-            constraint_builder.insert_integrity_stmt(stmt)?;
-        }
+        constraint_builder.insert_boundary_constraints(boundary_stmts)?;
+        constraint_builder.insert_integrity_constraints(integrity_stmts)?;
 
         let (declarations, constraints) = constraint_builder.into_air();
 

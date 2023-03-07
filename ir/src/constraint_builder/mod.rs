@@ -49,6 +49,32 @@ impl ConstraintBuilder {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
+    // TODO: docs
+    pub(crate) fn insert_boundary_constraints(
+        &mut self,
+        stmts: Vec<ast::BoundaryStmt>,
+    ) -> Result<(), SemanticError> {
+        for stmt in stmts.into_iter() {
+            self.insert_boundary_stmt(stmt)?
+        }
+        self.symbol_table.clear_variables();
+
+        Ok(())
+    }
+
+    // TODO: docs
+    pub(crate) fn insert_integrity_constraints(
+        &mut self,
+        stmts: Vec<ast::IntegrityStmt>,
+    ) -> Result<(), SemanticError> {
+        for stmt in stmts.into_iter() {
+            self.insert_integrity_stmt(stmt)?
+        }
+        self.symbol_table.clear_variables();
+
+        Ok(())
+    }
+
     /// Adds the provided parsed boundary statement to the graph. The statement can either be a
     /// variable defined in the boundary constraints section or a boundary constraint expression.
     ///
@@ -57,10 +83,7 @@ impl ConstraintBuilder {
     /// In case the statement is a constraint, the constraint is turned into a subgraph which is
     /// added to the [AlgebraicGraph] (reusing any existing nodes). The index of its entry node
     /// is then saved in the boundary_constraints matrix.
-    pub(super) fn insert_boundary_stmt(
-        &mut self,
-        stmt: ast::BoundaryStmt,
-    ) -> Result<(), SemanticError> {
+    fn insert_boundary_stmt(&mut self, stmt: ast::BoundaryStmt) -> Result<(), SemanticError> {
         match stmt {
             ast::BoundaryStmt::Constraint(constraint) => {
                 let trace_access = self
@@ -133,10 +156,7 @@ impl ConstraintBuilder {
     /// In case the statement is a constraint, the constraint is turned into a subgraph which is
     /// added to the [AlgebraicGraph] (reusing any existing nodes). The index of its entry node
     /// is then saved in the validity_constraints or transition_constraints matrices.
-    pub(super) fn insert_integrity_stmt(
-        &mut self,
-        stmt: ast::IntegrityStmt,
-    ) -> Result<(), SemanticError> {
+    fn insert_integrity_stmt(&mut self, stmt: ast::IntegrityStmt) -> Result<(), SemanticError> {
         match stmt {
             ast::IntegrityStmt::Constraint(constraint) => {
                 // add the left hand side expression to the graph.
