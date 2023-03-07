@@ -1,12 +1,8 @@
-use super::{
-    ast::Boundary, build_list_from_list_folding_value, get_variable_expr, AccessType,
-    ConstantValue, Expression, IndexedTraceAccess, ListFoldingType, SemanticError, SymbolTable,
-    SymbolType, TraceSegment, Value,
-};
+use super::{ast::Boundary, SemanticError, TraceSegment, Value};
 use std::collections::BTreeMap;
 
 mod constraint;
-pub use constraint::{ConstrainedBoundary, ConstraintDomain, ConstraintRoot};
+pub use constraint::{ConstraintDomain, ConstraintRoot};
 
 mod degree;
 pub use degree::IntegrityConstraintDegree;
@@ -152,27 +148,9 @@ impl Constraints {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    // TODO: get rid of this
-    pub(super) fn insert_expr(
-        &mut self,
-        symbol_table: &SymbolTable,
-        expr: &Expression,
-    ) -> Result<NodeIndex, SemanticError> {
-        self.graph.insert_expr(symbol_table, expr)
-    }
-
-    // TODO: get rid of this
-    pub(super) fn insert_trace_access(
-        &mut self,
-        symbol_table: &SymbolTable,
-        trace_access: &IndexedTraceAccess,
-    ) -> Result<NodeIndex, SemanticError> {
-        self.graph.insert_trace_access(symbol_table, trace_access)
-    }
-
-    // TODO: get rid of this
-    pub(super) fn merge_equal_exprs(&mut self, lhs: NodeIndex, rhs: NodeIndex) -> NodeIndex {
-        self.graph.merge_equal_exprs(lhs, rhs)
+    /// TODO: docs
+    pub(super) fn insert_graph_node(&mut self, op: Operation) -> NodeIndex {
+        self.graph.insert_op(op)
     }
 
     /// TODO: docs
