@@ -109,6 +109,24 @@ impl SemanticError {
         ))
     }
 
+    pub(crate) fn invalid_periodic_column_access_in_bc() -> SemanticError {
+        SemanticError::InvalidUsage(
+            "Periodic columns cannot be used in boundary constraints.".to_string(),
+        )
+    }
+
+    pub(crate) fn invalid_public_input_access_in_ic() -> SemanticError {
+        SemanticError::InvalidUsage(
+            "Public inputs cannot be used in integrity constraints.".to_string(),
+        )
+    }
+
+    pub(crate) fn invalid_trace_offset_in_bc(trace_access: &IndexedTraceAccess) -> SemanticError {
+        SemanticError::InvalidUsage(format!(
+            "Attempted to access trace column {} in a boundary constraint with a non-zero row offset of {}.", trace_access.col_idx(), trace_access.row_offset()
+        ))
+    }
+
     // --- DECLARATION ERRORS ---------------------------------------------------------------------
 
     fn missing_section_declaration(missing_section: &str) -> Self {

@@ -245,7 +245,7 @@ fn get_iterable_len(
         Iterable::Identifier(ident) => {
             let ident_type = symbol_table.get_type(ident.name())?;
             match ident_type {
-                IdentifierType::Variable(_, var_type) => match var_type.value() {
+                IdentifierType::Variable(_, var_type) => match var_type {
                     VariableType::Vector(vector) => Ok(vector.len()),
                     _ => Err(SemanticError::InvalidListComprehension(format!(
                         "Variable {} should be a vector for a valid list comprehension.",
@@ -320,7 +320,7 @@ fn build_ident_expression(
             )))
         }
         IdentifierType::Variable(_, var_type) => {
-            match var_type.value() {
+            match var_type {
                 VariableType::Vector(vector) => {
                     validate_access(i, vector.len())?;
                     Ok(vector[i].clone())
@@ -374,7 +374,7 @@ fn build_slice_ident_expression(
             )))
         }
         IdentifierType::Variable(_, var_type) => {
-            match var_type.value() {
+            match var_type {
                 VariableType::Vector(vector) => {
                     validate_access(i, vector.len())?;
                     Ok(vector[range_start + i].clone())

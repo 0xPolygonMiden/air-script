@@ -46,7 +46,7 @@ impl ValidateIdentifierAccess for VectorAccess {
             IdentifierType::RandomValuesBinding(_, size) => *size,
             IdentifierType::TraceColumns(trace_columns) => trace_columns.size(),
             IdentifierType::Variable(_, variable) => {
-                match variable.value() {
+                match variable {
                     // TODO: scalar can be ok; check this symbol in the future
                     VariableType::Scalar(_) => return Ok(()),
                     VariableType::Vector(vector) => vector.len(),
@@ -73,7 +73,7 @@ impl ValidateIdentifierAccess for MatrixAccess {
                 (matrix.len(), matrix[0].len())
             }
             IdentifierType::Variable(_, variable) => {
-                match variable.value() {
+                match variable {
                     // TODO: scalar & vector can be ok; check this symbol in the future
                     VariableType::Scalar(_) | VariableType::Vector(_) => return Ok(()),
                     VariableType::Matrix(matrix) => (matrix.len(), matrix[0].len()),

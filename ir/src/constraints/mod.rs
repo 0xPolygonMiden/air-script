@@ -1,8 +1,7 @@
 use super::{
-    ast::Boundary, build_list_from_list_folding_value, ConstantType, ExprDetails, Expression,
-    Identifier, IdentifierType, IndexedTraceAccess, ListFoldingType, MatrixAccess, Scope,
-    SemanticError, SymbolTable, TraceSegment, VariableRoots, VariableType, VariableValue,
-    VectorAccess,
+    ast::Boundary, build_list_from_list_folding_value, ConstantType, Expression, Identifier,
+    IdentifierType, IndexedTraceAccess, ListFoldingType, MatrixAccess, Scope, SemanticError,
+    SymbolTable, TraceSegment, VariableType, VariableValue, VectorAccess,
 };
 use std::collections::BTreeMap;
 
@@ -158,11 +157,9 @@ impl Constraints {
         &mut self,
         symbol_table: &SymbolTable,
         expr: &Expression,
-        variable_roots: &mut VariableRoots,
         default_domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        self.graph
-            .insert_expr(symbol_table, expr, variable_roots, default_domain)
+    ) -> Result<NodeIndex, SemanticError> {
+        self.graph.insert_expr(symbol_table, expr, default_domain)
     }
 
     // TODO: get rid of this
@@ -170,19 +167,22 @@ impl Constraints {
         &mut self,
         symbol_table: &SymbolTable,
         trace_access: &IndexedTraceAccess,
-        domain: ConstraintDomain,
-    ) -> Result<ExprDetails, SemanticError> {
-        self.graph
-            .insert_trace_access(symbol_table, trace_access, domain)
+    ) -> Result<NodeIndex, SemanticError> {
+        self.graph.insert_trace_access(symbol_table, trace_access)
     }
 
     // TODO: get rid of this
-    pub(super) fn merge_equal_exprs(
-        &mut self,
-        lhs: &ExprDetails,
-        rhs: &ExprDetails,
-    ) -> Result<ExprDetails, SemanticError> {
+    pub(super) fn merge_equal_exprs(&mut self, lhs: NodeIndex, rhs: NodeIndex) -> NodeIndex {
         self.graph.merge_equal_exprs(lhs, rhs)
+    }
+
+    /// TODO: docs
+    pub(super) fn node_details(
+        &self,
+        index: &NodeIndex,
+        default_domain: ConstraintDomain,
+    ) -> Result<(TraceSegment, ConstraintDomain), SemanticError> {
+        self.graph.node_details(index, default_domain)
     }
 
     pub(super) fn insert_constraint(
