@@ -1,70 +1,24 @@
 use super::{
-    ast, BTreeMap, Constant, ConstantType, Declarations, IndexedTraceAccess, MatrixAccess,
-    NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType, VectorAccess,
-    MIN_CYCLE_LENGTH,
+    ast, BTreeMap, Constant, ConstantType, Declarations, Identifier, IndexedTraceAccess,
+    MatrixAccess, NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType,
+    VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
-use std::fmt::Display;
+
+mod symbol;
+pub(crate) use symbol::Symbol;
+
+mod symbol_access;
+use symbol_access::ValidateIdentifierAccess;
+pub(crate) use symbol_access::{AccessType, ValidateAccess};
+
+mod symbol_type;
+pub(crate) use symbol_type::SymbolType;
 
 mod trace_columns;
 use trace_columns::TraceColumns;
 
-mod access_validation;
-use access_validation::ValidateIdentifierAccess;
-
-// TYPES
-// ================================================================================================
-
-/// TODO: docs
-/// TODO: get rid of need to make this public to the crate
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) enum IdentifierType {
-    /// an identifier for a constant, containing its type and value
-    Constant(ConstantType),
-    /// an identifier for a trace column, containing trace column information with its trace
-    /// segment, its size and its offset.
-    TraceColumns(TraceColumns),
-    /// an identifier for a public input, containing the size of the public input array
-    PublicInput(usize),
-    /// an identifier for a periodic column, containing its index out of all periodic columns and
-    /// its cycle length in that order.
-    PeriodicColumn(usize, usize),
-    /// an identifier for a variable, containing its scope (boundary or integrity), name, and value
-    Variable(Scope, VariableType),
-    /// an identifier for random value, containing its index in the random values array and its
-    /// length if this value is an array. For non-array random values second parameter is always 1.
-    RandomValuesBinding(usize, usize),
-}
-
-impl Display for IdentifierType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Constant(_) => write!(f, "Constant"),
-            Self::PublicInput(_) => write!(f, "PublicInput"),
-            Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
-            Self::TraceColumns(columns) => {
-                write!(f, "TraceColumns in segment {}", columns.trace_segment())
-            }
-            Self::Variable(Scope::BoundaryConstraints, _) => write!(f, "BoundaryVariable"),
-            Self::Variable(Scope::IntegrityConstraints, _) => write!(f, "IntegrityVariable"),
-            Self::RandomValuesBinding(_, _) => write!(f, "RandomValuesBinding"),
-        }
-    }
-}
-
-// TODO: get rid of need to make this public
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-pub(crate) enum Scope {
-    BoundaryConstraints,
-    IntegrityConstraints,
-}
-
-// TODO: get rid of need to make this public
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub enum VariableValue {
-    Scalar(String),
-    Vector(VectorAccess),
-    Matrix(MatrixAccess),
-}
+mod value;
+pub use value::{ConstantValue, Value};
 
 // SYMBOL TABLE
 // ================================================================================================
@@ -74,7 +28,10 @@ pub enum VariableValue {
 #[derive(Default, Debug)]
 pub struct SymbolTable {
     /// A map of all declared identifiers from their name (the key) to their type.
-    identifiers: BTreeMap<String, IdentifierType>,
+    symbols: BTreeMap<String, Symbol>,
+
+    /// TODO: docs
+    variables: Vec<String>,
 
     /// TODO: docs
     declarations: Declarations,
@@ -89,32 +46,86 @@ impl SymbolTable {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    /// Adds a declared identifier to the symbol table using the identifier as the key and the
-    /// type the identifier represents as the value.
-    ///
-    /// # Errors
-    /// It returns an error if the identifier already existed in the table.
-    fn insert_symbol(
-        &mut self,
-        name: String,
-        ident_type: IdentifierType,
-    ) -> Result<(), SemanticError> {
-        let result = self.identifiers.insert(name.clone(), ident_type.clone());
-        match result {
-            Some(prev_type) => Err(SemanticError::duplicate_identifer(
-                &name, ident_type, prev_type,
-            )),
-            None => Ok(()),
+    /// TODO: docs
+    pub(crate) fn clear_variables(&mut self) {
+        for variable in self.variables.iter() {
+            self.symbols.remove(variable);
         }
+        self.variables.clear();
     }
 
     /// Add a constant by its identifier and value.
     pub(super) fn insert_constant(&mut self, constant: Constant) -> Result<(), SemanticError> {
-        validate_constant(&constant)?;
         self.declarations.add_constant(constant.clone());
-
         let (name, constant_type) = constant.into_parts();
-        self.insert_symbol(name, IdentifierType::Constant(constant_type))?;
+
+        // check the number of elements in each row are same for a matrix
+        if let ConstantType::Matrix(matrix) = &constant_type {
+            let row_len = matrix[0].len();
+            if matrix.iter().skip(1).any(|row| row.len() != row_len) {
+                return Err(SemanticError::invalid_matrix_constant(&name));
+            }
+        }
+
+        self.insert_symbol(name, SymbolType::Constant(constant_type))?;
+
+        Ok(())
+    }
+
+    /// Adds all periodic columns by their identifier names, their indices in the array of all
+    /// periodic columns, and the lengths of their periodic cycles.
+    pub(super) fn insert_periodic_columns(
+        &mut self,
+        columns: Vec<ast::PeriodicColumn>,
+    ) -> Result<(), SemanticError> {
+        for (index, column) in columns.into_iter().enumerate() {
+            validate_cycles(&column)?;
+
+            let (name, values) = column.into_parts();
+            self.insert_symbol(name, SymbolType::PeriodicColumn(index, values.len()))?;
+            self.declarations.add_periodic_column(values);
+        }
+
+        Ok(())
+    }
+
+    /// Adds all public inputs by their identifier names and array length.
+    pub(super) fn insert_public_inputs(
+        &mut self,
+        public_inputs: Vec<ast::PublicInput>,
+    ) -> Result<(), SemanticError> {
+        for input in public_inputs.into_iter() {
+            let (name, size) = input.into_parts();
+            self.insert_symbol(name.clone(), SymbolType::PublicInput(size))?;
+            self.declarations.add_public_input((name, size));
+        }
+
+        Ok(())
+    }
+
+    /// Adds all random values by their identifier names and array length.
+    pub(super) fn insert_random_values(
+        &mut self,
+        rand_values: ast::RandomValues,
+    ) -> Result<(), SemanticError> {
+        let (name, num_values, bindings) = rand_values.into_parts();
+
+        let mut offset = 0;
+        // add the name of the random values array to the symbol table
+        self.insert_symbol(
+            name,
+            SymbolType::RandomValuesBinding(offset, num_values as usize),
+        )?;
+
+        // add the named random value bindings to the symbol table
+        for binding in bindings {
+            let (name, size) = binding.into_parts();
+            self.insert_symbol(name, SymbolType::RandomValuesBinding(offset, size as usize))?;
+            offset += size as usize;
+        }
+
+        // TODO: check this type coercion
+        self.declarations.set_num_random_values(num_values as u16);
 
         Ok(())
     }
@@ -131,7 +142,7 @@ impl SymbolTable {
                 TraceColumns::new(trace_segment, col_idx, trace_cols.size() as usize);
             self.insert_symbol(
                 trace_cols.name().to_string(),
-                IdentifierType::TraceColumns(trace_columns),
+                SymbolType::TraceColumns(trace_columns),
             )?;
             col_idx += trace_cols.size() as usize;
         }
@@ -151,91 +162,51 @@ impl SymbolTable {
         Ok(())
     }
 
-    /// Adds all public inputs by their identifier names and array length.
-    pub(super) fn insert_public_inputs(
-        &mut self,
-        public_inputs: Vec<ast::PublicInput>,
-    ) -> Result<(), SemanticError> {
-        for input in public_inputs.into_iter() {
-            let (name, size) = input.into_parts();
-            self.insert_symbol(name.clone(), IdentifierType::PublicInput(size))?;
-            self.declarations.add_public_input((name, size));
-        }
-
-        Ok(())
-    }
-
-    /// Adds all periodic columns by their identifier names, their indices in the array of all
-    /// periodic columns, and the lengths of their periodic cycles.
-    pub(super) fn insert_periodic_columns(
-        &mut self,
-        columns: Vec<ast::PeriodicColumn>,
-    ) -> Result<(), SemanticError> {
-        for (index, column) in columns.into_iter().enumerate() {
-            validate_cycles(&column)?;
-            let (name, values) = column.into_parts();
-            self.insert_symbol(name, IdentifierType::PeriodicColumn(index, values.len()))?;
-            self.declarations.add_periodic_column(values);
-        }
-
-        Ok(())
-    }
-
-    /// Adds all random values by their identifier names and array length.
-    pub(super) fn insert_random_values(
-        &mut self,
-        rand_values: ast::RandomValues,
-    ) -> Result<(), SemanticError> {
-        let (name, num_values, bindings) = rand_values.into_parts();
-
-        let mut offset = 0;
-        // add the name of the random values array to the symbol table
-        self.insert_symbol(
-            name,
-            IdentifierType::RandomValuesBinding(offset, num_values as usize),
-        )?;
-
-        // add the named random value bindings to the symbol table
-        for binding in bindings {
-            let (name, size) = binding.into_parts();
-            self.insert_symbol(
-                name,
-                IdentifierType::RandomValuesBinding(offset, size as usize),
-            )?;
-            offset += size as usize;
-        }
-
-        // TODO: check this type coercion
-        self.declarations.set_num_random_values(num_values as u16);
-
-        Ok(())
-    }
-
-    /// Inserts a boundary or integrity variable into the symbol table.
-    pub(super) fn insert_variable(
-        &mut self,
-        scope: Scope,
-        variable: Variable,
-    ) -> Result<(), SemanticError> {
+    /// Inserts a variable into the symbol table.
+    pub(super) fn insert_variable(&mut self, variable: Variable) -> Result<(), SemanticError> {
         let (name, value) = variable.into_parts();
-        self.insert_symbol(name, IdentifierType::Variable(scope, value))?;
+        self.insert_symbol(name, SymbolType::Variable(value))?;
+        Ok(())
+    }
+
+    /// Adds a declared identifier to the symbol table using the identifier and scope as the key and
+    /// the symbol as the value, where the symbol contains relevant details like scope and type.
+    ///
+    /// # Errors
+    /// It returns an error if the identifier already existed in the table in the same scope or the
+    /// global scope.
+    fn insert_symbol(
+        &mut self,
+        name: String,
+        symbol_type: SymbolType,
+    ) -> Result<(), SemanticError> {
+        // insert the identifier or return an error if it was already defined.
+        let symbol = Symbol::new(name.clone(), symbol_type.clone());
+
+        if let Some(symbol) = self.symbols.insert(name.clone(), symbol) {
+            return Err(SemanticError::duplicate_identifer(
+                &name,
+                &symbol_type,
+                symbol.symbol_type(),
+            ));
+        } else if matches!(symbol_type, SymbolType::Variable(_)) {
+            // track variables so we can clear them out when we are done with them
+            self.variables.push(name);
+        }
+
         Ok(())
     }
 
     // --- ACCESSORS ------------------------------------------------------------------------------
 
-    /// Gets the number of trace segments that were specified for this AIR.
-    pub(super) fn num_trace_segments(&self) -> usize {
-        self.declarations.num_trace_segments()
-    }
-
-    /// Returns the type associated with the specified identifier name.
+    /// Returns the symbol associated with the specified identifier and validated for the specified
+    /// constraint domain.
     ///
     /// # Errors
     /// Returns an error if the identifier was not in the symbol table.
-    pub(crate) fn get_type(&self, name: &str) -> Result<&IdentifierType, SemanticError> {
-        if let Some(ident_type) = self.identifiers.get(name) {
-            Ok(ident_type)
+    pub(super) fn get_symbol(&self, name: &str) -> Result<&Symbol, SemanticError> {
+        if let Some(symbol) = self.symbols.get(name) {
+            Ok(symbol)
         } else {
             Err(SemanticError::undeclared_identifier(name))
         }
@@ -253,10 +224,10 @@ impl SymbolTable {
         &self,
         trace_access: &NamedTraceAccess,
     ) -> Result<IndexedTraceAccess, SemanticError> {
-        let symbol_type = self.get_type(trace_access.name())?;
-        trace_access.validate(symbol_type)?;
+        let symbol = self.get_symbol(trace_access.name())?;
+        trace_access.validate(symbol)?;
 
-        let IdentifierType::TraceColumns(columns) = symbol_type else { unreachable!("validation of named trace access failed.") };
+        let SymbolType::TraceColumns(columns) = symbol.symbol_type() else { unreachable!("validation of named trace access failed.") };
         Ok(IndexedTraceAccess::new(
             columns.trace_segment(),
             columns.offset() + trace_access.idx(),
@@ -264,43 +235,9 @@ impl SymbolTable {
         ))
     }
 
-    /// Checks that the specified name and index are a valid reference to a declared public input
-    /// or a vector constant and returns the symbol type. If it's not a valid reference, an error
-    /// is returned.
-    ///
-    /// # Errors
-    /// - Returns an error if the identifier is not in the symbol table.
-    /// - Returns an error if the identifier is not associated with a vector access type.
-    /// - Returns an error if the index is not in the declared public input array.
-    /// - Returns an error if the index is greater than the vector's length.
-    /// TODO: update docs
-    pub(crate) fn access_vector_element(
-        &self,
-        vector_access: &VectorAccess,
-    ) -> Result<&IdentifierType, SemanticError> {
-        let symbol_type = self.get_type(vector_access.name())?;
-        vector_access.validate(symbol_type)?;
-
-        Ok(symbol_type)
-    }
-
-    /// Checks that the specified name and index are a valid reference to a matrix constant and
-    /// returns the symbol type. If it's not a valid reference, an error is returned.
-    ///
-    /// # Errors
-    /// - Returns an error if the identifier is not in the symbol table.
-    /// - Returns an error if the identifier is not associated with a matrix access type.
-    /// - Returns an error if the row index is greater than the matrix row length.
-    /// - Returns an error if the column index is greater than the matrix column length.
-    /// TODO: update docs
-    pub(crate) fn access_matrix_element(
-        &self,
-        matrix_access: &MatrixAccess,
-    ) -> Result<&IdentifierType, SemanticError> {
-        let symbol_type = self.get_type(matrix_access.name())?;
-        matrix_access.validate(symbol_type)?;
-
-        Ok(symbol_type)
+    /// Gets the number of trace segments that were specified for this AIR.
+    pub(super) fn num_trace_segments(&self) -> usize {
+        self.declarations.num_trace_segments()
     }
 
     // --- VALIDATION -----------------------------------------------------------------------------
@@ -328,19 +265,6 @@ impl SymbolTable {
 
         Ok(())
     }
-
-    /// Checks that the specified random value access index is valid, i.e. that it is in range of
-    /// the number of declared random values.
-    pub(crate) fn validate_rand_access(&self, index: usize) -> Result<(), SemanticError> {
-        if index >= usize::from(self.declarations.num_random_values()) {
-            return Err(SemanticError::random_value_access_out_of_bounds(
-                index,
-                self.declarations.num_random_values(),
-            ));
-        }
-
-        Ok(())
-    }
 }
 
 // HELPERS
@@ -362,20 +286,4 @@ fn validate_cycles(column: &ast::PeriodicColumn) -> Result<(), SemanticError> {
     }
 
     Ok(())
-}
-
-/// Checks that the declared value of a constant is valid.
-fn validate_constant(constant: &Constant) -> Result<(), SemanticError> {
-    match constant.value() {
-        // check the number of elements in each row are same for a matrix
-        ConstantType::Matrix(matrix) => {
-            let row_len = matrix[0].len();
-            if matrix.iter().skip(1).all(|row| row.len() == row_len) {
-                Ok(())
-            } else {
-                Err(SemanticError::invalid_matrix_constant(constant))
-            }
-        }
-        _ => Ok(()),
-    }
 }

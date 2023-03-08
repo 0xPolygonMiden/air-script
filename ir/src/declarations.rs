@@ -47,11 +47,6 @@ impl Declarations {
         &self.public_inputs
     }
 
-    /// Returns the number of random values that were specified for this AIR.
-    pub(super) fn num_random_values(&self) -> u16 {
-        self.num_random_values
-    }
-
     /// Gets the number of trace segments that were specified for this AIR.
     pub(super) fn num_trace_segments(&self) -> usize {
         self.trace_segment_widths.len() + 1

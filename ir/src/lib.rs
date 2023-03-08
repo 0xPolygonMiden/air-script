@@ -8,7 +8,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub mod constraint_builder;
 // TODO: remove most of these imports
-use constraint_builder::{build_list_from_list_folding_value, ConstraintBuilder};
+use constraint_builder::{
+    build_list_from_list_folding_value, get_variable_expr, ConstraintBuilder,
+};
 
 pub mod constraints;
 use constraints::{
@@ -22,7 +24,8 @@ use declarations::Declarations;
 pub use declarations::{PeriodicColumn, PublicInput};
 
 mod symbol_table;
-use symbol_table::{IdentifierType, Scope, SymbolTable, VariableValue};
+use symbol_table::{AccessType, SymbolTable, SymbolType, ValidateAccess};
+pub use symbol_table::{ConstantValue, Value};
 
 mod validation;
 use validation::{SemanticError, SourceValidator};
@@ -114,12 +117,8 @@ impl AirIR {
 
         // process the variable & constraint statements, and validate them against the symbol table.
         let mut constraint_builder = ConstraintBuilder::new(symbol_table);
-        for stmt in boundary_stmts.into_iter() {
-            constraint_builder.insert_boundary_stmt(stmt)?;
-        }
-        for stmt in integrity_stmts.into_iter() {
-            constraint_builder.insert_integrity_stmt(stmt)?;
-        }
+        constraint_builder.insert_boundary_constraints(boundary_stmts)?;
+        constraint_builder.insert_integrity_constraints(integrity_stmts)?;
 
         let (declarations, constraints) = constraint_builder.into_air();
 

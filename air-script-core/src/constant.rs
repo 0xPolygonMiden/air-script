@@ -38,7 +38,7 @@ impl Constant {
 /// - Scalar: 123
 /// - Vector: \[1, 2, 3\]
 /// - Matrix: \[\[1, 2, 3\], \[4, 5, 6\]\]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ConstantType {
     Scalar(u64),
     Vector(Vec<u64>),
