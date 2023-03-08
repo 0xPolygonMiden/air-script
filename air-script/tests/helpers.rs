@@ -36,7 +36,7 @@ impl Test {
             ))
         })?;
 
-        let ir = AirIR::new(&parsed).map_err(|_| {
+        let ir = AirIR::new(parsed).map_err(|_| {
             TestError::IR(format!(
                 "Failed to convert the input air file at {} to IR representation",
                 &self.input_path

@@ -59,6 +59,10 @@ impl RandomValues {
     pub fn bindings(&self) -> &Vec<RandBinding> {
         &self.bindings
     }
+
+    pub fn into_parts(self) -> (String, u64, Vec<RandBinding>) {
+        (self.name.into_name(), self.size, self.bindings)
+    }
 }
 
 /// Declaration of a random value binding used in [RandomValues]. It is represented by a named
@@ -81,5 +85,9 @@ impl RandBinding {
 
     pub fn size(&self) -> u64 {
         self.size
+    }
+
+    pub fn into_parts(self) -> (String, u64) {
+        (self.name.into_name(), self.size)
     }
 }

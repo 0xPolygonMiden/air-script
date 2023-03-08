@@ -17,7 +17,7 @@ fn random_values_indexed_access() {
         enf c' = $rand[3] + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -38,7 +38,7 @@ fn random_values_custom_name() {
         enf c' = $alphas[3] + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -59,7 +59,7 @@ fn random_values_named_access() {
         enf c' = m + n[2] + $rand[1]";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -80,7 +80,7 @@ fn err_random_values_out_of_bounds() {
         enf a' = $rand[4] + 1";
 
     let parsed = parse(source_fixed_list).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 
     let source_ident_vector_sub_vec = "
@@ -98,7 +98,7 @@ fn err_random_values_out_of_bounds() {
         enf a' = m + 1";
 
     let parsed = parse(source_ident_vector_sub_vec).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 
     let source_ident_vector_index = "
@@ -116,7 +116,7 @@ fn err_random_values_out_of_bounds() {
         enf a' = m + 1";
 
     let parsed = parse(source_ident_vector_index).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -136,7 +136,7 @@ fn err_random_values_without_aux_cols() {
         enf a' = a + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }
 
@@ -157,6 +157,6 @@ fn err_random_values_in_bc_against_main_cols() {
         enf c' = $rand[3] + 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_err());
 }

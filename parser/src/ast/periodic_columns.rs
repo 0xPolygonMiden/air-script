@@ -30,4 +30,8 @@ impl PeriodicColumn {
     pub fn values(&self) -> &[u64] {
         &self.values
     }
+
+    pub fn into_parts(self) -> (String, Vec<u64>) {
+        (self.name.into_name(), self.values)
+    }
 }

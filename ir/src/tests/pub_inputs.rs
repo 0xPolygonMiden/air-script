@@ -13,6 +13,6 @@ fn bc_with_public_inputs() {
         enf clk' = clk - 1";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }

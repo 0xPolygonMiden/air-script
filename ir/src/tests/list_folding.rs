@@ -17,7 +17,7 @@ fn list_folding_on_const() {
         enf clk = y - x";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -38,7 +38,7 @@ fn list_folding_on_variable() {
         enf clk = z - y";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -58,7 +58,7 @@ fn list_folding_on_vector() {
         enf clk = y - x";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -79,7 +79,7 @@ fn list_folding_on_lc() {
         enf clk = y - x";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
 
@@ -101,7 +101,7 @@ fn list_folding_in_lc() {
         enf clk = y[0]";
 
     let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
+    let result = AirIR::new(parsed);
 
     assert!(result.is_ok());
 }

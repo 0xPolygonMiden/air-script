@@ -51,17 +51,18 @@ impl AirIR {
     // --- CONSTRUCTOR ----------------------------------------------------------------------------
 
     /// Consumes the provided source and generates a matching AirIR.
-    pub fn new(source: &ast::Source) -> Result<Self, SemanticError> {
+    pub fn new(source: ast::Source) -> Result<Self, SemanticError> {
         let ast::Source(source) = source;
 
         // set a default name.
-        let mut air_name = "CustomAir";
-
-        let mut validator = SourceValidator::new();
+        let mut air_name = String::from("CustomAir");
 
         // process the declarations of identifiers first, using a single symbol table to enforce
         // uniqueness.
         let mut symbol_table = SymbolTable::default();
+        let mut validator = SourceValidator::new();
+        let mut boundary_stmts = Vec::new();
+        let mut integrity_stmts = Vec::new();
 
         for section in source {
             match section {
@@ -95,37 +96,35 @@ impl AirIR {
                     symbol_table.insert_random_values(values)?;
                     validator.exists("random_values");
                 }
-                _ => {}
-            }
-        }
-
-        // then process the constraints & validate them against the symbol table.
-        let mut constraint_builder = ConstraintBuilder::new(symbol_table);
-        for section in source {
-            match section {
                 ast::SourceSection::BoundaryConstraints(stmts) => {
-                    for stmt in stmts {
-                        constraint_builder.insert_boundary_stmt(stmt)?
-                    }
+                    // save the boundary statements for processing after the SymbolTable is built.
+                    boundary_stmts.extend(stmts);
                     validator.exists("boundary_constraints");
                 }
                 ast::SourceSection::IntegrityConstraints(stmts) => {
-                    for stmt in stmts {
-                        constraint_builder.insert_integrity_stmt(stmt)?
-                    }
+                    // save the integrity statements for processing after the SymbolTable is built.
+                    integrity_stmts.extend(stmts);
                     validator.exists("integrity_constraints");
                 }
-                _ => {}
             }
         }
-
-        let (declarations, constraints) = constraint_builder.into_air();
 
         // validate sections
         validator.check()?;
 
+        // process the variable & constraint statements, and validate them against the symbol table.
+        let mut constraint_builder = ConstraintBuilder::new(symbol_table);
+        for stmt in boundary_stmts.into_iter() {
+            constraint_builder.insert_boundary_stmt(stmt)?;
+        }
+        for stmt in integrity_stmts.into_iter() {
+            constraint_builder.insert_integrity_stmt(stmt)?;
+        }
+
+        let (declarations, constraints) = constraint_builder.into_air();
+
         Ok(Self {
-            air_name: air_name.to_string(),
+            air_name,
             declarations,
             constraints,
         })
