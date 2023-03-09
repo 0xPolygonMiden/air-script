@@ -1,27 +1,20 @@
-def MemoryAir
+mod MemoryAir
 
+### Helper functions/evaluators ###################################################################
 
+# Enforces that columns must be zero.
 ev equal_zero(&main: [4]):
     enf v = 0 for v in &main
 
+# Enforces that values in the columns in the current row must be equal to the values in the next 
+# row.
 ev equal_seq_lines(&main: [4]):
     enf v' = v for v in &main
 
+### Memory Chiplet Air Constraints ################################################################
 
-trace_columns:
-    main: [s[2], ctx, addr, clk, v[4], d[2], t, dummy]
-
-public_inputs:
-    stack_inputs: [16]
-
-random_values:
-    alphas: [9]
-
-boundary_constraints:
-    # This is a dummy trace column to satisfy requirement of at least one boundary constraint.
-    enf dummy.first = 0
-
-integrity_constraints:
+# Enforces the constraints on the memory chiplet, given the columns of the memory execution trace.
+ev memory_chiplet(main: [s[2], ctx, addr, clk, v[4], d[2], t]):
     let delta_c = ctx' - ctx
     let delta_a = addr' - addr
     let delta_i = clk' - clk - 1
