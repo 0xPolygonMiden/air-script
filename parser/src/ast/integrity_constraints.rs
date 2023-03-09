@@ -6,7 +6,9 @@ use super::{EvaluatorFunctionCall, Expression, Variable};
 #[derive(Debug, Eq, PartialEq)]
 pub enum IntegrityStmt {
     Constraint(IntegrityConstraint),
+    ConstraintWithSelector(IntegrityConstraint, Expression),
     EvaluatorFunctionCall(EvaluatorFunctionCall),
+    EvaluatorFunctionCallWithSelector(EvaluatorFunctionCall, Expression),
     Variable(Variable),
 }
 

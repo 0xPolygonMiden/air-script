@@ -139,6 +139,20 @@ pub enum Token {
     #[token("^")]
     Exp,
 
+    // SELECTOR KEYWORDS
+    // --------------------------------------------------------------------------------------------
+    #[token("&")]
+    And,
+
+    #[token("|")]
+    Or,
+
+    #[token("!")]
+    Not,
+
+    #[token("when")]
+    When,
+
     // DELIMITERS
     // --------------------------------------------------------------------------------------------
     /// Used as a delimiter for section and sub section headings.
