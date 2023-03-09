@@ -106,6 +106,7 @@ impl AirIR {
                     integrity_stmts.extend(stmts);
                     validator.exists("integrity_constraints");
                 }
+                ast::SourceSection::EvaluatorFunction(_) => todo!(),
             }
         }
 

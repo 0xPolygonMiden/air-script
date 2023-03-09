@@ -53,6 +53,7 @@ impl ConstraintBuilder {
                     self.symbol_table.insert_variable(variable)?
                 }
             }
+            IntegrityStmt::EvaluatorFunctionCall(_) => todo!(),
         }
 
         Ok(())

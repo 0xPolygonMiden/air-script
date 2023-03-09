@@ -1,4 +1,4 @@
-use super::{Expression, Variable};
+use super::{EvaluatorFunctionCall, Expression, Variable};
 
 // INTEGRITY STATEMENTS
 // ================================================================================================
@@ -6,6 +6,7 @@ use super::{Expression, Variable};
 #[derive(Debug, Eq, PartialEq)]
 pub enum IntegrityStmt {
     Constraint(IntegrityConstraint),
+    EvaluatorFunctionCall(EvaluatorFunctionCall),
     Variable(Variable),
 }
 
@@ -17,14 +18,17 @@ pub struct IntegrityConstraint {
 }
 
 impl IntegrityConstraint {
+    /// Creates a new integrity constraint.
     pub fn new(lhs: Expression, rhs: Expression) -> Self {
         Self { lhs, rhs }
     }
 
+    /// Returns the left-hand side of the integrity constraint.
     pub fn lhs(&self) -> &Expression {
         &self.lhs
     }
 
+    /// Returns the right-hand side of the integrity constraint.
     pub fn rhs(&self) -> &Expression {
         &self.rhs
     }
