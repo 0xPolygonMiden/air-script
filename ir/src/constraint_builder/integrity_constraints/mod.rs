@@ -54,8 +54,9 @@ impl ConstraintBuilder {
                 }
             }
             IntegrityStmt::EvaluatorFunctionCall(_)
-            | IntegrityStmt::ConstraintWithSelector(_, _)
-            | IntegrityStmt::EvaluatorFunctionCallWithSelector(_, _) => todo!(),
+            | IntegrityStmt::EvaluatorFunctionCallWithSelector(_, _)
+            | IntegrityStmt::MultiConstraintsWithSelector(_, _) => todo!()
+            
         }
 
         Ok(())

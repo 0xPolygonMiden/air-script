@@ -5,11 +5,16 @@ use super::{EvaluatorFunctionCall, Expression, Variable};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum IntegrityStmt {
-    Constraint(IntegrityConstraint),
-    ConstraintWithSelector(IntegrityConstraint, Expression),
-    EvaluatorFunctionCall(EvaluatorFunctionCall),
-    EvaluatorFunctionCallWithSelector(EvaluatorFunctionCall, Expression),
+    Constraint(ConstraintType),
+    ConstraintWithSelectors(ConstraintType, Expression),
+    MultiConstraintsWithSelectors(Vec<ConstraintType>, Expression),
     Variable(Variable),
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum ConstraintType {
+    IntegrityConstraint(IntegrityConstraint),
+    EvaluatorFunctionCall(EvaluatorFunctionCall)
 }
 
 /// Stores the expression corresponding to the integrity constraint.

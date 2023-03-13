@@ -302,10 +302,15 @@ IntegrityStmt: IntegrityStmt = {
 }
 
 IntegrityStmtWithSelector: IntegrityStmt = {
-    <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> "when" <selector: SelectorExpr> =>
-        IntegrityStmt::ConstraintWithSelector(IntegrityConstraint::new(lhs, rhs), selector),
-    <evaluator_fn_call: EvaluatorFunctionCall> "when" <selector: SelectorExpr> =>
-        IntegrityStmt::EvaluatorFunctionCallWithSelector(evaluator_fn_call, selector),
+    <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> "when" <selectors: SelectorExpr> =>
+        IntegrityStmt::Constraint(IntegrityConstraint::new(
+            Expression::Mul(
+                Box::new(Expression::Sub(Box::new(lhs), Box::new(rhs)),
+                Box::new(selectors)))
+            )
+        ),
+    <evaluator_fn_call: EvaluatorFunctionCall> "when" <selectors: SelectorExpr> =>
+        IntegrityStmt::EvaluatorFunctionCallWithSelector(evaluator_fn_call, selectors),
 }
 
 IntegrityVariableType: VariableType = {
