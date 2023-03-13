@@ -1,7 +1,7 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::{
     ast::{
-        EvaluatorFunction, EvaluatorFunctionCall, Expression::*, IntegrityStmt::*,
+        ConstraintType, EvaluatorFunction, EvaluatorFunctionCall, Expression::*, IntegrityStmt::*,
         NamedTraceAccess, TraceCols, Variable, VariableType,
     },
     error::{Error, ParseError},
@@ -20,13 +20,16 @@ fn ev_fn_main_cols() {
             Identifier("advance_clock".to_string()),
             vec![TraceCols::new(Identifier("clk".to_string()), 1)],
             vec![],
-            vec![Constraint(IntegrityConstraint::new(
-                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
-                Add(
-                    Box::new(Elem(Identifier("clk".to_string()))),
-                    Box::new(Const(1)),
-                ),
-            ))],
+            vec![Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                    Add(
+                        Box::new(Elem(Identifier("clk".to_string()))),
+                        Box::new(Const(1)),
+                    ),
+                )),
+                None,
+            )],
         ),
     )]);
     build_parse_test!(source).expect_ast(expected);
@@ -56,20 +59,30 @@ fn ev_fn_main_and_aux_cols() {
                         Box::new(Elem(Identifier("b".to_string()))),
                     )),
                 )),
-                Constraint(IntegrityConstraint::new(
-                    NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
-                    Add(
-                        Box::new(Elem(Identifier("clk".to_string()))),
-                        Box::new(Const(1)),
-                    ),
-                )),
-                Constraint(IntegrityConstraint::new(
-                    NamedTraceAccess(NamedTraceAccess::new(Identifier("a".to_string()), 0, 1)),
-                    Add(
-                        Box::new(Elem(Identifier("a".to_string()))),
-                        Box::new(Elem(Identifier("z".to_string()))),
-                    ),
-                )),
+                Constraint(
+                    ConstraintType::Inline(IntegrityConstraint::new(
+                        NamedTraceAccess(NamedTraceAccess::new(
+                            Identifier("clk".to_string()),
+                            0,
+                            1,
+                        )),
+                        Add(
+                            Box::new(Elem(Identifier("clk".to_string()))),
+                            Box::new(Const(1)),
+                        ),
+                    )),
+                    None,
+                ),
+                Constraint(
+                    ConstraintType::Inline(IntegrityConstraint::new(
+                        NamedTraceAccess(NamedTraceAccess::new(Identifier("a".to_string()), 0, 1)),
+                        Add(
+                            Box::new(Elem(Identifier("a".to_string()))),
+                            Box::new(Elem(Identifier("z".to_string()))),
+                        ),
+                    )),
+                    None,
+                ),
             ],
         ),
     )]);
@@ -82,12 +95,13 @@ fn ev_fn_call() {
     integrity_constraints:
         enf advance_clock([clk])";
 
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        EvaluatorFunctionCall(EvaluatorFunctionCall::new(
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
+        ConstraintType::Evaluator(EvaluatorFunctionCall::new(
             Identifier("advance_clock".to_string()),
             vec![vec![TraceCols::new(Identifier("clk".to_string()), 1)]],
         )),
-    ])]);
+        None,
+    )])]);
 
     build_parse_test!(source).expect_ast(expected);
 }
@@ -106,10 +120,13 @@ fn ev_fn_call_inside_ev_fn() {
                 TraceCols::new(Identifier("a".to_string()), 1),
                 TraceCols::new(Identifier("b".to_string()), 1),
             ],
-            vec![EvaluatorFunctionCall(EvaluatorFunctionCall::new(
-                Identifier("advance_clock".to_string()),
-                vec![vec![TraceCols::new(Identifier("clk".to_string()), 1)]],
-            ))],
+            vec![Constraint(
+                ConstraintType::Evaluator(EvaluatorFunctionCall::new(
+                    Identifier("advance_clock".to_string()),
+                    vec![vec![TraceCols::new(Identifier("clk".to_string()), 1)]],
+                )),
+                None,
+            )],
         ),
     )]);
 

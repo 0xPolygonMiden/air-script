@@ -1,3 +1,5 @@
+use crate::ast::ConstraintType;
+
 use super::{
     build_parse_test, Error, Expression::*, Identifier, IntegrityConstraint, IntegrityStmt::*,
     NamedTraceAccess, ParseError, Source, SourceSection::*, Trace, TraceCols,
@@ -66,17 +68,23 @@ fn trace_columns_groups() {
             ],
         }),
         IntegrityConstraints(vec![
-            Constraint(IntegrityConstraint::new(
-                NamedTraceAccess(NamedTraceAccess::new(Identifier("a".to_string()), 1, 1)),
-                Const(1),
-            )),
-            Constraint(IntegrityConstraint::new(
-                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
-                Sub(
-                    Box::new(Elem(Identifier("clk".to_string()))),
-                    Box::new(Const(1)),
-                ),
-            )),
+            Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    NamedTraceAccess(NamedTraceAccess::new(Identifier("a".to_string()), 1, 1)),
+                    Const(1),
+                )),
+                None,
+            ),
+            Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                    Sub(
+                        Box::new(Elem(Identifier("clk".to_string()))),
+                        Box::new(Const(1)),
+                    ),
+                )),
+                None,
+            ),
         ]),
     ]);
     build_parse_test!(source).expect_ast(expected);

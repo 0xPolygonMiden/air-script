@@ -4,9 +4,10 @@ use super::{
     ListFoldingValueType, NamedTraceAccess, SemanticError, Symbol, SymbolType, Variable,
     VariableType, VectorAccess, CURRENT_ROW,
 };
+// TODO: Move this to air-script-core
+use parser::ast::ConstraintType;
 
 mod list_comprehension;
-
 mod list_folding;
 
 impl ConstraintBuilder {
@@ -23,7 +24,7 @@ impl ConstraintBuilder {
         stmt: IntegrityStmt,
     ) -> Result<(), SemanticError> {
         match stmt {
-            IntegrityStmt::Constraint(constraint) => {
+            IntegrityStmt::Constraint(ConstraintType::Inline(constraint), _) => {
                 // add the left hand side expression to the graph.
                 let lhs = self.insert_expr(constraint.lhs())?;
 
@@ -53,7 +54,7 @@ impl ConstraintBuilder {
                     self.symbol_table.insert_variable(variable)?
                 }
             }
-            IntegrityStmt::EvaluatorFunctionCall(_) => todo!(),
+            IntegrityStmt::Constraint(ConstraintType::Evaluator(_), _) => todo!(),
         }
 
         Ok(())

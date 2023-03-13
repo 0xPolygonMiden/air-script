@@ -1,7 +1,7 @@
 use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
-        integrity_constraints::{IntegrityConstraint, IntegrityStmt},
+        integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
         Constant, ConstantType, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
         IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
         MatrixAccess, NamedTraceAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues,
@@ -270,7 +270,7 @@ IntegrityStmts: Vec<IntegrityStmt> = {
     <integrity_stmts: IntegrityStmt+> =>? {
         // check if at least one integrity constraint is defined
         let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
-            IntegrityStmt::Constraint(_) | IntegrityStmt::EvaluatorFunctionCall(_) => true,
+            IntegrityStmt::Constraint(_, _) => true,
             _ => false,
         });
         if !integrity_constraints_exist {
@@ -290,9 +290,9 @@ IntegrityStmt: IntegrityStmt = {
     "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
         IntegrityStmt::Variable(Variable::new(name, integrity_variable_type)),
     "enf" <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
-        IntegrityStmt::Constraint(IntegrityConstraint::new(lhs, rhs)),
+        IntegrityStmt::Constraint(ConstraintType::Inline(IntegrityConstraint::new(lhs, rhs)), None),
     "enf" <evaluator_fn_call: EvaluatorFunctionCall> =>
-        IntegrityStmt::EvaluatorFunctionCall(evaluator_fn_call),
+        IntegrityStmt::Constraint(ConstraintType::Evaluator(evaluator_fn_call), None),
 }
 
 IntegrityVariableType: VariableType = {

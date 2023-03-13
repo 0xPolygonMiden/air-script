@@ -3,8 +3,8 @@ use air_script_core::{Iterable, ListComprehension, ListFoldingType, ListFoldingV
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
     ast::{
-        Boundary, BoundaryConstraint, BoundaryStmt, Expression::*, IntegrityStmt, NamedTraceAccess,
-        SourceSection::*, Trace, TraceCols, Variable, VariableType, VectorAccess,
+        Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType, Expression::*, IntegrityStmt,
+        NamedTraceAccess, SourceSection::*, Trace, TraceCols, Variable, VariableType, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -378,13 +378,16 @@ fn ic_one_iterable_identifier_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
-                Elem(Identifier("a".to_string())),
-                Add(
-                    Box::new(Elem(Identifier("x".to_string()))),
-                    Box::new(Elem(Identifier("y".to_string()))),
-                ),
-            )),
+            IntegrityStmt::Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    Elem(Identifier("a".to_string())),
+                    Add(
+                        Box::new(Elem(Identifier("x".to_string()))),
+                        Box::new(Elem(Identifier("y".to_string()))),
+                    ),
+                )),
+                None,
+            ),
         ]),
     ]);
 
@@ -454,13 +457,16 @@ fn ic_two_iterable_identifier_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
-                Elem(Identifier("a".to_string())),
-                Add(
-                    Box::new(Elem(Identifier("x".to_string()))),
-                    Box::new(Elem(Identifier("y".to_string()))),
-                ),
-            )),
+            IntegrityStmt::Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    Elem(Identifier("a".to_string())),
+                    Add(
+                        Box::new(Elem(Identifier("x".to_string()))),
+                        Box::new(Elem(Identifier("y".to_string()))),
+                    ),
+                )),
+                None,
+            ),
         ]),
     ]);
 
@@ -529,13 +535,16 @@ fn ic_two_iterables_identifier_range_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
-                Elem(Identifier("a".to_string())),
-                Add(
-                    Box::new(Elem(Identifier("x".to_string()))),
-                    Box::new(Elem(Identifier("y".to_string()))),
-                ),
-            )),
+            IntegrityStmt::Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    Elem(Identifier("a".to_string())),
+                    Add(
+                        Box::new(Elem(Identifier("x".to_string()))),
+                        Box::new(Elem(Identifier("y".to_string()))),
+                    ),
+                )),
+                None,
+            ),
         ]),
     ]);
 
@@ -618,13 +627,16 @@ fn ic_three_iterables_slice_identifier_range_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
-                Elem(Identifier("a".to_string())),
-                Add(
-                    Box::new(Elem(Identifier("x".to_string()))),
-                    Box::new(Elem(Identifier("y".to_string()))),
-                ),
-            )),
+            IntegrityStmt::Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    Elem(Identifier("a".to_string())),
+                    Add(
+                        Box::new(Elem(Identifier("x".to_string()))),
+                        Box::new(Elem(Identifier("y".to_string()))),
+                    ),
+                )),
+                None,
+            ),
         ]),
     ]);
 
