@@ -13,6 +13,41 @@ periodic_columns:
 ev is_binary(main: [a]):
     enf a^2 - a = 0
 
+# Enforce selector columns constraints
+ev selector_columns(main: [s[3]], f_out, f_out_next, f_comp):
+    # Enforce that selector columns are binary.
+    enf is_binary([s_i]) for s_i in s
+    # Enforce that unless f_out = 1 or f_out' = 1, the values in columns s[1] and s[2] are copied 
+    # over to the nex row.
+    enf (s[1]' - s[1]) * (1 - f_out_next) * (1 - f_out) = 0
+    enf (s[2]' - s[2]) * (1 - f_out_next) * (1 - f_out) = 0
+    # Enforce that if any of f_abp, f_mpa, f_mva, f_mua flags is set to 1, the next value of s[0] 
+    # is 0.
+    enf s[0]' * f_comp = 0
+    # Enforce that no invalid combinations of flags are allowed.
+    enf k0 * (1 - s[0]) * s[1] = 0
+
+# Enforce node index constraints
+ev node_index(main: [i], b, f_an, f_out):
+    # Enforce that b is binary only when a new node is absorbed into the hasher state.
+    enf f_an * (b^2 - b) = 0
+    # Enforce that when a computation is finished i = 0.
+    enf f_out * i = 0
+    # Enforce that the value in i is copied over to the next row unless we are absorbing a new row 
+    # or the computation is finished.
+    enf (1 - f_an - f_out) * (i' - i) = 0
+
+# Enforce hasher state constraints
+ev hasher_state(main: [h[12]], b, f_abp, f_abs_node):
+    # Enforce that when absorbing the next set of elements into the state during linear hash 
+    # computation (i.e. f_abp = 1) the first 4 elements (the capacity portion) are carried over to 
+    # the next row.
+    enf f_abp * (h[j]' - h[j]) = 0 for j in 0..4
+    # Enforce that when absorbing the next node during Merkle path computation 
+    # (i.e. f_mp + f_mv + f_mu = 1), the result of the previous hash (h[4], ..., h[7]) are copied 
+    # over either to (h[4]', ..., h[7]') or to (h[8]', ..., h[11]') depending on the value of b.
+    enf (f_mp + f_mv + f_mu) * ((1 - b) * (h[j + 4]' - h[j + 4]) + b * (h[j + 8]' - h[j + 4])) = 0
+
 ### Bitwise Chiplet Air Constraints ###############################################################
 
 # Enforces the constraints on the hash chiplet, given the columns of the hash execution trace.
@@ -37,40 +72,19 @@ ev hash_chiplet(main: [s[3], r, h[12], i]):
     # TODO: Apply row address constraint
 
     ## Selector columns constraints ##
-    # Enforce that selector columns are binary.
-    enf is_binary([s_i]) for s_i in s
-    # Enforce that unless f_out = 1 or f_out' = 1, the values in columns s[1] and s[2] are copied 
-    # over to the nex row.
-    enf (s[1]' - s[1]) * (1 - f_out_next) * (1 - f_out) = 0
-    enf (s[2]' - s[2]) * (1 - f_out_next) * (1 - f_out) = 0
-    # Enforce that if any of f_abp, f_mpa, f_mva, f_mua flags is set to 1, the next value of s[0] 
-    # is 0.
-    enf s[0]' * (f_abp + f_mpa + f_mva + f_mua) = 0
-    # Enforce that no invalid combinations of flags are allowed.
-    enf k0 * (1 - s[0]) * s[1] = 0
+    let f_comp = f_abp + f_mpa + f_mva + f_mua
+    enf selector_columns([s], f_out, f_out_next, f_comp)
 
     ## Node index constraints ##
     # b is the value of the bit which is discarded during shift by one bit to the right.
     let b = i - 2 * i'
     let f_an = f_mp + f_mv + f_mu + f_mpa + f_mva + f_mua
-    # Enforce that b is binary only when a new node is absorbed into the hasher state.
-    enf f_an * (b^2 - b) = 0
-    # Enforce that when a computation is finished i = 0.
-    enf f_out * i = 0
-    # Enforce that the value in i is copied over to the next row unless we are absorbing a new row 
-    # or the computation is finished.
-    enf (1 - f_an - f_out) * (i' - i) = 0
+    enf node_index([i], b, f_an, f_out)
 
     ## Hasher state constraints ##
     # TODO: apply RPO constraints to the hasher state
-    # Enforce that when absorbing the next set of elements into the state during linear hash 
-    # computation (i.e. f_abp = 1) the first 4 elements (the capacity portion) are carried over to 
-    # the next row.
-    enf f_abp * (h[j]' - h[j]) for j in 0..4
-    # Enforce that when absorbing the next node during Merkle path computation 
-    # (i.e. f_mp + f_mv + f_mu = 1), the result of the previous hash (h[4], ..., h[7]) are copied 
-    # over either to (h[4]', ..., h[7]') or to (h[8]', ..., h[11]') depending on the value of b.
-    enf (f_mp + f_mv + f_mu) * ((1 - b) * (h[j + 4]' - h[j + 4]) + b * (h[j + 8]' - h[j + 4])) = 0
+    let f_abs_node = f_mp + f_mv + f_mu
+    enf hasher_state([h], b, f_abp, f_abs_node)
 
     # Multiset check constraints
     # TODO: Apply multiset check constraints
