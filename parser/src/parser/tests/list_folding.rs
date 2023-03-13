@@ -4,7 +4,7 @@ use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
     ast::{
         Boundary, BoundaryConstraint, BoundaryStmt, Expression::*, IntegrityStmt, NamedTraceAccess,
-        SourceSection::*, Trace, TraceCols, Variable, VariableType, VectorAccess,
+        SourceSection::*, Trace, TraceCols, Variable, VariableType, VectorAccess, ConstraintType,
     },
     error::{Error, ParseError},
 };
@@ -378,13 +378,13 @@ fn ic_one_iterable_identifier_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(ConstraintType::IntegrityConstraint(IntegrityConstraint::new(
                 Elem(Identifier("a".to_string())),
                 Add(
                     Box::new(Elem(Identifier("x".to_string()))),
                     Box::new(Elem(Identifier("y".to_string()))),
                 ),
-            )),
+            ))),
         ]),
     ]);
 
@@ -454,13 +454,13 @@ fn ic_two_iterable_identifier_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(ConstraintType::IntegrityConstraint(IntegrityConstraint::new(
                 Elem(Identifier("a".to_string())),
                 Add(
                     Box::new(Elem(Identifier("x".to_string()))),
                     Box::new(Elem(Identifier("y".to_string()))),
                 ),
-            )),
+            ))),
         ]),
     ]);
 
@@ -529,13 +529,13 @@ fn ic_two_iterables_identifier_range_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(ConstraintType::IntegrityConstraint(IntegrityConstraint::new(
                 Elem(Identifier("a".to_string())),
                 Add(
                     Box::new(Elem(Identifier("x".to_string()))),
                     Box::new(Elem(Identifier("y".to_string()))),
                 ),
-            )),
+            ))),
         ]),
     ]);
 
@@ -618,13 +618,13 @@ fn ic_three_iterables_slice_identifier_range_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(ConstraintType::IntegrityConstraint(IntegrityConstraint::new(
                 Elem(Identifier("a".to_string())),
                 Add(
                     Box::new(Elem(Identifier("x".to_string()))),
                     Box::new(Elem(Identifier("y".to_string()))),
                 ),
-            )),
+            ))),
         ]),
     ]);
 

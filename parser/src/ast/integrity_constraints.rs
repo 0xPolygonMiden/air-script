@@ -7,7 +7,6 @@ use super::{EvaluatorFunctionCall, Expression, Variable};
 pub enum IntegrityStmt {
     Constraint(ConstraintType),
     ConstraintWithSelectors(ConstraintType, Expression),
-    MultiConstraintsWithSelectors(Vec<ConstraintType>, Expression),
     Variable(Variable),
 }
 

@@ -48,7 +48,7 @@ fn full_air_file() {
         // integrity_constraints:
         //     enf clk' = clk + 1
         SourceSection::IntegrityConstraints(vec![IntegrityStmt::Constraint(
-            IntegrityConstraint::new(
+            ConstraintType::IntegrityConstraint(IntegrityConstraint::new(
                 // clk' = clk + 1
                 Expression::NamedTraceAccess(NamedTraceAccess::new(
                     Identifier("clk".to_string()),
@@ -59,7 +59,7 @@ fn full_air_file() {
                     Box::new(Expression::Elem(Identifier("clk".to_string()))),
                     Box::new(Expression::Const(1)),
                 ),
-            ),
+            )),
         )]),
         // boundary_constraints:
         //     enf clk.first = 0

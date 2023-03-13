@@ -4,7 +4,7 @@ use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
     ast::{
         Boundary, BoundaryConstraint, BoundaryStmt, Expression::*, IntegrityStmt, NamedTraceAccess,
-        SourceSection::*, Trace, TraceCols, Variable, VariableType, VectorAccess,
+        SourceSection::*, Trace, TraceCols, Variable, VariableType, VectorAccess, ConstraintType,
     },
     error::{Error, ParseError},
 };
@@ -427,7 +427,7 @@ fn ic_one_iterable_identifier_lc() {
                     )],
                 )),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(ConstraintType::IntegrityConstraint(IntegrityConstraint::new(
                 Elem(Identifier("a".to_string())),
                 Add(
                     Box::new(Add(
@@ -451,7 +451,7 @@ fn ic_one_iterable_identifier_lc() {
                         3,
                     ))),
                 ),
-            )),
+            ))),
         ]),
     ]);
 
@@ -500,7 +500,7 @@ fn ic_iterable_identifier_range_lc() {
                     ],
                 )),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(ConstraintType::IntegrityConstraint(IntegrityConstraint::new(
                 Elem(Identifier("a".to_string())),
                 Add(
                     Box::new(Add(
@@ -524,7 +524,7 @@ fn ic_iterable_identifier_range_lc() {
                         3,
                     ))),
                 ),
-            )),
+            ))),
         ]),
     ]);
 
@@ -561,7 +561,7 @@ fn ic_iterable_slice_lc() {
                     )],
                 )),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(ConstraintType::IntegrityConstraint(IntegrityConstraint::new(
                 Elem(Identifier("a".to_string())),
                 Add(
                     Box::new(Add(
@@ -585,7 +585,7 @@ fn ic_iterable_slice_lc() {
                         3,
                     ))),
                 ),
-            )),
+            ))),
         ]),
     ]);
 
@@ -632,7 +632,7 @@ fn ic_two_iterable_identifier_lc() {
                     ],
                 )),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(ConstraintType::IntegrityConstraint(IntegrityConstraint::new(
                 Elem(Identifier("a".to_string())),
                 Add(
                     Box::new(Add(
@@ -656,7 +656,7 @@ fn ic_two_iterable_identifier_lc() {
                         3,
                     ))),
                 ),
-            )),
+            ))),
         ]),
     ]);
 
@@ -717,7 +717,7 @@ fn ic_multiple_iterables_lc() {
                     ],
                 )),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(ConstraintType::IntegrityConstraint(IntegrityConstraint::new(
                 Elem(Identifier("a".to_string())),
                 Add(
                     Box::new(Add(
@@ -741,7 +741,7 @@ fn ic_multiple_iterables_lc() {
                         3,
                     ))),
                 ),
-            )),
+            ))),
         ]),
     ]);
 

@@ -10,7 +10,7 @@ fn chained_selectors() {
     integrity_constraints:
         enf clk' = clk when (n1 & !n2) | !n3";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        ConstraintWithSelector(ConstraintType::IntegrityConstraint(
+        ConstraintWithSelectors(ConstraintType::IntegrityConstraint(
             IntegrityConstraint::new(
                 // clk' = clk
                 NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
