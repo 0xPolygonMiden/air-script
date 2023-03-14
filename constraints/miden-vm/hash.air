@@ -1,90 +1,205 @@
-mod HashAir
+mod HashChipletAir
 
 ### Constants and periodic columns ################################################################
 
 periodic_columns:
-    k0: [0, 0, 0, 0, 0, 0, 0, 1]
-    k1: [0, 0, 0, 0, 0, 0, 1, 0]
-    k2: [1, 0, 0, 0, 0, 0, 0, 0]
+    cycle_row_0: [1, 0, 0, 0, 0, 0, 0, 0]
+    cycle_row_6: [0, 0, 0, 0, 0, 0, 1, 0]
+    cycle_row_7: [0, 0, 0, 0, 0, 0, 0, 1]
 
-### Helper functions/evaluators ###################################################################
+
+### Helper functions ##############################################################################
+
+# Returns binary negation of the value.
+fn binary_not(value: scalar) -> scalar:
+    return 1 - value
+
+
+# Set to 1 when selector flags are (1,0,1) on rows which are multiples of 8. This is flag of 
+# the instruction that initiates Merkle path verification computation.
+fn get_f_mp(s: vector[3]) -> scalar:
+    return cycle_row_0 & s[0] & binary_not(s[1]) & s[2]
+
+
+# Set to 1 when selector flags are (1,1,0) on rows which are multiples of 8. This is flag of 
+# the instruction that initiates Merkle path verification for the "old" node value during 
+# Merkle root update computation.
+fn get_f_mv(s: vector[3]) -> scalar:
+    return cycle_row_0 & s[0] & s[1] & binary_not(s[2])
+
+
+# Set to 1 when selector flags are (1,1,1) on rows which are multiples of 8. This is flag of 
+# the instruction that initiates Merkle path verification for the "new" node value during
+# Merkle root update computation.
+fn get_f_mu(s: vector[3]) -> scalar:
+    return cycle_row_0 & s[0] & s[1] & s[2]
+
+
+# Set to 1 when selector flags are (1,0,0) on rows which are 1 less than a multiple of 8. This 
+# is flag of the instruction that absorbs a new set of elements into the hasher state when 
+# computing a linear hash of many elements.
+fn get_f_abp(s: vector[3]) -> scalar:
+    return cycle_row_7 & s[0] & binary_not(s[1]) & binary_not(s[2])
+
+
+# Set to 1 when selector flags are (1,0,1) on rows which are 1 less than a multiple of 8. This 
+# is flag of the instruction that absorbs the next Merkle path node into the hasher state 
+# during Merkle path verification computation.
+fn get_f_mpa(s: vector[3]) -> scalar:
+    return cycle_row_7 & s[0] & binary_not(s[1]) & s[2]
+
+
+# Set to 1 when selector flags are (1,1,0) on rows which are 1 less than a multiple of 8. This 
+# is flag of the instruction that absorbs the next Merkle path node into the hasher state 
+# during Merkle path verification for the "old" node value during Merkle root update 
+# computation.
+fn get_f_mva(s: vector[3]) -> scalar:
+    return cycle_row_7 & s[0] & s[1] & binary_not(s[2])
+
+
+# Set to 1 when selector flags are (1,1,1) on rows which are 1 less than a multiple of 8. This 
+# is flag of the instruction that absorbs the next Merkle path node into the hasher state 
+# during Merkle path verification for the "new" node value during Merkle root update 
+# computation.
+fn get_f_mua(s: vector[3]) -> scalar:
+    return cycle_row_7 & s[0] & s[1] & s[2]
+
+
+# We can define two flags:
+# 1. Flag f_hout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & binary_not(s[2]), 
+# which is set to 1 when selector flags are (0,0,0) on rows which are 1 less than a multiple 
+# of 8. This is flag of the instruction that returns the result of the currently running 
+# computation.
+# 2. Flag f_sout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & s[2], which is set to 1 
+# when selector flags are (0,0,1) on rows which are 1 less than a multiple of 8. This is flag 
+# of the instruction that returns the whole hasher state.
+#
+# Flag f_out is set to 1 when either f_hout = 1 or f_sout = 1 in the current row.
+fn get_f_out(s: vector[3]) -> scalar:
+    return cycle_row_7 & binary_not(s[0]) & binary_not(s[1])
+
+
+# Flag f_out_next is set to 1 when either f_hout = 1 or f_sout = 1 in the next row.
+fn get_f_out_next(s: vector[3]) -> scalar:
+    return cycle_row_6 & binary_not(s[0]') & binary_not(s[1]')
+
+
+### Helper evaluators #############################################################################
 
 # Enforces that column must be binary.
 ev is_binary(main: [a]):
-    enf a^2 - a = 0
+    enf a^2 = a
+
+
+# Enforces that value in column is copied over to the next row.
+ev is_unchanged(main: [column]):
+    ev column' = column
+
 
 # Enforce selector columns constraints
-ev selector_columns(main: [s[3]], f_out, f_out_next, f_comp):
+ev selector_columns(main: [s[3]]):
+    let f_out = get_f_out(s)
+    let f_out_next = get_f_out_next(s)
+    let f_abp = get_f_abp(s)
+    let f_mpa = get_f_mpa(s)
+    let f_mva = get_f_mva(s)
+    let f_mua = get_f_mua(s)
+
+    # Flag that is true when the performed operation is one of the represented by flags f_abp, 
+    # f_mpa, f_mva or f_mua
+    let f_comp = f_abp + f_mpa + f_mva + f_mua
+
     # Enforce that selector columns are binary.
-    enf is_binary([s_i]) for s_i in s
+    enf is_binary([selector]) for selector in s
+
     # Enforce that unless f_out = 1 or f_out' = 1, the values in columns s[1] and s[2] are copied 
     # over to the nex row.
-    enf (s[1]' - s[1]) * (1 - f_out_next) * (1 - f_out) = 0
-    enf (s[2]' - s[2]) * (1 - f_out_next) * (1 - f_out) = 0
+    enf is_unchanged([s[1]]) when !f_out & !f_out_next
+    enf is_unchanged([s[2]]) when !f_out & !f_out_next
+
     # Enforce that if any of f_abp, f_mpa, f_mva, f_mua flags is set to 1, the next value of s[0] 
     # is 0.
     enf s[0]' * f_comp = 0
+
     # Enforce that no invalid combinations of flags are allowed.
-    enf k0 * (1 - s[0]) * s[1] = 0
+    enf cycle_row_7 * binary_not(s[0]) * s[1] = 0
+
 
 # Enforce node index constraints
-ev node_index(main: [i], b, f_an, f_out):
+ev node_index(main: [s[3], i]):
+    let f_out = get_f_out(s)
+    let f_mp = get_f_mp(s)
+    let f_mv = get_f_mv(s)
+    let f_mu = get_f_mu(s)
+    let f_mpa = get_f_mpa(s)
+    let f_mva = get_f_mva(s)
+    let f_mua = get_f_mua(s)
+
+    # b is the value of the bit which is discarded during shift by one bit to the right.
+    let b = i - 2 * i'
+
+    # Flag that allows to enforce constraint that b is binary only when a new node is absorbed into
+    # the hasher state (when the hash operation is one of Merkle path verification operations or 
+    # next Merkle path node absorption operations)
+    let f_an = f_mp + f_mv + f_mu + f_mpa + f_mva + f_mua
+
     # Enforce that b is binary only when a new node is absorbed into the hasher state.
     enf f_an * (b^2 - b) = 0
+
     # Enforce that when a computation is finished i = 0.
     enf f_out * i = 0
+
     # Enforce that the value in i is copied over to the next row unless we are absorbing a new row 
     # or the computation is finished.
-    enf (1 - f_an - f_out) * (i' - i) = 0
+    let absorbing_or_comp_finished = 1 - f_an - f_out
+    enf is_unchanged([i]) when absorbing_or_comp_finished
+
 
 # Enforce hasher state constraints
-ev hasher_state(main: [h[12]], b, f_abp, f_abs_node):
+ev hasher_state(main: [s[3], h[12], i]):
+    let f_mp = get_f_mp(s)
+    let f_mv = get_f_mv(s)
+    let f_mu = get_f_mu(s)
+    let f_abp = get_f_abp(s)
+
+    # Flag that is true when the performed operation includes absorbing the next node during Merkle
+    # path computation.
+    let f_absorb_node = f_mp + f_mv + f_mu
+
+    # b is the value of the bit which is discarded during shift by one bit to the right.
+    let b = i - 2 * i'
+
     # Enforce that when absorbing the next set of elements into the state during linear hash 
     # computation (i.e. f_abp = 1) the first 4 elements (the capacity portion) are carried over to 
     # the next row.
     enf f_abp * (h[j]' - h[j]) = 0 for j in 0..4
+
     # Enforce that when absorbing the next node during Merkle path computation 
     # (i.e. f_mp + f_mv + f_mu = 1), the result of the previous hash (h[4], ..., h[7]) are copied 
     # over either to (h[4]', ..., h[7]') or to (h[8]', ..., h[11]') depending on the value of b.
-    enf (f_mp + f_mv + f_mu) * ((1 - b) * (h[j + 4]' - h[j + 4]) + b * (h[j + 8]' - h[j + 4])) = 0
+    match enf:
+        is_unchanged(h[j + 4]) for j in 0..4 when !b & f_absorb_node
+        h[j + 8]' = h[j + 4] for j in 0..4 when b & f_absorb_node
 
-### Bitwise Chiplet Air Constraints ###############################################################
+
+### Hash Chiplet Air Constraints ##################################################################
 
 # Enforces the constraints on the hash chiplet, given the columns of the hash execution trace.
 ev hash_chiplet(main: [s[3], r, h[12], i]):
-
-    ## Instruction flags ##
-    let f_rpr = 1 - k0
-    let f_bp = k2 * s[0] * (1 - s[1]) * (1 - s[2])
-    let f_mp = k2 * s[0] * (1 - s[1]) * s[2]
-    let f_mv = k2 * s[0] * s[1] * (1 - s[2])
-    let f_mu = k2 * s[0] * s[1] * s[2]
-    let f_hout = k0 * (1 - s[0]) * (1 - s[1]) * (1 - s[2])
-    let f_sout = k0 * (1 - s[0]) * (1 - s[1]) * s[2]
-    let f_out = k0 * (1 - s[0]) * (1 - s[1])
-    let f_out_next = k1 * (1 - s[0]') * (1 - s[1]')
-    let f_abp = k0 * s[0] * (1 - s[1]) * (1 - s[2])
-    let f_mpa = k0 * s[0] * (1 - s[1]) * s[2]
-    let f_mva = k0 * s[0] * s[1] * (1 - s[2])
-    let f_mua = k0 * s[0] * s[1] * s[2]
-
     ## Row address constraint ##
-    # TODO: Apply row address constraint
+    # TODO: Apply row address constraints:
+    # 1. Boundary constraint `enf r.first = 1`
+    # 2. Transition constraint. It requires chiplets module's selector flag s0.
 
     ## Selector columns constraints ##
-    let f_comp = f_abp + f_mpa + f_mva + f_mua
-    enf selector_columns([s], f_out, f_out_next, f_comp)
+    enf selector_columns([s])
 
     ## Node index constraints ##
-    # b is the value of the bit which is discarded during shift by one bit to the right.
-    let b = i - 2 * i'
-    let f_an = f_mp + f_mv + f_mu + f_mpa + f_mva + f_mua
-    enf node_index([i], b, f_an, f_out)
+    enf node_index([s, i])
 
     ## Hasher state constraints ##
     # TODO: apply RPO constraints to the hasher state
-    let f_abs_node = f_mp + f_mv + f_mu
-    enf hasher_state([h], b, f_abp, f_abs_node)
+    enf hasher_state([s, h, i])
 
     # Multiset check constraints
     # TODO: Apply multiset check constraints
