@@ -106,7 +106,7 @@ impl Air for ConstantsAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
-        result[0] = aux_current[0] - (E::from(A) + E::from(B[1]) * E::from(C[1][1]));
-        result[1] = aux_next[0] - (aux_current[0] + E::from(A) + E::from(B[0]) * E::from(C[0][1]));
+        result[0] = aux_next[0] - (aux_current[0] + E::from(A) + E::from(B[0]) * E::from(C[0][1]));
+        result[1] = aux_current[0] - (E::from(A) + E::from(B[1]) * E::from(C[1][1]));
     }
 }

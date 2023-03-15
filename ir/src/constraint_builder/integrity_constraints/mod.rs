@@ -17,7 +17,7 @@ impl ConstraintBuilder {
     ///
     /// In case the statement is a constraint, the constraint is turned into a subgraph which is
     /// added to the [AlgebraicGraph] (reusing any existing nodes). The index of its entry node
-    /// is then saved in the validity_constraints or transition_constraints matrices.
+    /// is then saved in the integrity_constraints matrix.
     pub(super) fn insert_integrity_stmt(
         &mut self,
         stmt: IntegrityStmt,
