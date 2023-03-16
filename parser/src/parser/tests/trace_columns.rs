@@ -1,9 +1,8 @@
-use crate::ast::ConstraintType;
-
 use super::{
     build_parse_test, Error, Expression::*, Identifier, IntegrityConstraint, IntegrityStmt::*,
     NamedTraceAccess, ParseError, Source, SourceSection::*, Trace, TraceCols,
 };
+use crate::ast::ConstraintType;
 
 // TRACE COLUMNS
 // ================================================================================================

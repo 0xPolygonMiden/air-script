@@ -1,11 +1,10 @@
 use super::{
-    ast::IntegrityStmt, BTreeMap, ConstantType, ConstraintBuilder, ConstraintDomain, Expression,
-    Identifier, IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType,
-    ListFoldingValueType, NamedTraceAccess, SemanticError, Symbol, SymbolType, Variable,
-    VariableType, VectorAccess, CURRENT_ROW,
+    ast::{ConstraintType, IntegrityStmt},
+    BTreeMap, ConstantType, ConstraintBuilder, ConstraintDomain, Expression, Identifier,
+    IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
+    NamedTraceAccess, SemanticError, Symbol, SymbolType, Variable, VariableType, VectorAccess,
+    CURRENT_ROW,
 };
-// TODO: Move this to air-script-core
-use parser::ast::ConstraintType;
 
 mod list_comprehension;
 mod list_folding;

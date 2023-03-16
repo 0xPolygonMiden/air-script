@@ -1,9 +1,8 @@
-use crate::ast::ConstraintType;
-
 use super::{
     build_parse_test, Error, Expression::*, Identifier, IntegrityConstraint, IntegrityStmt::*,
     ParseError, RandBinding, RandomValues, Source, SourceSection, SourceSection::*,
 };
+use crate::ast::ConstraintType;
 
 // RANDOM VALUES
 // ================================================================================================
