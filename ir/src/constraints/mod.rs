@@ -39,14 +39,9 @@ pub(crate) struct Constraints {
     /// row of the trace.
     boundary_constraints: Vec<Vec<ConstraintRoot>>,
 
-    /// Constraint roots for all validity constraints against the execution trace, by trace segment,
-    /// where validity constraints are any constraints that apply to every row.
-    validity_constraints: Vec<Vec<ConstraintRoot>>,
-
-    /// Constraint roots for all transition constraints against the execution trace, by trace
-    /// segment, where transition constraints are any constraints that apply to a frame of multiple
-    /// rows.
-    transition_constraints: Vec<Vec<ConstraintRoot>>,
+    /// Constraint roots for all integrity constraints against the execution trace, by trace segment,
+    /// where integrity constraints are any constraints that apply to every row or every frame.
+    integrity_constraints: Vec<Vec<ConstraintRoot>>,
 
     /// A directed acyclic graph which represents all of the constraints and their subexpressions.
     graph: AlgebraicGraph,
@@ -59,8 +54,7 @@ impl Constraints {
     pub fn new(num_trace_segments: usize) -> Self {
         Self {
             boundary_constraints: vec![Vec::new(); num_trace_segments],
-            validity_constraints: vec![Vec::new(); num_trace_segments],
-            transition_constraints: vec![Vec::new(); num_trace_segments],
+            integrity_constraints: vec![Vec::new(); num_trace_segments],
             graph: AlgebraicGraph::default(),
         }
     }
@@ -87,58 +81,31 @@ impl Constraints {
         &self.boundary_constraints[trace_segment as usize]
     }
 
-    /// Returns a vector of the degrees of the validity constraints for the specified trace
+    /// Returns a vector of the degrees of the integrity constraints for the specified trace
     /// segment.
-    pub fn validity_constraint_degrees(
+    pub fn integrity_constraint_degrees(
         &self,
         trace_segment: TraceSegment,
     ) -> Vec<IntegrityConstraintDegree> {
-        if self.validity_constraints.len() <= trace_segment.into() {
+        if self.integrity_constraints.len() <= trace_segment.into() {
             return Vec::new();
         }
 
-        self.validity_constraints[trace_segment as usize]
+        self.integrity_constraints[trace_segment as usize]
             .iter()
             .map(|entry_index| self.graph.degree(entry_index.node_index()))
             .collect()
     }
 
-    /// Returns all validity constraints against the specified trace segment as a vector of
+    /// Returns all integrity constraints against the specified trace segment as a vector of
     /// references to [ConstraintRoot] where each index is the tip of the subgraph representing the
     /// constraint within the [AlgebraicGraph].
-    pub fn validity_constraints(&self, trace_segment: TraceSegment) -> &[ConstraintRoot] {
-        if self.validity_constraints.len() <= trace_segment.into() {
+    pub fn integrity_constraints(&self, trace_segment: TraceSegment) -> &[ConstraintRoot] {
+        if self.integrity_constraints.len() <= trace_segment.into() {
             return &[];
         }
 
-        &self.validity_constraints[trace_segment as usize]
-    }
-
-    /// Returns a vector of the degrees of the transition constraints for the specified trace
-    /// segment.
-    pub fn transition_constraint_degrees(
-        &self,
-        trace_segment: TraceSegment,
-    ) -> Vec<IntegrityConstraintDegree> {
-        if self.transition_constraints.len() <= trace_segment.into() {
-            return Vec::new();
-        }
-
-        self.transition_constraints[trace_segment as usize]
-            .iter()
-            .map(|entry_index| self.graph.degree(entry_index.node_index()))
-            .collect()
-    }
-
-    /// Returns all transition constraints against the specified trace segment as a vector of
-    /// references to [ConstraintRoot] where each index is the tip of the subgraph representing the
-    /// constraint within the [AlgebraicGraph].
-    pub fn transition_constraints(&self, trace_segment: TraceSegment) -> &[ConstraintRoot] {
-        if self.transition_constraints.len() <= trace_segment.into() {
-            return &[];
-        }
-
-        &self.transition_constraints[trace_segment as usize]
+        &self.integrity_constraints[trace_segment as usize]
     }
 
     /// Returns the [AlgebraicGraph] representing all constraints and sub-expressions.
@@ -171,16 +138,10 @@ impl Constraints {
         let constraint_root = ConstraintRoot::new(node_idx, domain);
 
         // add the constraint to the appropriate set of constraints.
-        match domain {
-            ConstraintDomain::FirstRow | ConstraintDomain::LastRow => {
-                self.boundary_constraints[trace_segment].push(constraint_root);
-            }
-            ConstraintDomain::EveryRow => {
-                self.validity_constraints[trace_segment].push(constraint_root);
-            }
-            ConstraintDomain::EveryFrame(_) => {
-                self.transition_constraints[trace_segment].push(constraint_root);
-            }
+        if domain.is_boundary() {
+            self.boundary_constraints[trace_segment].push(constraint_root);
+        } else {
+            self.integrity_constraints[trace_segment].push(constraint_root);
         }
     }
 }

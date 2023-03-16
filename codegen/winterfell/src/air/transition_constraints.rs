@@ -52,12 +52,7 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
 /// Iterates through the integrity constraints in the IR, and appends a line of generated code to
 /// the provided codegen function body for each constraint.
 fn add_constraints(func_body: &mut codegen::Function, ir: &AirIR, trace_segment: u8) {
-    for (idx, constraint) in ir
-        .validity_constraints(trace_segment)
-        .iter()
-        .chain(ir.transition_constraints(trace_segment).iter())
-        .enumerate()
-    {
+    for (idx, constraint) in ir.integrity_constraints(trace_segment).iter().enumerate() {
         func_body.line(format!(
             "result[{}] = {};",
             idx,

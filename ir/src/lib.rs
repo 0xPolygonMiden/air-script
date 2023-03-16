@@ -161,27 +161,31 @@ impl AirIR {
 
     // --- PUBLIC ACCESSORS FOR INTEGRITY CONSTRAINTS ---------------------------------------------
 
-    pub fn validity_constraint_degrees(
+    pub fn integrity_constraints(&self, trace_segment: TraceSegment) -> &[ConstraintRoot] {
+        self.constraints.integrity_constraints(trace_segment)
+    }
+
+    pub fn integrity_constraint_degrees(
         &self,
         trace_segment: TraceSegment,
     ) -> Vec<IntegrityConstraintDegree> {
-        self.constraints.validity_constraint_degrees(trace_segment)
+        self.constraints.integrity_constraint_degrees(trace_segment)
     }
 
-    pub fn validity_constraints(&self, trace_segment: TraceSegment) -> &[ConstraintRoot] {
-        self.constraints.validity_constraints(trace_segment)
-    }
-
-    pub fn transition_constraint_degrees(
-        &self,
-        trace_segment: TraceSegment,
-    ) -> Vec<IntegrityConstraintDegree> {
+    pub fn validity_constraints(&self, trace_segment: TraceSegment) -> Vec<&ConstraintRoot> {
         self.constraints
-            .transition_constraint_degrees(trace_segment)
+            .integrity_constraints(trace_segment)
+            .iter()
+            .filter(|constraint| matches!(constraint.domain(), ConstraintDomain::EveryRow))
+            .collect()
     }
 
-    pub fn transition_constraints(&self, trace_segment: TraceSegment) -> &[ConstraintRoot] {
-        self.constraints.transition_constraints(trace_segment)
+    pub fn transition_constraints(&self, trace_segment: TraceSegment) -> Vec<&ConstraintRoot> {
+        self.constraints
+            .integrity_constraints(trace_segment)
+            .iter()
+            .filter(|constraint| matches!(constraint.domain(), ConstraintDomain::EveryFrame(_)))
+            .collect()
     }
 
     pub fn constraint_graph(&self) -> &AlgebraicGraph {
