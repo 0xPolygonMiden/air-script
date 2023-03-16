@@ -382,8 +382,8 @@ IntegrityAtom: Expression = {
     "$" <ident: Identifier> <idx: Index> => Expression::Rand(ident, idx),
     <n: Num_u64> => Expression::Const(n),
     <ident: Identifier> => Expression::Elem(ident),
-    "!" <ident: Identifier> =>
-        Expression::Sub(Box::new(Expression::Const(1)), Box::new(Expression::Elem(ident))),
+    "!" <expr: IntegrityAtom> =>
+        Expression::Sub(Box::new(Expression::Const(1)), Box::new(expr)),
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access),
     <trace_access: NamedTraceAccessWithOffset> => Expression::NamedTraceAccess(trace_access),

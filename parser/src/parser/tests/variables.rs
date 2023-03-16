@@ -1,4 +1,95 @@
-use super::build_parse_test;
+use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
+use crate::ast::{
+    ConstraintType, Expression::*, IntegrityStmt::*, NamedTraceAccess, Variable, VariableType,
+    VectorAccess,
+};
+
+// VARIABLES
+// ================================================================================================
+#[test]
+fn variables_with_and_operators() {
+    let source = "
+    integrity_constraints:
+        let flag = n1 & !n2
+        enf clk' = clk + 1 when flag";
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
+        Variable(Variable::new(
+            Identifier("flag".to_string()),
+            VariableType::Scalar(Mul(
+                Box::new(Elem(Identifier("n1".to_string()))),
+                Box::new(Sub(
+                    Box::new(Const(1)),
+                    Box::new(Elem(Identifier("n2".to_string()))),
+                )),
+            )),
+        )),
+        Constraint(
+            ConstraintType::Inline(IntegrityConstraint::new(
+                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                Add(
+                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(Const(1)),
+                ),
+            )),
+            Some(Elem(Identifier("flag".to_string()))),
+        ),
+    ])]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn variables_with_or_operators() {
+    let source = "
+    integrity_constraints:
+        let flag = s[0] | !s[1]'
+        enf clk' = clk + 1 when flag";
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
+        Variable(Variable::new(
+            Identifier("flag".to_string()),
+            VariableType::Scalar(Sub(
+                Box::new(Add(
+                    Box::new(VectorAccess(VectorAccess::new(
+                        Identifier("s".to_string()),
+                        0,
+                    ))),
+                    Box::new(Sub(
+                        Box::new(Const(1)),
+                        Box::new(NamedTraceAccess(NamedTraceAccess::new(
+                            Identifier("s".to_string()),
+                            1,
+                            1,
+                        ))),
+                    )),
+                )),
+                Box::new(Mul(
+                    Box::new(VectorAccess(VectorAccess::new(
+                        Identifier("s".to_string()),
+                        0,
+                    ))),
+                    Box::new(Sub(
+                        Box::new(Const(1)),
+                        Box::new(NamedTraceAccess(NamedTraceAccess::new(
+                            Identifier("s".to_string()),
+                            1,
+                            1,
+                        ))),
+                    )),
+                )),
+            )),
+        )),
+        Constraint(
+            ConstraintType::Inline(IntegrityConstraint::new(
+                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                Add(
+                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(Const(1)),
+                ),
+            )),
+            Some(Elem(Identifier("flag".to_string()))),
+        ),
+    ])]);
+    build_parse_test!(source).expect_ast(expected);
+}
 
 // VARIABLES INVALID USAGE
 // ================================================================================================
