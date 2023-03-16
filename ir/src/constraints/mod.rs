@@ -50,12 +50,15 @@ pub(crate) struct Constraints {
 impl Constraints {
     // --- CONSTRUCTOR ----------------------------------------------------------------------------
 
-    /// TODO: these constraint vectors should be initialized to the proper length
-    pub fn new(num_trace_segments: usize) -> Self {
+    pub fn new(
+        graph: AlgebraicGraph,
+        boundary_constraints: Vec<Vec<ConstraintRoot>>,
+        integrity_constraints: Vec<Vec<ConstraintRoot>>,
+    ) -> Self {
         Self {
-            boundary_constraints: vec![Vec::new(); num_trace_segments],
-            integrity_constraints: vec![Vec::new(); num_trace_segments],
-            graph: AlgebraicGraph::default(),
+            graph,
+            boundary_constraints,
+            integrity_constraints,
         }
     }
 
@@ -111,37 +114,5 @@ impl Constraints {
     /// Returns the [AlgebraicGraph] representing all constraints and sub-expressions.
     pub fn graph(&self) -> &AlgebraicGraph {
         &self.graph
-    }
-
-    // --- MUTATORS -------------------------------------------------------------------------------
-
-    /// TODO: docs
-    pub(super) fn insert_graph_node(&mut self, op: Operation) -> NodeIndex {
-        self.graph.insert_op(op)
-    }
-
-    /// TODO: docs
-    pub(super) fn node_details(
-        &self,
-        index: &NodeIndex,
-        default_domain: ConstraintDomain,
-    ) -> Result<(TraceSegment, ConstraintDomain), SemanticError> {
-        self.graph.node_details(index, default_domain)
-    }
-
-    pub(super) fn insert_constraint(
-        &mut self,
-        node_idx: NodeIndex,
-        trace_segment: usize,
-        domain: ConstraintDomain,
-    ) {
-        let constraint_root = ConstraintRoot::new(node_idx, domain);
-
-        // add the constraint to the appropriate set of constraints.
-        if domain.is_boundary() {
-            self.boundary_constraints[trace_segment].push(constraint_root);
-        } else {
-            self.integrity_constraints[trace_segment].push(constraint_root);
-        }
     }
 }

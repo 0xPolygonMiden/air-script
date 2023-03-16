@@ -10,7 +10,7 @@ impl ConstraintBuilder {
     /// TODO: we can optimize this in the future in the case where lhs or rhs equals zero to just
     /// return the other expression.
     pub(crate) fn merge_equal_exprs(&mut self, lhs: NodeIndex, rhs: NodeIndex) -> NodeIndex {
-        self.constraints.insert_graph_node(Operation::Sub(lhs, rhs))
+        self.insert_graph_node(Operation::Sub(lhs, rhs))
     }
 
     /// Adds the expression to the graph and returns the [ExprDetails] of the constraint.
@@ -52,7 +52,7 @@ impl ConstraintBuilder {
                 let lhs = self.insert_expr(lhs)?;
                 let rhs = self.insert_expr(rhs)?;
                 // add the expression.
-                let node_index = self.constraints.insert_graph_node(Operation::Add(lhs, rhs));
+                let node_index = self.insert_graph_node(Operation::Add(lhs, rhs));
                 Ok(node_index)
             }
             Expression::Sub(lhs, rhs) => {
@@ -60,7 +60,7 @@ impl ConstraintBuilder {
                 let lhs = self.insert_expr(lhs)?;
                 let rhs = self.insert_expr(rhs)?;
                 // add the expression.
-                let node_index = self.constraints.insert_graph_node(Operation::Sub(lhs, rhs));
+                let node_index = self.insert_graph_node(Operation::Sub(lhs, rhs));
                 Ok(node_index)
             }
             Expression::Mul(lhs, rhs) => {
@@ -68,7 +68,7 @@ impl ConstraintBuilder {
                 let lhs = self.insert_expr(lhs)?;
                 let rhs = self.insert_expr(rhs)?;
                 // add the expression.
-                let node_index = self.constraints.insert_graph_node(Operation::Mul(lhs, rhs));
+                let node_index = self.insert_graph_node(Operation::Mul(lhs, rhs));
                 Ok(node_index)
             }
             Expression::Exp(lhs, rhs) => self.insert_exp_op(lhs, rhs),
@@ -80,11 +80,9 @@ impl ConstraintBuilder {
     /// Inserts the specified constant value into the graph and returns the resulting expression
     /// details.
     fn insert_inline_constant(&mut self, value: u64) -> Result<NodeIndex, SemanticError> {
-        let node_index = self
-            .constraints
-            .insert_graph_node(Operation::Value(Value::Constant(ConstantValue::Inline(
-                value,
-            ))));
+        let node_index = self.insert_graph_node(Operation::Value(Value::Constant(
+            ConstantValue::Inline(value),
+        )));
 
         Ok(node_index)
     }
@@ -104,9 +102,8 @@ impl ConstraintBuilder {
     ) -> Result<NodeIndex, SemanticError> {
         self.symbol_table.validate_trace_access(trace_access)?;
 
-        let node_index = self
-            .constraints
-            .insert_graph_node(Operation::Value(Value::TraceElement(*trace_access)));
+        let node_index =
+            self.insert_graph_node(Operation::Value(Value::TraceElement(*trace_access)));
         Ok(node_index)
     }
 
@@ -122,8 +119,7 @@ impl ConstraintBuilder {
         let lhs = self.insert_expr(lhs)?;
         // add exponent subexpression.
         let node_index = if let Expression::Const(rhs) = *rhs {
-            self.constraints
-                .insert_graph_node(Operation::Exp(lhs, rhs as usize))
+            self.insert_graph_node(Operation::Exp(lhs, rhs as usize))
         } else {
             Err(SemanticError::InvalidUsage(
                 "Non const exponents are only allowed inside list comprehensions".to_string(),
@@ -159,7 +155,7 @@ impl ConstraintBuilder {
                 let value = symbol.get_value(&access_type)?;
 
                 // add a value node in the graph.
-                let node_index = self.constraints.insert_graph_node(Operation::Value(value));
+                let node_index = self.insert_graph_node(Operation::Value(value));
 
                 Ok(node_index)
             }
@@ -190,7 +186,7 @@ impl ConstraintBuilder {
                         ListFoldingType::Sum(_) => Operation::Add(acc, expr),
                         ListFoldingType::Prod(_) => Operation::Mul(acc, expr),
                     };
-                    acc = self.constraints.insert_graph_node(op);
+                    acc = self.insert_graph_node(op);
                 }
 
                 Ok(acc)

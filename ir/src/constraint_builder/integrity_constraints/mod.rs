@@ -35,9 +35,8 @@ impl ConstraintBuilder {
 
                 // get the trace segment and domain of the constraint
                 // the default domain for integrity constraints is `EveryRow`
-                let (trace_segment, domain) = self
-                    .constraints
-                    .node_details(&root, ConstraintDomain::EveryRow)?;
+                let (trace_segment, domain) =
+                    self.graph.node_details(&root, ConstraintDomain::EveryRow)?;
 
                 // save the constraint information
                 self.insert_constraint(root, trace_segment.into(), domain)?;

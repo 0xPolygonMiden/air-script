@@ -11,8 +11,7 @@ use constraint_builder::{ConstrainedBoundary, ConstraintBuilder};
 
 pub mod constraints;
 use constraints::{
-    AlgebraicGraph, ConstraintDomain, ConstraintRoot, Constraints, Operation, CURRENT_ROW,
-    MIN_CYCLE_LENGTH,
+    AlgebraicGraph, ConstraintDomain, ConstraintRoot, Constraints, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
 pub use constraints::{IntegrityConstraintDegree, NodeIndex};
 

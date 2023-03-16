@@ -98,7 +98,7 @@ impl AlgebraicGraph {
     // --- PUBLIC MUTATORS ------------------------------------------------------------------------
     /// Insert the operation and return its node index. If an identical node already exists, return
     /// that index instead.
-    pub(super) fn insert_op(&mut self, op: Operation) -> NodeIndex {
+    pub(crate) fn insert_node(&mut self, op: Operation) -> NodeIndex {
         self.nodes.iter().position(|n| *n.op() == op).map_or_else(
             || {
                 // create a new node.

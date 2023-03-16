@@ -1,9 +1,11 @@
+use crate::constraints::{AlgebraicGraph, NodeIndex, Operation};
+
 use super::{
     ast, AccessType, BTreeMap, BTreeSet, ConstantType, ConstantValue, ConstraintDomain,
-    Constraints, Declarations, Expression, Identifier, IndexedTraceAccess, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, NamedTraceAccess,
-    NodeIndex, Operation, SemanticError, Symbol, SymbolTable, SymbolType, TraceSegment,
-    ValidateAccess, Value, Variable, VariableType, VectorAccess, CURRENT_ROW,
+    ConstraintRoot, Constraints, Declarations, Expression, Identifier, IndexedTraceAccess,
+    Iterable, ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess,
+    NamedTraceAccess, SemanticError, Symbol, SymbolTable, SymbolType, TraceSegment, ValidateAccess,
+    Value, Variable, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 mod boundary_constraints;
@@ -29,25 +31,46 @@ pub(super) struct ConstraintBuilder {
     /// than one constraint is defined at any given boundary.
     constrained_boundaries: BTreeSet<ConstrainedBoundary>,
 
-    // TODO: docs
-    constraints: Constraints,
+    /// A directed acyclic graph which represents all of the constraints and their subexpressions.
+    graph: AlgebraicGraph,
+
+    /// Constraint roots for all boundary constraints against the execution trace, by trace segment,
+    /// where boundary constraints are any constraints that apply to either the first or the last
+    /// row of the trace.
+    boundary_constraints: Vec<Vec<ConstraintRoot>>,
+
+    /// Constraint roots for all integrity constraints against the execution trace, by trace segment,
+    /// where integrity constraints are any constraints that apply to every row or every frame.
+    integrity_constraints: Vec<Vec<ConstraintRoot>>,
 }
 
 impl ConstraintBuilder {
     pub fn new(symbol_table: SymbolTable) -> Self {
-        let constraints = Constraints::new(symbol_table.num_trace_segments());
+        let num_trace_segments = symbol_table.num_trace_segments();
         Self {
             symbol_table,
             constrained_boundaries: BTreeSet::new(),
-            constraints,
+            graph: AlgebraicGraph::default(),
+            boundary_constraints: vec![Vec::new(); num_trace_segments],
+            integrity_constraints: vec![Vec::new(); num_trace_segments],
         }
     }
 
     pub fn into_air(self) -> (Declarations, Constraints) {
-        (self.symbol_table.into_declarations(), self.constraints)
+        let constraints = Constraints::new(
+            self.graph,
+            self.boundary_constraints,
+            self.integrity_constraints,
+        );
+        (self.symbol_table.into_declarations(), constraints)
     }
 
     // --- MUTATORS -------------------------------------------------------------------------------
+
+    /// TODO: docs
+    pub(super) fn insert_graph_node(&mut self, op: Operation) -> NodeIndex {
+        self.graph.insert_node(op)
+    }
 
     // TODO: docs
     pub(crate) fn insert_boundary_constraints(
@@ -92,8 +115,14 @@ impl ConstraintBuilder {
         }
 
         // add the constraint to the constraints
-        self.constraints
-            .insert_constraint(root, trace_segment, domain);
+        let constraint_root = ConstraintRoot::new(root, domain);
+
+        // add the constraint to the appropriate set of constraints.
+        if domain.is_boundary() {
+            self.boundary_constraints[trace_segment].push(constraint_root);
+        } else {
+            self.integrity_constraints[trace_segment].push(constraint_root);
+        }
 
         Ok(())
     }
