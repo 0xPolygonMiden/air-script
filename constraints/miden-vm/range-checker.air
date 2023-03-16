@@ -1,0 +1,41 @@
+mod RangeCheckerAir
+
+### Helper functions ##############################################################################
+
+# Returns binary negation of the value.
+fn binary_not(e: scalar) -> scalar:
+    return 1 - e
+
+### Helper evaluators #############################################################################
+
+# Returns the change in value between current and next rows.
+fn delta(e: scalar) -> scalar:
+    return e' - e
+
+# Enforces that column must be binary.
+ev is_binary(main: [v]):
+    enf v^2 = v
+
+# Enforces correct transition from 8-bit to 16-bit section of the table.
+ev transition_8_to_16_bit_validity(main: [t, v]):
+    # Ensure that values in column t can flip from 0 to 1 only once
+    enf t * binary_not(t') = 0
+
+    # Ensure that when column t flips, column v must equal 255
+    enf v = 255 when t' & !t
+
+    # Ensure that when column t flips, v' must be reset to 0
+    enf v' = 0 when t' & !t
+
+### Range checker Air Constraints #################################################################
+
+ev range_checker(main: [t, s0, s1, v]):
+    # Check selector flags are binary
+    let selectors = [t, s0, s1]
+    enf check_binary([s]) for s in selectors
+
+    # Constrain the row transitions in the 8-bit section of the table
+    enf change(v) * (change(v) - 1) = 0 when !t0'
+
+    # Constrain the transition from 8-bit to 16-bit section of the table
+    enf transition_8_to_16_bit_validity([t, v])
