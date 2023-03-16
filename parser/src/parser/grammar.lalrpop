@@ -145,7 +145,8 @@ RandValuesDecl: RandomValues = {
             )
         }
     ),
-    <name: Identifier> ":" "[" <rand_vec: CommaElems<RandElem>> "]" => RandomValues::new(name, rand_vec.iter().map(|v| v.size()).sum(), rand_vec)
+    <name: Identifier> ":" "[" <rand_vec: CommaElems<RandElem>> "]" =>
+        RandomValues::new(name, rand_vec.iter().map(|v| v.size()).sum(), rand_vec)
 }
 
 RandElem: RandBinding = {
@@ -267,7 +268,8 @@ IntegrityConstraints: Vec<IntegrityStmt> = {
 }
 
 IntegrityStmts: Vec<IntegrityStmt> = {
-    <integrity_stmts: IntegrityStmt+> =>? {
+    <integrity_stmts_groups: IntegrityStmtGroup+> =>? {
+        let integrity_stmts: Vec<IntegrityStmt> = integrity_stmts_groups.into_iter().flatten().collect();
         // check if at least one integrity constraint is defined
         let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
             IntegrityStmt::Constraint(_, _) => true,
@@ -283,16 +285,32 @@ IntegrityStmts: Vec<IntegrityStmt> = {
             });
         }
         Ok(integrity_stmts)
-    }
+    },
+    
 }
 
-IntegrityStmt: IntegrityStmt = {
+IntegrityStmtGroup: Vec<IntegrityStmt> = {
     "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
-        IntegrityStmt::Variable(Variable::new(name, integrity_variable_type)),
-    "enf" <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
+        vec![IntegrityStmt::Variable(Variable::new(name, integrity_variable_type))],
+    "enf" <integrity_constraint: IntegrityConstraintExpr> => vec![integrity_constraint],
+    "match" "enf" ":" <integrity_stmts: IntegrityConstraintExpr+> => integrity_stmts
+}
+
+IntegrityConstraintExpr: IntegrityStmt = {
+    <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
         IntegrityStmt::Constraint(ConstraintType::Inline(IntegrityConstraint::new(lhs, rhs)), None),
-    "enf" <evaluator_fn_call: EvaluatorFunctionCall> =>
+    <evaluator_fn_call: EvaluatorFunctionCall> =>
         IntegrityStmt::Constraint(ConstraintType::Evaluator(evaluator_fn_call), None),
+    <integrity_stmt_with_selector: IntegrityConstraintWithSelector> =>
+        integrity_stmt_with_selector,
+}
+
+IntegrityConstraintWithSelector: IntegrityStmt = {
+    <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> "when" <selectors: IntegrityExpr> =>
+        IntegrityStmt::Constraint(ConstraintType::Inline(IntegrityConstraint::new(lhs, rhs)),
+        Some(selectors)),
+    <evaluator_fn_call: EvaluatorFunctionCall> "when" <selectors: IntegrityExpr> =>
+        IntegrityStmt::Constraint(ConstraintType::Evaluator(evaluator_fn_call), Some(selectors)),
 }
 
 IntegrityVariableType: VariableType = {
@@ -324,9 +342,24 @@ EvaluatorFunctionCall: EvaluatorFunctionCall = {
 // --- INTEGRITY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
 
 IntegrityExpr: Expression = {
-    <lexpr: IntegrityExpr> "+" <rexpr: IntegrityFactor> =>
+    <lexpr: IntegrityExpr> "&" <rexpr: IntegritySum> =>
+        Expression::Mul(Box::new(lexpr), Box::new(rexpr)),
+    <lexpr: IntegrityExpr> "|" <rexpr: IntegritySum> =>
+        Expression::Sub(
+            Box::new(Expression::Add(
+                Box::new(lexpr.clone()), Box::new(rexpr.clone()))
+            ),
+            Box::new(Expression::Mul(
+                Box::new(lexpr), Box::new(rexpr))
+            )
+        ),
+    IntegritySum
+}
+
+IntegritySum: Expression = {
+    <lexpr: IntegritySum> "+" <rexpr: IntegrityFactor> =>
         Expression::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: IntegrityExpr> "-" <rexpr: IntegrityFactor> =>
+    <lexpr: IntegritySum> "-" <rexpr: IntegrityFactor> =>
         Expression::Sub(Box::new(lexpr), Box::new(rexpr)),
     IntegrityFactor
 }
@@ -349,6 +382,8 @@ IntegrityAtom: Expression = {
     "$" <ident: Identifier> <idx: Index> => Expression::Rand(ident, idx),
     <n: Num_u64> => Expression::Const(n),
     <ident: Identifier> => Expression::Elem(ident),
+    "!" <expr: IntegrityAtom> =>
+        Expression::Sub(Box::new(Expression::Const(1)), Box::new(expr)),
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access),
     <trace_access: NamedTraceAccessWithOffset> => Expression::NamedTraceAccess(trace_access),
@@ -503,12 +538,17 @@ extern {
         "$" => Token::Rand,
         "ev" => Token::EvaluatorFunction,
         "enf" => Token::Enf,
+        "when" => Token::When,
+        "match" => Token::Match,
         "'" => Token::Next,
         "=" => Token::Equal,
         "+" => Token::Plus,
         "-" => Token::Minus,
         "*" => Token::Mul,
         "^" => Token::Exp,
+        "&" => Token::And,
+        "|" => Token::Or,
+        "!" => Token::Not,
         ":" => Token::Colon,
         "," => Token::Comma,
         "[" => Token::Lsqb,
