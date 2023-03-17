@@ -3,8 +3,8 @@ use air_script_core::{Iterable, ListComprehension, Range};
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
     ast::{
-        Boundary, BoundaryConstraint, BoundaryStmt, Expression::*, IntegrityStmt, NamedTraceAccess,
-        SourceSection::*, Trace, TraceCols, Variable, VariableType, VectorAccess,
+        Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType, Expression::*, IntegrityStmt,
+        NamedTraceAccess, SourceSection::*, Trace, TraceCols, Variable, VariableType, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -427,31 +427,34 @@ fn ic_one_iterable_identifier_lc() {
                     )],
                 )),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
-                Elem(Identifier("a".to_string())),
-                Add(
-                    Box::new(Add(
+            IntegrityStmt::Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    Elem(Identifier("a".to_string())),
+                    Add(
                         Box::new(Add(
+                            Box::new(Add(
+                                Box::new(VectorAccess(VectorAccess::new(
+                                    Identifier("x".to_string()),
+                                    0,
+                                ))),
+                                Box::new(VectorAccess(VectorAccess::new(
+                                    Identifier("x".to_string()),
+                                    1,
+                                ))),
+                            )),
                             Box::new(VectorAccess(VectorAccess::new(
                                 Identifier("x".to_string()),
-                                0,
-                            ))),
-                            Box::new(VectorAccess(VectorAccess::new(
-                                Identifier("x".to_string()),
-                                1,
+                                2,
                             ))),
                         )),
                         Box::new(VectorAccess(VectorAccess::new(
                             Identifier("x".to_string()),
-                            2,
+                            3,
                         ))),
-                    )),
-                    Box::new(VectorAccess(VectorAccess::new(
-                        Identifier("x".to_string()),
-                        3,
-                    ))),
-                ),
-            )),
+                    ),
+                )),
+                None,
+            ),
         ]),
     ]);
 
@@ -500,31 +503,34 @@ fn ic_iterable_identifier_range_lc() {
                     ],
                 )),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
-                Elem(Identifier("a".to_string())),
-                Add(
-                    Box::new(Add(
+            IntegrityStmt::Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    Elem(Identifier("a".to_string())),
+                    Add(
                         Box::new(Add(
+                            Box::new(Add(
+                                Box::new(VectorAccess(VectorAccess::new(
+                                    Identifier("x".to_string()),
+                                    0,
+                                ))),
+                                Box::new(VectorAccess(VectorAccess::new(
+                                    Identifier("x".to_string()),
+                                    1,
+                                ))),
+                            )),
                             Box::new(VectorAccess(VectorAccess::new(
                                 Identifier("x".to_string()),
-                                0,
-                            ))),
-                            Box::new(VectorAccess(VectorAccess::new(
-                                Identifier("x".to_string()),
-                                1,
+                                2,
                             ))),
                         )),
                         Box::new(VectorAccess(VectorAccess::new(
                             Identifier("x".to_string()),
-                            2,
+                            3,
                         ))),
-                    )),
-                    Box::new(VectorAccess(VectorAccess::new(
-                        Identifier("x".to_string()),
-                        3,
-                    ))),
-                ),
-            )),
+                    ),
+                )),
+                None,
+            ),
         ]),
     ]);
 
@@ -561,31 +567,34 @@ fn ic_iterable_slice_lc() {
                     )],
                 )),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
-                Elem(Identifier("a".to_string())),
-                Add(
-                    Box::new(Add(
+            IntegrityStmt::Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    Elem(Identifier("a".to_string())),
+                    Add(
                         Box::new(Add(
+                            Box::new(Add(
+                                Box::new(VectorAccess(VectorAccess::new(
+                                    Identifier("x".to_string()),
+                                    0,
+                                ))),
+                                Box::new(VectorAccess(VectorAccess::new(
+                                    Identifier("x".to_string()),
+                                    1,
+                                ))),
+                            )),
                             Box::new(VectorAccess(VectorAccess::new(
                                 Identifier("x".to_string()),
-                                0,
-                            ))),
-                            Box::new(VectorAccess(VectorAccess::new(
-                                Identifier("x".to_string()),
-                                1,
+                                2,
                             ))),
                         )),
                         Box::new(VectorAccess(VectorAccess::new(
                             Identifier("x".to_string()),
-                            2,
+                            3,
                         ))),
-                    )),
-                    Box::new(VectorAccess(VectorAccess::new(
-                        Identifier("x".to_string()),
-                        3,
-                    ))),
-                ),
-            )),
+                    ),
+                )),
+                None,
+            ),
         ]),
     ]);
 
@@ -632,31 +641,34 @@ fn ic_two_iterable_identifier_lc() {
                     ],
                 )),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
-                Elem(Identifier("a".to_string())),
-                Add(
-                    Box::new(Add(
+            IntegrityStmt::Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    Elem(Identifier("a".to_string())),
+                    Add(
                         Box::new(Add(
+                            Box::new(Add(
+                                Box::new(VectorAccess(VectorAccess::new(
+                                    Identifier("x".to_string()),
+                                    0,
+                                ))),
+                                Box::new(VectorAccess(VectorAccess::new(
+                                    Identifier("x".to_string()),
+                                    1,
+                                ))),
+                            )),
                             Box::new(VectorAccess(VectorAccess::new(
                                 Identifier("x".to_string()),
-                                0,
-                            ))),
-                            Box::new(VectorAccess(VectorAccess::new(
-                                Identifier("x".to_string()),
-                                1,
+                                2,
                             ))),
                         )),
                         Box::new(VectorAccess(VectorAccess::new(
                             Identifier("x".to_string()),
-                            2,
+                            3,
                         ))),
-                    )),
-                    Box::new(VectorAccess(VectorAccess::new(
-                        Identifier("x".to_string()),
-                        3,
-                    ))),
-                ),
-            )),
+                    ),
+                )),
+                None,
+            ),
         ]),
     ]);
 
@@ -717,31 +729,34 @@ fn ic_multiple_iterables_lc() {
                     ],
                 )),
             )),
-            IntegrityStmt::Constraint(IntegrityConstraint::new(
-                Elem(Identifier("a".to_string())),
-                Add(
-                    Box::new(Add(
+            IntegrityStmt::Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    Elem(Identifier("a".to_string())),
+                    Add(
                         Box::new(Add(
+                            Box::new(Add(
+                                Box::new(VectorAccess(VectorAccess::new(
+                                    Identifier("x".to_string()),
+                                    0,
+                                ))),
+                                Box::new(VectorAccess(VectorAccess::new(
+                                    Identifier("x".to_string()),
+                                    1,
+                                ))),
+                            )),
                             Box::new(VectorAccess(VectorAccess::new(
                                 Identifier("x".to_string()),
-                                0,
-                            ))),
-                            Box::new(VectorAccess(VectorAccess::new(
-                                Identifier("x".to_string()),
-                                1,
+                                2,
                             ))),
                         )),
                         Box::new(VectorAccess(VectorAccess::new(
                             Identifier("x".to_string()),
-                            2,
+                            3,
                         ))),
-                    )),
-                    Box::new(VectorAccess(VectorAccess::new(
-                        Identifier("x".to_string()),
-                        3,
-                    ))),
-                ),
-            )),
+                    ),
+                )),
+                None,
+            ),
         ]),
     ]);
 

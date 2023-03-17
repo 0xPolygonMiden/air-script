@@ -121,6 +121,9 @@ pub enum Token {
     #[token("enf")]
     Enf,
 
+    #[token("match")]
+    Match,
+
     // OPERATORS
     // --------------------------------------------------------------------------------------------
     /// Asserts LHS of the expression is equal to RHS of the expression.
@@ -138,6 +141,20 @@ pub enum Token {
 
     #[token("^")]
     Exp,
+
+    // SELECTOR KEYWORDS
+    // --------------------------------------------------------------------------------------------
+    #[token("&")]
+    And,
+
+    #[token("|")]
+    Or,
+
+    #[token("!")]
+    Not,
+
+    #[token("when")]
+    When,
 
     // DELIMITERS
     // --------------------------------------------------------------------------------------------

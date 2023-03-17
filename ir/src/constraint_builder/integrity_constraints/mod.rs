@@ -1,12 +1,12 @@
 use super::{
-    ast::IntegrityStmt, BTreeMap, ConstantType, ConstraintBuilder, ConstraintDomain, Expression,
-    Identifier, IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType,
-    ListFoldingValueType, NamedTraceAccess, SemanticError, Symbol, SymbolType, Variable,
-    VariableType, VectorAccess, CURRENT_ROW,
+    ast::{ConstraintType, IntegrityStmt},
+    BTreeMap, ConstantType, ConstraintBuilder, ConstraintDomain, Expression, Identifier,
+    IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
+    NamedTraceAccess, SemanticError, Symbol, SymbolType, Variable, VariableType, VectorAccess,
+    CURRENT_ROW,
 };
 
 mod list_comprehension;
-
 mod list_folding;
 
 impl ConstraintBuilder {
@@ -23,7 +23,7 @@ impl ConstraintBuilder {
         stmt: IntegrityStmt,
     ) -> Result<(), SemanticError> {
         match stmt {
-            IntegrityStmt::Constraint(constraint) => {
+            IntegrityStmt::Constraint(ConstraintType::Inline(constraint), _) => {
                 // add the left hand side expression to the graph.
                 let lhs = self.insert_expr(constraint.lhs())?;
 
@@ -53,7 +53,7 @@ impl ConstraintBuilder {
                     self.symbol_table.insert_variable(variable)?
                 }
             }
-            IntegrityStmt::EvaluatorFunctionCall(_) => todo!(),
+            IntegrityStmt::Constraint(ConstraintType::Evaluator(_), _) => todo!(),
         }
 
         Ok(())

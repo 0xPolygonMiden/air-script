@@ -1,8 +1,8 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::{
     ast::{
-        Constant, ConstantType::*, Expression::*, IndexedTraceAccess, IntegrityStmt::*,
-        MatrixAccess, NamedTraceAccess, Variable, VariableType, VectorAccess,
+        Constant, ConstantType::*, ConstraintType, Expression::*, IndexedTraceAccess,
+        IntegrityStmt::*, MatrixAccess, NamedTraceAccess, Variable, VariableType, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -16,13 +16,14 @@ fn integrity_constraints() {
     integrity_constraints:
         enf clk' = clk + 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        IntegrityConstraint::new(
+        ConstraintType::Inline(IntegrityConstraint::new(
             NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
             ),
-        ),
+        )),
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -41,24 +42,30 @@ fn multiple_integrity_constraints() {
         enf clk' = clk + 1
         enf clk' - clk = 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Constraint(IntegrityConstraint::new(
-            NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
-            Add(
-                Box::new(Elem(Identifier("clk".to_string()))),
-                Box::new(Const(1)),
-            ),
-        )),
-        Constraint(IntegrityConstraint::new(
-            Sub(
-                Box::new(NamedTraceAccess(NamedTraceAccess::new(
-                    Identifier("clk".to_string()),
-                    0,
-                    1,
-                ))),
-                Box::new(Elem(Identifier("clk".to_string()))),
-            ),
-            Const(1),
-        )),
+        Constraint(
+            ConstraintType::Inline(IntegrityConstraint::new(
+                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                Add(
+                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(Const(1)),
+                ),
+            )),
+            None,
+        ),
+        Constraint(
+            ConstraintType::Inline(IntegrityConstraint::new(
+                Sub(
+                    Box::new(NamedTraceAccess(NamedTraceAccess::new(
+                        Identifier("clk".to_string()),
+                        0,
+                        1,
+                    ))),
+                    Box::new(Elem(Identifier("clk".to_string()))),
+                ),
+                Const(1),
+            )),
+            None,
+        ),
     ])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -69,13 +76,14 @@ fn integrity_constraint_with_periodic_col() {
     integrity_constraints:
         enf k0 + b = 0";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        IntegrityConstraint::new(
+        ConstraintType::Inline(IntegrityConstraint::new(
             Add(
                 Box::new(Elem(Identifier("k0".to_string()))),
                 Box::new(Elem(Identifier("b".to_string()))),
             ),
             Const(0),
-        ),
+        )),
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -86,13 +94,14 @@ fn integrity_constraint_with_random_value() {
     integrity_constraints:
         enf a + $rand[1] = 0";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        IntegrityConstraint::new(
+        ConstraintType::Inline(IntegrityConstraint::new(
             Add(
                 Box::new(Elem(Identifier("a".to_string()))),
                 Box::new(Rand(Identifier("rand".to_string()), 1)),
             ),
             Const(0),
-        ),
+        )),
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -115,23 +124,26 @@ fn integrity_constraint_with_constants() {
             Identifier("C".to_string()),
             Matrix(vec![vec![0, 1], vec![1, 0]]),
         )),
-        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
-            Add(
-                Box::new(Elem(Identifier("clk".to_string()))),
-                Box::new(Elem(Identifier("A".to_string()))),
-            ),
-            Add(
-                Box::new(VectorAccess(VectorAccess::new(
-                    Identifier("B".to_string()),
-                    1,
-                ))),
-                Box::new(MatrixAccess(MatrixAccess::new(
-                    Identifier("C".to_string()),
-                    1,
-                    1,
-                ))),
-            ),
-        ))]),
+        SourceSection::IntegrityConstraints(vec![Constraint(
+            ConstraintType::Inline(IntegrityConstraint::new(
+                Add(
+                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(Elem(Identifier("A".to_string()))),
+                ),
+                Add(
+                    Box::new(VectorAccess(VectorAccess::new(
+                        Identifier("B".to_string()),
+                        1,
+                    ))),
+                    Box::new(MatrixAccess(MatrixAccess::new(
+                        Identifier("C".to_string()),
+                        1,
+                        1,
+                    ))),
+                ),
+            )),
+            None,
+        )]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -178,23 +190,26 @@ fn integrity_constraint_with_variables() {
                 ],
             ]),
         )),
-        Constraint(IntegrityConstraint::new(
-            Add(
-                Box::new(Elem(Identifier("clk".to_string()))),
-                Box::new(Elem(Identifier("a".to_string()))),
-            ),
-            Add(
-                Box::new(VectorAccess(VectorAccess::new(
-                    Identifier("b".to_string()),
-                    1,
-                ))),
-                Box::new(MatrixAccess(MatrixAccess::new(
-                    Identifier("c".to_string()),
-                    1,
-                    1,
-                ))),
-            ),
-        )),
+        Constraint(
+            ConstraintType::Inline(IntegrityConstraint::new(
+                Add(
+                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(Elem(Identifier("a".to_string()))),
+                ),
+                Add(
+                    Box::new(VectorAccess(VectorAccess::new(
+                        Identifier("b".to_string()),
+                        1,
+                    ))),
+                    Box::new(MatrixAccess(MatrixAccess::new(
+                        Identifier("c".to_string()),
+                        1,
+                        1,
+                    ))),
+                ),
+            )),
+            None,
+        ),
     ])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -206,20 +221,26 @@ fn integrity_constraint_with_indexed_trace_access() {
         enf $main[0]' = $main[1] + 1
         enf $aux[0]' - $aux[1] = 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Constraint(IntegrityConstraint::new(
-            IndexedTraceAccess(IndexedTraceAccess::new(0, 0, 1)),
-            Add(
-                Box::new(IndexedTraceAccess(IndexedTraceAccess::new(0, 1, 0))),
-                Box::new(Const(1)),
-            ),
-        )),
-        Constraint(IntegrityConstraint::new(
-            Sub(
-                Box::new(IndexedTraceAccess(IndexedTraceAccess::new(1, 0, 1))),
-                Box::new(IndexedTraceAccess(IndexedTraceAccess::new(1, 1, 0))),
-            ),
-            Const(1),
-        )),
+        Constraint(
+            ConstraintType::Inline(IntegrityConstraint::new(
+                IndexedTraceAccess(IndexedTraceAccess::new(0, 0, 1)),
+                Add(
+                    Box::new(IndexedTraceAccess(IndexedTraceAccess::new(0, 1, 0))),
+                    Box::new(Const(1)),
+                ),
+            )),
+            None,
+        ),
+        Constraint(
+            ConstraintType::Inline(IntegrityConstraint::new(
+                Sub(
+                    Box::new(IndexedTraceAccess(IndexedTraceAccess::new(1, 0, 1))),
+                    Box::new(IndexedTraceAccess(IndexedTraceAccess::new(1, 1, 0))),
+                ),
+                Const(1),
+            )),
+            None,
+        ),
     ])]);
     build_parse_test!(source).expect_ast(expected);
 }
