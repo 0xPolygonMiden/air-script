@@ -65,7 +65,7 @@ impl ConstraintBuilder {
                 let lhs = self.insert_trace_access(&trace_access)?;
 
                 // get the trace segment and domain of the boundary column access
-                let (lhs_segment, lhs_domain) = self.constraints.node_details(&lhs, domain)?;
+                let (lhs_segment, lhs_domain) = self.graph.node_details(&lhs, domain)?;
                 debug_assert!(
                    lhs_domain == domain,
                    "The boundary constraint's domain should be {lhs_domain:?}, but the domain {domain:?} was inferred by the graph",
@@ -74,7 +74,7 @@ impl ConstraintBuilder {
                 // add its expression to the constraints graph.
                 let rhs = self.insert_expr(constraint.value())?;
                 // get the trace segment and domain of the expression
-                let (rhs_segment, rhs_domain) = self.constraints.node_details(&rhs, domain)?;
+                let (rhs_segment, rhs_domain) = self.graph.node_details(&rhs, domain)?;
 
                 // ensure that the inferred trace segment and domain of the rhs expression can be
                 // applied to column against which the boundary constraint is applied.
