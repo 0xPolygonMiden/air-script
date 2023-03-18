@@ -189,7 +189,7 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
     "boundary_constraints" ":" <boundary_stmts: BoundaryStmt+> =>? {
         // check if at least one boundary constraint is defined
         let boundary_constraints_exist = boundary_stmts.iter().any(|stmt| match stmt {
-            BoundaryStmt::Constraint(_) => true,
+            BoundaryStmt::Constraint(_) | BoundaryStmt::ConstraintComprehension(_, _) => true,
             _ => false,
         });
         if !boundary_constraints_exist {
@@ -280,7 +280,7 @@ IntegrityStmts: Vec<IntegrityStmt> = {
         let integrity_stmts: Vec<IntegrityStmt> = integrity_stmts_groups.into_iter().flatten().collect();
         // check if at least one integrity constraint is defined
         let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
-            IntegrityStmt::Constraint(_, _) => true,
+            IntegrityStmt::Constraint(_, _) | IntegrityStmt::ConstraintComprehension(_, _, _) => true,
             _ => false,
         });
         if !integrity_constraints_exist {

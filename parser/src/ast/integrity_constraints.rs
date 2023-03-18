@@ -1,4 +1,4 @@
-use super::{ConstraintComprehensionContext, EvaluatorFunctionCall, Expression, Variable};
+use super::{EvaluatorFunctionCall, Expression, Identifier, Iterable, Variable};
 
 // INTEGRITY STATEMENTS
 // ================================================================================================
@@ -43,3 +43,5 @@ impl IntegrityConstraint {
         &self.rhs
     }
 }
+
+pub type ConstraintComprehensionContext = Vec<(Identifier, Iterable)>;
