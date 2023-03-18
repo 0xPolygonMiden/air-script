@@ -22,10 +22,6 @@ pub use random_values::*;
 pub mod evaluator_function;
 pub use evaluator_function::*;
 
-// TYPE ALIASES
-// ================================================================================================
-pub type ConstraintComprehensionContext = Vec<(Identifier, Iterable)>;
-
 // AST
 // ================================================================================================
 
