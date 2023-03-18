@@ -1,4 +1,6 @@
-use super::{Expression, Identifier, Iterable, NamedTraceAccess, Variable};
+use super::{
+    ConstraintComprehensionContext, Expression, Identifier, Iterable, NamedTraceAccess, Variable,
+};
 use std::fmt::Display;
 
 // BOUNDARY STATEMENTS
@@ -7,7 +9,7 @@ use std::fmt::Display;
 #[derive(Debug, Eq, PartialEq)]
 pub enum BoundaryStmt {
     Constraint(BoundaryConstraint),
-    ConstraintComprehension(BoundaryConstraintComprehension),
+    ConstraintComprehension(BoundaryConstraint, ConstraintComprehensionContext),
     Variable(Variable),
 }
 
