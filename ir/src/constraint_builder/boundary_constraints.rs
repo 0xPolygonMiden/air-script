@@ -97,6 +97,7 @@ impl ConstraintBuilder {
                 self.insert_constraint(root, lhs_segment.into(), domain)?
             }
             BoundaryStmt::Variable(variable) => self.symbol_table.insert_variable(variable)?,
+            BoundaryStmt::ConstraintComprehension(_, _) => todo!(),
         }
 
         Ok(())

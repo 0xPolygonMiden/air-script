@@ -53,6 +53,7 @@ impl ConstraintBuilder {
                 }
             }
             IntegrityStmt::Constraint(ConstraintType::Evaluator(_), _) => todo!(),
+            IntegrityStmt::ConstraintComprehension(_, _, _) => todo!(),
         }
 
         Ok(())
