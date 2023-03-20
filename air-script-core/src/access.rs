@@ -78,3 +78,23 @@ impl Range {
         self.end
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Slice {
+    name: Identifier,
+    range: Range,
+}
+
+impl Slice {
+    pub fn new(name: Identifier, range: Range) -> Self {
+        Self { name, range }
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.name()
+    }
+
+    pub fn range(&self) -> &Range {
+        &self.range
+    }
+}

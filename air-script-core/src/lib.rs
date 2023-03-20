@@ -1,5 +1,5 @@
 mod access;
-pub use access::{MatrixAccess, Range, VectorAccess};
+pub use access::{MatrixAccess, Range, Slice, VectorAccess};
 
 mod constant;
 pub use constant::{Constant, ConstantType};

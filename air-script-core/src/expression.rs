@@ -1,5 +1,6 @@
 use super::{
-    Identifier, IndexedTraceAccess, ListComprehension, MatrixAccess, NamedTraceAccess, VectorAccess,
+    Identifier, IndexedTraceAccess, ListComprehension, MatrixAccess, NamedTraceAccess, Slice,
+    VectorAccess,
 };
 
 /// Arithmetic expressions for evaluation of constraints.
@@ -8,6 +9,7 @@ pub enum Expression {
     Const(u64),
     /// Represents any named constant or variable.
     Elem(Identifier),
+    Slice(Slice),
     /// Represents an element inside a constant or variable vector. [VectorAccess] contains the
     /// name of the vector and the index of the element to access.
     VectorAccess(VectorAccess),

@@ -5,7 +5,7 @@ use crate::{
         Constant, ConstantType, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
         IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
         MatrixAccess, NamedTraceAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues,
-        Range, Source, SourceSection, Trace, TraceCols, Variable, VariableType, VectorAccess
+        Range, Slice, Source, SourceSection, Trace, TraceCols, Variable, VariableType, VectorAccess
     }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
@@ -257,6 +257,7 @@ BoundaryAtom: Expression = {
     <ident: Identifier> => Expression::Elem(ident),
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access),
+    <ident: Identifier><slice: Slice> => Expression::Slice(Slice::new(ident, slice)),
     <list_folding_type: ListFoldingType<BoundaryExpr>> => Expression::ListFolding(list_folding_type),
 }
 
@@ -384,6 +385,7 @@ IntegrityAtom: Expression = {
     <ident: Identifier> => Expression::Elem(ident),
     "!" <expr: IntegrityAtom> =>
         Expression::Sub(Box::new(Expression::Const(1)), Box::new(expr)),
+    <ident: Identifier><slice: Slice> => Expression::Slice(Slice::new(ident, slice)),
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access),
     <trace_access: NamedTraceAccessWithOffset> => Expression::NamedTraceAccess(trace_access),
@@ -420,6 +422,10 @@ Size: u64 = {
 
 Index: usize = {
     "[" <idx: Num_u64> "]" => idx as usize
+}
+
+Slice: Range = {
+    "[" <start: Num_u64> ".." <end: Num_u64> "]" => Range::new(start as usize, end as usize)
 }
 
 VectorAccess: VectorAccess = {

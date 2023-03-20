@@ -2,7 +2,8 @@ use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSec
 use crate::{
     ast::{
         Constant, ConstantType::*, ConstraintType, Expression::*, IndexedTraceAccess,
-        IntegrityStmt::*, MatrixAccess, NamedTraceAccess, Variable, VariableType, VectorAccess,
+        IntegrityStmt::*, MatrixAccess, NamedTraceAccess, Range, Slice, Variable, VariableType,
+        VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -103,6 +104,37 @@ fn integrity_constraint_with_random_value() {
         )),
         None,
     )])]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn integrity_constraint_with_slice() {
+    let source = "
+    integrity_constraints:
+        let c = d[1..3]
+        enf a + c[1] = 0";
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
+        Variable(Variable::new(
+            Identifier("c".to_string()),
+            VariableType::Scalar(Slice(Slice::new(
+                Identifier("d".to_string()),
+                Range::new(1, 3),
+            ))),
+        )),
+        Constraint(
+            ConstraintType::Inline(IntegrityConstraint::new(
+                Add(
+                    Box::new(Elem(Identifier("a".to_string()))),
+                    Box::new(VectorAccess(VectorAccess::new(
+                        Identifier("c".to_string()),
+                        1,
+                    ))),
+                ),
+                Const(0),
+            )),
+            None,
+        ),
+    ])]);
     build_parse_test!(source).expect_ast(expected);
 }
 
