@@ -33,7 +33,7 @@ integrity_constraints:
     enf k0 * (s' - s) = m
 
     # c = a + b when s = 0.
-    enf (1 - s) * (c - a + b) = n[0] - n[1]
+    enf (1 - s) * (c - a - b) = n[0] - n[1]
 
     # c = a * b when s = 1.
     enf s * (c - a * b) = o[0][0] - o[0][1] - o[1][0]
