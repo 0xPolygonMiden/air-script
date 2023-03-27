@@ -37,22 +37,20 @@ fn full_air_file() {
         SourceSection::AirDef(Identifier("SystemAir".to_string())),
         // trace_columns:
         //     main: [clk, fmp, ctx]
-        SourceSection::Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("clk".to_string()), 1),
-                TraceCols::new(Identifier("fmp".to_string()), 1),
-                TraceCols::new(Identifier("ctx".to_string()), 1),
-            ],
-            aux_cols: vec![],
-        }),
+        SourceSection::Trace(vec![vec![
+            TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("fmp".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("ctx".to_string()), 0, 2, 1),
+        ]]),
         // integrity_constraints:
         //     enf clk' = clk + 1
         SourceSection::IntegrityConstraints(vec![IntegrityStmt::Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 // clk' = clk + 1
-                Expression::NamedTraceAccess(NamedTraceAccess::new(
+                Expression::TraceBindingAccess(TraceBindingAccess::new(
                     Identifier("clk".to_string()),
                     0,
+                    TraceBindingAccessSize::Full,
                     1,
                 )),
                 Expression::Add(
@@ -66,7 +64,12 @@ fn full_air_file() {
         //     enf clk.first = 0
         SourceSection::BoundaryConstraints(vec![BoundaryStmt::Constraint(
             BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
+                TraceBindingAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
                 Boundary::First,
                 Expression::Const(0),
             ),

@@ -2,10 +2,12 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
-        ComprehensionContext, Constant, ConstantType, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
+        build_column_groups, build_trace_bindings, ColumnGroup, Constant, ConstantType,
+        ComprehensionContext, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
         IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
-        MatrixAccess, NamedTraceAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues,
-        Range, Source, SourceSection, Trace, TraceCols, Variable, VariableType, VectorAccess
+        MatrixAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues, Range, Source,
+        SourceSection, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, Variable,
+        VariableType, VectorAccess
     }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
@@ -42,33 +44,33 @@ AirDef: Identifier = {
 // TRACE COLUMNS
 // ================================================================================================
 
-Trace: Trace = {
-    "trace_columns" ":" <main_cols: MainCols?> <aux_cols: AuxCols?> =>? match (main_cols, aux_cols)
-    {
-        (Some(main_cols), Some(aux_cols)) => Ok(Trace { main_cols, aux_cols }),
-        (Some(main_cols), None) => Ok(Trace { main_cols, aux_cols: vec![] }),
-        (None, Some(_aux_cols)) => Err(ParseError::User {
-            error: Error::ParseError(
-                MissingMainTraceCols("Declaration of main trace columns is required".to_string())
-            )
-        }),
-        (None, None) => Err(ParseError::User {
-            error: Error::ParseError(InvalidTraceCols("Trace Columns cannot be empty".to_string()))
-        })
-    } 
+Trace: Vec<Vec<TraceBinding>> = {
+    "trace_columns" ":" <main_cols: MainTraceBindings?> <aux_cols: AuxTraceBindings?> =>?
+        match (main_cols, aux_cols) {
+            (Some(main_cols), Some(aux_cols)) => Ok(vec![main_cols, aux_cols]),
+            (Some(main_cols), None) => Ok(vec![main_cols]),
+            (None, Some(_aux_cols)) => Err(ParseError::User {
+                error: Error::ParseError(
+                    MissingMainTraceCols("Declaration of main trace columns is required".to_string())
+                )
+            }),
+            (None, None) => Err(ParseError::User {
+                error: Error::ParseError(InvalidTraceCols("Trace Columns cannot be empty".to_string()))
+            })
+        } 
 }
 
-MainCols: Vec<TraceCols> = {
-    "main" ":" "[" <main_cols: CommaElems<TraceCols>> "]" => main_cols,
+MainTraceBindings: Vec<TraceBinding> = {
+    "main" ":" "[" <main_cols: CommaElems<ColumnGroup>> "]" => build_trace_bindings(0, main_cols),
 }
 
-AuxCols: Vec<TraceCols> = {
-    "aux" ":" "[" <aux_cols: CommaElems<TraceCols>> "]" => aux_cols,
+AuxTraceBindings: Vec<TraceBinding> = {
+    "aux" ":" "[" <aux_cols: CommaElems<ColumnGroup>> "]" => build_trace_bindings(1, aux_cols),
 }
 
-TraceCols: TraceCols = {
-    <name: Identifier> => TraceCols::new(name, 1),
-    <name: Identifier> <size: Size> => TraceCols::new(name, size)
+ColumnGroup: (Identifier, u64) = {
+    <name: Identifier> => (name, 1),
+    <name: Identifier> <size: Size> => (name, size)
 }
 
 // CONSTANTS
@@ -158,29 +160,36 @@ RandElem: RandBinding = {
 // ================================================================================================
 
 EvaluatorFunction: EvaluatorFunction = {
-    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainCols> "," <aux_cols: AuxCols> ")" ":"
+    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainColumnGroups> "," <aux_cols: AuxColumnGroups> ")" ":"
+        <integrity_stmts: IntegrityStmts> => {
+            let mut cols = main_cols;
+            cols.extend(aux_cols);
+            EvaluatorFunction::new(
+                evaluator_fn_name,
+                cols,
+                integrity_stmts)
+        },
+    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainColumnGroups> ")" ":"
         <integrity_stmts: IntegrityStmts> => 
             EvaluatorFunction::new(
                 evaluator_fn_name,
                 main_cols,
-                aux_cols,
                 integrity_stmts),
-    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainCols> ")" ":"
-        <integrity_stmts: IntegrityStmts> => 
-            EvaluatorFunction::new(
-                evaluator_fn_name,
-                main_cols,
-                Vec::new(),
-                integrity_stmts),
-    "ev" <evaluator_fn_name: Identifier> "(" <aux_cols: AuxCols> ")" ":"
+    "ev" <evaluator_fn_name: Identifier> "(" <aux_cols: AuxColumnGroups> ")" ":"
         <integrity_stmts: IntegrityStmts> =>
             EvaluatorFunction::new(
                 evaluator_fn_name,
-                Vec::new(),
                 aux_cols,
                 integrity_stmts),
 }
 
+MainColumnGroups: Vec<ColumnGroup> = {
+    "main" ":" "[" <main_cols: CommaElems<ColumnGroup>> "]" => build_column_groups(0, main_cols),
+}
+
+AuxColumnGroups: Vec<ColumnGroup> = {
+    "aux" ":" "[" <aux_cols: CommaElems<ColumnGroup>> "]" => build_column_groups(1, aux_cols),
+}
 
 // BOUNDARY STATEMENTS
 // ================================================================================================
@@ -216,7 +225,7 @@ BoundaryStmt: BoundaryStmt = {
 }
 
 BoundaryConstraintExpr: BoundaryConstraint = {
-    <column: NamedTraceAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
+    <column: TraceBindingAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
         BoundaryConstraint::new(column, boundary, value),
 }
 
@@ -339,7 +348,7 @@ IntegrityVariableType: VariableType = {
 }
 
 EvaluatorFunctionCall: EvaluatorFunctionCall = {
-    <ident: Identifier> "(" <args: CommaElems<Vector<TraceCols>>> ")" =>? {
+    <ident: Identifier> "(" <args: CommaElems<Vector<TraceBindingAccess>>> ")" =>? {
         if args.len() > 2 {
             return Err(ParseError::User {
                 error: Error::ParseError(
@@ -392,7 +401,7 @@ IntegrityExponent: Expression = {
 
 IntegrityAtom: Expression = {
     "(" <IntegrityExpr> ")",
-    <col_access: IndexedTraceAccess> => Expression::IndexedTraceAccess(col_access),
+    <col_access: IndexedTraceAccess> => Expression::TraceAccess(col_access),
     "$" <ident: Identifier> <idx: Index> => Expression::Rand(ident, idx),
     <n: Num_u64> => Expression::Const(n),
     <ident: Identifier> => Expression::Elem(ident),
@@ -400,7 +409,7 @@ IntegrityAtom: Expression = {
         Expression::Sub(Box::new(Expression::Const(1)), Box::new(expr)),
     <vector_access: VectorAccess> => Expression::VectorAccess(vector_access),
     <matrix_access: MatrixAccess> => Expression::MatrixAccess(matrix_access),
-    <trace_access: NamedTraceAccessWithOffset> => Expression::NamedTraceAccess(trace_access),
+    <trace_access: TraceBindingAccessWithOffset> => Expression::TraceBindingAccess(trace_access),
     <list_folding_type: ListFoldingType<IntegrityExpr>> =>
         Expression::ListFolding(list_folding_type),
 }
@@ -445,21 +454,25 @@ MatrixAccess: MatrixAccess = {
         MatrixAccess::new(ident, row, col)
 }
 
-NamedTraceAccess: NamedTraceAccess = {
-    <ident: Identifier> => NamedTraceAccess::new(ident, 0, 0),
-    <ident: Identifier> <idx: Index> => NamedTraceAccess::new(ident, idx, 0)
+TraceBindingAccess: TraceBindingAccess = {
+    <ident: Identifier> => TraceBindingAccess::new(ident, 0, TraceBindingAccessSize::Full, 0),
+    <ident: Identifier> "[" <range: Range> "]" =>
+        TraceBindingAccess::new(ident, range.start(), TraceBindingAccessSize::Slice(range), 0),
+    <ident: Identifier> <idx: Index> =>
+        TraceBindingAccess::new(ident, idx, TraceBindingAccessSize::Single, 0)
 }
 
-NamedTraceAccessWithOffset: NamedTraceAccess = {
-    <ident: Identifier> "'" => NamedTraceAccess::new(ident, 0, 1),
-    <ident: Identifier> <idx: Index> "'" => NamedTraceAccess::new(ident, idx, 1)
+TraceBindingAccessWithOffset: TraceBindingAccess = {
+    <ident: Identifier> "'" =>TraceBindingAccess::new(ident, 0, TraceBindingAccessSize::Full, 1),
+    <ident: Identifier> <idx: Index> "'" =>
+        TraceBindingAccess::new(ident, idx, TraceBindingAccessSize::Single, 1)
 }
 
 IndexedTraceAccess: IndexedTraceAccess = {
-    "$main" <idx: Index> => IndexedTraceAccess::new(0, idx, 0),
-    "$main" <idx: Index> "'" => IndexedTraceAccess::new(0, idx, 1), 
-    "$aux" <idx: Index> => IndexedTraceAccess::new(1, idx, 0),
-    "$aux" <idx: Index> "'" => IndexedTraceAccess::new(1, idx, 1),
+    "$main" <idx: Index> => IndexedTraceAccess::new(0, idx, 1, 0),
+    "$main" <idx: Index> "'" => IndexedTraceAccess::new(0, idx, 1, 1), 
+    "$aux" <idx: Index> => IndexedTraceAccess::new(1, idx, 1, 0),
+    "$aux" <idx: Index> "'" => IndexedTraceAccess::new(1, idx, 1, 1),
 }
 
 ConstraintComprehension<T>: ComprehensionContext = {

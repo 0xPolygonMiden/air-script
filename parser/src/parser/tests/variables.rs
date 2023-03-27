@@ -1,7 +1,7 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::ast::{
-    ConstraintType, Expression::*, IntegrityStmt::*, NamedTraceAccess, Variable, VariableType,
-    VectorAccess,
+    ConstraintType, Expression::*, IntegrityStmt::*, TraceBindingAccess, TraceBindingAccessSize,
+    Variable, VariableType, VectorAccess,
 };
 
 // VARIABLES
@@ -25,7 +25,12 @@ fn variables_with_and_operators() {
         )),
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
-                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                TraceBindingAccess(TraceBindingAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    1,
+                )),
                 Add(
                     Box::new(Elem(Identifier("clk".to_string()))),
                     Box::new(Const(1)),
@@ -54,9 +59,10 @@ fn variables_with_or_operators() {
                     ))),
                     Box::new(Sub(
                         Box::new(Const(1)),
-                        Box::new(NamedTraceAccess(NamedTraceAccess::new(
+                        Box::new(TraceBindingAccess(TraceBindingAccess::new(
                             Identifier("s".to_string()),
                             1,
+                            TraceBindingAccessSize::Single,
                             1,
                         ))),
                     )),
@@ -68,9 +74,10 @@ fn variables_with_or_operators() {
                     ))),
                     Box::new(Sub(
                         Box::new(Const(1)),
-                        Box::new(NamedTraceAccess(NamedTraceAccess::new(
+                        Box::new(TraceBindingAccess(TraceBindingAccess::new(
                             Identifier("s".to_string()),
                             1,
+                            TraceBindingAccessSize::Single,
                             1,
                         ))),
                     )),
@@ -79,7 +86,12 @@ fn variables_with_or_operators() {
         )),
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
-                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                TraceBindingAccess(TraceBindingAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    1,
+                )),
                 Add(
                     Box::new(Elem(Identifier("clk".to_string()))),
                     Box::new(Const(1)),

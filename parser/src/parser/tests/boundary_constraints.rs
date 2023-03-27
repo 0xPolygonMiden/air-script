@@ -1,9 +1,8 @@
 use super::{build_parse_test, Boundary, BoundaryConstraint, Identifier, Source, SourceSection};
 use crate::{
     ast::{
-        BoundaryStmt::*, Constant, ConstantType::*, Expression::*, Iterable, MatrixAccess,
-        NamedTraceAccess, PublicInput, Range, SourceSection::*, Trace, TraceCols, Variable,
-        VariableType, VectorAccess,
+        BoundaryStmt::*, Constant, ConstantType::*, Expression::*, MatrixAccess, PublicInput,
+        TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -18,7 +17,7 @@ fn boundary_constraint_at_first() {
         enf clk.first = 0";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
+            TraceBindingAccess::new(Identifier("clk".to_string()), 0, TraceBindingAccessSize::Full, 0),
             Boundary::First,
             Const(0),
         ),
@@ -33,7 +32,7 @@ fn boundary_constraint_at_last() {
         enf clk.last = 15";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
+            TraceBindingAccess::new(Identifier("clk".to_string()), 0, TraceBindingAccessSize::Full, 0),
             Boundary::Last,
             Const(15),
         ),
@@ -57,12 +56,12 @@ fn multiple_boundary_constraints() {
         enf clk.last = 1";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
         Constraint(BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
+            TraceBindingAccess::new(Identifier("clk".to_string()), 0, TraceBindingAccessSize::Full, 0),
             Boundary::First,
             Const(0),
         )),
         Constraint(BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
+            TraceBindingAccess::new(Identifier("clk".to_string()), 0, TraceBindingAccessSize::Full, 0),
             Boundary::Last,
             Const(1),
         )),
@@ -80,7 +79,7 @@ fn boundary_constraint_with_pub_input() {
     let expected = Source(vec![
         SourceSection::PublicInputs(vec![PublicInput::new(Identifier("a".to_string()), 16)]),
         SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
+            TraceBindingAccess::new(Identifier("clk".to_string()), 0, TraceBindingAccessSize::Full, 0),
             Boundary::First,
             VectorAccess(VectorAccess::new(Identifier("a".to_string()), 0)),
         ))]),
@@ -95,7 +94,7 @@ fn boundary_constraint_with_expr() {
         enf clk.first = 5 + a[3] + 6";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
+            TraceBindingAccess::new(Identifier("clk".to_string()), 0, TraceBindingAccessSize::Full, 0),
             Boundary::First,
             Add(
                 Box::new(Add(
@@ -131,7 +130,7 @@ fn boundary_constraint_with_const() {
             Matrix(vec![vec![0, 1], vec![1, 0]]),
         )),
         SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
+            TraceBindingAccess::new(Identifier("clk".to_string()), 0, TraceBindingAccessSize::Full, 0),
             Boundary::First,
             Sub(
                 Box::new(Add(
@@ -195,7 +194,7 @@ fn boundary_constraint_with_variables() {
             ]),
         )),
         Constraint(BoundaryConstraint::new(
-            NamedTraceAccess::new(Identifier("clk".to_string()), 0, 0),
+            TraceBindingAccess::new(Identifier("clk".to_string()), 0, TraceBindingAccessSize::Full, 0),
             Boundary::First,
             Add(
                 Box::new(Add(
