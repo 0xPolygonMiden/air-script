@@ -2,7 +2,8 @@ use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSec
 use crate::{
     ast::{
         Constant, ConstantType::*, ConstraintType, Expression::*, IndexedTraceAccess,
-        IntegrityStmt::*, MatrixAccess, NamedTraceAccess, Variable, VariableType, VectorAccess,
+        IntegrityStmt::*, MatrixAccess, TraceBindingAccess, TraceBindingAccessSize, Variable,
+        VariableType, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -17,7 +18,12 @@ fn integrity_constraints() {
         enf clk' = clk + 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
-            NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+            TraceBindingAccess(TraceBindingAccess::new(
+                Identifier("clk".to_string()),
+                0,
+                TraceBindingAccessSize::Full,
+                1,
+            )),
             Add(
                 Box::new(Elem(Identifier("clk".to_string()))),
                 Box::new(Const(1)),
@@ -44,7 +50,12 @@ fn multiple_integrity_constraints() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
-                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                TraceBindingAccess(TraceBindingAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    1,
+                )),
                 Add(
                     Box::new(Elem(Identifier("clk".to_string()))),
                     Box::new(Const(1)),
@@ -55,9 +66,10 @@ fn multiple_integrity_constraints() {
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 Sub(
-                    Box::new(NamedTraceAccess(NamedTraceAccess::new(
+                    Box::new(TraceBindingAccess(TraceBindingAccess::new(
                         Identifier("clk".to_string()),
                         0,
+                        TraceBindingAccessSize::Full,
                         1,
                     ))),
                     Box::new(Elem(Identifier("clk".to_string()))),
@@ -223,9 +235,9 @@ fn integrity_constraint_with_indexed_trace_access() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
-                IndexedTraceAccess(IndexedTraceAccess::new(0, 0, 1)),
+                TraceAccess(IndexedTraceAccess::new(0, 0, 1, 1)),
                 Add(
-                    Box::new(IndexedTraceAccess(IndexedTraceAccess::new(0, 1, 0))),
+                    Box::new(TraceAccess(IndexedTraceAccess::new(0, 1, 1, 0))),
                     Box::new(Const(1)),
                 ),
             )),
@@ -234,8 +246,8 @@ fn integrity_constraint_with_indexed_trace_access() {
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 Sub(
-                    Box::new(IndexedTraceAccess(IndexedTraceAccess::new(1, 0, 1))),
-                    Box::new(IndexedTraceAccess(IndexedTraceAccess::new(1, 1, 0))),
+                    Box::new(TraceAccess(IndexedTraceAccess::new(1, 0, 1, 1))),
+                    Box::new(TraceAccess(IndexedTraceAccess::new(1, 1, 1, 0))),
                 ),
                 Const(1),
             )),

@@ -2,8 +2,8 @@ use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
     ast::{
         Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType, EvaluatorFunction,
-        EvaluatorFunctionCall, Expression::*, IntegrityStmt, Iterable, NamedTraceAccess, Range,
-        SourceSection::*, Trace, TraceCols, VectorAccess,
+        EvaluatorFunctionCall, Expression::*, IntegrityStmt, Iterable, Range, SourceSection::*,
+        TraceBinding, TraceBindingAccess, TraceBindingAccessSize, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -23,15 +23,15 @@ fn bc_comprehension_one_iterable_identifier() {
     let expected = Source(vec![
         Trace(Trace {
             main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
+                TraceBinding::new(Identifier("a".to_string()), 1),
+                TraceBinding::new(Identifier("b".to_string()), 1),
+                TraceBinding::new(Identifier("c".to_string()), 4),
             ],
             aux_cols: vec![],
         }),
         BoundaryConstraints(vec![BoundaryStmt::ConstraintComprehension(
             BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("x".to_string()), 0, 0),
+                TraceBindingAccess::new(Identifier("x".to_string()), 0, TraceBindingAccessSize::Full, 0),
                 Boundary::First,
                 Const(0),
             ),
@@ -57,15 +57,15 @@ fn bc_comprehension_one_iterable_range() {
     let expected = Source(vec![
         Trace(Trace {
             main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
+                TraceBinding::new(Identifier("a".to_string()), 1),
+                TraceBinding::new(Identifier("b".to_string()), 1),
+                TraceBinding::new(Identifier("c".to_string()), 4),
             ],
             aux_cols: vec![],
         }),
         BoundaryConstraints(vec![BoundaryStmt::ConstraintComprehension(
             BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("x".to_string()), 0, 0),
+                TraceBindingAccess::new(Identifier("x".to_string()), 0, TraceBindingAccessSize::Full, 0),
                 Boundary::First,
                 Const(0),
             ),
@@ -91,15 +91,15 @@ fn bc_comprehension_one_iterable_slice() {
     let expected = Source(vec![
         Trace(Trace {
             main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
+                TraceBinding::new(Identifier("a".to_string()), 1),
+                TraceBinding::new(Identifier("b".to_string()), 1),
+                TraceBinding::new(Identifier("c".to_string()), 4),
             ],
             aux_cols: vec![],
         }),
         BoundaryConstraints(vec![BoundaryStmt::ConstraintComprehension(
             BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("x".to_string()), 0, 0),
+                TraceBindingAccess::new(Identifier("x".to_string()), 0, TraceBindingAccessSize::Full, 0),
                 Boundary::First,
                 Const(0),
             ),
@@ -124,16 +124,16 @@ fn bc_comprehension_two_iterable_identifiers() {
     let expected = Source(vec![
         Trace(Trace {
             main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-                TraceCols::new(Identifier("d".to_string()), 4),
+                TraceBinding::new(Identifier("a".to_string()), 1),
+                TraceBinding::new(Identifier("b".to_string()), 1),
+                TraceBinding::new(Identifier("c".to_string()), 4),
+                TraceBinding::new(Identifier("d".to_string()), 4),
             ],
             aux_cols: vec![],
         }),
         BoundaryConstraints(vec![BoundaryStmt::ConstraintComprehension(
             BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("x".to_string()), 0, 0),
+                TraceBindingAccess::new(Identifier("x".to_string()), 0, TraceBindingAccessSize::Full, 0),
                 Boundary::First,
                 Elem(Identifier("y".to_string())),
             ),
@@ -165,9 +165,9 @@ fn ic_comprehension_one_iterable_identifier() {
     let expected = Source(vec![
         Trace(Trace {
             main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
+                TraceBinding::new(Identifier("a".to_string()), 1),
+                TraceBinding::new(Identifier("b".to_string()), 1),
+                TraceBinding::new(Identifier("c".to_string()), 4),
             ],
             aux_cols: vec![],
         }),
@@ -201,9 +201,9 @@ fn ic_comprehension_one_iterable_range() {
     let expected = Source(vec![
         Trace(Trace {
             main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
+                TraceBinding::new(Identifier("a".to_string()), 1),
+                TraceBinding::new(Identifier("b".to_string()), 1),
+                TraceBinding::new(Identifier("c".to_string()), 4),
             ],
             aux_cols: vec![],
         }),
@@ -237,10 +237,10 @@ fn ic_comprehension_with_selectors() {
     let expected = Source(vec![
         Trace(Trace {
             main_cols: vec![
-                TraceCols::new(Identifier("s".to_string()), 2),
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
+                TraceBinding::new(Identifier("s".to_string()), 2),
+                TraceBinding::new(Identifier("a".to_string()), 1),
+                TraceBinding::new(Identifier("b".to_string()), 1),
+                TraceBinding::new(Identifier("c".to_string()), 4),
             ],
             aux_cols: vec![],
         }),
@@ -286,7 +286,7 @@ fn ic_comprehension_with_evaluator_call() {
     let expected = Source(vec![
         EvaluatorFunction(EvaluatorFunction::new(
             Identifier("is_binary".to_string()),
-            vec![TraceCols::new(Identifier("x".to_string()), 1)],
+            vec![TraceBinding::new(Identifier("x".to_string()), 1)],
             Vec::new(),
             vec![IntegrityStmt::Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
@@ -301,17 +301,17 @@ fn ic_comprehension_with_evaluator_call() {
         )),
         Trace(Trace {
             main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-                TraceCols::new(Identifier("d".to_string()), 4),
+                TraceBinding::new(Identifier("a".to_string()), 1),
+                TraceBinding::new(Identifier("b".to_string()), 1),
+                TraceBinding::new(Identifier("c".to_string()), 4),
+                TraceBinding::new(Identifier("d".to_string()), 4),
             ],
             aux_cols: vec![],
         }),
         IntegrityConstraints(vec![IntegrityStmt::ConstraintComprehension(
             ConstraintType::Evaluator(EvaluatorFunctionCall::new(
                 Identifier("is_binary".to_string()),
-                vec![vec![TraceCols::new(Identifier("x".to_string()), 1)]],
+                vec![vec![TraceBinding::new(Identifier("x".to_string()), 1)]],
             )),
             None,
             vec![(

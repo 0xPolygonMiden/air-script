@@ -1,8 +1,10 @@
+use air_script_core::Range;
+
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::{
     ast::{
-        ConstraintType, EvaluatorFunction, EvaluatorFunctionCall, Expression::*, IntegrityStmt::*,
-        NamedTraceAccess, TraceCols, Variable, VariableType,
+        ColumnGroup, ConstraintType, EvaluatorFunction, EvaluatorFunctionCall, Expression::*,
+        IntegrityStmt::*, TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType,
     },
     error::{Error, ParseError},
 };
@@ -18,11 +20,15 @@ fn ev_fn_main_cols() {
     let expected = Source(vec![SourceSection::EvaluatorFunction(
         EvaluatorFunction::new(
             Identifier("advance_clock".to_string()),
-            vec![TraceCols::new(Identifier("clk".to_string()), 1)],
-            vec![],
+            vec![ColumnGroup::new(Identifier("clk".to_string()), 0, 1)],
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                    TraceBindingAccess(TraceBindingAccess::new(
+                        Identifier("clk".to_string()),
+                        0,
+                        TraceBindingAccessSize::Full,
+                        1,
+                    )),
                     Add(
                         Box::new(Elem(Identifier("clk".to_string()))),
                         Box::new(Const(1)),
@@ -46,10 +52,10 @@ fn ev_fn_main_and_aux_cols() {
     let expected = Source(vec![SourceSection::EvaluatorFunction(
         EvaluatorFunction::new(
             Identifier("ev_func".to_string()),
-            vec![TraceCols::new(Identifier("clk".to_string()), 1)],
             vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
+                ColumnGroup::new(Identifier("clk".to_string()), 0, 1),
+                ColumnGroup::new(Identifier("a".to_string()), 1, 1),
+                ColumnGroup::new(Identifier("b".to_string()), 1, 1),
             ],
             vec![
                 Variable(Variable::new(
@@ -61,9 +67,10 @@ fn ev_fn_main_and_aux_cols() {
                 )),
                 Constraint(
                     ConstraintType::Inline(IntegrityConstraint::new(
-                        NamedTraceAccess(NamedTraceAccess::new(
+                        TraceBindingAccess(TraceBindingAccess::new(
                             Identifier("clk".to_string()),
                             0,
+                            TraceBindingAccessSize::Full,
                             1,
                         )),
                         Add(
@@ -75,7 +82,12 @@ fn ev_fn_main_and_aux_cols() {
                 ),
                 Constraint(
                     ConstraintType::Inline(IntegrityConstraint::new(
-                        NamedTraceAccess(NamedTraceAccess::new(Identifier("a".to_string()), 0, 1)),
+                        TraceBindingAccess(TraceBindingAccess::new(
+                            Identifier("a".to_string()),
+                            0,
+                            TraceBindingAccessSize::Full,
+                            1,
+                        )),
                         Add(
                             Box::new(Elem(Identifier("a".to_string()))),
                             Box::new(Elem(Identifier("z".to_string()))),
@@ -90,7 +102,7 @@ fn ev_fn_main_and_aux_cols() {
 }
 
 #[test]
-fn ev_fn_call() {
+fn ev_fn_call_simple() {
     let source = "
     integrity_constraints:
         enf advance_clock([clk])";
@@ -98,7 +110,48 @@ fn ev_fn_call() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Evaluator(EvaluatorFunctionCall::new(
             Identifier("advance_clock".to_string()),
-            vec![vec![TraceCols::new(Identifier("clk".to_string()), 1)]],
+            vec![vec![TraceBindingAccess::new(
+                Identifier("clk".to_string()),
+                0,
+                TraceBindingAccessSize::Full,
+                0,
+            )]],
+        )),
+        None,
+    )])]);
+
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
+fn ev_fn_call() {
+    let source = "
+    integrity_constraints:
+        enf advance_clock([a, b[1], c[2..4]])";
+
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
+        ConstraintType::Evaluator(EvaluatorFunctionCall::new(
+            Identifier("advance_clock".to_string()),
+            vec![vec![
+                TraceBindingAccess::new(
+                    Identifier("a".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
+                TraceBindingAccess::new(
+                    Identifier("b".to_string()),
+                    1,
+                    TraceBindingAccessSize::Single,
+                    0,
+                ),
+                TraceBindingAccess::new(
+                    Identifier("c".to_string()),
+                    2,
+                    TraceBindingAccessSize::Slice(Range::new(2, 4)),
+                    0,
+                ),
+            ]],
         )),
         None,
     )])]);
@@ -115,15 +168,20 @@ fn ev_fn_call_inside_ev_fn() {
     let expected = Source(vec![SourceSection::EvaluatorFunction(
         EvaluatorFunction::new(
             Identifier("ev_func".to_string()),
-            vec![TraceCols::new(Identifier("clk".to_string()), 1)],
             vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
+                ColumnGroup::new(Identifier("clk".to_string()), 0, 1),
+                ColumnGroup::new(Identifier("a".to_string()), 1, 1),
+                ColumnGroup::new(Identifier("b".to_string()), 1, 1),
             ],
             vec![Constraint(
                 ConstraintType::Evaluator(EvaluatorFunctionCall::new(
                     Identifier("advance_clock".to_string()),
-                    vec![vec![TraceCols::new(Identifier("clk".to_string()), 1)]],
+                    vec![vec![TraceBindingAccess::new(
+                        Identifier("clk".to_string()),
+                        0,
+                        TraceBindingAccessSize::Full,
+                        0,
+                    )]],
                 )),
                 None,
             )],
