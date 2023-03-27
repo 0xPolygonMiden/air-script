@@ -21,10 +21,8 @@ impl ConstraintBuilder {
             Expression::Const(value) => self.insert_inline_constant(*value),
 
             // --- TRACE ACCESS REFERENCE ---------------------------------------------------------
-            Expression::IndexedTraceAccess(column_access) => {
-                self.insert_trace_access(column_access)
-            }
-            Expression::NamedTraceAccess(trace_access) => {
+            Expression::TraceAccess(column_access) => self.insert_trace_access(column_access),
+            Expression::TraceBindingAccess(trace_access) => {
                 let trace_access = self.symbol_table.get_trace_access_by_name(trace_access)?;
                 self.insert_trace_access(&trace_access)
             }

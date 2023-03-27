@@ -42,17 +42,13 @@ impl EvaluatorFunction {
     /// Returns the name, main trace columns, auxiliary trace columns, and integrity statements
     /// of the evaluator function.
     pub fn into_parts(self) -> (String, Vec<ColumnGroup>, Vec<IntegrityStmt>) {
-        (
-            self.name.into_name(),
-            self.params,
-            self.integrity_stmts,
-        )
+        (self.name.into_name(), self.params, self.integrity_stmts)
     }
 }
 
-/// Evaluator function call is used to invoke an evaluator function. It takes a vector of vectors of 
-/// trace binding accesses as input, where each vector of trace binding accesses represents trace
-/// columns of that trace segment that are used as arguments to the evaluator function.
+/// Evaluator function call is used to invoke an evaluator function. It takes a vector of vectors
+/// of trace binding accesses as input, where each vector of trace binding accesses represents
+/// trace columns of that trace segment that are used as arguments to the evaluator function.
 #[derive(Debug, Eq, PartialEq)]
 pub struct EvaluatorFunctionCall {
     name: Identifier,

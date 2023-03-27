@@ -153,7 +153,7 @@ impl Symbol {
                 }
                 let trace_segment = columns.trace_segment();
                 let trace_access =
-                    IndexedTraceAccess::new(trace_segment, columns.offset(), row_offset);
+                    IndexedTraceAccess::new(trace_segment, columns.offset(), 1, row_offset);
                 Ok(Value::TraceElement(trace_access))
             }
             AccessType::Vector(idx) => {
@@ -167,7 +167,7 @@ impl Symbol {
 
                 let trace_segment = columns.trace_segment();
                 let trace_access =
-                    IndexedTraceAccess::new(trace_segment, columns.offset() + idx, row_offset);
+                    IndexedTraceAccess::new(trace_segment, columns.offset() + idx, 1, row_offset);
                 Ok(Value::TraceElement(trace_access))
             }
             _ => Err(SemanticError::invalid_trace_access_type(

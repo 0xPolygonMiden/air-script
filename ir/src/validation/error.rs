@@ -1,6 +1,8 @@
+use air_script_core::TraceBindingAccess;
+
 use super::{
-    AccessType, ConstrainedBoundary, ConstraintDomain, IndexedTraceAccess, NamedTraceAccess,
-    SymbolType, TraceSegment, MIN_CYCLE_LENGTH,
+    AccessType, ConstrainedBoundary, ConstraintDomain, IndexedTraceAccess, SymbolType,
+    TraceSegment, MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]
@@ -195,12 +197,12 @@ impl SemanticError {
     }
 
     pub(crate) fn named_trace_column_access_out_of_bounds(
-        access: &NamedTraceAccess,
+        access: &TraceBindingAccess,
         size: usize,
     ) -> Self {
         SemanticError::IndexOutOfRange(format!(
             "Out-of-range index '{}' while accessing named trace column group '{}' of length {}",
-            access.idx(),
+            access.col_offset(),
             access.name(),
             size
         ))

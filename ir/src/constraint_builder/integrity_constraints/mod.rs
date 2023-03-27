@@ -2,8 +2,8 @@ use super::{
     ast::{ConstraintType, IntegrityStmt},
     BTreeMap, ConstantType, ConstraintBuilder, ConstraintDomain, Expression, Identifier,
     IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
-    NamedTraceAccess, SemanticError, Symbol, SymbolType, Variable, VariableType, VectorAccess,
-    CURRENT_ROW,
+    SemanticError, Symbol, SymbolType, TraceBindingAccess, TraceBindingAccessSize, Variable,
+    VariableType, VectorAccess, CURRENT_ROW,
 };
 
 mod list_comprehension;

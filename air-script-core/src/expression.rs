@@ -1,5 +1,6 @@
 use super::{
-    Identifier, IndexedTraceAccess, ListComprehension, MatrixAccess, TraceBindingAccess, VectorAccess,
+    Identifier, IndexedTraceAccess, ListComprehension, MatrixAccess, TraceBindingAccess,
+    VectorAccess,
 };
 
 /// Arithmetic expressions for evaluation of constraints.

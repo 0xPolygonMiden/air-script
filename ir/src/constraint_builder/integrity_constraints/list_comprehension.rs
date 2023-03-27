@@ -1,7 +1,7 @@
 use super::{
     BTreeMap, ConstraintBuilder, Expression, Identifier, IndexedTraceAccess, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, NamedTraceAccess, SemanticError,
-    Symbol, SymbolType, VariableType, VectorAccess, CURRENT_ROW,
+    ListComprehension, ListFoldingType, ListFoldingValueType, SemanticError, Symbol, SymbolType,
+    TraceBindingAccess, TraceBindingAccessSize, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 /// Maps each identifier in the list comprehension to its corresponding [Iterable].
@@ -45,7 +45,7 @@ impl ConstraintBuilder {
     ) -> Result<Expression, SemanticError> {
         match expression {
             Expression::Elem(ident) => self.parse_elem(ident, iterable_context, i),
-            Expression::NamedTraceAccess(named_trace_access) => {
+            Expression::TraceBindingAccess(named_trace_access) => {
                 self.parse_named_trace_access(named_trace_access, iterable_context, i)
             }
             Expression::Add(lhs, rhs) => {
@@ -119,7 +119,7 @@ impl ConstraintBuilder {
     ///   trace column.
     fn parse_named_trace_access(
         &self,
-        named_trace_access: &NamedTraceAccess,
+        named_trace_access: &TraceBindingAccess,
         iterable_context: &IterableContext,
         i: usize,
     ) -> Result<Expression, SemanticError> {
@@ -127,16 +127,17 @@ impl ConstraintBuilder {
         match iterable {
             // if the corresponding iterable is not present in the iterable context that means the
             // trace column is not part of the list comprehension and we just return it as it is.
-            None => Ok(Expression::NamedTraceAccess(named_trace_access.clone())),
+            None => Ok(Expression::TraceBindingAccess(named_trace_access.clone())),
             Some(iterable_type) => match iterable_type {
                 Iterable::Identifier(ident) => {
                     let symbol = self.symbol_table.get_symbol(ident.name())?;
                     match symbol.symbol_type() {
                         SymbolType::TraceColumns(size) => {
                             validate_access(i, size.size())?;
-                            Ok(Expression::NamedTraceAccess(NamedTraceAccess::new(
+                            Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
                                 ident.clone(),
                                 i,
+                                TraceBindingAccessSize::Single,
                                 named_trace_access.row_offset(),
                             )))
                         }
@@ -154,9 +155,10 @@ impl ConstraintBuilder {
                     match symbol.symbol_type() {
                         SymbolType::TraceColumns(trace_columns) => {
                             validate_access(i, trace_columns.size())?;
-                            Ok(Expression::NamedTraceAccess(NamedTraceAccess::new(
+                            Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
                                 ident.clone(),
                                 range.start() + i,
+                                TraceBindingAccessSize::Single,
                                 named_trace_access.row_offset(),
                             )))
                         }
@@ -301,9 +303,10 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
         SymbolType::TraceColumns(trace_columns) => {
             validate_access(i, trace_columns.size())?;
             let trace_segment = trace_columns.trace_segment();
-            Ok(Expression::IndexedTraceAccess(IndexedTraceAccess::new(
+            Ok(Expression::TraceAccess(IndexedTraceAccess::new(
                 trace_segment,
                 trace_columns.offset() + i,
+                1,
                 CURRENT_ROW,
             )))
         }
@@ -355,9 +358,10 @@ fn build_slice_ident_expression(
     match symbol.symbol_type() {
         SymbolType::TraceColumns(trace_columns) => {
             validate_access(i, trace_columns.size())?;
-            Ok(Expression::NamedTraceAccess(NamedTraceAccess::new(
+            Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
                 Identifier(symbol.name().to_string()),
                 range_start + i,
+                TraceBindingAccessSize::Single,
                 CURRENT_ROW,
             )))
         }
