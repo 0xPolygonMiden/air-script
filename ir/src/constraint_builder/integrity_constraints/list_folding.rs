@@ -40,9 +40,10 @@ impl ConstraintBuilder {
                             let trace_segment = columns.trace_segment();
                             Ok((0..columns.size())
                                 .map(|i| {
-                                    Expression::IndexedTraceAccess(IndexedTraceAccess::new(
+                                    Expression::TraceAccess(IndexedTraceAccess::new(
                                         trace_segment,
                                         columns.offset() + i,
+                                        1,
                                         CURRENT_ROW,
                                     ))
                                 })

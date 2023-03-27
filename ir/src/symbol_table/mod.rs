@@ -1,7 +1,7 @@
 use super::{
     ast, BTreeMap, Constant, ConstantType, Declarations, Identifier, IndexedTraceAccess,
-    MatrixAccess, NamedTraceAccess, SemanticError, TraceSegment, Variable, VariableType,
-    VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
+    MatrixAccess, SemanticError, TraceBinding, TraceBindingAccess, TraceSegment, Variable,
+    VariableType, VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
 
 mod symbol;
@@ -134,17 +134,16 @@ impl SymbolTable {
     pub(super) fn insert_trace_columns(
         &mut self,
         trace_segment: TraceSegment,
-        trace: &[ast::TraceCols],
+        trace: &[TraceBinding],
     ) -> Result<(), SemanticError> {
         let mut col_idx = 0;
         for trace_cols in trace {
-            let trace_columns =
-                TraceColumns::new(trace_segment, col_idx, trace_cols.size() as usize);
+            let trace_columns = TraceColumns::new(trace_segment, col_idx, trace_cols.size());
             self.insert_symbol(
                 trace_cols.name().to_string(),
                 SymbolType::TraceColumns(trace_columns),
             )?;
-            col_idx += trace_cols.size() as usize;
+            col_idx += trace_cols.size();
         }
 
         if col_idx > u16::MAX.into() {
@@ -222,7 +221,7 @@ impl SymbolTable {
     /// TODO: update docs
     pub(crate) fn get_trace_access_by_name(
         &self,
-        trace_access: &NamedTraceAccess,
+        trace_access: &TraceBindingAccess,
     ) -> Result<IndexedTraceAccess, SemanticError> {
         let symbol = self.get_symbol(trace_access.name())?;
         trace_access.validate(symbol)?;
@@ -230,7 +229,8 @@ impl SymbolTable {
         let SymbolType::TraceColumns(columns) = symbol.symbol_type() else { unreachable!("validation of named trace access failed.") };
         Ok(IndexedTraceAccess::new(
             columns.trace_segment(),
-            columns.offset() + trace_access.idx(),
+            columns.offset() + trace_access.col_offset(),
+            1,
             trace_access.row_offset(),
         ))
     }
