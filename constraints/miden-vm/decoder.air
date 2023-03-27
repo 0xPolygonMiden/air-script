@@ -1,0 +1,495 @@
+mod DecoderAir
+
+### Constants and periodic columns ################################################################
+
+periodic_columns:
+    cycle_row_0: [1, 0, 0, 0, 0, 0, 0, 0]
+    cycle_row_7: [0, 0, 0, 0, 0, 0, 0, 1]
+
+
+### Helper functions ##############################################################################
+
+# Returns binary negation of the value.
+fn binary_not(value: scalar) -> scalar:
+    return 1 - value
+
+
+# Returns the delta between the value in the next row and in the current row.
+fn delta(v: scalar) -> scalar:
+    return v' - v
+
+
+# Returns the f_join operation flag which is set when JOIN control operation is executed.
+fn f_join(b: vector[7]) -> scalar:
+    return b[6] & !b[5] & b[4] & b[3] & !b[2] & b[1]
+
+
+# Returns the f_split operation flag which is set when SPLIT control operation is executed.
+fn f_split(b: vector[7]) -> scalar:
+    return b[6] & !b[5] & b[4] & b[3] & b[2] & !b[1]
+
+
+# Returns the f_loop operation flag which is set when LOOP control operation is executed.
+fn f_loop(b: vector[7]) -> scalar:
+    return b[6] & !b[5] & b[4] & b[3] & b[2] & b[1]
+
+
+# Returns the f_repeat operation flag which is set when REPEAT operation is executed.
+fn f_repeat(b: vector[7], extra: scalar) -> scalar:
+    return extra & b[4] & !b[3] & b[2]
+
+
+# Returns the f_repeat operation flag which is set when REPEAT operation is executed in the next 
+# row.
+fn f_repeat_next(b: vector[7], extra: scalar) -> scalar:
+    return extra' & b[4]' & !b[3]' & b[2]'
+    
+
+# Returns the f_span operation flag which is set when SPAN operation is executed.
+fn f_span(b: vector[7]) -> scalar:
+    return b[6] & !b[5] & b[4] & b[3] & !b[2] & !b[1]
+
+
+# Returns the f_respan operation flag which is set when RESPAN operation is executed.
+fn f_respan(b: vector[7], extra: scalar) -> scalar:
+    return extra & b[4] & b[3] & !b[2]
+
+
+# Returns the f_respan operation flag which is set when RESPAN operation is executed in the next 
+# row.
+fn f_respan_next(b: vector[7], extra: scalar) -> scalar:
+    return extra' & b[4]' & b[3]' & !b[2]'
+
+
+# Returns the f_call operation flag which is set when CALL control operation is executed.
+fn f_call(b: vector[7], extra: scalar) -> scalar:
+    return extra & !b[4] & b[3] & b[2]
+
+
+# Returns the f_syscall operation flag which is set when SYSCALL control operation is executed.
+fn f_syscall(b: vector[7], extra: scalar) -> scalar:
+    return extra & !b[4] & b[3] & !b[2]
+
+
+# Returns the f_end operation flag which is set when END operation is executed.
+fn f_end(b: vector[7], extra: scalar) -> scalar:
+    return extra & b[4] & !b[3] & !b[2]
+
+
+# Returns the f_end operation flag which is set when END operation is executed in the next 
+# row.
+fn f_end_next(b: vector[7], extra: scalar) -> scalar:
+    return extra' & b[4]' & !b[3]' & !b[2]'
+
+
+# Returns the f_halt operation flag which is set when HALT operation is executed.
+fn f_halt(b: vector[7], extra: scalar) -> scalar:
+    return extra & b[4] & b[3] & b[2]
+
+
+# Returns the f_halt operation flag which is set when HALT operation is executed in the next 
+# row.
+fn f_halt_next(b: vector[7], extra: scalar) -> scalar:
+    return extra' & b[4]' & b[3]' & b[2]'
+
+
+# Returns the f_push operation flag which is set when PUSH operation is executed.
+fn f_push(b: vector[7], extra: scalar) -> scalar:
+    return extra & !b[4] & !b[3] & b[2]
+
+
+# Returns the f_ctrl flag which is set when any one of the control flow operations that has flags 
+# above (JOIN, SPLIT, LOOP, CALL, SYSCALL) is being executed.
+fn f_ctrl(b: vector[7], extra: scalar) -> scalar:
+    # flag for SPAN, JOIN, SPLIT, LOOP
+    let f_sjsl = b[6] & !b[5] & b[4] & b[3]
+
+    # flag for END, REPEAT, RESPAN, HALT
+    let f_errh = b[6] & b[5] & b[4]
+
+    return f_sjsl + f_errh + f_call(b, extra) + f_syscall(b, extra)
+
+
+# Returns f_ctrli flag which is set to 1 when a control flow operation that signifies the 
+# initialization of a control block is being executed on the VM.
+fn f_ctrli(b: vector[7], extra: scalar) -< scalar:
+    return f_join(b) + f_split(b) + f_loop(b) + f_call(b, extra) + f_syscall(b, extra)
+
+
+# Returns transition label, composed of the operation label and the periodic columns that uniquely 
+# identify each transition function.
+fn get_transition_label(op_label: scalar) -> scalar:
+    return op_label + 2^4 * cycle_row_7 + 2^5 * cycle_row_0
+
+
+# Returns f_g8 flag which is set to 1 if there are 8 operation groups in the batch.
+fn get_f_g8(op_batch_flags: vector[3]) -> scalar:
+    return op_batch_flags[0]
+
+
+# Returns f_g4 flag which is set to 1 if there are 4 operation groups in the batch.
+fn get_f_g4(op_batch_flags: vector[3]) -> scalar:
+    return !op_batch_flags[0] & op_batch_flags[1] & op_batch_flags[2]
+
+
+# Returns f_g2 flag which is set to 1 if there are 2 operation groups in the batch.
+fn get_f_g2(op_batch_flags: vector[3]) -> scalar:
+    return !op_batch_flags[0] & !op_batch_flags[1] & op_batch_flags[2]
+
+
+# Returns f_g1 flag which is set to 1 if there are 1 operation groups in the batch.
+fn get_f_g1(op_batch_flags: vector[3]) -> scalar:
+    return !op_batch_flags[0] & op_batch_flags[1] & !op_batch_flags[2]
+
+
+### Helper evaluators #############################################################################
+
+# Enforces that column must be binary.
+ev is_binary(main: [a]):
+    enf a^2 = a
+
+
+# Enforces that value in column is copied over to the next row.
+ev is_unchanged(main: [column]):
+    ev column' = column
+
+
+# Enforces decoder general constraints.
+ev general_constraints(main: [addr, op_bits[7], hasher[8], is_span, s0], aux: [extra]):
+    # TODO: add constraints to check not used operational bits.
+
+    # Enforce that when SPLIT or LOOP operation is executed, the top of the operand stack must 
+    # contain a binary value.
+    enf is_binary([s0]) when f_split(op_bits) | f_loop(op_bits)
+
+    # Enforce that When REPEAT operation is executed, the value at the top of the operand stack 
+    # must be 1.
+    enf s0 = 1 when f_repeat(op_bits, extra)
+
+    # Enforce that when REPEAT operation is executed, the value in hasher[4] column (the 
+    # is_loop_body flag), must be set to 1. This ensures that REPEAT operation can be executed only
+    # inside a loop.
+    enf hasher[4] = 1 when f_repeat(op_bits, extra)
+
+    # Enforce that when RESPAN operation is executed, we need to make sure that the block ID is 
+    # incremented by 8.
+    enf addr' = addr + 8 when f_respan(op_bits, extra)
+
+    # Enforce that when END operation is executed and we are exiting a loop block (i.e., is_loop, 
+    # value which is stored in hasher[5], is 1), the value at the top of the operand stack must be 
+    # 0.
+    enf s0 = 0 when f_end(op_bits, extra) & hasher[5]
+
+    # Enforce that when END operation is executed and the next operation is REPEAT, values in 
+    # hasher[0], ..., hasher[4] (the hash of the current block and the is_loop_body flag) must be 
+    # copied to the next row.
+    enf is_unchanged([hasher[i]]) for i in 0..5 when f_end(op_bits, extra) & f_repeat_next(op_bits, extra)
+
+    # Enforce that a HALT instruction can be followed only by another HALT instruction.
+    enf f_halt(op_bits, extra) * !f_halt_next = 0
+
+    # Enforce that when a HALT operation is executed, block address column (addr) must be 0.
+    enf addr = 0 when f_halt(op_bits, extra)
+
+    # Enforce that values in op_bits columns must be binary.
+    enf is_binary([b]) for b in op_bits
+
+    # Enforce that when the value in is_span column is set to 1, control flow operations cannot be 
+    # executed on the VM, but when is_span flag is 0, only control flow operations can be executed
+    # on the VM.
+    enf 1 - is_span - f_ctrl = 0
+
+
+# Enforces constraint for computing block hashes.
+ev block_hash_computation_constraints(main: [addr, op_bits[7], hasher[8]], aux: [extra, p[4]]):
+    # Operation label for HASHER_LINER_HASH operation.
+    let op_linhash = 3
+
+    # Operation label for HASHER_RETURN_HASH operation.
+    let op_hout = 1
+
+    # Label specifying that we are starting a new hash computation.
+    let m_bp = get_transition_label(op_linhash)
+
+    # Label specifying that we are absorbing the next sequence of 8 elements into an ongoing hash 
+    # computation.
+    let m_abp = get_transition_label(op_linhash)
+
+    # Label specifying that we are reading the result of a hash computation.
+    let m_hout = get_transition_label(op_hout)
+
+    # `alpha` is inherited random values array.
+    let rate_sum = sum([alpha[i + 8] * hasher[i] for i in 0..8])
+    let digest_sum = sum([alpha[i + 8] * hasher[i] for i in 0..4])
+
+    # Variable for initiating a hasher with address addr' and absorbing 8 elements from the hasher
+    # state (hasher[0], ..., hasher[7]) into it.
+    let h_init = alpha[0] + alpha[1] * m_bp + alpha[2] * addr' + rate_sum
+
+    # Variable for the absorption.
+    let h_abp = alpha[0] + alpha[1] * m_abp + alpha[2] * addr' + rate_sum
+
+    # Variable for the result
+    let h_res = alpha[0] + alpha[1] * m_hout + alpha[2] * (addr + 7) + digest_sum
+
+    # Opcode value of the opcode being executed on the virtual machine.
+    let opcode_value = sum([op_bits[i] * 2^i for i in 0..7])
+    
+    # When a control block initializer operation (JOIN, SPLIT, LOOP, CALL, SYSCALL) is executed, a 
+    # new hasher is initialized and the contents of hasher[0], ..., hasher[7] are absorbed into the
+    # hasher. 
+    let u_ctrli = f_ctrli(op_bits, extra) * (h_init + alpha[5] * opcode_value)
+
+    # When SPAN operation is executed, a new hasher is initialized and contents of 
+    # hasher[0], ..., hasher[7] are absorbed into the hasher.
+    let u_span = f_span(op_bits) * h_init
+
+    # When RESPAN operation is executed, contents of hasher[0], ..., hasher[7] (which contain the 
+    # new operation batch) are absorbed into the hasher.
+    let u_respan = f_respan(op_bits, extra) * h_abp
+
+    # When END operation is executed, the hash result is copied into registers 
+    # hasher[0], ..., hasher[3].
+    let u_end = f_end(op_bits, extra) * h_res
+
+    # Enforce the block hash computation constraint.
+    enf p[0]' * (u_ctrli + u_span + u_respan + u_end + 1 - (f_ctrli(op_bits, extra) + 
+        f_span(op_bits) + f_respan(op_bits, extra) + f_end(op_bits, extra))) = p[0]
+
+
+# Enforces constraint for updating the block stack table.
+ev block_stack_table_constraints(main: [addr, op_bits[7], hasher[8], s0], aux: [extra, p[4]]):
+    # When JOIN operation is executed, row (addr', addr, 0) is added to the block stack table.
+    let v_join = f_join(op_bits) * (alpha[0] + alpha[1] * addr' + alpha[2] * addr)
+
+    # When SPLIT operation is executed, row (addr', addr, 0) added to the block stack table.
+    let v_split = f_split(op_bits) * (alpha[0] + alpha[1] * addr' + alpha[2] * addr)
+
+    # When LOOP operation is executed, row (addr', addr, 1) is added to the block stack table if 
+    # the value at the top of the operand stack is 1, and row (addr', addr, 0) is added to the 
+    # block stack table if the value at the top of the operand stack is 0.
+    let v_loop = f_loop(op_bits) * (alpha[0] + alpha[1] * addr' + alpha[2] * addr + alpha[3] * s0)
+
+    # When SPAN operation is executed, row (addr', addr, 0) is added to the block stack table.
+    let v_span = f_span(op_bits) * (alpha[0] + alpha[1] * addr' + alpha[2] * addr)
+
+    # When RESPAN operation is executed, row (addr, hasher[1]', 0) is removed from the block stack 
+    # table, and row (addr', hasher[1]', 0) is added to the table. The prover sets the value of 
+    # register hasher[1] at the next row to the ID of the parent block:
+    let u_respan = f_respan(op_bits, extra) * (alpha[0] + alpha[1] * addr + alpha[2] * hasher[1]')
+    let v_respan = f_respan(op_bits, extra) * (alpha[0] + alpha[1] * addr' + alpha[2] * hasher[1]')
+
+    # When END operation is executed, row (addr, addr', hasher[5]) is removed from the block span 
+    # table. Register hasher[5] contains the is_loop flag.
+    let u_end = f_end(op_bits, extra) * 
+        (alpha[0] + alpha[1] * addr + alpha[2] * addr' + alpha[3] * hasher[5])
+
+    # Enforce the block stack table constraint.
+    # TODO: do proper line wrapping
+    enf p[1]' * (u_end + u_respan + 1 - (f_end(op_bits, extra) + f_respan(op_bits, extra)))
+        = p[1] * (v_join + v_split + v_loop + v_span + v_respan + 1 - (f_join(op_bits) + 
+        f_split(op_bits) + f_loop(op_bits) + f_span(op_bits) + 
+        f_respan(op_bits, extra)))
+
+
+# Enforces constraint for updating the block hash table.
+ev block_hash_table_constraints(main: [addr, op_bits[7], hasher[8], s0], aux: [extra, p[4]]):
+    # Values representing left and right children of a block.
+    let ch1 = alpha[0] + alpha[1] * addr' + sum([alpha[i + 2] * hasher[i] for i in 0..4])
+    let ch2 = alpha[0] + alpha[1] * addr' + sum([alpha[i + 2] * hasher[i + 4] for i in 0..4])
+
+    # Value representing the result of hash computation.
+    let bh = alpha[0] + alpha[1] * addr + sum([alpha[i + 2] * hasher[i]]) + alpha[7] * hasher[4]
+
+    # When JOIN operation is executed, hashes of both child nodes are added to the block hash 
+    # table.
+    let v_join = f_join(op_bits) * (ch1 + alpha[6]) * ch2
+
+    # When SPLIT operation is executed and the top of the stack is 1, hash of the true branch is 
+    # added to the block hash table, but when the top of the stack is 0, hash of the false branch
+    # is added to the block hash table.
+    let v_split = f_split(op_bits) * (s0 * ch1 + (1 - s0) * ch2)
+
+    # When LOOP operation is executed and the top of the stack is 1, hash of loop body is added to
+    # the block hash table.
+    let v_loop = f_loop(op_bits) * s0 * (ch1 + alpha[7])
+
+    # When REPEAT operation is executed, hash of loop body is added to the block hash table.
+    let v_repeat = f_repeat(op_bits, extra) * (ch1 + alpha[7])
+
+    # When END operation is executed, hash of the completed block is removed from the block hash 
+    # table.
+    let u_end = f_end(op_bits, extra) * 
+        (bh + alpha[6] * (1 - (f_end_next(op_bits, extra) + f_repeat_next(op_bits, extra))))
+
+    # Enforce the block hash table constraint.
+    enf p[2]' * (u_end + 1 - f_end(op_bits, extra)) = 
+        p[2] * (v_join + v_split + v_loop + v_repeat + 1 - 
+        (f_join(op_bits) + f_split(op_bits) + f_loop(op_bits) + f_repeat(op_bits, extra)))
+
+    # TODO: add boundary constraints to the p[2] column.
+
+
+# Enforce that values in is_span column are set correctly. 
+ev inspan_column_constraints(main: [op_bits[7], is_span], aux: [extra]):
+    # Enforce that when executing SPAN or RESPAN operation, the next value in is_span column must 
+    # be set to 1.
+    enf (f_span(op_bits) + f_respan(op_bits, extra)) * binary_not(is_span') = 0
+
+    # Enforce that when the next operation is END or RESPAN, the next value in is_span column must 
+    # be set 0.
+    enf (f_end_next(op_bits, extra) + f_respan_next(op_bits, extra)) * is_span' = 0
+
+    # Enforce that in all other cases, the value in is_span column must be copied over to the next 
+    # row.
+    (1 - f_span(op_bits) - f_respan(op_bits, extra) - f_end_next(op_bits, extra) - 
+        f_respan_next(op_bits, extra)) * (is_span' - is_span) = 0
+
+    # TODO: add boundary constraint for is_span column.
+
+
+# Enforce that when we are inside a span block, values in block address columns (denoted as addr) 
+# must remain the same.
+ev block_address_constraints(main: [addr, is_span]):
+    # Enforce that when we are inside a span block, values in block address columns must remain the
+    # same.
+    enf is_span * delta(addr) = 0
+
+
+# Enforce that values in group_count column are set correctly.
+ev group_count_constraints(main: [op_bits[7], hasher[8], is_span, group_count], aux: [extra]):
+    # Enforce that inside a span block, group count can either stay the same or decrease by one.
+    enf is_span * delta(group_count) * (delta(group_count) - 1) = 0
+    
+    # Enforce that when group count is decremented inside a span block, either hasher[0] must be 0 
+    # (we consumed all operations in a group) or we must be executing PUSH operation.
+    enf is_span * delta(group_count) * (1 - f_push(op_bits, extra)) * hasher[0] = 0
+
+    # Enforce that when executing a SPAN, a RESPAN, or a PUSH operation, group count must be 
+    # decremented by 1.
+    enf (f_span(op_bits) + f_respan(op_bits, extra) + f_push(op_bits, extra)) * 
+        (delta(group_count) - 1) = 0
+
+    # Enforce that if the next operation is either an END or a RESPAN, group count must remain the 
+    # same.
+    enf delta(group_count) * (f_end_next(op_bits, extra) + f_respan_next(op_bits, extra)) = 0
+
+    # Enforce that when an END operation is executed, group count must be 0.
+    enf f_end(op_bits, extra) * group_count = 0
+
+
+# Enforce that register hasher[0], which is used to keep track of operations to be executed in the 
+# current operation group, is set correctly.
+ev op_group_decoding_constraints(main: [op_bits[7], is_span, group_count, op_index], aux: [extra]):
+    let op = sum([op_bits[i] * 2^i for i in 0..7])
+    let f_sgc = is_span * is_span' * (1 - delta(group_count))
+
+    # Enforce that when a SPAN, a RESPAN, or a PUSH operation is executed or when the group count 
+    # does not change, the value in hasher[0] should be decremented by the value of the opcode in 
+    # the next row.
+    enf (f_span(op_bits) + f_respan(op_bits, extra) + f_push(op_bits, extra) + f_sgc) * 
+        (hasher[0] - hasher[0]' * 2^7 - op_index') = 0
+
+    # Enforce that when we are in a span block and the next operation is END or RESPAN, the current
+    # value in hasher[0] column must be 0.
+    enf is_span * (f_end_next(op_bits, extra) * f_respan_next(op_bits, extra)) * hasher[0] = 0
+
+
+# Enforce that the values in op_index column are set correctly.
+ev op_index_constraints(main: [op_bits[7], is_span, group_count, op_index], aux: [extra]):
+    let ng = delta(group_count) - f_push(op_bits, extra)
+
+    # Enforce that when executing SPAN or RESPAN operations the next value of op_index must be set 
+    # to 0.
+    enf (f_span(op_bits) + f_respan(op_bits, extra)) * op_index' = 0
+
+    # Enforce that when starting a new operation group inside a span block, the next value of 
+    # op_index must be set to 0.
+    enf is_span * ng * op_index' = 0
+
+    # Enforce that when inside a span block but not starting a new operation group, op_index must 
+    # be incremented by 1.
+    enf is_span * is_span' * (1 - ng) * (delta(op_index) - 1) = 0
+
+    # Enforce that values of op_index must be in the range [0, 8].
+    enf prod([op_index - i for i in 0..9]) = 0
+
+
+# Enforce that values in operation batch flag columns (denoted op_batch_flags[]) are set correctly.
+ev op_batch_flag_constraints(main: [op_bits[7], hasher[8], op_batch_flags[3]], aux: [extra]):
+    # Enforce that all batch flags are binary.
+    enf is_binary(bc) for bc in op_batch_flags
+
+    # Enforce that when SPAN or RESPAN operations is executed, one of the batch flags must be set 
+    # to 1.
+    (f_span(op_bits) + f_respan(op_bits, extra)) - (get_f_g1(op_batch_flags) + 
+        get_f_g2(op_batch_flags) + get_f_g4(op_batch_flags) + get_f_g8(op_batch_flags)) = 0
+
+    # Enforce that when we have at most 4 groups in a batch, registers h[4], ..., h[7] should be 
+    # set to 0's.
+    enf (get_f_g1(op_batch_flags) + get_f_g2(op_batch_flags) + get_f_g4(op_batch_flags)) * hasher[i] = 0 for i in 4..8
+
+    # Enforce that When we have at most 2 groups in a batch, registers h[2] and h[3] should also be
+    # set to 0's.
+    (get_f_g1(op_batch_flags) + get_f_g2(op_batch_flags)) * hasher[i] = 0 for i in 2..4
+
+    # Enforce that when we have at most 1 groups in a batch, register h[1] should also be set to 0.
+    enf get_f_g1(op_batch_flags) * hasher[1] = 0
+
+
+# Enforce that all operation groups in a given batch are consumed before a new batch is started 
+# (i.e., via a RESPAN operation) or the execution of a span block is complete (i.e., via an END 
+# operation).
+ev op_group_table_constraints(main: [addr, op_bits[7], hasher[8], is_span, group_count, op_index, op_batch_flags[3], s0], aux: [extra, p[4]]):
+    # Values of the rows to be added to the op group table when a SPAN or a RESPAN operation is 
+    # executed.
+    let v_i = alpha[0] + alpha[1] * addr' + alpha[2] * (group_count - i) + alpha[3] * hasher[i]
+
+    # Row value for group in hasher[1] to be added to the op group table when a SPAN or a RESPAN 
+    # operation is executed.
+    let v_1 = alpha[0] + alpha[1] * addr' + alpha[2] * (group_count - 1) + alpha[3] * hasher[1]
+
+    let prod_v_3 = prod([alpha[0] + alpha[1] * addr' + alpha[2] * (group_count - i) + alpha[3] * hasher[i] for i in 1..4])
+    let prod_v_7 = prod([alpha[0] + alpha[1] * addr' + alpha[2] * (group_count - i) + alpha[3] * hasher[i] for i in 1..8])
+
+    # The value of the row to be removed from the op group table.
+    let u = alpha[0] + alpha[1] * addr + alpha[2] * group_count + alpha[3] * 
+        ((hasher[0]' * 2^7 + op_index') * 
+        (1 - f_push(op_bits, extra) + s0' * f_push(op_bits, extra))) = 0
+    
+    # A flag which is set to 1 when a group needs to be removed from the op group table.
+    let f_dg = is_span * delta(group_count)
+
+    # Enforce the constraint for updating op group table
+    enf p[3]' * (f_dg * u + 1 - f_dg) = 
+        p[3] * (get_f_g2(op_batch_flags) * v_1 + get_f_g4(op_batch_flags) * 
+        prod_v_3 + get_f_g8(op_batch_flags) * 
+        prod_v_7 - 1 + (f_span(op_bits) + f_respan(op_bits, extra)))
+    
+
+# Enforces proper decoding of span blocks.
+ev span_block_constraints(main: [addr, op_bits[7], hasher[8], is_span, group_count, op_index, op_batch_flags[3], s0], aux: [extra, p[4]]):
+    enf inspan_column_constraints([op_bits, is_span], [extra])
+    enf block_address_constraints([addr, is_span])
+    enf group_count_constraints([op_bits, hasher, is_span, group_count], [extra])
+    enf op_group_decoding_constraints([op_bits, is_span, group_count, op_index], aux: [extra])
+    enf op_index_constraints([op_bits, is_span, group_count, op_index], [extra])
+    enf op_batch_flag_constraints([op_bits, hasher, op_batch_flags], [extra])
+    enf op_group_table_constraints([addr, op_bits, hasher, is_span, group_count, op_index, op_batch_flags, s0], [extra, p])
+
+
+### Decoder Air Constraints #######################################################################
+
+# Enforces the constraints on the decoder. The register `s0` in the main segment denotes the value 
+# at the top of the stack. In the aux segment `extra` denotes the register for degree reduxtion 
+# during flags computation, and p[4] columns denote multiset check columns.
+ev decoder_constraints(main: [addr, op_bits[7], hasher[8], is_span, group_count, op_index, op_batch_flags[3], s0], aux: [extra, p[4]]):
+    enf general_constraints([addr, op_bits[7], hasher[8], is_span, s0], [extra])
+    
+    enf block_hash_computation_constraints([addr, op_bits[7], hasher[8]], [extra, p[4]])
+
+    enf block_stack_table_constraints([addr, op_bits[7], hasher[8], s0], [extra, p[4]])
+
+    ev block_hash_table_constraints([addr, op_bits, hasher, s0], [extra, p[4]])
+
+    enf span_block_constraints([addr, op_bits[7], hasher[8], is_span, group_count, op_index, op_batch_flags[3], s0], [extra, p[4]])
