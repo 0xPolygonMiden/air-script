@@ -1,6 +1,6 @@
 use super::{
-    BTreeMap, ConstraintBuilder, Expression, Identifier, IndexedTraceAccess, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, SemanticError, Symbol, SymbolType,
+    BTreeMap, ConstraintBuilder, Expression, Identifier, Iterable, ListComprehension,
+    ListFoldingType, ListFoldingValueType, SemanticError, Symbol, SymbolType, TraceAccess,
     TraceBindingAccess, TraceBindingAccessSize, VariableType, VectorAccess, CURRENT_ROW,
 };
 
@@ -303,7 +303,7 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
         SymbolType::TraceColumns(trace_columns) => {
             validate_access(i, trace_columns.size())?;
             let trace_segment = trace_columns.trace_segment();
-            Ok(Expression::TraceAccess(IndexedTraceAccess::new(
+            Ok(Expression::TraceAccess(TraceAccess::new(
                 trace_segment,
                 trace_columns.offset() + i,
                 1,

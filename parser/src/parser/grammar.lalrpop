@@ -4,7 +4,7 @@ use crate::{
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
         build_column_groups, build_trace_bindings, ColumnGroup, Constant, ConstantType,
         ComprehensionContext, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
-        IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
+        TraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
         MatrixAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues, Range, Source,
         SourceSection, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, Variable,
         VariableType, VectorAccess
@@ -401,7 +401,7 @@ IntegrityExponent: Expression = {
 
 IntegrityAtom: Expression = {
     "(" <IntegrityExpr> ")",
-    <col_access: IndexedTraceAccess> => Expression::TraceAccess(col_access),
+    <col_access: TraceAccess> => Expression::TraceAccess(col_access),
     "$" <ident: Identifier> <idx: Index> => Expression::Rand(ident, idx),
     <n: Num_u64> => Expression::Const(n),
     <ident: Identifier> => Expression::Elem(ident),
@@ -468,11 +468,11 @@ TraceBindingAccessWithOffset: TraceBindingAccess = {
         TraceBindingAccess::new(ident, idx, TraceBindingAccessSize::Single, 1)
 }
 
-IndexedTraceAccess: IndexedTraceAccess = {
-    "$main" <idx: Index> => IndexedTraceAccess::new(0, idx, 1, 0),
-    "$main" <idx: Index> "'" => IndexedTraceAccess::new(0, idx, 1, 1), 
-    "$aux" <idx: Index> => IndexedTraceAccess::new(1, idx, 1, 0),
-    "$aux" <idx: Index> "'" => IndexedTraceAccess::new(1, idx, 1, 1),
+TraceAccess: TraceAccess = {
+    "$main" <idx: Index> => TraceAccess::new(0, idx, 1, 0),
+    "$main" <idx: Index> "'" => TraceAccess::new(0, idx, 1, 1), 
+    "$aux" <idx: Index> => TraceAccess::new(1, idx, 1, 0),
+    "$aux" <idx: Index> "'" => TraceAccess::new(1, idx, 1, 1),
 }
 
 ConstraintComprehension<T>: ComprehensionContext = {

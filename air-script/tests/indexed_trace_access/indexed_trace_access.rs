@@ -20,18 +20,18 @@ impl Serializable for PublicInputs {
     }
 }
 
-pub struct IndexedTraceAccessAir {
+pub struct TraceAccessAir {
     context: AirContext<Felt>,
     stack_inputs: [Felt; 16],
 }
 
-impl IndexedTraceAccessAir {
+impl TraceAccessAir {
     pub fn last_step(&self) -> usize {
         self.trace_length() - self.context().num_transition_exemptions()
     }
 }
 
-impl Air for IndexedTraceAccessAir {
+impl Air for TraceAccessAir {
     type BaseField = Felt;
     type PublicInputs = PublicInputs;
 

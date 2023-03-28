@@ -1,4 +1,4 @@
-use ir::IndexedTraceAccess;
+use ir::TraceAccess;
 
 use super::{
     AirIR, ConstantValue, ElemType, IntegrityConstraintDegree, NodeIndex, Operation, Value,
@@ -33,7 +33,7 @@ impl Codegen for IntegrityConstraintDegree {
     }
 }
 
-impl Codegen for IndexedTraceAccess {
+impl Codegen for TraceAccess {
     fn to_string(&self, _ir: &AirIR, _elem_type: ElemType, trace_segment: u8) -> String {
         let frame = if let 0 = self.trace_segment() {
             "main"

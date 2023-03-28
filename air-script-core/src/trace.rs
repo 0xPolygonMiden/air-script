@@ -86,22 +86,22 @@ impl TraceBinding {
     }
 }
 
-/// [IndexedTraceAccess] is used to represent accessing an element in the execution trace during
+/// [TraceAccess] is used to represent accessing an element in the execution trace during
 /// constraint evaluation. The trace_segment specifies
 /// how many trace commitments have preceded the specified segment. `col_idx` specifies the index
 /// of the column within that trace segment, and `row_offset` specifies the offset from the current
 /// row. For example, an element in the "next" row of the "main" trace would be specified by
 /// a trace_segment of 0 and a row_offset of 1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct IndexedTraceAccess {
+pub struct TraceAccess {
     trace_segment: TraceSegment,
     col_idx: usize,
     size: usize,
     row_offset: usize,
 }
 
-impl IndexedTraceAccess {
-    /// Creates a new [IndexedTraceAccess].
+impl TraceAccess {
+    /// Creates a new [TraceAccess].
     pub fn new(
         trace_segment: TraceSegment,
         col_idx: usize,
@@ -116,22 +116,22 @@ impl IndexedTraceAccess {
         }
     }
 
-    /// Gets the trace segment of this [IndexedTraceAccess].
+    /// Gets the trace segment of this [TraceAccess].
     pub fn trace_segment(&self) -> TraceSegment {
         self.trace_segment
     }
 
-    /// Gets the column index of this [IndexedTraceAccess].
+    /// Gets the column index of this [TraceAccess].
     pub fn col_idx(&self) -> usize {
         self.col_idx
     }
 
-    /// Gets the size of this [IndexedTraceAccess].
+    /// Gets the size of this [TraceAccess].
     pub fn size(&self) -> usize {
         self.size
     }
 
-    /// Gets the row offset of this [IndexedTraceAccess].
+    /// Gets the row offset of this [TraceAccess].
     pub fn row_offset(&self) -> usize {
         self.row_offset
     }

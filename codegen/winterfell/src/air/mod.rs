@@ -1,5 +1,5 @@
 use super::{AirIR, Impl, Scope};
-use air_script_core::{Constant, ConstantType, IndexedTraceAccess};
+use air_script_core::{Constant, ConstantType, TraceAccess};
 use ir::{
     constraints::{AlgebraicGraph, ConstraintDomain, Operation},
     ConstantValue, IntegrityConstraintDegree, NodeIndex, PeriodicColumn, Value,

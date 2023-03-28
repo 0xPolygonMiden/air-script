@@ -5,7 +5,7 @@ use super::{
 use crate::{
     ast::{
         Constant, ConstantType::*, ConstraintType, EvaluatorFunction, EvaluatorFunctionCall,
-        Expression::*, IndexedTraceAccess, IntegrityStmt::*, MatrixAccess, TraceBindingAccess,
+        Expression::*, IntegrityStmt::*, MatrixAccess, TraceAccess, TraceBindingAccess,
         TraceBindingAccessSize, Variable, VariableType, VectorAccess,
     },
     error::{Error, ParseError},
@@ -238,9 +238,9 @@ fn integrity_constraint_with_indexed_trace_access() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
-                TraceAccess(IndexedTraceAccess::new(0, 0, 1, 1)),
+                TraceAccess(TraceAccess::new(0, 0, 1, 1)),
                 Add(
-                    Box::new(TraceAccess(IndexedTraceAccess::new(0, 1, 1, 0))),
+                    Box::new(TraceAccess(TraceAccess::new(0, 1, 1, 0))),
                     Box::new(Const(1)),
                 ),
             )),
@@ -249,8 +249,8 @@ fn integrity_constraint_with_indexed_trace_access() {
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 Sub(
-                    Box::new(TraceAccess(IndexedTraceAccess::new(1, 0, 1, 1))),
-                    Box::new(TraceAccess(IndexedTraceAccess::new(1, 1, 1, 0))),
+                    Box::new(TraceAccess(TraceAccess::new(1, 0, 1, 1))),
+                    Box::new(TraceAccess(TraceAccess::new(1, 1, 1, 0))),
                 ),
                 Const(1),
             )),

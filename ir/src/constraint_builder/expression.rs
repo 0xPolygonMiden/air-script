@@ -1,6 +1,6 @@
 use super::{
-    get_variable_expr, AccessType, ConstantValue, ConstraintBuilder, Expression,
-    IndexedTraceAccess, ListFoldingType, NodeIndex, Operation, SemanticError, SymbolType, Value,
+    get_variable_expr, AccessType, ConstantValue, ConstraintBuilder, Expression, ListFoldingType,
+    NodeIndex, Operation, SemanticError, SymbolType, TraceAccess, Value,
 };
 
 impl ConstraintBuilder {
@@ -96,7 +96,7 @@ impl ConstraintBuilder {
     /// - The segment of the trace access is greater than the number of segments.
     pub(crate) fn insert_trace_access(
         &mut self,
-        trace_access: &IndexedTraceAccess,
+        trace_access: &TraceAccess,
     ) -> Result<NodeIndex, SemanticError> {
         self.symbol_table.validate_trace_access(trace_access)?;
 

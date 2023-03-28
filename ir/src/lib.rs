@@ -1,7 +1,7 @@
 pub use air_script_core::{
-    Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, TraceBinding,
-    TraceBindingAccess, TraceBindingAccessSize, TraceSegment, Variable, VariableType, VectorAccess,
+    Constant, ConstantType, Expression, Identifier, Iterable, ListComprehension, ListFoldingType,
+    ListFoldingValueType, MatrixAccess, TraceAccess, TraceBinding, TraceBindingAccess,
+    TraceBindingAccessSize, TraceSegment, Variable, VariableType, VectorAccess,
 };
 pub use parser::ast;
 use std::collections::{BTreeMap, BTreeSet};

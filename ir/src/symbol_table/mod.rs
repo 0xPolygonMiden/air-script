@@ -1,7 +1,7 @@
 use super::{
-    ast, BTreeMap, Constant, ConstantType, Declarations, Identifier, IndexedTraceAccess,
-    MatrixAccess, SemanticError, TraceBinding, TraceBindingAccess, TraceSegment, Variable,
-    VariableType, VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
+    ast, BTreeMap, Constant, ConstantType, Declarations, Identifier, MatrixAccess, SemanticError,
+    TraceAccess, TraceBinding, TraceBindingAccess, TraceSegment, Variable, VariableType,
+    VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
 
 mod symbol;
@@ -212,7 +212,7 @@ impl SymbolTable {
     }
 
     /// Looks up a [NamedTraceAccess] by its identifier name and returns an equivalent
-    /// [IndexedTraceAccess].
+    /// [TraceAccess].
     ///
     /// # Errors
     /// Returns an error if:
@@ -222,12 +222,12 @@ impl SymbolTable {
     pub(crate) fn get_trace_access_by_name(
         &self,
         trace_access: &TraceBindingAccess,
-    ) -> Result<IndexedTraceAccess, SemanticError> {
+    ) -> Result<TraceAccess, SemanticError> {
         let symbol = self.get_symbol(trace_access.name())?;
         trace_access.validate(symbol)?;
 
         let SymbolType::TraceColumns(columns) = symbol.symbol_type() else { unreachable!("validation of named trace access failed.") };
-        Ok(IndexedTraceAccess::new(
+        Ok(TraceAccess::new(
             columns.trace_segment(),
             columns.offset() + trace_access.col_offset(),
             1,
@@ -251,7 +251,7 @@ impl SymbolTable {
     /// - the specified column index is out of range.
     pub(crate) fn validate_trace_access(
         &self,
-        trace_access: &IndexedTraceAccess,
+        trace_access: &TraceAccess,
     ) -> Result<(), SemanticError> {
         let trace_segment = usize::from(trace_access.trace_segment());
         let trace_segment_width = self.declarations.trace_segment_width(trace_segment)?;
