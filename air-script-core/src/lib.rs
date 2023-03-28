@@ -15,3 +15,7 @@ pub use trace::{IndexedTraceAccess, NamedTraceAccess, TraceSegment};
 
 mod variable;
 pub use variable::{Iterable, ListComprehension, Variable, VariableType};
+
+// TYPES
+// ================================================================================================
+pub type ComprehensionContext = Vec<(Identifier, Iterable)>;

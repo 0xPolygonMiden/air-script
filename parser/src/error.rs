@@ -11,6 +11,7 @@ pub enum ParseError {
     InvalidConst(String),
     InvalidEvaluatorFunction(String),
     InvalidInt(String),
+    InvalidConstraintComprehension(String),
     InvalidListComprehension(String),
     InvalidRandomValues(String),
     InvalidTraceCols(String),

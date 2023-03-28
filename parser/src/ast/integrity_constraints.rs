@@ -1,3 +1,5 @@
+use air_script_core::ComprehensionContext;
+
 use super::{EvaluatorFunctionCall, Expression, Variable};
 
 // INTEGRITY STATEMENTS
@@ -6,6 +8,7 @@ use super::{EvaluatorFunctionCall, Expression, Variable};
 #[derive(Debug, Eq, PartialEq)]
 pub enum IntegrityStmt {
     Constraint(ConstraintType, Option<Expression>),
+    ConstraintComprehension(ConstraintType, Option<Expression>, ComprehensionContext),
     Variable(Variable),
 }
 

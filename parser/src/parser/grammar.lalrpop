@@ -2,7 +2,7 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
-        Constant, ConstantType, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
+        ComprehensionContext, Constant, ConstantType, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
         IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
         MatrixAccess, NamedTraceAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues,
         Range, Source, SourceSection, Trace, TraceCols, Variable, VariableType, VectorAccess
@@ -189,7 +189,7 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
     "boundary_constraints" ":" <boundary_stmts: BoundaryStmt+> =>? {
         // check if at least one boundary constraint is defined
         let boundary_constraints_exist = boundary_stmts.iter().any(|stmt| match stmt {
-            BoundaryStmt::Constraint(_) => true,
+            BoundaryStmt::Constraint(_) | BoundaryStmt::ConstraintComprehension(_, _) => true,
             _ => false,
         });
         if !boundary_constraints_exist {
@@ -208,8 +208,16 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
 BoundaryStmt: BoundaryStmt = {
     "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
         BoundaryStmt::Variable(Variable::new(name, boundary_variable_type)),
-    "enf" <column: NamedTraceAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
-        BoundaryStmt::Constraint(BoundaryConstraint::new(column, boundary, value)),
+    "enf" <boundary_constraint: BoundaryConstraintExpr> =>
+        BoundaryStmt::Constraint(boundary_constraint),
+    "enf" <boundary_constraint: BoundaryConstraintExpr>
+        <comprehension: ConstraintComprehension<BoundaryExpr>> =>
+        BoundaryStmt::ConstraintComprehension(boundary_constraint, comprehension),
+}
+
+BoundaryConstraintExpr: BoundaryConstraint = {
+    <column: NamedTraceAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
+        BoundaryConstraint::new(column, boundary, value),
 }
 
 BoundaryVariableType: VariableType = {
@@ -272,7 +280,7 @@ IntegrityStmts: Vec<IntegrityStmt> = {
         let integrity_stmts: Vec<IntegrityStmt> = integrity_stmts_groups.into_iter().flatten().collect();
         // check if at least one integrity constraint is defined
         let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
-            IntegrityStmt::Constraint(_, _) => true,
+            IntegrityStmt::Constraint(_, _) | IntegrityStmt::ConstraintComprehension(_, _, _) => true,
             _ => false,
         });
         if !integrity_constraints_exist {
@@ -293,7 +301,13 @@ IntegrityStmtGroup: Vec<IntegrityStmt> = {
     "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
         vec![IntegrityStmt::Variable(Variable::new(name, integrity_variable_type))],
     "enf" <integrity_constraint: IntegrityConstraintExpr> => vec![integrity_constraint],
-    "match" "enf" ":" <integrity_stmts: IntegrityConstraintExpr+> => integrity_stmts
+    "match" "enf" ":" <integrity_stmts: IntegrityConstraintExpr+> => integrity_stmts,
+    "enf" <integrity_constraint: IntegrityConstraintExpr>
+        <comprehension: ConstraintComprehension<IntegrityExpr>> => match integrity_constraint {
+            IntegrityStmt::Constraint(constraint_type, selectors) =>
+                return vec![IntegrityStmt::ConstraintComprehension(constraint_type, selectors, comprehension)],
+            _ => unreachable!() // this should never happen
+        }
 }
 
 IntegrityConstraintExpr: IntegrityStmt = {
@@ -446,6 +460,19 @@ IndexedTraceAccess: IndexedTraceAccess = {
     "$main" <idx: Index> "'" => IndexedTraceAccess::new(0, idx, 1), 
     "$aux" <idx: Index> => IndexedTraceAccess::new(1, idx, 0),
     "$aux" <idx: Index> "'" => IndexedTraceAccess::new(1, idx, 1),
+}
+
+ConstraintComprehension<T>: ComprehensionContext = {
+    "for" <members: Members> "in" <iterables: Iterables> =>?
+        if members.len() != iterables.len() {
+            Err(ParseError::User {
+                error: Error::ParseError(InvalidConstraintComprehension(
+                    "Number of members and iterables must match".to_string()
+                ))
+            })
+        } else {
+            Ok(members.into_iter().zip(iterables).collect::<Vec<_>>())
+        }
 }
 
 ListComprehension<T>: ListComprehension = {
