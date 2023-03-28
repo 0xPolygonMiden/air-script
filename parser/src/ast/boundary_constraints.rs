@@ -1,4 +1,4 @@
-use super::{ComprehensionContext, Expression, Identifier, Iterable, NamedTraceAccess, Variable};
+use super::{ComprehensionContext, Expression, Identifier, Iterable, TraceBindingAccess, Variable};
 use std::fmt::Display;
 
 // BOUNDARY STATEMENTS

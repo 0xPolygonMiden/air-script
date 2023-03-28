@@ -1,4 +1,7 @@
-use super::{build_parse_test, Boundary, BoundaryConstraint, Identifier, Source, SourceSection};
+use super::{
+    build_parse_test, Boundary, BoundaryConstraint, Identifier, Iterable, Range, Source,
+    SourceSection, TraceBinding,
+};
 use crate::{
     ast::{
         BoundaryStmt::*, Constant, ConstantType::*, Expression::*, MatrixAccess, PublicInput,
@@ -264,17 +267,19 @@ fn bc_comprehension_one_iterable_identifier() {
         enf x.first = 0 for x in c";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
-        BoundaryConstraints(vec![ConstraintComprehension(
+        SourceSection::Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+        ]]),
+        SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("x".to_string()), 0, 0),
+                TraceBindingAccess::new(
+                    Identifier("x".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
                 Boundary::First,
                 Const(0),
             ),
@@ -298,17 +303,19 @@ fn bc_comprehension_one_iterable_range() {
         enf x.first = 0 for x in (0..4)";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
-        BoundaryConstraints(vec![ConstraintComprehension(
+        SourceSection::Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+        ]]),
+        SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("x".to_string()), 0, 0),
+                TraceBindingAccess::new(
+                    Identifier("x".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
                 Boundary::First,
                 Const(0),
             ),
@@ -332,17 +339,19 @@ fn bc_comprehension_one_iterable_slice() {
         enf x.first = 0 for x in c[1..3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
-        BoundaryConstraints(vec![ConstraintComprehension(
+        SourceSection::Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+        ]]),
+        SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("x".to_string()), 0, 0),
+                TraceBindingAccess::new(
+                    Identifier("x".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
                 Boundary::First,
                 Const(0),
             ),
@@ -365,18 +374,20 @@ fn bc_comprehension_two_iterable_identifiers() {
         enf x.first = y for (x, y) in (c, d)";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-                TraceCols::new(Identifier("d".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
-        BoundaryConstraints(vec![ConstraintComprehension(
+        SourceSection::Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
+        ]]),
+        SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("x".to_string()), 0, 0),
+                TraceBindingAccess::new(
+                    Identifier("x".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
                 Boundary::First,
                 Elem(Identifier("y".to_string())),
             ),

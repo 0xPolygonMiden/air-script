@@ -1,7 +1,8 @@
 pub(crate) use air_script_core::{
-    ComprehensionContext, ColumnGroup, Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, Range, TraceBinding,
-    TraceBindingAccess, TraceBindingAccessSize, TraceSegment, Variable, VariableType, VectorAccess,
+    ColumnGroup, ComprehensionContext, Constant, ConstantType, Expression, Identifier,
+    IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
+    MatrixAccess, Range, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment,
+    Variable, VariableType, VectorAccess,
 };
 
 pub mod pub_inputs;
