@@ -1,6 +1,5 @@
+use super::{ComprehensionContext, Expression, Identifier, Range};
 use std::fmt::Display;
-
-use super::{Expression, Identifier, Range};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Variable {
@@ -48,12 +47,12 @@ impl Display for VariableType {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ListComprehension {
     expression: Box<Expression>,
-    context: Vec<(Identifier, Iterable)>,
+    context: ComprehensionContext,
 }
 
 impl ListComprehension {
     /// Creates a new list comprehension.
-    pub fn new(expression: Expression, context: Vec<(Identifier, Iterable)>) -> Self {
+    pub fn new(expression: Expression, context: ComprehensionContext) -> Self {
         Self {
             expression: Box::new(expression),
             context,

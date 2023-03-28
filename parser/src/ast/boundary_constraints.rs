@@ -1,6 +1,4 @@
-use super::{
-    ConstraintComprehensionContext, Expression, Identifier, Iterable, NamedTraceAccess, Variable,
-};
+use super::{ComprehensionContext, Expression, Identifier, Iterable, NamedTraceAccess, Variable};
 use std::fmt::Display;
 
 // BOUNDARY STATEMENTS
@@ -9,7 +7,7 @@ use std::fmt::Display;
 #[derive(Debug, Eq, PartialEq)]
 pub enum BoundaryStmt {
     Constraint(BoundaryConstraint),
-    ConstraintComprehension(BoundaryConstraint, ConstraintComprehensionContext),
+    ConstraintComprehension(BoundaryConstraint, ComprehensionContext),
     Variable(Variable),
 }
 
@@ -65,7 +63,7 @@ pub struct BoundaryConstraintComprehension {
     access: NamedTraceAccess,
     boundary: Boundary,
     expr: Expression,
-    context: Vec<(Identifier, Iterable)>,
+    context: ComprehensionContext,
 }
 
 impl BoundaryConstraintComprehension {
@@ -73,7 +71,7 @@ impl BoundaryConstraintComprehension {
         access: NamedTraceAccess,
         boundary: Boundary,
         expr: Expression,
-        context: Vec<(Identifier, Iterable)>,
+        context: ComprehensionContext,
     ) -> Self {
         Self {
             access,

@@ -1,4 +1,6 @@
-use super::{EvaluatorFunctionCall, Expression, Identifier, Iterable, Variable};
+use air_script_core::ComprehensionContext;
+
+use super::{EvaluatorFunctionCall, Expression, Variable};
 
 // INTEGRITY STATEMENTS
 // ================================================================================================
@@ -6,11 +8,7 @@ use super::{EvaluatorFunctionCall, Expression, Identifier, Iterable, Variable};
 #[derive(Debug, Eq, PartialEq)]
 pub enum IntegrityStmt {
     Constraint(ConstraintType, Option<Expression>),
-    ConstraintComprehension(
-        ConstraintType,
-        Option<Expression>,
-        ConstraintComprehensionContext,
-    ),
+    ConstraintComprehension(ConstraintType, Option<Expression>, ComprehensionContext),
     Variable(Variable),
 }
 
@@ -43,5 +41,3 @@ impl IntegrityConstraint {
         &self.rhs
     }
 }
-
-pub type ConstraintComprehensionContext = Vec<(Identifier, Iterable)>;

@@ -2,7 +2,7 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
-        Constant, ConstantType, ConstraintComprehensionContext, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
+        ComprehensionContext, Constant, ConstantType, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
         IndexedTraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
         MatrixAccess, NamedTraceAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues,
         Range, Source, SourceSection, Trace, TraceCols, Variable, VariableType, VectorAccess
@@ -462,7 +462,7 @@ IndexedTraceAccess: IndexedTraceAccess = {
     "$aux" <idx: Index> "'" => IndexedTraceAccess::new(1, idx, 1),
 }
 
-ConstraintComprehension<T>: ConstraintComprehensionContext = {
+ConstraintComprehension<T>: ComprehensionContext = {
     "for" <members: Members> "in" <iterables: Iterables> =>?
         if members.len() != iterables.len() {
             Err(ParseError::User {
