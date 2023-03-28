@@ -2,12 +2,11 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
-        build_column_groups, build_trace_bindings, ColumnGroup, Constant, ConstantType,
-        ComprehensionContext, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier,
-        TraceAccess, Iterable, ListComprehension, ListFoldingType, ListFoldingValueType,
-        MatrixAccess, PeriodicColumn, PublicInput, RandBinding, RandomValues, Range, Source,
-        SourceSection, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, Variable,
-        VariableType, VectorAccess
+        build_trace_bindings, Constant, ConstantType, ComprehensionContext,
+        Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier, TraceAccess, Iterable,
+        ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, PeriodicColumn,
+        PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, TraceBinding,
+        TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType, VectorAccess
     }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
@@ -61,14 +60,14 @@ Trace: Vec<Vec<TraceBinding>> = {
 }
 
 MainTraceBindings: Vec<TraceBinding> = {
-    "main" ":" "[" <main_cols: CommaElems<ColumnGroup>> "]" => build_trace_bindings(0, main_cols),
+    "main" ":" "[" <main_cols: CommaElems<TraceBinding>> "]" => build_trace_bindings(0, main_cols),
 }
 
 AuxTraceBindings: Vec<TraceBinding> = {
-    "aux" ":" "[" <aux_cols: CommaElems<ColumnGroup>> "]" => build_trace_bindings(1, aux_cols),
+    "aux" ":" "[" <aux_cols: CommaElems<TraceBinding>> "]" => build_trace_bindings(1, aux_cols),
 }
 
-ColumnGroup: (Identifier, u64) = {
+TraceBinding: (Identifier, u64) = {
     <name: Identifier> => (name, 1),
     <name: Identifier> <size: Size> => (name, size)
 }
@@ -160,7 +159,7 @@ RandElem: RandBinding = {
 // ================================================================================================
 
 EvaluatorFunction: EvaluatorFunction = {
-    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainColumnGroups> "," <aux_cols: AuxColumnGroups> ")" ":"
+    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainTraceBindings> "," <aux_cols: AuxTraceBindings> ")" ":"
         <integrity_stmts: IntegrityStmts> => {
             let mut cols = main_cols;
             cols.extend(aux_cols);
@@ -169,26 +168,18 @@ EvaluatorFunction: EvaluatorFunction = {
                 cols,
                 integrity_stmts)
         },
-    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainColumnGroups> ")" ":"
+    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainTraceBindings> ")" ":"
         <integrity_stmts: IntegrityStmts> => 
             EvaluatorFunction::new(
                 evaluator_fn_name,
                 main_cols,
                 integrity_stmts),
-    "ev" <evaluator_fn_name: Identifier> "(" <aux_cols: AuxColumnGroups> ")" ":"
+    "ev" <evaluator_fn_name: Identifier> "(" <aux_cols: AuxTraceBindings> ")" ":"
         <integrity_stmts: IntegrityStmts> =>
             EvaluatorFunction::new(
                 evaluator_fn_name,
                 aux_cols,
                 integrity_stmts),
-}
-
-MainColumnGroups: Vec<ColumnGroup> = {
-    "main" ":" "[" <main_cols: CommaElems<ColumnGroup>> "]" => build_column_groups(0, main_cols),
-}
-
-AuxColumnGroups: Vec<ColumnGroup> = {
-    "aux" ":" "[" <aux_cols: CommaElems<ColumnGroup>> "]" => build_column_groups(1, aux_cols),
 }
 
 // BOUNDARY STATEMENTS

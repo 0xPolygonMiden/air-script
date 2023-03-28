@@ -1,5 +1,5 @@
 pub(crate) use air_script_core::{
-    ColumnGroup, ComprehensionContext, Constant, ConstantType, Expression, Identifier, Iterable,
+    ComprehensionContext, Constant, ConstantType, Expression, Identifier, Iterable,
     ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, Range, TraceAccess,
     TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment, Variable, VariableType,
     VectorAccess,
@@ -63,7 +63,8 @@ pub enum SourceSection {
 // TRACE
 // ================================================================================================
 
-/// Given a vector of identifiers and their trace segment, returns a vector of trace bindings.
+/// Given a trace segment and a vector of (Identifier, size) pairs, returns a vector of trace
+/// bindings.
 pub fn build_trace_bindings(
     trace_segment: TraceSegment,
     bindings: Vec<(Identifier, u64)>,
@@ -74,19 +75,6 @@ pub fn build_trace_bindings(
     for (ident, size) in bindings.into_iter() {
         trace_cols.push(TraceBinding::new(ident, trace_segment.into(), offset, size));
         offset += size as usize;
-    }
-
-    trace_cols
-}
-
-pub fn build_column_groups(
-    trace_segment: TraceSegment,
-    groups: Vec<(Identifier, u64)>,
-) -> Vec<ColumnGroup> {
-    let mut trace_cols = Vec::new();
-
-    for (ident, size) in groups.into_iter() {
-        trace_cols.push(ColumnGroup::new(ident, trace_segment, size));
     }
 
     trace_cols

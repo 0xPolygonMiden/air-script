@@ -1,12 +1,12 @@
-use super::{ColumnGroup, Identifier, IntegrityStmt, TraceBindingAccess};
+use super::{Identifier, IntegrityStmt, TraceBinding, TraceBindingAccess};
 
-/// Evaluator functions take column groups as parameters where each column group is a set of
-/// columns in the particular trace segment that are passed to the evaluator function, and enforce
-/// integrity constraints on those trace columns.
+/// Evaluator functions take a vector of trace bindings as parameters where each trace binding
+/// represents one or a group of columns in the execution trace that are passed to the evaluator
+/// function, and enforce integrity constraints on those trace columns.
 #[derive(Debug, Eq, PartialEq)]
 pub struct EvaluatorFunction {
     name: Identifier,
-    params: Vec<ColumnGroup>,
+    params: Vec<TraceBinding>,
     integrity_stmts: Vec<IntegrityStmt>,
 }
 
@@ -14,7 +14,7 @@ impl EvaluatorFunction {
     /// Creates a new function.
     pub fn new(
         name: Identifier,
-        params: Vec<ColumnGroup>,
+        params: Vec<TraceBinding>,
         integrity_stmts: Vec<IntegrityStmt>,
     ) -> Self {
         Self {
@@ -30,7 +30,7 @@ impl EvaluatorFunction {
     }
 
     /// Returns the parameters of the evaluator function.
-    pub fn params(&self) -> &[ColumnGroup] {
+    pub fn params(&self) -> &[TraceBinding] {
         &self.params
     }
 
@@ -39,9 +39,8 @@ impl EvaluatorFunction {
         &self.integrity_stmts
     }
 
-    /// Returns the name, main trace columns, auxiliary trace columns, and integrity statements
-    /// of the evaluator function.
-    pub fn into_parts(self) -> (String, Vec<ColumnGroup>, Vec<IntegrityStmt>) {
+    /// Returns the name, trace bindings and integrity statements of the evaluator function.
+    pub fn into_parts(self) -> (String, Vec<TraceBinding>, Vec<IntegrityStmt>) {
         (self.name.into_name(), self.params, self.integrity_stmts)
     }
 }

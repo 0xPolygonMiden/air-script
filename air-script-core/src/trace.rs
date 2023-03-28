@@ -4,45 +4,6 @@ use super::{Identifier, Range};
 // ================================================================================================
 pub type TraceSegment = u8;
 
-/// A named group of columns of the specified size and trace segment.
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ColumnGroup {
-    name: Identifier,
-    trace_segment: TraceSegment,
-    size: u64,
-}
-
-impl ColumnGroup {
-    /// Creates a new column group.
-    pub fn new(name: Identifier, trace_segment: TraceSegment, size: u64) -> Self {
-        Self {
-            name,
-            trace_segment,
-            size,
-        }
-    }
-
-    /// Returns the name of the column group.
-    pub fn name(&self) -> &str {
-        self.name.name()
-    }
-
-    /// Returns the trace segment of the column group.
-    pub fn trace_segment(&self) -> TraceSegment {
-        self.trace_segment
-    }
-
-    /// Returns the size of the column group.
-    pub fn size(&self) -> u64 {
-        self.size
-    }
-
-    /// Returns the name, trace segment, and size of the column group.
-    pub fn into_parts(self) -> (Identifier, TraceSegment, u64) {
-        (self.name, self.trace_segment, self.size)
-    }
-}
-
 /// [TraceBinding] is used to represent one or more columns in the execution trace that are bound to
 /// a name. For single columns, the size is 1. For groups, the size is the number of columns in the
 /// group. The offset is the column index in the trace where the first column of the binding starts.

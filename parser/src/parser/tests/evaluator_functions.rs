@@ -1,10 +1,8 @@
-use air_script_core::Range;
-
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::{
     ast::{
-        ColumnGroup, ConstraintType, EvaluatorFunction, EvaluatorFunctionCall, Expression::*,
-        IntegrityStmt::*, TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType,
+        ConstraintType, EvaluatorFunction, EvaluatorFunctionCall, Expression::*, IntegrityStmt::*,
+        Range, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType,
     },
     error::{Error, ParseError},
 };
@@ -20,7 +18,7 @@ fn ev_fn_main_cols() {
     let expected = Source(vec![SourceSection::EvaluatorFunction(
         EvaluatorFunction::new(
             Identifier("advance_clock".to_string()),
-            vec![ColumnGroup::new(Identifier("clk".to_string()), 0, 1)],
+            vec![TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1)],
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
                     TraceBindingAccess(TraceBindingAccess::new(
@@ -53,9 +51,9 @@ fn ev_fn_main_and_aux_cols() {
         EvaluatorFunction::new(
             Identifier("ev_func".to_string()),
             vec![
-                ColumnGroup::new(Identifier("clk".to_string()), 0, 1),
-                ColumnGroup::new(Identifier("a".to_string()), 1, 1),
-                ColumnGroup::new(Identifier("b".to_string()), 1, 1),
+                TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
+                TraceBinding::new(Identifier("a".to_string()), 1, 0, 1),
+                TraceBinding::new(Identifier("b".to_string()), 1, 1, 1),
             ],
             vec![
                 Variable(Variable::new(
@@ -169,9 +167,9 @@ fn ev_fn_call_inside_ev_fn() {
         EvaluatorFunction::new(
             Identifier("ev_func".to_string()),
             vec![
-                ColumnGroup::new(Identifier("clk".to_string()), 0, 1),
-                ColumnGroup::new(Identifier("a".to_string()), 1, 1),
-                ColumnGroup::new(Identifier("b".to_string()), 1, 1),
+                TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
+                TraceBinding::new(Identifier("a".to_string()), 1, 0, 1),
+                TraceBinding::new(Identifier("b".to_string()), 1, 1, 1),
             ],
             vec![Constraint(
                 ConstraintType::Evaluator(EvaluatorFunctionCall::new(

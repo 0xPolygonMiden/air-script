@@ -1,8 +1,6 @@
-use air_script_core::TraceBindingAccess;
-
 use super::{
-    AccessType, ConstrainedBoundary, ConstraintDomain, SymbolType, TraceAccess, TraceSegment,
-    MIN_CYCLE_LENGTH,
+    AccessType, ConstrainedBoundary, ConstraintDomain, SymbolType, TraceAccess, TraceBindingAccess,
+    TraceSegment, MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]

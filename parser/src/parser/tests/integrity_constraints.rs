@@ -1,6 +1,6 @@
 use super::{
-    build_parse_test, ColumnGroup, Identifier, IntegrityConstraint, Iterable, Range, Source,
-    SourceSection, TraceBinding,
+    build_parse_test, Identifier, IntegrityConstraint, Iterable, Range, Source, SourceSection,
+    TraceBinding,
 };
 use crate::{
     ast::{
@@ -387,7 +387,7 @@ fn ic_comprehension_with_evaluator_call() {
     let expected = Source(vec![
         SourceSection::EvaluatorFunction(EvaluatorFunction::new(
             Identifier("is_binary".to_string()),
-            vec![ColumnGroup::new(Identifier("x".to_string()), 0, 1)],
+            vec![TraceBinding::new(Identifier("x".to_string()), 0, 0, 1)],
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
                     Exp(
@@ -440,7 +440,7 @@ fn ic_comprehension_with_evaluator_and_selectors() {
     let expected = Source(vec![
         SourceSection::EvaluatorFunction(EvaluatorFunction::new(
             Identifier("is_binary".to_string()),
-            vec![ColumnGroup::new(Identifier("x".to_string()), 0, 1)],
+            vec![TraceBinding::new(Identifier("x".to_string()), 0, 0, 1)],
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
                     Exp(

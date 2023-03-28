@@ -12,8 +12,7 @@ pub use identifier::Identifier;
 
 mod trace;
 pub use trace::{
-    ColumnGroup, TraceAccess, TraceBinding, TraceBindingAccess, TraceBindingAccessSize,
-    TraceSegment,
+    TraceAccess, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment,
 };
 
 mod variable;
