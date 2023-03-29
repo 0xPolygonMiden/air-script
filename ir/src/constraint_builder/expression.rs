@@ -1,6 +1,6 @@
 use super::{
-    get_variable_expr, AccessType, ConstantValue, ConstraintBuilder, Expression,
-    IndexedTraceAccess, ListFoldingType, NodeIndex, Operation, SemanticError, SymbolType, Value,
+    get_variable_expr, AccessType, ConstantValue, ConstraintBuilder, Expression, ListFoldingType,
+    NodeIndex, Operation, SemanticError, SymbolType, TraceAccess, Value,
 };
 
 impl ConstraintBuilder {
@@ -21,10 +21,8 @@ impl ConstraintBuilder {
             Expression::Const(value) => self.insert_inline_constant(*value),
 
             // --- TRACE ACCESS REFERENCE ---------------------------------------------------------
-            Expression::IndexedTraceAccess(column_access) => {
-                self.insert_trace_access(column_access)
-            }
-            Expression::NamedTraceAccess(trace_access) => {
+            Expression::TraceAccess(column_access) => self.insert_trace_access(column_access),
+            Expression::TraceBindingAccess(trace_access) => {
                 let trace_access = self.symbol_table.get_trace_access_by_name(trace_access)?;
                 self.insert_trace_access(&trace_access)
             }
@@ -98,7 +96,7 @@ impl ConstraintBuilder {
     /// - The segment of the trace access is greater than the number of segments.
     pub(crate) fn insert_trace_access(
         &mut self,
-        trace_access: &IndexedTraceAccess,
+        trace_access: &TraceAccess,
     ) -> Result<NodeIndex, SemanticError> {
         self.symbol_table.validate_trace_access(trace_access)?;
 

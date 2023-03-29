@@ -11,7 +11,9 @@ mod identifier;
 pub use identifier::Identifier;
 
 mod trace;
-pub use trace::{IndexedTraceAccess, NamedTraceAccess, TraceSegment};
+pub use trace::{
+    TraceAccess, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment,
+};
 
 mod variable;
 pub use variable::{Iterable, ListComprehension, Variable, VariableType};

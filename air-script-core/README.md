@@ -6,7 +6,7 @@ This crate contains the core components used by other crates in AirScript. These
 - Constant structure defined in [Constant](./constant.rs) struct
 - Expression set defined in [Expression](./expression.rs) enum
 - Identifier structure defined in [Identifier](./identifier.rs) struct
-- Trace Access structures defined in [NamedTraceAccess and IndexedTraceAccess](./trace.rs) structs
+- Trace Access structures defined in [TraceBindingAccess and TraceAccess](./trace.rs) structs
 - Variable structure and Variable types defined in [variables.rs](./variable.rs)
 
 ## License

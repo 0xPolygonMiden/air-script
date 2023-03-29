@@ -1,4 +1,4 @@
-use super::{ComprehensionContext, Expression, Identifier, Iterable, NamedTraceAccess, Variable};
+use super::{ComprehensionContext, Expression, Identifier, Iterable, TraceBindingAccess, Variable};
 use std::fmt::Display;
 
 // BOUNDARY STATEMENTS
@@ -14,13 +14,13 @@ pub enum BoundaryStmt {
 /// Stores the expression corresponding to the boundary constraint.
 #[derive(Debug, Eq, PartialEq)]
 pub struct BoundaryConstraint {
-    access: NamedTraceAccess,
+    access: TraceBindingAccess,
     boundary: Boundary,
     value: Expression,
 }
 
 impl BoundaryConstraint {
-    pub fn new(access: NamedTraceAccess, boundary: Boundary, value: Expression) -> Self {
+    pub fn new(access: TraceBindingAccess, boundary: Boundary, value: Expression) -> Self {
         Self {
             access,
             boundary,
@@ -28,7 +28,7 @@ impl BoundaryConstraint {
         }
     }
 
-    pub fn access(&self) -> &NamedTraceAccess {
+    pub fn access(&self) -> &TraceBindingAccess {
         &self.access
     }
 
@@ -60,7 +60,7 @@ impl Display for Boundary {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct BoundaryConstraintComprehension {
-    access: NamedTraceAccess,
+    access: TraceBindingAccess,
     boundary: Boundary,
     expr: Expression,
     context: ComprehensionContext,
@@ -68,7 +68,7 @@ pub struct BoundaryConstraintComprehension {
 
 impl BoundaryConstraintComprehension {
     pub fn new(
-        access: NamedTraceAccess,
+        access: TraceBindingAccess,
         boundary: Boundary,
         expr: Expression,
         context: ComprehensionContext,
@@ -81,7 +81,7 @@ impl BoundaryConstraintComprehension {
         }
     }
 
-    pub fn access(&self) -> &NamedTraceAccess {
+    pub fn access(&self) -> &TraceBindingAccess {
         &self.access
     }
 

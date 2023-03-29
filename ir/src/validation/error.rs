@@ -1,6 +1,6 @@
 use super::{
-    AccessType, ConstrainedBoundary, ConstraintDomain, IndexedTraceAccess, NamedTraceAccess,
-    SymbolType, TraceSegment, MIN_CYCLE_LENGTH,
+    AccessType, ConstrainedBoundary, ConstraintDomain, SymbolType, TraceAccess, TraceBindingAccess,
+    TraceSegment, MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]
@@ -154,7 +154,7 @@ impl SemanticError {
         ))
     }
 
-    pub(crate) fn invalid_trace_offset_in_bc(trace_access: &IndexedTraceAccess) -> SemanticError {
+    pub(crate) fn invalid_trace_offset_in_bc(trace_access: &TraceAccess) -> SemanticError {
         SemanticError::InvalidUsage(format!(
             "Attempted to access trace column {} in a boundary constraint with a non-zero row offset of {}.", trace_access.col_idx(), trace_access.row_offset()
         ))
@@ -183,7 +183,7 @@ impl SemanticError {
     }
 
     pub(crate) fn indexed_trace_column_access_out_of_bounds(
-        access: &IndexedTraceAccess,
+        access: &TraceAccess,
         segment_width: u16,
     ) -> Self {
         SemanticError::IndexOutOfRange(format!(
@@ -195,12 +195,12 @@ impl SemanticError {
     }
 
     pub(crate) fn named_trace_column_access_out_of_bounds(
-        access: &NamedTraceAccess,
+        access: &TraceBindingAccess,
         size: usize,
     ) -> Self {
         SemanticError::IndexOutOfRange(format!(
             "Out-of-range index '{}' while accessing named trace column group '{}' of length {}",
-            access.idx(),
+            access.col_offset(),
             access.name(),
             size
         ))

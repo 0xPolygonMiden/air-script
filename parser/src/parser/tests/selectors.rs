@@ -1,5 +1,7 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
-use crate::ast::{ConstraintType, Expression::*, IntegrityStmt::*, NamedTraceAccess};
+use crate::ast::{
+    ConstraintType, Expression::*, IntegrityStmt::*, TraceBindingAccess, TraceBindingAccessSize,
+};
 
 // SELECTORS
 // ================================================================================================
@@ -12,7 +14,12 @@ fn single_selector() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             // clk' = clk
-            NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+            TraceBindingAccess(TraceBindingAccess::new(
+                Identifier("clk".to_string()),
+                0,
+                TraceBindingAccessSize::Full,
+                1,
+            )),
             Elem(Identifier("clk".to_string())),
         )),
         // n1
@@ -29,7 +36,12 @@ fn chained_selectors() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             // clk' = clk
-            NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+            TraceBindingAccess(TraceBindingAccess::new(
+                Identifier("clk".to_string()),
+                0,
+                TraceBindingAccessSize::Full,
+                1,
+            )),
             Elem(Identifier("clk".to_string())),
         )),
         // (n1 & !n2) | !n3
@@ -77,7 +89,12 @@ fn multiconstraint_selectors() {
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 // clk' = 0 when n1 & !n2
-                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                TraceBindingAccess(TraceBindingAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    1,
+                )),
                 Const(0),
             )),
             Some(Mul(
@@ -91,7 +108,12 @@ fn multiconstraint_selectors() {
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 // clk' = clk when n1 & n2
-                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                TraceBindingAccess(TraceBindingAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    1,
+                )),
                 Elem(Identifier("clk".to_string())),
             )),
             Some(Mul(
@@ -102,7 +124,12 @@ fn multiconstraint_selectors() {
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 // clk' = 1 when !n1 & !n2
-                NamedTraceAccess(NamedTraceAccess::new(Identifier("clk".to_string()), 0, 1)),
+                TraceBindingAccess(TraceBindingAccess::new(
+                    Identifier("clk".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    1,
+                )),
                 Const(1),
             )),
             Some(Mul(

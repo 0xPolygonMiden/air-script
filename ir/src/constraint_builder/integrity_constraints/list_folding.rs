@@ -1,6 +1,6 @@
 use super::{
-    ConstantType, ConstraintBuilder, Expression, IndexedTraceAccess, ListFoldingValueType,
-    SemanticError, SymbolType, VariableType, CURRENT_ROW,
+    ConstantType, ConstraintBuilder, Expression, ListFoldingValueType, SemanticError, SymbolType,
+    TraceAccess, VariableType, CURRENT_ROW,
 };
 
 // LIST FOLDING
@@ -40,9 +40,10 @@ impl ConstraintBuilder {
                             let trace_segment = columns.trace_segment();
                             Ok((0..columns.size())
                                 .map(|i| {
-                                    Expression::IndexedTraceAccess(IndexedTraceAccess::new(
+                                    Expression::TraceAccess(TraceAccess::new(
                                         trace_segment,
                                         columns.offset() + i,
+                                        1,
                                         CURRENT_ROW,
                                     ))
                                 })

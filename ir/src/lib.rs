@@ -1,7 +1,7 @@
 pub use air_script_core::{
-    Constant, ConstantType, Expression, Identifier, IndexedTraceAccess, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, NamedTraceAccess,
-    TraceSegment, Variable, VariableType, VectorAccess,
+    Constant, ConstantType, Expression, Identifier, Iterable, ListComprehension, ListFoldingType,
+    ListFoldingValueType, MatrixAccess, TraceAccess, TraceBinding, TraceBindingAccess,
+    TraceBindingAccessSize, TraceSegment, Variable, VariableType, VectorAccess,
 };
 pub use parser::ast;
 use std::collections::{BTreeMap, BTreeSet};
@@ -74,11 +74,11 @@ impl AirIR {
                 }
                 ast::SourceSection::Trace(columns) => {
                     // process & validate the main trace columns
-                    symbol_table.insert_trace_columns(0, &columns.main_cols)?;
+                    symbol_table.insert_trace_columns(0, &columns[0])?;
                     validator.exists("main_trace_columns");
-                    if !columns.aux_cols.is_empty() {
+                    if columns.len() > 1 {
                         // process & validate the auxiliary trace columns
-                        symbol_table.insert_trace_columns(1, &columns.aux_cols)?;
+                        symbol_table.insert_trace_columns(1, &columns[1])?;
                         validator.exists("aux_trace_columns");
                     }
                 }

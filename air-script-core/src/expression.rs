@@ -1,5 +1,5 @@
 use super::{
-    Identifier, IndexedTraceAccess, ListComprehension, MatrixAccess, NamedTraceAccess, VectorAccess,
+    Identifier, ListComprehension, MatrixAccess, TraceAccess, TraceBindingAccess, VectorAccess,
 };
 
 /// Arithmetic expressions for evaluation of constraints.
@@ -14,8 +14,8 @@ pub enum Expression {
     /// Represents an element inside a constant or variable matrix. [MatrixAccess] contains the
     /// name of the matrix and indices of the element to access.
     MatrixAccess(MatrixAccess),
-    IndexedTraceAccess(IndexedTraceAccess),
-    NamedTraceAccess(NamedTraceAccess),
+    TraceAccess(TraceAccess),
+    TraceBindingAccess(TraceBindingAccess),
     /// Represents a random value provided by the verifier. The first inner value is the name of
     /// the random values array and the second is the index of this random value in that array
     Rand(Identifier, usize),

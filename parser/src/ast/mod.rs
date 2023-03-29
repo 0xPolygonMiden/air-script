@@ -1,7 +1,8 @@
 pub(crate) use air_script_core::{
-    ComprehensionContext, Constant, ConstantType, Expression, Identifier, IndexedTraceAccess,
-    Iterable, ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess,
-    NamedTraceAccess, Range, Variable, VariableType, VectorAccess,
+    ComprehensionContext, Constant, ConstantType, Expression, Identifier, Iterable,
+    ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, Range, TraceAccess,
+    TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment, Variable, VariableType,
+    VectorAccess,
 };
 
 pub mod pub_inputs;
@@ -50,7 +51,7 @@ pub struct Source(pub Vec<SourceSection>);
 pub enum SourceSection {
     AirDef(Identifier),
     Constant(Constant),
-    Trace(Trace),
+    Trace(Vec<Vec<TraceBinding>>),
     PublicInputs(Vec<PublicInput>),
     PeriodicColumns(Vec<PeriodicColumn>),
     RandomValues(RandomValues),
@@ -62,31 +63,19 @@ pub enum SourceSection {
 // TRACE
 // ================================================================================================
 
-/// [Trace] contains the main and auxiliary trace segments of the execution trace.
-#[derive(Debug, Eq, PartialEq)]
-pub struct Trace {
-    pub main_cols: Vec<TraceCols>,
-    pub aux_cols: Vec<TraceCols>,
-}
+/// Given a trace segment and a vector of (Identifier, size) pairs, returns a vector of trace
+/// bindings.
+pub fn build_trace_bindings(
+    trace_segment: TraceSegment,
+    bindings: Vec<(Identifier, u64)>,
+) -> Vec<TraceBinding> {
+    let mut trace_cols = Vec::new();
 
-/// [TraceCols] is used to represent a single or a group of columns in the execution trace. For
-/// single columns, the size is 1. For groups, the size is the number of columns in the group.
-#[derive(Debug, Eq, PartialEq)]
-pub struct TraceCols {
-    name: Identifier,
-    size: u64,
-}
-
-impl TraceCols {
-    pub fn new(name: Identifier, size: u64) -> Self {
-        Self { name, size }
+    let mut offset = 0;
+    for (ident, size) in bindings.into_iter() {
+        trace_cols.push(TraceBinding::new(ident, trace_segment.into(), offset, size));
+        offset += size as usize;
     }
 
-    pub fn name(&self) -> &str {
-        self.name.name()
-    }
-
-    pub fn size(&self) -> u64 {
-        self.size
-    }
+    trace_cols
 }

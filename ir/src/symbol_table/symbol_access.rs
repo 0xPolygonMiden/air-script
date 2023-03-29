@@ -1,4 +1,4 @@
-use super::{ConstantType, NamedTraceAccess, SemanticError, Symbol, SymbolType, VariableType};
+use super::{ConstantType, SemanticError, Symbol, SymbolType, TraceBindingAccess, VariableType};
 use std::fmt::Display;
 
 /// TODO: docs
@@ -30,11 +30,11 @@ pub(super) trait ValidateIdentifierAccess {
     fn validate(&self, symbol: &Symbol) -> Result<(), SemanticError>;
 }
 
-impl ValidateIdentifierAccess for NamedTraceAccess {
+impl ValidateIdentifierAccess for TraceBindingAccess {
     fn validate(&self, symbol: &Symbol) -> Result<(), SemanticError> {
         match symbol.symbol_type() {
             SymbolType::TraceColumns(columns) => {
-                if self.idx() >= columns.size() {
+                if self.col_offset() >= columns.size() {
                     return Err(SemanticError::named_trace_column_access_out_of_bounds(
                         self,
                         columns.size(),

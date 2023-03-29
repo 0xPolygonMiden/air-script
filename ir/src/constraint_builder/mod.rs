@@ -2,10 +2,10 @@ use crate::constraints::{AlgebraicGraph, NodeIndex, Operation};
 
 use super::{
     ast, AccessType, BTreeMap, BTreeSet, ConstantType, ConstantValue, ConstraintDomain,
-    ConstraintRoot, Constraints, Declarations, Expression, Identifier, IndexedTraceAccess,
-    Iterable, ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess,
-    NamedTraceAccess, SemanticError, Symbol, SymbolTable, SymbolType, TraceSegment, ValidateAccess,
-    Value, Variable, VariableType, VectorAccess, CURRENT_ROW,
+    ConstraintRoot, Constraints, Declarations, Expression, Identifier, Iterable, ListComprehension,
+    ListFoldingType, ListFoldingValueType, MatrixAccess, SemanticError, Symbol, SymbolTable,
+    SymbolType, TraceAccess, TraceBindingAccess, TraceBindingAccessSize, TraceSegment,
+    ValidateAccess, Value, Variable, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 mod boundary_constraints;

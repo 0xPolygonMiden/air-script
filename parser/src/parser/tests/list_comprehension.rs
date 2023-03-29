@@ -4,7 +4,8 @@ use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
     ast::{
         Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType, Expression::*, IntegrityStmt,
-        NamedTraceAccess, SourceSection::*, Trace, TraceCols, Variable, VariableType, VectorAccess,
+        SourceSection::*, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, Variable,
+        VariableType, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -25,14 +26,11 @@ fn bc_one_iterable_identifier_lc() {
         enf a.first = x[0] + x[1] + x[2] + x[3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
+        Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+        ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
@@ -48,7 +46,12 @@ fn bc_one_iterable_identifier_lc() {
                 )),
             )),
             BoundaryStmt::Constraint(BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("a".to_string()), 0, 0),
+                TraceBindingAccess::new(
+                    Identifier("a".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
                 Boundary::First,
                 Add(
                     Box::new(Add(
@@ -90,14 +93,11 @@ fn bc_identifier_and_range_lc() {
         enf a.first = x[0] + x[1] + x[2] + x[3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
+        Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+        ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
@@ -122,7 +122,12 @@ fn bc_identifier_and_range_lc() {
                 )),
             )),
             BoundaryStmt::Constraint(BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("a".to_string()), 0, 0),
+                TraceBindingAccess::new(
+                    Identifier("a".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
                 Boundary::First,
                 Add(
                     Box::new(Add(
@@ -164,14 +169,11 @@ fn bc_iterable_slice_lc() {
         enf a.first = x[0] + x[1] + x[2] + x[3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
+        Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+        ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
@@ -184,7 +186,12 @@ fn bc_iterable_slice_lc() {
                 )),
             )),
             BoundaryStmt::Constraint(BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("a".to_string()), 0, 0),
+                TraceBindingAccess::new(
+                    Identifier("a".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
                 Boundary::First,
                 Add(
                     Box::new(Add(
@@ -226,15 +233,12 @@ fn bc_two_iterable_identifier_lc() {
         enf a.first = x[0] + x[1] + x[2] + x[3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-                TraceCols::new(Identifier("d".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
+        Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
+        ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::Variable(Variable::new(
                 Identifier("diff".to_string()),
@@ -256,7 +260,12 @@ fn bc_two_iterable_identifier_lc() {
                 )),
             )),
             BoundaryStmt::Constraint(BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("a".to_string()), 0, 0),
+                TraceBindingAccess::new(
+                    Identifier("a".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
                 Boundary::First,
                 Add(
                     Box::new(Add(
@@ -298,15 +307,12 @@ fn bc_multiple_iterables_lc() {
         enf a.first = x[0] + x[1] + x[2] + x[3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 3),
-                TraceCols::new(Identifier("c".to_string()), 4),
-                TraceCols::new(Identifier("d".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
+        Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 3),
+            TraceBinding::new(Identifier("c".to_string()), 0, 4, 4),
+            TraceBinding::new(Identifier("d".to_string()), 0, 8, 4),
+        ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::Variable(Variable::new(
                 Identifier("diff".to_string()),
@@ -342,7 +348,12 @@ fn bc_multiple_iterables_lc() {
                 )),
             )),
             BoundaryStmt::Constraint(BoundaryConstraint::new(
-                NamedTraceAccess::new(Identifier("a".to_string()), 0, 0),
+                TraceBindingAccess::new(
+                    Identifier("a".to_string()),
+                    0,
+                    TraceBindingAccessSize::Full,
+                    0,
+                ),
                 Boundary::First,
                 Add(
                     Box::new(Add(
@@ -388,14 +399,11 @@ fn ic_one_iterable_identifier_lc() {
         enf a = x[0] + x[1] + x[2] + x[3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
+        Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+        ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
@@ -414,9 +422,10 @@ fn ic_one_iterable_identifier_lc() {
                 Identifier("y".to_string()),
                 VariableType::ListComprehension(ListComprehension::new(
                     Exp(
-                        Box::new(NamedTraceAccess(NamedTraceAccess::new(
+                        Box::new(TraceBindingAccess(TraceBindingAccess::new(
                             Identifier("col".to_string()),
                             0,
+                            TraceBindingAccessSize::Full,
                             1,
                         ))),
                         Box::new(Const(7)),
@@ -472,14 +481,11 @@ fn ic_iterable_identifier_range_lc() {
         enf a = x[0] + x[1] + x[2] + x[3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
+        Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+        ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
@@ -548,14 +554,11 @@ fn ic_iterable_slice_lc() {
         enf a = x[0] + x[1] + x[2] + x[3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
+        Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+        ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
@@ -612,15 +615,12 @@ fn ic_two_iterable_identifier_lc() {
         enf a = x[0] + x[1] + x[2] + x[3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 1),
-                TraceCols::new(Identifier("c".to_string()), 4),
-                TraceCols::new(Identifier("d".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
+        Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
+            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
+        ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::Variable(Variable::new(
                 Identifier("diff".to_string()),
@@ -686,15 +686,12 @@ fn ic_multiple_iterables_lc() {
         enf a = x[0] + x[1] + x[2] + x[3]";
 
     let expected = Source(vec![
-        Trace(Trace {
-            main_cols: vec![
-                TraceCols::new(Identifier("a".to_string()), 1),
-                TraceCols::new(Identifier("b".to_string()), 3),
-                TraceCols::new(Identifier("c".to_string()), 4),
-                TraceCols::new(Identifier("d".to_string()), 4),
-            ],
-            aux_cols: vec![],
-        }),
+        Trace(vec![vec![
+            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
+            TraceBinding::new(Identifier("b".to_string()), 0, 1, 3),
+            TraceBinding::new(Identifier("c".to_string()), 0, 4, 4),
+            TraceBinding::new(Identifier("d".to_string()), 0, 8, 4),
+        ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::Variable(Variable::new(
                 Identifier("diff".to_string()),
