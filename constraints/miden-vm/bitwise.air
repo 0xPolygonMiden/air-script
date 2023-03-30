@@ -32,11 +32,13 @@ ev input_decomposition(main:[a, b, a_limb[4], b_limb[4]]):
 
     # Enforce that the value in the first row of column `a` of the current 8-row cycle should be 
     # the aggregation of the decomposed bit columns `a_limb`.
-    enf a = aggregate(a_limb) when k0
+    let a_aggr = aggregate(a_limb)
+    enf a = a_aggr when k0
 
     # Enforce that the value in the first row of column `b` of the current 8-row cycle should be 
     # the aggregation of the decomposed bit columns `b_limb`.
-    enf b = aggregate(b_limb) when k0
+    let b_aggr = aggregate(b_limb)
+    enf b = b_aggr when k0
 
     # Enforce that for all rows in an 8-row cycle, except for the last one, the values in a and b
     # columns are increased by the values contained in the individual bit columns a_limb and 
