@@ -1,0 +1,404 @@
+mod StacktAir
+
+### Helper functions ##############################################################################
+
+fn delta(v: scalar) -> scalar:
+    return v' - v
+
+
+# Flags for the first bits (b[6], b[5], b[4])
+
+fn f_000(b: vector[7]) -> scalar:
+    return !b[6] & !b[5] & !b[4]
+
+fn f_001(b: vector[7]) -> scalar:
+    return !b[6] & !b[5] & b[4]
+
+fn f_010(b: vector[7]) -> scalar:
+    return !b[6] & b[5] & !b[4]
+
+fn f_011(b: vector[7]) -> scalar:
+    return !b[6] & b[5] & b[4]
+
+# This flag is equal to f_100
+fn f_u32rc(b: vector[7]) -> scalar:
+    return b[6] & !b[5] & !b[4]
+
+fn f_101(b: vector[7]) -> scalar:
+    return b[6] & !b[5] & b[4]
+
+
+# Flags for the four last bits (b[3], b[2], b[1], b[0])
+
+fn f_x0000(b: vector[7]) -> scalar:
+    return !b[3] & !b[2] & !b[1] & !b[0]
+
+fn f_x0001(b: vector[7]) -> scalar:
+    return !b[3] & !b[2] & !b[1] & b[0]
+
+fn f_x0010(b: vector[7]) -> scalar:
+    return !b[3] & !b[2] & b[1] & !b[0]
+
+fn f_x0011(b: vector[7]) -> scalar:
+    return !b[3] & !b[2] & b[1] & b[0]
+
+fn f_x0100(b: vector[7]) -> scalar:
+    return !b[3] & b[2] & !b[1] & !b[0]
+
+fn f_x0101(b: vector[7]) -> scalar:
+    return !b[3] & b[2] & !b[1] & b[0]
+
+fn f_x0110(b: vector[7]) -> scalar:
+    return !b[3] & b[2] & b[1] & !b[0]
+
+fn f_x0111(b: vector[7]) -> scalar:
+    return !b[3] & b[2] & b[1] & b[0]
+
+fn f_x1000(b: vector[7]) -> scalar:
+    return b[3] & !b[2] & !b[1] & !b[0]
+
+fn f_x1001(b: vector[7]) -> scalar:
+    return b[3] & !b[2] & !b[1] & b[0]
+
+fn f_x1010(b: vector[7]) -> scalar:
+    return b[3] & !b[2] & b[1] & !b[0]
+
+fn f_x1011(b: vector[7]) -> scalar:
+    return b[3] & !b[2] & b[1] & b[0]
+
+fn f_x1100(b: vector[7]) -> scalar:
+    return b[3] & b[2] & !b[1] & !b[0]
+
+fn f_x1101(b: vector[7]) -> scalar:
+    return b[3] & b[2] & !b[1] & b[0]
+
+fn f_x1110(b: vector[7]) -> scalar:
+    return b[3] & b[2] & b[1] & !b[0]
+
+fn f_x1111(b: vector[7]) -> scalar:
+    return b[3] & b[2] & b[1] & b[0]
+
+
+# No stack shift operations
+
+fn f_noop(b: vector[7]) -> scalar:
+    return f_000(b) & f_x0000(b)
+
+fn f_eqz(b: vector[7]) -> scalar:
+    return f_000(b) & f_x0001(b)
+
+fn f_neg(b: vector[7]) -> scalar:
+    return f_000(b) & f_x0010(b)
+
+fn f_inv(b: vector[7]) -> scalar:
+    return f_000(b) & f_x0011(b)
+
+fn f_incr(b: vector[7]) -> scalar:
+    return f_000(b) & f_x0100(b)
+
+fn f_not(b: vector[7]) -> scalar:
+    return f_000(b) & f_x0101(b)
+
+fn f_fmpadd(b: vector[7]) -> scalar:
+    return f_000(b) & f_x0110(b)
+
+fn f_mload(b: vector[7]) -> scalar:
+    return f_000(b) & f_x0111(b)
+
+fn f_swap(b: vector[7]) -> scalar:
+    return f_000(b) & f_x1000(b)
+
+fn f_caller(b: vector[7]) -> scalar:
+    return f_000(b) & f_x1001(b)
+
+fn f_movup2(b: vector[7]) -> scalar:
+    return f_000(b) & f_x1010(b)
+
+fn f_movdn2(b: vector[7]) -> scalar:
+    return f_000(b) & f_x1011(b)
+
+fn f_movup3(b: vector[7]) -> scalar:
+    return f_000(b) & f_x1100(b)
+
+fn f_movdn3(b: vector[7]) -> scalar:
+    return f_000(b) & f_x1101(b)
+
+fn f_advpopw(b: vector[7]) -> scalar:
+    return f_000(b) & f_x1110(b)
+
+fn f_expacc(b: vector[7]) -> scalar:
+    return f_000(b) & f_x1111(b)
+
+
+fn f_movup4(b: vector[7]) -> scalar:
+    return f_001(b) & f_x0000(b)
+
+fn f_movdn4(b: vector[7]) -> scalar:
+    return f_001(b) & f_x0001(b)
+
+fn f_movup5(b: vector[7]) -> scalar:
+    return f_001(b) & f_x0010(b)
+
+fn f_movdn5(b: vector[7]) -> scalar:
+    return f_001(b) & f_x0011(b)
+
+fn f_movup6(b: vector[7]) -> scalar:
+    return f_001(b) & f_x0100(b)
+
+fn f_movdn6(b: vector[7]) -> scalar:
+    return f_001(b) & f_x0101(b)
+
+fn f_movup7(b: vector[7]) -> scalar:
+    return f_001(b) & f_x0110(b)
+
+fn f_movdn7(b: vector[7]) -> scalar:
+    return f_001(b) & f_x0111(b)
+
+fn f_swapw(b: vector[7]) -> scalar:
+    return f_001(b) & f_x1000(b)
+
+fn f_ext2mul(b: vector[7]) -> scalar:
+    return f_001(b) & f_x1001(b)
+
+fn f_movup8(b: vector[7]) -> scalar:
+    return f_001(b) & f_x1010(b)
+
+fn f_movdn8(b: vector[7]) -> scalar:
+    return f_001(b) & f_x1011(b)
+
+fn f_swapw2(b: vector[7]) -> scalar:
+    return f_001(b) & f_x1100(b)
+
+fn f_swapw3(b: vector[7]) -> scalar:
+    return f_001(b) & f_x1101(b)
+
+fn f_swapdw(b: vector[7]) -> scalar:
+    return f_001(b) & f_x1110(b)
+
+
+# Left stack shift operations
+
+fn f_assert(b: vector[7]) -> scalar:
+    return f_010(b) & f_x0000(b)
+
+fn f_eq(b: vector[7]) -> scalar:
+    return f_010(b) & f_x0001(b)
+
+fn f_add(b: vector[7]) -> scalar:
+    return f_010(b) & f_x0010(b)
+
+fn f_mul(b: vector[7]) -> scalar:
+    return f_010(b) & f_x0011(b)
+
+fn f_and(b: vector[7]) -> scalar:
+    return f_010(b) & f_x0100(b)
+
+fn f_or(b: vector[7]) -> scalar:
+    return f_010(b) & f_x0101(b)
+
+fn f_u32and(b: vector[7]) -> scalar:
+    return f_010(b) & f_x0110(b)
+
+fn f_u32xor(b: vector[7]) -> scalar:
+    return f_010(b) & f_x0111(b)
+
+fn f_frie2f4(b: vector[7]) -> scalar:
+    return f_010(b) & f_x1000(b)
+
+fn f_drop(b: vector[7]) -> scalar:
+    return f_010(b) & f_x1001(b)
+
+fn f_cswap(b: vector[7]) -> scalar:
+    return f_010(b) & f_x1010(b)
+
+fn f_cswapw(b: vector[7]) -> scalar:
+    return f_010(b) & f_x1011(b)
+
+fn f_mloadw(b: vector[7]) -> scalar:
+    return f_010(b) & f_x1100(b)
+
+fn f_mstore(b: vector[7]) -> scalar:
+    return f_010(b) & f_x1101(b)
+
+fn f_mstorew(b: vector[7]) -> scalar:
+    return f_010(b) & f_x1110(b)
+
+fn f_fmpupdate(b: vector[7]) -> scalar:
+    return f_010(b) & f_x1111(b)
+
+
+# Right stack shift operations
+
+fn f_pad(b: vector[7]) -> scalar:
+    return f_011(b) & f_x0000(b)
+
+fn f_dup(b: vector[7]) -> scalar:
+    return f_011(b) & f_x0001(b)
+
+fn f_dup1(b: vector[7]) -> scalar:
+    return f_011(b) & f_x0010(b)
+
+fn f_dup2(b: vector[7]) -> scalar:
+    return f_011(b) & f_x0011(b)
+
+fn f_dup3(b: vector[7]) -> scalar:
+    return f_011(b) & f_x0100(b)
+
+fn f_dup4(b: vector[7]) -> scalar:
+    return f_011(b) & f_x0101(b)
+
+fn f_dup5(b: vector[7]) -> scalar:
+    return f_011(b) & f_x0110(b)
+
+fn f_dup6(b: vector[7]) -> scalar:
+    return f_011(b) & f_x0111(b)
+
+fn f_dup7(b: vector[7]) -> scalar:
+    return f_011(b) & f_x1000(b)
+
+fn f_dup9(b: vector[7]) -> scalar:
+    return f_011(b) & f_x1001(b)
+
+fn f_dup11(b: vector[7]) -> scalar:
+    return f_011(b) & f_x1010(b)
+
+fn f_dup13(b: vector[7]) -> scalar:
+    return f_011(b) & f_x1011(b)
+
+fn f_dup15(b: vector[7]) -> scalar:
+    return f_011(b) & f_x1100(b)
+
+fn f_advpop(b: vector[7]) -> scalar:
+    return f_011(b) & f_x1101(b)
+
+fn f_sdepth(b: vector[7]) -> scalar:
+    return f_011(b) & f_x1110(b)
+
+fn f_clk(b: vector[7]) -> scalar:
+    return f_011(b) & f_x1111(b)
+
+
+# u32 operations
+
+fn f_u32add(b: vector[7]) -> scalar:
+    return f_u32rc(b) & !b[3] & !b[2] & !b[1]
+
+fn f_u32sub(b: vector[7]) -> scalar:
+    return f_u32rc(b) & !b[3] & !b[2] & b[1]
+
+fn f_u32mul(b: vector[7]) -> scalar:
+    return f_u32rc(b) & !b[3] & b[2] & !b[1]
+
+fn f_u32div(b: vector[7]) -> scalar:
+    return f_u32rc(b) & !b[3] & b[2] & b[1]
+
+fn f_u32split(b: vector[7]) -> scalar:
+    return f_u32rc(b) & b[3] & !b[2] & !b[1]
+
+fn f_u32assert2(b: vector[7]) -> scalar:
+    return f_u32rc(b) & b[3] & !b[2] & b[1]
+
+fn f_u32add3(b: vector[7]) -> scalar:
+    return f_u32rc(b) & b[3] & b[2] & !b[1]
+
+fn f_madd(b: vector[7]) -> scalar:
+    return f_u32rc(b) & b[3] & b[2] & b[1]
+
+
+# High-degree operations
+
+fn f_hperm(b: vector[7]) -> scalar:
+    return f_101(b) & !b[3] & !b[2] & !b[1]
+
+fn f_mpverify(b: vector[7]) -> scalar:
+    return f_101(b) & !b[3] & !b[2] & b[1]
+
+fn f_pipe(b: vector[7]) -> scalar:
+    return f_101(b) & !b[3] & b[2] & !b[1]
+
+fn f_mstream(b: vector[7]) -> scalar:
+    return f_101(b) & !b[3] & b[2] & b[1]
+
+fn f_span(b: vector[7]) -> scalar:
+    return f_101(b) & b[3] & !b[2] & !b[1]
+
+fn f_join(b: vector[7]) -> scalar:
+    return f_101(b) & b[3] & !b[2] & b[1]
+
+fn f_split(b: vector[7]) -> scalar:
+    return f_101(b) & b[3] & b[2] & !b[1]
+
+fn f_loop(b: vector[7]) -> scalar:
+    return f_101(b) & b[3] & b[2] & b[1]
+
+
+# Very high-degree operations
+
+fn f_mrupdate(b: vector[7], extra: scalar) -> scalar:
+    return extra & !b[4] & !b[3] & !b[2]
+
+fn f_push(b: vector[7], extra: scalar) -> scalar:
+    return extra & !b[4] & !b[3] & b[2]
+
+fn f_syscall(b: vector[7], extra: scalar) -> scalar:
+    return extra & !b[4] & b[3] & !b[2]
+
+fn f_call(b: vector[7], extra: scalar) -> scalar:
+    return extra & !b[4] & b[3] & b[2]
+
+fn f_end(b: vector[7], extra: scalar) -> scalar:
+    return extra & b[4] & !b[3] & !b[2]
+
+fn f_repeat(b: vector[7], extra: scalar) -> scalar:
+    return extra & b[4] & !b[3] & b[2]
+
+fn f_respan(b: vector[7], extra: scalar) -> scalar:
+    return extra & b[4] & b[3] & !b[2]
+
+fn f_halt(b: vector[7], extra: scalar) -> scalar:
+    return extra & b[4] & b[3] & b[2]
+
+
+# Composite flags
+
+fn f_shr(b: vector[7], extra: scalar) -> scalar:
+    return !b[6] & b[5] & b[4] + f_u32split(b) + f_push(b, extra)
+
+fn f_shl(b: vector[7], extra: scalar, h5: scalar) -> scalar:
+    let f_add3_mad = b[6] & !b[5] & !b[4] & b[3] & b[2]
+    let f_split_loop = b[6] & !b[5] & b[4] & b[3] & b[2]
+    return !b[6] & b[5] & !b[4] + f_add3_mad + f_split_loop + f_repeat(b, extra) + f_end(b, extra) * h5 
+
+fn f_ctrl(b: vector[7], extra: scalar) -> scalar:
+    # flag for SPAN, JOIN, SPLIT, LOOP
+    let f_sjsl = b[6] & !b[5] & b[4] & b[3]
+
+    # flag for END, REPEAT, RESPAN, HALT
+    let f_errh = b[6] & b[5] & b[4]
+
+    return f_sjsl + f_errh + f_call(b, extra) + f_syscall(b, extra)
+
+
+### Helper evaluators #############################################################################
+
+# Enforces that the provided columns must be zero.
+ev is_zero(main: [values[4]]):
+    enf v = 0 for v in values
+
+
+# Enforces that values in the columns in the current row must be equal to the values in the next 
+# row.
+ev is_unchanged(main: [values[4]]):
+    enf v' = v for v in values
+
+
+# Enforces that the provided columns must be binary.
+ev is_binary(main: [a]):
+    enf a^2 = a
+
+
+0######################################################################
+
+# Enforces the constraints on the stack.
+# TODO: add docs for columns
+ev stack_constraints(main: [stack[16], bookkeeping[2], helper], aux: [op_bits[7], extra, hasher5]):
