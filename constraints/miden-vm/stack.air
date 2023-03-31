@@ -379,6 +379,10 @@ fn f_ctrl(b: vector[7], extra: scalar) -> scalar:
     return f_sjsl + f_errh + f_call(b, extra) + f_syscall(b, extra)
 
 
+fn binary_check_sub(elem: scalar) -> scalar:
+    return elem^2 - elem
+
+
 ### Helper evaluators #############################################################################
 
 # Enforces that the provided columns must be zero.
@@ -392,16 +396,16 @@ ev is_unchanged(main: [values[4]]):
     enf v' = v for v in values
 
 
-# Enforces that the provided columns must be binary.
-ev is_binary(main: [a]):
-    enf a^2 = a
+ev range_check_16bit()
 
 
-0######################################################################
+### Stack Air Constraints #########################################################################
 
 # Enforces the constraints on the stack.
 # TODO: add docs for columns
 # ev stack_constraints(main: [stack[16], bookkeeping[2], helper], aux: [op_bits[7], extra, hasher5]):
+
+# No stack shift operations
 
 ev noop(main: [s[16]], aux: [b[7]]):
     enf f_dup(b) * delta(elem) = 0 for elem in stack
@@ -424,7 +428,7 @@ ev incr(main: [s[16]], aux: [b[7]]):
     enf f_incr(b) * delta(s[i]) = 0 for i in 1..16
 
 ev not(main: [s[16]], aux: [b[7]]):
-    enf f_not(b) * is_binary([s[0]])
+    enf f_not(b) * binary_check_sub(s[0])
     enf f_not(b) * (s[0]' - !s[0]) = 0
     enf f_not(b) * delta(s[i]) = 0 for i in 1..16
 
@@ -474,7 +478,7 @@ ev advpopw(main: [s[16]], aux: [b[7]]):
     enf f_advpopw(b) * delta(s[i]) = 0 for i in 4..16
 
 ev expacc(main: [s[16]], aux: [b[7], helper]):
-    enf f_expacc(b) * is_binary(s[0]')
+    enf f_expacc(b) * binary_check_sub(s[0]')
     enf f_expacc(b) * (s[1]' - s[1]^2) = 0
     enf f_expacc(b) * (helper - ((s[1] - 1) * s[0]' + 1)) = 0
     enf f_expacc(b) * (s[2]' - s[2] * helper) = 0
@@ -559,3 +563,153 @@ ev swapw3(main: [s[16]], aux: [b[7]]):
 ev swapdw(main: [s[16]], aux: [b[7]]):
     enf f_swapdw(b) * (s[i]' - s[i + 8]) = 0 for i in 0..8
     enf f_swapdw(b) * (s[i + 8]' - s[i]) = 0 for i in 0..8
+
+
+# Left stack shift operationds
+
+ev assert(main: [s[16]], aux: [b[7]]):
+    enf f_assert(b) * (s[0] - 1) = 0
+    enf f_assert(b) * (s[i]' - s[i + 1]) = 0 for i in 0..15
+
+ev eq(main: [s[16]], aux: [b[7], helper]):
+    enf f_eq(b) * (s[0]' * (s[0] - s[1])) = 0
+    enf f_eq(b) * (s[0]' - (1 - (s[0] - s[1]) * helper)) = 0
+    enf f_eq(b) * (s[i]' - s[i + 1]) = 0 for i in 1..15
+
+ev add(main: [s[16]], aux: [b[7]]):
+    enf f_add(b) * (s[0]' - (s[0] + s[1])) = 0
+    enf f_eq(b) * (s[i]' - s[i + 1]) = 0 for i in 1..15
+
+ev mul(main: [s[16]], aux: [b[7]]):
+    enf f_mul(b) * (s[0]' - s[0] * s[1]) = 0
+    enf f_mul(b) * (s[i]' - s[i + 1]) = 0 for i in 1..15
+
+ev and(main: [s[16]], aux: [b[7]]):
+    enf f_and(b) * binary_check_sub(s[i]) = 0 for i in 0..2
+    enf f_and(b) * (s[0]' - s[0] * s[1]) = 0
+    enf f_and(b) * (s[i]' - s[i + 1]) = 0 for i in 1..15
+
+ev or(main: [s[16]], aux: [b[7]]):
+    enf f_or(b) * binary_check_sub(s[i]) = 0 for i in 0..2
+    enf f_or(b) * (s[0]' - (s[1] + s[0] - s[1] * s[0])) = 0
+    enf f_or(b) * (s[i]' - s[i + 1]) = 0 for i in 1..15
+
+ev u32and(main: [s[16]], aux: [b[7], b_chip]):
+    let op_u32and = 2
+    enf f_u32and(b) * b_chip' * (alpha[0] + alpha[1] * op_u32and + alpha[2] * s[0] + alpha[3] * s[1] + alpha[4] * s[0]') = b_chip
+    enf f_u32and(b) * (s[i]' - s[i + 1]) = 0 for i in 1..15
+
+ev u32xor(main: [s[16]], aux: [b[7], b_chip]):
+    let op_u32xor = 6
+    enf f_u32xor(b) * b_chip' * (alpha[0] + alpha[1] * op_u32xor + alpha[2] * s[0] + alpha[3] * s[1] + alpha[4] * s[0]') = b_chip
+    enf f_u32xor(b) * (s[i]' - s[i + 1]) = 0 for i in 1..15
+
+# TODO: add constraints
+ev frie2f4(main: [s[16]], aux: [b[7]]):
+
+
+ev drop(main: [s[16]], aux: [b[7]]):
+    enf f_drop(b) * (s[i]' - s[i + 1]) = 0 for i in 0..15
+
+ev cswap(main: [s[16]], aux: [b[7]]):
+    enf f_cswap(b) * binary_check_sub(s[0]) = 0
+    enf f_cswap(b) * (s[0]' - s[0] * s[2] - (1 - s[0]) * s[1]) = 0
+    enf f_cswap(b) * (s[1]' - s[0] * s[1] - (1 - s[0]) * s[2]) = 0
+    enf f_cswap(b) * (s[i]' - s[i + 1]) = 0 for i in 2..15
+
+ev cswapw(main: [s[16]], aux: [b[7]]):
+    enf f_cswapw(b) * binary_check_sub(s[0]) = 0
+    enf f_cswapw(b) * (s[i]' - s[0] * s[i + 5] - (1 - s[0]) * s[i + 1]) = 0 for i in 0..4
+    enf f_cswapw(b) * (s[i + 4]' - s[0] * s[i + 1] + (1 - s[0]) * s[i + 5]) = 0 for i in 0..4
+    enf f_cswapw(b) * (s[i]' - s[i + 1]) = 0 for i in 8..15
+
+ev mloadw(main: [s[16]], aux: [b[7], b_chip, clk]):
+    let v = sum([alpha[i + 5] * s[3 - i]' for i in 0..4])
+    let op_mem_read = 12
+    let u_mem = alpha[0] + alpha[1] * op_mem_read + alpha[3] * s[0] + alpha[4] * clk + v
+    enf f_mloadw(b) * (b_chip' * u_mem - b_chip) = 0
+    enf f_mloadw(b) * (s[i]' - s[i + 1]) = 0 for i in 4..15
+
+ev mstore(main: [s[16]], aux: [b[7], helper[3], clk, b_chip]):
+    let v = alpha[5] * s[0]' + sum([alpha[i + 5] * helper[3 - i]' for i in 1..4])
+    let op_mem_write = 4
+    let u_mem = alpha[0] + alpha[1] * op_mem_write + alpha[3] * s[0] + alpha[4] * clk + v
+    enf f_mstore(b) * (b_chip' * u_mem - b_chip) = 0
+    enf f_mstore(b) * (s[i]' - s[i + 1]) = 0 for i in 0..15
+
+ev mstorew(main: [s[16]], aux: [b[7]]):
+    let v = sum([alpha[i + 5] * s[3 - i]']) for i in 0..4
+    let op_mem_write = 4
+    let u_mem = alpha[0] + alpha[1] * op_mem_write + alpha[3] * s[0] + alpha[4] * clk + v
+    enf f_mstorew(b) * (b_chip' * u_mem - b_chip) = 0
+    enf f_mstore(b) * (s[i]' - s[i + 1]) = 0 for i in 0..15
+
+ev fmpupdate(main: [s[16]], aux: [b[7], fmp]):
+    enf f_fmpupdate(b) * (fmp' - (fmp + s[0])) = 0
+    enf f_fmpupdate(b) * (s[i]' - s[i + 1]) = 0 for i in 0..15
+
+
+# Right stack shift operations
+
+ev pad(main: [s[16]], aux: [b[7]]):
+    enf f_pad(b) * s[0]' = 0
+    enf f_pad(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup(main: [s[16]], aux: [b[7]]):
+    enf f_dup(b) * (s[0]' - s[0]) = 0
+    enf f_dup(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup1(main: [s[16]], aux: [b[7]]):
+    enf f_dup1(b) * (s[0]' - s[1]) = 0
+    enf f_dup1(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup2(main: [s[16]], aux: [b[7]]):
+    enf f_dup2(b) * (s[0]' - s[2]) = 0
+    enf f_dup2(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup3(main: [s[16]], aux: [b[7]]):
+    enf f_dup3(b) * (s[0]' - s[3]) = 0
+    enf f_dup3(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup4(main: [s[16]], aux: [b[7]]):
+    enf f_dup4(b) * (s[0]' - s[4]) = 0
+    enf f_dup4(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup5(main: [s[16]], aux: [b[7]]):
+    enf f_dup5(b) * (s[0]' - s[5]) = 0
+    enf f_dup5(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup6(main: [s[16]], aux: [b[7]]):
+    enf f_dup6(b) * (s[0]' - s[6]) = 0
+    enf f_dup6(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup7(main: [s[16]], aux: [b[7]]):
+    enf f_dup7(b) * (s[0]' - s[7]) = 0
+    enf f_dup7(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup9(main: [s[16]], aux: [b[7]]):
+    enf f_dup9(b) * (s[0]' - s[9]) = 0
+    enf f_dup9(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup11(main: [s[16]], aux: [b[7]]):
+    enf f_dup11(b) * (s[0]' - s[11]) = 0
+    enf f_dup11(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup13(main: [s[16]], aux: [b[7]]):
+    enf f_dup13(b) * (s[0]' - s[13]) = 0
+    enf f_dup13(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev dup15(main: [s[16]], aux: [b[7]]):
+    enf f_dup15(b) * (s[0]' - s[15]) = 0
+    enf f_dup15(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev advpop(main: [s[16]], aux: [b[7]]):
+    enf f_advpop(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev sdepth(main: [s[16], bookkeeping[2]], aux: [b[7]]):
+    enf f_sdepth(b) * (s[0]' - b[0]) = 0
+    enf f_sdepth(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
+
+ev clk(main: [s[16]], aux: [b[7], clk]):
+    enf f_clk(b) * (s[0]' - clk) = 0
+    enf f_clk(b) * (s[i + 1]' - s[i]) = 0 for i in 0..15
