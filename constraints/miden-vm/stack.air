@@ -401,4 +401,161 @@ ev is_binary(main: [a]):
 
 # Enforces the constraints on the stack.
 # TODO: add docs for columns
-ev stack_constraints(main: [stack[16], bookkeeping[2], helper], aux: [op_bits[7], extra, hasher5]):
+# ev stack_constraints(main: [stack[16], bookkeeping[2], helper], aux: [op_bits[7], extra, hasher5]):
+
+ev noop(main: [s[16]], aux: [b[7]]):
+    enf f_dup(b) * delta(elem) = 0 for elem in stack
+
+ev eqz(main: [s[16], helper], aux: [b[7]]):
+    enf f_eqz(b) * (s[0]' * s[0]) = 0
+    enf f_eqz(b) * (s[0]' - (1 - s[0] * helper))
+    enf f_eqz(b) * delta(s[i]) = 0 for i in 1..16
+
+ev neg(main: [s[16]], aux: [b[7]]):
+    enf f_neg(b) * (s[0]' + s[0]) = 0
+    enf f_neg(b) * delta(s[i]) = 0 for i in 1..16
+
+ev inv(main: [s[16]], aux: [b[7]]):
+    enf f_inv(b) * (1 - s[0]' * s[0]) = 0
+    enf f_inv(b) * delta(s[i]) = 0 for i in 1..16
+
+ev incr(main: [s[16]], aux: [b[7]]):
+    enf f_incr(b) * (s[0]' - s[0] - 1) = 0
+    enf f_incr(b) * delta(s[i]) = 0 for i in 1..16
+
+ev not(main: [s[16]], aux: [b[7]]):
+    enf f_not(b) * is_binary([s[0]])
+    enf f_not(b) * (s[0]' - !s[0]) = 0
+    enf f_not(b) * delta(s[i]) = 0 for i in 1..16
+
+ev fmpadd(main: [s[16]], aux: [b[7], fmp]):
+    enf f_fmpadd(b) * (s[0]' - s[0] - fmp) = 0
+    enf f_fmpadd(b) * delta(s[i]) = 0 for i in 1..16
+
+# WARNING: not sure that I got the constraint right
+# What are the "helper" columns? Is it just a different name for hasher decoder columns, or they 
+# are unique for i/o ops?
+ev mload(main: [s[16]], aux: [b[7], helper[3], clk, b_chip]):
+    let v = alpha[5] * s[0]' + sum([alpha[i + 5] * helper[3 - i]'])
+    let op_mem_read = 12
+    let u_mem = alpha[0] + alpha[1] * op_mem_read + alpha[3] * s[0] + alpha[4] * clk + v
+    enf f_mload(b) * (b_chip' * u_mem - b_chip) = 0
+    enf f_mload(b) * delta(s[i]) = 0 for i in 1..16
+
+ev swap(main: [s[16]], aux: [b[7]]):
+    enf f_swap(b) * (s[0]' - s[1]) = 0
+    enf f_swap(b) * (s[1]' - s[0]) = 0
+    enf f_swap(b) * delta(s[i]) = 0 for i in 2..16
+
+# TODO: add constraints
+ev caller(main: [s[16]], aux: [b[7]]):
+
+ev movup2(main: [s[16]], aux: [b[7]]):
+    enf f_movup2(b) * (s[0]' - s[2]) = 0
+    enf f_movup2(b) * (s[i + 1]' - s[i]) = 0 for i in 0..2
+    enf f_movup2(b) * delta(s[i]) = 0 for i in 3..16
+
+ev movdn2(main: [s[16]], aux: [b[7]]):
+    enf f_movdn2(b) * (s[2]' - s[0]) = 0
+    enf f_movdn2(b) * (s[i]' - s[i + 1]) = 0 for i in 0..2
+    enf f_movdn2(b) * delta(s[i]) = 0 for i in 3..16
+
+ev movup3(main: [s[16]], aux: [b[7]]):
+    enf f_movup3(b) * (s[0]' - s[3]) = 0
+    enf f_movup3(b) * (s[i + 1]' - s[i]) = 0 for i in 0..3
+    enf f_movup3(b) * delta(s[i]) = 0 for i in 4..16
+
+ev movdn3(main: [s[16]], aux: [b[7]]):
+    enf f_movdn3(b) * (s[3]' - s[0]) = 0
+    enf f_movdn3(b) * (s[i]' - s[i + 1]) = 0 for i in 0..3
+    enf f_movdn3(b) * delta(s[i]) = 0 for i in 4..16
+
+ev advpopw(main: [s[16]], aux: [b[7]]):
+    enf f_advpopw(b) * delta(s[i]) = 0 for i in 4..16
+
+ev expacc(main: [s[16]], aux: [b[7], helper]):
+    enf f_expacc(b) * is_binary(s[0]')
+    enf f_expacc(b) * (s[1]' - s[1]^2) = 0
+    enf f_expacc(b) * (helper - ((s[1] - 1) * s[0]' + 1)) = 0
+    enf f_expacc(b) * (s[2]' - s[2] * helper) = 0
+    enf f_expacc(b) * (s[3]' - (s[3] * 2 + s[0]')) = 0
+    enf f_expacc(b) * delta(s[i]) = 0 for i in 4..16
+
+ev movup4(main: [s[16]], aux: [b[7]]):
+    enf f_movup4(b) * (s[0]' - s[4]) = 0
+    enf f_movup4(b) * (s[i + 1]' - s[i]) = 0 for i in 0..4
+    enf f_movup4(b) * delta(s[i]) = 0 for i in 5..16
+
+ev movdn4(main: [s[16]], aux: [b[7]]):
+    enf f_movdn4(b) * (s[4]' - s[0]) = 0
+    enf f_movdn4(b) * (s[i]' - s[i + 1]) = 0 for i in 0..4
+    enf f_movdn4(b) * delta(s[i]) = 0 for i in 5..16
+
+ev movup5(main: [s[16]], aux: [b[7]]):
+    enf f_movup5(b) * (s[0]' - s[5]) = 0
+    enf f_movup5(b) * (s[i + 1]' - s[i]) = 0 for i in 0..5
+    enf f_movup5(b) * delta(s[i]) = 0 for i in 6..16
+
+ev movdn5(main: [s[16]], aux: [b[7]]):
+    enf f_movdn5(b) * (s[5]' - s[0]) = 0
+    enf f_movdn5(b) * (s[i]' - s[i + 1]) = 0 for i in 0..5
+    enf f_movdn5(b) * delta(s[i]) = 0 for i in 6..16
+
+ev movup6(main: [s[16]], aux: [b[7]]):
+    enf f_movup6(b) * (s[0]' - s[6]) = 0
+    enf f_movup6(b) * (s[i + 1]' - s[i]) = 0 for i in 0..6
+    enf f_movup6(b) * delta(s[i]) = 0 for i in 7..16
+
+ev movdn6(main: [s[16]], aux: [b[7]]):
+    enf f_movdn6(b) * (s[6]' - s[0]) = 0
+    enf f_movdn6(b) * (s[i]' - s[i + 1]) = 0 for i in 0..6
+    enf f_movdn6(b) * delta(s[i]) = 0 for i in 7..16
+
+ev movup7(main: [s[16]], aux: [b[7]]):
+    enf f_movup7(b) * (s[0]' - s[7]) = 0
+    enf f_movup7(b) * (s[i + 1]' - s[i]) = 0 for i in 0..7
+    enf f_movup7(b) * delta(s[i]) = 0 for i in 8..16
+
+ev movdn7(main: [s[16]], aux: [b[7]]):
+    enf f_movdn7(b) * (s[7]' - s[0]) = 0
+    enf f_movdn7(b) * (s[i]' - s[i + 1]) = 0 for i in 0..7
+    enf f_movdn7(b) * delta(s[i]) = 0 for i in 8..16
+
+ev swapw(main: [s[16]], aux: [b[7]]):
+    enf f_swapw(b) * (s[i]' - s[i + 4]) = 0 for i in 0..4
+    enf f_swapw(b) * (s[i + 4]' - s[i]) = 0 for i in 0..4
+    enf f_swapw(b) * delta(s[i]) = 0 for i in 8..16
+
+ev ext2mul(main: [s[16]], aux: [b[7]]):
+    enf f_ext2mul(b) * (s[0]' - s[0]) = 0
+    enf f_ext2mul(b) * (s[1]' - s[1]) = 0
+    enf f_ext2mul(b) * (s[2]' - (s[0] + s[1]) * (s[2] + s[3]) + s[0] * s[2]) = 0
+    enf f_ext2mul(b) * (s[3]' - s[1] * s[3] + 2 * s[0] * s[2]) = 0
+    enf f_ext2mul(b) * delta(s[i]) = 0 for i in 4..16
+
+ev movup8(main: [s[16]], aux: [b[7]]):
+    enf f_movup8(b) * (s[0]' - s[8]) = 0
+    enf f_movup8(b) * (s[i + 1]' - s[i]) = 0 for i in 0..8
+    enf f_movup8(b) * delta(s[i]) = 0 for i in 9..16
+
+ev movdn8(main: [s[16]], aux: [b[7]]):
+    enf f_movdn8(b) * (s[8]' - s[0]) = 0
+    enf f_movdn8(b) * (s[i]' - s[i + 1]) = 0 for i in 0..8
+    enf f_movdn8(b) * delta(s[i]) = 0 for i in 9..16
+
+ev swapw2(main: [s[16]], aux: [b[7]]):
+    enf f_swapw2(b) * (s[i]' - s[i + 8]) = 0 for i in 0..4
+    enf f_swapw2(b) * (s[i + 8]' - s[i]) = 0 for i in 0..4
+    enf f_swapw2(b) * delta(s[i]) = 0 for i in 4..8
+    enf f_swapw2(b) * delta(s[i]) = 0 for i in 12..16
+
+# Should we enforce that elements in position grater than 15 do not change? 
+ev swapw3(main: [s[16]], aux: [b[7]]):
+    enf f_swapw3(b) * (s[i]' - s[i + 12]) = 0 for i in 0..4
+    enf f_swapw3(b) * (s[i + 12]' - s[i]) = 0 for i in 0..4
+    enf f_swapw3(b) * delta(s[i]) = 0 for i in 4..12
+
+# Should we enforce that elements in position grater than 15 do not change? 
+ev swapdw(main: [s[16]], aux: [b[7]]):
+    enf f_swapdw(b) * (s[i]' - s[i + 8]) = 0 for i in 0..8
+    enf f_swapdw(b) * (s[i + 8]' - s[i]) = 0 for i in 0..8
