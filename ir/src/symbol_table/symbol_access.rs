@@ -33,11 +33,11 @@ pub(super) trait ValidateIdentifierAccess {
 impl ValidateIdentifierAccess for TraceBindingAccess {
     fn validate(&self, symbol: &Symbol) -> Result<(), SemanticError> {
         match symbol.symbol_type() {
-            SymbolType::TraceColumns(columns) => {
-                if self.col_offset() >= columns.size() {
+            SymbolType::TraceColumns(trace_binding) | SymbolType::Parameter(trace_binding) => {
+                if self.col_offset() >= trace_binding.size() {
                     return Err(SemanticError::named_trace_column_access_out_of_bounds(
                         self,
-                        columns.size(),
+                        trace_binding.size(),
                     ));
                 }
             }

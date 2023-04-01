@@ -7,7 +7,9 @@ pub use parser::ast;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod constraint_builder;
-use constraint_builder::{ConstrainedBoundary, ConstraintBuilder};
+use constraint_builder::{
+    ConstrainedBoundary, ConstraintBuilder, ConstraintBuilderContext, Evaluator,
+};
 
 pub mod constraints;
 use constraints::{
@@ -60,6 +62,7 @@ impl AirIR {
         // uniqueness.
         let mut symbol_table = SymbolTable::default();
         let mut validator = SourceValidator::new();
+        let mut eval_exprs = Vec::new();
         let mut boundary_stmts = Vec::new();
         let mut integrity_stmts = Vec::new();
 
@@ -72,15 +75,15 @@ impl AirIR {
                 ast::SourceSection::Constant(constant) => {
                     symbol_table.insert_constant(constant)?;
                 }
-                ast::SourceSection::Trace(columns) => {
-                    // process & validate the main trace columns
-                    symbol_table.insert_trace_columns(0, &columns[0])?;
-                    validator.exists("main_trace_columns");
-                    if columns.len() > 1 {
-                        // process & validate the auxiliary trace columns
-                        symbol_table.insert_trace_columns(1, &columns[1])?;
+                ast::SourceSection::Trace(trace_bindings) => {
+                    if !trace_bindings.is_empty() {
+                        validator.exists("main_trace_columns");
+                    }
+                    if trace_bindings.len() > 1 {
                         validator.exists("aux_trace_columns");
                     }
+                    // process & validate the trace bindings
+                    symbol_table.insert_trace_bindings(trace_bindings)?;
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
                     // process & validate the public inputs
@@ -105,7 +108,7 @@ impl AirIR {
                     integrity_stmts.extend(stmts);
                     validator.exists("integrity_constraints");
                 }
-                ast::SourceSection::EvaluatorFunction(_) => todo!(),
+                ast::SourceSection::EvaluatorFunction(eval_expr) => eval_exprs.push(eval_expr),
             }
         }
 
@@ -113,12 +116,23 @@ impl AirIR {
         validator.check()?;
 
         // process the variable & constraint statements, and validate them against the symbol table.
-        let mut constraint_builder = ConstraintBuilder::new(symbol_table);
-        constraint_builder.insert_boundary_constraints(boundary_stmts)?;
-        constraint_builder.insert_integrity_constraints(integrity_stmts)?;
 
-        let (declarations, constraints) = constraint_builder.into_air();
+        // process evaluators
+        let mut evaluators: BTreeMap<String, Evaluator> = BTreeMap::new();
+        for eval_expr in eval_exprs {
+            let mut constraint_builder =
+                ConstraintBuilder::new(symbol_table.clone(), evaluators.clone());
 
+            let (name, trace_params, integrity_stmts) = eval_expr.into_parts();
+            constraint_builder.process_evaluator(trace_params, integrity_stmts)?;
+            let evaluator = constraint_builder.into_evaluator()?;
+            evaluators.insert(name, evaluator);
+        }
+
+        // process constraint sections
+        let mut constraint_builder = ConstraintBuilder::new(symbol_table, evaluators);
+        constraint_builder.insert_constraints(boundary_stmts, integrity_stmts)?;
+        let (declarations, constraints) = constraint_builder.into_air()?;
         Ok(Self {
             air_name,
             declarations,

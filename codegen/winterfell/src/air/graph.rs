@@ -141,6 +141,9 @@ impl Codegen for Value {
             Value::TraceElement(trace_access) => {
                 trace_access.to_string(ir, elem_type, trace_segment)
             }
+            Value::Parameter(_) => {
+                unreachable!("Parameters should be replaced with their values before codegen.")
+            }
             Value::PeriodicColumn(col_idx, _) => {
                 format!("periodic_values[{col_idx}]")
             }

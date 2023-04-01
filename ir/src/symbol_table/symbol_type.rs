@@ -1,4 +1,4 @@
-use super::{ConstantType, TraceColumns, VariableType};
+use super::{ConstantType, TraceBinding, VariableType};
 use std::fmt::Display;
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -7,7 +7,9 @@ pub(crate) enum SymbolType {
     Constant(ConstantType),
     /// an identifier for a trace column, containing trace column information with its trace
     /// segment, its size and its offset.
-    TraceColumns(TraceColumns),
+    TraceColumns(TraceBinding),
+    /// TODO: docs
+    Parameter(TraceBinding),
     /// an identifier for a public input, containing the size of the public input array
     PublicInput(usize),
     /// an identifier for a periodic column, containing its index out of all periodic columns and
@@ -24,11 +26,12 @@ impl Display for SymbolType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Constant(_) => write!(f, "Constant"),
-            Self::PublicInput(_) => write!(f, "PublicInput"),
-            Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
             Self::TraceColumns(columns) => {
                 write!(f, "TraceColumns in segment {}", columns.trace_segment())
             }
+            Self::Parameter(_) => write!(f, "Parameter"),
+            Self::PublicInput(_) => write!(f, "PublicInput"),
+            Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
             Self::Variable(_) => write!(f, "Variable"),
             Self::RandomValuesBinding(_, _) => write!(f, "RandomValuesBinding"),
         }

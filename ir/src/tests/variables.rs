@@ -242,7 +242,6 @@ fn err_variable_def_in_other_section() {
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::new(parsed);
-    println!("{result:?}");
     assert!(result.is_err());
 
     let source = "

@@ -64,6 +64,14 @@ fn bitwise() {
 
     let expected = expect_file!["bitwise/bitwise.rs"];
     expected.assert_eq(&generated_air);
+
+    // bitwise constraints using evaluator should generate the same code
+    let generated_air = Test::new("tests/bitwise/bitwise_with_evaluator.air".to_string())
+        .transpile()
+        .unwrap();
+
+    let expected = expect_file!["bitwise/bitwise.rs"];
+    expected.assert_eq(&generated_air);
 }
 
 #[test]

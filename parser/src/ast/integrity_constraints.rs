@@ -40,4 +40,9 @@ impl IntegrityConstraint {
     pub fn rhs(&self) -> &Expression {
         &self.rhs
     }
+
+    /// Returns the left-hand side and right-hand side of the integrity constraint as a tuple.
+    pub fn into_parts(self) -> (Expression, Expression) {
+        (self.lhs, self.rhs)
+    }
 }

@@ -1,6 +1,5 @@
 use super::{parse, AirIR};
 
-#[ignore]
 #[test]
 fn simple_evaluator() {
     let source = "
@@ -24,7 +23,6 @@ fn simple_evaluator() {
     assert!(result.is_ok());
 }
 
-#[ignore]
 #[test]
 fn evaluator_with_main_and_aux_cols() {
     let source = "
@@ -51,7 +49,6 @@ fn evaluator_with_main_and_aux_cols() {
     assert!(result.is_ok());
 }
 
-#[ignore]
 #[test]
 fn ev_call_inside_evaluator() {
     let source = "

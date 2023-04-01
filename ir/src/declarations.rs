@@ -10,7 +10,7 @@ pub type PeriodicColumn = Vec<u64>;
 // ================================================================================================
 
 /// TODO: docs
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub(super) struct Declarations {
     /// A vector of constants declared in the AirScript module.
     constants: Vec<Constant>,

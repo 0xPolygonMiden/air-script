@@ -1,6 +1,8 @@
+use crate::{constraints::Operation, NodeIndex};
+
 use super::{
-    AccessType, ConstrainedBoundary, ConstraintDomain, SymbolType, TraceAccess, TraceBindingAccess,
-    TraceSegment, MIN_CYCLE_LENGTH,
+    AccessType, ConstrainedBoundary, ConstraintBuilderContext, ConstraintDomain, SymbolType,
+    TraceAccess, TraceBindingAccess, TraceSegment, MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]
@@ -10,15 +12,18 @@ pub enum SemanticError {
     InvalidConstant(String),
     InvalidConstraint(String),
     InvalidConstraintDomain(String),
+    InvalidContext(String),
     InvalidIdentifier(String),
     InvalidListComprehension(String),
     InvalidListFolding(String),
+    InvalidParameterUsage(String),
     InvalidPeriodicColumn(String),
     InvalidTraceSegment(String),
     InvalidUsage(String),
     MissingDeclaration(String),
     OutOfScope(String),
     TooManyConstraints(String),
+    InvalidNodeReference(String),
 }
 
 impl SemanticError {
@@ -82,6 +87,16 @@ impl SemanticError {
 
     pub(crate) fn invalid_matrix_constant(name: &str) -> Self {
         SemanticError::InvalidConstant(format!("The matrix value of constant {name} is invalid"))
+    }
+
+    pub(crate) fn invalid_node_reference(
+        idx: NodeIndex,
+        referencing_node: Operation,
+    ) -> SemanticError {
+        SemanticError::InvalidNodeReference(format!(
+            "Invalid node reference: {:?} in node: {:?}",
+            idx, referencing_node
+        ))
     }
 
     // --- TYPE ERRORS ----------------------------------------------------------------------------
@@ -227,9 +242,12 @@ impl SemanticError {
         SemanticError::TooManyConstraints(format!("A constraint was already defined at {boundary}"))
     }
 
-    pub(crate) fn trace_segment_mismatch(segment: TraceSegment) -> Self {
+    pub(crate) fn boundary_constraint_trace_segment_mismatch(
+        lhs_segment: TraceSegment,
+        rhs_segment: TraceSegment,
+    ) -> Self {
         SemanticError::InvalidUsage(format!(
-            "The constraint expression cannot be enforced against trace segment {segment}"
+            "The boundary constraint lhs trace segment {lhs_segment} should not be less than rhs trace segment {rhs_segment}"
         ))
     }
 
@@ -247,6 +265,19 @@ impl SemanticError {
     ) -> SemanticError {
         SemanticError::InvalidListFolding(format!(
             "List folding value cannot be an empty list. {lf_value_type:?} represents an empty list.",
+        ))
+    }
+
+    pub(crate) fn undeclared_parameter(name: String) -> Self {
+        SemanticError::InvalidParameterUsage(format!("Parameter `{}` is not declared", name))
+    }
+
+    // --- INVALID CONTEXT ERRORS --------------------------------------------------------------
+
+    pub(crate) fn invalid_context(expected: &str, actual: ConstraintBuilderContext) -> Self {
+        SemanticError::InvalidContext(format!(
+            "Expected context `{}`, found `{}`",
+            expected, actual
         ))
     }
 }

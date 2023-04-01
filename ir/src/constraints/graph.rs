@@ -18,7 +18,7 @@ use super::{
 /// - Tip nodes with no incoming edges (no parent nodes) always represent constraints, although they
 ///   do not necessarily represent all constraints. There could be constraints which are also
 ///   subgraphs of other constraints.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct AlgebraicGraph {
     /// All nodes in the graph.
     nodes: Vec<Node>,
@@ -26,6 +26,11 @@ pub struct AlgebraicGraph {
 
 impl AlgebraicGraph {
     // --- PUBLIC ACCESSORS -----------------------------------------------------------------------
+
+    /// Returns all the nodes in the graph.
+    pub fn nodes(&self) -> &[Node] {
+        &self.nodes
+    }
 
     /// Returns the node with the specified index.
     pub fn node(&self, index: &NodeIndex) -> &Node {
@@ -54,6 +59,10 @@ impl AlgebraicGraph {
         match self.node(index).op() {
             Operation::Value(value) => match value {
                 Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
+                Value::Parameter(_) => {
+                    // TODO: error - graph isn't finalized if it contains parameter nodes
+                    todo!()
+                }
                 Value::PeriodicColumn(_, _) => {
                     if default_domain.is_boundary() {
                         return Err(SemanticError::invalid_periodic_column_access_in_bc());
@@ -113,6 +122,31 @@ impl AlgebraicGraph {
         )
     }
 
+    pub(crate) fn replace_value_node(&mut self, index: NodeIndex, value: Value) {
+        self.nodes[index.0] = Node {
+            op: Operation::Value(value),
+        };
+    }
+
+    pub fn insert_subgraph(
+        &mut self,
+        subgraph: &AlgebraicGraph,
+        constraint_nodes: &mut Vec<NodeIndex>,
+    ) -> Result<(), SemanticError> {
+        let mut idx_mapping: BTreeMap<NodeIndex, NodeIndex> = BTreeMap::new();
+        for (idx, node) in subgraph.nodes.iter().enumerate() {
+            let op = node.op.update_idx(&idx_mapping)?;
+            let new_node = Node { op };
+
+            let new_index = self.insert_node(new_node.op.clone());
+            idx_mapping.insert(NodeIndex(idx), new_index);
+        }
+        for constraint in constraint_nodes {
+            *constraint = idx_mapping[constraint];
+        }
+        Ok(())
+    }
+
     // --- HELPERS --------------------------------------------------------------------------------
 
     /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.
@@ -121,7 +155,7 @@ impl AlgebraicGraph {
         match self.node(index).op() {
             Operation::Value(value) => match value {
                 Value::Constant(_) | Value::RandomValue(_) | Value::PublicInput(_, _) => 0,
-                Value::TraceElement(_) => 1,
+                Value::Parameter(_) | Value::TraceElement(_) => 1,
                 Value::PeriodicColumn(index, cycle_len) => {
                     cycles.insert(*index, *cycle_len);
                     0
@@ -151,10 +185,10 @@ impl AlgebraicGraph {
 }
 
 /// Reference to a node in a graph by its index in the nodes vector of the graph struct.
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct NodeIndex(usize);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Node {
     /// The operation represented by this node
     op: Operation,
@@ -164,10 +198,18 @@ impl Node {
     pub fn op(&self) -> &Operation {
         &self.op
     }
+
+    pub fn value(&self) -> &Value {
+        if let Operation::Value(value) = &self.op {
+            value
+        } else {
+            unreachable!("node is not a value node");
+        }
+    }
 }
 
 /// An integrity constraint operation or value reference.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Operation {
     /// TODO: docs
     Value(Value),
@@ -190,6 +232,48 @@ impl Operation {
             Operation::Sub(_, _) => 2,
             Operation::Mul(_, _) => 3,
             _ => 4,
+        }
+    }
+
+    pub fn update_idx(
+        &self,
+        idx_mapping: &BTreeMap<NodeIndex, NodeIndex>,
+    ) -> Result<Self, SemanticError> {
+        match self {
+            Operation::Value(value) => Ok(Operation::Value(value.clone())),
+            Operation::Add(lhs, rhs) => {
+                let new_lhs = idx_mapping
+                    .get(lhs)
+                    .ok_or_else(|| SemanticError::invalid_node_reference(*lhs, self.clone()))?;
+                let new_rhs = idx_mapping
+                    .get(rhs)
+                    .ok_or_else(|| SemanticError::invalid_node_reference(*rhs, self.clone()))?;
+                Ok(Operation::Add(*new_lhs, *new_rhs))
+            }
+            Operation::Sub(lhs, rhs) => {
+                let new_lhs = idx_mapping
+                    .get(lhs)
+                    .ok_or_else(|| SemanticError::invalid_node_reference(*lhs, self.clone()))?;
+                let new_rhs = idx_mapping
+                    .get(rhs)
+                    .ok_or_else(|| SemanticError::invalid_node_reference(*rhs, self.clone()))?;
+                Ok(Operation::Sub(*new_lhs, *new_rhs))
+            }
+            Operation::Mul(lhs, rhs) => {
+                let new_lhs = idx_mapping
+                    .get(lhs)
+                    .ok_or_else(|| SemanticError::invalid_node_reference(*lhs, self.clone()))?;
+                let new_rhs = idx_mapping
+                    .get(rhs)
+                    .ok_or_else(|| SemanticError::invalid_node_reference(*rhs, self.clone()))?;
+                Ok(Operation::Mul(*new_lhs, *new_rhs))
+            }
+            Operation::Exp(lhs, rhs) => {
+                let new_lhs = idx_mapping
+                    .get(lhs)
+                    .ok_or_else(|| SemanticError::invalid_node_reference(*lhs, self.clone()))?;
+                Ok(Operation::Exp(*new_lhs, *rhs))
+            }
         }
     }
 }
