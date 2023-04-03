@@ -7,7 +7,9 @@ pub use parser::ast;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod constraint_builder;
-use constraint_builder::{ConstrainedBoundary, ConstraintBuilder};
+use constraint_builder::{
+    ConstrainedBoundary, ConstraintBuilder, ConstraintBuilderContext, Evaluator,
+};
 
 pub mod constraints;
 use constraints::{
@@ -115,10 +117,20 @@ impl AirIR {
 
         // process the variable & constraint statements, and validate them against the symbol table.
 
-        // TODO: process evaluators
+        // process evaluators
+        let mut evaluators: BTreeMap<String, Evaluator> = BTreeMap::new();
+        for eval_expr in eval_exprs {
+            let mut constraint_builder =
+                ConstraintBuilder::new(symbol_table.clone(), evaluators.clone());
+
+            let (name, trace_params, integrity_stmts) = eval_expr.into_parts();
+            constraint_builder.process_evaluator(trace_params, integrity_stmts)?;
+            let evaluator = constraint_builder.into_evaluator()?;
+            evaluators.insert(name, evaluator);
+        }
 
         // process constraint sections
-        let mut constraint_builder = ConstraintBuilder::new(symbol_table);
+        let mut constraint_builder = ConstraintBuilder::new(symbol_table, evaluators);
         constraint_builder.insert_constraints(boundary_stmts, integrity_stmts)?;
         let (declarations, constraints) = constraint_builder.into_air()?;
         Ok(Self {

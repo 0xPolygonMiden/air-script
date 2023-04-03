@@ -1,3 +1,5 @@
+use crate::symbol_table::{get_ev_name, TraceParameterAccess};
+
 use super::{
     get_variable_expr, AccessType, ConstantValue, ConstraintBuilder, ConstraintBuilderContext,
     Expression, ListFoldingType, NodeIndex, Operation, SemanticError, SymbolType, TraceAccess,
@@ -116,7 +118,16 @@ impl ConstraintBuilder {
         trace_access: TraceBindingAccess,
     ) -> Result<NodeIndex, SemanticError> {
         match &self.context {
-            ConstraintBuilderContext::EvaluatorFunction(_) => todo!(),
+            ConstraintBuilderContext::EvaluatorFunction(_) => {
+                let param_access = self.symbol_table.get_trace_param_access(&trace_access)?;
+                let node_index = self
+                    .insert_graph_node(Operation::Value(Value::Parameter(param_access.clone())));
+                if self.param_nodes.get(&param_access).is_none() {
+                    self.param_nodes.insert(param_access, node_index);
+                }
+
+                Ok(node_index)
+            }
             _ => {
                 let trace_access = self.symbol_table.get_trace_binding_access(&trace_access)?;
                 self.insert_trace_access(trace_access)
@@ -160,7 +171,28 @@ impl ConstraintBuilder {
         access_type: AccessType,
     ) -> Result<NodeIndex, SemanticError> {
         if matches!(self.context, ConstraintBuilderContext::EvaluatorFunction(_)) {
-            todo!()
+            let param_name = get_ev_name(name);
+            let symbol = self
+                .symbol_table
+                .get_symbol(param_name.as_str())
+                .or_else(|_| self.symbol_table.get_symbol(name))?;
+            if let SymbolType::Parameter(trace_binding) = symbol.symbol_type() {
+                // Does the actual values matter here since this will be overwritten
+                let param_access = TraceParameterAccess::new(
+                    trace_binding.name().to_string(),
+                    trace_binding.trace_segment(),
+                    trace_binding.offset(),
+                    0,
+                );
+                let node_index = self
+                    .insert_graph_node(Operation::Value(Value::Parameter(param_access.clone())));
+
+                if self.param_nodes.get(&param_access).is_none() {
+                    self.param_nodes.insert(param_access, node_index);
+                }
+
+                return Ok(node_index);
+            }
         }
         let symbol = self.symbol_table.get_symbol(name)?;
         match symbol.symbol_type() {

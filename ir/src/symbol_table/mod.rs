@@ -1,8 +1,11 @@
 use super::{
     ast, BTreeMap, Constant, ConstantType, Declarations, Identifier, MatrixAccess, SemanticError,
-    TraceAccess, TraceBinding, TraceBindingAccess, Variable, VariableType, VectorAccess,
-    CURRENT_ROW, MIN_CYCLE_LENGTH,
+    TraceAccess, TraceBinding, TraceBindingAccess, TraceSegment, Variable, VariableType,
+    VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
+
+mod parameter;
+pub(crate) use parameter::TraceParameterAccess;
 
 mod symbol;
 pub(crate) use symbol::Symbol;
@@ -65,6 +68,19 @@ impl SymbolTable {
         }
 
         self.insert_symbol(name, SymbolType::Constant(constant_type))?;
+
+        Ok(())
+    }
+
+    /// TODO: docs
+    pub(super) fn insert_ev_parameters(
+        &mut self,
+        params: Vec<TraceBinding>,
+    ) -> Result<(), SemanticError> {
+        for param in params.into_iter() {
+            let param_name = get_ev_name(param.name());
+            self.insert_symbol(param_name, SymbolType::Parameter(param))?;
+        }
 
         Ok(())
     }
@@ -232,6 +248,24 @@ impl SymbolTable {
         ))
     }
 
+    /// TODO: docs
+    pub(crate) fn get_trace_param_access(
+        &self,
+        trace_access: &TraceBindingAccess,
+    ) -> Result<TraceParameterAccess, SemanticError> {
+        let param_name = get_ev_name(trace_access.name());
+        let symbol = self.get_symbol(&param_name)?;
+        trace_access.validate(symbol)?;
+
+        let SymbolType::Parameter(param) = symbol.symbol_type() else { unreachable!("validation of parameter access failed.") };
+        Ok(TraceParameterAccess::new(
+            param.name().to_string(),
+            param.trace_segment(),
+            trace_access.col_offset(),
+            trace_access.row_offset(),
+        ))
+    }
+
     /// Gets the number of trace segments that were specified for this AIR.
     pub(super) fn num_trace_segments(&self) -> usize {
         self.declarations.num_trace_segments()
@@ -282,4 +316,8 @@ fn validate_cycles(column: &ast::PeriodicColumn) -> Result<(), SemanticError> {
     }
 
     Ok(())
+}
+
+pub fn get_ev_name(name: &str) -> String {
+    format!("__EV__{}", name)
 }

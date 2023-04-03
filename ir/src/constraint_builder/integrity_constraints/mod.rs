@@ -37,7 +37,32 @@ impl ConstraintBuilder {
                     self.symbol_table.insert_variable(variable)?
                 }
             }
-            IntegrityStmt::Constraint(ConstraintType::Evaluator(_), _) => todo!(),
+            IntegrityStmt::Constraint(ConstraintType::Evaluator(ev_call), _) => {
+                let (name, args) = ev_call.into_parts();
+
+                // ensure the evaluator exists
+                let evaluator = self.evaluators.get(&name);
+                match evaluator {
+                    Some(evaluator) => {
+                        // check the arguments against the symbol table and turn them into [TraceAccess].
+                        let mut accesses = Vec::new();
+                        for segment in args.into_iter() {
+                            for binding in segment.into_iter() {
+                                let access =
+                                    self.symbol_table.get_trace_binding_access(&binding)?;
+                                accesses.push(access);
+                            }
+                        }
+                        // apply the evaluator to the arguments and return the resulting graph
+                        let (_subgraph, _constraint_nodes) = evaluator.apply(accesses)?;
+
+                        // TODO: insert the subgraph into the main graph and save the entry node index
+                    }
+                    None => {
+                        todo!("Error");
+                    }
+                }
+            }
             IntegrityStmt::ConstraintComprehension(_, _, _) => todo!(),
         }
 

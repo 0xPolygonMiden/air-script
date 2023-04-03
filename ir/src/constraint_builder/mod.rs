@@ -1,6 +1,9 @@
 use std::fmt;
 
-use crate::constraints::{AlgebraicGraph, NodeIndex, Operation};
+use crate::{
+    constraints::{AlgebraicGraph, NodeIndex, Operation},
+    symbol_table::TraceParameterAccess,
+};
 
 use super::{
     ast, AccessType, BTreeMap, BTreeSet, ConstantType, ConstantValue, ConstraintDomain,
@@ -13,6 +16,9 @@ use super::{
 mod boundary_constraints;
 use air_script_core::TraceBinding;
 pub(crate) use boundary_constraints::ConstrainedBoundary;
+
+mod evaluators;
+pub(crate) use evaluators::Evaluator;
 
 mod expression;
 
@@ -57,6 +63,12 @@ pub(super) struct ConstraintBuilder {
     /// than one constraint is defined at any given boundary.
     constrained_boundaries: BTreeSet<ConstrainedBoundary>,
 
+    /// TODO: docs
+    evaluators: BTreeMap<String, Evaluator>,
+
+    /// TODO: docs (for evaluators)
+    param_nodes: BTreeMap<TraceParameterAccess, NodeIndex>,
+
     // --- ACCUMULATED CONTEXT DATA ---------------------------------------------------------------
     /// A directed acyclic graph which represents all of the constraints and their subexpressions.
     graph: AlgebraicGraph,
@@ -72,14 +84,16 @@ pub(super) struct ConstraintBuilder {
 }
 
 impl ConstraintBuilder {
-    pub fn new(symbol_table: SymbolTable) -> Self {
+    pub fn new(symbol_table: SymbolTable, evaluators: BTreeMap<String, Evaluator>) -> Self {
         let num_trace_segments = symbol_table.num_trace_segments();
         Self {
             symbol_table,
 
             // context variables
             context: ConstraintBuilderContext::None,
+            param_nodes: BTreeMap::new(),
             constrained_boundaries: BTreeSet::new(),
+            evaluators,
 
             // accumulated data in the current context
             boundary_constraints: Vec::with_capacity(num_trace_segments),

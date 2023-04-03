@@ -1,7 +1,7 @@
 use super::{
     symbol_access::ValidateAccess, AccessType, ConstantType, ConstantValue, Identifier,
-    MatrixAccess, SemanticError, SymbolType, TraceAccess, TraceBinding, Value, VectorAccess,
-    CURRENT_ROW,
+    MatrixAccess, SemanticError, SymbolType, TraceAccess, TraceBinding, TraceParameterAccess,
+    Value, VectorAccess, CURRENT_ROW,
 };
 
 /// Symbol information for a constant, variable, trace column, periodic column, or public input.
@@ -30,6 +30,9 @@ impl Symbol {
         match self.symbol_type() {
             SymbolType::Constant(constant_type) => {
                 self.get_constant_value(constant_type, access_type)
+            }
+            SymbolType::Parameter(trace_binding) => {
+                self.get_parameter_value(trace_binding, access_type)
             }
             SymbolType::PeriodicColumn(index, cycle_len) => {
                 self.get_periodic_column_value(*index, *cycle_len, access_type)
@@ -169,6 +172,55 @@ impl Symbol {
                 let trace_access =
                     TraceAccess::new(trace_segment, columns.offset() + idx, 1, row_offset);
                 Ok(Value::TraceElement(trace_access))
+            }
+            _ => Err(SemanticError::invalid_trace_access_type(
+                self.name(),
+                access_type,
+            )),
+        }
+    }
+
+    pub fn get_parameter_value(
+        &self,
+        param: &TraceBinding,
+        access_type: &AccessType,
+    ) -> Result<Value, SemanticError> {
+        // symbol accesses at rows other than the first are identified by the parser as
+        // [NamedTraceAccess] and handled differently, so this case will only occur for
+        // trace column accesses at the current row.
+        // TODO: can we handle this differently so it's more explicit & get rid of this comment?
+        let row_offset = CURRENT_ROW;
+        match access_type {
+            AccessType::Default => {
+                if param.size() != 1 {
+                    return Err(SemanticError::invalid_trace_binding_access(self.name()));
+                }
+                let trace_segment = param.trace_segment();
+                let param_access = TraceParameterAccess::new(
+                    param.name().to_string(),
+                    trace_segment,
+                    0,
+                    row_offset,
+                );
+                Ok(Value::Parameter(param_access))
+            }
+            AccessType::Vector(idx) => {
+                if *idx >= param.size() {
+                    return Err(SemanticError::vector_access_out_of_bounds(
+                        self.name(),
+                        *idx,
+                        param.size(),
+                    ));
+                }
+
+                let trace_segment = param.trace_segment();
+                let param_access = TraceParameterAccess::new(
+                    param.name().to_string(),
+                    trace_segment,
+                    *idx,
+                    row_offset,
+                );
+                Ok(Value::Parameter(param_access))
             }
             _ => Err(SemanticError::invalid_trace_access_type(
                 self.name(),

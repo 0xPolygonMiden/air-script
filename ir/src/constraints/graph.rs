@@ -27,6 +27,11 @@ pub struct AlgebraicGraph {
 impl AlgebraicGraph {
     // --- PUBLIC ACCESSORS -----------------------------------------------------------------------
 
+    /// Returns all the nodes in the graph.
+    pub fn nodes(&self) -> &[Node] {
+        &self.nodes
+    }
+
     /// Returns the node with the specified index.
     pub fn node(&self, index: &NodeIndex) -> &Node {
         &self.nodes[index.0]
@@ -54,6 +59,10 @@ impl AlgebraicGraph {
         match self.node(index).op() {
             Operation::Value(value) => match value {
                 Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
+                Value::Parameter(_) => {
+                    // TODO: error - graph isn't finalized if it contains parameter nodes
+                    todo!()
+                }
                 Value::PeriodicColumn(_, _) => {
                     if default_domain.is_boundary() {
                         return Err(SemanticError::invalid_periodic_column_access_in_bc());
@@ -113,6 +122,12 @@ impl AlgebraicGraph {
         )
     }
 
+    pub(crate) fn replace_value_node(&mut self, index: NodeIndex, value: Value) {
+        self.nodes[index.0] = Node {
+            op: Operation::Value(value),
+        };
+    }
+
     // --- HELPERS --------------------------------------------------------------------------------
 
     /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.
@@ -121,7 +136,7 @@ impl AlgebraicGraph {
         match self.node(index).op() {
             Operation::Value(value) => match value {
                 Value::Constant(_) | Value::RandomValue(_) | Value::PublicInput(_, _) => 0,
-                Value::TraceElement(_) => 1,
+                Value::Parameter(_) | Value::TraceElement(_) => 1,
                 Value::PeriodicColumn(index, cycle_len) => {
                     cycles.insert(*index, *cycle_len);
                     0
@@ -151,7 +166,7 @@ impl AlgebraicGraph {
 }
 
 /// Reference to a node in a graph by its index in the nodes vector of the graph struct.
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct NodeIndex(usize);
 
 #[derive(Debug, Clone)]
@@ -164,10 +179,18 @@ impl Node {
     pub fn op(&self) -> &Operation {
         &self.op
     }
+
+    pub fn value(&self) -> &Value {
+        if let Operation::Value(value) = &self.op {
+            value
+        } else {
+            unreachable!("node is not a value node");
+        }
+    }
 }
 
 /// An integrity constraint operation or value reference.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Operation {
     /// TODO: docs
     Value(Value),

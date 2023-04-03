@@ -1,4 +1,4 @@
-use super::{MatrixAccess, TraceAccess, VectorAccess};
+use super::{MatrixAccess, TraceAccess, TraceParameterAccess, VectorAccess};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Value {
@@ -7,6 +7,8 @@ pub enum Value {
     /// An identifier for an element in the trace segment, column, and row offset specified by the
     /// [TraceAccess]
     TraceElement(TraceAccess),
+    /// TODO: docs
+    Parameter(TraceParameterAccess),
     /// An identifier for a periodic value from a specified periodic column. The first inner value
     /// is the index of the periodic column within the declared periodic columns. The second inner
     /// value is the length of the column's periodic cycle. The periodic value made available from

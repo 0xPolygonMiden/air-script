@@ -1,6 +1,6 @@
 use super::{
-    AccessType, ConstrainedBoundary, ConstraintDomain, SymbolType, TraceAccess, TraceBindingAccess,
-    TraceSegment, MIN_CYCLE_LENGTH,
+    AccessType, ConstrainedBoundary, ConstraintBuilderContext, ConstraintDomain, SymbolType,
+    TraceAccess, TraceBindingAccess, TraceSegment, MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]
@@ -21,7 +21,6 @@ pub enum SemanticError {
     MissingDeclaration(String),
     OutOfScope(String),
     TooManyConstraints(String),
-    InvalidNodeReference(String),
 }
 
 impl SemanticError {
@@ -253,6 +252,19 @@ impl SemanticError {
     ) -> SemanticError {
         SemanticError::InvalidListFolding(format!(
             "List folding value cannot be an empty list. {lf_value_type:?} represents an empty list.",
+        ))
+    }
+
+    pub(crate) fn undeclared_parameter(name: String) -> Self {
+        SemanticError::InvalidParameterUsage(format!("Parameter `{}` is not declared", name))
+    }
+
+    // --- INVALID CONTEXT ERRORS --------------------------------------------------------------
+
+    pub(crate) fn invalid_context(expected: &str, actual: ConstraintBuilderContext) -> Self {
+        SemanticError::InvalidContext(format!(
+            "Expected context `{}`, found `{}`",
+            expected, actual
         ))
     }
 }

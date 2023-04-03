@@ -8,6 +8,8 @@ pub(crate) enum SymbolType {
     /// an identifier for a trace column, containing trace column information with its trace
     /// segment, its size and its offset.
     TraceColumns(TraceBinding),
+    /// TODO: docs
+    Parameter(TraceBinding),
     /// an identifier for a public input, containing the size of the public input array
     PublicInput(usize),
     /// an identifier for a periodic column, containing its index out of all periodic columns and
@@ -27,6 +29,7 @@ impl Display for SymbolType {
             Self::TraceColumns(columns) => {
                 write!(f, "TraceColumns in segment {}", columns.trace_segment())
             }
+            Self::Parameter(_) => write!(f, "Parameter"),
             Self::PublicInput(_) => write!(f, "PublicInput"),
             Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
             Self::Variable(_) => write!(f, "Variable"),
