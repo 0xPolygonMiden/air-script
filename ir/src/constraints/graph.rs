@@ -59,10 +59,7 @@ impl AlgebraicGraph {
         match self.node(index).op() {
             Operation::Value(value) => match value {
                 Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
-                Value::Parameter(_) => {
-                    // TODO: error - graph isn't finalized if it contains parameter nodes
-                    todo!()
-                }
+                Value::Parameter(_) => unreachable!("parameters should have been replaced by now"),
                 Value::PeriodicColumn(_, _) => {
                     if default_domain.is_boundary() {
                         return Err(SemanticError::invalid_periodic_column_access_in_bc());
@@ -126,6 +123,24 @@ impl AlgebraicGraph {
         self.nodes[index.0] = Node {
             op: Operation::Value(value),
         };
+    }
+
+    pub fn insert_subgraph(
+        &mut self,
+        subgraph: &AlgebraicGraph,
+        constraint_nodes: &mut Vec<NodeIndex>,
+    ) {
+        let mut idx_mapping: BTreeMap<NodeIndex, NodeIndex> = BTreeMap::new();
+        for (idx, node) in subgraph.nodes.iter().enumerate() {
+            let op = node.op.update_idx(&idx_mapping);
+            let new_node = Node { op };
+
+            let new_index = self.insert_node(new_node.op.clone());
+            idx_mapping.insert(NodeIndex(idx), new_index);
+        }
+        for constraint in constraint_nodes {
+            *constraint = idx_mapping[constraint];
+        }
     }
 
     // --- HELPERS --------------------------------------------------------------------------------
@@ -213,6 +228,50 @@ impl Operation {
             Operation::Sub(_, _) => 2,
             Operation::Mul(_, _) => 3,
             _ => 4,
+        }
+    }
+
+    /// Update the node indices in the operation referencing the old indices in the subgraph to
+    /// match the new indices in the graph based on the provided mapping between old indices in the
+    /// subgraph and new indices in the constraint graph.
+    ///
+    /// Panics if the old indices are not found in the mapping.
+    pub fn update_idx(&self, idx_mapping: &BTreeMap<NodeIndex, NodeIndex>) -> Self {
+        match self {
+            Operation::Value(value) => Operation::Value(value.clone()),
+            Operation::Add(lhs, rhs) => {
+                let new_lhs = idx_mapping
+                    .get(lhs)
+                    .unwrap_or_else(|| panic!("node index {lhs:?} not found in mapping"));
+                let new_rhs = idx_mapping
+                    .get(rhs)
+                    .unwrap_or_else(|| panic!("node index {rhs:?} not found in mapping"));
+                Operation::Add(*new_lhs, *new_rhs)
+            }
+            Operation::Sub(lhs, rhs) => {
+                let new_lhs = idx_mapping
+                    .get(lhs)
+                    .unwrap_or_else(|| panic!("node index {lhs:?} not found in mapping"));
+                let new_rhs = idx_mapping
+                    .get(rhs)
+                    .unwrap_or_else(|| panic!("node index {rhs:?} not found in mapping"));
+                Operation::Sub(*new_lhs, *new_rhs)
+            }
+            Operation::Mul(lhs, rhs) => {
+                let new_lhs = idx_mapping
+                    .get(lhs)
+                    .unwrap_or_else(|| panic!("node index {lhs:?} not found in mapping"));
+                let new_rhs = idx_mapping
+                    .get(rhs)
+                    .unwrap_or_else(|| panic!("node index {rhs:?} not found in mapping"));
+                Operation::Mul(*new_lhs, *new_rhs)
+            }
+            Operation::Exp(lhs, rhs) => {
+                let new_lhs = idx_mapping
+                    .get(lhs)
+                    .unwrap_or_else(|| panic!("node index {lhs:?} not found in mapping"));
+                Operation::Exp(*new_lhs, *rhs)
+            }
         }
     }
 }

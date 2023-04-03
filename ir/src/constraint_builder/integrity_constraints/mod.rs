@@ -54,9 +54,13 @@ impl ConstraintBuilder {
                             }
                         }
                         // apply the evaluator to the arguments and return the resulting graph
-                        let (_subgraph, _constraint_nodes) = evaluator.apply(accesses)?;
+                        let (subgraph, mut constraint_nodes) = evaluator.apply(accesses)?;
 
-                        // TODO: insert the subgraph into the main graph and save the entry node index
+                        // insert the subgraph into the main graph and save the entry node index
+                        self.graph.insert_subgraph(&subgraph, &mut constraint_nodes);
+                        for constraint_node in constraint_nodes {
+                            self.integrity_constraints.push(constraint_node);
+                        }
                     }
                     None => {
                         todo!("Error");
