@@ -10,15 +10,18 @@ pub enum SemanticError {
     InvalidConstant(String),
     InvalidConstraint(String),
     InvalidConstraintDomain(String),
+    InvalidContext(String),
     InvalidIdentifier(String),
     InvalidListComprehension(String),
     InvalidListFolding(String),
+    InvalidParameterUsage(String),
     InvalidPeriodicColumn(String),
     InvalidTraceSegment(String),
     InvalidUsage(String),
     MissingDeclaration(String),
     OutOfScope(String),
     TooManyConstraints(String),
+    InvalidNodeReference(String),
 }
 
 impl SemanticError {
@@ -227,9 +230,12 @@ impl SemanticError {
         SemanticError::TooManyConstraints(format!("A constraint was already defined at {boundary}"))
     }
 
-    pub(crate) fn trace_segment_mismatch(segment: TraceSegment) -> Self {
+    pub(crate) fn boundary_constraint_trace_segment_mismatch(
+        lhs_segment: TraceSegment,
+        rhs_segment: TraceSegment,
+    ) -> Self {
         SemanticError::InvalidUsage(format!(
-            "The constraint expression cannot be enforced against trace segment {segment}"
+            "The boundary constraint lhs trace segment {lhs_segment} should not be less than rhs trace segment {rhs_segment}"
         ))
     }
 

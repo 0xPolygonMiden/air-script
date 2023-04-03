@@ -1,6 +1,6 @@
 use super::{
     symbol_access::ValidateAccess, AccessType, ConstantType, ConstantValue, Identifier,
-    MatrixAccess, SemanticError, SymbolType, TraceAccess, TraceColumns, Value, VectorAccess,
+    MatrixAccess, SemanticError, SymbolType, TraceAccess, TraceBinding, Value, VectorAccess,
     CURRENT_ROW,
 };
 
@@ -138,7 +138,7 @@ impl Symbol {
 
     fn get_trace_value(
         &self,
-        columns: &TraceColumns,
+        columns: &TraceBinding,
         access_type: &AccessType,
     ) -> Result<Value, SemanticError> {
         // symbol accesses at rows other than the first are identified by the parser as
@@ -152,7 +152,8 @@ impl Symbol {
                     return Err(SemanticError::invalid_trace_binding_access(self.name()));
                 }
                 let trace_segment = columns.trace_segment();
-                let trace_access = TraceAccess::new(trace_segment, columns.offset(), 1, row_offset);
+                let trace_access =
+                    TraceAccess::new(trace_segment, columns.offset(), columns.size(), row_offset);
                 Ok(Value::TraceElement(trace_access))
             }
             AccessType::Vector(idx) => {

@@ -1,7 +1,7 @@
 use super::{
     ast, BTreeMap, Constant, ConstantType, Declarations, Identifier, MatrixAccess, SemanticError,
-    TraceAccess, TraceBinding, TraceBindingAccess, TraceSegment, Variable, VariableType,
-    VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
+    TraceAccess, TraceBinding, TraceBindingAccess, Variable, VariableType, VectorAccess,
+    CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
 
 mod symbol;
@@ -14,9 +14,6 @@ pub(crate) use symbol_access::{AccessType, ValidateAccess};
 mod symbol_type;
 pub(crate) use symbol_type::SymbolType;
 
-mod trace_columns;
-use trace_columns::TraceColumns;
-
 mod value;
 pub use value::{ConstantValue, Value};
 
@@ -25,7 +22,7 @@ pub use value::{ConstantValue, Value};
 
 /// SymbolTable for identifiers to track their types and information and enforce uniqueness of
 /// identifiers.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct SymbolTable {
     /// A map of all declared identifiers from their name (the key) to their type.
     symbols: BTreeMap<String, Symbol>,
@@ -131,32 +128,32 @@ impl SymbolTable {
     }
 
     /// Add all trace columns in the specified trace segment by their identifiers, sizes and indices.
-    pub(super) fn insert_trace_columns(
+    pub(super) fn insert_trace_bindings(
         &mut self,
-        trace_segment: TraceSegment,
-        trace: &[TraceBinding],
+        trace: Vec<Vec<TraceBinding>>,
     ) -> Result<(), SemanticError> {
-        let mut col_idx = 0;
-        for trace_cols in trace {
-            let trace_columns = TraceColumns::new(trace_segment, col_idx, trace_cols.size());
-            self.insert_symbol(
-                trace_cols.name().to_string(),
-                SymbolType::TraceColumns(trace_columns),
-            )?;
-            col_idx += trace_cols.size();
-        }
+        for (trace_segment, bindings) in trace.into_iter().enumerate() {
+            let mut width = 0;
+            for binding in bindings {
+                width = binding.offset() + binding.size();
+                self.insert_symbol(
+                    binding.name().to_string(),
+                    SymbolType::TraceColumns(binding),
+                )?;
+            }
 
-        if col_idx > u16::MAX.into() {
-            return Err(SemanticError::InvalidTraceSegment(format!(
-                "Trace segment {} has {} columns, but the maximum number of columns is {}",
-                trace_segment,
-                col_idx,
-                u16::MAX
-            )));
-        }
+            if width > u16::MAX.into() {
+                return Err(SemanticError::InvalidTraceSegment(format!(
+                    "Trace segment {} has {} columns, but the maximum number of columns is {}",
+                    trace_segment,
+                    width,
+                    u16::MAX
+                )));
+            }
 
-        self.declarations
-            .set_trace_segment_width(usize::from(trace_segment), col_idx as u16);
+            self.declarations
+                .set_trace_segment_width(trace_segment, width as u16);
+        }
 
         Ok(())
     }
@@ -211,7 +208,7 @@ impl SymbolTable {
         }
     }
 
-    /// Looks up a [NamedTraceAccess] by its identifier name and returns an equivalent
+    /// Looks up a [TraceBindingAccess] by its identifier name and returns an equivalent
     /// [TraceAccess].
     ///
     /// # Errors
@@ -219,7 +216,7 @@ impl SymbolTable {
     /// - the identifier was not in the symbol table.
     /// - the identifier was not declared as a trace column binding.
     /// TODO: update docs
-    pub(crate) fn get_trace_access_by_name(
+    pub(crate) fn get_trace_binding_access(
         &self,
         trace_access: &TraceBindingAccess,
     ) -> Result<TraceAccess, SemanticError> {
@@ -230,7 +227,7 @@ impl SymbolTable {
         Ok(TraceAccess::new(
             columns.trace_segment(),
             columns.offset() + trace_access.col_offset(),
-            1,
+            columns.size(),
             trace_access.row_offset(),
         ))
     }
@@ -255,7 +252,6 @@ impl SymbolTable {
     ) -> Result<(), SemanticError> {
         let trace_segment = usize::from(trace_access.trace_segment());
         let trace_segment_width = self.declarations.trace_segment_width(trace_segment)?;
-
         if trace_access.col_idx() as u16 >= trace_segment_width {
             return Err(SemanticError::indexed_trace_column_access_out_of_bounds(
                 trace_access,

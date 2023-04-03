@@ -1,4 +1,7 @@
-use super::{ast::BoundaryStmt, ConstraintBuilder, ConstraintDomain, SemanticError, TraceSegment};
+use super::{
+    ast::BoundaryStmt, ConstraintBuilder, ConstraintBuilderContext, ConstraintDomain, Expression,
+    SemanticError, TraceAccess, TraceSegment,
+};
 use std::fmt::Display;
 
 /// [ConstrainedBoundary] represents the location within the trace where a boundary constraint is
@@ -41,63 +44,42 @@ impl ConstraintBuilder {
     /// In case the statement is a constraint, the constraint is turned into a subgraph which is
     /// added to the [AlgebraicGraph] (reusing any existing nodes). The index of its entry node
     /// is then saved in the boundary_constraints matrix.
-    pub(super) fn insert_boundary_stmt(&mut self, stmt: BoundaryStmt) -> Result<(), SemanticError> {
+    pub(super) fn process_boundary_stmt(
+        &mut self,
+        stmt: BoundaryStmt,
+    ) -> Result<(), SemanticError> {
         match stmt {
             BoundaryStmt::Constraint(constraint) => {
-                let trace_access = self
-                    .symbol_table
-                    .get_trace_access_by_name(constraint.access())?;
-                let domain = constraint.boundary().into();
-                let constrained_boundary = ConstrainedBoundary::new(
-                    trace_access.trace_segment(),
-                    trace_access.col_idx(),
-                    domain,
-                );
-                // add the boundary to the set of constrained boundaries.
-                if !self.constrained_boundaries.insert(constrained_boundary) {
-                    // raise an error if the same boundary was previously constrained
-                    return Err(SemanticError::boundary_already_constrained(
-                        &constrained_boundary,
-                    ));
-                }
+                let (boundary, trace_access, expression) = constraint.into_parts();
+                let domain = boundary.into();
+                self.context = ConstraintBuilderContext::BoundaryConstraint(domain);
 
-                // add the trace access at the specified boundary to the graph.
-                let lhs = self.insert_trace_access(&trace_access)?;
+                let trace_access = self.symbol_table.get_trace_binding_access(&trace_access)?;
+                self.add_constrained_boundary(trace_access, domain)?;
 
-                // get the trace segment and domain of the boundary column access
-                let (lhs_segment, lhs_domain) = self.graph.node_details(&lhs, domain)?;
-                debug_assert!(
-                   lhs_domain == domain,
-                   "The boundary constraint's domain should be {lhs_domain:?}, but the domain {domain:?} was inferred by the graph",
-               );
-
-                // add its expression to the constraints graph.
-                let rhs = self.insert_expr(constraint.value())?;
-                // get the trace segment and domain of the expression
-                let (rhs_segment, rhs_domain) = self.graph.node_details(&rhs, domain)?;
-
-                // ensure that the inferred trace segment and domain of the rhs expression can be
-                // applied to column against which the boundary constraint is applied.
-                if lhs_segment < rhs_segment {
-                    // trace segment inference defaults to the lowest segment (the main trace) and is
-                    // adjusted according to the use of random values and trace columns.
-                    return Err(SemanticError::trace_segment_mismatch(lhs_segment));
-                }
-                if lhs_domain != rhs_domain {
-                    return Err(SemanticError::incompatible_constraint_domains(
-                        &lhs_domain,
-                        &rhs_domain,
-                    ));
-                }
-
-                // merge the two sides of the expression into a constraint.
-                let root = self.merge_equal_exprs(lhs, rhs);
-
-                // save the constraint information
-                self.insert_constraint(root, lhs_segment.into(), domain)?
+                self.insert_constraint(Expression::TraceAccess(trace_access), expression)?;
             }
             BoundaryStmt::Variable(variable) => self.symbol_table.insert_variable(variable)?,
             BoundaryStmt::ConstraintComprehension(_, _) => todo!(),
+        }
+
+        Ok(())
+    }
+
+    /// TODO: docs
+    fn add_constrained_boundary(
+        &mut self,
+        trace_access: TraceAccess,
+        domain: ConstraintDomain,
+    ) -> Result<(), SemanticError> {
+        let constrained_boundary =
+            ConstrainedBoundary::new(trace_access.trace_segment(), trace_access.col_idx(), domain);
+        // add the boundary to the set of constrained boundaries.
+        if !self.constrained_boundaries.insert(constrained_boundary) {
+            // raise an error if the same boundary was previously constrained
+            return Err(SemanticError::boundary_already_constrained(
+                &constrained_boundary,
+            ));
         }
 
         Ok(())

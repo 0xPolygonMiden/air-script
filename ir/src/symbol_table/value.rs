@@ -1,6 +1,6 @@
 use super::{MatrixAccess, TraceAccess, VectorAccess};
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Value {
     /// An inlined or named constant with identifier and access indices.
     Constant(ConstantValue),
@@ -20,7 +20,7 @@ pub enum Value {
     RandomValue(usize),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum ConstantValue {
     Inline(u64),
     Scalar(String),

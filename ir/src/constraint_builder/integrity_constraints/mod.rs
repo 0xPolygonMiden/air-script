@@ -1,9 +1,8 @@
 use super::{
     ast::{ConstraintType, IntegrityStmt},
-    BTreeMap, ConstantType, ConstraintBuilder, ConstraintDomain, Expression, Identifier, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, SemanticError, Symbol, SymbolType,
-    TraceAccess, TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType, VectorAccess,
-    CURRENT_ROW,
+    BTreeMap, ConstantType, ConstraintBuilder, Expression, Identifier, Iterable, ListComprehension,
+    ListFoldingType, ListFoldingValueType, SemanticError, Symbol, SymbolType, TraceAccess,
+    TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 mod list_comprehension;
@@ -18,28 +17,14 @@ impl ConstraintBuilder {
     /// In case the statement is a constraint, the constraint is turned into a subgraph which is
     /// added to the [AlgebraicGraph] (reusing any existing nodes). The index of its entry node
     /// is then saved in the integrity_constraints matrix.
-    pub(super) fn insert_integrity_stmt(
+    pub(super) fn process_integrity_stmt(
         &mut self,
         stmt: IntegrityStmt,
     ) -> Result<(), SemanticError> {
         match stmt {
             IntegrityStmt::Constraint(ConstraintType::Inline(constraint), _) => {
-                // add the left hand side expression to the graph.
-                let lhs = self.insert_expr(constraint.lhs())?;
-
-                // add the right hand side expression to the graph.
-                let rhs = self.insert_expr(constraint.rhs())?;
-
-                // merge the two sides of the expression into a constraint.
-                let root = self.merge_equal_exprs(lhs, rhs);
-
-                // get the trace segment and domain of the constraint
-                // the default domain for integrity constraints is `EveryRow`
-                let (trace_segment, domain) =
-                    self.graph.node_details(&root, ConstraintDomain::EveryRow)?;
-
-                // save the constraint information
-                self.insert_constraint(root, trace_segment.into(), domain)?;
+                let (lhs, rhs) = constraint.into_parts();
+                self.insert_constraint(lhs, rhs)?;
             }
             IntegrityStmt::Variable(variable) => {
                 if let VariableType::ListComprehension(list_comprehension) = variable.value() {
