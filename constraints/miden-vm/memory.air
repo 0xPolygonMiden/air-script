@@ -7,13 +7,13 @@ fn delta(v: scalar) -> scalar:
 
 
 # Returns the n0 flag which is set to 1 when context changes and 0 otherwise.
-fn get_n0(ctx: scalar, t: scalar) -> scalar:
-    return delta(ctx) * t'
+fn get_n0(ctx: scalar, ctx_next: scalar, t_next: scalar) -> scalar:
+    return (ctx_next - ctx) * t_next
 
 
 # Returns the n1 flag. If context remains the same, n1 = 1 when address changes and 0 otherwise.
-fn get_n1(addr: scalar, t: scalar) -> scalar:
-    return delta(addr) * t'
+fn get_n1(addr: scalar, addr_next: scalar, t_next: scalar) -> scalar:
+    return (addr_next - addr) * t_next
 
 
 ### Helper evaluators #############################################################################
@@ -37,10 +37,10 @@ ev is_binary(main: [a]):
 # Enforces that created flags have valid values during the program execution.
 ev flags_validity(main: [ctx, addr, t]):
     # n0 = 1 when context changes and 0 otherwise.
-    let n0 = get_n0(ctx, t)
+    let n0 = get_n0(ctx, ctx', t')
 
     # if context remains the same, n1 = 1 when address changes and 0 otherwise.
-    let n1 = get_n1(addr, t)
+    let n1 = get_n1(addr, addr', t')
 
     # Enforce that n0 must be binary.
     enf n0^2 = n0
@@ -63,10 +63,10 @@ ev enforce_selectors(main: [s[2], ctx, addr, t]):
     enf is_binary([selector]) for selector in s
 
     # n0 = 1 when context changes and 0 otherwise.
-    let n0 = get_n0(ctx, t)
+    let n0 = get_n0(ctx, ctx', t')
 
     # if context remains the same, n1 = 1 when address changes and 0 otherwise.
-    let n1 = get_n1(addr, t)
+    let n1 = get_n1(addr, addr', t')
 
     # Enforce that s[1]' = 1 when the operation is a read and `ctx` and `addr` columns are both 
     # unchanged.
@@ -81,19 +81,19 @@ ev enforce_selectors(main: [s[2], ctx, addr, t]):
 # and decomposed into the `d1` and `d0` columns correctly.
 ev enforce_delta(main: [ctx, addr, clk, d[2], t]):
     # n0 = 1 when context changes and 0 otherwise.
-    let n0 = get_n0(ctx, t)
+    let n0 = get_n0(ctx, ctx', t')
 
     # if context remains the same, n1 = 1 when address changes and 0 otherwise.
-    let n1 = get_n1(addr, t)
+    let n1 = get_n1(addr, addr', t')
 
     let d_next_agg = 2^16 * d[1]' + d[0]'
 
     # Enforce that values of context (`ctx`), address (`addr`), and clock cycle (`clk`) grow 
     # monotonically
     match enf:
-        d_next_agg = delta(ctx) when n0
-        d_next_agg = delta(addr) when !n0 & n1
-        d_next_agg = delta(clk) - 1 when !n0 & !n1
+        d_next_agg = ctx' - ctx when n0
+        d_next_agg = addr' - addr when !n0 & n1
+        d_next_agg = clk' - clk - 1 when !n0 & !n1
 
 
 # Enforces that memory is initialized to zero when it is read before being written and that when 
