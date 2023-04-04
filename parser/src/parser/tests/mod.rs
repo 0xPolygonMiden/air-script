@@ -13,6 +13,7 @@ mod boundary_constraints;
 mod comments;
 mod constants;
 mod evaluator_functions;
+mod functions;
 mod identifiers;
 mod integrity_constraints;
 mod list_comprehension;
