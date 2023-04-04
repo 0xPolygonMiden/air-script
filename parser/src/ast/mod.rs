@@ -14,6 +14,9 @@ pub use periodic_columns::PeriodicColumn;
 pub mod boundary_constraints;
 pub use boundary_constraints::*;
 
+mod function;
+pub use function::*;
+
 pub mod integrity_constraints;
 pub use integrity_constraints::*;
 
@@ -52,10 +55,11 @@ pub enum SourceSection {
     AirDef(Identifier),
     Constant(Constant),
     Trace(Vec<Vec<TraceBinding>>),
+    EvaluatorFunction(EvaluatorFunction),
+    Function(Function),
     PublicInputs(Vec<PublicInput>),
     PeriodicColumns(Vec<PeriodicColumn>),
     RandomValues(RandomValues),
-    EvaluatorFunction(EvaluatorFunction),
     BoundaryConstraints(Vec<BoundaryStmt>),
     IntegrityConstraints(Vec<IntegrityStmt>),
 }

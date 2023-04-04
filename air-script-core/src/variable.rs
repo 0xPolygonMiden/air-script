@@ -30,6 +30,7 @@ pub enum VariableType {
     Scalar(Expression),
     Vector(Vec<Expression>),
     Matrix(Vec<Vec<Expression>>),
+    Tuple(Vec<Expression>),
     ListComprehension(ListComprehension),
 }
 
@@ -39,6 +40,7 @@ impl Display for VariableType {
             Self::Scalar(_) => write!(f, "scalar"),
             Self::Vector(_) => write!(f, "vector"),
             Self::Matrix(_) => write!(f, "matrix"),
+            Self::Tuple(_) => write!(f, "tuple"),
             Self::ListComprehension(_) => write!(f, "list comprehension"),
         }
     }

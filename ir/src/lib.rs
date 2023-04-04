@@ -109,6 +109,7 @@ impl AirIR {
                     validator.exists("integrity_constraints");
                 }
                 ast::SourceSection::EvaluatorFunction(eval_expr) => eval_exprs.push(eval_expr),
+                ast::SourceSection::Function(_) => todo!()
             }
         }
 
