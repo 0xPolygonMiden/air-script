@@ -1,0 +1,32 @@
+mod RangeChecker8BitAir
+
+### Helper functions ##############################################################################
+
+# Set to 1 when we don't include the value into the running product.
+fn f0(s0: scalar, s1: scalar) -> scalar:
+    return !s0 & !s1
+
+
+# Set to 1 when we include the value into the running product.
+fn f1(s0: scalar, s1: scalar) -> scalar:
+    return s0 & !s1
+
+
+# Set to 1 when we include two copies of the value into the running product.
+fn f2(s0: scalar, s1: scalar) -> scalar:
+    return !s0 & s1
+
+
+# Set to 1 when we include four copies of the value into the running product.
+fn f3(s0: scalar, s1: scalar) -> scalar:
+    return s0 & s1
+
+
+### 8-bit Range Checker Air Constraints #################################################################
+
+ev range_checker_8bit(main: [t, s0, s1, v, p0]):
+    # z represents how a row in the execution trace is reduced to a single value.
+    let z = ($alpha[0] + v)^4 * f3(s0, s1) + ($alpha[0] + v)^2 * f2(s0, s1) + ($alpha[0] + v) * f1(s0, s1) + f0(s0, s1)
+    enf p0' * (($alpha[0] + v' - v) * t - t + 1) = p0 * (z - z * t + t)
+
+    # TODO: add boundary constraints p0.first = 1 and p0.last = 1
