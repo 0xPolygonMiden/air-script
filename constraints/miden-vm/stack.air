@@ -75,295 +75,12 @@ fn f_x1111(op_bits: vector[8]) -> scalar:
     return op_bits[3] & op_bits[2] & op_bits[1] & op_bits[0]
 
 
-# No stack shift operations
-
-fn f_noop(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x0000(op_bits)
-
-fn f_eqz(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x0001(op_bits)
-
-fn f_neg(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x0010(op_bits)
-
-fn f_inv(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x0011(op_bits)
-
-fn f_incr(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x0100(op_bits)
-
-fn f_not(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x0101(op_bits)
-
-fn f_fmpadd(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x0110(op_bits)
-
-fn f_mload(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x0111(op_bits)
-
-fn f_swap(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x1000(op_bits)
-
-fn f_caller(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x1001(op_bits)
-
-fn f_movup2(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x1010(op_bits)
-
-fn f_movdn2(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x1011(op_bits)
-
-fn f_movup3(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x1100(op_bits)
-
-fn f_movdn3(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x1101(op_bits)
-
-fn f_advpopw(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x1110(op_bits)
-
-fn f_expacc(op_bits: vector[8]) -> scalar:
-    return f_000(op_bits) & f_x1111(op_bits)
-
-
-fn f_movup4(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x0000(op_bits)
-
-fn f_movdn4(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x0001(op_bits)
-
-fn f_movup5(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x0010(op_bits)
-
-fn f_movdn5(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x0011(op_bits)
-
-fn f_movup6(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x0100(op_bits)
-
-fn f_movdn6(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x0101(op_bits)
-
-fn f_movup7(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x0110(op_bits)
-
-fn f_movdn7(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x0111(op_bits)
-
-fn f_swapw(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x1000(op_bits)
-
-fn f_ext2mul(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x1001(op_bits)
-
-fn f_movup8(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x1010(op_bits)
-
-fn f_movdn8(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x1011(op_bits)
-
-fn f_swapw2(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x1100(op_bits)
-
-fn f_swapw3(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x1101(op_bits)
-
-fn f_swapdw(op_bits: vector[8]) -> scalar:
-    return f_001(op_bits) & f_x1110(op_bits)
-
-fn f_001_1111() -> scalar:
-    return 0
-
-
-# Left stack shift operations
-
-fn f_assert(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x0000(op_bits)
-
-fn f_eq(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x0001(op_bits)
-
-fn f_add(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x0010(op_bits)
-
-fn f_mul(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x0011(op_bits)
-
-fn f_and(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x0100(op_bits)
-
-fn f_or(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x0101(op_bits)
-
-fn f_u32and(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x0110(op_bits)
-
-fn f_u32xor(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x0111(op_bits)
-
-fn f_frie2f4(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x1000(op_bits)
-
-fn f_drop(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x1001(op_bits)
-
-fn f_cswap(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x1010(op_bits)
-
-fn f_cswapw(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x1011(op_bits)
-
-fn f_mloadw(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x1100(op_bits)
-
-fn f_mstore(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x1101(op_bits)
-
-fn f_mstorew(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x1110(op_bits)
-
-fn f_fmpupdate(op_bits: vector[8]) -> scalar:
-    return f_010(op_bits) & f_x1111(op_bits)
-
-
-# Right stack shift operations
-
-fn f_pad(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x0000(op_bits)
-
-fn f_dup(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x0001(op_bits)
-
-fn f_dup1(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x0010(op_bits)
-
-fn f_dup2(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x0011(op_bits)
-
-fn f_dup3(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x0100(op_bits)
-
-fn f_dup4(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x0101(op_bits)
-
-fn f_dup5(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x0110(op_bits)
-
-fn f_dup6(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x0111(op_bits)
-
-fn f_dup7(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x1000(op_bits)
-
-fn f_dup9(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x1001(op_bits)
-
-fn f_dup11(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x1010(op_bits)
-
-fn f_dup13(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x1011(op_bits)
-
-fn f_dup15(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x1100(op_bits)
-
-fn f_advpop(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x1101(op_bits)
-
-fn f_sdepth(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x1110(op_bits)
-
-fn f_clk(op_bits: vector[8]) -> scalar:
-    return f_011(op_bits) & f_x1111(op_bits)
-
-
-# u32 operations
-
-fn f_u32add(op_bits: vector[8]) -> scalar:
-    return f_u32rc(op_bits) & !op_bits[3] & !op_bits[2] & !op_bits[1]
-
-fn f_u32sub(op_bits: vector[8]) -> scalar:
-    return f_u32rc(op_bits) & !op_bits[3] & !op_bits[2] & op_bits[1]
-
-fn f_u32mul(op_bits: vector[8]) -> scalar:
-    return f_u32rc(op_bits) & !op_bits[3] & op_bits[2] & !op_bits[1]
-
-fn f_u32div(op_bits: vector[8]) -> scalar:
-    return f_u32rc(op_bits) & !op_bits[3] & op_bits[2] & op_bits[1]
-
-fn f_u32split(op_bits: vector[8]) -> scalar:
-    return f_u32rc(op_bits) & op_bits[3] & !op_bits[2] & !op_bits[1]
-
-fn f_u32assert2(op_bits: vector[8]) -> scalar:
-    return f_u32rc(op_bits) & op_bits[3] & !op_bits[2] & op_bits[1]
-
-fn f_u32add3(op_bits: vector[8]) -> scalar:
-    return f_u32rc(op_bits) & op_bits[3] & op_bits[2] & !op_bits[1]
-
-fn f_madd(op_bits: vector[8]) -> scalar:
-    return f_u32rc(op_bits) & op_bits[3] & op_bits[2] & op_bits[1]
-
-
-# High-degree operations
-
-fn f_hperm(op_bits: vector[8]) -> scalar:
-    return f_101(op_bits) & !op_bits[3] & !op_bits[2] & !op_bits[1]
-
-fn f_mpverify(op_bits: vector[8]) -> scalar:
-    return f_101(op_bits) & !op_bits[3] & !op_bits[2] & op_bits[1]
-
-fn f_pipe(op_bits: vector[8]) -> scalar:
-    return f_101(op_bits) & !op_bits[3] & op_bits[2] & !op_bits[1]
-
-fn f_mstream(op_bits: vector[8]) -> scalar:
-    return f_101(op_bits) & !op_bits[3] & op_bits[2] & op_bits[1]
-
-fn f_span(op_bits: vector[8]) -> scalar:
-    return f_101(op_bits) & op_bits[3] & !op_bits[2] & !op_bits[1]
-
-fn f_join(op_bits: vector[8]) -> scalar:
-    return f_101(op_bits) & op_bits[3] & !op_bits[2] & op_bits[1]
-
-fn f_split(op_bits: vector[8]) -> scalar:
-    return f_101(op_bits) & op_bits[3] & op_bits[2] & !op_bits[1]
-
-fn f_loop(op_bits: vector[8]) -> scalar:
-    return f_101(op_bits) & op_bits[3] & op_bits[2] & op_bits[1]
-
-
-# Very high-degree operations
-
-fn f_mrupdate(op_bits: vector[8]) -> scalar:
-    return op_bits[7] & !op_bits[4] & !op_bits[3] & !op_bits[2]
-
-fn f_push(op_bits: vector[8]) -> scalar:
-    return op_bits[7] & !op_bits[4] & !op_bits[3] & op_bits[2]
-
-fn f_syscall(op_bits: vector[8]) -> scalar:
-    return op_bits[7] & !op_bits[4] & op_bits[3] & !op_bits[2]
-
-fn f_call(op_bits: vector[8]) -> scalar:
-    return op_bits[7] & !op_bits[4] & op_bits[3] & op_bits[2]
-
-fn f_end(op_bits: vector[8]) -> scalar:
-    return op_bits[7] & op_bits[4] & !op_bits[3] & !op_bits[2]
-
-fn f_repeat(op_bits: vector[8]) -> scalar:
-    return op_bits[7] & op_bits[4] & !op_bits[3] & op_bits[2]
-
-fn f_respan(op_bits: vector[8]) -> scalar:
-    return op_bits[7] & op_bits[4] & op_bits[3] & !op_bits[2]
-
-fn f_halt(op_bits: vector[8]) -> scalar:
-    return op_bits[7] & op_bits[4] & op_bits[3] & op_bits[2]
-
-
 # Composite flags
 
 fn f_shr(op_bits: vector[8]) -> scalar:
     return !op_bits[6] & op_bits[5] & op_bits[4] + f_u32split(op_bits) + f_push(op_bits)
 
-# hasher[5] = op_helpers[3], where hahser -- main columns from the decoder, helper -- aux columns from the stack
+# hasher[5] = op_helpers[3], where hahser[] are decoder columns, which are the same as helper[] -- columns from the stack
 fn f_shl(op_bits: vector[8], op_helpers: vector[6]) -> scalar:
     let f_add3_mad = op_bits[6] & !op_bits[5] & !op_bits[4] & op_bits[3] & op_bits[2]
     let f_split_loop = op_bits[6] & !op_bits[5] & op_bits[4] & op_bits[3] & op_bits[2]
@@ -381,114 +98,109 @@ fn f_ctrl(op_bits: vector[8]) -> scalar:
 
 fn compute_op_flags(op_bits: vector[8]) -> vector[88]:
     return [
-        f_noop(op_bits),
-        f_eqz(op_bits),
-        f_neg(op_bits),
-        f_inv(op_bits),
-        f_incr(op_bits),
-        f_not(op_bits),
-        f_fmpadd(op_bits),
-        f_mload(op_bits),
-        f_swap(op_bits),
-        f_caller(op_bits),
-        f_movup2(op_bits),
-        f_movdn2(op_bits),
-        f_movup3(op_bits),
-        f_movdn3(op_bits),
-        f_advpopw(op_bits),
-        f_expacc(op_bits),
-        f_movup4(op_bits),
-        f_movdn4(op_bits),
-        f_movup5(op_bits),
-        f_movdn5(op_bits),
-        f_movup6(op_bits),
-        f_movdn6(op_bits),
-        f_movup7(op_bits),
-        f_movdn7(op_bits),
-        f_swapw(op_bits),
-        f_ext2mul(op_bits),
-        f_movup8(op_bits),
-        f_movdn8(op_bits),
-        f_swapw2(op_bits),
-        f_swapw3(op_bits),
-        f_swapdw(op_bits),
-        f_001_1111(op_bits),
+        # No stack shift operations
+        f_000(op_bits) & f_x0000(op_bits), # noop
+        f_000(op_bits) & f_x0001(op_bits), # eqz
+        f_000(op_bits) & f_x0010(op_bits), # neg
+        f_000(op_bits) & f_x0011(op_bits), # inv
+        f_000(op_bits) & f_x0100(op_bits), # incr
+        f_000(op_bits) & f_x0101(op_bits), # not
+        f_000(op_bits) & f_x0110(op_bits), # fmpadd
+        f_000(op_bits) & f_x0111(op_bits), # mload
+        f_000(op_bits) & f_x1000(op_bits), # swap
+        f_000(op_bits) & f_x1001(op_bits), # caller
+        f_000(op_bits) & f_x1010(op_bits), # movup2
+        f_000(op_bits) & f_x1011(op_bits), # movdn2
+        f_000(op_bits) & f_x1100(op_bits), # movup3
+        f_000(op_bits) & f_x1101(op_bits), # movdn3
+        f_000(op_bits) & f_x1110(op_bits), # advpop
+        f_000(op_bits) & f_x1111(op_bits), # expacc
+        f_001(op_bits) & f_x0000(op_bits), # movup4
+        f_001(op_bits) & f_x0001(op_bits), # movdn4
+        f_001(op_bits) & f_x0010(op_bits), # movup5
+        f_001(op_bits) & f_x0011(op_bits), # movdn5
+        f_001(op_bits) & f_x0100(op_bits), # movup6
+        f_001(op_bits) & f_x0101(op_bits), # movdn6
+        f_001(op_bits) & f_x0110(op_bits), # movup7
+        f_001(op_bits) & f_x0111(op_bits), # movdn7
+        f_001(op_bits) & f_x1000(op_bits), # swapw
+        f_001(op_bits) & f_x1001(op_bits), # ext2mul
+        f_001(op_bits) & f_x1010(op_bits), # movup8
+        f_001(op_bits) & f_x1011(op_bits), # movdn8
+        f_001(op_bits) & f_x1100(op_bits), # swapw2
+        f_001(op_bits) & f_x1101(op_bits), # swapw3
+        f_001(op_bits) & f_x1110(op_bits), # swapdw
+        f_001_1111(op_bits), # <unused>
 
-        f_assert(op_bits),
-        f_eq(op_bits),
-        f_add(op_bits),
-        f_mul(op_bits),
-        f_and(op_bits),
-        f_or(op_bits),
-        f_u32and(op_bits),
-        f_u32xor(op_bits),
-        f_frie2f4(op_bits),
-        f_drop(op_bits),
-        f_cswap(op_bits),
-        f_cswapw(op_bits),
-        f_mloadw(op_bits),
-        f_mstore(op_bits),
-        f_mstorew(op_bits),
-        f_fmpupdate(op_bits),
+        # Left stack shift operations
+        f_010(op_bits) & f_x0000(op_bits), # assert
+        f_010(op_bits) & f_x0001(op_bits), # eq
+        f_010(op_bits) & f_x0010(op_bits), # add
+        f_010(op_bits) & f_x0011(op_bits), # mul
+        f_010(op_bits) & f_x0100(op_bits), # and
+        f_010(op_bits) & f_x0101(op_bits), # or
+        f_010(op_bits) & f_x0110(op_bits), # u32and
+        f_010(op_bits) & f_x0111(op_bits), # u32xor
+        f_010(op_bits) & f_x1000(op_bits), # frie2f4
+        f_010(op_bits) & f_x1001(op_bits), # drop
+        f_010(op_bits) & f_x1010(op_bits), # cswap
+        f_010(op_bits) & f_x1011(op_bits), # cswapw
+        f_010(op_bits) & f_x1100(op_bits), # mloadw
+        f_010(op_bits) & f_x1101(op_bits), # mstore
+        f_010(op_bits) & f_x1110(op_bits), # mstorew
+        f_010(op_bits) & f_x1111(op_bits), # fmupdate
 
-        f_pad(op_bits),
-        f_dup(op_bits),
-        f_dup1(op_bits),
-        f_dup2(op_bits),
-        f_dup3(op_bits),
-        f_dup4(op_bits),
-        f_dup5(op_bits),
-        f_dup6(op_bits),
-        f_dup7(op_bits),
-        f_dup9(op_bits),
-        f_dup11(op_bits),
-        f_dup13(op_bits),
-        f_dup15(op_bits),
-        f_advpop(op_bits),
-        f_sdepth(op_bits),
-        f_clk(op_bits),
+        # Right stack shift operations
+        f_011(op_bits) & f_x0000(op_bits), # pad
+        f_011(op_bits) & f_x0001(op_bits), # dup
+        f_011(op_bits) & f_x0010(op_bits), # dup1
+        f_011(op_bits) & f_x0011(op_bits), # dup2
+        f_011(op_bits) & f_x0100(op_bits), # dup3
+        f_011(op_bits) & f_x0101(op_bits), # dup4
+        f_011(op_bits) & f_x0110(op_bits), # dup5
+        f_011(op_bits) & f_x0111(op_bits), # dup6
+        f_011(op_bits) & f_x1000(op_bits), # dup7
+        f_011(op_bits) & f_x1001(op_bits), # dup9
+        f_011(op_bits) & f_x1010(op_bits), # dup11
+        f_011(op_bits) & f_x1011(op_bits), # dup13
+        f_011(op_bits) & f_x1100(op_bits), # dup15
+        f_011(op_bits) & f_x1101(op_bits), # advpop
+        f_011(op_bits) & f_x1110(op_bits), # sdepth
+        f_011(op_bits) & f_x1111(op_bits), # clk
 
-        f_u32add(op_bits),
-        f_u32sub(op_bits),
-        f_u32mul(op_bits),
-        f_u32div(op_bits),
-        f_u32split(op_bits),
-        f_u32assert2(op_bits),
-        f_u32add3(op_bits),
-        f_madd(op_bits),
+        # u32 operations
+        f_u32rc(op_bits) & !op_bits[3] & !op_bits[2] & !op_bits[1], # u32add
+        f_u32rc(op_bits) & !op_bits[3] & !op_bits[2] & op_bits[1],  # u32sub
+        f_u32rc(op_bits) & !op_bits[3] & op_bits[2] & !op_bits[1],  # u32mul
+        f_u32rc(op_bits) & !op_bits[3] & op_bits[2] & op_bits[1],   # u32div
+        f_u32rc(op_bits) & op_bits[3] & !op_bits[2] & !op_bits[1],  # u32split
+        f_u32rc(op_bits) & op_bits[3] & !op_bits[2] & op_bits[1],   # u32assert2
+        f_u32rc(op_bits) & op_bits[3] & op_bits[2] & !op_bits[1],   # u32add3
+        f_u32rc(op_bits) & op_bits[3] & op_bits[2] & op_bits[1],    # u32madd
 
-        f_hperm(op_bits),
-        f_mpverify(op_bits),
-        f_pipe(op_bits),
-        f_mstream(op_bits),
-        f_span(op_bits),
-        f_join(op_bits),
-        f_split(op_bits),
-        f_loop(op_bits),
+        # High-degree operations
+        f_101(op_bits) & !op_bits[3] & !op_bits[2] & !op_bits[1], # hperm
+        f_101(op_bits) & !op_bits[3] & !op_bits[2] & op_bits[1],  # mpverify
+        f_101(op_bits) & !op_bits[3] & op_bits[2] & !op_bits[1],  # pipe
+        f_101(op_bits) & !op_bits[3] & op_bits[2] & op_bits[1],   # mstream
+        f_101(op_bits) & op_bits[3] & !op_bits[2] & !op_bits[1],  # span
+        f_101(op_bits) & op_bits[3] & !op_bits[2] & op_bits[1],   # join
+        f_101(op_bits) & op_bits[3] & op_bits[2] & !op_bits[1],   # split
+        f_101(op_bits) & op_bits[3] & op_bits[2] & op_bits[1],    # loop
 
-        f_mrupdate(op_bits),
-        f_push(op_bits),
-        f_syscall(op_bits),
-        f_call(op_bits),
-        f_end(op_bits),
-        f_repeat(op_bits),
-        f_respan(op_bits),
-        f_halt(op_bits)
+        # Very high-degree operations
+        op_bits[7] & !op_bits[4] & !op_bits[3] & !op_bits[2], # mrupdate
+        op_bits[7] & !op_bits[4] & !op_bits[3] & op_bits[2],  # push
+        op_bits[7] & !op_bits[4] & op_bits[3] & !op_bits[2],  # syscall
+        op_bits[7] & !op_bits[4] & op_bits[3] & op_bits[2],   # call
+        op_bits[7] & op_bits[4] & !op_bits[3] & !op_bits[2],  # end
+        op_bits[7] & op_bits[4] & !op_bits[3] & op_bits[2],   # repeat
+        op_bits[7] & op_bits[4] & op_bits[3] & !op_bits[2],   # respan
+        op_bits[7] & op_bits[4] & op_bits[3] & op_bits[2],    # halt
     ]
 
 
 ### Helper evaluators #############################################################################
-
-# Enforces that the provided columns must be zero.
-ev is_zero(main: [values[4]]):
-    enf v = 0 for v in values
-
-
-# Enforces that values in the columns in the current row must be equal to the values in the next 
-# row.
-ev is_unchanged(main: [values[4]]):
-    enf v' = v for v in values
-
 
 # Enforces that the provided columns must be binary.
 ev is_binary(main: [a]):
@@ -562,7 +274,7 @@ ev stack_constraints(main: [stack_top[16], stack_helpers[3], op_bits[8], op_help
         or([stack_top])                       when op_flags[37]
         u32and([stack_top])                   when op_flags[38]
         u32xor([stack_top])                   when op_flags[39]
-        # TODO: add match variant for caller 
+        # TODO: add match variant for frie2f4 
         frie2f4()
         drop([stack_top])                     when op_flags[41]
         cswap([stack_top])                    when op_flags[42]
