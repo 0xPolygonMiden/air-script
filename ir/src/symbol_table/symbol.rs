@@ -1,6 +1,6 @@
 use super::{
     symbol_access::ValidateAccess, AccessType, ConstantType, ConstantValue, Identifier,
-    MatrixAccess, SemanticError, SymbolType, TraceAccess, TraceColumns, Value, VectorAccess,
+    MatrixAccess, SemanticError, SymbolType, TraceAccess, TraceBinding, Value, VectorAccess,
     CURRENT_ROW,
 };
 
@@ -138,7 +138,7 @@ impl Symbol {
 
     fn get_trace_value(
         &self,
-        columns: &TraceColumns,
+        binding: &TraceBinding,
         access_type: &AccessType,
     ) -> Result<Value, SemanticError> {
         // symbol accesses at rows other than the first are identified by the parser as
@@ -148,25 +148,26 @@ impl Symbol {
         let row_offset = CURRENT_ROW;
         match access_type {
             AccessType::Default => {
-                if columns.size() != 1 {
+                if binding.size() != 1 {
                     return Err(SemanticError::invalid_trace_binding_access(self.name()));
                 }
-                let trace_segment = columns.trace_segment();
-                let trace_access = TraceAccess::new(trace_segment, columns.offset(), 1, row_offset);
+                let trace_segment = binding.trace_segment();
+                let trace_access =
+                    TraceAccess::new(trace_segment, binding.offset(), binding.size(), row_offset);
                 Ok(Value::TraceElement(trace_access))
             }
             AccessType::Vector(idx) => {
-                if *idx >= columns.size() {
+                if *idx >= binding.size() {
                     return Err(SemanticError::vector_access_out_of_bounds(
                         self.name(),
                         *idx,
-                        columns.size(),
+                        binding.size(),
                     ));
                 }
 
-                let trace_segment = columns.trace_segment();
+                let trace_segment = binding.trace_segment();
                 let trace_access =
-                    TraceAccess::new(trace_segment, columns.offset() + idx, 1, row_offset);
+                    TraceAccess::new(trace_segment, binding.offset() + idx, 1, row_offset);
                 Ok(Value::TraceElement(trace_access))
             }
             _ => Err(SemanticError::invalid_trace_access_type(

@@ -11,7 +11,8 @@ use constraint_builder::{ConstrainedBoundary, ConstraintBuilder};
 
 pub mod constraints;
 use constraints::{
-    AlgebraicGraph, ConstraintDomain, ConstraintRoot, Constraints, CURRENT_ROW, MIN_CYCLE_LENGTH,
+    AlgebraicGraph, ConstraintDomain, ConstraintRoot, Constraints, Operation, CURRENT_ROW,
+    MIN_CYCLE_LENGTH,
 };
 pub use constraints::{IntegrityConstraintDegree, NodeIndex};
 
@@ -60,6 +61,7 @@ impl AirIR {
         // uniqueness.
         let mut symbol_table = SymbolTable::default();
         let mut validator = SourceValidator::new();
+        let mut eval_exprs = Vec::new();
         let mut boundary_stmts = Vec::new();
         let mut integrity_stmts = Vec::new();
 
@@ -72,15 +74,15 @@ impl AirIR {
                 ast::SourceSection::Constant(constant) => {
                     symbol_table.insert_constant(constant)?;
                 }
-                ast::SourceSection::Trace(columns) => {
-                    // process & validate the main trace columns
-                    symbol_table.insert_trace_columns(0, &columns[0])?;
-                    validator.exists("main_trace_columns");
-                    if columns.len() > 1 {
-                        // process & validate the auxiliary trace columns
-                        symbol_table.insert_trace_columns(1, &columns[1])?;
+                ast::SourceSection::Trace(trace_bindings) => {
+                    if !trace_bindings.is_empty() {
+                        validator.exists("main_trace_columns");
+                    }
+                    if trace_bindings.len() > 1 {
                         validator.exists("aux_trace_columns");
                     }
+                    // process & validate the trace bindings
+                    symbol_table.insert_trace_bindings(trace_bindings)?;
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
                     // process & validate the public inputs
@@ -105,12 +107,16 @@ impl AirIR {
                     integrity_stmts.extend(stmts);
                     validator.exists("integrity_constraints");
                 }
-                ast::SourceSection::EvaluatorFunction(_) => todo!(),
+                ast::SourceSection::EvaluatorFunction(eval_expr) => eval_exprs.push(eval_expr),
             }
         }
 
         // validate sections
         validator.check()?;
+
+        // process the variable & constraint statements, and validate them against the symbol table.
+
+        // TODO: process evaluators
 
         // process the variable & constraint statements, and validate them against the symbol table.
         let mut constraint_builder = ConstraintBuilder::new(symbol_table);

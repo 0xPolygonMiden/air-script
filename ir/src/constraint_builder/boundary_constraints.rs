@@ -44,10 +44,10 @@ impl ConstraintBuilder {
     pub(super) fn insert_boundary_stmt(&mut self, stmt: BoundaryStmt) -> Result<(), SemanticError> {
         match stmt {
             BoundaryStmt::Constraint(constraint) => {
-                let trace_access = self
-                    .symbol_table
-                    .get_trace_access_by_name(constraint.access())?;
-                let domain = constraint.boundary().into();
+                let (boundary, access, value) = constraint.into_parts();
+
+                let trace_access = self.symbol_table.get_trace_binding_access(&access)?;
+                let domain = boundary.into();
                 let constrained_boundary = ConstrainedBoundary::new(
                     trace_access.trace_segment(),
                     trace_access.col_idx(),
@@ -72,7 +72,7 @@ impl ConstraintBuilder {
                );
 
                 // add its expression to the constraints graph.
-                let rhs = self.insert_expr(constraint.value())?;
+                let rhs = self.insert_expr(value)?;
                 // get the trace segment and domain of the expression
                 let (rhs_segment, rhs_domain) = self.graph.node_details(&rhs, domain)?;
 

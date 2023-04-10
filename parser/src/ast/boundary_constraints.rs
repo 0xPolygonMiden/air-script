@@ -40,6 +40,10 @@ impl BoundaryConstraint {
     pub fn value(&self) -> &Expression {
         &self.value
     }
+
+    pub fn into_parts(self) -> (Boundary, TraceBindingAccess, Expression) {
+        (self.boundary, self.access, self.value)
+    }
 }
 
 /// Describes the type of boundary in the boundary constraint.
