@@ -54,7 +54,10 @@ fn full_air_file() {
                     1,
                 )),
                 Expression::Add(
-                    Box::new(Expression::Elem(Identifier("clk".to_string()))),
+                    Box::new(Expression::BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
                     Box::new(Expression::Const(1)),
                 ),
             )),

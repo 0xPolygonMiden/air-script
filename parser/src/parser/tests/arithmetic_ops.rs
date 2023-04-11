@@ -1,6 +1,6 @@
 use super::{
-    build_parse_test, Expression::*, Identifier, IntegrityConstraint, IntegrityStmt::*, Source,
-    SourceSection::*,
+    build_parse_test, AccessType, BindingAccess, Expression::*, Identifier, IntegrityConstraint,
+    IntegrityStmt::*, Source, SourceSection::*,
 };
 use crate::ast::{ConstraintType, TraceBindingAccess, TraceBindingAccessSize};
 
@@ -22,7 +22,10 @@ fn single_addition() {
                     TraceBindingAccessSize::Full,
                     1,
                 ))),
-                Box::new(Elem(Identifier("clk".to_string()))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("clk".to_string()),
+                    AccessType::Default,
+                ))),
             ),
             Const(0),
         )),
@@ -47,7 +50,10 @@ fn multi_addition() {
                         TraceBindingAccessSize::Full,
                         1,
                     ))),
-                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
                 )),
                 Box::new(Const(2)),
             ),
@@ -73,7 +79,10 @@ fn single_subtraction() {
                     TraceBindingAccessSize::Full,
                     1,
                 ))),
-                Box::new(Elem(Identifier("clk".to_string()))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("clk".to_string()),
+                    AccessType::Default,
+                ))),
             ),
             Const(0),
         )),
@@ -98,7 +107,10 @@ fn multi_subtraction() {
                         TraceBindingAccessSize::Full,
                         1,
                     ))),
-                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
                 )),
                 Box::new(Const(1)),
             ),
@@ -124,7 +136,10 @@ fn single_multiplication() {
                     TraceBindingAccessSize::Full,
                     1,
                 ))),
-                Box::new(Elem(Identifier("clk".to_string()))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("clk".to_string()),
+                    AccessType::Default,
+                ))),
             ),
             Const(0),
         )),
@@ -149,7 +164,10 @@ fn multi_multiplication() {
                         TraceBindingAccessSize::Full,
                         1,
                     ))),
-                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
                 )),
                 Box::new(Const(2)),
             ),
@@ -192,7 +210,10 @@ fn ops_with_parens() {
                         TraceBindingAccessSize::Full,
                         1,
                     ))),
-                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
                 )),
                 Box::new(Const(2)),
             ),
@@ -243,7 +264,10 @@ fn non_const_exponentiation() {
                     1,
                 ))),
                 Box::new(Add(
-                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
                     Box::new(Const(2)),
                 )),
             ),
@@ -289,7 +313,10 @@ fn multi_arithmetic_ops_same_precedence() {
                             TraceBindingAccessSize::Full,
                             1,
                         ))),
-                        Box::new(Elem(Identifier("clk".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("clk".to_string()),
+                            AccessType::Default,
+                        ))),
                     )),
                     Box::new(Const(2)),
                 )),
@@ -327,7 +354,10 @@ fn multi_arithmetic_ops_different_precedence() {
                         Box::new(Const(2)),
                     )),
                     Box::new(Mul(
-                        Box::new(Elem(Identifier("clk".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("clk".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(2)),
                     )),
                 )),
@@ -363,7 +393,10 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
                 ))),
                 Box::new(Mul(
                     Box::new(Exp(
-                        Box::new(Elem(Identifier("clk".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("clk".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(2)),
                     )),
                     Box::new(Sub(Box::new(Const(2)), Box::new(Const(1)))),

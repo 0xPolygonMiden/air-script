@@ -1,9 +1,9 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::{
     ast::{
-        ConstraintType, EvaluatorFunction, EvaluatorFunctionCall, Expression::*, IntegrityStmt::*,
-        Range, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, VariableBinding,
-        VariableValueExpr,
+        AccessType, BindingAccess, ConstraintType, EvaluatorFunction, EvaluatorFunctionCall,
+        Expression::*, IntegrityStmt::*, Range, TraceBinding, TraceBindingAccess,
+        TraceBindingAccessSize, VariableBinding, VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -29,7 +29,10 @@ fn ev_fn_main_cols() {
                         1,
                     )),
                     Add(
-                        Box::new(Elem(Identifier("clk".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("clk".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(1)),
                     ),
                 )),
@@ -60,8 +63,14 @@ fn ev_fn_main_and_aux_cols() {
                 VariableBinding(VariableBinding::new(
                     Identifier("z".to_string()),
                     VariableValueExpr::Scalar(Add(
-                        Box::new(Elem(Identifier("a".to_string()))),
-                        Box::new(Elem(Identifier("b".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("a".to_string()),
+                            AccessType::Default,
+                        ))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("b".to_string()),
+                            AccessType::Default,
+                        ))),
                     )),
                 )),
                 Constraint(
@@ -73,7 +82,10 @@ fn ev_fn_main_and_aux_cols() {
                             1,
                         )),
                         Add(
-                            Box::new(Elem(Identifier("clk".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("clk".to_string()),
+                                AccessType::Default,
+                            ))),
                             Box::new(Const(1)),
                         ),
                     )),
@@ -88,8 +100,14 @@ fn ev_fn_main_and_aux_cols() {
                             1,
                         )),
                         Add(
-                            Box::new(Elem(Identifier("a".to_string()))),
-                            Box::new(Elem(Identifier("z".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("a".to_string()),
+                                AccessType::Default,
+                            ))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("z".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                     )),
                     None,

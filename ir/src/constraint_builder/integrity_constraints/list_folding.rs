@@ -22,10 +22,10 @@ impl ConstraintBuilder {
             ListFoldingValueExpr::Identifier(ident) => {
                 let symbol = self.symbol_table.get_symbol(ident.name())?;
                 match symbol.symbol_type() {
-                    SymbolType::Constant(ConstantValueExpr::Vector(list)) => {
+                    SymbolType::ConstantBinding(ConstantValueExpr::Vector(list)) => {
                         Ok(list.iter().map(|value| Expression::Const(*value)).collect())
                     }
-                    SymbolType::Variable(variable_type) => {
+                    SymbolType::VariableBinding(variable_type) => {
                         if let VariableValueExpr::Vector(list) = variable_type {
                             Ok(list.clone())
                         } else {

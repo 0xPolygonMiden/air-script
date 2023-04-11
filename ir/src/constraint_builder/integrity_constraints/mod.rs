@@ -1,9 +1,9 @@
 use super::{
     ast::{ConstraintType, IntegrityStmt},
-    BTreeMap, ConstantValueExpr, ConstraintBuilder, ConstraintDomain, Expression, Identifier,
-    Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, SemanticError, Symbol,
-    SymbolType, TraceAccess, TraceBindingAccess, TraceBindingAccessSize, VariableBinding,
-    VariableValueExpr, VectorAccess, CURRENT_ROW,
+    AccessType, BTreeMap, BindingAccess, ConstantValueExpr, ConstraintBuilder, ConstraintDomain,
+    Expression, Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr,
+    SemanticError, Symbol, SymbolType, TraceAccess, TraceBindingAccess, TraceBindingAccessSize,
+    VariableBinding, VariableValueExpr, CURRENT_ROW,
 };
 
 mod list_comprehension;

@@ -1,7 +1,6 @@
-use ir::TraceAccess;
-
 use super::{
-    AirIR, ConstantValue, ElemType, IntegrityConstraintDegree, NodeIndex, Operation, Value,
+    AccessType, AirIR, ElemType, IntegrityConstraintDegree, NodeIndex, Operation, TraceAccess,
+    Value,
 };
 
 // RUST STRING GENERATION FOR THE CONSTRAINT GRAPH
@@ -102,42 +101,33 @@ impl Codegen for Value {
     fn to_string(&self, ir: &AirIR, elem_type: ElemType, trace_segment: u8) -> String {
         match self {
             // TODO: move constant handling to a helper function
-            Value::Constant(ConstantValue::Inline(0)) => match elem_type {
+            Value::InlineConstant(0) => match elem_type {
                 ElemType::Base => "Felt::ZERO".to_string(),
                 ElemType::Ext => "E::ZERO".to_string(),
             },
-            Value::Constant(ConstantValue::Inline(1)) => match elem_type {
+            Value::InlineConstant(1) => match elem_type {
                 ElemType::Base => "Felt::ONE".to_string(),
                 ElemType::Ext => "E::ONE".to_string(),
             },
-            Value::Constant(ConstantValue::Inline(value)) => match elem_type {
+            Value::InlineConstant(value) => match elem_type {
                 ElemType::Base => format!("Felt::new({value})"),
                 ElemType::Ext => format!("E::from({value}_u64)"),
             },
-            Value::Constant(ConstantValue::Scalar(ident)) => match elem_type {
-                ElemType::Base => ident.to_string(),
-                ElemType::Ext => format!("E::from({ident})"),
-            },
-            Value::Constant(ConstantValue::Vector(vector_access)) => match elem_type {
-                ElemType::Base => format!("{}[{}]", vector_access.name(), vector_access.idx()),
-                ElemType::Ext => {
-                    format!("E::from({}[{}])", vector_access.name(), vector_access.idx())
+            Value::BoundConstant(binding_access) => {
+                let name = binding_access.name().to_string();
+                let access_type = binding_access.access_type();
+                let base_value = match access_type {
+                    AccessType::Default => name,
+                    AccessType::Vector(idx) => format!("{name}[{idx}]"),
+                    AccessType::Matrix(row_idx, col_idx) => {
+                        format!("{name}[{row_idx}][{col_idx}]",)
+                    }
+                };
+                match elem_type {
+                    ElemType::Base => base_value,
+                    ElemType::Ext => format!("E::from({base_value})"),
                 }
-            },
-            Value::Constant(ConstantValue::Matrix(matrix_access)) => match elem_type {
-                ElemType::Base => format!(
-                    "{}[{}][{}]",
-                    matrix_access.name(),
-                    matrix_access.row_idx(),
-                    matrix_access.col_idx()
-                ),
-                ElemType::Ext => format!(
-                    "E::from({}[{}][{}])",
-                    matrix_access.name(),
-                    matrix_access.row_idx(),
-                    matrix_access.col_idx()
-                ),
-            },
+            }
             Value::TraceElement(trace_access) => {
                 trace_access.to_string(ir, elem_type, trace_segment)
             }

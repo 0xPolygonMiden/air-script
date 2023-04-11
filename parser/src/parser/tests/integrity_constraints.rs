@@ -4,10 +4,9 @@ use super::{
 };
 use crate::{
     ast::{
-        ConstantBinding, ConstantValueExpr::*, ConstraintType, EvaluatorFunction,
-        EvaluatorFunctionCall, Expression::*, IntegrityStmt::*, MatrixAccess, TraceAccess,
+        AccessType, BindingAccess, ConstantBinding, ConstantValueExpr::*, ConstraintType,
+        EvaluatorFunction, EvaluatorFunctionCall, Expression::*, IntegrityStmt::*, TraceAccess,
         TraceBindingAccess, TraceBindingAccessSize, VariableBinding, VariableValueExpr,
-        VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -29,7 +28,10 @@ fn integrity_constraints() {
                 1,
             )),
             Add(
-                Box::new(Elem(Identifier("clk".to_string()))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("clk".to_string()),
+                    AccessType::Default,
+                ))),
                 Box::new(Const(1)),
             ),
         )),
@@ -61,7 +63,10 @@ fn multiple_integrity_constraints() {
                     1,
                 )),
                 Add(
-                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
                     Box::new(Const(1)),
                 ),
             )),
@@ -76,7 +81,10 @@ fn multiple_integrity_constraints() {
                         TraceBindingAccessSize::Full,
                         1,
                     ))),
-                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
                 Const(1),
             )),
@@ -94,8 +102,14 @@ fn integrity_constraint_with_periodic_col() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             Add(
-                Box::new(Elem(Identifier("k0".to_string()))),
-                Box::new(Elem(Identifier("b".to_string()))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("k0".to_string()),
+                    AccessType::Default,
+                ))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("b".to_string()),
+                    AccessType::Default,
+                ))),
             ),
             Const(0),
         )),
@@ -112,7 +126,10 @@ fn integrity_constraint_with_random_value() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             Add(
-                Box::new(Elem(Identifier("a".to_string()))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("a".to_string()),
+                    AccessType::Default,
+                ))),
                 Box::new(Rand(Identifier("rand".to_string()), 1)),
             ),
             Const(0),
@@ -143,18 +160,23 @@ fn integrity_constraint_with_constants() {
         SourceSection::IntegrityConstraints(vec![Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 Add(
-                    Box::new(Elem(Identifier("clk".to_string()))),
-                    Box::new(Elem(Identifier("A".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("A".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
                 Add(
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("B".to_string()),
-                        1,
+                        AccessType::Vector(1),
                     ))),
-                    Box::new(MatrixAccess(MatrixAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("C".to_string()),
-                        1,
-                        1,
+                        AccessType::Matrix(1, 1),
                     ))),
                 ),
             )),
@@ -180,10 +202,16 @@ fn integrity_constraint_with_variables() {
         VariableBinding(VariableBinding::new(
             Identifier("b".to_string()),
             VariableValueExpr::Vector(vec![
-                Elem(Identifier("a".to_string())),
+                BindingAccess(BindingAccess::new(
+                    Identifier("a".to_string()),
+                    AccessType::Default,
+                )),
                 Mul(
                     Box::new(Const(2)),
-                    Box::new(Elem(Identifier("a".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
             ]),
         )),
@@ -192,35 +220,52 @@ fn integrity_constraint_with_variables() {
             VariableValueExpr::Matrix(vec![
                 vec![
                     Sub(
-                        Box::new(Elem(Identifier("a".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("a".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(1)),
                     ),
                     Exp(
-                        Box::new(Elem(Identifier("a".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("a".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(2)),
                     ),
                 ],
                 vec![
-                    VectorAccess(VectorAccess::new(Identifier("b".to_string()), 0)),
-                    VectorAccess(VectorAccess::new(Identifier("b".to_string()), 1)),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("b".to_string()),
+                        AccessType::Vector(0),
+                    )),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("b".to_string()),
+                        AccessType::Vector(1),
+                    )),
                 ],
             ]),
         )),
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 Add(
-                    Box::new(Elem(Identifier("clk".to_string()))),
-                    Box::new(Elem(Identifier("a".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
                 Add(
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("b".to_string()),
-                        1,
+                        AccessType::Vector(1),
                     ))),
-                    Box::new(MatrixAccess(MatrixAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("c".to_string()),
-                        1,
-                        1,
+                        AccessType::Matrix(1, 1),
                     ))),
                 ),
             )),
@@ -281,10 +326,19 @@ fn ic_comprehension_one_iterable_identifier() {
         ]]),
         SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
             ConstraintType::Inline(IntegrityConstraint::new(
-                Elem(Identifier("x".to_string())),
+                BindingAccess(BindingAccess::new(
+                    Identifier("x".to_string()),
+                    AccessType::Default,
+                )),
                 Add(
-                    Box::new(Elem(Identifier("a".to_string()))),
-                    Box::new(Elem(Identifier("b".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("b".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
             )),
             None,
@@ -314,10 +368,19 @@ fn ic_comprehension_one_iterable_range() {
         ]]),
         SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
             ConstraintType::Inline(IntegrityConstraint::new(
-                Elem(Identifier("x".to_string())),
+                BindingAccess(BindingAccess::new(
+                    Identifier("x".to_string()),
+                    AccessType::Default,
+                )),
                 Add(
-                    Box::new(Elem(Identifier("a".to_string()))),
-                    Box::new(Elem(Identifier("b".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("b".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
             )),
             None,
@@ -348,20 +411,29 @@ fn ic_comprehension_with_selectors() {
         ]]),
         SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
             ConstraintType::Inline(IntegrityConstraint::new(
-                Elem(Identifier("x".to_string())),
+                BindingAccess(BindingAccess::new(
+                    Identifier("x".to_string()),
+                    AccessType::Default,
+                )),
                 Add(
-                    Box::new(Elem(Identifier("a".to_string()))),
-                    Box::new(Elem(Identifier("b".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("b".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
             )),
             Some(Mul(
-                Box::new(VectorAccess(VectorAccess::new(
+                Box::new(BindingAccess(BindingAccess::new(
                     Identifier("s".to_string()),
-                    0,
+                    AccessType::Vector(0),
                 ))),
-                Box::new(VectorAccess(VectorAccess::new(
+                Box::new(BindingAccess(BindingAccess::new(
                     Identifier("s".to_string()),
-                    1,
+                    AccessType::Vector(1),
                 ))),
             )),
             vec![(
@@ -392,10 +464,16 @@ fn ic_comprehension_with_evaluator_call() {
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
                     Exp(
-                        Box::new(Elem(Identifier("x".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("x".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(2)),
                     ),
-                    Elem(Identifier("x".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                    )),
                 )),
                 None,
             )],
@@ -445,10 +523,16 @@ fn ic_comprehension_with_evaluator_and_selectors() {
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
                     Exp(
-                        Box::new(Elem(Identifier("x".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("x".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(2)),
                     ),
-                    Elem(Identifier("x".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                    )),
                 )),
                 None,
             )],
@@ -471,13 +555,13 @@ fn ic_comprehension_with_evaluator_and_selectors() {
                 )]],
             )),
             Some(Mul(
-                Box::new(VectorAccess(VectorAccess::new(
+                Box::new(BindingAccess(BindingAccess::new(
                     Identifier("s".to_string()),
-                    0,
+                    AccessType::Vector(0),
                 ))),
-                Box::new(VectorAccess(VectorAccess::new(
+                Box::new(BindingAccess(BindingAccess::new(
                     Identifier("s".to_string()),
-                    1,
+                    AccessType::Vector(1),
                 ))),
             )),
             vec![(

@@ -1,17 +1,11 @@
-use super::{Identifier, ListFolding, MatrixAccess, TraceAccess, TraceBindingAccess, VectorAccess};
+use super::{BindingAccess, Identifier, ListFolding, TraceAccess, TraceBindingAccess};
 
 /// Arithmetic expressions for evaluation of constraints.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Expression {
     Const(u64),
-    /// Represents any named constant or variable.
-    Elem(Identifier),
-    /// Represents an element inside a constant or variable vector. [VectorAccess] contains the
-    /// name of the vector and the index of the element to access.
-    VectorAccess(VectorAccess),
-    /// Represents an element inside a constant or variable matrix. [MatrixAccess] contains the
-    /// name of the matrix and indices of the element to access.
-    MatrixAccess(MatrixAccess),
+    /// Represents a reference to all or part of a constant, variable, or trace binding.
+    BindingAccess(BindingAccess),
     TraceAccess(TraceAccess),
     TraceBindingAccess(TraceBindingAccess),
     /// Represents a random value provided by the verifier. The first inner value is the name of

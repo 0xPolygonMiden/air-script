@@ -1,8 +1,8 @@
 use super::{AirIR, Impl, Scope};
-use air_script_core::{ConstantBinding, ConstantValueExpr, TraceAccess};
+use air_script_core::{AccessType, ConstantBinding, ConstantValueExpr, TraceAccess};
 use ir::{
     constraints::{AlgebraicGraph, ConstraintDomain, Operation},
-    ConstantValue, IntegrityConstraintDegree, NodeIndex, PeriodicColumn, Value,
+    IntegrityConstraintDegree, NodeIndex, PeriodicColumn, Value,
 };
 
 mod constants;

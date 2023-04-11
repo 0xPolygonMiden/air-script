@@ -53,7 +53,9 @@ impl AlgebraicGraph {
         // recursively walk the subgraph and infer the trace segment and domain
         match self.node(index).op() {
             Operation::Value(value) => match value {
-                Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
+                Value::InlineConstant(_) | Value::BoundConstant(_) => {
+                    Ok((DEFAULT_SEGMENT, default_domain))
+                }
                 Value::PeriodicColumn(_, _) => {
                     if default_domain.is_boundary() {
                         return Err(SemanticError::invalid_periodic_column_access_in_bc());
@@ -120,7 +122,10 @@ impl AlgebraicGraph {
         // recursively walk the subgraph and compute the degree from the operation and child nodes
         match self.node(index).op() {
             Operation::Value(value) => match value {
-                Value::Constant(_) | Value::RandomValue(_) | Value::PublicInput(_, _) => 0,
+                Value::InlineConstant(_)
+                | Value::BoundConstant(_)
+                | Value::RandomValue(_)
+                | Value::PublicInput(_, _) => 0,
                 Value::TraceElement(_) => 1,
                 Value::PeriodicColumn(index, cycle_len) => {
                     cycles.insert(*index, *cycle_len);

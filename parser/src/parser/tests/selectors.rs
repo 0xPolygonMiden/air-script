@@ -1,6 +1,7 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::ast::{
-    ConstraintType, Expression::*, IntegrityStmt::*, TraceBindingAccess, TraceBindingAccessSize,
+    AccessType, BindingAccess, ConstraintType, Expression::*, IntegrityStmt::*, TraceBindingAccess,
+    TraceBindingAccessSize,
 };
 
 // SELECTORS
@@ -20,10 +21,16 @@ fn single_selector() {
                 TraceBindingAccessSize::Full,
                 1,
             )),
-            Elem(Identifier("clk".to_string())),
+            BindingAccess(BindingAccess::new(
+                Identifier("clk".to_string()),
+                AccessType::Default,
+            )),
         )),
         // n1
-        Some(Elem(Identifier("n1".to_string()))),
+        Some(BindingAccess(BindingAccess::new(
+            Identifier("n1".to_string()),
+            AccessType::Default,
+        ))),
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -42,34 +49,55 @@ fn chained_selectors() {
                 TraceBindingAccessSize::Full,
                 1,
             )),
-            Elem(Identifier("clk".to_string())),
+            BindingAccess(BindingAccess::new(
+                Identifier("clk".to_string()),
+                AccessType::Default,
+            )),
         )),
         // (n1 & !n2) | !n3
         Some(Sub(
             Box::new(Add(
                 Box::new(Mul(
-                    Box::new(Elem(Identifier("n1".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("n1".to_string()),
+                        AccessType::Default,
+                    ))),
                     Box::new(Sub(
                         Box::new(Const(1)),
-                        Box::new(Elem(Identifier("n2".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("n2".to_string()),
+                            AccessType::Default,
+                        ))),
                     )),
                 )),
                 Box::new(Sub(
                     Box::new(Const(1)),
-                    Box::new(Elem(Identifier("n3".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("n3".to_string()),
+                        AccessType::Default,
+                    ))),
                 )),
             )),
             Box::new(Mul(
                 Box::new(Mul(
-                    Box::new(Elem(Identifier("n1".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("n1".to_string()),
+                        AccessType::Default,
+                    ))),
                     Box::new(Sub(
                         Box::new(Const(1)),
-                        Box::new(Elem(Identifier("n2".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("n2".to_string()),
+                            AccessType::Default,
+                        ))),
                     )),
                 )),
                 Box::new(Sub(
                     Box::new(Const(1)),
-                    Box::new(Elem(Identifier("n3".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("n3".to_string()),
+                        AccessType::Default,
+                    ))),
                 )),
             )),
         )),
@@ -98,10 +126,16 @@ fn multiconstraint_selectors() {
                 Const(0),
             )),
             Some(Mul(
-                Box::new(Elem(Identifier("n1".to_string()))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("n1".to_string()),
+                    AccessType::Default,
+                ))),
                 Box::new(Sub(
                     Box::new(Const(1)),
-                    Box::new(Elem(Identifier("n2".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("n2".to_string()),
+                        AccessType::Default,
+                    ))),
                 )),
             )),
         ),
@@ -114,11 +148,20 @@ fn multiconstraint_selectors() {
                     TraceBindingAccessSize::Full,
                     1,
                 )),
-                Elem(Identifier("clk".to_string())),
+                BindingAccess(BindingAccess::new(
+                    Identifier("clk".to_string()),
+                    AccessType::Default,
+                )),
             )),
             Some(Mul(
-                Box::new(Elem(Identifier("n1".to_string()))),
-                Box::new(Elem(Identifier("n2".to_string()))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("n1".to_string()),
+                    AccessType::Default,
+                ))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("n2".to_string()),
+                    AccessType::Default,
+                ))),
             )),
         ),
         Constraint(
@@ -135,11 +178,17 @@ fn multiconstraint_selectors() {
             Some(Mul(
                 Box::new(Sub(
                     Box::new(Const(1)),
-                    Box::new(Elem(Identifier("n1".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("n1".to_string()),
+                        AccessType::Default,
+                    ))),
                 )),
                 Box::new(Sub(
                     Box::new(Const(1)),
-                    Box::new(Elem(Identifier("n2".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("n2".to_string()),
+                        AccessType::Default,
+                    ))),
                 )),
             )),
         ),

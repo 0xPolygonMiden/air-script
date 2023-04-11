@@ -1,7 +1,7 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::ast::{
-    ConstraintType, Expression::*, IntegrityStmt::*, TraceBindingAccess, TraceBindingAccessSize,
-    VariableBinding, VariableValueExpr, VectorAccess,
+    AccessType, BindingAccess, ConstraintType, Expression::*, IntegrityStmt::*, TraceBindingAccess,
+    TraceBindingAccessSize, VariableBinding, VariableValueExpr,
 };
 
 // VARIABLES
@@ -16,10 +16,16 @@ fn variables_with_and_operators() {
         VariableBinding(VariableBinding::new(
             Identifier("flag".to_string()),
             VariableValueExpr::Scalar(Mul(
-                Box::new(Elem(Identifier("n1".to_string()))),
+                Box::new(BindingAccess(BindingAccess::new(
+                    Identifier("n1".to_string()),
+                    AccessType::Default,
+                ))),
                 Box::new(Sub(
                     Box::new(Const(1)),
-                    Box::new(Elem(Identifier("n2".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("n2".to_string()),
+                        AccessType::Default,
+                    ))),
                 )),
             )),
         )),
@@ -32,11 +38,17 @@ fn variables_with_and_operators() {
                     1,
                 )),
                 Add(
-                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
                     Box::new(Const(1)),
                 ),
             )),
-            Some(Elem(Identifier("flag".to_string()))),
+            Some(BindingAccess(BindingAccess::new(
+                Identifier("flag".to_string()),
+                AccessType::Default,
+            ))),
         ),
     ])]);
     build_parse_test!(source).expect_ast(expected);
@@ -53,9 +65,9 @@ fn variables_with_or_operators() {
             Identifier("flag".to_string()),
             VariableValueExpr::Scalar(Sub(
                 Box::new(Add(
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("s".to_string()),
-                        0,
+                        AccessType::Vector(0),
                     ))),
                     Box::new(Sub(
                         Box::new(Const(1)),
@@ -68,9 +80,9 @@ fn variables_with_or_operators() {
                     )),
                 )),
                 Box::new(Mul(
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("s".to_string()),
-                        0,
+                        AccessType::Vector(0),
                     ))),
                     Box::new(Sub(
                         Box::new(Const(1)),
@@ -93,11 +105,17 @@ fn variables_with_or_operators() {
                     1,
                 )),
                 Add(
-                    Box::new(Elem(Identifier("clk".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                    ))),
                     Box::new(Const(1)),
                 ),
             )),
-            Some(Elem(Identifier("flag".to_string()))),
+            Some(BindingAccess(BindingAccess::new(
+                Identifier("flag".to_string()),
+                AccessType::Default,
+            ))),
         ),
     ])]);
     build_parse_test!(source).expect_ast(expected);

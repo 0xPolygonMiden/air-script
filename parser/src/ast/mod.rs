@@ -1,8 +1,8 @@
 pub(crate) use air_script_core::{
-    ComprehensionContext, ConstantBinding, ConstantValueExpr, Expression, Identifier, Iterable,
-    ListComprehension, ListFolding, ListFoldingValueExpr, MatrixAccess, Range, TraceAccess,
-    TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment, VariableBinding,
-    VariableValueExpr, VectorAccess,
+    AccessType, BindingAccess, ComprehensionContext, ConstantBinding, ConstantValueExpr,
+    Expression, Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, Range,
+    TraceAccess, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment,
+    VariableBinding, VariableValueExpr,
 };
 
 // declaration modules
@@ -37,8 +37,8 @@ pub struct Source(pub Vec<SourceSection>);
 /// - AirDef: Name of the air constraints module.
 ///
 /// The type declaration sections are:
-/// - ConstantBinding: A constant is represented by a name and a value. Each [ConstantBinding] source section
-///   declares a single constant.
+/// - Constant: A constant is represented by a name and a value. Each [ConstantBinding] source
+///   section declares a single constant.
 /// - EvaluatorFunction: Evaluator functions take descriptions of the main and auxiliary traces as
 ///   input, and enforce integrity constraints on those trace columns. Each [EvaluatorFunction]
 ///   source section declares a single evaluator function

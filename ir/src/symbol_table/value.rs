@@ -1,9 +1,11 @@
-use super::{MatrixAccess, TraceAccess, VectorAccess};
+use super::{BindingAccess, TraceAccess};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Value {
-    /// An inlined or named constant with identifier and access indices.
-    Constant(ConstantValue),
+    /// A named constant with identifier and access indices.
+    BoundConstant(BindingAccess),
+    /// An inlined constant value.
+    InlineConstant(u64),
     /// An identifier for an element in the trace segment, column, and row offset specified by the
     /// [TraceAccess]
     TraceElement(TraceAccess),
@@ -18,12 +20,4 @@ pub enum Value {
     /// A random value provided by the verifier. The inner value is the index of this random value
     /// in the array of all random values.
     RandomValue(usize),
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum ConstantValue {
-    Inline(u64),
-    Scalar(String),
-    Vector(VectorAccess),
-    Matrix(MatrixAccess),
 }

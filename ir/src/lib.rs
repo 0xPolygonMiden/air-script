@@ -1,7 +1,7 @@
 pub use air_script_core::{
-    ConstantBinding, ConstantValueExpr, Expression, Identifier, Iterable, ListComprehension,
-    ListFolding, ListFoldingValueExpr, MatrixAccess, TraceAccess, TraceBinding, TraceBindingAccess,
-    TraceBindingAccessSize, TraceSegment, VariableBinding, VariableValueExpr, VectorAccess,
+    AccessType, BindingAccess, ConstantBinding, ConstantValueExpr, Expression, Identifier,
+    Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, TraceAccess, TraceBinding,
+    TraceBindingAccess, TraceBindingAccessSize, TraceSegment, VariableBinding, VariableValueExpr,
 };
 pub use parser::ast;
 use std::collections::{BTreeMap, BTreeSet};
@@ -21,8 +21,8 @@ use declarations::Declarations;
 pub use declarations::{PeriodicColumn, PublicInput};
 
 mod symbol_table;
-use symbol_table::{AccessType, Symbol, SymbolTable, SymbolType, ValidateAccess};
-pub use symbol_table::{ConstantValue, Value};
+pub use symbol_table::Value;
+use symbol_table::{Symbol, SymbolTable, SymbolType};
 
 mod validation;
 use validation::{SemanticError, SourceValidator};

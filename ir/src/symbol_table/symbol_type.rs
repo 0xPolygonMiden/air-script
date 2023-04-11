@@ -4,7 +4,7 @@ use std::fmt::Display;
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) enum SymbolType {
     /// an identifier for a constant, containing its type and value
-    Constant(ConstantValueExpr),
+    ConstantBinding(ConstantValueExpr),
     /// an identifier for a binding to one or more trace columns, containing the trace binding
     /// information with its identifier, trace segment, size, and offset.
     TraceBinding(TraceBinding),
@@ -14,7 +14,7 @@ pub(crate) enum SymbolType {
     /// its cycle length in that order.
     PeriodicColumn(usize, usize),
     /// an expression or set of expressions associated with a variable
-    Variable(VariableValueExpr),
+    VariableBinding(VariableValueExpr),
     /// an identifier for random value, containing its index in the random values array and its
     /// length if this value is an array. For non-array random values second parameter is always 1.
     RandomValuesBinding(usize, usize),
@@ -23,13 +23,13 @@ pub(crate) enum SymbolType {
 impl Display for SymbolType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Constant(_) => write!(f, "Constant"),
+            Self::ConstantBinding(_) => write!(f, "ConstantBinding"),
             Self::TraceBinding(binding) => {
                 write!(f, "TraceBinding in segment {}", binding.trace_segment())
             }
             Self::PublicInput(_) => write!(f, "PublicInput"),
             Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
-            Self::Variable(_) => write!(f, "Variable"),
+            Self::VariableBinding(_) => write!(f, "VariableBinding"),
             Self::RandomValuesBinding(_, _) => write!(f, "RandomValuesBinding"),
         }
     }
