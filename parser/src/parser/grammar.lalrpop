@@ -60,11 +60,11 @@ Trace: Vec<Vec<TraceBinding>> = {
 }
 
 MainTraceBindings: Vec<TraceBinding> = {
-    "main" ":" "[" <main_cols: CommaElems<TraceBinding>> "]" => build_trace_bindings(0, main_cols),
+    "main" ":" <main_cols: Vector<TraceBinding>> => build_trace_bindings(0, main_cols),
 }
 
 AuxTraceBindings: Vec<TraceBinding> = {
-    "aux" ":" "[" <aux_cols: CommaElems<TraceBinding>> "]" => build_trace_bindings(1, aux_cols),
+    "aux" ":" <aux_cols: Vector<TraceBinding>> => build_trace_bindings(1, aux_cols),
 }
 
 TraceBinding: (Identifier, u64) = {
@@ -78,9 +78,9 @@ TraceBinding: (Identifier, u64) = {
 Constant: Constant = {
     "const" <name: ConstName> "=" <scalar_value: Num_u64> => 
         Constant::new(name, ConstantType::Scalar(scalar_value)),
-    "const" <name: ConstName> "=" "[" <vector_value: CommaElems<Num_u64>> "]" =>
+    "const" <name: ConstName> "=" <vector_value: Vector<Num_u64>> =>
         Constant::new(name, ConstantType::Vector(vector_value)),
-    "const" <name: ConstName> "=" "[" <matrix_value: CommaElems<Vector<Num_u64>>> "]" =>
+    "const" <name: ConstName> "=" <matrix_value: Matrix<Num_u64>> =>
         Constant::new(name, ConstantType::Matrix(matrix_value)),
 }
 
@@ -117,7 +117,7 @@ PeriodicColumns: Vec<PeriodicColumn> = {
 }
 
 PeriodicColumn: PeriodicColumn = {
-    <name: Identifier> ":" "[" <values: CommaElems<Num_u64>> "]" =>
+    <name: Identifier> ":" <values: Vector<Num_u64>> =>
         PeriodicColumn::new(name, values),
 }
 
@@ -146,7 +146,7 @@ RandValuesDecl: RandomValues = {
             )
         }
     ),
-    <name: Identifier> ":" "[" <rand_vec: CommaElems<RandElem>> "]" =>
+    <name: Identifier> ":" <rand_vec: Vector<RandElem>> =>
         RandomValues::new(name, rand_vec.iter().map(|v| v.size()).sum(), rand_vec)
 }
 
@@ -221,11 +221,11 @@ BoundaryConstraintExpr: BoundaryConstraint = {
 }
 
 BoundaryVariableType: VariableType = {
-    <scalar_value: BoundaryExpr> =>
+    <scalar_value: BoundaryExpr> => 
         VariableType::Scalar(scalar_value),
-    "[" <vector_value: CommaElems<BoundaryExpr>> "]" =>
+    <vector_value: Vector<BoundaryExpr>> => 
         VariableType::Vector(vector_value),
-    "[" <matrix_value: CommaElems<Vector<BoundaryExpr>>> "]" =>
+    <matrix_value: Matrix<BoundaryExpr>> =>
         VariableType::Matrix(matrix_value),
     "[" <list_comprehension: ListComprehension<BoundaryExpr>> "]" =>
         VariableType::ListComprehension(list_comprehension),
@@ -330,9 +330,9 @@ IntegrityConstraintWithSelector: IntegrityStmt = {
 IntegrityVariableType: VariableType = {
     <scalar_value: IntegrityExpr> =>
         VariableType::Scalar(scalar_value),
-    "[" <vector_value: CommaElems<IntegrityExpr>> "]" =>
+    <vector_value: Vector<IntegrityExpr>> => 
         VariableType::Vector(vector_value),
-    "[" <matrix_value: CommaElems<Vector<IntegrityExpr>>> "]" =>
+    <matrix_value: Matrix<IntegrityExpr>> =>
         VariableType::Matrix(matrix_value),
     "[" <list_comprehension: ListComprehension<IntegrityExpr>> "]" =>
         VariableType::ListComprehension(list_comprehension),
@@ -426,6 +426,10 @@ Tuple<T>: Vec<T> = {
 
 Vector<T>: Vec<T> = {
     "[" <elems: CommaElems<T>> "]" => elems
+}
+
+Matrix<T>: Vec<Vec<T>> = {
+    <elems: Vector<Vector<T>>> => elems
 }
 
 Size: u64 = {
