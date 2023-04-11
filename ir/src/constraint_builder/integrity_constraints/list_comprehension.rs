@@ -79,11 +79,11 @@ impl ConstraintBuilder {
     /// - Returns an error if the iterable is an identifier and that identifier does not correspond to
     ///   a vector.
     /// - Returns an error if the iterable is an identifier but is not of a type in set:
-    ///   { TraceColumns, IntegrityVariable, PublicInput, RandomValuesBinding }.
+    ///   { TraceBinding, IntegrityVariable, PublicInput, RandomValuesBinding }.
     /// - Returns an error if the iterable is a slice and that identifier does not correspond to
     ///   a vector.
     /// - Returns an error if the iterable is an identifier but is not of a type in set:
-    ///   { TraceColumns, IntegrityVariable, PublicInput, RandomValuesBinding }.
+    ///   { TraceBinding, IntegrityVariable, PublicInput, RandomValuesBinding }.
     fn parse_elem(
         &self,
         ident: &Identifier,
@@ -132,7 +132,7 @@ impl ConstraintBuilder {
                 Iterable::Identifier(ident) => {
                     let symbol = self.symbol_table.get_symbol(ident.name())?;
                     match symbol.symbol_type() {
-                        SymbolType::TraceColumns(size) => {
+                        SymbolType::TraceBinding(size) => {
                             validate_access(i, size.size())?;
                             Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
                                 ident.clone(),
@@ -153,7 +153,7 @@ impl ConstraintBuilder {
                 Iterable::Slice(ident, range) => {
                     let symbol = self.symbol_table.get_symbol(ident.name())?;
                     match symbol.symbol_type() {
-                        SymbolType::TraceColumns(trace_columns) => {
+                        SymbolType::TraceBinding(trace_columns) => {
                             validate_access(i, trace_columns.size())?;
                             Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
                                 ident.clone(),
@@ -231,7 +231,7 @@ impl ConstraintBuilder {
     /// - Returns an error if the iterable identifier is anything other than a vector in the symbol
     ///   table if it's a variable.
     /// - Returns an error if the iterable is not of type in set:
-    ///   { IntegrityVariable, PublicInput, TraceColumns }
+    ///   { IntegrityVariable, PublicInput, TraceBinding }
     fn get_iterable_len(&self, iterable: &Iterable) -> Result<usize, SemanticError> {
         match iterable {
             Iterable::Identifier(ident) => {
@@ -245,7 +245,7 @@ impl ConstraintBuilder {
                         ))),
                     },
                     SymbolType::PublicInput(size) => Ok(*size),
-                    SymbolType::TraceColumns(trace_columns) => Ok(trace_columns.size()),
+                    SymbolType::TraceBinding(trace_columns) => Ok(trace_columns.size()),
                     _ => Err(SemanticError::InvalidListComprehension(format!(
                         "SymbolType {} not supported for list comprehensions",
                         symbol.symbol_type()
@@ -295,12 +295,12 @@ fn build_iterable_context(lc: &ListComprehension) -> Result<IterableContext, Sem
 ///
 /// # Errors
 /// - Returns an error if the identifier is not of type in set:
-///  { IntegrityVariable, PublicInput, TraceColumns, RandomValuesBinding }
+///  { IntegrityVariable, PublicInput, TraceBinding, RandomValuesBinding }
 /// - Returns an error if the access index is greater than the size of the vector.
 /// - Returns an error if the identifier is not a vector in the symbol table if it's a variable.
 fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, SemanticError> {
     match symbol.symbol_type() {
-        SymbolType::TraceColumns(trace_columns) => {
+        SymbolType::TraceBinding(trace_columns) => {
             validate_access(i, trace_columns.size())?;
             let trace_segment = trace_columns.trace_segment();
             Ok(Expression::TraceAccess(TraceAccess::new(
@@ -347,7 +347,7 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
 ///
 /// # Errors
 /// - Returns an error if the identifier is not of type in set:
-/// { IntegrityVariable, PublicInput, TraceColumns, RandomValuesBinding }
+/// { IntegrityVariable, PublicInput, TraceBinding, RandomValuesBinding }
 /// - Returns an error if the access index is greater than the size of the vector.
 /// - Returns an error if the identifier is not a vector in the symbol table if it's a variable.
 fn build_slice_ident_expression(
@@ -356,7 +356,7 @@ fn build_slice_ident_expression(
     i: usize,
 ) -> Result<Expression, SemanticError> {
     match symbol.symbol_type() {
-        SymbolType::TraceColumns(trace_columns) => {
+        SymbolType::TraceBinding(trace_columns) => {
             validate_access(i, trace_columns.size())?;
             Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
                 Identifier(symbol.name().to_string()),

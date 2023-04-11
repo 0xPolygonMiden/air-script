@@ -35,7 +35,7 @@ impl ConstraintBuilder {
                             ))
                         }
                     }
-                    SymbolType::TraceColumns(columns) => {
+                    SymbolType::TraceBinding(columns) => {
                         if columns.size() > 1 {
                             let trace_segment = columns.trace_segment();
                             Ok((0..columns.size())

@@ -38,7 +38,7 @@ impl Symbol {
             SymbolType::RandomValuesBinding(offset, size) => {
                 self.get_random_value(*offset, *size, access_type)
             }
-            SymbolType::TraceColumns(columns) => self.get_trace_value(columns, access_type),
+            SymbolType::TraceBinding(columns) => self.get_trace_value(columns, access_type),
             SymbolType::Variable(_) => {
                 unreachable!("Variable values cannot be accessed directly, since they reference expressions which must be added to the graph");
             }

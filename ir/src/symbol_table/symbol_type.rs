@@ -5,9 +5,9 @@ use std::fmt::Display;
 pub(crate) enum SymbolType {
     /// an identifier for a constant, containing its type and value
     Constant(ConstantType),
-    /// an identifier for a trace column, containing trace column information with its trace
-    /// segment, its size and its offset.
-    TraceColumns(TraceBinding),
+    /// an identifier for a binding to one or more trace columns, containing the trace binding
+    /// information with its identifier, trace segment, size, and offset.
+    TraceBinding(TraceBinding),
     /// an identifier for a public input, containing the size of the public input array
     PublicInput(usize),
     /// an identifier for a periodic column, containing its index out of all periodic columns and
@@ -24,8 +24,8 @@ impl Display for SymbolType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Constant(_) => write!(f, "Constant"),
-            Self::TraceColumns(columns) => {
-                write!(f, "TraceColumns in segment {}", columns.trace_segment())
+            Self::TraceBinding(binding) => {
+                write!(f, "TraceBinding in segment {}", binding.trace_segment())
             }
             Self::PublicInput(_) => write!(f, "PublicInput"),
             Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
