@@ -227,12 +227,6 @@ impl SemanticError {
         SemanticError::TooManyConstraints(format!("A constraint was already defined at {boundary}"))
     }
 
-    pub(crate) fn trace_segment_mismatch(segment: TraceSegment) -> Self {
-        SemanticError::InvalidUsage(format!(
-            "The constraint expression cannot be enforced against trace segment {segment}"
-        ))
-    }
-
     pub(crate) fn invalid_list_folding(
         lf_value_type: &air_script_core::ListFoldingValueType,
         symbol_type: &SymbolType,
@@ -247,6 +241,12 @@ impl SemanticError {
     ) -> SemanticError {
         SemanticError::InvalidListFolding(format!(
             "List folding value cannot be an empty list. {lf_value_type:?} represents an empty list.",
+        ))
+    }
+
+    pub(crate) fn trace_segment_mismatch(segment: TraceSegment) -> Self {
+        SemanticError::InvalidUsage(format!(
+            "The constraint expression cannot be enforced against trace segment {segment}"
         ))
     }
 }

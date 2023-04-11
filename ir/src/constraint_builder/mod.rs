@@ -1,11 +1,10 @@
-use crate::constraints::{AlgebraicGraph, NodeIndex, Operation};
-
 use super::{
-    ast, AccessType, BTreeMap, BTreeSet, ConstantType, ConstantValue, ConstraintDomain,
-    ConstraintRoot, Constraints, Declarations, Expression, Identifier, Iterable, ListComprehension,
-    ListFoldingType, ListFoldingValueType, MatrixAccess, SemanticError, Symbol, SymbolTable,
-    SymbolType, TraceAccess, TraceBindingAccess, TraceBindingAccessSize, TraceSegment,
-    ValidateAccess, Value, Variable, VariableType, VectorAccess, CURRENT_ROW,
+    ast, AccessType, AlgebraicGraph, BTreeMap, BTreeSet, ConstantType, ConstantValue,
+    ConstraintDomain, ConstraintRoot, Constraints, Declarations, Expression, Identifier, Iterable,
+    ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, NodeIndex, Operation,
+    SemanticError, Symbol, SymbolTable, SymbolType, TraceAccess, TraceBindingAccess,
+    TraceBindingAccessSize, TraceSegment, ValidateAccess, Value, Variable, VariableType,
+    VectorAccess, CURRENT_ROW,
 };
 
 mod boundary_constraints;
@@ -49,10 +48,14 @@ impl ConstraintBuilder {
         let num_trace_segments = symbol_table.num_trace_segments();
         Self {
             symbol_table,
+
+            // context variables
             constrained_boundaries: BTreeSet::new(),
-            graph: AlgebraicGraph::default(),
+
+            // accumulated data in the current context
             boundary_constraints: vec![Vec::new(); num_trace_segments],
             integrity_constraints: vec![Vec::new(); num_trace_segments],
+            graph: AlgebraicGraph::default(),
         }
     }
 
@@ -116,7 +119,6 @@ impl ConstraintBuilder {
 
         // add the constraint to the constraints
         let constraint_root = ConstraintRoot::new(root, domain);
-
         // add the constraint to the appropriate set of constraints.
         if domain.is_boundary() {
             self.boundary_constraints[trace_segment].push(constraint_root);

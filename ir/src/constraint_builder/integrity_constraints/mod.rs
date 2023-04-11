@@ -24,11 +24,12 @@ impl ConstraintBuilder {
     ) -> Result<(), SemanticError> {
         match stmt {
             IntegrityStmt::Constraint(ConstraintType::Inline(constraint), _) => {
+                let (lhs, rhs) = constraint.into_parts();
                 // add the left hand side expression to the graph.
-                let lhs = self.insert_expr(constraint.lhs())?;
+                let lhs = self.insert_expr(lhs)?;
 
                 // add the right hand side expression to the graph.
-                let rhs = self.insert_expr(constraint.rhs())?;
+                let rhs = self.insert_expr(rhs)?;
 
                 // merge the two sides of the expression into a constraint.
                 let root = self.merge_equal_exprs(lhs, rhs);
