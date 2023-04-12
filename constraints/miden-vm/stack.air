@@ -311,6 +311,38 @@ ev stack_constraints([stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6]
         u32madd([stack_top, op_helpers])      when op_flags[71]
 
 
+ev overflow_table_constraints(
+    main: [stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6], clk, fmp], 
+    aux: [p1]
+):
+    # Flag to indicate whether the overflow table contains values (overflow flag).
+    let f_ov = (stack_helpers[0] - 16) * stack_helpers[2]
+    
+    # Enforce that overflow flag is set correctly.
+    enf (1 - f_ov) * (stack_helpers[0] - 16) = 0
+
+    # Enforce that stack depth column stack_helpers[0] (bookkeeping[0]) is updated correctly.
+    enf stack_helpers[0]' - stack_helpers[0] + f_shl(op_bits, op_helpers) * f_ov - f_shr(op_bits) = 0
+
+    # Value of the row to be added to the table
+    let v = $alpha[0] + $alpha[1] * clk + $alpha[2] * stack_top[15] + $alpha[3] * stack_helpers[1]
+
+    # Value of the row to be removed from the table
+    let u = $alpha[0] + $alpha[1] * stack_helpers[1] + $alpha[2] * stack_top[15]' + alpha[3] * stack_helpers[1]'
+
+    # Enforce that right and left shifts update the overflow table correctly.
+    enf p1' * (u * f_shl(op_bits, op_helpers) * f_ov + 1 - f_shl(op_bits, op_helpers) * f_ov) = 
+        p1 * (v * f_shr(op_bits) + 1 - f_shr)
+
+    # Enforce that the next value of stack_helpers[1] (bookkeeping[1]) is set to the current value of clk.
+    enf f_shr(op_bits) * (stack_helpers[1]' - clk) = 0
+
+    # Enforce that when the overflow table is empty, 0 is "shifted in" from the right (i.e. stack_top[15] is set to 0).
+    enf f_shl(op_bits, op_helpers) * (1 - f_ov) * stack_top[15]' = 0
+
+    # TODO: enforce boundary constraints
+
+
 # No stack shift operations
 
 ev noop([s[16]]):
