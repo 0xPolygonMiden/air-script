@@ -78,3 +78,17 @@ impl Range {
         self.end
     }
 }
+
+/// Contains values to be iterated over in a comprehension such as list comprehension or constraint
+/// comprehension.
+///
+/// For example, in the list comprehension \[x + y + z for (x, y, z) in (x, 0..5, z\[1..6\])\],
+/// `x` is an Iterable of type Identifier representing the vector to iterate over,
+/// `0..5` is an Iterable of type Range representing the range to iterate over,
+/// `z[1..6]` is an Iterable of type Slice representing the slice of the vector z to iterate over.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Iterable {
+    Identifier(Identifier),
+    Range(Range),
+    Slice(Identifier, Range),
+}

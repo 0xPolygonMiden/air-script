@@ -1,4 +1,4 @@
-use super::{ComprehensionContext, Expression, Identifier, Range};
+use super::{Expression, Identifier, ListComprehension};
 use std::fmt::Display;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -42,43 +42,4 @@ impl Display for VariableType {
             Self::ListComprehension(_) => write!(f, "list comprehension"),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ListComprehension {
-    expression: Box<Expression>,
-    context: ComprehensionContext,
-}
-
-impl ListComprehension {
-    /// Creates a new list comprehension.
-    pub fn new(expression: Expression, context: ComprehensionContext) -> Self {
-        Self {
-            expression: Box::new(expression),
-            context,
-        }
-    }
-
-    /// Returns the expression that is evaluated for each member of the list.
-    pub fn expression(&self) -> &Expression {
-        &self.expression
-    }
-
-    /// Returns the context of the list comprehension.
-    pub fn context(&self) -> &[(Identifier, Iterable)] {
-        &self.context
-    }
-}
-
-/// Contains values to be iterated over in a list comprehension.
-///
-/// For e.g. in the list comprehension \[x + y + z for (x, y, z) in (x, 0..5, z\[1..6\])\],
-/// `x` is an Iterable of type Identifier representing the vector to iterate over,
-/// `0..5` is an Iterable of type Range representing the range to iterate over,
-/// `z[1..6]` is an Iterable of type Slice representing the slice of the vector z to iterate over.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Iterable {
-    Identifier(Identifier),
-    Range(Range),
-    Slice(Identifier, Range),
 }

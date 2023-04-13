@@ -1,5 +1,5 @@
 use super::{
-    get_variable_expr, AccessType, ConstantValue, ConstraintBuilder, Expression, ListFoldingType,
+    get_variable_expr, AccessType, ConstantValue, ConstraintBuilder, Expression, ListFolding,
     NodeIndex, Operation, SemanticError, SymbolType, TraceAccess, TraceBindingAccess, Value,
 };
 
@@ -175,12 +175,9 @@ impl ConstraintBuilder {
     /// # Errors
     /// - Panics if the list is empty.
     /// - Returns an error if the list cannot be unfolded properly.
-    fn insert_list_folding(
-        &mut self,
-        lf_type: ListFoldingType,
-    ) -> Result<NodeIndex, SemanticError> {
+    fn insert_list_folding(&mut self, lf_type: ListFolding) -> Result<NodeIndex, SemanticError> {
         match &lf_type {
-            ListFoldingType::Sum(lf_value_type) | ListFoldingType::Prod(lf_value_type) => {
+            ListFolding::Sum(lf_value_type) | ListFolding::Prod(lf_value_type) => {
                 let list = self.build_list_from_list_folding_value(lf_value_type)?;
                 if list.is_empty() {
                     return Err(SemanticError::list_folding_empty_list(lf_value_type));
@@ -190,8 +187,8 @@ impl ConstraintBuilder {
                 for elem in list.into_iter().skip(1) {
                     let expr = self.insert_expr(elem)?;
                     let op = match lf_type {
-                        ListFoldingType::Sum(_) => Operation::Add(acc, expr),
-                        ListFoldingType::Prod(_) => Operation::Mul(acc, expr),
+                        ListFolding::Sum(_) => Operation::Add(acc, expr),
+                        ListFolding::Prod(_) => Operation::Mul(acc, expr),
                     };
                     acc = self.insert_graph_node(op);
                 }

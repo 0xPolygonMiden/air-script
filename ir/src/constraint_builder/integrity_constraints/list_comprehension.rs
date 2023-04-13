@@ -1,7 +1,7 @@
 use super::{
-    BTreeMap, ConstraintBuilder, Expression, Identifier, Iterable, ListComprehension,
-    ListFoldingType, ListFoldingValueType, SemanticError, Symbol, SymbolType, TraceAccess,
-    TraceBindingAccess, TraceBindingAccessSize, VariableType, VectorAccess, CURRENT_ROW,
+    BTreeMap, ConstraintBuilder, Expression, Identifier, Iterable, ListComprehension, ListFolding,
+    ListFoldingValueType, SemanticError, Symbol, SymbolType, TraceAccess, TraceBindingAccess,
+    TraceBindingAccessSize, VariableType, VectorAccess, CURRENT_ROW,
 };
 
 /// Maps each identifier in the list comprehension to its corresponding [Iterable].
@@ -177,12 +177,12 @@ impl ConstraintBuilder {
     /// - Returns an error if there is an error while unfolding the list comprehension.
     fn parse_list_folding(
         &self,
-        lf_type: &ListFoldingType,
+        lf_type: &ListFolding,
         expression: &Expression,
         i: usize,
     ) -> Result<Expression, SemanticError> {
         match lf_type {
-            ListFoldingType::Sum(lf_value_type) | ListFoldingType::Prod(lf_value_type) => {
+            ListFolding::Sum(lf_value_type) | ListFolding::Prod(lf_value_type) => {
                 let list = self.build_list_from_list_folding_value(lf_value_type)?;
                 let iterable_context =
                     if let ListFoldingValueType::ListComprehension(lc) = lf_value_type {
@@ -197,8 +197,8 @@ impl ConstraintBuilder {
                 for elem in list.iter().skip(1) {
                     let expr = self.parse_lc_expr(elem, &iterable_context, i)?;
                     acc = match lf_type {
-                        ListFoldingType::Sum(_) => Expression::Add(Box::new(acc), Box::new(expr)),
-                        ListFoldingType::Prod(_) => Expression::Mul(Box::new(acc), Box::new(expr)),
+                        ListFolding::Sum(_) => Expression::Add(Box::new(acc), Box::new(expr)),
+                        ListFolding::Prod(_) => Expression::Mul(Box::new(acc), Box::new(expr)),
                     };
                 }
                 Ok(acc)
