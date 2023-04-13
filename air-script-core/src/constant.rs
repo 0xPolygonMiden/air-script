@@ -8,23 +8,23 @@ use super::Identifier;
 /// - Vector: \[1, 2, 3\]
 /// - Matrix: \[\[1, 2, 3\], \[4, 5, 6\]\]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Constant {
+pub struct ConstantBinding {
     name: Identifier,
     value: ConstantType,
 }
 
-impl Constant {
-    /// Returns a new instance of a [Constant]
+impl ConstantBinding {
+    /// Returns a new instance of a [ConstantBinding]
     pub fn new(name: Identifier, value: ConstantType) -> Self {
         Self { name, value }
     }
 
-    /// Returns the name of the [Constant]
+    /// Returns the name of the [ConstantBinding]
     pub fn name(&self) -> &Identifier {
         &self.name
     }
 
-    /// Returns the value of the [Constant]
+    /// Returns the value of the [ConstantBinding]
     pub fn value(&self) -> &ConstantType {
         &self.value
     }

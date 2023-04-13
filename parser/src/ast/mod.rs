@@ -1,8 +1,8 @@
 pub(crate) use air_script_core::{
-    ComprehensionContext, Constant, ConstantType, Expression, Identifier, Iterable,
+    ComprehensionContext, ConstantBinding, ConstantType, Expression, Identifier, Iterable,
     ListComprehension, ListFolding, ListFoldingValueType, MatrixAccess, Range, TraceAccess,
-    TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment, Variable, VariableType,
-    VectorAccess,
+    TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment, VariableBinding,
+    VariableType, VectorAccess,
 };
 
 // declaration modules
@@ -37,7 +37,7 @@ pub struct Source(pub Vec<SourceSection>);
 /// - AirDef: Name of the air constraints module.
 ///
 /// The type declaration sections are:
-/// - Constant: A constant is represented by a name and a value. Each [Constant] source section
+/// - ConstantBinding: A constant is represented by a name and a value. Each [ConstantBinding] source section
 ///   declares a single constant.
 /// - EvaluatorFunction: Evaluator functions take descriptions of the main and auxiliary traces as
 ///   input, and enforce integrity constraints on those trace columns. Each [EvaluatorFunction]
@@ -63,7 +63,7 @@ pub enum SourceSection {
     AirDef(Identifier),
 
     // type declarations
-    Constant(Constant),
+    Constant(ConstantBinding),
     EvaluatorFunction(EvaluatorFunction),
     PeriodicColumns(Vec<PeriodicColumn>),
     PublicInputs(Vec<PublicInput>),

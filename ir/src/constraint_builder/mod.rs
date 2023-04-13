@@ -3,7 +3,7 @@ use super::{
     ConstraintDomain, ConstraintRoot, Constraints, Declarations, Expression, Identifier, Iterable,
     ListComprehension, ListFolding, ListFoldingValueType, MatrixAccess, NodeIndex, Operation,
     SemanticError, Symbol, SymbolTable, SymbolType, TraceAccess, TraceBindingAccess,
-    TraceBindingAccessSize, TraceSegment, ValidateAccess, Value, Variable, VariableType,
+    TraceBindingAccessSize, TraceSegment, ValidateAccess, Value, VariableBinding, VariableType,
     VectorAccess, CURRENT_ROW,
 };
 

@@ -1,7 +1,7 @@
 use super::{
-    ast, BTreeMap, Constant, ConstantType, Declarations, Identifier, MatrixAccess, SemanticError,
-    TraceAccess, TraceBinding, TraceBindingAccess, Variable, VariableType, VectorAccess,
-    CURRENT_ROW, MIN_CYCLE_LENGTH,
+    ast, BTreeMap, ConstantBinding, ConstantType, Declarations, Identifier, MatrixAccess,
+    SemanticError, TraceAccess, TraceBinding, TraceBindingAccess, VariableBinding, VariableType,
+    VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
 
 mod symbol;
@@ -52,7 +52,10 @@ impl SymbolTable {
     }
 
     /// Add a constant by its identifier and value.
-    pub(super) fn insert_constant(&mut self, constant: Constant) -> Result<(), SemanticError> {
+    pub(super) fn insert_constant(
+        &mut self,
+        constant: ConstantBinding,
+    ) -> Result<(), SemanticError> {
         self.declarations.add_constant(constant.clone());
         let (name, constant_type) = constant.into_parts();
 
@@ -159,7 +162,10 @@ impl SymbolTable {
     }
 
     /// Inserts a variable into the symbol table.
-    pub(super) fn insert_variable(&mut self, variable: Variable) -> Result<(), SemanticError> {
+    pub(super) fn insert_variable(
+        &mut self,
+        variable: VariableBinding,
+    ) -> Result<(), SemanticError> {
         let (name, value) = variable.into_parts();
         self.insert_symbol(name, SymbolType::Variable(value))?;
         Ok(())

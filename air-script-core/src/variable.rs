@@ -2,12 +2,12 @@ use super::{Expression, Identifier, ListComprehension};
 use std::fmt::Display;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Variable {
+pub struct VariableBinding {
     name: Identifier,
     value: VariableType,
 }
 
-impl Variable {
+impl VariableBinding {
     pub fn new(name: Identifier, value: VariableType) -> Self {
         Self { name, value }
     }

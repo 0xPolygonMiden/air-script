@@ -1,4 +1,4 @@
-use super::{AirIR, Constant, ConstantType, Scope};
+use super::{AirIR, ConstantBinding, ConstantType, Scope};
 
 /// Updates the provided scope with constant declarations.
 pub(super) fn add_constants(scope: &mut Scope, ir: &AirIR) {
@@ -37,7 +37,7 @@ trait Codegen {
     fn to_string(&self) -> String;
 }
 
-impl Codegen for Constant {
+impl Codegen for ConstantBinding {
     fn to_string(&self) -> String {
         match self.value() {
             ConstantType::Scalar(scalar_const) => match scalar_const {

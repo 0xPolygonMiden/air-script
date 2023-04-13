@@ -2,11 +2,11 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
-        build_trace_bindings, Constant, ConstantType, ComprehensionContext,
+        build_trace_bindings, ConstantBinding, ConstantType, ComprehensionContext,
         Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier, TraceAccess, Iterable,
         ListComprehension, ListFolding, ListFoldingValueType, MatrixAccess, PeriodicColumn,
         PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, TraceBinding,
-        TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType, VectorAccess
+        TraceBindingAccess, TraceBindingAccessSize, VariableBinding, VariableType, VectorAccess
     }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
@@ -75,13 +75,13 @@ TraceBinding: (Identifier, u64) = {
 // CONSTANTS
 // ================================================================================================
 
-Constant: Constant = {
+Constant: ConstantBinding = {
     "const" <name: ConstName> "=" <scalar_value: Num_u64> => 
-        Constant::new(name, ConstantType::Scalar(scalar_value)),
+        ConstantBinding::new(name, ConstantType::Scalar(scalar_value)),
     "const" <name: ConstName> "=" <vector_value: Vector<Num_u64>> =>
-        Constant::new(name, ConstantType::Vector(vector_value)),
+        ConstantBinding::new(name, ConstantType::Vector(vector_value)),
     "const" <name: ConstName> "=" <matrix_value: Matrix<Num_u64>> =>
-        Constant::new(name, ConstantType::Matrix(matrix_value)),
+        ConstantBinding::new(name, ConstantType::Matrix(matrix_value)),
 }
 
 ConstName: Identifier = {
@@ -207,7 +207,7 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
 
 BoundaryStmt: BoundaryStmt = {
     "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
-        BoundaryStmt::Variable(Variable::new(name, boundary_variable_type)),
+        BoundaryStmt::VariableBinding(VariableBinding::new(name, boundary_variable_type)),
     "enf" <boundary_constraint: BoundaryConstraintExpr> =>
         BoundaryStmt::Constraint(boundary_constraint),
     "enf" <boundary_constraint: BoundaryConstraintExpr>
@@ -299,7 +299,7 @@ IntegrityStmts: Vec<IntegrityStmt> = {
 
 IntegrityStmtGroup: Vec<IntegrityStmt> = {
     "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
-        vec![IntegrityStmt::Variable(Variable::new(name, integrity_variable_type))],
+        vec![IntegrityStmt::VariableBinding(VariableBinding::new(name, integrity_variable_type))],
     "enf" <integrity_constraint: IntegrityConstraintExpr> => vec![integrity_constraint],
     "match" "enf" ":" <integrity_stmts: IntegrityConstraintExpr+> => integrity_stmts,
     "enf" <integrity_constraint: IntegrityConstraintExpr>

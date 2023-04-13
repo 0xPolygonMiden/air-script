@@ -2,7 +2,7 @@ mod access;
 pub use access::{Iterable, MatrixAccess, Range, VectorAccess};
 
 mod constant;
-pub use constant::{Constant, ConstantType};
+pub use constant::{ConstantBinding, ConstantType};
 
 mod comprehension;
 pub use comprehension::{
@@ -21,4 +21,4 @@ pub use trace::{
 };
 
 mod variable;
-pub use variable::{Variable, VariableType};
+pub use variable::{VariableBinding, VariableType};

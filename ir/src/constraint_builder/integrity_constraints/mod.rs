@@ -2,8 +2,8 @@ use super::{
     ast::{ConstraintType, IntegrityStmt},
     BTreeMap, ConstantType, ConstraintBuilder, ConstraintDomain, Expression, Identifier, Iterable,
     ListComprehension, ListFolding, ListFoldingValueType, SemanticError, Symbol, SymbolType,
-    TraceAccess, TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType, VectorAccess,
-    CURRENT_ROW,
+    TraceAccess, TraceBindingAccess, TraceBindingAccessSize, VariableBinding, VariableType,
+    VectorAccess, CURRENT_ROW,
 };
 
 mod list_comprehension;
@@ -42,10 +42,10 @@ impl ConstraintBuilder {
                 // save the constraint information
                 self.insert_constraint(root, trace_segment.into(), domain)?;
             }
-            IntegrityStmt::Variable(variable) => {
+            IntegrityStmt::VariableBinding(variable) => {
                 if let VariableType::ListComprehension(list_comprehension) = variable.value() {
                     let vector = self.unfold_lc(list_comprehension)?;
-                    self.symbol_table.insert_variable(Variable::new(
+                    self.symbol_table.insert_variable(VariableBinding::new(
                         Identifier(variable.name().to_string()),
                         VariableType::Vector(vector),
                     ))?
