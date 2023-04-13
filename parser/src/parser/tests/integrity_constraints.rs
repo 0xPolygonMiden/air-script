@@ -4,9 +4,10 @@ use super::{
 };
 use crate::{
     ast::{
-        ConstantBinding, ConstantType::*, ConstraintType, EvaluatorFunction, EvaluatorFunctionCall,
-        Expression::*, IntegrityStmt::*, MatrixAccess, TraceAccess, TraceBindingAccess,
-        TraceBindingAccessSize, VariableBinding, VariableType, VectorAccess,
+        ConstantBinding, ConstantValueExpr::*, ConstraintType, EvaluatorFunction,
+        EvaluatorFunctionCall, Expression::*, IntegrityStmt::*, MatrixAccess, TraceAccess,
+        TraceBindingAccess, TraceBindingAccessSize, VariableBinding, VariableValueExpr,
+        VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -174,11 +175,11 @@ fn integrity_constraint_with_variables() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
         VariableBinding(VariableBinding::new(
             Identifier("a".to_string()),
-            VariableType::Scalar(Exp(Box::new(Const(2)), Box::new(Const(2)))),
+            VariableValueExpr::Scalar(Exp(Box::new(Const(2)), Box::new(Const(2)))),
         )),
         VariableBinding(VariableBinding::new(
             Identifier("b".to_string()),
-            VariableType::Vector(vec![
+            VariableValueExpr::Vector(vec![
                 Elem(Identifier("a".to_string())),
                 Mul(
                     Box::new(Const(2)),
@@ -188,7 +189,7 @@ fn integrity_constraint_with_variables() {
         )),
         VariableBinding(VariableBinding::new(
             Identifier("c".to_string()),
-            VariableType::Matrix(vec![
+            VariableValueExpr::Matrix(vec![
                 vec![
                     Sub(
                         Box::new(Elem(Identifier("a".to_string()))),

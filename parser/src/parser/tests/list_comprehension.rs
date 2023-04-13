@@ -5,7 +5,7 @@ use crate::{
     ast::{
         Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType, Expression::*, IntegrityStmt,
         SourceSection::*, TraceBinding, TraceBindingAccess, TraceBindingAccessSize,
-        VariableBinding, VariableType, VectorAccess,
+        VariableBinding, VariableValueExpr, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -34,7 +34,7 @@ fn bc_one_iterable_identifier_lc() {
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
                 Identifier("x".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Exp(
                         Box::new(Elem(Identifier("col".to_string()))),
                         Box::new(Const(7)),
@@ -101,7 +101,7 @@ fn bc_identifier_and_range_lc() {
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
                 Identifier("x".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Mul(
                         Box::new(Exp(
                             Box::new(Const(2)),
@@ -177,7 +177,7 @@ fn bc_iterable_slice_lc() {
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
                 Identifier("x".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Elem(Identifier("c".to_string())),
                     vec![(
                         Identifier("c".to_string()),
@@ -242,7 +242,7 @@ fn bc_two_iterable_identifier_lc() {
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
                 Identifier("diff".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Sub(
                         Box::new(Elem(Identifier("x".to_string()))),
                         Box::new(Elem(Identifier("y".to_string()))),
@@ -316,7 +316,7 @@ fn bc_multiple_iterables_lc() {
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
                 Identifier("diff".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Sub(
                         Box::new(Sub(
                             Box::new(Add(
@@ -407,7 +407,7 @@ fn ic_one_iterable_identifier_lc() {
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
                 Identifier("x".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Exp(
                         Box::new(Elem(Identifier("col".to_string()))),
                         Box::new(Const(7)),
@@ -420,7 +420,7 @@ fn ic_one_iterable_identifier_lc() {
             )),
             IntegrityStmt::VariableBinding(VariableBinding::new(
                 Identifier("y".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Exp(
                         Box::new(TraceBindingAccess(TraceBindingAccess::new(
                             Identifier("col".to_string()),
@@ -489,7 +489,7 @@ fn ic_iterable_identifier_range_lc() {
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
                 Identifier("x".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Mul(
                         Box::new(Exp(
                             Box::new(Const(2)),
@@ -562,7 +562,7 @@ fn ic_iterable_slice_lc() {
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
                 Identifier("x".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Elem(Identifier("c".to_string())),
                     vec![(
                         Identifier("c".to_string()),
@@ -624,7 +624,7 @@ fn ic_two_iterable_identifier_lc() {
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
                 Identifier("diff".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Sub(
                         Box::new(Elem(Identifier("x".to_string()))),
                         Box::new(Elem(Identifier("y".to_string()))),
@@ -695,7 +695,7 @@ fn ic_multiple_iterables_lc() {
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
                 Identifier("diff".to_string()),
-                VariableType::ListComprehension(ListComprehension::new(
+                VariableValueExpr::ListComprehension(ListComprehension::new(
                     Sub(
                         Box::new(Sub(
                             Box::new(Add(

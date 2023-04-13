@@ -4,9 +4,9 @@ use super::{
 };
 use crate::{
     ast::{
-        BoundaryStmt::*, ConstantBinding, ConstantType::*, Expression::*, MatrixAccess,
-        PublicInput, TraceBindingAccess, TraceBindingAccessSize, VariableBinding, VariableType,
-        VectorAccess,
+        BoundaryStmt::*, ConstantBinding, ConstantValueExpr::*, Expression::*, MatrixAccess,
+        PublicInput, TraceBindingAccess, TraceBindingAccessSize, VariableBinding,
+        VariableValueExpr, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -201,11 +201,11 @@ fn boundary_constraint_with_variables() {
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
         VariableBinding(VariableBinding::new(
             Identifier("a".to_string()),
-            VariableType::Scalar(Exp(Box::new(Const(2)), Box::new(Const(2)))),
+            VariableValueExpr::Scalar(Exp(Box::new(Const(2)), Box::new(Const(2)))),
         )),
         VariableBinding(VariableBinding::new(
             Identifier("b".to_string()),
-            VariableType::Vector(vec![
+            VariableValueExpr::Vector(vec![
                 Elem(Identifier("a".to_string())),
                 Mul(
                     Box::new(Const(2)),
@@ -215,7 +215,7 @@ fn boundary_constraint_with_variables() {
         )),
         VariableBinding(VariableBinding::new(
             Identifier("c".to_string()),
-            VariableType::Matrix(vec![
+            VariableValueExpr::Matrix(vec![
                 vec![
                     Sub(
                         Box::new(Elem(Identifier("a".to_string()))),

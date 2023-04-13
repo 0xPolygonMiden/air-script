@@ -1,6 +1,6 @@
 use super::{build_parse_test, Identifier, Source, SourceSection};
 use crate::{
-    ast::{ConstantBinding, ConstantType},
+    ast::{ConstantBinding, ConstantValueExpr},
     error::{Error, ParseError},
 };
 
@@ -15,11 +15,11 @@ fn constants_scalars() {
     let expected = Source(vec![
         SourceSection::Constant(ConstantBinding::new(
             Identifier("A".to_string()),
-            ConstantType::Scalar(1),
+            ConstantValueExpr::Scalar(1),
         )),
         SourceSection::Constant(ConstantBinding::new(
             Identifier("B".to_string()),
-            ConstantType::Scalar(2),
+            ConstantValueExpr::Scalar(2),
         )),
     ]);
     build_parse_test!(source).expect_ast(expected);
@@ -33,11 +33,11 @@ fn constants_vectors() {
     let expected = Source(vec![
         SourceSection::Constant(ConstantBinding::new(
             Identifier("A".to_string()),
-            ConstantType::Vector(vec![1, 2, 3, 4]),
+            ConstantValueExpr::Vector(vec![1, 2, 3, 4]),
         )),
         SourceSection::Constant(ConstantBinding::new(
             Identifier("B".to_string()),
-            ConstantType::Vector(vec![5, 6, 7, 8]),
+            ConstantValueExpr::Vector(vec![5, 6, 7, 8]),
         )),
     ]);
     build_parse_test!(source).expect_ast(expected);
@@ -51,11 +51,11 @@ fn constants_matrices() {
     let expected = Source(vec![
         SourceSection::Constant(ConstantBinding::new(
             Identifier("ABC".to_string()),
-            ConstantType::Matrix(vec![vec![1, 2], vec![3, 4]]),
+            ConstantValueExpr::Matrix(vec![vec![1, 2], vec![3, 4]]),
         )),
         SourceSection::Constant(ConstantBinding::new(
             Identifier("XYZ".to_string()),
-            ConstantType::Matrix(vec![vec![5, 6], vec![7, 8]]),
+            ConstantValueExpr::Matrix(vec![vec![5, 6], vec![7, 8]]),
         )),
     ]);
     build_parse_test!(source).expect_ast(expected);
@@ -69,7 +69,7 @@ fn const_matrix_unequal_number_of_cols() {
     const A = [[1, 2], [3, 4, 5]]";
     let expected = Source(vec![SourceSection::Constant(ConstantBinding::new(
         Identifier("A".to_string()),
-        ConstantType::Matrix(vec![vec![1, 2], vec![3, 4, 5]]),
+        ConstantValueExpr::Matrix(vec![vec![1, 2], vec![3, 4, 5]]),
     ))]);
     build_parse_test!(source).expect_ast(expected);
 }

@@ -2,11 +2,11 @@ mod access;
 pub use access::{Iterable, MatrixAccess, Range, VectorAccess};
 
 mod constant;
-pub use constant::{ConstantBinding, ConstantType};
+pub use constant::{ConstantBinding, ConstantValueExpr};
 
 mod comprehension;
 pub use comprehension::{
-    ComprehensionContext, ListComprehension, ListFolding, ListFoldingValueType,
+    ComprehensionContext, ListComprehension, ListFolding, ListFoldingValueExpr,
 };
 
 mod expression;
@@ -21,4 +21,4 @@ pub use trace::{
 };
 
 mod variable;
-pub use variable::{VariableBinding, VariableType};
+pub use variable::{VariableBinding, VariableValueExpr};

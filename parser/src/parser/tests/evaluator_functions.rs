@@ -3,7 +3,7 @@ use crate::{
     ast::{
         ConstraintType, EvaluatorFunction, EvaluatorFunctionCall, Expression::*, IntegrityStmt::*,
         Range, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, VariableBinding,
-        VariableType,
+        VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -59,7 +59,7 @@ fn ev_fn_main_and_aux_cols() {
             vec![
                 VariableBinding(VariableBinding::new(
                     Identifier("z".to_string()),
-                    VariableType::Scalar(Add(
+                    VariableValueExpr::Scalar(Add(
                         Box::new(Elem(Identifier("a".to_string()))),
                         Box::new(Elem(Identifier("b".to_string()))),
                     )),

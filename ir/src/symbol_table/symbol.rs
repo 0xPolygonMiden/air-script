@@ -1,5 +1,5 @@
 use super::{
-    symbol_access::ValidateAccess, AccessType, ConstantType, ConstantValue, Identifier,
+    symbol_access::ValidateAccess, AccessType, ConstantValue, ConstantValueExpr, Identifier,
     MatrixAccess, SemanticError, SymbolType, TraceAccess, TraceBinding, Value, VectorAccess,
     CURRENT_ROW,
 };
@@ -49,7 +49,7 @@ impl Symbol {
 
     fn get_constant_value(
         &self,
-        constant_type: &ConstantType,
+        constant_type: &ConstantValueExpr,
         access_type: &AccessType,
     ) -> Result<Value, SemanticError> {
         constant_type.validate(self.name(), access_type)?;

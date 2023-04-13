@@ -1,6 +1,6 @@
 use super::{
-    ConstantType, ConstraintBuilder, Expression, ListFoldingValueType, SemanticError, SymbolType,
-    TraceAccess, VariableType, CURRENT_ROW,
+    ConstantValueExpr, ConstraintBuilder, Expression, ListFoldingValueExpr, SemanticError,
+    SymbolType, TraceAccess, VariableValueExpr, CURRENT_ROW,
 };
 
 // LIST FOLDING
@@ -16,17 +16,17 @@ impl ConstraintBuilder {
     /// - the list folding value is an identifier that does not refer to a vector
     pub fn build_list_from_list_folding_value(
         &self,
-        lf_value_type: &ListFoldingValueType,
+        lf_value_type: &ListFoldingValueExpr,
     ) -> Result<Vec<Expression>, SemanticError> {
         match lf_value_type {
-            ListFoldingValueType::Identifier(ident) => {
+            ListFoldingValueExpr::Identifier(ident) => {
                 let symbol = self.symbol_table.get_symbol(ident.name())?;
                 match symbol.symbol_type() {
-                    SymbolType::Constant(ConstantType::Vector(list)) => {
+                    SymbolType::Constant(ConstantValueExpr::Vector(list)) => {
                         Ok(list.iter().map(|value| Expression::Const(*value)).collect())
                     }
                     SymbolType::Variable(variable_type) => {
-                        if let VariableType::Vector(list) = variable_type {
+                        if let VariableValueExpr::Vector(list) = variable_type {
                             Ok(list.clone())
                         } else {
                             Err(SemanticError::invalid_list_folding(
@@ -61,8 +61,8 @@ impl ConstraintBuilder {
                     )),
                 }
             }
-            ListFoldingValueType::Vector(vector) => Ok(vector.clone()),
-            ListFoldingValueType::ListComprehension(lc) => Ok(self.unfold_lc(lc)?),
+            ListFoldingValueExpr::Vector(vector) => Ok(vector.clone()),
+            ListFoldingValueExpr::ListComprehension(lc) => Ok(self.unfold_lc(lc)?),
         }
     }
 }

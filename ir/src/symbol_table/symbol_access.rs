@@ -1,4 +1,6 @@
-use super::{ConstantType, SemanticError, Symbol, SymbolType, TraceBindingAccess, VariableType};
+use super::{
+    ConstantValueExpr, SemanticError, Symbol, SymbolType, TraceBindingAccess, VariableValueExpr,
+};
 use std::fmt::Display;
 
 /// TODO: docs
@@ -23,7 +25,7 @@ impl Display for AccessType {
 /// Checks that the specified access into an identifier is valid and returns an error otherwise.
 /// # Errors:
 /// - Returns an error if the type of the identifier does not allow the access type. For example,
-///   VariableType::Vector does not allow a MatrixAccess.
+///   VariableValueExpr::Vector does not allow a MatrixAccess.
 /// - Returns an error if any indices specified for the access are out of bounds fo the specified
 ///   identifier.
 pub(super) trait ValidateIdentifierAccess {
@@ -57,18 +59,18 @@ pub(crate) trait ValidateAccess {
     fn validate(&self, name: &str, access_type: &AccessType) -> Result<(), SemanticError>;
 }
 
-impl ValidateAccess for ConstantType {
+impl ValidateAccess for ConstantValueExpr {
     fn validate(&self, name: &str, access_type: &AccessType) -> Result<(), SemanticError> {
         match access_type {
             AccessType::Default => return Ok(()),
             AccessType::Vector(idx) => match self {
-                ConstantType::Scalar(_) => {
+                ConstantValueExpr::Scalar(_) => {
                     return Err(SemanticError::invalid_constant_access_type(
                         name,
                         access_type,
                     ))
                 }
-                ConstantType::Vector(vector) => {
+                ConstantValueExpr::Vector(vector) => {
                     if *idx >= vector.len() {
                         return Err(SemanticError::vector_access_out_of_bounds(
                             name,
@@ -77,7 +79,7 @@ impl ValidateAccess for ConstantType {
                         ));
                     }
                 }
-                ConstantType::Matrix(matrix) => {
+                ConstantValueExpr::Matrix(matrix) => {
                     if *idx >= matrix.len() {
                         return Err(SemanticError::vector_access_out_of_bounds(
                             name,
@@ -88,13 +90,13 @@ impl ValidateAccess for ConstantType {
                 }
             },
             AccessType::Matrix(row_idx, col_idx) => match self {
-                ConstantType::Scalar(_) | ConstantType::Vector(_) => {
+                ConstantValueExpr::Scalar(_) | ConstantValueExpr::Vector(_) => {
                     return Err(SemanticError::invalid_constant_access_type(
                         name,
                         access_type,
                     ))
                 }
-                ConstantType::Matrix(matrix) => {
+                ConstantValueExpr::Matrix(matrix) => {
                     if *row_idx >= matrix.len() || *col_idx >= matrix[0].len() {
                         return Err(SemanticError::matrix_access_out_of_bounds(
                             name,
@@ -112,14 +114,14 @@ impl ValidateAccess for ConstantType {
     }
 }
 
-impl ValidateAccess for VariableType {
+impl ValidateAccess for VariableValueExpr {
     fn validate(&self, name: &str, access_type: &AccessType) -> Result<(), SemanticError> {
         match access_type {
             AccessType::Default => return Ok(()),
             AccessType::Vector(idx) => match self {
                 // TODO: scalar can be ok; check this symbol in the future
-                VariableType::Scalar(_) => return Ok(()),
-                VariableType::Vector(vector) => {
+                VariableValueExpr::Scalar(_) => return Ok(()),
+                VariableValueExpr::Vector(vector) => {
                     if *idx >= vector.len() {
                         return Err(SemanticError::vector_access_out_of_bounds(
                             name,
@@ -137,8 +139,8 @@ impl ValidateAccess for VariableType {
             },
             AccessType::Matrix(row_idx, col_idx) => match self {
                 // TODO: scalar & vector can be ok; check this symbol in the future
-                VariableType::Scalar(_) | VariableType::Vector(_) => return Ok(()),
-                VariableType::Matrix(matrix) => {
+                VariableValueExpr::Scalar(_) | VariableValueExpr::Vector(_) => return Ok(()),
+                VariableValueExpr::Matrix(matrix) => {
                     if *row_idx >= matrix.len() || *col_idx >= matrix[0].len() {
                         return Err(SemanticError::matrix_access_out_of_bounds(
                             name,

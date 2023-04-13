@@ -228,7 +228,7 @@ impl SemanticError {
     }
 
     pub(crate) fn invalid_list_folding(
-        lf_value_type: &air_script_core::ListFoldingValueType,
+        lf_value_type: &air_script_core::ListFoldingValueExpr,
         symbol_type: &SymbolType,
     ) -> SemanticError {
         SemanticError::InvalidListFolding(format!(
@@ -237,7 +237,7 @@ impl SemanticError {
     }
 
     pub(crate) fn list_folding_empty_list(
-        lf_value_type: &air_script_core::ListFoldingValueType,
+        lf_value_type: &air_script_core::ListFoldingValueExpr,
     ) -> SemanticError {
         SemanticError::InvalidListFolding(format!(
             "List folding value cannot be an empty list. {lf_value_type:?} represents an empty list.",

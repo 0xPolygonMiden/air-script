@@ -1,10 +1,10 @@
 use super::{
-    ast, AccessType, AlgebraicGraph, BTreeMap, BTreeSet, ConstantType, ConstantValue,
+    ast, AccessType, AlgebraicGraph, BTreeMap, BTreeSet, ConstantValue, ConstantValueExpr,
     ConstraintDomain, ConstraintRoot, Constraints, Declarations, Expression, Identifier, Iterable,
-    ListComprehension, ListFolding, ListFoldingValueType, MatrixAccess, NodeIndex, Operation,
+    ListComprehension, ListFolding, ListFoldingValueExpr, MatrixAccess, NodeIndex, Operation,
     SemanticError, Symbol, SymbolTable, SymbolType, TraceAccess, TraceBindingAccess,
-    TraceBindingAccessSize, TraceSegment, ValidateAccess, Value, VariableBinding, VariableType,
-    VectorAccess, CURRENT_ROW,
+    TraceBindingAccessSize, TraceSegment, ValidateAccess, Value, VariableBinding,
+    VariableValueExpr, VectorAccess, CURRENT_ROW,
 };
 
 mod boundary_constraints;

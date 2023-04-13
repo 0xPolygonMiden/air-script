@@ -1,7 +1,7 @@
 use super::{
-    ast, BTreeMap, ConstantBinding, ConstantType, Declarations, Identifier, MatrixAccess,
-    SemanticError, TraceAccess, TraceBinding, TraceBindingAccess, VariableBinding, VariableType,
-    VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
+    ast, BTreeMap, ConstantBinding, ConstantValueExpr, Declarations, Identifier, MatrixAccess,
+    SemanticError, TraceAccess, TraceBinding, TraceBindingAccess, VariableBinding,
+    VariableValueExpr, VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
 
 mod symbol;
@@ -60,7 +60,7 @@ impl SymbolTable {
         let (name, constant_type) = constant.into_parts();
 
         // check the number of elements in each row are same for a matrix
-        if let ConstantType::Matrix(matrix) = &constant_type {
+        if let ConstantValueExpr::Matrix(matrix) = &constant_type {
             let row_len = matrix[0].len();
             if matrix.iter().skip(1).any(|row| row.len() != row_len) {
                 return Err(SemanticError::invalid_matrix_constant(&name));
