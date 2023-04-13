@@ -1,0 +1,67 @@
+use bitwise::bitwise_chiplet
+use hash::hash_chiplet
+use memory::memory_chiplet
+
+mod ChipletsConstraintsAir
+
+### Helper evaluators #############################################################################
+
+# Enforces that the provided columns must be binary.
+ev is_binary(main: [a]):
+    enf a^2 = a
+
+# Enforces that constraints are only ever selected for one chiplet at a time.
+ev chiplet_constraints(main: [s[3], chip_columns[15]]):
+    # Variables for hash chiplet.
+    let hash_s_3 = [s[1], s[2], chip_columns[0]]
+    let hash_r = chip_columns[1]
+    let hash_h_12 = [chip_columns[2], chip_columns[3], chip_columns[4], 
+                     chip_columns[5], chip_columns[6], chip_columns[7], 
+                     chip_columns[8], chip_columns[9], chip_columns[10], 
+                     chip_columns[11], chip_columns[12], chip_columns[13]]
+    let hash_i = chip_columns[14]
+
+    # Variables for bitwise chiplet.
+    let bitwise_s = s[2]
+    let bitwise_a = chip_columns[0]
+    let bitwise_b = chip_columns[1]
+    let bitwise_a_limb_4 = [chip_columns[2], chip_columns[3], chip_columns[4], chip_columns[5]]
+    let bitwise_b_limb_4 = [chip_columns[6], chip_columns[7], chip_columns[8], chip_columns[9]]
+    let bitwise_zp = chip_columns[10]
+    let bitwise_z = chip_columns[11]
+
+    # Variables for memory chiplet.
+    let memory_s_2 = [chip_columns[0], chip_columns[1]]
+    let memory_ctx = chip_columns[2]
+    let memory_addr = chip_columns[3]
+    let memory_clk = chip_columns[4]
+    let memory_v_4 = [chip_columns[5], chip_columns[6], chip_columns[7], chip_columns[8]]
+    let memory_d_2 = [chip_columns[9], chip_columns[10]]
+    let memory_t = chip_columns[11]
+
+    match enf: 
+        hash_chiplet([hash_s_3, hash_r, hash_h_12, hash_i]) when !s[0]
+        bitwise_chiplet([bitwise_s, bitwise_a, bitwise_b, bitwise_a_limb_4, bitwise_b_limb_4, bitwise_zp, bitwise_z]) when s[0] & !s[1]
+        memory_chiplet([memory_s_2, memory_ctx, memory_addr, memory_clk, memory_v_4, memory_d_2, memory_t]) when s[0] & s[1] & !s[2]'
+
+
+# Enforces that the chiplet selector columns are set correctly.
+enf chiplet_selector_constraints(main: [s[3]]):
+    # Enforce that selectors are binary.
+    enf is_binary([s[0]])
+    enf is_binary([s[1]]) when s[0]
+    enf is_binary([s[2]]) when s[0] & s[1]
+
+    # Enforce that the chiplets are stacked correctly by restricting selector values so they can 
+    # only change from 0 to 1.
+    enf s[0]' = s[0] when s[0]
+    enf s[1]' = s[1] when s[0] & s[1]
+    enf s[2]' = s[2] when s[0] & s[1] & s[2]
+
+
+### Chiplets Constraints ##########################################################################
+
+ev chiplets_constraints(main: [s[3], chip_columns[15]]):
+    enf chiplet_constraints([s, chip_columns])
+
+    enf chiplet_selector_constraints([s])
