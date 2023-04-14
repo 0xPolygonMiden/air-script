@@ -41,7 +41,10 @@ impl ConstraintBuilder {
     /// In case the statement is a constraint, the constraint is turned into a subgraph which is
     /// added to the [AlgebraicGraph] (reusing any existing nodes). The index of its entry node
     /// is then saved in the boundary_constraints matrix.
-    pub(super) fn insert_boundary_stmt(&mut self, stmt: BoundaryStmt) -> Result<(), SemanticError> {
+    pub(super) fn process_boundary_stmt(
+        &mut self,
+        stmt: BoundaryStmt,
+    ) -> Result<(), SemanticError> {
         match stmt {
             BoundaryStmt::Constraint(constraint) => {
                 let (boundary, access, value) = constraint.into_parts();

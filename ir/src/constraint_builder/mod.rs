@@ -9,6 +9,9 @@ use super::{
 mod boundary_constraints;
 pub(crate) use boundary_constraints::ConstrainedBoundary;
 
+mod evaluator_functions;
+pub(crate) use evaluator_functions::Evaluator;
+
 mod integrity_constraints;
 
 mod expression;
@@ -25,10 +28,15 @@ pub(super) struct ConstraintBuilder {
     // TODO: docs
     symbol_table: SymbolTable,
 
+    // --- CONTEXT VARIABLES ----------------------------------------------------------------------
     /// A set of all boundaries which have been constrained. This is used to ensure that no more
     /// than one constraint is defined at any given boundary.
     constrained_boundaries: BTreeSet<ConstrainedBoundary>,
 
+    /// TODO: docs
+    evaluators: BTreeMap<String, Evaluator>,
+
+    // --- ACCUMULATED CONTEXT DATA ---------------------------------------------------------------
     /// A directed acyclic graph which represents all of the constraints and their subexpressions.
     graph: AlgebraicGraph,
 
@@ -43,13 +51,14 @@ pub(super) struct ConstraintBuilder {
 }
 
 impl ConstraintBuilder {
-    pub fn new(symbol_table: SymbolTable) -> Self {
+    pub fn new(symbol_table: SymbolTable, evaluators: BTreeMap<String, Evaluator>) -> Self {
         let num_trace_segments = symbol_table.num_trace_segments();
         Self {
             symbol_table,
 
             // context variables
             constrained_boundaries: BTreeSet::new(),
+            evaluators,
 
             // accumulated data in the current context
             boundary_constraints: vec![Vec::new(); num_trace_segments],
@@ -83,14 +92,14 @@ impl ConstraintBuilder {
         // --- PROCESS BOUNDARY STATEMENTS --------------------------------------------------------
 
         for stmt in boundary_stmts.into_iter() {
-            self.insert_boundary_stmt(stmt)?
+            self.process_boundary_stmt(stmt)?
         }
         self.symbol_table.clear_variables();
 
         // --- PROCESS INTEGRITY STATEMENTS -------------------------------------------------------
 
         for stmt in integrity_stmts.into_iter() {
-            self.insert_integrity_stmt(stmt)?
+            self.process_integrity_stmt(stmt)?
         }
         self.symbol_table.clear_variables();
 

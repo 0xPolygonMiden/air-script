@@ -7,7 +7,7 @@ pub use parser::ast;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod constraint_builder;
-use constraint_builder::{ConstrainedBoundary, ConstraintBuilder};
+use constraint_builder::{ConstrainedBoundary, ConstraintBuilder, Evaluator};
 
 pub mod constraints;
 use constraints::{
@@ -60,7 +60,7 @@ impl AirIR {
         // process the declarations of identifiers first, using a single symbol table to enforce
         // uniqueness.
         let mut symbol_table = SymbolTable::default();
-        let mut eval_decls = Vec::new();
+        let mut ev_decls = Vec::new();
         let mut pub_input_decls = Vec::new();
         let mut trace_decls = Vec::new();
 
@@ -86,7 +86,7 @@ impl AirIR {
                         validator.exists("aux_trace_columns");
                     }
                     // accumulate and save the trace bindings for later processing.
-                    trace_decls.extend(trace_bindings);
+                    trace_decls.push(trace_bindings);
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
                     validator.exists("public_inputs");
@@ -112,22 +112,29 @@ impl AirIR {
                     // save the integrity statements for processing after the SymbolTable is built.
                     integrity_stmts.extend(stmts);
                 }
-                ast::SourceSection::EvaluatorFunction(eval_expr) => eval_decls.push(eval_expr),
+                ast::SourceSection::EvaluatorFunction(ev_expr) => ev_decls.push(ev_expr),
             }
         }
 
         // validate sections
         validator.check()?;
 
-        // TODO: process evaluators
+        // process evaluators
+        let mut evaluators: BTreeMap<String, Evaluator> = BTreeMap::new();
+        for ev_decl in ev_decls {
+            let constraint_builder = ConstraintBuilder::new(symbol_table.clone(), evaluators);
+            evaluators = constraint_builder.process_evaluator(ev_decl)?;
+        }
 
         // process & validate the public inputs
         symbol_table.insert_public_inputs(pub_input_decls)?;
         // process & validate the trace bindings
-        symbol_table.insert_trace_bindings(trace_decls)?;
+        for trace_bindings in trace_decls.into_iter() {
+            symbol_table.insert_trace_bindings(trace_bindings)?;
+        }
 
         // process the variable & constraint statements, and validate them against the symbol table.
-        let mut constraint_builder = ConstraintBuilder::new(symbol_table);
+        let mut constraint_builder = ConstraintBuilder::new(symbol_table, evaluators);
         constraint_builder.insert_constraints(boundary_stmts, integrity_stmts)?;
 
         let (declarations, constraints) = constraint_builder.into_air();

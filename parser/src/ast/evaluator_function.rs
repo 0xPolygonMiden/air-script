@@ -6,7 +6,7 @@ use super::{Identifier, IntegrityStmt, SymbolAccess, TraceBinding};
 #[derive(Debug, Eq, PartialEq)]
 pub struct EvaluatorFunction {
     name: Identifier,
-    params: Vec<TraceBinding>,
+    params: Vec<Vec<TraceBinding>>,
     integrity_stmts: Vec<IntegrityStmt>,
 }
 
@@ -14,7 +14,7 @@ impl EvaluatorFunction {
     /// Creates a new function.
     pub fn new(
         name: Identifier,
-        params: Vec<TraceBinding>,
+        params: Vec<Vec<TraceBinding>>,
         integrity_stmts: Vec<IntegrityStmt>,
     ) -> Self {
         Self {
@@ -29,18 +29,13 @@ impl EvaluatorFunction {
         self.name.name()
     }
 
-    /// Returns the parameters of the evaluator function.
-    pub fn params(&self) -> &[TraceBinding] {
-        &self.params
-    }
-
     /// Returns the integrity statements of the evaluator function.
     pub fn integrity_stmts(&self) -> &[IntegrityStmt] {
         &self.integrity_stmts
     }
 
     /// Returns the name, trace bindings and integrity statements of the evaluator function.
-    pub fn into_parts(self) -> (String, Vec<TraceBinding>, Vec<IntegrityStmt>) {
+    pub fn into_parts(self) -> (String, Vec<Vec<TraceBinding>>, Vec<IntegrityStmt>) {
         (self.name.into_name(), self.params, self.integrity_stmts)
     }
 }
