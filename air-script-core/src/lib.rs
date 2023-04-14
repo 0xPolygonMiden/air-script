@@ -1,11 +1,16 @@
 mod access;
-pub use access::{MatrixAccess, Range, VectorAccess};
+pub use access::{Iterable, MatrixAccess, Range, VectorAccess};
 
 mod constant;
 pub use constant::{Constant, ConstantType};
 
+mod comprehension;
+pub use comprehension::{
+    ComprehensionContext, ListComprehension, ListFolding, ListFoldingValueType,
+};
+
 mod expression;
-pub use expression::{Expression, ListFoldingType, ListFoldingValueType};
+pub use expression::Expression;
 
 mod identifier;
 pub use identifier::Identifier;
@@ -16,8 +21,4 @@ pub use trace::{
 };
 
 mod variable;
-pub use variable::{Iterable, ListComprehension, Variable, VariableType};
-
-// TYPES
-// ================================================================================================
-pub type ComprehensionContext = Vec<(Identifier, Iterable)>;
+pub use variable::{Variable, VariableType};

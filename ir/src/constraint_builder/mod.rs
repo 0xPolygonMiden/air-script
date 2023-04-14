@@ -1,7 +1,7 @@
 use super::{
     ast, AccessType, AlgebraicGraph, BTreeMap, BTreeSet, ConstantType, ConstantValue,
     ConstraintDomain, ConstraintRoot, Constraints, Declarations, Expression, Identifier, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, MatrixAccess, NodeIndex, Operation,
+    ListComprehension, ListFolding, ListFoldingValueType, MatrixAccess, NodeIndex, Operation,
     SemanticError, Symbol, SymbolTable, SymbolType, TraceAccess, TraceBindingAccess,
     TraceBindingAccessSize, TraceSegment, ValidateAccess, Value, Variable, VariableType,
     VectorAccess, CURRENT_ROW,

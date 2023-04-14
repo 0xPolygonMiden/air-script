@@ -1,7 +1,7 @@
 use super::{
     ast::{ConstraintType, IntegrityStmt},
     BTreeMap, ConstantType, ConstraintBuilder, ConstraintDomain, Expression, Identifier, Iterable,
-    ListComprehension, ListFoldingType, ListFoldingValueType, SemanticError, Symbol, SymbolType,
+    ListComprehension, ListFolding, ListFoldingValueType, SemanticError, Symbol, SymbolType,
     TraceAccess, TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType, VectorAccess,
     CURRENT_ROW,
 };

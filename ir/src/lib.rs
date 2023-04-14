@@ -1,5 +1,5 @@
 pub use air_script_core::{
-    Constant, ConstantType, Expression, Identifier, Iterable, ListComprehension, ListFoldingType,
+    Constant, ConstantType, Expression, Identifier, Iterable, ListComprehension, ListFolding,
     ListFoldingValueType, MatrixAccess, TraceAccess, TraceBinding, TraceBindingAccess,
     TraceBindingAccessSize, TraceSegment, Variable, VariableType, VectorAccess,
 };

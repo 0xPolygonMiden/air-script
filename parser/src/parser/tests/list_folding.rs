@@ -1,4 +1,4 @@
-use air_script_core::{Iterable, ListComprehension, ListFoldingType, ListFoldingValueType, Range};
+use air_script_core::{Iterable, ListComprehension, ListFolding, ListFoldingValueType, Range};
 
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
@@ -32,13 +32,13 @@ fn identifier_lf() {
         BoundaryConstraints(vec![
             BoundaryStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Sum(
+                VariableType::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueType::Identifier(Identifier("c".to_string())),
                 ))),
             )),
             BoundaryStmt::Variable(Variable::new(
                 Identifier("y".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Prod(
+                VariableType::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueType::Identifier(Identifier("c".to_string())),
                 ))),
             )),
@@ -79,17 +79,17 @@ fn vector_lf() {
         BoundaryConstraints(vec![
             BoundaryStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Sum(
-                    ListFoldingValueType::Vector(vec![
+                VariableType::Scalar(ListFolding(ListFolding::Sum(ListFoldingValueType::Vector(
+                    vec![
                         Elem(Identifier("a".to_string())),
                         Elem(Identifier("b".to_string())),
                         VectorAccess(VectorAccess::new(Identifier("c".to_string()), 0)),
-                    ]),
-                ))),
+                    ],
+                )))),
             )),
             BoundaryStmt::Variable(Variable::new(
                 Identifier("y".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Prod(
+                VariableType::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueType::Vector(vec![
                         Elem(Identifier("a".to_string())),
                         Elem(Identifier("b".to_string())),
@@ -135,7 +135,7 @@ fn bc_one_iterable_identifier_lf() {
         BoundaryConstraints(vec![
             BoundaryStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Sum(
+                VariableType::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Exp(
                             Box::new(Elem(Identifier("col".to_string()))),
@@ -150,7 +150,7 @@ fn bc_one_iterable_identifier_lf() {
             )),
             BoundaryStmt::Variable(Variable::new(
                 Identifier("y".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Prod(
+                VariableType::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Exp(
                             Box::new(Elem(Identifier("col".to_string()))),
@@ -202,7 +202,7 @@ fn bc_two_iterable_identifier_lf() {
         BoundaryConstraints(vec![
             BoundaryStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Sum(
+                VariableType::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Mul(
                             Box::new(Elem(Identifier("c".to_string()))),
@@ -223,7 +223,7 @@ fn bc_two_iterable_identifier_lf() {
             )),
             BoundaryStmt::Variable(Variable::new(
                 Identifier("y".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Prod(
+                VariableType::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Add(
                             Box::new(Elem(Identifier("c".to_string()))),
@@ -280,7 +280,7 @@ fn bc_two_iterables_identifier_range_lf() {
         BoundaryConstraints(vec![
             BoundaryStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Sum(
+                VariableType::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Mul(
                             Box::new(Elem(Identifier("i".to_string()))),
@@ -301,7 +301,7 @@ fn bc_two_iterables_identifier_range_lf() {
             )),
             BoundaryStmt::Variable(Variable::new(
                 Identifier("y".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Prod(
+                VariableType::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Add(
                             Box::new(Elem(Identifier("i".to_string()))),
@@ -358,7 +358,7 @@ fn ic_one_iterable_identifier_lf() {
         IntegrityConstraints(vec![
             IntegrityStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Sum(
+                VariableType::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Exp(
                             Box::new(Elem(Identifier("col".to_string()))),
@@ -373,7 +373,7 @@ fn ic_one_iterable_identifier_lf() {
             )),
             IntegrityStmt::Variable(Variable::new(
                 Identifier("y".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Prod(
+                VariableType::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Exp(
                             Box::new(Elem(Identifier("col".to_string()))),
@@ -422,7 +422,7 @@ fn ic_two_iterable_identifier_lf() {
         IntegrityConstraints(vec![
             IntegrityStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Sum(
+                VariableType::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Mul(
                             Box::new(Elem(Identifier("c".to_string()))),
@@ -443,7 +443,7 @@ fn ic_two_iterable_identifier_lf() {
             )),
             IntegrityStmt::Variable(Variable::new(
                 Identifier("y".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Prod(
+                VariableType::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Add(
                             Box::new(Elem(Identifier("c".to_string()))),
@@ -497,7 +497,7 @@ fn ic_two_iterables_identifier_range_lf() {
         IntegrityConstraints(vec![
             IntegrityStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Sum(
+                VariableType::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Mul(
                             Box::new(Elem(Identifier("i".to_string()))),
@@ -518,7 +518,7 @@ fn ic_two_iterables_identifier_range_lf() {
             )),
             IntegrityStmt::Variable(Variable::new(
                 Identifier("y".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Prod(
+                VariableType::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Add(
                             Box::new(Elem(Identifier("i".to_string()))),
@@ -572,7 +572,7 @@ fn ic_three_iterables_slice_identifier_range_lf() {
         IntegrityConstraints(vec![
             IntegrityStmt::Variable(Variable::new(
                 Identifier("x".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Sum(
+                VariableType::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Mul(
                             Box::new(Mul(
@@ -600,7 +600,7 @@ fn ic_three_iterables_slice_identifier_range_lf() {
             )),
             IntegrityStmt::Variable(Variable::new(
                 Identifier("y".to_string()),
-                VariableType::Scalar(ListFolding(ListFoldingType::Sum(
+                VariableType::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueType::ListComprehension(ListComprehension::new(
                         Mul(
                             Box::new(Mul(

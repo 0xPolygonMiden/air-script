@@ -138,7 +138,7 @@ impl SymbolTable {
                 width = binding.offset() + binding.size();
                 self.insert_symbol(
                     binding.name().to_string(),
-                    SymbolType::TraceColumns(binding),
+                    SymbolType::TraceBinding(binding),
                 )?;
             }
 
@@ -223,7 +223,7 @@ impl SymbolTable {
         let symbol = self.get_symbol(trace_access.name())?;
         trace_access.validate(symbol)?;
 
-        let SymbolType::TraceColumns(columns) = symbol.symbol_type() else { unreachable!("validation of named trace access failed.") };
+        let SymbolType::TraceBinding(columns) = symbol.symbol_type() else { unreachable!("validation of named trace access failed.") };
         Ok(TraceAccess::new(
             columns.trace_segment(),
             columns.offset() + trace_access.col_offset(),
