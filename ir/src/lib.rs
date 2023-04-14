@@ -60,11 +60,14 @@ impl AirIR {
         // process the declarations of identifiers first, using a single symbol table to enforce
         // uniqueness.
         let mut symbol_table = SymbolTable::default();
-        let mut validator = SourceValidator::new();
-        let mut eval_exprs = Vec::new();
+        let mut eval_decls = Vec::new();
+        let mut pub_input_decls = Vec::new();
+        let mut trace_decls = Vec::new();
+
         let mut boundary_stmts = Vec::new();
         let mut integrity_stmts = Vec::new();
 
+        let mut validator = SourceValidator::new();
         for section in source {
             match section {
                 ast::SourceSection::AirDef(Identifier(air_def)) => {
@@ -72,6 +75,7 @@ impl AirIR {
                     air_name = air_def;
                 }
                 ast::SourceSection::Constant(constant) => {
+                    // process & validate the constant.
                     symbol_table.insert_constant(constant)?;
                 }
                 ast::SourceSection::Trace(trace_bindings) => {
@@ -81,47 +85,50 @@ impl AirIR {
                     if trace_bindings.len() > 1 {
                         validator.exists("aux_trace_columns");
                     }
-                    // process & validate the trace bindings
-                    symbol_table.insert_trace_bindings(trace_bindings)?;
+                    // accumulate and save the trace bindings for later processing.
+                    trace_decls.extend(trace_bindings);
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
-                    // process & validate the public inputs
-                    symbol_table.insert_public_inputs(inputs)?;
                     validator.exists("public_inputs");
+                    // accumulate and save the public input bindings for later processing.
+                    pub_input_decls.extend(inputs);
                 }
                 ast::SourceSection::PeriodicColumns(columns) => {
                     // process & validate the periodic columns
                     symbol_table.insert_periodic_columns(columns)?;
                 }
                 ast::SourceSection::RandomValues(values) => {
-                    symbol_table.insert_random_values(values)?;
                     validator.exists("random_values");
+                    // process & validate the random value declarations
+                    symbol_table.insert_random_values(values)?;
                 }
                 ast::SourceSection::BoundaryConstraints(stmts) => {
+                    validator.exists("boundary_constraints");
                     // save the boundary statements for processing after the SymbolTable is built.
                     boundary_stmts.extend(stmts);
-                    validator.exists("boundary_constraints");
                 }
                 ast::SourceSection::IntegrityConstraints(stmts) => {
+                    validator.exists("integrity_constraints");
                     // save the integrity statements for processing after the SymbolTable is built.
                     integrity_stmts.extend(stmts);
-                    validator.exists("integrity_constraints");
                 }
-                ast::SourceSection::EvaluatorFunction(eval_expr) => eval_exprs.push(eval_expr),
+                ast::SourceSection::EvaluatorFunction(eval_expr) => eval_decls.push(eval_expr),
             }
         }
 
         // validate sections
         validator.check()?;
 
-        // process the variable & constraint statements, and validate them against the symbol table.
-
         // TODO: process evaluators
+
+        // process & validate the public inputs
+        symbol_table.insert_public_inputs(pub_input_decls)?;
+        // process & validate the trace bindings
+        symbol_table.insert_trace_bindings(trace_decls)?;
 
         // process the variable & constraint statements, and validate them against the symbol table.
         let mut constraint_builder = ConstraintBuilder::new(symbol_table);
-        constraint_builder.insert_boundary_constraints(boundary_stmts)?;
-        constraint_builder.insert_integrity_constraints(integrity_stmts)?;
+        constraint_builder.insert_constraints(boundary_stmts, integrity_stmts)?;
 
         let (declarations, constraints) = constraint_builder.into_air();
 

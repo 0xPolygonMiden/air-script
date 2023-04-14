@@ -74,25 +74,22 @@ impl ConstraintBuilder {
         self.graph.insert_node(op)
     }
 
-    // TODO: docs
-    pub(crate) fn insert_boundary_constraints(
+    /// TODO: docs
+    pub(crate) fn insert_constraints(
         &mut self,
-        stmts: Vec<ast::BoundaryStmt>,
+        boundary_stmts: Vec<ast::BoundaryStmt>,
+        integrity_stmts: Vec<ast::IntegrityStmt>,
     ) -> Result<(), SemanticError> {
-        for stmt in stmts.into_iter() {
+        // --- PROCESS BOUNDARY STATEMENTS --------------------------------------------------------
+
+        for stmt in boundary_stmts.into_iter() {
             self.insert_boundary_stmt(stmt)?
         }
         self.symbol_table.clear_variables();
 
-        Ok(())
-    }
+        // --- PROCESS INTEGRITY STATEMENTS -------------------------------------------------------
 
-    // TODO: docs
-    pub(crate) fn insert_integrity_constraints(
-        &mut self,
-        stmts: Vec<ast::IntegrityStmt>,
-    ) -> Result<(), SemanticError> {
-        for stmt in stmts.into_iter() {
+        for stmt in integrity_stmts.into_iter() {
             self.insert_integrity_stmt(stmt)?
         }
         self.symbol_table.clear_variables();
