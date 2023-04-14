@@ -128,6 +128,12 @@ impl ConstraintBuilder {
         if domain.is_boundary() {
             self.boundary_constraints[trace_segment].push(constraint_root);
         } else {
+            if self.integrity_constraints.len() <= trace_segment {
+                // resize the integrity constraints vector to include the new trace segment
+                // this can be required when processing evaluators.
+                self.integrity_constraints
+                    .resize(trace_segment + 1, Vec::new());
+            }
             self.integrity_constraints[trace_segment].push(constraint_root);
         }
 

@@ -52,7 +52,9 @@ impl ConstraintBuilder {
                     self.symbol_table.insert_variable(variable)?
                 }
             }
-            IntegrityStmt::Constraint(ConstraintType::Evaluator(_), _) => todo!(),
+            IntegrityStmt::Constraint(ConstraintType::Evaluator(ev_call), _) => {
+                self.process_evaluator_call(ev_call)?;
+            }
             IntegrityStmt::ConstraintComprehension(_, _, _) => todo!(),
         }
 

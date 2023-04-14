@@ -58,6 +58,17 @@ impl TraceAccess {
     pub fn row_offset(&self) -> usize {
         self.row_offset
     }
+
+    /// Creates a new [TraceAccess] with a new column index that is updated according to the
+    /// provided offsets. All other data is left unchanged.
+    pub fn clone_with_offsets(&self, offsets: &[Vec<usize>]) -> Self {
+        Self::new(
+            self.trace_segment(),
+            offsets[self.trace_segment() as usize][self.col_idx()],
+            self.size(),
+            self.row_offset(),
+        )
+    }
 }
 
 /// [TraceBinding] is used to represent one or more columns in the execution trace that are bound to

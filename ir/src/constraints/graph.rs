@@ -25,11 +25,21 @@ pub struct AlgebraicGraph {
 }
 
 impl AlgebraicGraph {
+    /// Creates a new graph from a list of nodes.
+    fn new(nodes: Vec<Node>) -> Self {
+        Self { nodes }
+    }
+
     // --- PUBLIC ACCESSORS -----------------------------------------------------------------------
 
     /// Returns the node with the specified index.
     pub fn node(&self, index: &NodeIndex) -> &Node {
         &self.nodes[index.0]
+    }
+
+    /// Returns the number of nodes in the graph.
+    pub fn num_nodes(&self) -> usize {
+        self.nodes.len()
     }
 
     /// Returns the degree of the subgraph which has the specified node as its tip.
@@ -115,6 +125,31 @@ impl AlgebraicGraph {
         )
     }
 
+    /// Adds the nodes from the provided graph into self.
+    pub(crate) fn extend(&mut self, graph: Self) {
+        self.nodes.extend(graph.nodes);
+    }
+
+    /// Clones the graph, updates all nodes that reference the trace according to the provided set
+    /// of offsets, and returns the new graph.
+    pub(crate) fn clone_with_offsets(&self, offsets: &[Vec<usize>]) -> Self {
+        let nodes = self
+            .nodes
+            .iter()
+            .map(|node| match node.op() {
+                Operation::Value(Value::TraceElement(trace_access)) => {
+                    let value = Value::TraceElement(trace_access.clone_with_offsets(offsets));
+                    Node {
+                        op: Operation::Value(value),
+                    }
+                }
+                _ => node.clone(),
+            })
+            .collect::<Vec<_>>();
+
+        Self::new(nodes)
+    }
+
     // --- HELPERS --------------------------------------------------------------------------------
 
     /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.
@@ -158,6 +193,14 @@ impl AlgebraicGraph {
 /// Reference to a node in a graph by its index in the nodes vector of the graph struct.
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
 pub struct NodeIndex(usize);
+
+impl NodeIndex {
+    /// Clones the [NodeIndex], updates its value by adding the provided offset, and returns the new
+    /// [NodeIndex].
+    pub fn clone_with_offset(&self, offset: usize) -> NodeIndex {
+        Self(self.0 + offset)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Node {
