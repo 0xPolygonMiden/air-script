@@ -1,4 +1,4 @@
-use super::{Constant, SemanticError};
+use super::{ConstantBinding, SemanticError};
 
 // TYPE ALIASES
 // ================================================================================================
@@ -13,7 +13,7 @@ pub type PeriodicColumn = Vec<u64>;
 #[derive(Default, Debug, Clone)]
 pub(super) struct Declarations {
     /// A vector of constants declared in the AirScript module.
-    constants: Vec<Constant>,
+    constants: Vec<ConstantBinding>,
 
     /// A map of the Air's periodic columns using the index of the column within the declared
     /// periodic columns as the key and the vector of periodic values as the value
@@ -35,7 +35,7 @@ pub(super) struct Declarations {
 impl Declarations {
     // --- ACCESSORS ------------------------------------------------------------------------------
 
-    pub(super) fn constants(&self) -> &[Constant] {
+    pub(super) fn constants(&self) -> &[ConstantBinding] {
         &self.constants
     }
 
@@ -74,7 +74,7 @@ impl Declarations {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    pub(super) fn add_constant(&mut self, constant: Constant) {
+    pub(super) fn add_constant(&mut self, constant: ConstantBinding) {
         self.constants.push(constant)
     }
 

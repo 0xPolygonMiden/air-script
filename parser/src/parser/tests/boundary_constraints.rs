@@ -4,8 +4,9 @@ use super::{
 };
 use crate::{
     ast::{
-        BoundaryStmt::*, Constant, ConstantType::*, Expression::*, MatrixAccess, PublicInput,
-        TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType, VectorAccess,
+        BoundaryStmt::*, ConstantBinding, ConstantValueExpr::*, Expression::*, MatrixAccess,
+        PublicInput, TraceBindingAccess, TraceBindingAccessSize, VariableBinding,
+        VariableValueExpr, VectorAccess,
     },
     error::{Error, ParseError},
 };
@@ -153,12 +154,12 @@ fn boundary_constraint_with_const() {
     boundary_constraints:
         enf clk.first = A + B[1] - C[0][1]";
     let expected = Source(vec![
-        SourceSection::Constant(Constant::new(Identifier("A".to_string()), Scalar(1))),
-        SourceSection::Constant(Constant::new(
+        SourceSection::Constant(ConstantBinding::new(Identifier("A".to_string()), Scalar(1))),
+        SourceSection::Constant(ConstantBinding::new(
             Identifier("B".to_string()),
             Vector(vec![0, 1]),
         )),
-        SourceSection::Constant(Constant::new(
+        SourceSection::Constant(ConstantBinding::new(
             Identifier("C".to_string()),
             Matrix(vec![vec![0, 1], vec![1, 0]]),
         )),
@@ -198,13 +199,13 @@ fn boundary_constraint_with_variables() {
         let c = [[a - 1, a^2], [b[0], b[1]]]
         enf clk.first = 5 + a[3] + 6";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
-        Variable(Variable::new(
+        VariableBinding(VariableBinding::new(
             Identifier("a".to_string()),
-            VariableType::Scalar(Exp(Box::new(Const(2)), Box::new(Const(2)))),
+            VariableValueExpr::Scalar(Exp(Box::new(Const(2)), Box::new(Const(2)))),
         )),
-        Variable(Variable::new(
+        VariableBinding(VariableBinding::new(
             Identifier("b".to_string()),
-            VariableType::Vector(vec![
+            VariableValueExpr::Vector(vec![
                 Elem(Identifier("a".to_string())),
                 Mul(
                     Box::new(Const(2)),
@@ -212,9 +213,9 @@ fn boundary_constraint_with_variables() {
                 ),
             ]),
         )),
-        Variable(Variable::new(
+        VariableBinding(VariableBinding::new(
             Identifier("c".to_string()),
-            VariableType::Matrix(vec![
+            VariableValueExpr::Matrix(vec![
                 vec![
                     Sub(
                         Box::new(Elem(Identifier("a".to_string()))),

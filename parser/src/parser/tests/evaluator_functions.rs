@@ -2,7 +2,8 @@ use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSec
 use crate::{
     ast::{
         ConstraintType, EvaluatorFunction, EvaluatorFunctionCall, Expression::*, IntegrityStmt::*,
-        Range, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType,
+        Range, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, VariableBinding,
+        VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -56,9 +57,9 @@ fn ev_fn_main_and_aux_cols() {
                 TraceBinding::new(Identifier("b".to_string()), 1, 1, 1),
             ],
             vec![
-                Variable(Variable::new(
+                VariableBinding(VariableBinding::new(
                     Identifier("z".to_string()),
-                    VariableType::Scalar(Add(
+                    VariableValueExpr::Scalar(Add(
                         Box::new(Elem(Identifier("a".to_string()))),
                         Box::new(Elem(Identifier("b".to_string()))),
                     )),

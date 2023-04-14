@@ -8,38 +8,38 @@ use super::Identifier;
 /// - Vector: \[1, 2, 3\]
 /// - Matrix: \[\[1, 2, 3\], \[4, 5, 6\]\]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Constant {
+pub struct ConstantBinding {
     name: Identifier,
-    value: ConstantType,
+    value: ConstantValueExpr,
 }
 
-impl Constant {
-    /// Returns a new instance of a [Constant]
-    pub fn new(name: Identifier, value: ConstantType) -> Self {
+impl ConstantBinding {
+    /// Returns a new instance of a [ConstantBinding]
+    pub fn new(name: Identifier, value: ConstantValueExpr) -> Self {
         Self { name, value }
     }
 
-    /// Returns the name of the [Constant]
+    /// Returns the name of the [ConstantBinding]
     pub fn name(&self) -> &Identifier {
         &self.name
     }
 
-    /// Returns the value of the [Constant]
-    pub fn value(&self) -> &ConstantType {
+    /// Returns the value of the [ConstantBinding]
+    pub fn value(&self) -> &ConstantValueExpr {
         &self.value
     }
 
-    pub fn into_parts(self) -> (String, ConstantType) {
+    pub fn into_parts(self) -> (String, ConstantValueExpr) {
         (self.name.into_name(), self.value)
     }
 }
 
-/// Type of constant. Constants can be of 3 types:
+/// Value of a constant. Constants can be of 3 value types:
 /// - Scalar: 123
 /// - Vector: \[1, 2, 3\]
 /// - Matrix: \[\[1, 2, 3\], \[4, 5, 6\]\]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ConstantType {
+pub enum ConstantValueExpr {
     Scalar(u64),
     Vector(Vec<u64>),
     Matrix(Vec<Vec<u64>>),

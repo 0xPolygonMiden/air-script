@@ -1,19 +1,19 @@
 use super::{
-    AccessType, Expression, Identifier, MatrixAccess, SemanticError, ValidateAccess, VariableType,
-    VectorAccess,
+    AccessType, Expression, Identifier, MatrixAccess, SemanticError, ValidateAccess,
+    VariableValueExpr, VectorAccess,
 };
 
 /// TODO: add doc comment and add comments in the code to explain the logic
 pub(crate) fn get_variable_expr(
     variable_name: &str,
-    variable_type: &VariableType,
+    variable_type: &VariableValueExpr,
     access_type: &AccessType,
 ) -> Result<Expression, SemanticError> {
     variable_type.validate(variable_name, access_type)?;
 
     let expr = match (variable_type, access_type) {
-        (VariableType::Scalar(expr), AccessType::Default) => expr.clone(),
-        (VariableType::Scalar(expr), AccessType::Vector(idx)) => match expr {
+        (VariableValueExpr::Scalar(expr), AccessType::Default) => expr.clone(),
+        (VariableValueExpr::Scalar(expr), AccessType::Vector(idx)) => match expr {
             Expression::Elem(elem) => {
                 Expression::VectorAccess(VectorAccess::new(elem.clone(), *idx))
             }
@@ -31,11 +31,14 @@ pub(crate) fn get_variable_expr(
                 ))
             }
         },
-        (VariableType::Scalar(Expression::Elem(elem)), AccessType::Matrix(row_idx, col_idx)) => {
-            Expression::MatrixAccess(MatrixAccess::new(elem.clone(), *row_idx, *col_idx))
+        (
+            VariableValueExpr::Scalar(Expression::Elem(elem)),
+            AccessType::Matrix(row_idx, col_idx),
+        ) => Expression::MatrixAccess(MatrixAccess::new(elem.clone(), *row_idx, *col_idx)),
+        (VariableValueExpr::Vector(expr_vector), AccessType::Vector(idx)) => {
+            expr_vector[*idx].clone()
         }
-        (VariableType::Vector(expr_vector), AccessType::Vector(idx)) => expr_vector[*idx].clone(),
-        (VariableType::Vector(expr_vector), AccessType::Matrix(row_idx, col_idx)) => {
+        (VariableValueExpr::Vector(expr_vector), AccessType::Matrix(row_idx, col_idx)) => {
             match &expr_vector[*row_idx] {
                 Expression::Elem(elem) => {
                     Expression::VectorAccess(VectorAccess::new(elem.clone(), *col_idx))
@@ -55,7 +58,7 @@ pub(crate) fn get_variable_expr(
                 }
             }
         }
-        (VariableType::Matrix(expr_matrix), AccessType::Matrix(row_idx, col_idx)) => {
+        (VariableValueExpr::Matrix(expr_matrix), AccessType::Matrix(row_idx, col_idx)) => {
             expr_matrix[*row_idx][*col_idx].clone()
         }
         _ => {

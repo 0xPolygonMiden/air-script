@@ -32,12 +32,12 @@ impl ListComprehension {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ListFolding {
-    Sum(ListFoldingValueType),
-    Prod(ListFoldingValueType),
+    Sum(ListFoldingValueExpr),
+    Prod(ListFoldingValueExpr),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ListFoldingValueType {
+pub enum ListFoldingValueExpr {
     Identifier(Identifier),
     Vector(Vec<Expression>),
     ListComprehension(ListComprehension),

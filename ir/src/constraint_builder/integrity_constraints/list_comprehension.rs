@@ -1,7 +1,7 @@
 use super::{
     BTreeMap, ConstraintBuilder, Expression, Identifier, Iterable, ListComprehension, ListFolding,
-    ListFoldingValueType, SemanticError, Symbol, SymbolType, TraceAccess, TraceBindingAccess,
-    TraceBindingAccessSize, VariableType, VectorAccess, CURRENT_ROW,
+    ListFoldingValueExpr, SemanticError, Symbol, SymbolType, TraceAccess, TraceBindingAccess,
+    TraceBindingAccessSize, VariableValueExpr, VectorAccess, CURRENT_ROW,
 };
 
 /// Maps each identifier in the list comprehension to its corresponding [Iterable].
@@ -185,7 +185,7 @@ impl ConstraintBuilder {
             ListFolding::Sum(lf_value_type) | ListFolding::Prod(lf_value_type) => {
                 let list = self.build_list_from_list_folding_value(lf_value_type)?;
                 let iterable_context =
-                    if let ListFoldingValueType::ListComprehension(lc) = lf_value_type {
+                    if let ListFoldingValueExpr::ListComprehension(lc) = lf_value_type {
                         build_iterable_context(lc)?
                     } else {
                         BTreeMap::new()
@@ -238,7 +238,7 @@ impl ConstraintBuilder {
                 let symbol = self.symbol_table.get_symbol(ident.name())?;
                 match symbol.symbol_type() {
                     SymbolType::Variable(variable_type) => match variable_type {
-                        VariableType::Vector(vector) => Ok(vector.len()),
+                        VariableValueExpr::Vector(vector) => Ok(vector.len()),
                         _ => Err(SemanticError::InvalidListComprehension(format!(
                             "Variable {} should be a vector for a valid list comprehension.",
                             symbol.name()
@@ -312,7 +312,7 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
         }
         SymbolType::Variable(variable_type) => {
             match variable_type {
-                VariableType::Vector(vector) => {
+                VariableValueExpr::Vector(vector) => {
                     validate_access(i, vector.len())?;
                     Ok(vector[i].clone())
                 }
@@ -367,7 +367,7 @@ fn build_slice_ident_expression(
         }
         SymbolType::Variable(variable) => {
             match variable {
-                VariableType::Vector(vector) => {
+                VariableValueExpr::Vector(vector) => {
                     validate_access(i, vector.len())?;
                     Ok(vector[range_start + i].clone())
                 }

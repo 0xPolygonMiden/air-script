@@ -1,4 +1,6 @@
-use super::{ComprehensionContext, Expression, Identifier, Iterable, TraceBindingAccess, Variable};
+use super::{
+    ComprehensionContext, Expression, Identifier, Iterable, TraceBindingAccess, VariableBinding,
+};
 use std::fmt::Display;
 
 // BOUNDARY STATEMENTS
@@ -8,7 +10,7 @@ use std::fmt::Display;
 pub enum BoundaryStmt {
     Constraint(BoundaryConstraint),
     ConstraintComprehension(BoundaryConstraint, ComprehensionContext),
-    Variable(Variable),
+    VariableBinding(VariableBinding),
 }
 
 /// Stores the expression corresponding to the boundary constraint.

@@ -1,4 +1,4 @@
-use super::{AirIR, Constant, ConstantType, Scope};
+use super::{AirIR, ConstantBinding, ConstantValueExpr, Scope};
 
 /// Updates the provided scope with constant declarations.
 pub(super) fn add_constants(scope: &mut Scope, ir: &AirIR) {
@@ -6,20 +6,20 @@ pub(super) fn add_constants(scope: &mut Scope, ir: &AirIR) {
     let mut consts = vec![];
     for constant in constants {
         let const_str = match constant.value() {
-            ConstantType::Scalar(_) => {
+            ConstantValueExpr::Scalar(_) => {
                 format!(
                     "const {}: Felt = {};",
                     constant.name(),
                     constant.to_string()
                 )
             }
-            ConstantType::Vector(vector) => format!(
+            ConstantValueExpr::Vector(vector) => format!(
                 "const {}: [Felt; {}] = {};",
                 constant.name(),
                 vector.len(),
                 constant.to_string()
             ),
-            ConstantType::Matrix(matrix) => format!(
+            ConstantValueExpr::Matrix(matrix) => format!(
                 "const {}: [[Felt; {}]; {}] = {};",
                 constant.name(),
                 matrix[0].len(),
@@ -37,17 +37,17 @@ trait Codegen {
     fn to_string(&self) -> String;
 }
 
-impl Codegen for Constant {
+impl Codegen for ConstantBinding {
     fn to_string(&self) -> String {
         match self.value() {
-            ConstantType::Scalar(scalar_const) => match scalar_const {
+            ConstantValueExpr::Scalar(scalar_const) => match scalar_const {
                 0 => "Felt::ZERO".to_string(),
                 1 => "Felt::ONE".to_string(),
                 _ => {
                     format!("Felt::new({scalar_const})")
                 }
             },
-            ConstantType::Vector(vector_const) => format!(
+            ConstantValueExpr::Vector(vector_const) => format!(
                 "[{}]",
                 vector_const
                     .iter()
@@ -61,7 +61,7 @@ impl Codegen for Constant {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            ConstantType::Matrix(matrix_const) => {
+            ConstantValueExpr::Matrix(matrix_const) => {
                 let mut rows = vec![];
                 for row in matrix_const {
                     rows.push(format!(

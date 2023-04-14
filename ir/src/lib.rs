@@ -1,7 +1,7 @@
 pub use air_script_core::{
-    Constant, ConstantType, Expression, Identifier, Iterable, ListComprehension, ListFolding,
-    ListFoldingValueType, MatrixAccess, TraceAccess, TraceBinding, TraceBindingAccess,
-    TraceBindingAccessSize, TraceSegment, Variable, VariableType, VectorAccess,
+    ConstantBinding, ConstantValueExpr, Expression, Identifier, Iterable, ListComprehension,
+    ListFolding, ListFoldingValueExpr, MatrixAccess, TraceAccess, TraceBinding, TraceBindingAccess,
+    TraceBindingAccessSize, TraceSegment, VariableBinding, VariableValueExpr, VectorAccess,
 };
 pub use parser::ast;
 use std::collections::{BTreeMap, BTreeSet};
@@ -138,7 +138,7 @@ impl AirIR {
         &self.air_name
     }
 
-    pub fn constants(&self) -> &[Constant] {
+    pub fn constants(&self) -> &[ConstantBinding] {
         self.declarations.constants()
     }
 

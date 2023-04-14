@@ -2,11 +2,11 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
-        build_trace_bindings, Constant, ConstantType, ComprehensionContext,
+        build_trace_bindings, ConstantBinding, ConstantValueExpr, ComprehensionContext,
         Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier, TraceAccess, Iterable,
-        ListComprehension, ListFolding, ListFoldingValueType, MatrixAccess, PeriodicColumn,
+        ListComprehension, ListFolding, ListFoldingValueExpr, MatrixAccess, PeriodicColumn,
         PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, TraceBinding,
-        TraceBindingAccess, TraceBindingAccessSize, Variable, VariableType, VectorAccess
+        TraceBindingAccess, TraceBindingAccessSize, VariableBinding, VariableValueExpr, VectorAccess
     }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
@@ -75,13 +75,13 @@ TraceBinding: (Identifier, u64) = {
 // CONSTANTS
 // ================================================================================================
 
-Constant: Constant = {
+Constant: ConstantBinding = {
     "const" <name: ConstName> "=" <scalar_value: Num_u64> => 
-        Constant::new(name, ConstantType::Scalar(scalar_value)),
+        ConstantBinding::new(name, ConstantValueExpr::Scalar(scalar_value)),
     "const" <name: ConstName> "=" <vector_value: Vector<Num_u64>> =>
-        Constant::new(name, ConstantType::Vector(vector_value)),
+        ConstantBinding::new(name, ConstantValueExpr::Vector(vector_value)),
     "const" <name: ConstName> "=" <matrix_value: Matrix<Num_u64>> =>
-        Constant::new(name, ConstantType::Matrix(matrix_value)),
+        ConstantBinding::new(name, ConstantValueExpr::Matrix(matrix_value)),
 }
 
 ConstName: Identifier = {
@@ -207,7 +207,7 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
 
 BoundaryStmt: BoundaryStmt = {
     "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
-        BoundaryStmt::Variable(Variable::new(name, boundary_variable_type)),
+        BoundaryStmt::VariableBinding(VariableBinding::new(name, boundary_variable_type)),
     "enf" <boundary_constraint: BoundaryConstraintExpr> =>
         BoundaryStmt::Constraint(boundary_constraint),
     "enf" <boundary_constraint: BoundaryConstraintExpr>
@@ -220,15 +220,15 @@ BoundaryConstraintExpr: BoundaryConstraint = {
         BoundaryConstraint::new(column, boundary, value),
 }
 
-BoundaryVariableType: VariableType = {
+BoundaryVariableType: VariableValueExpr = {
     <scalar_value: BoundaryExpr> => 
-        VariableType::Scalar(scalar_value),
+        VariableValueExpr::Scalar(scalar_value),
     <vector_value: Vector<BoundaryExpr>> => 
-        VariableType::Vector(vector_value),
+        VariableValueExpr::Vector(vector_value),
     <matrix_value: Matrix<BoundaryExpr>> =>
-        VariableType::Matrix(matrix_value),
+        VariableValueExpr::Matrix(matrix_value),
     "[" <list_comprehension: ListComprehension<BoundaryExpr>> "]" =>
-        VariableType::ListComprehension(list_comprehension),
+        VariableValueExpr::ListComprehension(list_comprehension),
 }
 
 Boundary: Boundary = {
@@ -299,7 +299,7 @@ IntegrityStmts: Vec<IntegrityStmt> = {
 
 IntegrityStmtGroup: Vec<IntegrityStmt> = {
     "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
-        vec![IntegrityStmt::Variable(Variable::new(name, integrity_variable_type))],
+        vec![IntegrityStmt::VariableBinding(VariableBinding::new(name, integrity_variable_type))],
     "enf" <integrity_constraint: IntegrityConstraintExpr> => vec![integrity_constraint],
     "match" "enf" ":" <integrity_stmts: IntegrityConstraintExpr+> => integrity_stmts,
     "enf" <integrity_constraint: IntegrityConstraintExpr>
@@ -327,15 +327,15 @@ IntegrityConstraintWithSelector: IntegrityStmt = {
         IntegrityStmt::Constraint(ConstraintType::Evaluator(evaluator_fn_call), Some(selectors)),
 }
 
-IntegrityVariableType: VariableType = {
+IntegrityVariableType: VariableValueExpr = {
     <scalar_value: IntegrityExpr> =>
-        VariableType::Scalar(scalar_value),
+        VariableValueExpr::Scalar(scalar_value),
     <vector_value: Vector<IntegrityExpr>> => 
-        VariableType::Vector(vector_value),
+        VariableValueExpr::Vector(vector_value),
     <matrix_value: Matrix<IntegrityExpr>> =>
-        VariableType::Matrix(matrix_value),
+        VariableValueExpr::Matrix(matrix_value),
     "[" <list_comprehension: ListComprehension<IntegrityExpr>> "]" =>
-        VariableType::ListComprehension(list_comprehension),
+        VariableValueExpr::ListComprehension(list_comprehension),
 }
 
 EvaluatorFunctionCall: EvaluatorFunctionCall = {
@@ -497,17 +497,17 @@ ListComprehension<T>: ListComprehension = {
 }
 
 ListFolding<T>: ListFolding = {
-    "sum" "(" <list_folding_value_type: ListFoldingValueType<T>> ")" =>
+    "sum" "(" <list_folding_value_type: ListFoldingValueExpr<T>> ")" =>
         ListFolding::Sum(list_folding_value_type),
-    "prod" "(" <list_folding_value_type: ListFoldingValueType<T>> ")" =>
+    "prod" "(" <list_folding_value_type: ListFoldingValueExpr<T>> ")" =>
         ListFolding::Prod(list_folding_value_type),
 }
 
-ListFoldingValueType<T>: ListFoldingValueType = {
-    <name: Identifier> => ListFoldingValueType::Identifier(name),
-    <vector: Vector<T>> => ListFoldingValueType::Vector(vector),
+ListFoldingValueExpr<T>: ListFoldingValueExpr = {
+    <name: Identifier> => ListFoldingValueExpr::Identifier(name),
+    <vector: Vector<T>> => ListFoldingValueExpr::Vector(vector),
     "[" <list_comprehension: ListComprehension<T>> "]" =>
-        ListFoldingValueType::ListComprehension(list_comprehension)
+        ListFoldingValueExpr::ListComprehension(list_comprehension)
 }
 
 Members: Vec<Identifier> = {

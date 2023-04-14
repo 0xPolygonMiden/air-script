@@ -1,7 +1,7 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::ast::{
     ConstraintType, Expression::*, IntegrityStmt::*, TraceBindingAccess, TraceBindingAccessSize,
-    Variable, VariableType, VectorAccess,
+    VariableBinding, VariableValueExpr, VectorAccess,
 };
 
 // VARIABLES
@@ -13,9 +13,9 @@ fn variables_with_and_operators() {
         let flag = n1 & !n2
         enf clk' = clk + 1 when flag";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Variable(Variable::new(
+        VariableBinding(VariableBinding::new(
             Identifier("flag".to_string()),
-            VariableType::Scalar(Mul(
+            VariableValueExpr::Scalar(Mul(
                 Box::new(Elem(Identifier("n1".to_string()))),
                 Box::new(Sub(
                     Box::new(Const(1)),
@@ -49,9 +49,9 @@ fn variables_with_or_operators() {
         let flag = s[0] | !s[1]'
         enf clk' = clk + 1 when flag";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Variable(Variable::new(
+        VariableBinding(VariableBinding::new(
             Identifier("flag".to_string()),
-            VariableType::Scalar(Sub(
+            VariableValueExpr::Scalar(Sub(
                 Box::new(Add(
                     Box::new(VectorAccess(VectorAccess::new(
                         Identifier("s".to_string()),
