@@ -1,6 +1,6 @@
 use super::{
-    get_variable_expr, AccessType, ConstraintBuilder, Expression, ListFolding, NodeIndex,
-    Operation, SemanticError, SymbolAccess, SymbolBinding, TraceAccess, TraceBindingAccess, Value,
+    get_variable_expr, ConstraintBuilder, Expression, ListFolding, NodeIndex, Operation,
+    SemanticError, SymbolAccess, SymbolBinding, TraceAccess, TraceBindingAccess, Value,
 };
 
 impl ConstraintBuilder {
@@ -28,12 +28,6 @@ impl ConstraintBuilder {
 
             // --- IDENTIFIER EXPRESSIONS ---------------------------------------------------------
             Expression::SymbolAccess(access) => self.insert_symbol_access(access),
-            Expression::Rand(ident, index) => {
-                // TODO: replace Rand with SymbolAccess in parser?
-                let access_type = AccessType::Vector(index);
-                let access = SymbolAccess::new(ident, access_type);
-                self.insert_symbol_access(access)
-            }
             Expression::ListFolding(lf_type) => self.insert_list_folding(lf_type),
 
             // --- OPERATION EXPRESSIONS ----------------------------------------------------------

@@ -112,7 +112,7 @@ impl SymbolTable {
         let mut offset = 0;
         // add the name of the random values array to the symbol table
         self.insert_symbol(
-            name,
+            format!("${name}"),
             SymbolBinding::RandomValues(offset, num_values as usize),
         )?;
 

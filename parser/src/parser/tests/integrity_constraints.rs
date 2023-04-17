@@ -130,7 +130,10 @@ fn integrity_constraint_with_random_value() {
                     Identifier("a".to_string()),
                     AccessType::Default,
                 ))),
-                Box::new(Rand(Identifier("rand".to_string()), 1)),
+                Box::new(SymbolAccess(SymbolAccess::new(
+                    Identifier("$rand".to_string()),
+                    AccessType::Vector(1),
+                ))),
             ),
             Const(0),
         )),
