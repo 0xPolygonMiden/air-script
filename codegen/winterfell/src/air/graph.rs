@@ -113,9 +113,9 @@ impl Codegen for Value {
                 ElemType::Base => format!("Felt::new({value})"),
                 ElemType::Ext => format!("E::from({value}_u64)"),
             },
-            Value::BoundConstant(binding_access) => {
-                let name = binding_access.name().to_string();
-                let access_type = binding_access.access_type();
+            Value::BoundConstant(symbol_access) => {
+                let name = symbol_access.name().to_string();
+                let access_type = symbol_access.access_type();
                 let base_value = match access_type {
                     AccessType::Default => name,
                     AccessType::Vector(idx) => format!("{name}[{idx}]"),

@@ -1,4 +1,4 @@
-use super::{AccessType, BindingAccess, Expression, SemanticError, VariableValueExpr};
+use super::{AccessType, Expression, SemanticError, SymbolAccess, VariableValueExpr};
 
 /// Returns an expression representing a single element, based on the name and value of a variable
 /// binding and the type of access into that variable which is being attempted.
@@ -8,11 +8,11 @@ use super::{AccessType, BindingAccess, Expression, SemanticError, VariableValueE
 /// single expression.
 pub(crate) fn get_variable_expr(
     bound_value: &VariableValueExpr,
-    binding_access: BindingAccess,
+    symbol_access: SymbolAccess,
 ) -> Result<Expression, SemanticError> {
-    let (ident, access_type) = binding_access.into_parts();
+    let (ident, access_type) = symbol_access.into_parts();
 
-    // access the expression in the bound value that is specified by the binding_access.
+    // access the expression in the bound value that is specified by the symbol_access.
     let (inner_expr, inner_access_type) = match bound_value {
         // return the expression. the access type does not change.
         VariableValueExpr::Scalar(expr) => (expr, access_type),
@@ -97,14 +97,14 @@ fn reduce_access_dim(var_name: &str, access_type: AccessType) -> Result<AccessTy
     }
 }
 
-/// Accesses into a `BindingAccess` expression and returns a new `BindingAccess` of a higher
+/// Accesses into a `SymbolAccess` expression and returns a new `SymbolAccess` of a higher
 /// dimension.
 ///
 /// For example:
-/// Suppose the `expr` is a [BindingAccess] specifying that a binding `A` is being accessed as a
+/// Suppose the `expr` is a [SymbolAccess] specifying that a binding `A` is being accessed as a
 /// vector at index 0 (i.e. the access_type is [AccessType::Vector(0)], representing `A[0]`).
 /// Suppose also the specified `access_type` is [AccessType::Vector(i)]. Then the resulting
-/// expression would be A[i][0], represented by a new [BindingAccess] with identifier `A` and
+/// expression would be A[i][0], represented by a new [SymbolAccess] with identifier `A` and
 /// [AccessType::Matrix(0, i)].
 ///
 /// # Errors
@@ -119,20 +119,20 @@ fn access_inner_expr(
         AccessType::Default => Ok(expr.clone()),
         // access into the expression at the specified index
         AccessType::Vector(new_idx) => match expr {
-            Expression::BindingAccess(inner_binding) => match inner_binding.access_type() {
+            Expression::SymbolAccess(inner_binding) => match inner_binding.access_type() {
                 AccessType::Default => {
-                    let new_binding_access = BindingAccess::new(
+                    let new_symbol_access = SymbolAccess::new(
                         inner_binding.ident().clone(),
                         AccessType::Vector(new_idx),
                     );
-                    Ok(Expression::BindingAccess(new_binding_access))
+                    Ok(Expression::SymbolAccess(new_symbol_access))
                 }
                 AccessType::Vector(old_idx) => {
-                    let new_binding_access = BindingAccess::new(
+                    let new_symbol_access = SymbolAccess::new(
                         inner_binding.ident().clone(),
                         AccessType::Matrix(*old_idx, new_idx),
                     );
-                    Ok(Expression::BindingAccess(new_binding_access))
+                    Ok(Expression::SymbolAccess(new_symbol_access))
                 }
                 _ => Err(SemanticError::invalid_variable_access_type(
                     inner_binding.name(),
@@ -149,13 +149,13 @@ fn access_inner_expr(
         },
         // access into the expression at the specified row and column indices
         AccessType::Matrix(row_idx, col_idx) => match expr {
-            Expression::BindingAccess(inner_binding) => match inner_binding.access_type() {
+            Expression::SymbolAccess(inner_binding) => match inner_binding.access_type() {
                 AccessType::Default => {
-                    let new_binding_access = BindingAccess::new(
+                    let new_symbol_access = SymbolAccess::new(
                         inner_binding.ident().clone(),
                         AccessType::Matrix(row_idx, col_idx),
                     );
-                    Ok(Expression::BindingAccess(new_binding_access))
+                    Ok(Expression::SymbolAccess(new_symbol_access))
                 }
                 _ => Err(SemanticError::invalid_variable_access_type(
                     inner_binding.name(),

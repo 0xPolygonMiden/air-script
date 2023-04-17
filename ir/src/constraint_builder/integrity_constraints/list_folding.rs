@@ -1,6 +1,6 @@
 use super::{
     ConstantValueExpr, ConstraintBuilder, Expression, ListFoldingValueExpr, SemanticError,
-    SymbolType, TraceAccess, VariableValueExpr, CURRENT_ROW,
+    SymbolBinding, TraceAccess, VariableValueExpr, CURRENT_ROW,
 };
 
 // LIST FOLDING
@@ -21,21 +21,21 @@ impl ConstraintBuilder {
         match lf_value_type {
             ListFoldingValueExpr::Identifier(ident) => {
                 let symbol = self.symbol_table.get_symbol(ident.name())?;
-                match symbol.symbol_type() {
-                    SymbolType::ConstantBinding(ConstantValueExpr::Vector(list)) => {
+                match symbol.binding() {
+                    SymbolBinding::Constant(ConstantValueExpr::Vector(list)) => {
                         Ok(list.iter().map(|value| Expression::Const(*value)).collect())
                     }
-                    SymbolType::VariableBinding(variable_type) => {
+                    SymbolBinding::Variable(variable_type) => {
                         if let VariableValueExpr::Vector(list) = variable_type {
                             Ok(list.clone())
                         } else {
                             Err(SemanticError::invalid_list_folding(
                                 lf_value_type,
-                                symbol.symbol_type(),
+                                symbol.binding(),
                             ))
                         }
                     }
-                    SymbolType::TraceBinding(columns) => {
+                    SymbolBinding::Trace(columns) => {
                         if columns.size() > 1 {
                             let trace_segment = columns.trace_segment();
                             Ok((0..columns.size())
@@ -51,13 +51,13 @@ impl ConstraintBuilder {
                         } else {
                             Err(SemanticError::invalid_list_folding(
                                 lf_value_type,
-                                symbol.symbol_type(),
+                                symbol.binding(),
                             ))
                         }
                     }
                     _ => Err(SemanticError::invalid_list_folding(
                         lf_value_type,
-                        symbol.symbol_type(),
+                        symbol.binding(),
                     )),
                 }
             }

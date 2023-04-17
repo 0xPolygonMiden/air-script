@@ -1,6 +1,6 @@
 use super::{
-    ast, AccessType, BTreeMap, BindingAccess, ConstantBinding, ConstantValueExpr, Declarations,
-    Identifier, SemanticError, TraceAccess, TraceBinding, TraceBindingAccess, VariableBinding,
+    ast, AccessType, BTreeMap, ConstantBinding, ConstantValueExpr, Declarations, Identifier,
+    SemanticError, SymbolAccess, TraceAccess, TraceBinding, TraceBindingAccess, VariableBinding,
     VariableValueExpr, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
 
@@ -10,8 +10,8 @@ pub(crate) use symbol::Symbol;
 mod symbol_access;
 use symbol_access::ValidateIdentifierAccess;
 
-mod symbol_type;
-pub(crate) use symbol_type::SymbolType;
+mod symbol_binding;
+pub(crate) use symbol_binding::SymbolBinding;
 
 mod value;
 pub use value::Value;
@@ -66,7 +66,7 @@ impl SymbolTable {
             }
         }
 
-        self.insert_symbol(name, SymbolType::ConstantBinding(constant_type))?;
+        self.insert_symbol(name, SymbolBinding::Constant(constant_type))?;
 
         Ok(())
     }
@@ -81,7 +81,7 @@ impl SymbolTable {
             validate_cycles(&column)?;
 
             let (name, values) = column.into_parts();
-            self.insert_symbol(name, SymbolType::PeriodicColumn(index, values.len()))?;
+            self.insert_symbol(name, SymbolBinding::PeriodicColumn(index, values.len()))?;
             self.declarations.add_periodic_column(values);
         }
 
@@ -95,7 +95,7 @@ impl SymbolTable {
     ) -> Result<(), SemanticError> {
         for input in public_inputs.into_iter() {
             let (name, size) = input.into_parts();
-            self.insert_symbol(name.clone(), SymbolType::PublicInput(size))?;
+            self.insert_symbol(name.clone(), SymbolBinding::PublicInput(size))?;
             self.declarations.add_public_input((name, size));
         }
 
@@ -113,13 +113,13 @@ impl SymbolTable {
         // add the name of the random values array to the symbol table
         self.insert_symbol(
             name,
-            SymbolType::RandomValuesBinding(offset, num_values as usize),
+            SymbolBinding::RandomValues(offset, num_values as usize),
         )?;
 
         // add the named random value bindings to the symbol table
         for binding in bindings {
             let (name, size) = binding.into_parts();
-            self.insert_symbol(name, SymbolType::RandomValuesBinding(offset, size as usize))?;
+            self.insert_symbol(name, SymbolBinding::RandomValues(offset, size as usize))?;
             offset += size as usize;
         }
 
@@ -138,10 +138,7 @@ impl SymbolTable {
             let mut width = 0;
             for binding in bindings {
                 width = binding.offset() + binding.size();
-                self.insert_symbol(
-                    binding.name().to_string(),
-                    SymbolType::TraceBinding(binding),
-                )?;
+                self.insert_symbol(binding.name().to_string(), SymbolBinding::Trace(binding))?;
             }
 
             if width > u16::MAX.into() {
@@ -166,7 +163,7 @@ impl SymbolTable {
         variable: VariableBinding,
     ) -> Result<(), SemanticError> {
         let (name, value) = variable.into_parts();
-        self.insert_symbol(name, SymbolType::VariableBinding(value))?;
+        self.insert_symbol(name, SymbolBinding::Variable(value))?;
         Ok(())
     }
 
@@ -179,18 +176,18 @@ impl SymbolTable {
     fn insert_symbol(
         &mut self,
         name: String,
-        symbol_type: SymbolType,
+        symbol_binding: SymbolBinding,
     ) -> Result<(), SemanticError> {
         // insert the identifier or return an error if it was already defined.
-        let symbol = Symbol::new(name.clone(), symbol_type.clone());
+        let symbol = Symbol::new(name.clone(), symbol_binding.clone());
 
         if let Some(symbol) = self.symbols.insert(name.clone(), symbol) {
             return Err(SemanticError::duplicate_identifer(
                 &name,
-                &symbol_type,
-                symbol.symbol_type(),
+                &symbol_binding,
+                symbol.binding(),
             ));
-        } else if matches!(symbol_type, SymbolType::VariableBinding(_)) {
+        } else if matches!(symbol_binding, SymbolBinding::Variable(_)) {
             // track variables so we can clear them out when we are done with them
             self.variables.push(name);
         }
@@ -228,7 +225,7 @@ impl SymbolTable {
         let symbol = self.get_symbol(trace_access.name())?;
         trace_access.validate(symbol)?;
 
-        let SymbolType::TraceBinding(columns) = symbol.symbol_type() else { unreachable!("validation of named trace access failed.") };
+        let SymbolBinding::Trace(columns) = symbol.binding() else { unreachable!("validation of named trace access failed.") };
         Ok(TraceAccess::new(
             columns.trace_segment(),
             columns.offset() + trace_access.col_offset(),

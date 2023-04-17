@@ -1,6 +1,6 @@
 use super::{
-    AccessType, ConstrainedBoundary, ConstraintDomain, SymbolType, TraceAccess, TraceBindingAccess,
-    TraceSegment, MIN_CYCLE_LENGTH,
+    AccessType, ConstrainedBoundary, ConstraintDomain, SymbolBinding, TraceAccess,
+    TraceBindingAccess, TraceSegment, MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]
@@ -55,8 +55,8 @@ impl SemanticError {
 
     pub(crate) fn duplicate_identifer(
         ident_name: &str,
-        ident_type: &SymbolType,
-        prev_type: &SymbolType,
+        ident_type: &SymbolBinding,
+        prev_type: &SymbolBinding,
     ) -> Self {
         SemanticError::DuplicateIdentifier(format!(
             "Cannot declare {ident_name} as a {ident_type}, since it was already defined as a {prev_type}"))
@@ -86,7 +86,10 @@ impl SemanticError {
 
     // --- TYPE ERRORS ----------------------------------------------------------------------------
 
-    pub(crate) fn not_a_trace_column_identifier(ident_name: &str, ident_type: &SymbolType) -> Self {
+    pub(crate) fn not_a_trace_column_identifier(
+        ident_name: &str,
+        ident_type: &SymbolBinding,
+    ) -> Self {
         SemanticError::InvalidUsage(format!(
             "Identifier {ident_name} was declared as a {ident_type} not as a trace column"
         ))
@@ -229,10 +232,10 @@ impl SemanticError {
 
     pub(crate) fn invalid_list_folding(
         lf_value_type: &air_script_core::ListFoldingValueExpr,
-        symbol_type: &SymbolType,
+        symbol_binding: &SymbolBinding,
     ) -> SemanticError {
         SemanticError::InvalidListFolding(format!(
-            "Symbol type {symbol_type} is not supported for list folding value type {lf_value_type:?}",
+            "Symbol type {symbol_binding} is not supported for list folding value type {lf_value_type:?}",
         ))
     }
 

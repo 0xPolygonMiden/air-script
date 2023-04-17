@@ -1,7 +1,7 @@
 use super::{
-    build_parse_test, AccessType, BindingAccess, Error, Expression::*, Identifier,
-    IntegrityConstraint, IntegrityStmt::*, ParseError, RandBinding, RandomValues, Source,
-    SourceSection, SourceSection::*,
+    build_parse_test, AccessType, Error, Expression::*, Identifier, IntegrityConstraint,
+    IntegrityStmt::*, ParseError, RandBinding, RandomValues, Source, SourceSection,
+    SourceSection::*, SymbolAccess,
 };
 use crate::ast::ConstraintType;
 
@@ -82,7 +82,7 @@ fn random_values_index_access() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             Add(
-                Box::new(BindingAccess(BindingAccess::new(
+                Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("a".to_string()),
                     AccessType::Default,
                 ))),

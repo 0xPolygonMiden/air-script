@@ -1,6 +1,6 @@
 use super::{
-    get_variable_expr, AccessType, BindingAccess, ConstraintBuilder, Expression, ListFolding,
-    NodeIndex, Operation, SemanticError, SymbolType, TraceAccess, TraceBindingAccess, Value,
+    get_variable_expr, AccessType, ConstraintBuilder, Expression, ListFolding, NodeIndex,
+    Operation, SemanticError, SymbolAccess, SymbolBinding, TraceAccess, TraceBindingAccess, Value,
 };
 
 impl ConstraintBuilder {
@@ -27,11 +27,11 @@ impl ConstraintBuilder {
             }
 
             // --- IDENTIFIER EXPRESSIONS ---------------------------------------------------------
-            Expression::BindingAccess(access) => self.insert_symbol_access(access),
+            Expression::SymbolAccess(access) => self.insert_symbol_access(access),
             Expression::Rand(ident, index) => {
-                // TODO: replace Rand with BindingAccess in parser?
+                // TODO: replace Rand with SymbolAccess in parser?
                 let access_type = AccessType::Vector(index);
-                let access = BindingAccess::new(ident, access_type);
+                let access = SymbolAccess::new(ident, access_type);
                 self.insert_symbol_access(access)
             }
             Expression::ListFolding(lf_type) => self.insert_list_folding(lf_type),
@@ -137,19 +137,19 @@ impl ConstraintBuilder {
     /// type.
     fn insert_symbol_access(
         &mut self,
-        binding_access: BindingAccess,
+        symbol_access: SymbolAccess,
     ) -> Result<NodeIndex, SemanticError> {
-        let symbol = self.symbol_table.get_symbol(binding_access.name())?;
+        let symbol = self.symbol_table.get_symbol(symbol_access.name())?;
 
-        match symbol.symbol_type() {
-            SymbolType::VariableBinding(bound_value) => {
+        match symbol.binding() {
+            SymbolBinding::Variable(bound_value) => {
                 // access the expression bound to the variable and return an expression that reduces
                 // to a single element.
-                let expr = get_variable_expr(bound_value, binding_access)?;
+                let expr = get_variable_expr(bound_value, symbol_access)?;
                 self.insert_expr(expr)
             }
             _ => {
-                let (_, access_type) = binding_access.into_parts();
+                let (_, access_type) = symbol_access.into_parts();
                 // all other symbol types indicate we're accessing a value or group of values.
                 let value = symbol.get_value(access_type)?;
 

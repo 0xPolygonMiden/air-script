@@ -28,18 +28,18 @@ impl Display for AccessType {
     }
 }
 
-/// [BindingAccess] is used to indicate referencing all or part of an identifier that is bound to a
+/// [SymbolAccess] is used to indicate referencing all or part of an identifier that is bound to a
 /// value, such as a [ConstantBinding] or a [VariableBinding].
 ///
 /// - `name`: is the identifier of the [ConstantBinding] or [VariableBinding] being accessed.
 /// - `access_type`: specifies the [AccessType] by which the identifier is being accessed.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BindingAccess {
+pub struct SymbolAccess {
     name: Identifier,
     access_type: AccessType,
 }
 
-impl BindingAccess {
+impl SymbolAccess {
     pub fn new(name: Identifier, access_type: AccessType) -> Self {
         Self { name, access_type }
     }
@@ -52,7 +52,7 @@ impl BindingAccess {
         self.name.name()
     }
 
-    /// Gets the access type of this [BindingAccess].
+    /// Gets the access type of this [SymbolAccess].
     pub fn access_type(&self) -> &AccessType {
         &self.access_type
     }

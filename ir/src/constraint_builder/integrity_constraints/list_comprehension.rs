@@ -1,6 +1,6 @@
 use super::{
-    AccessType, BTreeMap, BindingAccess, ConstraintBuilder, Expression, Identifier, Iterable,
-    ListComprehension, ListFolding, ListFoldingValueExpr, SemanticError, Symbol, SymbolType,
+    AccessType, BTreeMap, ConstraintBuilder, Expression, Identifier, Iterable, ListComprehension,
+    ListFolding, ListFoldingValueExpr, SemanticError, Symbol, SymbolAccess, SymbolBinding,
     TraceAccess, TraceBindingAccess, TraceBindingAccessSize, VariableValueExpr, CURRENT_ROW,
 };
 
@@ -44,8 +44,8 @@ impl ConstraintBuilder {
         i: usize,
     ) -> Result<Expression, SemanticError> {
         match expression {
-            Expression::BindingAccess(binding_access) => {
-                self.parse_elem(binding_access.ident(), iterable_context, i)
+            Expression::SymbolAccess(symbol_access) => {
+                self.parse_elem(symbol_access.ident(), iterable_context, i)
             }
             Expression::TraceBindingAccess(named_trace_access) => {
                 self.parse_named_trace_access(named_trace_access, iterable_context, i)
@@ -81,11 +81,9 @@ impl ConstraintBuilder {
     /// - Returns an error if the iterable is an identifier and that identifier does not correspond to
     ///   a vector.
     /// - Returns an error if the iterable is an identifier but is not of a type in set:
-    ///   { TraceBinding, IntegrityVariable, PublicInput, RandomValuesBinding }.
+    ///   { Trace, Variable, PublicInput, RandomValues }.
     /// - Returns an error if the iterable is a slice and that identifier does not correspond to
     ///   a vector.
-    /// - Returns an error if the iterable is an identifier but is not of a type in set:
-    ///   { TraceBinding, IntegrityVariable, PublicInput, RandomValuesBinding }.
     fn parse_elem(
         &self,
         ident: &Identifier,
@@ -96,7 +94,7 @@ impl ConstraintBuilder {
         match iterable {
             // if the corresponding iterable is not present in the iterable context that means the
             // identifier is not part of the list comprehension and we just return it as it is.
-            None => Ok(Expression::BindingAccess(BindingAccess::new(
+            None => Ok(Expression::SymbolAccess(SymbolAccess::new(
                 ident.clone(),
                 AccessType::Default,
             ))),
@@ -136,8 +134,8 @@ impl ConstraintBuilder {
             Some(iterable_type) => match iterable_type {
                 Iterable::Identifier(ident) => {
                     let symbol = self.symbol_table.get_symbol(ident.name())?;
-                    match symbol.symbol_type() {
-                        SymbolType::TraceBinding(size) => {
+                    match symbol.binding() {
+                        SymbolBinding::Trace(size) => {
                             validate_access(i, size.size())?;
                             Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
                                 ident.clone(),
@@ -157,8 +155,8 @@ impl ConstraintBuilder {
                 ))),
                 Iterable::Slice(ident, range) => {
                     let symbol = self.symbol_table.get_symbol(ident.name())?;
-                    match symbol.symbol_type() {
-                        SymbolType::TraceBinding(trace_columns) => {
+                    match symbol.binding() {
+                        SymbolBinding::Trace(trace_columns) => {
                             validate_access(i, trace_columns.size())?;
                             Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
                                 ident.clone(),
@@ -236,24 +234,24 @@ impl ConstraintBuilder {
     /// - Returns an error if the iterable identifier is anything other than a vector in the symbol
     ///   table if it's a variable.
     /// - Returns an error if the iterable is not of type in set:
-    ///   { IntegrityVariable, PublicInput, TraceBinding }
+    ///   { Variable, PublicInput, Trace }
     fn get_iterable_len(&self, iterable: &Iterable) -> Result<usize, SemanticError> {
         match iterable {
             Iterable::Identifier(ident) => {
                 let symbol = self.symbol_table.get_symbol(ident.name())?;
-                match symbol.symbol_type() {
-                    SymbolType::VariableBinding(variable_type) => match variable_type {
+                match symbol.binding() {
+                    SymbolBinding::Variable(variable_type) => match variable_type {
                         VariableValueExpr::Vector(vector) => Ok(vector.len()),
                         _ => Err(SemanticError::InvalidListComprehension(format!(
                             "VariableBinding {} should be a vector for a valid list comprehension.",
                             symbol.name()
                         ))),
                     },
-                    SymbolType::PublicInput(size) => Ok(*size),
-                    SymbolType::TraceBinding(trace_columns) => Ok(trace_columns.size()),
+                    SymbolBinding::PublicInput(size) => Ok(*size),
+                    SymbolBinding::Trace(trace_columns) => Ok(trace_columns.size()),
                     _ => Err(SemanticError::InvalidListComprehension(format!(
-                        "SymbolType {} not supported for list comprehensions",
-                        symbol.symbol_type()
+                        "SymbolBinding {} not supported for list comprehensions",
+                        symbol.binding()
                     ))),
                 }
             }
@@ -300,12 +298,12 @@ fn build_iterable_context(lc: &ListComprehension) -> Result<IterableContext, Sem
 ///
 /// # Errors
 /// - Returns an error if the identifier is not of type in set:
-///  { IntegrityVariable, PublicInput, TraceBinding, RandomValuesBinding }
+///  { Variable, PublicInput, Trace, RandomValues }
 /// - Returns an error if the access index is greater than the size of the vector.
 /// - Returns an error if the identifier is not a vector in the symbol table if it's a variable.
 fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, SemanticError> {
-    match symbol.symbol_type() {
-        SymbolType::TraceBinding(trace_columns) => {
+    match symbol.binding() {
+        SymbolBinding::Trace(trace_columns) => {
             validate_access(i, trace_columns.size())?;
             let trace_segment = trace_columns.trace_segment();
             Ok(Expression::TraceAccess(TraceAccess::new(
@@ -315,7 +313,7 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
                 CURRENT_ROW,
             )))
         }
-        SymbolType::VariableBinding(variable_type) => {
+        SymbolBinding::Variable(variable_type) => {
             match variable_type {
                 VariableValueExpr::Vector(vector) => {
                     validate_access(i, vector.len())?;
@@ -328,12 +326,12 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
                 )))?,
             }
         }
-        SymbolType::PublicInput(size) | SymbolType::RandomValuesBinding(_, size) => {
+        SymbolBinding::PublicInput(size) | SymbolBinding::RandomValues(_, size) => {
             validate_access(i, *size)?;
             let access_type = AccessType::Vector(i);
-            let binding_access =
-                BindingAccess::new(Identifier(symbol.name().to_string()), access_type);
-            Ok(Expression::BindingAccess(binding_access))
+            let symbol_access =
+                SymbolAccess::new(Identifier(symbol.name().to_string()), access_type);
+            Ok(Expression::SymbolAccess(symbol_access))
         }
         _ => Err(SemanticError::InvalidListComprehension(
             "{ident_type} is an invalid type for a vector".to_string(),
@@ -345,7 +343,7 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
 ///
 /// # Errors
 /// - Returns an error if the identifier is not of type in set:
-/// { IntegrityVariable, PublicInput, TraceBinding, RandomValuesBinding }
+/// { Variable, PublicInput, Trace, RandomValues }
 /// - Returns an error if the access index is greater than the size of the vector.
 /// - Returns an error if the identifier is not a vector in the symbol table if it's a variable.
 fn build_slice_ident_expression(
@@ -353,8 +351,8 @@ fn build_slice_ident_expression(
     range_start: usize,
     i: usize,
 ) -> Result<Expression, SemanticError> {
-    match symbol.symbol_type() {
-        SymbolType::TraceBinding(trace_columns) => {
+    match symbol.binding() {
+        SymbolBinding::Trace(trace_columns) => {
             validate_access(i, trace_columns.size())?;
             Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
                 Identifier(symbol.name().to_string()),
@@ -363,7 +361,7 @@ fn build_slice_ident_expression(
                 CURRENT_ROW,
             )))
         }
-        SymbolType::VariableBinding(variable) => {
+        SymbolBinding::Variable(variable) => {
             match variable {
                 VariableValueExpr::Vector(vector) => {
                     validate_access(i, vector.len())?;
@@ -376,12 +374,12 @@ fn build_slice_ident_expression(
                 )))?,
             }
         }
-        SymbolType::PublicInput(size) | SymbolType::RandomValuesBinding(_, size) => {
+        SymbolBinding::PublicInput(size) | SymbolBinding::RandomValues(_, size) => {
             validate_access(i, *size)?;
             let access_type = AccessType::Vector(range_start + i);
-            let binding_access =
-                BindingAccess::new(Identifier(symbol.name().to_string()), access_type);
-            Ok(Expression::BindingAccess(binding_access))
+            let symbol_access =
+                SymbolAccess::new(Identifier(symbol.name().to_string()), access_type);
+            Ok(Expression::SymbolAccess(symbol_access))
         }
         _ => Err(SemanticError::InvalidListComprehension(
             "{ident_type} is an invalid type for a vector".to_string(),
