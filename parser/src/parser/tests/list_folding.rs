@@ -4,8 +4,8 @@ use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
     ast::{
         AccessType, Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType, Expression::*,
-        IntegrityStmt, SourceSection::*, SymbolAccess, TraceBinding, TraceBindingAccess,
-        TraceBindingAccessSize, VariableBinding, VariableValueExpr,
+        IntegrityStmt, SourceSection::*, SymbolAccess, TraceBinding, VariableBinding,
+        VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -43,21 +43,18 @@ fn identifier_lf() {
                 ))),
             )),
             BoundaryStmt::Constraint(BoundaryConstraint::new(
-                TraceBindingAccess::new(
-                    Identifier("a".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
-                    0,
-                ),
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
                 Boundary::First,
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("x".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("y".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
             )),
@@ -90,14 +87,17 @@ fn vector_lf() {
                         SymbolAccess(SymbolAccess::new(
                             Identifier("a".to_string()),
                             AccessType::Default,
+                            0,
                         )),
                         SymbolAccess(SymbolAccess::new(
                             Identifier("b".to_string()),
                             AccessType::Default,
+                            0,
                         )),
                         SymbolAccess(SymbolAccess::new(
                             Identifier("c".to_string()),
                             AccessType::Vector(0),
+                            0,
                         )),
                     ]),
                 ))),
@@ -109,34 +109,34 @@ fn vector_lf() {
                         SymbolAccess(SymbolAccess::new(
                             Identifier("a".to_string()),
                             AccessType::Default,
+                            0,
                         )),
                         SymbolAccess(SymbolAccess::new(
                             Identifier("b".to_string()),
                             AccessType::Default,
+                            0,
                         )),
                         SymbolAccess(SymbolAccess::new(
                             Identifier("c".to_string()),
                             AccessType::Vector(0),
+                            0,
                         )),
                     ]),
                 ))),
             )),
             BoundaryStmt::Constraint(BoundaryConstraint::new(
-                TraceBindingAccess::new(
-                    Identifier("a".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
-                    0,
-                ),
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
                 Boundary::First,
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("x".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("y".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
             )),
@@ -171,6 +171,7 @@ fn bc_one_iterable_identifier_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("col".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(Const(7)),
                         ),
@@ -189,6 +190,7 @@ fn bc_one_iterable_identifier_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("col".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(Const(7)),
                         ),
@@ -200,21 +202,18 @@ fn bc_one_iterable_identifier_lf() {
                 ))),
             )),
             BoundaryStmt::Constraint(BoundaryConstraint::new(
-                TraceBindingAccess::new(
-                    Identifier("a".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
-                    0,
-                ),
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
                 Boundary::First,
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("x".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("y".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
             )),
@@ -250,10 +249,12 @@ fn bc_two_iterable_identifier_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("c".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("d".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                         vec![
@@ -277,10 +278,12 @@ fn bc_two_iterable_identifier_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("c".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("d".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                         vec![
@@ -297,21 +300,18 @@ fn bc_two_iterable_identifier_lf() {
                 ))),
             )),
             BoundaryStmt::Constraint(BoundaryConstraint::new(
-                TraceBindingAccess::new(
-                    Identifier("a".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
-                    0,
-                ),
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
                 Boundary::First,
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("x".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("y".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
             )),
@@ -346,10 +346,12 @@ fn bc_two_iterables_identifier_range_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("i".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("c".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                         vec![
@@ -373,10 +375,12 @@ fn bc_two_iterables_identifier_range_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("i".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("c".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                         vec![
@@ -393,21 +397,18 @@ fn bc_two_iterables_identifier_range_lf() {
                 ))),
             )),
             BoundaryStmt::Constraint(BoundaryConstraint::new(
-                TraceBindingAccess::new(
-                    Identifier("a".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
-                    0,
-                ),
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
                 Boundary::First,
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("x".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("y".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
             )),
@@ -442,6 +443,7 @@ fn ic_one_iterable_identifier_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("col".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(Const(7)),
                         ),
@@ -460,6 +462,7 @@ fn ic_one_iterable_identifier_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("col".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(Const(7)),
                         ),
@@ -475,15 +478,18 @@ fn ic_one_iterable_identifier_lf() {
                     SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
+                        0,
                     )),
                     Add(
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("x".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("y".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                     ),
                 )),
@@ -521,10 +527,12 @@ fn ic_two_iterable_identifier_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("c".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("d".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                         vec![
@@ -548,10 +556,12 @@ fn ic_two_iterable_identifier_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("c".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("d".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                         vec![
@@ -572,15 +582,18 @@ fn ic_two_iterable_identifier_lf() {
                     SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
+                        0,
                     )),
                     Add(
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("x".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("y".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                     ),
                 )),
@@ -617,10 +630,12 @@ fn ic_two_iterables_identifier_range_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("i".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("c".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                         vec![
@@ -644,10 +659,12 @@ fn ic_two_iterables_identifier_range_lf() {
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("i".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("c".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                         vec![
@@ -668,15 +685,18 @@ fn ic_two_iterables_identifier_range_lf() {
                     SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
+                        0,
                     )),
                     Add(
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("x".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("y".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                     ),
                 )),
@@ -714,15 +734,18 @@ fn ic_three_iterables_slice_identifier_range_lf() {
                                 Box::new(SymbolAccess(SymbolAccess::new(
                                     Identifier("m".to_string()),
                                     AccessType::Default,
+                                    0,
                                 ))),
                                 Box::new(SymbolAccess(SymbolAccess::new(
                                     Identifier("n".to_string()),
                                     AccessType::Default,
+                                    0,
                                 ))),
                             )),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("i".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                         vec![
@@ -751,15 +774,18 @@ fn ic_three_iterables_slice_identifier_range_lf() {
                                 Box::new(SymbolAccess(SymbolAccess::new(
                                     Identifier("m".to_string()),
                                     AccessType::Default,
+                                    0,
                                 ))),
                                 Box::new(SymbolAccess(SymbolAccess::new(
                                     Identifier("n".to_string()),
                                     AccessType::Default,
+                                    0,
                                 ))),
                             )),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("i".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                         vec![
@@ -784,15 +810,18 @@ fn ic_three_iterables_slice_identifier_range_lf() {
                     SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
+                        0,
                     )),
                     Add(
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("x".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("y".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                     ),
                 )),

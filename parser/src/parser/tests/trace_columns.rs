@@ -1,7 +1,6 @@
 use super::{
     build_parse_test, AccessType, Error, Expression::*, Identifier, IntegrityConstraint,
     IntegrityStmt::*, ParseError, Source, SourceSection::*, SymbolAccess, TraceBinding,
-    TraceBindingAccess, TraceBindingAccessSize,
 };
 use crate::ast::ConstraintType;
 
@@ -67,10 +66,9 @@ fn trace_columns_groups() {
         IntegrityConstraints(vec![
             Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    TraceBindingAccess(TraceBindingAccess::new(
+                    SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
-                        1,
-                        TraceBindingAccessSize::Single,
+                        AccessType::Vector(1),
                         1,
                     )),
                     Const(1),
@@ -79,16 +77,16 @@ fn trace_columns_groups() {
             ),
             Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    TraceBindingAccess(TraceBindingAccess::new(
+                    SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
-                        0,
-                        TraceBindingAccessSize::Full,
+                        AccessType::Default,
                         1,
                     )),
                     Sub(
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("clk".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(Const(1)),
                     ),

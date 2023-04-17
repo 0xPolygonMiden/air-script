@@ -2,8 +2,7 @@ use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSec
 use crate::{
     ast::{
         AccessType, ConstraintType, EvaluatorFunction, EvaluatorFunctionCall, Expression::*,
-        IntegrityStmt::*, Range, SymbolAccess, TraceBinding, TraceBindingAccess,
-        TraceBindingAccessSize, VariableBinding, VariableValueExpr,
+        IntegrityStmt::*, Range, SymbolAccess, TraceBinding, VariableBinding, VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -22,16 +21,16 @@ fn ev_fn_main_cols() {
             vec![TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1)],
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    TraceBindingAccess(TraceBindingAccess::new(
+                    SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
-                        0,
-                        TraceBindingAccessSize::Full,
+                        AccessType::Default,
                         1,
                     )),
                     Add(
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("clk".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(Const(1)),
                     ),
@@ -66,25 +65,27 @@ fn ev_fn_main_and_aux_cols() {
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("a".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("b".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                     )),
                 )),
                 Constraint(
                     ConstraintType::Inline(IntegrityConstraint::new(
-                        TraceBindingAccess(TraceBindingAccess::new(
+                        SymbolAccess(SymbolAccess::new(
                             Identifier("clk".to_string()),
-                            0,
-                            TraceBindingAccessSize::Full,
+                            AccessType::Default,
                             1,
                         )),
                         Add(
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("clk".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(Const(1)),
                         ),
@@ -93,20 +94,21 @@ fn ev_fn_main_and_aux_cols() {
                 ),
                 Constraint(
                     ConstraintType::Inline(IntegrityConstraint::new(
-                        TraceBindingAccess(TraceBindingAccess::new(
+                        SymbolAccess(SymbolAccess::new(
                             Identifier("a".to_string()),
-                            0,
-                            TraceBindingAccessSize::Full,
+                            AccessType::Default,
                             1,
                         )),
                         Add(
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("a".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                             Box::new(SymbolAccess(SymbolAccess::new(
                                 Identifier("z".to_string()),
                                 AccessType::Default,
+                                0,
                             ))),
                         ),
                     )),
@@ -127,10 +129,9 @@ fn ev_fn_call_simple() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Evaluator(EvaluatorFunctionCall::new(
             Identifier("advance_clock".to_string()),
-            vec![vec![TraceBindingAccess::new(
+            vec![vec![SymbolAccess::new(
                 Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
+                AccessType::Default,
                 0,
             )]],
         )),
@@ -150,22 +151,11 @@ fn ev_fn_call() {
         ConstraintType::Evaluator(EvaluatorFunctionCall::new(
             Identifier("advance_clock".to_string()),
             vec![vec![
-                TraceBindingAccess::new(
-                    Identifier("a".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
-                    0,
-                ),
-                TraceBindingAccess::new(
-                    Identifier("b".to_string()),
-                    1,
-                    TraceBindingAccessSize::Single,
-                    0,
-                ),
-                TraceBindingAccess::new(
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
+                SymbolAccess::new(Identifier("b".to_string()), AccessType::Vector(1), 0),
+                SymbolAccess::new(
                     Identifier("c".to_string()),
-                    2,
-                    TraceBindingAccessSize::Slice(Range::new(2, 4)),
+                    AccessType::Slice(Range::new(2, 4)),
                     0,
                 ),
             ]],
@@ -193,10 +183,9 @@ fn ev_fn_call_inside_ev_fn() {
             vec![Constraint(
                 ConstraintType::Evaluator(EvaluatorFunctionCall::new(
                     Identifier("advance_clock".to_string()),
-                    vec![vec![TraceBindingAccess::new(
+                    vec![vec![SymbolAccess::new(
                         Identifier("clk".to_string()),
-                        0,
-                        TraceBindingAccessSize::Full,
+                        AccessType::Default,
                         0,
                     )]],
                 )),

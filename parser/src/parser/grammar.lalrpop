@@ -6,7 +6,7 @@ use crate::{
         ComprehensionContext, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier, 
         TraceAccess, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr,
         PeriodicColumn, PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, 
-        TraceBinding, TraceBindingAccess, TraceBindingAccessSize, VariableBinding, VariableValueExpr, 
+        TraceBinding, VariableBinding, VariableValueExpr, 
     }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
@@ -216,7 +216,7 @@ BoundaryStmt: BoundaryStmt = {
 }
 
 BoundaryConstraintExpr: BoundaryConstraint = {
-    <column: TraceBindingAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
+    <column: SymbolAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
         BoundaryConstraint::new(column, boundary, value),
 }
 
@@ -336,7 +336,7 @@ IntegrityVariableType: VariableValueExpr = {
 }
 
 EvaluatorFunctionCall: EvaluatorFunctionCall = {
-    <ident: Identifier> "(" <args: CommaElems<Vector<TraceBindingAccess>>> ")" =>? {
+    <ident: Identifier> "(" <args: CommaElems<Vector<SymbolAccess>>> ")" =>? {
         if args.len() > 2 {
             return Err(ParseError::User {
                 error: Error::ParseError(
@@ -394,7 +394,6 @@ IntegrityAtom: Expression = {
     "!" <expr: IntegrityAtom> =>
         Expression::Sub(Box::new(Expression::Const(1)), Box::new(expr)),
     <symbol_access: SymbolAccess> => Expression::SymbolAccess(symbol_access),
-    <trace_access: TraceBindingAccessWithOffset> => Expression::TraceBindingAccess(trace_access),
     <list_folding_type: ListFolding<IntegrityExpr>> =>
         Expression::ListFolding(list_folding_type),
 }
@@ -435,31 +434,18 @@ Index: usize = {
 }
 
 SymbolAccess: SymbolAccess = {
-    <ident: Identifier> => 
-        SymbolAccess::new(ident, AccessType::Default),
-    <ident: Identifier> <idx: Index> => 
-        SymbolAccess::new(ident, AccessType::Vector(idx)),
-    <ident: Identifier> <row: Index> <col: Index> =>
-        SymbolAccess::new(ident, AccessType::Matrix(row, col)),
+    <symbol_access: SymbolAccessBase> => SymbolAccess::new(symbol_access.0, symbol_access.1, 0),
+    <symbol_access: SymbolAccessBase> "'" => SymbolAccess::new(symbol_access.0, symbol_access.1, 1)
+}
+
+SymbolAccessBase: (Identifier, AccessType) = {
+    <ident: Identifier> => (ident, AccessType::Default),
+    <ident: Identifier> "[" <range: Range> "]" => (ident, AccessType::Slice(range)),
+    <ident: Identifier> <idx: Index> =>  (ident, AccessType::Vector(idx)),
+    <ident: Identifier> <row: Index> <col: Index> => (ident, AccessType::Matrix(row, col)),
     // accessing the random values array
-    <ident: RandArrayAccess> => 
-        SymbolAccess::new(ident, AccessType::Default),
-    <ident: RandArrayAccess> <idx: Index> =>  
-        SymbolAccess::new(ident, AccessType::Vector(idx)),
-}
-
-TraceBindingAccess: TraceBindingAccess = {
-    <ident: Identifier> => TraceBindingAccess::new(ident, 0, TraceBindingAccessSize::Full, 0),
-    <ident: Identifier> "[" <range: Range> "]" =>
-        TraceBindingAccess::new(ident, range.start(), TraceBindingAccessSize::Slice(range), 0),
-    <ident: Identifier> <idx: Index> =>
-        TraceBindingAccess::new(ident, idx, TraceBindingAccessSize::Single, 0)
-}
-
-TraceBindingAccessWithOffset: TraceBindingAccess = {
-    <ident: Identifier> "'" =>TraceBindingAccess::new(ident, 0, TraceBindingAccessSize::Full, 1),
-    <ident: Identifier> <idx: Index> "'" =>
-        TraceBindingAccess::new(ident, idx, TraceBindingAccessSize::Single, 1)
+    <ident: RandArrayAccess> => (ident, AccessType::Default),
+    <ident: RandArrayAccess> <idx: Index> => (ident, AccessType::Vector(idx))
 }
 
 TraceAccess: TraceAccess = {

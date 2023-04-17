@@ -1,7 +1,7 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::ast::{
-    AccessType, ConstraintType, Expression::*, IntegrityStmt::*, SymbolAccess, TraceBindingAccess,
-    TraceBindingAccessSize, VariableBinding, VariableValueExpr,
+    AccessType, ConstraintType, Expression::*, IntegrityStmt::*, SymbolAccess, VariableBinding,
+    VariableValueExpr,
 };
 
 // VARIABLES
@@ -19,28 +19,30 @@ fn variables_with_and_operators() {
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("n1".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
                 Box::new(Sub(
                     Box::new(Const(1)),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("n2".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 )),
             )),
         )),
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
-                TraceBindingAccess(TraceBindingAccess::new(
+                SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 )),
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(Const(1)),
                 ),
@@ -48,6 +50,7 @@ fn variables_with_and_operators() {
             Some(SymbolAccess(SymbolAccess::new(
                 Identifier("flag".to_string()),
                 AccessType::Default,
+                0,
             ))),
         ),
     ])]);
@@ -68,13 +71,13 @@ fn variables_with_or_operators() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("s".to_string()),
                         AccessType::Vector(0),
+                        0,
                     ))),
                     Box::new(Sub(
                         Box::new(Const(1)),
-                        Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                        Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("s".to_string()),
-                            1,
-                            TraceBindingAccessSize::Single,
+                            AccessType::Vector(1),
                             1,
                         ))),
                     )),
@@ -83,13 +86,13 @@ fn variables_with_or_operators() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("s".to_string()),
                         AccessType::Vector(0),
+                        0,
                     ))),
                     Box::new(Sub(
                         Box::new(Const(1)),
-                        Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                        Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("s".to_string()),
-                            1,
-                            TraceBindingAccessSize::Single,
+                            AccessType::Vector(1),
                             1,
                         ))),
                     )),
@@ -98,16 +101,16 @@ fn variables_with_or_operators() {
         )),
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
-                TraceBindingAccess(TraceBindingAccess::new(
+                SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 )),
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(Const(1)),
                 ),
@@ -115,6 +118,7 @@ fn variables_with_or_operators() {
             Some(SymbolAccess(SymbolAccess::new(
                 Identifier("flag".to_string()),
                 AccessType::Default,
+                0,
             ))),
         ),
     ])]);
