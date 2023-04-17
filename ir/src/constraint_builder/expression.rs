@@ -1,6 +1,6 @@
 use super::{
     get_variable_expr, ConstraintBuilder, Expression, ListFolding, NodeIndex, Operation,
-    SemanticError, SymbolAccess, SymbolBinding, TraceAccess, TraceBindingAccess, Value,
+    SemanticError, SymbolAccess, SymbolBinding, TraceAccess, Value,
 };
 
 impl ConstraintBuilder {
@@ -22,9 +22,6 @@ impl ConstraintBuilder {
 
             // --- TRACE ACCESS REFERENCE ---------------------------------------------------------
             Expression::TraceAccess(column_access) => self.insert_trace_access(&column_access),
-            Expression::TraceBindingAccess(trace_access) => {
-                self.insert_trace_binding_access(trace_access)
-            }
 
             // --- IDENTIFIER EXPRESSIONS ---------------------------------------------------------
             Expression::SymbolAccess(access) => self.insert_symbol_access(access),
@@ -89,16 +86,6 @@ impl ConstraintBuilder {
         Ok(node_index)
     }
 
-    pub(crate) fn insert_trace_binding_access(
-        &mut self,
-        trace_binding_access: TraceBindingAccess,
-    ) -> Result<NodeIndex, SemanticError> {
-        let trace_access = self
-            .symbol_table
-            .get_trace_binding_access(&trace_binding_access)?;
-        self.insert_trace_access(&trace_access)
-    }
-
     // --- OPERATOR EXPRESSIONS -----------------------------------------------------------------
 
     // TODO: docs
@@ -143,9 +130,8 @@ impl ConstraintBuilder {
                 self.insert_expr(expr)
             }
             _ => {
-                let (_, access_type) = symbol_access.into_parts();
-                // all other symbol types indicate we're accessing a value or group of values.
-                let value = symbol.get_value(access_type)?;
+                // all other symbol types indicate we're accessing a value.
+                let value = symbol.get_value(symbol_access)?;
 
                 // add a value node in the graph.
                 let node_index = self.insert_graph_node(Operation::Value(value));

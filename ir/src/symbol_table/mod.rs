@@ -1,14 +1,10 @@
 use super::{
-    ast, AccessType, BTreeMap, ConstantBinding, ConstantValueExpr, Declarations, Identifier,
-    SemanticError, SymbolAccess, TraceAccess, TraceBinding, TraceBindingAccess, VariableBinding,
-    VariableValueExpr, CURRENT_ROW, MIN_CYCLE_LENGTH,
+    ast, AccessType, BTreeMap, ConstantBinding, ConstantValueExpr, Declarations, SemanticError,
+    SymbolAccess, TraceAccess, TraceBinding, VariableBinding, VariableValueExpr, MIN_CYCLE_LENGTH,
 };
 
 mod symbol;
 pub(crate) use symbol::Symbol;
-
-mod symbol_access;
-use symbol_access::ValidateIdentifierAccess;
 
 mod symbol_binding;
 pub(crate) use symbol_binding::SymbolBinding;
@@ -210,28 +206,48 @@ impl SymbolTable {
         }
     }
 
-    /// Looks up a [TraceBindingAccess] by its identifier name and returns an equivalent
-    /// [TraceAccess].
+    /// Looks up a [SymbolAccess] by its identifier name and returns an equivalent [TraceAccess] if
+    /// the symbol access references a single value in the trace.
     ///
     /// # Errors
     /// Returns an error if:
     /// - the identifier was not in the symbol table.
-    /// - the identifier was not declared as a trace column binding.
-    /// TODO: update docs
-    pub(crate) fn get_trace_binding_access(
+    /// - the identifier was not declared as a trace binding.
+    /// - the access would not return a single value in the execution trace.
+    pub(crate) fn get_trace_access(
         &self,
-        trace_access: &TraceBindingAccess,
+        symbol_access: &SymbolAccess,
     ) -> Result<TraceAccess, SemanticError> {
-        let symbol = self.get_symbol(trace_access.name())?;
-        trace_access.validate(symbol)?;
+        let symbol = self.get_symbol(symbol_access.name())?;
 
-        let SymbolBinding::Trace(columns) = symbol.binding() else { unreachable!("validation of named trace access failed.") };
-        Ok(TraceAccess::new(
-            columns.trace_segment(),
-            columns.offset() + trace_access.col_offset(),
-            1,
-            trace_access.row_offset(),
-        ))
+        match symbol.binding() {
+            SymbolBinding::Trace(columns) => {
+                let col_offset = match symbol_access.access_type() {
+                    AccessType::Default => columns.offset(),
+                    AccessType::Vector(idx) => {
+                        if *idx >= columns.size() {
+                            todo!("invalid trace access");
+                        }
+                        columns.offset() + *idx
+                    }
+                    _ => {
+                        todo!("invalid trace access")
+                    }
+                };
+                Ok(TraceAccess::new(
+                    columns.trace_segment(),
+                    col_offset,
+                    1,
+                    symbol_access.offset(),
+                ))
+            }
+            _ => {
+                return Err(SemanticError::not_a_trace_column_identifier(
+                    symbol.name(),
+                    symbol.binding(),
+                ))
+            }
+        }
     }
 
     /// Gets the number of trace segments that were specified for this AIR.

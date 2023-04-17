@@ -1,7 +1,7 @@
 use super::{
     AccessType, BTreeMap, ConstraintBuilder, Expression, Identifier, Iterable, ListComprehension,
     ListFolding, ListFoldingValueExpr, SemanticError, Symbol, SymbolAccess, SymbolBinding,
-    TraceAccess, TraceBindingAccess, TraceBindingAccessSize, VariableValueExpr, CURRENT_ROW,
+    TraceAccess, VariableValueExpr,
 };
 
 /// Maps each identifier in the list comprehension to its corresponding [Iterable].
@@ -45,10 +45,7 @@ impl ConstraintBuilder {
     ) -> Result<Expression, SemanticError> {
         match expression {
             Expression::SymbolAccess(symbol_access) => {
-                self.parse_elem(symbol_access.ident(), iterable_context, i)
-            }
-            Expression::TraceBindingAccess(named_trace_access) => {
-                self.parse_named_trace_access(named_trace_access, iterable_context, i)
+                self.parse_symbol_access(symbol_access, iterable_context, i)
             }
             Expression::Add(lhs, rhs) => {
                 let lhs = self.parse_lc_expr(lhs, iterable_context, i)?;
@@ -84,91 +81,27 @@ impl ConstraintBuilder {
     ///   { Trace, Variable, PublicInput, RandomValues }.
     /// - Returns an error if the iterable is a slice and that identifier does not correspond to
     ///   a vector.
-    fn parse_elem(
+    fn parse_symbol_access(
         &self,
-        ident: &Identifier,
+        symbol_access: &SymbolAccess,
         iterable_context: &IterableContext,
         i: usize,
     ) -> Result<Expression, SemanticError> {
-        let iterable = iterable_context.get(ident);
+        let iterable = iterable_context.get(symbol_access.ident());
         match iterable {
             // if the corresponding iterable is not present in the iterable context that means the
             // identifier is not part of the list comprehension and we just return it as it is.
-            None => Ok(Expression::SymbolAccess(SymbolAccess::new(
-                ident.clone(),
-                AccessType::Default,
-            ))),
+            None => Ok(Expression::SymbolAccess(symbol_access.clone())),
             Some(iterable_type) => match iterable_type {
                 Iterable::Identifier(ident) => {
                     let symbol = self.symbol_table.get_symbol(ident.name())?;
-                    build_ident_expression(symbol, i)
+                    build_ident_expression(symbol, i, symbol_access.offset())
                 }
+                // TODO: check range handling now that trace bindings are included in SymbolAccess
                 Iterable::Range(range) => Ok(Expression::Const((range.start() + i) as u64)),
                 Iterable::Slice(ident, range) => {
                     let symbol = self.symbol_table.get_symbol(ident.name())?;
-                    build_slice_ident_expression(symbol, range.start(), i)
-                }
-            },
-        }
-    }
-
-    /// Parses a named trace access in a list comprehension expression.
-    ///
-    /// # Errors
-    /// - Returns an error if the iterable is an identifier and that identifier does not correspond to
-    ///   a trace column.
-    /// - Returns an error if the iterable is a range.
-    /// - Returns an error if the iterable is a slice and that identifier does not correspond to a
-    ///   trace column.
-    fn parse_named_trace_access(
-        &self,
-        named_trace_access: &TraceBindingAccess,
-        iterable_context: &IterableContext,
-        i: usize,
-    ) -> Result<Expression, SemanticError> {
-        let iterable = iterable_context.get(&Identifier(named_trace_access.name().to_string()));
-        match iterable {
-            // if the corresponding iterable is not present in the iterable context that means the
-            // trace column is not part of the list comprehension and we just return it as it is.
-            None => Ok(Expression::TraceBindingAccess(named_trace_access.clone())),
-            Some(iterable_type) => match iterable_type {
-                Iterable::Identifier(ident) => {
-                    let symbol = self.symbol_table.get_symbol(ident.name())?;
-                    match symbol.binding() {
-                        SymbolBinding::Trace(size) => {
-                            validate_access(i, size.size())?;
-                            Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
-                                ident.clone(),
-                                i,
-                                TraceBindingAccessSize::Single,
-                                named_trace_access.row_offset(),
-                            )))
-                        }
-                        _ => Err(SemanticError::InvalidListComprehension(format!(
-                            "Iterable {ident} should contain trace columns"
-                        )))?,
-                    }
-                }
-                Iterable::Range(_) => Err(SemanticError::InvalidListComprehension(format!(
-                    "Iterable cannot be of type Range for named trace access {}",
-                    named_trace_access.name()
-                ))),
-                Iterable::Slice(ident, range) => {
-                    let symbol = self.symbol_table.get_symbol(ident.name())?;
-                    match symbol.binding() {
-                        SymbolBinding::Trace(trace_columns) => {
-                            validate_access(i, trace_columns.size())?;
-                            Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
-                                ident.clone(),
-                                range.start() + i,
-                                TraceBindingAccessSize::Single,
-                                named_trace_access.row_offset(),
-                            )))
-                        }
-                        _ => Err(SemanticError::InvalidListComprehension(format!(
-                            "Iterable {ident} should contain trace columns"
-                        )))?,
-                    }
+                    build_slice_ident_expression(symbol, range.start(), i, symbol_access.offset())
                 }
             },
         }
@@ -301,7 +234,11 @@ fn build_iterable_context(lc: &ListComprehension) -> Result<IterableContext, Sem
 ///  { Variable, PublicInput, Trace, RandomValues }
 /// - Returns an error if the access index is greater than the size of the vector.
 /// - Returns an error if the identifier is not a vector in the symbol table if it's a variable.
-fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, SemanticError> {
+fn build_ident_expression(
+    symbol: &Symbol,
+    i: usize,
+    offset: usize,
+) -> Result<Expression, SemanticError> {
     match symbol.binding() {
         SymbolBinding::Trace(trace_columns) => {
             validate_access(i, trace_columns.size())?;
@@ -310,7 +247,7 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
                 trace_segment,
                 trace_columns.offset() + i,
                 1,
-                CURRENT_ROW,
+                offset,
             )))
         }
         SymbolBinding::Variable(variable_type) => {
@@ -330,7 +267,7 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
             validate_access(i, *size)?;
             let access_type = AccessType::Vector(i);
             let symbol_access =
-                SymbolAccess::new(Identifier(symbol.name().to_string()), access_type);
+                SymbolAccess::new(Identifier(symbol.name().to_string()), access_type, offset);
             Ok(Expression::SymbolAccess(symbol_access))
         }
         _ => Err(SemanticError::InvalidListComprehension(
@@ -350,15 +287,15 @@ fn build_slice_ident_expression(
     symbol: &Symbol,
     range_start: usize,
     i: usize,
+    offset: usize,
 ) -> Result<Expression, SemanticError> {
     match symbol.binding() {
         SymbolBinding::Trace(trace_columns) => {
             validate_access(i, trace_columns.size())?;
-            Ok(Expression::TraceBindingAccess(TraceBindingAccess::new(
+            Ok(Expression::SymbolAccess(SymbolAccess::new(
                 Identifier(symbol.name().to_string()),
-                range_start + i,
-                TraceBindingAccessSize::Single,
-                CURRENT_ROW,
+                AccessType::Vector(range_start + i),
+                offset,
             )))
         }
         SymbolBinding::Variable(variable) => {
@@ -378,7 +315,7 @@ fn build_slice_ident_expression(
             validate_access(i, *size)?;
             let access_type = AccessType::Vector(range_start + i);
             let symbol_access =
-                SymbolAccess::new(Identifier(symbol.name().to_string()), access_type);
+                SymbolAccess::new(Identifier(symbol.name().to_string()), access_type, offset);
             Ok(Expression::SymbolAccess(symbol_access))
         }
         _ => Err(SemanticError::InvalidListComprehension(

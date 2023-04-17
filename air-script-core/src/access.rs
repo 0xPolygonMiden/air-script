@@ -64,6 +64,11 @@ impl SymbolAccess {
         &self.access_type
     }
 
+    /// Gets the offset of this [SymbolAccess].
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
     pub fn into_parts(self) -> (Identifier, AccessType, usize) {
         (self.name, self.access_type, self.offset)
     }

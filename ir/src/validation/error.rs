@@ -1,6 +1,6 @@
 use super::{
-    AccessType, ConstrainedBoundary, ConstraintDomain, SymbolBinding, TraceAccess,
-    TraceBindingAccess, TraceSegment, MIN_CYCLE_LENGTH,
+    AccessType, ConstrainedBoundary, ConstraintDomain, SymbolBinding, TraceAccess, TraceSegment,
+    MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]
@@ -194,18 +194,6 @@ impl SemanticError {
             access.col_idx(),
             access.trace_segment(),
             segment_width
-        ))
-    }
-
-    pub(crate) fn named_trace_column_access_out_of_bounds(
-        access: &TraceBindingAccess,
-        size: usize,
-    ) -> Self {
-        SemanticError::IndexOutOfRange(format!(
-            "Out-of-range index '{}' while accessing named trace column group '{}' of length {}",
-            access.col_offset(),
-            access.name(),
-            size
         ))
     }
 

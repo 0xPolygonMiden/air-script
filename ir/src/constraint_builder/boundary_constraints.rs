@@ -46,7 +46,7 @@ impl ConstraintBuilder {
             BoundaryStmt::Constraint(constraint) => {
                 let (boundary, access, value) = constraint.into_parts();
 
-                let trace_access = self.symbol_table.get_trace_binding_access(&access)?;
+                let trace_access = self.symbol_table.get_trace_access(&access)?;
                 let domain = boundary.into();
                 let constrained_boundary = ConstrainedBoundary::new(
                     trace_access.trace_segment(),

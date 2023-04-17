@@ -2,8 +2,8 @@ use super::{
     ast, AccessType, AlgebraicGraph, BTreeMap, BTreeSet, ConstantValueExpr, ConstraintDomain,
     ConstraintRoot, Constraints, Declarations, Expression, Identifier, Iterable, ListComprehension,
     ListFolding, ListFoldingValueExpr, NodeIndex, Operation, SemanticError, Symbol, SymbolAccess,
-    SymbolBinding, SymbolTable, TraceAccess, TraceBindingAccess, TraceBindingAccessSize,
-    TraceSegment, Value, VariableBinding, VariableValueExpr, CURRENT_ROW,
+    SymbolBinding, SymbolTable, TraceAccess, TraceSegment, Value, VariableBinding,
+    VariableValueExpr, CURRENT_ROW,
 };
 
 mod boundary_constraints;

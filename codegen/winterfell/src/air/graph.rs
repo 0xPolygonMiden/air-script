@@ -8,6 +8,7 @@ use super::{
 
 /// Code generation trait for generating Rust code strings from IR types related to constraints and
 /// the [AlgebraicGraph].
+/// TODO: replace panics with errors
 pub trait Codegen {
     fn to_string(&self, ir: &AirIR, elem_type: ElemType, trace_segment: u8) -> String;
 }
@@ -122,6 +123,7 @@ impl Codegen for Value {
                     AccessType::Matrix(row_idx, col_idx) => {
                         format!("{name}[{row_idx}][{col_idx}]",)
                     }
+                    AccessType::Slice(_) => panic!("unsupported access type"),
                 };
                 match elem_type {
                     ElemType::Base => base_value,

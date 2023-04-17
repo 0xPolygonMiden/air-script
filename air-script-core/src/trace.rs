@@ -1,4 +1,4 @@
-use super::{Identifier, Range};
+use super::Identifier;
 
 // TYPES
 // ================================================================================================
@@ -100,65 +100,5 @@ impl TraceBinding {
     /// Returns the size of the trace binding.
     pub fn size(&self) -> usize {
         self.size
-    }
-}
-
-/// Indicates how much of a [TraceBinding] is being accessed.
-///
-/// TODO: check that this is correct for `Single`.
-/// - `Single`: only a single element from the [TraceBinding] is being referenced.
-/// - `Slice`: the specified range of the [TraceBinding] is being referenced.
-/// - `Full`: the entire [TraceBinding] is being referenced.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum TraceBindingAccessSize {
-    Single,
-    Slice(Range),
-    Full,
-}
-
-/// [TraceBindingAccess] is used to indicate accessing a [TraceBinding].
-///
-/// - `binding`: is the identifier of the [TraceBinding] being accessed.
-/// - `col_offset`: specifies the column within the [TraceBinding] where the access starts. For
-///   example, if a [TraceBinding] has `offset` = 2 and the [TraceBindingAccess] has
-///   `col_offset` = 2, then the offset of the access within the trace segment will be 4. If the
-///   [TraceBinding] refers to a single column, then this value will be zero.
-/// - `size`: specifies how much of the [TraceBinding] is being accessed.
-/// - `row_offset`: specifies the offset from the current row.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TraceBindingAccess {
-    binding: Identifier,
-    col_offset: usize,
-    size: TraceBindingAccessSize,
-    row_offset: usize,
-}
-
-impl TraceBindingAccess {
-    pub fn new(
-        binding: Identifier,
-        col_offset: usize,
-        size: TraceBindingAccessSize,
-        row_offset: usize,
-    ) -> Self {
-        Self {
-            binding,
-            col_offset,
-            size,
-            row_offset,
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        self.binding.name()
-    }
-
-    /// Gets the column offset of this [TraceBindingAccess].
-    pub fn col_offset(&self) -> usize {
-        self.col_offset
-    }
-
-    /// Gets the row offset of this [TraceBindingAccess].
-    pub fn row_offset(&self) -> usize {
-        self.row_offset
     }
 }
