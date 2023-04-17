@@ -1,7 +1,7 @@
 use super::{
-    BTreeMap, ConstraintBuilder, Expression, Identifier, Iterable, ListComprehension, ListFolding,
-    ListFoldingValueExpr, SemanticError, Symbol, SymbolType, TraceAccess, TraceBindingAccess,
-    TraceBindingAccessSize, VariableValueExpr, VectorAccess, CURRENT_ROW,
+    AccessType, BTreeMap, BindingAccess, ConstraintBuilder, Expression, Identifier, Iterable,
+    ListComprehension, ListFolding, ListFoldingValueExpr, SemanticError, Symbol, SymbolType,
+    TraceAccess, TraceBindingAccess, TraceBindingAccessSize, VariableValueExpr, CURRENT_ROW,
 };
 
 /// Maps each identifier in the list comprehension to its corresponding [Iterable].
@@ -44,7 +44,9 @@ impl ConstraintBuilder {
         i: usize,
     ) -> Result<Expression, SemanticError> {
         match expression {
-            Expression::Elem(ident) => self.parse_elem(ident, iterable_context, i),
+            Expression::BindingAccess(binding_access) => {
+                self.parse_elem(binding_access.ident(), iterable_context, i)
+            }
             Expression::TraceBindingAccess(named_trace_access) => {
                 self.parse_named_trace_access(named_trace_access, iterable_context, i)
             }
@@ -94,7 +96,10 @@ impl ConstraintBuilder {
         match iterable {
             // if the corresponding iterable is not present in the iterable context that means the
             // identifier is not part of the list comprehension and we just return it as it is.
-            None => Ok(Expression::Elem(ident.clone())),
+            None => Ok(Expression::BindingAccess(BindingAccess::new(
+                ident.clone(),
+                AccessType::Default,
+            ))),
             Some(iterable_type) => match iterable_type {
                 Iterable::Identifier(ident) => {
                     let symbol = self.symbol_table.get_symbol(ident.name())?;
@@ -237,10 +242,10 @@ impl ConstraintBuilder {
             Iterable::Identifier(ident) => {
                 let symbol = self.symbol_table.get_symbol(ident.name())?;
                 match symbol.symbol_type() {
-                    SymbolType::Variable(variable_type) => match variable_type {
+                    SymbolType::VariableBinding(variable_type) => match variable_type {
                         VariableValueExpr::Vector(vector) => Ok(vector.len()),
                         _ => Err(SemanticError::InvalidListComprehension(format!(
-                            "Variable {} should be a vector for a valid list comprehension.",
+                            "VariableBinding {} should be a vector for a valid list comprehension.",
                             symbol.name()
                         ))),
                     },
@@ -310,7 +315,7 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
                 CURRENT_ROW,
             )))
         }
-        SymbolType::Variable(variable_type) => {
+        SymbolType::VariableBinding(variable_type) => {
             match variable_type {
                 VariableValueExpr::Vector(vector) => {
                     validate_access(i, vector.len())?;
@@ -323,19 +328,12 @@ fn build_ident_expression(symbol: &Symbol, i: usize) -> Result<Expression, Seman
                 )))?,
             }
         }
-        SymbolType::PublicInput(size) => {
+        SymbolType::PublicInput(size) | SymbolType::RandomValuesBinding(_, size) => {
             validate_access(i, *size)?;
-            Ok(Expression::VectorAccess(VectorAccess::new(
-                Identifier(symbol.name().to_string()),
-                i,
-            )))
-        }
-        SymbolType::RandomValuesBinding(_, size) => {
-            validate_access(i, *size)?;
-            Ok(Expression::VectorAccess(VectorAccess::new(
-                Identifier(symbol.name().to_string()),
-                i,
-            )))
+            let access_type = AccessType::Vector(i);
+            let binding_access =
+                BindingAccess::new(Identifier(symbol.name().to_string()), access_type);
+            Ok(Expression::BindingAccess(binding_access))
         }
         _ => Err(SemanticError::InvalidListComprehension(
             "{ident_type} is an invalid type for a vector".to_string(),
@@ -365,7 +363,7 @@ fn build_slice_ident_expression(
                 CURRENT_ROW,
             )))
         }
-        SymbolType::Variable(variable) => {
+        SymbolType::VariableBinding(variable) => {
             match variable {
                 VariableValueExpr::Vector(vector) => {
                     validate_access(i, vector.len())?;
@@ -373,24 +371,17 @@ fn build_slice_ident_expression(
                 }
                 // TODO: Handle matrix access
                 _ => Err(SemanticError::InvalidListComprehension(format!(
-                    "Variable {} should be a vector for a valid list comprehension",
+                    "VariableBinding {} should be a vector for a valid list comprehension",
                     symbol.name()
                 )))?,
             }
         }
-        SymbolType::PublicInput(size) => {
+        SymbolType::PublicInput(size) | SymbolType::RandomValuesBinding(_, size) => {
             validate_access(i, *size)?;
-            Ok(Expression::VectorAccess(VectorAccess::new(
-                Identifier(symbol.name().to_string()),
-                range_start + i,
-            )))
-        }
-        SymbolType::RandomValuesBinding(_, size) => {
-            validate_access(i, *size)?;
-            Ok(Expression::VectorAccess(VectorAccess::new(
-                Identifier(symbol.name().to_string()),
-                range_start + i,
-            )))
+            let access_type = AccessType::Vector(range_start + i);
+            let binding_access =
+                BindingAccess::new(Identifier(symbol.name().to_string()), access_type);
+            Ok(Expression::BindingAccess(binding_access))
         }
         _ => Err(SemanticError::InvalidListComprehension(
             "{ident_type} is an invalid type for a vector".to_string(),

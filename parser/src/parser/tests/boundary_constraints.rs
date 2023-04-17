@@ -1,12 +1,11 @@
 use super::{
-    build_parse_test, Boundary, BoundaryConstraint, Identifier, Iterable, Range, Source,
-    SourceSection, TraceBinding,
+    build_parse_test, AccessType, BindingAccess, Boundary, BoundaryConstraint, Identifier,
+    Iterable, Range, Source, SourceSection, TraceBinding,
 };
 use crate::{
     ast::{
-        BoundaryStmt::*, ConstantBinding, ConstantValueExpr::*, Expression::*, MatrixAccess,
-        PublicInput, TraceBindingAccess, TraceBindingAccessSize, VariableBinding,
-        VariableValueExpr, VectorAccess,
+        BoundaryStmt::*, ConstantBinding, ConstantValueExpr::*, Expression::*, PublicInput,
+        TraceBindingAccess, TraceBindingAccessSize, VariableBinding, VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -110,7 +109,10 @@ fn boundary_constraint_with_pub_input() {
                 0,
             ),
             Boundary::First,
-            VectorAccess(VectorAccess::new(Identifier("a".to_string()), 0)),
+            BindingAccess(BindingAccess::new(
+                Identifier("a".to_string()),
+                AccessType::Vector(0),
+            )),
         ))]),
     ]);
     build_parse_test!(source).expect_ast(expected);
@@ -133,9 +135,9 @@ fn boundary_constraint_with_expr() {
             Add(
                 Box::new(Add(
                     Box::new(Const(5)),
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("a".to_string()),
-                        3,
+                        AccessType::Vector(3),
                     ))),
                 )),
                 Box::new(Const(6)),
@@ -173,16 +175,18 @@ fn boundary_constraint_with_const() {
             Boundary::First,
             Sub(
                 Box::new(Add(
-                    Box::new(Elem(Identifier("A".to_string()))),
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("A".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("B".to_string()),
-                        1,
+                        AccessType::Vector(1),
                     ))),
                 )),
-                Box::new(MatrixAccess(MatrixAccess::new(
+                Box::new(BindingAccess(BindingAccess::new(
                     Identifier("C".to_string()),
-                    0,
-                    1,
+                    AccessType::Matrix(0, 1),
                 ))),
             ),
         ))]),
@@ -206,10 +210,16 @@ fn boundary_constraint_with_variables() {
         VariableBinding(VariableBinding::new(
             Identifier("b".to_string()),
             VariableValueExpr::Vector(vec![
-                Elem(Identifier("a".to_string())),
+                BindingAccess(BindingAccess::new(
+                    Identifier("a".to_string()),
+                    AccessType::Default,
+                )),
                 Mul(
                     Box::new(Const(2)),
-                    Box::new(Elem(Identifier("a".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
             ]),
         )),
@@ -218,17 +228,29 @@ fn boundary_constraint_with_variables() {
             VariableValueExpr::Matrix(vec![
                 vec![
                     Sub(
-                        Box::new(Elem(Identifier("a".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("a".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(1)),
                     ),
                     Exp(
-                        Box::new(Elem(Identifier("a".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("a".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(2)),
                     ),
                 ],
                 vec![
-                    VectorAccess(VectorAccess::new(Identifier("b".to_string()), 0)),
-                    VectorAccess(VectorAccess::new(Identifier("b".to_string()), 1)),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("b".to_string()),
+                        AccessType::Vector(0),
+                    )),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("b".to_string()),
+                        AccessType::Vector(1),
+                    )),
                 ],
             ]),
         )),
@@ -243,9 +265,9 @@ fn boundary_constraint_with_variables() {
             Add(
                 Box::new(Add(
                     Box::new(Const(5)),
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("a".to_string()),
-                        3,
+                        AccessType::Vector(3),
                     ))),
                 )),
                 Box::new(Const(6)),
@@ -390,7 +412,10 @@ fn bc_comprehension_two_iterable_identifiers() {
                     0,
                 ),
                 Boundary::First,
-                Elem(Identifier("y".to_string())),
+                BindingAccess(BindingAccess::new(
+                    Identifier("y".to_string()),
+                    AccessType::Default,
+                )),
             ),
             vec![
                 (

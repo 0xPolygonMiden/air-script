@@ -1,7 +1,7 @@
 use super::{
-    ast, BTreeMap, ConstantBinding, ConstantValueExpr, Declarations, Identifier, MatrixAccess,
-    SemanticError, TraceAccess, TraceBinding, TraceBindingAccess, VariableBinding,
-    VariableValueExpr, VectorAccess, CURRENT_ROW, MIN_CYCLE_LENGTH,
+    ast, AccessType, BTreeMap, BindingAccess, ConstantBinding, ConstantValueExpr, Declarations,
+    Identifier, SemanticError, TraceAccess, TraceBinding, TraceBindingAccess, VariableBinding,
+    VariableValueExpr, CURRENT_ROW, MIN_CYCLE_LENGTH,
 };
 
 mod symbol;
@@ -9,13 +9,12 @@ pub(crate) use symbol::Symbol;
 
 mod symbol_access;
 use symbol_access::ValidateIdentifierAccess;
-pub(crate) use symbol_access::{AccessType, ValidateAccess};
 
 mod symbol_type;
 pub(crate) use symbol_type::SymbolType;
 
 mod value;
-pub use value::{ConstantValue, Value};
+pub use value::Value;
 
 // SYMBOL TABLE
 // ================================================================================================
@@ -67,7 +66,7 @@ impl SymbolTable {
             }
         }
 
-        self.insert_symbol(name, SymbolType::Constant(constant_type))?;
+        self.insert_symbol(name, SymbolType::ConstantBinding(constant_type))?;
 
         Ok(())
     }
@@ -167,7 +166,7 @@ impl SymbolTable {
         variable: VariableBinding,
     ) -> Result<(), SemanticError> {
         let (name, value) = variable.into_parts();
-        self.insert_symbol(name, SymbolType::Variable(value))?;
+        self.insert_symbol(name, SymbolType::VariableBinding(value))?;
         Ok(())
     }
 
@@ -191,7 +190,7 @@ impl SymbolTable {
                 &symbol_type,
                 symbol.symbol_type(),
             ));
-        } else if matches!(symbol_type, SymbolType::Variable(_)) {
+        } else if matches!(symbol_type, SymbolType::VariableBinding(_)) {
             // track variables so we can clear them out when we are done with them
             self.variables.push(name);
         }

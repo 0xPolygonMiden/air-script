@@ -1,5 +1,5 @@
 use super::{
-    get_variable_expr, AccessType, ConstantValue, ConstraintBuilder, Expression, ListFolding,
+    get_variable_expr, AccessType, BindingAccess, ConstraintBuilder, Expression, ListFolding,
     NodeIndex, Operation, SemanticError, SymbolType, TraceAccess, TraceBindingAccess, Value,
 };
 
@@ -27,19 +27,12 @@ impl ConstraintBuilder {
             }
 
             // --- IDENTIFIER EXPRESSIONS ---------------------------------------------------------
-            Expression::Elem(ident) => self.insert_symbol_access(ident.name(), AccessType::Default),
+            Expression::BindingAccess(access) => self.insert_symbol_access(access),
             Expression::Rand(ident, index) => {
+                // TODO: replace Rand with BindingAccess in parser?
                 let access_type = AccessType::Vector(index);
-                self.insert_symbol_access(ident.name(), access_type)
-            }
-            Expression::VectorAccess(vector_access) => {
-                let access_type = AccessType::Vector(vector_access.idx());
-                self.insert_symbol_access(vector_access.name(), access_type)
-            }
-            Expression::MatrixAccess(matrix_access) => {
-                let access_type =
-                    AccessType::Matrix(matrix_access.row_idx(), matrix_access.col_idx());
-                self.insert_symbol_access(matrix_access.name(), access_type)
+                let access = BindingAccess::new(ident, access_type);
+                self.insert_symbol_access(access)
             }
             Expression::ListFolding(lf_type) => self.insert_list_folding(lf_type),
 
@@ -77,9 +70,7 @@ impl ConstraintBuilder {
     /// Inserts the specified constant value into the graph and returns the resulting expression
     /// details.
     fn insert_inline_constant(&mut self, value: u64) -> Result<NodeIndex, SemanticError> {
-        let node_index = self.insert_graph_node(Operation::Value(Value::Constant(
-            ConstantValue::Inline(value),
-        )));
+        let node_index = self.insert_graph_node(Operation::Value(Value::InlineConstant(value)));
 
         Ok(node_index)
     }
@@ -139,27 +130,28 @@ impl ConstraintBuilder {
     // --- IDENTIFIER EXPRESSIONS -----------------------------------------------------------------
 
     /// Adds a trace column, periodic column, random value, named constant or a variable to the
-    /// graph and returns the [ExprDetails] of the inserted expression.
+    /// graph and returns the [NodeIndex] of the inserted expression.
     ///
     /// # Errors
     /// Returns an error if the identifier is not present in the symbol table or is not a supported
     /// type.
     fn insert_symbol_access(
         &mut self,
-        name: &str,
-        access_type: AccessType,
+        binding_access: BindingAccess,
     ) -> Result<NodeIndex, SemanticError> {
-        let symbol = self.symbol_table.get_symbol(name)?;
+        let symbol = self.symbol_table.get_symbol(binding_access.name())?;
 
         match symbol.symbol_type() {
-            SymbolType::Variable(variable_type) => {
-                // this symbol refers to an expression or group of expressions
-                let expr = get_variable_expr(symbol.name(), variable_type, &access_type)?;
+            SymbolType::VariableBinding(bound_value) => {
+                // access the expression bound to the variable and return an expression that reduces
+                // to a single element.
+                let expr = get_variable_expr(bound_value, binding_access)?;
                 self.insert_expr(expr)
             }
             _ => {
+                let (_, access_type) = binding_access.into_parts();
                 // all other symbol types indicate we're accessing a value or group of values.
-                let value = symbol.get_value(&access_type)?;
+                let value = symbol.get_value(access_type)?;
 
                 // add a value node in the graph.
                 let node_index = self.insert_graph_node(Operation::Value(value));

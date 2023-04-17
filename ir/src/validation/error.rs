@@ -96,7 +96,7 @@ impl SemanticError {
 
     pub(crate) fn invalid_constant_access_type(name: &str, access_type: &AccessType) -> Self {
         Self::InvalidUsage(format!(
-            "Constant '{name}' cannot be accessed by a {access_type}.",
+            "ConstantBinding '{name}' cannot be accessed by a {access_type}.",
         ))
     }
 
@@ -126,7 +126,7 @@ impl SemanticError {
 
     pub(crate) fn invalid_variable_access_type(name: &str, access_type: &AccessType) -> Self {
         Self::InvalidUsage(format!(
-            "Variable '{name}' cannot be accessed as a {access_type}.",
+            "VariableBinding '{name}' cannot be accessed as a {access_type}.",
         ))
     }
 

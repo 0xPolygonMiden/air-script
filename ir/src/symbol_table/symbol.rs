@@ -1,7 +1,6 @@
 use super::{
-    symbol_access::ValidateAccess, AccessType, ConstantValue, ConstantValueExpr, Identifier,
-    MatrixAccess, SemanticError, SymbolType, TraceAccess, TraceBinding, Value, VectorAccess,
-    CURRENT_ROW,
+    symbol_access::ValidateAccess, AccessType, BindingAccess, ConstantValueExpr, Identifier,
+    SemanticError, SymbolType, TraceAccess, TraceBinding, Value, CURRENT_ROW,
 };
 
 /// Symbol information for a constant, variable, trace column, periodic column, or public input.
@@ -26,9 +25,9 @@ impl Symbol {
         &self.symbol_type
     }
 
-    pub fn get_value(&self, access_type: &AccessType) -> Result<Value, SemanticError> {
+    pub fn get_value(&self, access_type: AccessType) -> Result<Value, SemanticError> {
         match self.symbol_type() {
-            SymbolType::Constant(constant_type) => {
+            SymbolType::ConstantBinding(constant_type) => {
                 self.get_constant_value(constant_type, access_type)
             }
             SymbolType::PeriodicColumn(index, cycle_len) => {
@@ -39,8 +38,8 @@ impl Symbol {
                 self.get_random_value(*offset, *size, access_type)
             }
             SymbolType::TraceBinding(columns) => self.get_trace_value(columns, access_type),
-            SymbolType::Variable(_) => {
-                unreachable!("Variable values cannot be accessed directly, since they reference expressions which must be added to the graph");
+            SymbolType::VariableBinding(_) => {
+                unreachable!("VariableBinding values cannot be accessed directly, since they reference expressions which must be added to the graph");
             }
         }
     }
@@ -50,29 +49,20 @@ impl Symbol {
     fn get_constant_value(
         &self,
         constant_type: &ConstantValueExpr,
-        access_type: &AccessType,
+        access_type: AccessType,
     ) -> Result<Value, SemanticError> {
-        constant_type.validate(self.name(), access_type)?;
+        constant_type.validate(self.name(), &access_type)?;
 
         let name = self.name().to_string();
-        match access_type {
-            AccessType::Default => Ok(Value::Constant(ConstantValue::Scalar(name))),
-            AccessType::Vector(idx) => {
-                let access = VectorAccess::new(Identifier(name), *idx);
-                Ok(Value::Constant(ConstantValue::Vector(access)))
-            }
-            AccessType::Matrix(row_idx, col_idx) => {
-                let access = MatrixAccess::new(Identifier(name), *row_idx, *col_idx);
-                Ok(Value::Constant(ConstantValue::Matrix(access)))
-            }
-        }
+        let binding_access = BindingAccess::new(Identifier(name), access_type);
+        Ok(Value::BoundConstant(binding_access))
     }
 
     fn get_periodic_column_value(
         &self,
         index: usize,
         cycle_len: usize,
-        access_type: &AccessType,
+        access_type: AccessType,
     ) -> Result<Value, SemanticError> {
         match access_type {
             AccessType::Default => Ok(Value::PeriodicColumn(index, cycle_len)),
@@ -85,18 +75,18 @@ impl Symbol {
     fn get_public_input_value(
         &self,
         size: usize,
-        access_type: &AccessType,
+        access_type: AccessType,
     ) -> Result<Value, SemanticError> {
         match access_type {
             AccessType::Vector(index) => {
-                if *index >= size {
+                if index >= size {
                     return Err(SemanticError::vector_access_out_of_bounds(
                         self.name(),
-                        *index,
+                        index,
                         size,
                     ));
                 }
-                return Ok(Value::PublicInput(self.name().to_string(), *index));
+                return Ok(Value::PublicInput(self.name().to_string(), index));
             }
             _ => return Err(SemanticError::invalid_public_input_access_type(self.name())),
         }
@@ -106,7 +96,7 @@ impl Symbol {
         &self,
         binding_offset: usize,
         binding_size: usize,
-        access_type: &AccessType,
+        access_type: AccessType,
     ) -> Result<Value, SemanticError> {
         match access_type {
             AccessType::Default => {
@@ -118,10 +108,10 @@ impl Symbol {
                 Ok(Value::RandomValue(binding_offset))
             }
             AccessType::Vector(idx) => {
-                if *idx >= binding_size {
+                if idx >= binding_size {
                     return Err(SemanticError::vector_access_out_of_bounds(
                         self.name(),
-                        *idx,
+                        idx,
                         binding_size,
                     ));
                 }
@@ -131,7 +121,7 @@ impl Symbol {
             }
             _ => Err(SemanticError::invalid_random_value_access_type(
                 self.name(),
-                access_type,
+                &access_type,
             )),
         }
     }
@@ -139,7 +129,7 @@ impl Symbol {
     fn get_trace_value(
         &self,
         binding: &TraceBinding,
-        access_type: &AccessType,
+        access_type: AccessType,
     ) -> Result<Value, SemanticError> {
         // symbol accesses at rows other than the first are identified by the parser as
         // [NamedTraceAccess] and handled differently, so this case will only occur for
@@ -157,10 +147,10 @@ impl Symbol {
                 Ok(Value::TraceElement(trace_access))
             }
             AccessType::Vector(idx) => {
-                if *idx >= binding.size() {
+                if idx >= binding.size() {
                     return Err(SemanticError::vector_access_out_of_bounds(
                         self.name(),
-                        *idx,
+                        idx,
                         binding.size(),
                     ));
                 }
@@ -172,7 +162,7 @@ impl Symbol {
             }
             _ => Err(SemanticError::invalid_trace_access_type(
                 self.name(),
-                access_type,
+                &access_type,
             )),
         }
     }

@@ -3,9 +3,9 @@ use air_script_core::{Iterable, ListComprehension, ListFolding, ListFoldingValue
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
     ast::{
-        Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType, Expression::*, IntegrityStmt,
-        SourceSection::*, TraceBinding, TraceBindingAccess, TraceBindingAccessSize,
-        VariableBinding, VariableValueExpr, VectorAccess,
+        AccessType, BindingAccess, Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType,
+        Expression::*, IntegrityStmt, SourceSection::*, TraceBinding, TraceBindingAccess,
+        TraceBindingAccessSize, VariableBinding, VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -51,8 +51,14 @@ fn identifier_lf() {
                 ),
                 Boundary::First,
                 Add(
-                    Box::new(Elem(Identifier("x".to_string()))),
-                    Box::new(Elem(Identifier("y".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("y".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
             )),
         ]),
@@ -81,9 +87,18 @@ fn vector_lf() {
                 Identifier("x".to_string()),
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueExpr::Vector(vec![
-                        Elem(Identifier("a".to_string())),
-                        Elem(Identifier("b".to_string())),
-                        VectorAccess(VectorAccess::new(Identifier("c".to_string()), 0)),
+                        BindingAccess(BindingAccess::new(
+                            Identifier("a".to_string()),
+                            AccessType::Default,
+                        )),
+                        BindingAccess(BindingAccess::new(
+                            Identifier("b".to_string()),
+                            AccessType::Default,
+                        )),
+                        BindingAccess(BindingAccess::new(
+                            Identifier("c".to_string()),
+                            AccessType::Vector(0),
+                        )),
                     ]),
                 ))),
             )),
@@ -91,9 +106,18 @@ fn vector_lf() {
                 Identifier("y".to_string()),
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueExpr::Vector(vec![
-                        Elem(Identifier("a".to_string())),
-                        Elem(Identifier("b".to_string())),
-                        VectorAccess(VectorAccess::new(Identifier("c".to_string()), 0)),
+                        BindingAccess(BindingAccess::new(
+                            Identifier("a".to_string()),
+                            AccessType::Default,
+                        )),
+                        BindingAccess(BindingAccess::new(
+                            Identifier("b".to_string()),
+                            AccessType::Default,
+                        )),
+                        BindingAccess(BindingAccess::new(
+                            Identifier("c".to_string()),
+                            AccessType::Vector(0),
+                        )),
                     ]),
                 ))),
             )),
@@ -106,8 +130,14 @@ fn vector_lf() {
                 ),
                 Boundary::First,
                 Add(
-                    Box::new(Elem(Identifier("x".to_string()))),
-                    Box::new(Elem(Identifier("y".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("y".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
             )),
         ]),
@@ -138,7 +168,10 @@ fn bc_one_iterable_identifier_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Exp(
-                            Box::new(Elem(Identifier("col".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("col".to_string()),
+                                AccessType::Default,
+                            ))),
                             Box::new(Const(7)),
                         ),
                         vec![(
@@ -153,7 +186,10 @@ fn bc_one_iterable_identifier_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Exp(
-                            Box::new(Elem(Identifier("col".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("col".to_string()),
+                                AccessType::Default,
+                            ))),
                             Box::new(Const(7)),
                         ),
                         vec![(
@@ -172,8 +208,14 @@ fn bc_one_iterable_identifier_lf() {
                 ),
                 Boundary::First,
                 Add(
-                    Box::new(Elem(Identifier("x".to_string()))),
-                    Box::new(Elem(Identifier("y".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("y".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
             )),
         ]),
@@ -205,8 +247,14 @@ fn bc_two_iterable_identifier_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Mul(
-                            Box::new(Elem(Identifier("c".to_string()))),
-                            Box::new(Elem(Identifier("d".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("c".to_string()),
+                                AccessType::Default,
+                            ))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("d".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                         vec![
                             (
@@ -226,8 +274,14 @@ fn bc_two_iterable_identifier_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Add(
-                            Box::new(Elem(Identifier("c".to_string()))),
-                            Box::new(Elem(Identifier("d".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("c".to_string()),
+                                AccessType::Default,
+                            ))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("d".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                         vec![
                             (
@@ -251,8 +305,14 @@ fn bc_two_iterable_identifier_lf() {
                 ),
                 Boundary::First,
                 Add(
-                    Box::new(Elem(Identifier("x".to_string()))),
-                    Box::new(Elem(Identifier("y".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("y".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
             )),
         ]),
@@ -283,8 +343,14 @@ fn bc_two_iterables_identifier_range_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Mul(
-                            Box::new(Elem(Identifier("i".to_string()))),
-                            Box::new(Elem(Identifier("c".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("i".to_string()),
+                                AccessType::Default,
+                            ))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("c".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                         vec![
                             (
@@ -304,8 +370,14 @@ fn bc_two_iterables_identifier_range_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Add(
-                            Box::new(Elem(Identifier("i".to_string()))),
-                            Box::new(Elem(Identifier("c".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("i".to_string()),
+                                AccessType::Default,
+                            ))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("c".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                         vec![
                             (
@@ -329,8 +401,14 @@ fn bc_two_iterables_identifier_range_lf() {
                 ),
                 Boundary::First,
                 Add(
-                    Box::new(Elem(Identifier("x".to_string()))),
-                    Box::new(Elem(Identifier("y".to_string()))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                    ))),
+                    Box::new(BindingAccess(BindingAccess::new(
+                        Identifier("y".to_string()),
+                        AccessType::Default,
+                    ))),
                 ),
             )),
         ]),
@@ -361,7 +439,10 @@ fn ic_one_iterable_identifier_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Exp(
-                            Box::new(Elem(Identifier("col".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("col".to_string()),
+                                AccessType::Default,
+                            ))),
                             Box::new(Const(7)),
                         ),
                         vec![(
@@ -376,7 +457,10 @@ fn ic_one_iterable_identifier_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Exp(
-                            Box::new(Elem(Identifier("col".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("col".to_string()),
+                                AccessType::Default,
+                            ))),
                             Box::new(Const(7)),
                         ),
                         vec![(
@@ -388,10 +472,19 @@ fn ic_one_iterable_identifier_lf() {
             )),
             IntegrityStmt::Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    Elem(Identifier("a".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    )),
                     Add(
-                        Box::new(Elem(Identifier("x".to_string()))),
-                        Box::new(Elem(Identifier("y".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("x".to_string()),
+                            AccessType::Default,
+                        ))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("y".to_string()),
+                            AccessType::Default,
+                        ))),
                     ),
                 )),
                 None,
@@ -425,8 +518,14 @@ fn ic_two_iterable_identifier_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Mul(
-                            Box::new(Elem(Identifier("c".to_string()))),
-                            Box::new(Elem(Identifier("d".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("c".to_string()),
+                                AccessType::Default,
+                            ))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("d".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                         vec![
                             (
@@ -446,8 +545,14 @@ fn ic_two_iterable_identifier_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Add(
-                            Box::new(Elem(Identifier("c".to_string()))),
-                            Box::new(Elem(Identifier("d".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("c".to_string()),
+                                AccessType::Default,
+                            ))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("d".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                         vec![
                             (
@@ -464,10 +569,19 @@ fn ic_two_iterable_identifier_lf() {
             )),
             IntegrityStmt::Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    Elem(Identifier("a".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    )),
                     Add(
-                        Box::new(Elem(Identifier("x".to_string()))),
-                        Box::new(Elem(Identifier("y".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("x".to_string()),
+                            AccessType::Default,
+                        ))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("y".to_string()),
+                            AccessType::Default,
+                        ))),
                     ),
                 )),
                 None,
@@ -500,8 +614,14 @@ fn ic_two_iterables_identifier_range_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Sum(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Mul(
-                            Box::new(Elem(Identifier("i".to_string()))),
-                            Box::new(Elem(Identifier("c".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("i".to_string()),
+                                AccessType::Default,
+                            ))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("c".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                         vec![
                             (
@@ -521,8 +641,14 @@ fn ic_two_iterables_identifier_range_lf() {
                 VariableValueExpr::Scalar(ListFolding(ListFolding::Prod(
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Add(
-                            Box::new(Elem(Identifier("i".to_string()))),
-                            Box::new(Elem(Identifier("c".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("i".to_string()),
+                                AccessType::Default,
+                            ))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("c".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                         vec![
                             (
@@ -539,10 +665,19 @@ fn ic_two_iterables_identifier_range_lf() {
             )),
             IntegrityStmt::Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    Elem(Identifier("a".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    )),
                     Add(
-                        Box::new(Elem(Identifier("x".to_string()))),
-                        Box::new(Elem(Identifier("y".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("x".to_string()),
+                            AccessType::Default,
+                        ))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("y".to_string()),
+                            AccessType::Default,
+                        ))),
                     ),
                 )),
                 None,
@@ -576,10 +711,19 @@ fn ic_three_iterables_slice_identifier_range_lf() {
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Mul(
                             Box::new(Mul(
-                                Box::new(Elem(Identifier("m".to_string()))),
-                                Box::new(Elem(Identifier("n".to_string()))),
+                                Box::new(BindingAccess(BindingAccess::new(
+                                    Identifier("m".to_string()),
+                                    AccessType::Default,
+                                ))),
+                                Box::new(BindingAccess(BindingAccess::new(
+                                    Identifier("n".to_string()),
+                                    AccessType::Default,
+                                ))),
                             )),
-                            Box::new(Elem(Identifier("i".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("i".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                         vec![
                             (
@@ -604,10 +748,19 @@ fn ic_three_iterables_slice_identifier_range_lf() {
                     ListFoldingValueExpr::ListComprehension(ListComprehension::new(
                         Mul(
                             Box::new(Mul(
-                                Box::new(Elem(Identifier("m".to_string()))),
-                                Box::new(Elem(Identifier("n".to_string()))),
+                                Box::new(BindingAccess(BindingAccess::new(
+                                    Identifier("m".to_string()),
+                                    AccessType::Default,
+                                ))),
+                                Box::new(BindingAccess(BindingAccess::new(
+                                    Identifier("n".to_string()),
+                                    AccessType::Default,
+                                ))),
                             )),
-                            Box::new(Elem(Identifier("i".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("i".to_string()),
+                                AccessType::Default,
+                            ))),
                         ),
                         vec![
                             (
@@ -628,10 +781,19 @@ fn ic_three_iterables_slice_identifier_range_lf() {
             )),
             IntegrityStmt::Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    Elem(Identifier("a".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    )),
                     Add(
-                        Box::new(Elem(Identifier("x".to_string()))),
-                        Box::new(Elem(Identifier("y".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("x".to_string()),
+                            AccessType::Default,
+                        ))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("y".to_string()),
+                            AccessType::Default,
+                        ))),
                     ),
                 )),
                 None,

@@ -148,7 +148,7 @@ fn ic_variables_access_vector_from_matrix() {
 #[test]
 fn err_ic_variables_vector_with_inlined_vector() {
     // We can not parse matrix variable that consists of inlined vector and scalar elements.
-    // Variable `d` is parsed as a vector and can not contain inlined vectors.
+    // VariableBinding `d` is parsed as a vector and can not contain inlined vectors.
     let source = "
     trace_columns:
         main: [clk]
@@ -168,7 +168,7 @@ fn err_ic_variables_vector_with_inlined_vector() {
 #[test]
 fn err_ic_variables_matrix_with_vector_reference() {
     // We can not parse matrix variable that consists of inlined vector and scalar elements
-    // Variable `d` is parsed as a matrix and can not contain references to vectors.
+    // VariableBinding `d` is parsed as a matrix and can not contain references to vectors.
     let source = "
     trace_columns:
         main: [clk]
@@ -370,4 +370,54 @@ fn err_ic_variable_matrix_invalid_access() {
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::new(parsed);
     assert!(result.is_err());
+}
+
+#[test]
+fn err_ic_invalid_rand_access() {
+    let source = "
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
+    trace_columns:
+        main: [clk]
+        aux: [p]
+    public_inputs:
+        stack_inputs: [16]
+    random_values:
+        alphas: [1]
+    boundary_constraints:
+        enf clk.first = 1
+    integrity_constraints:
+        let a = $alphas[0]
+        enf clk' = clk + a[0]";
+
+    let parsed = parse(source).expect("Parsing failed");
+
+    let result = AirIR::new(parsed);
+    assert!(result.is_err());
+}
+
+#[test]
+fn ic_variable_trace_access() {
+    let source = "
+    const A = 123
+    const B = [1, 2, 3]
+    const C = [[1, 2, 3], [4, 5, 6]]
+    trace_columns:
+        main: [clk, x[4]]
+        aux: [p]
+    public_inputs:
+        stack_inputs: [16]
+    random_values:
+        alphas: [1]
+    boundary_constraints:
+        enf clk.first = 1
+    integrity_constraints:
+        let a = x
+        enf clk' = clk + a[0]";
+
+    let parsed = parse(source).expect("Parsing failed");
+
+    let result = AirIR::new(parsed);
+    assert!(result.is_ok());
 }

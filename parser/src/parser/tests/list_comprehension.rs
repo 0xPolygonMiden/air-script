@@ -3,9 +3,9 @@ use air_script_core::{Iterable, ListComprehension, Range};
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
     ast::{
-        Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType, Expression::*, IntegrityStmt,
-        SourceSection::*, TraceBinding, TraceBindingAccess, TraceBindingAccessSize,
-        VariableBinding, VariableValueExpr, VectorAccess,
+        AccessType, BindingAccess, Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType,
+        Expression::*, IntegrityStmt, SourceSection::*, TraceBinding, TraceBindingAccess,
+        TraceBindingAccessSize, VariableBinding, VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -36,7 +36,10 @@ fn bc_one_iterable_identifier_lc() {
                 Identifier("x".to_string()),
                 VariableValueExpr::ListComprehension(ListComprehension::new(
                     Exp(
-                        Box::new(Elem(Identifier("col".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("col".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(7)),
                     ),
                     vec![(
@@ -56,23 +59,23 @@ fn bc_one_iterable_identifier_lc() {
                 Add(
                     Box::new(Add(
                         Box::new(Add(
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                0,
+                                AccessType::Vector(0),
                             ))),
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                1,
+                                AccessType::Vector(1),
                             ))),
                         )),
-                        Box::new(VectorAccess(VectorAccess::new(
+                        Box::new(BindingAccess(BindingAccess::new(
                             Identifier("x".to_string()),
-                            2,
+                            AccessType::Vector(2),
                         ))),
                     )),
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("x".to_string()),
-                        3,
+                        AccessType::Vector(3),
                     ))),
                 ),
             )),
@@ -105,9 +108,15 @@ fn bc_identifier_and_range_lc() {
                     Mul(
                         Box::new(Exp(
                             Box::new(Const(2)),
-                            Box::new(Elem(Identifier("i".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("i".to_string()),
+                                AccessType::Default,
+                            ))),
                         )),
-                        Box::new(Elem(Identifier("c".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("c".to_string()),
+                            AccessType::Default,
+                        ))),
                     ),
                     vec![
                         (
@@ -132,23 +141,23 @@ fn bc_identifier_and_range_lc() {
                 Add(
                     Box::new(Add(
                         Box::new(Add(
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                0,
+                                AccessType::Vector(0),
                             ))),
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                1,
+                                AccessType::Vector(1),
                             ))),
                         )),
-                        Box::new(VectorAccess(VectorAccess::new(
+                        Box::new(BindingAccess(BindingAccess::new(
                             Identifier("x".to_string()),
-                            2,
+                            AccessType::Vector(2),
                         ))),
                     )),
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("x".to_string()),
-                        3,
+                        AccessType::Vector(3),
                     ))),
                 ),
             )),
@@ -178,7 +187,10 @@ fn bc_iterable_slice_lc() {
             BoundaryStmt::VariableBinding(VariableBinding::new(
                 Identifier("x".to_string()),
                 VariableValueExpr::ListComprehension(ListComprehension::new(
-                    Elem(Identifier("c".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("c".to_string()),
+                        AccessType::Default,
+                    )),
                     vec![(
                         Identifier("c".to_string()),
                         Iterable::Slice(Identifier("c".to_string()), Range::new(0, 3)),
@@ -196,23 +208,23 @@ fn bc_iterable_slice_lc() {
                 Add(
                     Box::new(Add(
                         Box::new(Add(
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                0,
+                                AccessType::Vector(0),
                             ))),
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                1,
+                                AccessType::Vector(1),
                             ))),
                         )),
-                        Box::new(VectorAccess(VectorAccess::new(
+                        Box::new(BindingAccess(BindingAccess::new(
                             Identifier("x".to_string()),
-                            2,
+                            AccessType::Vector(2),
                         ))),
                     )),
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("x".to_string()),
-                        3,
+                        AccessType::Vector(3),
                     ))),
                 ),
             )),
@@ -244,8 +256,14 @@ fn bc_two_iterable_identifier_lc() {
                 Identifier("diff".to_string()),
                 VariableValueExpr::ListComprehension(ListComprehension::new(
                     Sub(
-                        Box::new(Elem(Identifier("x".to_string()))),
-                        Box::new(Elem(Identifier("y".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("x".to_string()),
+                            AccessType::Default,
+                        ))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("y".to_string()),
+                            AccessType::Default,
+                        ))),
                     ),
                     vec![
                         (
@@ -270,23 +288,23 @@ fn bc_two_iterable_identifier_lc() {
                 Add(
                     Box::new(Add(
                         Box::new(Add(
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                0,
+                                AccessType::Vector(0),
                             ))),
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                1,
+                                AccessType::Vector(1),
                             ))),
                         )),
-                        Box::new(VectorAccess(VectorAccess::new(
+                        Box::new(BindingAccess(BindingAccess::new(
                             Identifier("x".to_string()),
-                            2,
+                            AccessType::Vector(2),
                         ))),
                     )),
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("x".to_string()),
-                        3,
+                        AccessType::Vector(3),
                     ))),
                 ),
             )),
@@ -320,12 +338,24 @@ fn bc_multiple_iterables_lc() {
                     Sub(
                         Box::new(Sub(
                             Box::new(Add(
-                                Box::new(Elem(Identifier("w".to_string()))),
-                                Box::new(Elem(Identifier("x".to_string()))),
+                                Box::new(BindingAccess(BindingAccess::new(
+                                    Identifier("w".to_string()),
+                                    AccessType::Default,
+                                ))),
+                                Box::new(BindingAccess(BindingAccess::new(
+                                    Identifier("x".to_string()),
+                                    AccessType::Default,
+                                ))),
                             )),
-                            Box::new(Elem(Identifier("y".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("y".to_string()),
+                                AccessType::Default,
+                            ))),
                         )),
-                        Box::new(Elem(Identifier("z".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("z".to_string()),
+                            AccessType::Default,
+                        ))),
                     ),
                     vec![
                         (
@@ -358,23 +388,23 @@ fn bc_multiple_iterables_lc() {
                 Add(
                     Box::new(Add(
                         Box::new(Add(
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                0,
+                                AccessType::Vector(0),
                             ))),
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                1,
+                                AccessType::Vector(1),
                             ))),
                         )),
-                        Box::new(VectorAccess(VectorAccess::new(
+                        Box::new(BindingAccess(BindingAccess::new(
                             Identifier("x".to_string()),
-                            2,
+                            AccessType::Vector(2),
                         ))),
                     )),
-                    Box::new(VectorAccess(VectorAccess::new(
+                    Box::new(BindingAccess(BindingAccess::new(
                         Identifier("x".to_string()),
-                        3,
+                        AccessType::Vector(3),
                     ))),
                 ),
             )),
@@ -409,7 +439,10 @@ fn ic_one_iterable_identifier_lc() {
                 Identifier("x".to_string()),
                 VariableValueExpr::ListComprehension(ListComprehension::new(
                     Exp(
-                        Box::new(Elem(Identifier("col".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("col".to_string()),
+                            AccessType::Default,
+                        ))),
                         Box::new(Const(7)),
                     ),
                     vec![(
@@ -438,27 +471,30 @@ fn ic_one_iterable_identifier_lc() {
             )),
             IntegrityStmt::Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    Elem(Identifier("a".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    )),
                     Add(
                         Box::new(Add(
                             Box::new(Add(
-                                Box::new(VectorAccess(VectorAccess::new(
+                                Box::new(BindingAccess(BindingAccess::new(
                                     Identifier("x".to_string()),
-                                    0,
+                                    AccessType::Vector(0),
                                 ))),
-                                Box::new(VectorAccess(VectorAccess::new(
+                                Box::new(BindingAccess(BindingAccess::new(
                                     Identifier("x".to_string()),
-                                    1,
+                                    AccessType::Vector(1),
                                 ))),
                             )),
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                2,
+                                AccessType::Vector(2),
                             ))),
                         )),
-                        Box::new(VectorAccess(VectorAccess::new(
+                        Box::new(BindingAccess(BindingAccess::new(
                             Identifier("x".to_string()),
-                            3,
+                            AccessType::Vector(3),
                         ))),
                     ),
                 )),
@@ -493,9 +529,15 @@ fn ic_iterable_identifier_range_lc() {
                     Mul(
                         Box::new(Exp(
                             Box::new(Const(2)),
-                            Box::new(Elem(Identifier("i".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("i".to_string()),
+                                AccessType::Default,
+                            ))),
                         )),
-                        Box::new(Elem(Identifier("c".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("c".to_string()),
+                            AccessType::Default,
+                        ))),
                     ),
                     vec![
                         (
@@ -511,27 +553,30 @@ fn ic_iterable_identifier_range_lc() {
             )),
             IntegrityStmt::Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    Elem(Identifier("a".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    )),
                     Add(
                         Box::new(Add(
                             Box::new(Add(
-                                Box::new(VectorAccess(VectorAccess::new(
+                                Box::new(BindingAccess(BindingAccess::new(
                                     Identifier("x".to_string()),
-                                    0,
+                                    AccessType::Vector(0),
                                 ))),
-                                Box::new(VectorAccess(VectorAccess::new(
+                                Box::new(BindingAccess(BindingAccess::new(
                                     Identifier("x".to_string()),
-                                    1,
+                                    AccessType::Vector(1),
                                 ))),
                             )),
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                2,
+                                AccessType::Vector(2),
                             ))),
                         )),
-                        Box::new(VectorAccess(VectorAccess::new(
+                        Box::new(BindingAccess(BindingAccess::new(
                             Identifier("x".to_string()),
-                            3,
+                            AccessType::Vector(3),
                         ))),
                     ),
                 )),
@@ -563,7 +608,10 @@ fn ic_iterable_slice_lc() {
             IntegrityStmt::VariableBinding(VariableBinding::new(
                 Identifier("x".to_string()),
                 VariableValueExpr::ListComprehension(ListComprehension::new(
-                    Elem(Identifier("c".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("c".to_string()),
+                        AccessType::Default,
+                    )),
                     vec![(
                         Identifier("c".to_string()),
                         Iterable::Slice(Identifier("c".to_string()), Range::new(0, 3)),
@@ -572,27 +620,30 @@ fn ic_iterable_slice_lc() {
             )),
             IntegrityStmt::Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    Elem(Identifier("a".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    )),
                     Add(
                         Box::new(Add(
                             Box::new(Add(
-                                Box::new(VectorAccess(VectorAccess::new(
+                                Box::new(BindingAccess(BindingAccess::new(
                                     Identifier("x".to_string()),
-                                    0,
+                                    AccessType::Vector(0),
                                 ))),
-                                Box::new(VectorAccess(VectorAccess::new(
+                                Box::new(BindingAccess(BindingAccess::new(
                                     Identifier("x".to_string()),
-                                    1,
+                                    AccessType::Vector(1),
                                 ))),
                             )),
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                2,
+                                AccessType::Vector(2),
                             ))),
                         )),
-                        Box::new(VectorAccess(VectorAccess::new(
+                        Box::new(BindingAccess(BindingAccess::new(
                             Identifier("x".to_string()),
-                            3,
+                            AccessType::Vector(3),
                         ))),
                     ),
                 )),
@@ -626,8 +677,14 @@ fn ic_two_iterable_identifier_lc() {
                 Identifier("diff".to_string()),
                 VariableValueExpr::ListComprehension(ListComprehension::new(
                     Sub(
-                        Box::new(Elem(Identifier("x".to_string()))),
-                        Box::new(Elem(Identifier("y".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("x".to_string()),
+                            AccessType::Default,
+                        ))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("y".to_string()),
+                            AccessType::Default,
+                        ))),
                     ),
                     vec![
                         (
@@ -643,27 +700,30 @@ fn ic_two_iterable_identifier_lc() {
             )),
             IntegrityStmt::Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    Elem(Identifier("a".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    )),
                     Add(
                         Box::new(Add(
                             Box::new(Add(
-                                Box::new(VectorAccess(VectorAccess::new(
+                                Box::new(BindingAccess(BindingAccess::new(
                                     Identifier("x".to_string()),
-                                    0,
+                                    AccessType::Vector(0),
                                 ))),
-                                Box::new(VectorAccess(VectorAccess::new(
+                                Box::new(BindingAccess(BindingAccess::new(
                                     Identifier("x".to_string()),
-                                    1,
+                                    AccessType::Vector(1),
                                 ))),
                             )),
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                2,
+                                AccessType::Vector(2),
                             ))),
                         )),
-                        Box::new(VectorAccess(VectorAccess::new(
+                        Box::new(BindingAccess(BindingAccess::new(
                             Identifier("x".to_string()),
-                            3,
+                            AccessType::Vector(3),
                         ))),
                     ),
                 )),
@@ -699,12 +759,24 @@ fn ic_multiple_iterables_lc() {
                     Sub(
                         Box::new(Sub(
                             Box::new(Add(
-                                Box::new(Elem(Identifier("w".to_string()))),
-                                Box::new(Elem(Identifier("x".to_string()))),
+                                Box::new(BindingAccess(BindingAccess::new(
+                                    Identifier("w".to_string()),
+                                    AccessType::Default,
+                                ))),
+                                Box::new(BindingAccess(BindingAccess::new(
+                                    Identifier("x".to_string()),
+                                    AccessType::Default,
+                                ))),
                             )),
-                            Box::new(Elem(Identifier("y".to_string()))),
+                            Box::new(BindingAccess(BindingAccess::new(
+                                Identifier("y".to_string()),
+                                AccessType::Default,
+                            ))),
                         )),
-                        Box::new(Elem(Identifier("z".to_string()))),
+                        Box::new(BindingAccess(BindingAccess::new(
+                            Identifier("z".to_string()),
+                            AccessType::Default,
+                        ))),
                     ),
                     vec![
                         (
@@ -728,27 +800,30 @@ fn ic_multiple_iterables_lc() {
             )),
             IntegrityStmt::Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
-                    Elem(Identifier("a".to_string())),
+                    BindingAccess(BindingAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                    )),
                     Add(
                         Box::new(Add(
                             Box::new(Add(
-                                Box::new(VectorAccess(VectorAccess::new(
+                                Box::new(BindingAccess(BindingAccess::new(
                                     Identifier("x".to_string()),
-                                    0,
+                                    AccessType::Vector(0),
                                 ))),
-                                Box::new(VectorAccess(VectorAccess::new(
+                                Box::new(BindingAccess(BindingAccess::new(
                                     Identifier("x".to_string()),
-                                    1,
+                                    AccessType::Vector(1),
                                 ))),
                             )),
-                            Box::new(VectorAccess(VectorAccess::new(
+                            Box::new(BindingAccess(BindingAccess::new(
                                 Identifier("x".to_string()),
-                                2,
+                                AccessType::Vector(2),
                             ))),
                         )),
-                        Box::new(VectorAccess(VectorAccess::new(
+                        Box::new(BindingAccess(BindingAccess::new(
                             Identifier("x".to_string()),
-                            3,
+                            AccessType::Vector(3),
                         ))),
                     ),
                 )),

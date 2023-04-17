@@ -1,5 +1,5 @@
 mod access;
-pub use access::{Iterable, MatrixAccess, Range, VectorAccess};
+pub use access::{AccessType, BindingAccess, Iterable, Range};
 
 mod constant;
 pub use constant::{ConstantBinding, ConstantValueExpr};
