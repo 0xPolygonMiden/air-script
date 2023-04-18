@@ -1,6 +1,6 @@
 pub use air_script_core::{
-    AccessType, BindingAccess, ConstantBinding, ConstantValueExpr, Expression, Identifier,
-    Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, TraceAccess, TraceBinding,
+    AccessType, ConstantBinding, ConstantValueExpr, Expression, Identifier, Iterable,
+    ListComprehension, ListFolding, ListFoldingValueExpr, SymbolAccess, TraceAccess, TraceBinding,
     TraceBindingAccess, TraceBindingAccessSize, TraceSegment, VariableBinding, VariableValueExpr,
 };
 pub use parser::ast;
@@ -22,7 +22,7 @@ pub use declarations::{PeriodicColumn, PublicInput};
 
 mod symbol_table;
 pub use symbol_table::Value;
-use symbol_table::{Symbol, SymbolTable, SymbolType};
+use symbol_table::{Symbol, SymbolBinding, SymbolTable};
 
 mod validation;
 use validation::{SemanticError, SourceValidator};

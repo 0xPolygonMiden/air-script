@@ -1,6 +1,6 @@
 pub(crate) use air_script_core::{
-    AccessType, BindingAccess, ComprehensionContext, ConstantBinding, ConstantValueExpr,
-    Expression, Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, Range,
+    AccessType, ComprehensionContext, ConstantBinding, ConstantValueExpr, Expression, Identifier,
+    Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, Range, SymbolAccess,
     TraceAccess, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment,
     VariableBinding, VariableValueExpr,
 };

@@ -1,6 +1,6 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::ast::{
-    AccessType, BindingAccess, ConstraintType, Expression::*, IntegrityStmt::*, TraceBindingAccess,
+    AccessType, ConstraintType, Expression::*, IntegrityStmt::*, SymbolAccess, TraceBindingAccess,
     TraceBindingAccessSize, VariableBinding, VariableValueExpr,
 };
 
@@ -16,13 +16,13 @@ fn variables_with_and_operators() {
         VariableBinding(VariableBinding::new(
             Identifier("flag".to_string()),
             VariableValueExpr::Scalar(Mul(
-                Box::new(BindingAccess(BindingAccess::new(
+                Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("n1".to_string()),
                     AccessType::Default,
                 ))),
                 Box::new(Sub(
                     Box::new(Const(1)),
-                    Box::new(BindingAccess(BindingAccess::new(
+                    Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("n2".to_string()),
                         AccessType::Default,
                     ))),
@@ -38,14 +38,14 @@ fn variables_with_and_operators() {
                     1,
                 )),
                 Add(
-                    Box::new(BindingAccess(BindingAccess::new(
+                    Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
                     ))),
                     Box::new(Const(1)),
                 ),
             )),
-            Some(BindingAccess(BindingAccess::new(
+            Some(SymbolAccess(SymbolAccess::new(
                 Identifier("flag".to_string()),
                 AccessType::Default,
             ))),
@@ -65,7 +65,7 @@ fn variables_with_or_operators() {
             Identifier("flag".to_string()),
             VariableValueExpr::Scalar(Sub(
                 Box::new(Add(
-                    Box::new(BindingAccess(BindingAccess::new(
+                    Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("s".to_string()),
                         AccessType::Vector(0),
                     ))),
@@ -80,7 +80,7 @@ fn variables_with_or_operators() {
                     )),
                 )),
                 Box::new(Mul(
-                    Box::new(BindingAccess(BindingAccess::new(
+                    Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("s".to_string()),
                         AccessType::Vector(0),
                     ))),
@@ -105,14 +105,14 @@ fn variables_with_or_operators() {
                     1,
                 )),
                 Add(
-                    Box::new(BindingAccess(BindingAccess::new(
+                    Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
                     ))),
                     Box::new(Const(1)),
                 ),
             )),
-            Some(BindingAccess(BindingAccess::new(
+            Some(SymbolAccess(SymbolAccess::new(
                 Identifier("flag".to_string()),
                 AccessType::Default,
             ))),

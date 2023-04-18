@@ -1,4 +1,6 @@
-use super::{AccessType, ConstantValueExpr, SemanticError, Symbol, SymbolType, TraceBindingAccess};
+use super::{
+    AccessType, ConstantValueExpr, SemanticError, Symbol, SymbolBinding, TraceBindingAccess,
+};
 
 /// Checks that the specified access into an identifier is valid and returns an error otherwise.
 /// # Errors:
@@ -12,8 +14,8 @@ pub(super) trait ValidateIdentifierAccess {
 
 impl ValidateIdentifierAccess for TraceBindingAccess {
     fn validate(&self, symbol: &Symbol) -> Result<(), SemanticError> {
-        match symbol.symbol_type() {
-            SymbolType::TraceBinding(trace_binding) => {
+        match symbol.binding() {
+            SymbolBinding::Trace(trace_binding) => {
                 if self.col_offset() >= trace_binding.size() {
                     return Err(SemanticError::named_trace_column_access_out_of_bounds(
                         self,
@@ -24,7 +26,7 @@ impl ValidateIdentifierAccess for TraceBindingAccess {
             _ => {
                 return Err(SemanticError::not_a_trace_column_identifier(
                     symbol.name(),
-                    symbol.symbol_type(),
+                    symbol.binding(),
                 ))
             }
         }

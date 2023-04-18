@@ -1,9 +1,9 @@
-use super::{BindingAccess, TraceAccess};
+use super::{SymbolAccess, TraceAccess};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Value {
     /// A named constant with identifier and access indices.
-    BoundConstant(BindingAccess),
+    BoundConstant(SymbolAccess),
     /// An inlined constant value.
     InlineConstant(u64),
     /// An identifier for an element in the trace segment, column, and row offset specified by the

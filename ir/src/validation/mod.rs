@@ -1,5 +1,5 @@
 use super::{
-    constraints::ConstraintDomain, AccessType, ConstrainedBoundary, SymbolType, TraceAccess,
+    constraints::ConstraintDomain, AccessType, ConstrainedBoundary, SymbolBinding, TraceAccess,
     TraceBindingAccess, TraceSegment, MIN_CYCLE_LENGTH,
 };
 

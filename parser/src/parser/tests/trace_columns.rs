@@ -1,6 +1,6 @@
 use super::{
-    build_parse_test, AccessType, BindingAccess, Error, Expression::*, Identifier,
-    IntegrityConstraint, IntegrityStmt::*, ParseError, Source, SourceSection::*, TraceBinding,
+    build_parse_test, AccessType, Error, Expression::*, Identifier, IntegrityConstraint,
+    IntegrityStmt::*, ParseError, Source, SourceSection::*, SymbolAccess, TraceBinding,
     TraceBindingAccess, TraceBindingAccessSize,
 };
 use crate::ast::ConstraintType;
@@ -86,7 +86,7 @@ fn trace_columns_groups() {
                         1,
                     )),
                     Sub(
-                        Box::new(BindingAccess(BindingAccess::new(
+                        Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("clk".to_string()),
                             AccessType::Default,
                         ))),

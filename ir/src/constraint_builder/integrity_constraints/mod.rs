@@ -1,8 +1,8 @@
 use super::{
     ast::{ConstraintType, IntegrityStmt},
-    AccessType, BTreeMap, BindingAccess, ConstantValueExpr, ConstraintBuilder, ConstraintDomain,
-    Expression, Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr,
-    SemanticError, Symbol, SymbolType, TraceAccess, TraceBindingAccess, TraceBindingAccessSize,
+    AccessType, BTreeMap, ConstantValueExpr, ConstraintBuilder, ConstraintDomain, Expression,
+    Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, SemanticError,
+    Symbol, SymbolAccess, SymbolBinding, TraceAccess, TraceBindingAccess, TraceBindingAccessSize,
     VariableBinding, VariableValueExpr, CURRENT_ROW,
 };
 

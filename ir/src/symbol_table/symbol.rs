@@ -1,18 +1,18 @@
 use super::{
-    symbol_access::ValidateAccess, AccessType, BindingAccess, ConstantValueExpr, Identifier,
-    SemanticError, SymbolType, TraceAccess, TraceBinding, Value, CURRENT_ROW,
+    symbol_access::ValidateAccess, AccessType, ConstantValueExpr, Identifier, SemanticError,
+    SymbolAccess, SymbolBinding, TraceAccess, TraceBinding, Value, CURRENT_ROW,
 };
 
 /// Symbol information for a constant, variable, trace column, periodic column, or public input.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct Symbol {
     name: String,
-    symbol_type: SymbolType,
+    binding: SymbolBinding,
 }
 
 impl Symbol {
-    pub(super) fn new(name: String, symbol_type: SymbolType) -> Self {
-        Self { name, symbol_type }
+    pub(super) fn new(name: String, binding: SymbolBinding) -> Self {
+        Self { name, binding }
     }
 
     // --- PUBLIC ACCESSORS -----------------------------------------------------------------------
@@ -21,25 +21,25 @@ impl Symbol {
         &self.name
     }
 
-    pub fn symbol_type(&self) -> &SymbolType {
-        &self.symbol_type
+    pub fn binding(&self) -> &SymbolBinding {
+        &self.binding
     }
 
     pub fn get_value(&self, access_type: AccessType) -> Result<Value, SemanticError> {
-        match self.symbol_type() {
-            SymbolType::ConstantBinding(constant_type) => {
+        match self.binding() {
+            SymbolBinding::Constant(constant_type) => {
                 self.get_constant_value(constant_type, access_type)
             }
-            SymbolType::PeriodicColumn(index, cycle_len) => {
+            SymbolBinding::PeriodicColumn(index, cycle_len) => {
                 self.get_periodic_column_value(*index, *cycle_len, access_type)
             }
-            SymbolType::PublicInput(size) => self.get_public_input_value(*size, access_type),
-            SymbolType::RandomValuesBinding(offset, size) => {
+            SymbolBinding::PublicInput(size) => self.get_public_input_value(*size, access_type),
+            SymbolBinding::RandomValues(offset, size) => {
                 self.get_random_value(*offset, *size, access_type)
             }
-            SymbolType::TraceBinding(columns) => self.get_trace_value(columns, access_type),
-            SymbolType::VariableBinding(_) => {
-                unreachable!("VariableBinding values cannot be accessed directly, since they reference expressions which must be added to the graph");
+            SymbolBinding::Trace(columns) => self.get_trace_value(columns, access_type),
+            SymbolBinding::Variable(_) => {
+                unreachable!("Variable values cannot be accessed directly, since they reference expressions which must be added to the graph");
             }
         }
     }
@@ -54,8 +54,8 @@ impl Symbol {
         constant_type.validate(self.name(), &access_type)?;
 
         let name = self.name().to_string();
-        let binding_access = BindingAccess::new(Identifier(name), access_type);
-        Ok(Value::BoundConstant(binding_access))
+        let symbol_access = SymbolAccess::new(Identifier(name), access_type);
+        Ok(Value::BoundConstant(symbol_access))
     }
 
     fn get_periodic_column_value(
