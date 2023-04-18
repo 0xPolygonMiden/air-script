@@ -10,7 +10,7 @@ pub(crate) fn get_variable_expr(
     bound_value: &VariableValueExpr,
     symbol_access: SymbolAccess,
 ) -> Result<Expression, SemanticError> {
-    let (ident, access_type) = symbol_access.into_parts();
+    let (ident, access_type, offset) = symbol_access.into_parts();
 
     // access the expression in the bound value that is specified by the symbol_access.
     let (inner_expr, inner_access_type) = match bound_value {
@@ -23,10 +23,9 @@ pub(crate) fn get_variable_expr(
                     if *idx < expr_vector.len() {
                         &expr_vector[*idx]
                     } else {
-                        return Err(SemanticError::vector_access_out_of_bounds(
+                        return Err(SemanticError::invalid_variable_access_type(
                             ident.name(),
-                            *idx,
-                            expr_vector.len(),
+                            &access_type,
                         ));
                     }
                 }
@@ -48,12 +47,9 @@ pub(crate) fn get_variable_expr(
                     if *row_idx < expr_matrix.len() && *col_idx < expr_matrix[0].len() {
                         &expr_matrix[*row_idx][*col_idx]
                     } else {
-                        return Err(SemanticError::matrix_access_out_of_bounds(
+                        return Err(SemanticError::invalid_variable_access_type(
                             ident.name(),
-                            *row_idx,
-                            *col_idx,
-                            expr_matrix.len(),
-                            expr_matrix[0].len(),
+                            &access_type,
                         ));
                     }
                 }
@@ -78,7 +74,7 @@ pub(crate) fn get_variable_expr(
     };
 
     // access the inner expression with the specified access type to get the expression
-    access_inner_expr(ident.name(), inner_expr, inner_access_type)
+    access_inner_expr(ident.name(), inner_access_type, offset, inner_expr)
 }
 
 // HELPERS
@@ -88,10 +84,9 @@ pub(crate) fn get_variable_expr(
 /// becomes a Vector access.
 fn reduce_access_dim(var_name: &str, access_type: AccessType) -> Result<AccessType, SemanticError> {
     match access_type {
-        AccessType::Default => Err(SemanticError::invalid_variable_access_type(
-            var_name,
-            &access_type,
-        )),
+        AccessType::Default | AccessType::Slice(_) => Err(
+            SemanticError::invalid_variable_access_type(var_name, &access_type),
+        ),
         AccessType::Vector(_) => Ok(AccessType::Default),
         AccessType::Matrix(_, idx) => Ok(AccessType::Vector(idx)),
     }
@@ -110,13 +105,16 @@ fn reduce_access_dim(var_name: &str, access_type: AccessType) -> Result<AccessTy
 /// # Errors
 /// Returns an error if the expression is one that can't be accessed
 fn access_inner_expr(
-    var_name: &str,
-    expr: &Expression,
+    parent_name: &str,
     access_type: AccessType,
+    parent_offset: usize,
+    expr: &Expression,
 ) -> Result<Expression, SemanticError> {
     match access_type {
         // access the entire expression
         AccessType::Default => Ok(expr.clone()),
+        // TODO: handle slice access type
+        AccessType::Slice(_) => todo!(),
         // access into the expression at the specified index
         AccessType::Vector(new_idx) => match expr {
             Expression::SymbolAccess(inner_binding) => match inner_binding.access_type() {
@@ -124,6 +122,7 @@ fn access_inner_expr(
                     let new_symbol_access = SymbolAccess::new(
                         inner_binding.ident().clone(),
                         AccessType::Vector(new_idx),
+                        parent_offset + inner_binding.offset(),
                     );
                     Ok(Expression::SymbolAccess(new_symbol_access))
                 }
@@ -131,6 +130,7 @@ fn access_inner_expr(
                     let new_symbol_access = SymbolAccess::new(
                         inner_binding.ident().clone(),
                         AccessType::Matrix(*old_idx, new_idx),
+                        parent_offset + inner_binding.offset(),
                     );
                     Ok(Expression::SymbolAccess(new_symbol_access))
                 }
@@ -142,7 +142,7 @@ fn access_inner_expr(
             _ => {
                 // other variable value expressions cannot be accessed directly.
                 Err(SemanticError::invalid_variable_access_type(
-                    var_name,
+                    parent_name,
                     &access_type,
                 ))
             }
@@ -154,6 +154,7 @@ fn access_inner_expr(
                     let new_symbol_access = SymbolAccess::new(
                         inner_binding.ident().clone(),
                         AccessType::Matrix(row_idx, col_idx),
+                        parent_offset + inner_binding.offset(),
                     );
                     Ok(Expression::SymbolAccess(new_symbol_access))
                 }
@@ -165,7 +166,7 @@ fn access_inner_expr(
             _ => {
                 // other variable value expressions cannot be accessed directly.
                 Err(SemanticError::invalid_variable_access_type(
-                    var_name,
+                    parent_name,
                     &access_type,
                 ))
             }

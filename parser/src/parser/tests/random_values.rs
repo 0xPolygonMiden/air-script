@@ -85,10 +85,12 @@ fn random_values_index_access() {
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("a".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("$alphas".to_string()),
                     AccessType::Vector(1),
+                    0,
                 ))),
             ),
             Const(0),

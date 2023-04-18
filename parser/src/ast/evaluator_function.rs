@@ -1,4 +1,4 @@
-use super::{Identifier, IntegrityStmt, TraceBinding, TraceBindingAccess};
+use super::{Identifier, IntegrityStmt, SymbolAccess, TraceBinding};
 
 /// Evaluator functions take a vector of trace bindings as parameters where each trace binding
 /// represents one or a group of columns in the execution trace that are passed to the evaluator
@@ -51,12 +51,12 @@ impl EvaluatorFunction {
 #[derive(Debug, Eq, PartialEq)]
 pub struct EvaluatorFunctionCall {
     name: Identifier,
-    args: Vec<Vec<TraceBindingAccess>>,
+    args: Vec<Vec<SymbolAccess>>,
 }
 
 impl EvaluatorFunctionCall {
     /// Creates a new evaluator function call.
-    pub fn new(name: Identifier, args: Vec<Vec<TraceBindingAccess>>) -> Self {
+    pub fn new(name: Identifier, args: Vec<Vec<SymbolAccess>>) -> Self {
         Self { name, args }
     }
 
@@ -66,12 +66,12 @@ impl EvaluatorFunctionCall {
     }
 
     /// Returns the arguments of the evaluator function.
-    pub fn args(&self) -> &Vec<Vec<TraceBindingAccess>> {
+    pub fn args(&self) -> &Vec<Vec<SymbolAccess>> {
         &self.args
     }
 
     /// Returns the name and arguments of the evaluator function.
-    pub fn into_parts(self) -> (String, Vec<Vec<TraceBindingAccess>>) {
+    pub fn into_parts(self) -> (String, Vec<Vec<SymbolAccess>>) {
         (self.name.into_name(), self.args)
     }
 }

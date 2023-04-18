@@ -13,6 +13,7 @@ use std::fmt::Display;
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum AccessType {
     Default,
+    Slice(Range),
     Vector(usize),
     /// Access into a matrix, with the values referring to the row and column indices respectively.
     Matrix(usize, usize),
@@ -22,8 +23,9 @@ impl Display for AccessType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Default => write!(f, "direct reference by name"),
-            Self::Vector(_) => write!(f, "vector"),
-            Self::Matrix(_, _) => write!(f, "matrix"),
+            Self::Slice(range) => write!(f, "slice in range {range}"),
+            Self::Vector(idx) => write!(f, "vector at index {idx}"),
+            Self::Matrix(row, col) => write!(f, "matrix at [{row}][{col}]"),
         }
     }
 }
@@ -37,11 +39,16 @@ impl Display for AccessType {
 pub struct SymbolAccess {
     name: Identifier,
     access_type: AccessType,
+    offset: usize,
 }
 
 impl SymbolAccess {
-    pub fn new(name: Identifier, access_type: AccessType) -> Self {
-        Self { name, access_type }
+    pub fn new(name: Identifier, access_type: AccessType, offset: usize) -> Self {
+        Self {
+            name,
+            access_type,
+            offset,
+        }
     }
 
     pub fn ident(&self) -> &Identifier {
@@ -57,8 +64,13 @@ impl SymbolAccess {
         &self.access_type
     }
 
-    pub fn into_parts(self) -> (Identifier, AccessType) {
-        (self.name, self.access_type)
+    /// Gets the offset of this [SymbolAccess].
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    pub fn into_parts(self) -> (Identifier, AccessType, usize) {
+        (self.name, self.access_type, self.offset)
     }
 }
 
@@ -79,6 +91,12 @@ impl Range {
 
     pub fn end(&self) -> usize {
         self.end
+    }
+}
+
+impl Display for Range {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}..{}", self.start(), self.end())
     }
 }
 

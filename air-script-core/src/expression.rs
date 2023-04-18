@@ -1,4 +1,4 @@
-use super::{ListFolding, SymbolAccess, TraceAccess, TraceBindingAccess};
+use super::{ListFolding, SymbolAccess, TraceAccess};
 
 /// Arithmetic expressions for evaluation of constraints.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -7,7 +7,6 @@ pub enum Expression {
     /// Represents a reference to all or part of a constant, variable, or trace binding.
     SymbolAccess(SymbolAccess),
     TraceAccess(TraceAccess),
-    TraceBindingAccess(TraceBindingAccess),
     Add(Box<Expression>, Box<Expression>),
     Sub(Box<Expression>, Box<Expression>),
     Mul(Box<Expression>, Box<Expression>),

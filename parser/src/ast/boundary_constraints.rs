@@ -1,5 +1,5 @@
 use super::{
-    ComprehensionContext, Expression, Identifier, Iterable, TraceBindingAccess, VariableBinding,
+    ComprehensionContext, Expression, Identifier, Iterable, SymbolAccess, VariableBinding,
 };
 use std::fmt::Display;
 
@@ -16,13 +16,13 @@ pub enum BoundaryStmt {
 /// Stores the expression corresponding to the boundary constraint.
 #[derive(Debug, Eq, PartialEq)]
 pub struct BoundaryConstraint {
-    access: TraceBindingAccess,
+    access: SymbolAccess,
     boundary: Boundary,
     value: Expression,
 }
 
 impl BoundaryConstraint {
-    pub fn new(access: TraceBindingAccess, boundary: Boundary, value: Expression) -> Self {
+    pub fn new(access: SymbolAccess, boundary: Boundary, value: Expression) -> Self {
         Self {
             access,
             boundary,
@@ -30,7 +30,7 @@ impl BoundaryConstraint {
         }
     }
 
-    pub fn access(&self) -> &TraceBindingAccess {
+    pub fn access(&self) -> &SymbolAccess {
         &self.access
     }
 
@@ -43,7 +43,7 @@ impl BoundaryConstraint {
         &self.value
     }
 
-    pub fn into_parts(self) -> (Boundary, TraceBindingAccess, Expression) {
+    pub fn into_parts(self) -> (Boundary, SymbolAccess, Expression) {
         (self.boundary, self.access, self.value)
     }
 }
@@ -66,7 +66,7 @@ impl Display for Boundary {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct BoundaryConstraintComprehension {
-    access: TraceBindingAccess,
+    access: SymbolAccess,
     boundary: Boundary,
     expr: Expression,
     context: ComprehensionContext,
@@ -74,7 +74,7 @@ pub struct BoundaryConstraintComprehension {
 
 impl BoundaryConstraintComprehension {
     pub fn new(
-        access: TraceBindingAccess,
+        access: SymbolAccess,
         boundary: Boundary,
         expr: Expression,
         context: ComprehensionContext,
@@ -87,7 +87,7 @@ impl BoundaryConstraintComprehension {
         }
     }
 
-    pub fn access(&self) -> &TraceBindingAccess {
+    pub fn access(&self) -> &SymbolAccess {
         &self.access
     }
 

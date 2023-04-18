@@ -1,6 +1,6 @@
 use super::{
-    AccessType, ConstrainedBoundary, ConstraintDomain, SymbolBinding, TraceAccess,
-    TraceBindingAccess, TraceSegment, MIN_CYCLE_LENGTH,
+    AccessType, ConstrainedBoundary, ConstraintDomain, Symbol, SymbolBinding, TraceAccess,
+    TraceSegment, MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]
@@ -86,44 +86,31 @@ impl SemanticError {
 
     // --- TYPE ERRORS ----------------------------------------------------------------------------
 
-    pub(crate) fn not_a_trace_column_identifier(
-        ident_name: &str,
-        ident_type: &SymbolBinding,
-    ) -> Self {
+    pub(crate) fn not_a_trace_column_identifier(symbol: &Symbol) -> Self {
         SemanticError::InvalidUsage(format!(
-            "Identifier {ident_name} was declared as a {ident_type} not as a trace column"
+            "Identifier {} was declared as a {} not as a trace column",
+            symbol.name(),
+            symbol.binding()
         ))
     }
 
     // --- INVALID ACCESS ERRORS ------------------------------------------------------------------
 
-    pub(crate) fn invalid_constant_access_type(name: &str, access_type: &AccessType) -> Self {
+    pub(crate) fn invalid_access_type(symbol: &Symbol, access_type: &AccessType) -> Self {
         Self::InvalidUsage(format!(
-            "ConstantBinding '{name}' cannot be accessed by a {access_type}.",
+            "{} '{}' cannot be accessed as a {}.",
+            symbol.binding(),
+            symbol.name(),
+            access_type
         ))
     }
 
-    pub(crate) fn invalid_periodic_column_access_type(name: &str) -> Self {
+    pub(crate) fn invalid_access_offset(symbol: &Symbol, access_offset: usize) -> Self {
         Self::InvalidUsage(format!(
-            "Attempted to access periodic column '{name}' by index, which is not allowed.",
-        ))
-    }
-
-    pub(crate) fn invalid_public_input_access_type(name: &str) -> Self {
-        Self::InvalidUsage(format!(
-            "Public input '{name}' can only be accessed by indexing into the vector.",
-        ))
-    }
-
-    pub(crate) fn invalid_random_value_access_type(name: &str, access_type: &AccessType) -> Self {
-        Self::InvalidUsage(format!(
-            "Random value '{name}' cannot be indexed as a {access_type}.",
-        ))
-    }
-
-    pub(crate) fn invalid_trace_access_type(name: &str, access_type: &AccessType) -> Self {
-        Self::InvalidUsage(format!(
-            "Trace column binding '{name}' cannot be accessed as a {access_type}.",
+            "{} '{}' cannot be accessed with an offset of {}.",
+            symbol.binding(),
+            symbol.name(),
+            access_offset
         ))
     }
 
@@ -145,67 +132,18 @@ impl SemanticError {
         )
     }
 
-    pub(crate) fn invalid_random_value_binding_access(ident: &str) -> SemanticError {
-        SemanticError::InvalidUsage(format!(
-            "Expected {ident} to be a binding to a single random value."
-        ))
-    }
-
-    pub(crate) fn invalid_trace_binding_access(ident: &str) -> SemanticError {
-        SemanticError::InvalidUsage(format!(
-            "Expected {ident} to be a binding to a single trace column."
-        ))
-    }
-
     pub(crate) fn invalid_trace_offset_in_bc(trace_access: &TraceAccess) -> SemanticError {
         SemanticError::InvalidUsage(format!(
             "Attempted to access trace column {} in a boundary constraint with a non-zero row offset of {}.", trace_access.col_idx(), trace_access.row_offset()
         ))
     }
 
-    pub(crate) fn vector_access_out_of_bounds(
-        name: &str,
-        access_idx: usize,
-        vector_len: usize,
-    ) -> Self {
-        Self::IndexOutOfRange(format!(
-            "Out-of-range index {access_idx} in vector {name} of length {vector_len}",
-        ))
-    }
-
-    pub(crate) fn matrix_access_out_of_bounds(
-        name: &str,
-        access_row: usize,
-        access_col: usize,
-        matrix_row_len: usize,
-        matrix_col_len: usize,
-    ) -> Self {
-        SemanticError::IndexOutOfRange(format!(
-            "Out-of-range index [{access_row}][{access_col}] in matrix {name} of dimensions ({matrix_row_len}, {matrix_col_len})",
-        ))
-    }
-
-    pub(crate) fn indexed_trace_column_access_out_of_bounds(
-        access: &TraceAccess,
-        segment_width: u16,
-    ) -> Self {
+    pub(crate) fn trace_access_out_of_bounds(access: &TraceAccess, segment_width: u16) -> Self {
         SemanticError::IndexOutOfRange(format!(
             "Out-of-range index '{}' in trace segment '{}' of length {}",
             access.col_idx(),
             access.trace_segment(),
             segment_width
-        ))
-    }
-
-    pub(crate) fn named_trace_column_access_out_of_bounds(
-        access: &TraceBindingAccess,
-        size: usize,
-    ) -> Self {
-        SemanticError::IndexOutOfRange(format!(
-            "Out-of-range index '{}' while accessing named trace column group '{}' of length {}",
-            access.col_offset(),
-            access.name(),
-            size
         ))
     }
 

@@ -16,9 +16,7 @@ mod identifier;
 pub use identifier::Identifier;
 
 mod trace;
-pub use trace::{
-    TraceAccess, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment,
-};
+pub use trace::{TraceAccess, TraceBinding, TraceSegment};
 
 mod variable;
 pub use variable::{VariableBinding, VariableValueExpr};

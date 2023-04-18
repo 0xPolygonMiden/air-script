@@ -6,7 +6,7 @@ use crate::{
     ast::{
         AccessType, ConstantBinding, ConstantValueExpr::*, ConstraintType, EvaluatorFunction,
         EvaluatorFunctionCall, Expression::*, IntegrityStmt::*, SymbolAccess, TraceAccess,
-        TraceBindingAccess, TraceBindingAccessSize, VariableBinding, VariableValueExpr,
+        VariableBinding, VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -21,16 +21,16 @@ fn integrity_constraints() {
         enf clk' = clk + 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
-            TraceBindingAccess(TraceBindingAccess::new(
+            SymbolAccess(SymbolAccess::new(
                 Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
+                AccessType::Default,
                 1,
             )),
             Add(
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
                 Box::new(Const(1)),
             ),
@@ -56,16 +56,16 @@ fn multiple_integrity_constraints() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
-                TraceBindingAccess(TraceBindingAccess::new(
+                SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 )),
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(Const(1)),
                 ),
@@ -75,15 +75,15 @@ fn multiple_integrity_constraints() {
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 Sub(
-                    Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                    Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
-                        0,
-                        TraceBindingAccessSize::Full,
+                        AccessType::Default,
                         1,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
                 Const(1),
@@ -105,10 +105,12 @@ fn integrity_constraint_with_periodic_col() {
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("k0".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("b".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
             ),
             Const(0),
@@ -129,10 +131,12 @@ fn integrity_constraint_with_random_value() {
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("a".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("$rand".to_string()),
                     AccessType::Vector(1),
+                    0,
                 ))),
             ),
             Const(0),
@@ -166,20 +170,24 @@ fn integrity_constraint_with_constants() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("A".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("B".to_string()),
                         AccessType::Vector(1),
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("C".to_string()),
                         AccessType::Matrix(1, 1),
+                        0,
                     ))),
                 ),
             )),
@@ -208,12 +216,14 @@ fn integrity_constraint_with_variables() {
                 SymbolAccess(SymbolAccess::new(
                     Identifier("a".to_string()),
                     AccessType::Default,
+                    0,
                 )),
                 Mul(
                     Box::new(Const(2)),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
             ]),
@@ -226,6 +236,7 @@ fn integrity_constraint_with_variables() {
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("a".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(Const(1)),
                     ),
@@ -233,6 +244,7 @@ fn integrity_constraint_with_variables() {
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("a".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(Const(2)),
                     ),
@@ -241,10 +253,12 @@ fn integrity_constraint_with_variables() {
                     SymbolAccess(SymbolAccess::new(
                         Identifier("b".to_string()),
                         AccessType::Vector(0),
+                        0,
                     )),
                     SymbolAccess(SymbolAccess::new(
                         Identifier("b".to_string()),
                         AccessType::Vector(1),
+                        0,
                     )),
                 ],
             ]),
@@ -255,20 +269,24 @@ fn integrity_constraint_with_variables() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("b".to_string()),
                         AccessType::Vector(1),
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("c".to_string()),
                         AccessType::Matrix(1, 1),
+                        0,
                     ))),
                 ),
             )),
@@ -332,15 +350,18 @@ fn ic_comprehension_one_iterable_identifier() {
                 SymbolAccess(SymbolAccess::new(
                     Identifier("x".to_string()),
                     AccessType::Default,
+                    0,
                 )),
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("b".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
             )),
@@ -374,15 +395,18 @@ fn ic_comprehension_one_iterable_range() {
                 SymbolAccess(SymbolAccess::new(
                     Identifier("x".to_string()),
                     AccessType::Default,
+                    0,
                 )),
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("b".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
             )),
@@ -417,15 +441,18 @@ fn ic_comprehension_with_selectors() {
                 SymbolAccess(SymbolAccess::new(
                     Identifier("x".to_string()),
                     AccessType::Default,
+                    0,
                 )),
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("b".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
             )),
@@ -433,10 +460,12 @@ fn ic_comprehension_with_selectors() {
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("s".to_string()),
                     AccessType::Vector(0),
+                    0,
                 ))),
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("s".to_string()),
                     AccessType::Vector(1),
+                    0,
                 ))),
             )),
             vec![(
@@ -470,12 +499,14 @@ fn ic_comprehension_with_evaluator_call() {
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("x".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(Const(2)),
                     ),
                     SymbolAccess(SymbolAccess::new(
                         Identifier("x".to_string()),
                         AccessType::Default,
+                        0,
                     )),
                 )),
                 None,
@@ -490,10 +521,9 @@ fn ic_comprehension_with_evaluator_call() {
         SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
             ConstraintType::Evaluator(EvaluatorFunctionCall::new(
                 Identifier("is_binary".to_string()),
-                vec![vec![TraceBindingAccess::new(
+                vec![vec![SymbolAccess::new(
                     Identifier("x".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     0,
                 )]],
             )),
@@ -529,12 +559,14 @@ fn ic_comprehension_with_evaluator_and_selectors() {
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("x".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(Const(2)),
                     ),
                     SymbolAccess(SymbolAccess::new(
                         Identifier("x".to_string()),
                         AccessType::Default,
+                        0,
                     )),
                 )),
                 None,
@@ -550,10 +582,9 @@ fn ic_comprehension_with_evaluator_and_selectors() {
         SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
             ConstraintType::Evaluator(EvaluatorFunctionCall::new(
                 Identifier("is_binary".to_string()),
-                vec![vec![TraceBindingAccess::new(
+                vec![vec![SymbolAccess::new(
                     Identifier("x".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     0,
                 )]],
             )),
@@ -561,10 +592,12 @@ fn ic_comprehension_with_evaluator_and_selectors() {
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("s".to_string()),
                     AccessType::Vector(0),
+                    0,
                 ))),
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("s".to_string()),
                     AccessType::Vector(1),
+                    0,
                 ))),
             )),
             vec![(

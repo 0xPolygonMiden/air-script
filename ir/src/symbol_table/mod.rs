@@ -1,14 +1,10 @@
 use super::{
-    ast, AccessType, BTreeMap, ConstantBinding, ConstantValueExpr, Declarations, Identifier,
-    SemanticError, SymbolAccess, TraceAccess, TraceBinding, TraceBindingAccess, VariableBinding,
-    VariableValueExpr, CURRENT_ROW, MIN_CYCLE_LENGTH,
+    ast, AccessType, BTreeMap, ConstantBinding, ConstantValueExpr, Declarations, SemanticError,
+    SymbolAccess, TraceAccess, TraceBinding, VariableBinding, VariableValueExpr, MIN_CYCLE_LENGTH,
 };
 
 mod symbol;
 pub(crate) use symbol::Symbol;
-
-mod symbol_access;
-use symbol_access::ValidateIdentifierAccess;
 
 mod symbol_binding;
 pub(crate) use symbol_binding::SymbolBinding;
@@ -210,27 +206,48 @@ impl SymbolTable {
         }
     }
 
-    /// Looks up a [TraceBindingAccess] by its identifier name and returns an equivalent
-    /// [TraceAccess].
+    /// Looks up a [SymbolAccess] by its identifier name and returns an equivalent [TraceAccess] if
+    /// the symbol access references a single value in the trace.
     ///
     /// # Errors
     /// Returns an error if:
     /// - the identifier was not in the symbol table.
-    /// - the identifier was not declared as a trace column binding.
-    /// TODO: update docs
-    pub(crate) fn get_trace_binding_access(
+    /// - the identifier was not declared as a trace binding.
+    /// - the access would not return a single value in the execution trace.
+    pub(crate) fn get_trace_access(
         &self,
-        trace_access: &TraceBindingAccess,
+        symbol_access: &SymbolAccess,
     ) -> Result<TraceAccess, SemanticError> {
-        let symbol = self.get_symbol(trace_access.name())?;
-        trace_access.validate(symbol)?;
+        let symbol = self.get_symbol(symbol_access.name())?;
 
-        let SymbolBinding::Trace(columns) = symbol.binding() else { unreachable!("validation of named trace access failed.") };
+        let columns = match symbol.binding() {
+            SymbolBinding::Trace(columns) => columns,
+            _ => return Err(SemanticError::not_a_trace_column_identifier(symbol)),
+        };
+
+        let col_offset = match symbol_access.access_type() {
+            AccessType::Default => columns.offset(),
+            AccessType::Vector(idx) => {
+                if *idx >= columns.size() {
+                    return Err(SemanticError::invalid_access_type(
+                        symbol,
+                        symbol_access.access_type(),
+                    ));
+                }
+                columns.offset() + *idx
+            }
+            _ => {
+                return Err(SemanticError::invalid_access_type(
+                    symbol,
+                    symbol_access.access_type(),
+                ));
+            }
+        };
         Ok(TraceAccess::new(
             columns.trace_segment(),
-            columns.offset() + trace_access.col_offset(),
+            col_offset,
             1,
-            trace_access.row_offset(),
+            symbol_access.offset(),
         ))
     }
 
@@ -255,7 +272,7 @@ impl SymbolTable {
         let trace_segment = usize::from(trace_access.trace_segment());
         let trace_segment_width = self.declarations.trace_segment_width(trace_segment)?;
         if trace_access.col_idx() as u16 >= trace_segment_width {
-            return Err(SemanticError::indexed_trace_column_access_out_of_bounds(
+            return Err(SemanticError::trace_access_out_of_bounds(
                 trace_access,
                 trace_segment_width,
             ));

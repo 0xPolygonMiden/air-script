@@ -5,7 +5,7 @@ use super::{
 use crate::{
     ast::{
         BoundaryStmt::*, ConstantBinding, ConstantValueExpr::*, Expression::*, PublicInput,
-        TraceBindingAccess, TraceBindingAccessSize, VariableBinding, VariableValueExpr,
+        VariableBinding, VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -20,12 +20,7 @@ fn boundary_constraint_at_first() {
         enf clk.first = 0";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
-            TraceBindingAccess::new(
-                Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
-                0,
-            ),
+            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
             Boundary::First,
             Const(0),
         ),
@@ -40,12 +35,7 @@ fn boundary_constraint_at_last() {
         enf clk.last = 15";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
-            TraceBindingAccess::new(
-                Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
-                0,
-            ),
+            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
             Boundary::Last,
             Const(15),
         ),
@@ -69,22 +59,12 @@ fn multiple_boundary_constraints() {
         enf clk.last = 1";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
         Constraint(BoundaryConstraint::new(
-            TraceBindingAccess::new(
-                Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
-                0,
-            ),
+            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
             Boundary::First,
             Const(0),
         )),
         Constraint(BoundaryConstraint::new(
-            TraceBindingAccess::new(
-                Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
-                0,
-            ),
+            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
             Boundary::Last,
             Const(1),
         )),
@@ -102,16 +82,12 @@ fn boundary_constraint_with_pub_input() {
     let expected = Source(vec![
         SourceSection::PublicInputs(vec![PublicInput::new(Identifier("a".to_string()), 16)]),
         SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            TraceBindingAccess::new(
-                Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
-                0,
-            ),
+            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
             Boundary::First,
             SymbolAccess(SymbolAccess::new(
                 Identifier("a".to_string()),
                 AccessType::Vector(0),
+                0,
             )),
         ))]),
     ]);
@@ -125,12 +101,7 @@ fn boundary_constraint_with_expr() {
         enf clk.first = 5 + a[3] + 6";
     let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
         BoundaryConstraint::new(
-            TraceBindingAccess::new(
-                Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
-                0,
-            ),
+            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
             Boundary::First,
             Add(
                 Box::new(Add(
@@ -138,6 +109,7 @@ fn boundary_constraint_with_expr() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Vector(3),
+                        0,
                     ))),
                 )),
                 Box::new(Const(6)),
@@ -166,27 +138,25 @@ fn boundary_constraint_with_const() {
             Matrix(vec![vec![0, 1], vec![1, 0]]),
         )),
         SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            TraceBindingAccess::new(
-                Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
-                0,
-            ),
+            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
             Boundary::First,
             Sub(
                 Box::new(Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("A".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("B".to_string()),
                         AccessType::Vector(1),
+                        0,
                     ))),
                 )),
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("C".to_string()),
                     AccessType::Matrix(0, 1),
+                    0,
                 ))),
             ),
         ))]),
@@ -213,12 +183,14 @@ fn boundary_constraint_with_variables() {
                 SymbolAccess(SymbolAccess::new(
                     Identifier("a".to_string()),
                     AccessType::Default,
+                    0,
                 )),
                 Mul(
                     Box::new(Const(2)),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 ),
             ]),
@@ -231,6 +203,7 @@ fn boundary_constraint_with_variables() {
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("a".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(Const(1)),
                     ),
@@ -238,6 +211,7 @@ fn boundary_constraint_with_variables() {
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("a".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(Const(2)),
                     ),
@@ -246,21 +220,18 @@ fn boundary_constraint_with_variables() {
                     SymbolAccess(SymbolAccess::new(
                         Identifier("b".to_string()),
                         AccessType::Vector(0),
+                        0,
                     )),
                     SymbolAccess(SymbolAccess::new(
                         Identifier("b".to_string()),
                         AccessType::Vector(1),
+                        0,
                     )),
                 ],
             ]),
         )),
         Constraint(BoundaryConstraint::new(
-            TraceBindingAccess::new(
-                Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
-                0,
-            ),
+            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
             Boundary::First,
             Add(
                 Box::new(Add(
@@ -268,6 +239,7 @@ fn boundary_constraint_with_variables() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Vector(3),
+                        0,
                     ))),
                 )),
                 Box::new(Const(6)),
@@ -297,12 +269,7 @@ fn bc_comprehension_one_iterable_identifier() {
         ]]),
         SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
-                TraceBindingAccess::new(
-                    Identifier("x".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
-                    0,
-                ),
+                SymbolAccess::new(Identifier("x".to_string()), AccessType::Default, 0),
                 Boundary::First,
                 Const(0),
             ),
@@ -333,12 +300,7 @@ fn bc_comprehension_one_iterable_range() {
         ]]),
         SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
-                TraceBindingAccess::new(
-                    Identifier("x".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
-                    0,
-                ),
+                SymbolAccess::new(Identifier("x".to_string()), AccessType::Default, 0),
                 Boundary::First,
                 Const(0),
             ),
@@ -369,12 +331,7 @@ fn bc_comprehension_one_iterable_slice() {
         ]]),
         SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
-                TraceBindingAccess::new(
-                    Identifier("x".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
-                    0,
-                ),
+                SymbolAccess::new(Identifier("x".to_string()), AccessType::Default, 0),
                 Boundary::First,
                 Const(0),
             ),
@@ -405,16 +362,12 @@ fn bc_comprehension_two_iterable_identifiers() {
         ]]),
         SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
-                TraceBindingAccess::new(
-                    Identifier("x".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
-                    0,
-                ),
+                SymbolAccess::new(Identifier("x".to_string()), AccessType::Default, 0),
                 Boundary::First,
                 SymbolAccess(SymbolAccess::new(
                     Identifier("y".to_string()),
                     AccessType::Default,
+                    0,
                 )),
             ),
             vec![

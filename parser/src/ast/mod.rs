@@ -1,8 +1,7 @@
 pub(crate) use air_script_core::{
     AccessType, ComprehensionContext, ConstantBinding, ConstantValueExpr, Expression, Identifier,
     Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, Range, SymbolAccess,
-    TraceAccess, TraceBinding, TraceBindingAccess, TraceBindingAccessSize, TraceSegment,
-    VariableBinding, VariableValueExpr,
+    TraceAccess, TraceBinding, TraceSegment, VariableBinding, VariableValueExpr,
 };
 
 // declaration modules

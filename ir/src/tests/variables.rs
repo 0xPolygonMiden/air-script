@@ -96,7 +96,10 @@ fn err_bc_variable_ref_next() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    assert!(parse(source).is_err());
+    let parsed = parse(source).expect("Parsing failed");
+
+    let result = AirIR::new(parsed);
+    assert!(result.is_err());
 }
 
 #[test]

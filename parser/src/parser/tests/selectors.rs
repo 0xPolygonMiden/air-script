@@ -1,8 +1,5 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
-use crate::ast::{
-    AccessType, ConstraintType, Expression::*, IntegrityStmt::*, SymbolAccess, TraceBindingAccess,
-    TraceBindingAccessSize,
-};
+use crate::ast::{AccessType, ConstraintType, Expression::*, IntegrityStmt::*, SymbolAccess};
 
 // SELECTORS
 // ================================================================================================
@@ -15,21 +12,22 @@ fn single_selector() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             // clk' = clk
-            TraceBindingAccess(TraceBindingAccess::new(
+            SymbolAccess(SymbolAccess::new(
                 Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
+                AccessType::Default,
                 1,
             )),
             SymbolAccess(SymbolAccess::new(
                 Identifier("clk".to_string()),
                 AccessType::Default,
+                0,
             )),
         )),
         // n1
         Some(SymbolAccess(SymbolAccess::new(
             Identifier("n1".to_string()),
             AccessType::Default,
+            0,
         ))),
     )])]);
     build_parse_test!(source).expect_ast(expected);
@@ -43,15 +41,15 @@ fn chained_selectors() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             // clk' = clk
-            TraceBindingAccess(TraceBindingAccess::new(
+            SymbolAccess(SymbolAccess::new(
                 Identifier("clk".to_string()),
-                0,
-                TraceBindingAccessSize::Full,
+                AccessType::Default,
                 1,
             )),
             SymbolAccess(SymbolAccess::new(
                 Identifier("clk".to_string()),
                 AccessType::Default,
+                0,
             )),
         )),
         // (n1 & !n2) | !n3
@@ -61,12 +59,14 @@ fn chained_selectors() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("n1".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(Sub(
                         Box::new(Const(1)),
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("n2".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                     )),
                 )),
@@ -75,6 +75,7 @@ fn chained_selectors() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("n3".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 )),
             )),
@@ -83,12 +84,14 @@ fn chained_selectors() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("n1".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(Sub(
                         Box::new(Const(1)),
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("n2".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                     )),
                 )),
@@ -97,6 +100,7 @@ fn chained_selectors() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("n3".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 )),
             )),
@@ -117,10 +121,9 @@ fn multiconstraint_selectors() {
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 // clk' = 0 when n1 & !n2
-                TraceBindingAccess(TraceBindingAccess::new(
+                SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 )),
                 Const(0),
@@ -129,12 +132,14 @@ fn multiconstraint_selectors() {
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("n1".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
                 Box::new(Sub(
                     Box::new(Const(1)),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("n2".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 )),
             )),
@@ -142,35 +147,36 @@ fn multiconstraint_selectors() {
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 // clk' = clk when n1 & n2
-                TraceBindingAccess(TraceBindingAccess::new(
+                SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 )),
                 SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
                     AccessType::Default,
+                    0,
                 )),
             )),
             Some(Mul(
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("n1".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("n2".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
             )),
         ),
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 // clk' = 1 when !n1 & !n2
-                TraceBindingAccess(TraceBindingAccess::new(
+                SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 )),
                 Const(1),
@@ -181,6 +187,7 @@ fn multiconstraint_selectors() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("n1".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 )),
                 Box::new(Sub(
@@ -188,6 +195,7 @@ fn multiconstraint_selectors() {
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("n2".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 )),
             )),

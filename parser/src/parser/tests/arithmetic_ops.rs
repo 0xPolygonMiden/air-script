@@ -2,7 +2,7 @@ use super::{
     build_parse_test, AccessType, Expression::*, Identifier, IntegrityConstraint, IntegrityStmt::*,
     Source, SourceSection::*, SymbolAccess,
 };
-use crate::ast::{ConstraintType, TraceBindingAccess, TraceBindingAccessSize};
+use crate::ast::ConstraintType;
 
 // EXPRESSIONS
 // ================================================================================================
@@ -16,15 +16,15 @@ fn single_addition() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             Add(
-                Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 ))),
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
             ),
             Const(0),
@@ -44,15 +44,15 @@ fn multi_addition() {
         ConstraintType::Inline(IntegrityConstraint::new(
             Add(
                 Box::new(Add(
-                    Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                    Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
-                        0,
-                        TraceBindingAccessSize::Full,
+                        AccessType::Default,
                         1,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 )),
                 Box::new(Const(2)),
@@ -73,15 +73,15 @@ fn single_subtraction() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             Sub(
-                Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 ))),
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
             ),
             Const(0),
@@ -101,15 +101,15 @@ fn multi_subtraction() {
         ConstraintType::Inline(IntegrityConstraint::new(
             Sub(
                 Box::new(Sub(
-                    Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                    Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
-                        0,
-                        TraceBindingAccessSize::Full,
+                        AccessType::Default,
                         1,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 )),
                 Box::new(Const(1)),
@@ -130,15 +130,15 @@ fn single_multiplication() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             Mul(
-                Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 ))),
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
                     AccessType::Default,
+                    0,
                 ))),
             ),
             Const(0),
@@ -158,15 +158,15 @@ fn multi_multiplication() {
         ConstraintType::Inline(IntegrityConstraint::new(
             Mul(
                 Box::new(Mul(
-                    Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                    Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
-                        0,
-                        TraceBindingAccessSize::Full,
+                        AccessType::Default,
                         1,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 )),
                 Box::new(Const(2)),
@@ -204,15 +204,15 @@ fn ops_with_parens() {
         ConstraintType::Inline(IntegrityConstraint::new(
             Mul(
                 Box::new(Add(
-                    Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                    Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
-                        0,
-                        TraceBindingAccessSize::Full,
+                        AccessType::Default,
                         1,
                     ))),
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                 )),
                 Box::new(Const(2)),
@@ -233,10 +233,9 @@ fn const_exponentiation() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             Exp(
-                Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 ))),
                 Box::new(Const(2)),
@@ -257,16 +256,16 @@ fn non_const_exponentiation() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             Exp(
-                Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 ))),
                 Box::new(Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
+                        0,
                     ))),
                     Box::new(Const(2)),
                 )),
@@ -307,15 +306,15 @@ fn multi_arithmetic_ops_same_precedence() {
             Add(
                 Box::new(Sub(
                     Box::new(Sub(
-                        Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                        Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("clk".to_string()),
-                            0,
-                            TraceBindingAccessSize::Full,
+                            AccessType::Default,
                             1,
                         ))),
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("clk".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                     )),
                     Box::new(Const(2)),
@@ -345,10 +344,9 @@ fn multi_arithmetic_ops_different_precedence() {
             Sub(
                 Box::new(Sub(
                     Box::new(Exp(
-                        Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                        Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("clk".to_string()),
-                            0,
-                            TraceBindingAccessSize::Full,
+                            AccessType::Default,
                             1,
                         ))),
                         Box::new(Const(2)),
@@ -357,6 +355,7 @@ fn multi_arithmetic_ops_different_precedence() {
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("clk".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(Const(2)),
                     )),
@@ -385,10 +384,9 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
     let expected = Source(vec![IntegrityConstraints(vec![Constraint(
         ConstraintType::Inline(IntegrityConstraint::new(
             Sub(
-                Box::new(TraceBindingAccess(TraceBindingAccess::new(
+                Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
-                    0,
-                    TraceBindingAccessSize::Full,
+                    AccessType::Default,
                     1,
                 ))),
                 Box::new(Mul(
@@ -396,6 +394,7 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("clk".to_string()),
                             AccessType::Default,
+                            0,
                         ))),
                         Box::new(Const(2)),
                     )),
