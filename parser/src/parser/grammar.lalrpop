@@ -2,11 +2,11 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
-        build_trace_bindings, AccessType, SymbolAccess, ConstantBinding, ConstantValueExpr, 
-        ComprehensionContext, Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier, 
-        TraceAccess, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr,
-        PeriodicColumn, PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, 
-        TraceBinding, VariableBinding, VariableValueExpr, 
+        build_trace_bindings, AccessType, ComprehensionContext, ConstantBinding, ConstantValueExpr, 
+        Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier, Iterable, 
+        ListComprehension, ListFolding, ListFoldingValueExpr, PeriodicColumn, PublicInput, 
+        RandBinding, RandomValues, Range, Source, SourceSection, SymbolAccess, TraceBinding, 
+        VariableBinding, VariableValueExpr, 
     }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
@@ -56,15 +56,17 @@ Trace: Vec<Vec<TraceBinding>> = {
             (None, None) => Err(ParseError::User {
                 error: Error::ParseError(InvalidTraceCols("Trace Columns cannot be empty".to_string()))
             })
-        } 
+        }
 }
 
 MainTraceBindings: Vec<TraceBinding> = {
-    "main" ":" <main_cols: Vector<TraceBinding>> => build_trace_bindings(0, main_cols),
+    "main" ":" <main_cols: Vector<TraceBinding>> => 
+        build_trace_bindings(0, Identifier("$main".to_string()), main_cols),
 }
 
 AuxTraceBindings: Vec<TraceBinding> = {
-    "aux" ":" <aux_cols: Vector<TraceBinding>> => build_trace_bindings(1, aux_cols),
+    "aux" ":" <aux_cols: Vector<TraceBinding>> => 
+        build_trace_bindings(1, Identifier("$aux".to_string()), aux_cols),
 }
 
 TraceBinding: (Identifier, u64) = {
@@ -136,18 +138,24 @@ RandomValues: RandomValues = {
 }
 
 RandValuesDecl: RandomValues = {
-    <name: Identifier> ":" <size: Size> => RandomValues::new(name, size, vec![]),
-    <Identifier> ":" "[" "]" =>? Err(
-        ParseError::User{
-            error: Error::ParseError(
-                InvalidRandomValues(
-                    "Random Values section cannot be empty".to_string()
+    <name: DeclIdentifier> ":" <size: Size> => 
+        RandomValues::new(size, vec![RandBinding::new(name, size)]),
+    <DeclIdentifier> ":" "[" "]" =>? 
+        Err(
+            ParseError::User{
+                error: Error::ParseError(
+                    InvalidRandomValues(
+                        "Random Values section cannot be empty".to_string()
+                    )
                 )
-            )
-        }
-    ),
-    <name: Identifier> ":" <rand_vec: Vector<RandElem>> =>
-        RandomValues::new(name, rand_vec.iter().map(|v| v.size()).sum(), rand_vec)
+            }
+        ),
+    <name: DeclIdentifier> ":" <rand_vec: Vector<RandElem>> => {
+        let num_values = rand_vec.iter().map(|v| v.size()).sum();
+        let mut rand_values = vec![RandBinding::new(name, num_values)];
+        rand_values.extend(rand_vec);
+        RandomValues::new(num_values, rand_values)
+    }
 }
 
 RandElem: RandBinding = {
@@ -389,7 +397,6 @@ IntegrityExponent: Expression = {
 
 IntegrityAtom: Expression = {
     "(" <IntegrityExpr> ")",
-    <col_access: TraceAccess> => Expression::TraceAccess(col_access),
     <n: Num_u64> => Expression::Const(n),
     "!" <expr: IntegrityAtom> =>
         Expression::Sub(Box::new(Expression::Const(1)), Box::new(expr)),
@@ -443,16 +450,11 @@ SymbolAccessBase: (Identifier, AccessType) = {
     <ident: Identifier> "[" <range: Range> "]" => (ident, AccessType::Slice(range)),
     <ident: Identifier> <idx: Index> =>  (ident, AccessType::Vector(idx)),
     <ident: Identifier> <row: Index> <col: Index> => (ident, AccessType::Matrix(row, col)),
-    // accessing the random values array
-    <ident: RandArrayAccess> => (ident, AccessType::Default),
-    <ident: RandArrayAccess> <idx: Index> => (ident, AccessType::Vector(idx))
-}
+    // accessing an identifier used in a section declaration, like the full random values array or
+    // a named trace segment, e.g. $main, $aux, $rand
+    <ident: DeclIdentRef> => (ident, AccessType::Default),
+    <ident: DeclIdentRef> <idx: Index> => (ident, AccessType::Vector(idx))
 
-TraceAccess: TraceAccess = {
-    "$main" <idx: Index> => TraceAccess::new(0, idx, 1, 0),
-    "$main" <idx: Index> "'" => TraceAccess::new(0, idx, 1, 1), 
-    "$aux" <idx: Index> => TraceAccess::new(1, idx, 1, 0),
-    "$aux" <idx: Index> "'" => TraceAccess::new(1, idx, 1, 1),
 }
 
 ConstraintComprehension<T>: ComprehensionContext = {
@@ -515,12 +517,16 @@ Range: Range = {
     <start: Num_u64> ".." <end: Num_u64> => Range::new(start as usize, end as usize)
 }
 
-RandArrayAccess: Identifier = {
-    "$" <n:identifier> => Identifier(format!("${n}"))
+DeclIdentRef: Identifier = {
+    <ident: decl_ident_ref> => Identifier(ident.to_string())
+}
+
+DeclIdentifier: Identifier = {
+    <ident: identifier> => Identifier(format!("${ident}"))
 }
 
 Identifier: Identifier = {
-    <n:identifier> => Identifier(n.to_string())
+    <ident: identifier> => Identifier(ident.to_string())
 }
 
 Num_u64: u64 = {
@@ -539,6 +545,7 @@ extern {
 
     enum Token {
         identifier => Token::Ident(<String>),
+        decl_ident_ref => Token::DeclIdentRef(<String>),
         r"[0-9]+" => Token::Num(<String>),
         "def" => Token::Def,
         "let" => Token::Let,
@@ -557,9 +564,6 @@ extern {
         "first" => Token::First,
         "last" => Token::Last,
         "integrity_constraints" => Token::IntegrityConstraints,
-        "$main" => Token::MainAccess,
-        "$aux" => Token::AuxAccess,
-        "$" => Token::Rand,
         "ev" => Token::EvaluatorFunction,
         "enf" => Token::Enf,
         "when" => Token::When,

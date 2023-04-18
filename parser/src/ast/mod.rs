@@ -1,7 +1,7 @@
 pub(crate) use air_script_core::{
     AccessType, ComprehensionContext, ConstantBinding, ConstantValueExpr, Expression, Identifier,
     Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, Range, SymbolAccess,
-    TraceAccess, TraceBinding, TraceSegment, VariableBinding, VariableValueExpr,
+    TraceBinding, TraceSegment, VariableBinding, VariableValueExpr,
 };
 
 // declaration modules
@@ -81,15 +81,22 @@ pub enum SourceSection {
 /// bindings.
 pub fn build_trace_bindings(
     trace_segment: TraceSegment,
+    segment_name: Identifier,
     bindings: Vec<(Identifier, u64)>,
 ) -> Vec<TraceBinding> {
     let mut trace_cols = Vec::new();
+    let trace_segment = trace_segment.into();
 
     let mut offset = 0;
     for (ident, size) in bindings.into_iter() {
-        trace_cols.push(TraceBinding::new(ident, trace_segment.into(), offset, size));
-        offset += size as usize;
+        let size = size as usize;
+        trace_cols.push(TraceBinding::new(ident, trace_segment, offset, size));
+        offset += size;
     }
+
+    // the size for the binding for the entire segment is the sum of the other sizes.
+    let segment_binding = TraceBinding::new(segment_name, trace_segment, 0, offset);
+    trace_cols.push(segment_binding);
 
     trace_cols
 }

@@ -103,20 +103,20 @@ impl SymbolTable {
         &mut self,
         rand_values: ast::RandomValues,
     ) -> Result<(), SemanticError> {
-        let (name, num_values, bindings) = rand_values.into_parts();
+        let (num_values, bindings) = rand_values.into_parts();
 
         let mut offset = 0;
-        // add the name of the random values array to the symbol table
-        self.insert_symbol(
-            format!("${name}"),
-            SymbolBinding::RandomValues(offset, num_values as usize),
-        )?;
-
         // add the named random value bindings to the symbol table
         for binding in bindings {
             let (name, size) = binding.into_parts();
-            self.insert_symbol(name, SymbolBinding::RandomValues(offset, size as usize))?;
-            offset += size as usize;
+            if size == num_values {
+                // for the binding to the entire array, there is no offset.
+                self.insert_symbol(name, SymbolBinding::RandomValues(0, size as usize))?;
+            } else {
+                // otherwise, it is a binding to a slice of the array, so we track the offset.
+                self.insert_symbol(name, SymbolBinding::RandomValues(offset, size as usize))?;
+                offset += size as usize;
+            }
         }
 
         // TODO: check this type coercion

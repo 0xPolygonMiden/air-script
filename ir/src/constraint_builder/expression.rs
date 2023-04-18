@@ -20,9 +20,6 @@ impl ConstraintBuilder {
             // --- INLINE VALUES ------------------------------------------------------------------
             Expression::Const(value) => self.insert_inline_constant(value),
 
-            // --- TRACE ACCESS REFERENCE ---------------------------------------------------------
-            Expression::TraceAccess(column_access) => self.insert_trace_access(&column_access),
-
             // --- IDENTIFIER EXPRESSIONS ---------------------------------------------------------
             Expression::SymbolAccess(access) => self.insert_symbol_access(access),
             Expression::ListFolding(lf_type) => self.insert_list_folding(lf_type),

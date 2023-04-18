@@ -266,6 +266,7 @@ fn bc_comprehension_one_iterable_identifier() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
@@ -297,6 +298,7 @@ fn bc_comprehension_one_iterable_range() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
@@ -328,6 +330,7 @@ fn bc_comprehension_one_iterable_slice() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(
@@ -359,6 +362,7 @@ fn bc_comprehension_two_iterable_identifiers() {
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
             TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 10),
         ]]),
         SourceSection::BoundaryConstraints(vec![ConstraintComprehension(
             BoundaryConstraint::new(

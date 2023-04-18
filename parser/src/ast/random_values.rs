@@ -19,7 +19,7 @@ use super::Identifier;
 ///
 /// created [RandomValues] instance will look like
 ///
-/// `RandomValues { name: "rand", size: 15, bindings: [] }`
+/// `RandomValues { size: 15, bindings: [ RandBinding { name: "$rand", size: 15 } ] }`
 ///
 /// If random values are declared in form
 ///
@@ -30,38 +30,33 @@ use super::Identifier;
 ///
 /// created [RandomValues] instance will look like
 ///
-/// `RandomValues { name: "rand", size: 13, bindings: [ RandBinding { name: "a", size: 1 }, RandBinding { name: "b", size: 12 } ] }`
+/// `RandomValues { size: 13, bindings: [ RandBinding { name: "$rand", size: 13 },
+///                                       RandBinding { name: "a", size: 1 },
+///                                       RandBinding { name: "b", size: 12 } ] }`
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RandomValues {
-    name: Identifier,
-    size: u64,
+    num_values: u64,
     bindings: Vec<RandBinding>,
 }
 
 impl RandomValues {
-    pub(crate) fn new(name: Identifier, size: u64, bindings: Vec<RandBinding>) -> Self {
+    pub(crate) fn new(num_values: u64, bindings: Vec<RandBinding>) -> Self {
         Self {
-            name,
-            size,
+            num_values,
             bindings,
         }
     }
 
-    pub fn name(&self) -> &str {
-        let Identifier(name) = &self.name;
-        name
-    }
-
-    pub fn size(&self) -> u64 {
-        self.size
+    pub fn num_values(&self) -> u64 {
+        self.num_values
     }
 
     pub fn bindings(&self) -> &Vec<RandBinding> {
         &self.bindings
     }
 
-    pub fn into_parts(self) -> (String, u64, Vec<RandBinding>) {
-        (self.name.into_name(), self.size, self.bindings)
+    pub fn into_parts(self) -> (u64, Vec<RandBinding>) {
+        (self.num_values, self.bindings)
     }
 }
 

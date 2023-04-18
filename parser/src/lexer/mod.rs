@@ -14,8 +14,13 @@ pub enum Token {
     // --------------------------------------------------------------------------------------------
     /// Identifiers should start with alphabet followed by one or more alpha numeric characters
     /// or an underscore.
-    #[regex("[a-zA-Z][a-zA-Z0-9_]*", |tok| tok.slice().to_string())]
+    #[regex(r"[a-zA-Z][a-zA-Z0-9_]*", |tok| tok.slice().to_string())]
     Ident(String),
+
+    /// A reference to an identifier used for a section declaration, such as the random values
+    /// array or a trace segment like "main" or "aux".
+    #[regex(r"\$[a-zA-Z][a-zA-Z0-9_]*", |tok| tok.slice().to_string())]
+    DeclIdentRef(String),
 
     /// Integers should only contain numeric characters.
     #[regex(r"[0-9]+", |tok| tok.slice().to_string())]
@@ -47,14 +52,6 @@ pub enum Token {
     #[token("aux")]
     AuxDecl,
 
-    /// A reserved keyword for accessing main columns by index
-    #[token("$main")]
-    MainAccess,
-
-    /// A reserved keyword for accessing aux columns by index
-    #[token("$aux")]
-    AuxAccess,
-
     /// Keyword to declare the public inputs declaration section for the AIR.
     #[token("public_inputs")]
     PublicInputs,
@@ -66,10 +63,6 @@ pub enum Token {
     /// Keyword to declare random values section in the AIR constraints module.
     #[token("random_values")]
     RandomValues,
-
-    /// A reserved symbol for accessing random values provided by the verifier.
-    #[token("$")]
-    Rand,
 
     /// Keyword to declare the evaluator function section in the AIR constraints module.
     #[token("ev")]

@@ -73,12 +73,12 @@ pub struct TraceBinding {
 
 impl TraceBinding {
     /// Creates a new trace binding.
-    pub fn new(binding: Identifier, trace_segment: usize, offset: usize, size: u64) -> Self {
+    pub fn new(binding: Identifier, trace_segment: usize, offset: usize, size: usize) -> Self {
         Self {
             binding,
             trace_segment: trace_segment as TraceSegment,
             offset,
-            size: size as usize,
+            size,
         }
     }
 
