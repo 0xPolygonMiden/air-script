@@ -23,10 +23,9 @@ pub(crate) fn get_variable_expr(
                     if *idx < expr_vector.len() {
                         &expr_vector[*idx]
                     } else {
-                        return Err(SemanticError::vector_access_out_of_bounds(
+                        return Err(SemanticError::invalid_variable_access_type(
                             ident.name(),
-                            *idx,
-                            expr_vector.len(),
+                            &access_type,
                         ));
                     }
                 }
@@ -48,12 +47,9 @@ pub(crate) fn get_variable_expr(
                     if *row_idx < expr_matrix.len() && *col_idx < expr_matrix[0].len() {
                         &expr_matrix[*row_idx][*col_idx]
                     } else {
-                        return Err(SemanticError::matrix_access_out_of_bounds(
+                        return Err(SemanticError::invalid_variable_access_type(
                             ident.name(),
-                            *row_idx,
-                            *col_idx,
-                            expr_matrix.len(),
-                            expr_matrix[0].len(),
+                            &access_type,
                         ));
                     }
                 }

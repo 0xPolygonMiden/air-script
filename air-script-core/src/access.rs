@@ -23,9 +23,9 @@ impl Display for AccessType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Default => write!(f, "direct reference by name"),
-            Self::Slice(_) => write!(f, "slice"),
-            Self::Vector(_) => write!(f, "vector"),
-            Self::Matrix(_, _) => write!(f, "matrix"),
+            Self::Slice(range) => write!(f, "slice in range {range}"),
+            Self::Vector(idx) => write!(f, "vector at index {idx}"),
+            Self::Matrix(row, col) => write!(f, "matrix at [{row}][{col}]"),
         }
     }
 }
@@ -91,6 +91,12 @@ impl Range {
 
     pub fn end(&self) -> usize {
         self.end
+    }
+}
+
+impl Display for Range {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}..{}", self.start(), self.end())
     }
 }
 

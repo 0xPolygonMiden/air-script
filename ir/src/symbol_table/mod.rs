@@ -220,34 +220,35 @@ impl SymbolTable {
     ) -> Result<TraceAccess, SemanticError> {
         let symbol = self.get_symbol(symbol_access.name())?;
 
-        match symbol.binding() {
-            SymbolBinding::Trace(columns) => {
-                let col_offset = match symbol_access.access_type() {
-                    AccessType::Default => columns.offset(),
-                    AccessType::Vector(idx) => {
-                        if *idx >= columns.size() {
-                            todo!("invalid trace access");
-                        }
-                        columns.offset() + *idx
-                    }
-                    _ => {
-                        todo!("invalid trace access")
-                    }
-                };
-                Ok(TraceAccess::new(
-                    columns.trace_segment(),
-                    col_offset,
-                    1,
-                    symbol_access.offset(),
-                ))
+        let columns = match symbol.binding() {
+            SymbolBinding::Trace(columns) => columns,
+            _ => return Err(SemanticError::not_a_trace_column_identifier(symbol)),
+        };
+
+        let col_offset = match symbol_access.access_type() {
+            AccessType::Default => columns.offset(),
+            AccessType::Vector(idx) => {
+                if *idx >= columns.size() {
+                    return Err(SemanticError::invalid_access_type(
+                        symbol,
+                        symbol_access.access_type(),
+                    ));
+                }
+                columns.offset() + *idx
             }
             _ => {
-                return Err(SemanticError::not_a_trace_column_identifier(
-                    symbol.name(),
-                    symbol.binding(),
-                ))
+                return Err(SemanticError::invalid_access_type(
+                    symbol,
+                    symbol_access.access_type(),
+                ));
             }
-        }
+        };
+        Ok(TraceAccess::new(
+            columns.trace_segment(),
+            col_offset,
+            1,
+            symbol_access.offset(),
+        ))
     }
 
     /// Gets the number of trace segments that were specified for this AIR.
@@ -271,7 +272,7 @@ impl SymbolTable {
         let trace_segment = usize::from(trace_access.trace_segment());
         let trace_segment_width = self.declarations.trace_segment_width(trace_segment)?;
         if trace_access.col_idx() as u16 >= trace_segment_width {
-            return Err(SemanticError::indexed_trace_column_access_out_of_bounds(
+            return Err(SemanticError::trace_access_out_of_bounds(
                 trace_access,
                 trace_segment_width,
             ));

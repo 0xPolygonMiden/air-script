@@ -23,13 +23,13 @@ pub(crate) enum SymbolBinding {
 impl Display for SymbolBinding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Constant(_) => write!(f, "Constant"),
-            Self::Trace(binding) => {
-                write!(f, "Trace in segment {}", binding.trace_segment())
+            Self::Constant(_) => write!(f, "ConstantBinding"),
+            Self::Trace(_) => {
+                write!(f, "TraceBinding")
             }
             Self::PublicInput(_) => write!(f, "PublicInput"),
             Self::PeriodicColumn(_, _) => write!(f, "PeriodicColumn"),
-            Self::Variable(_) => write!(f, "Variable"),
+            Self::Variable(_) => write!(f, "VariableBinding"),
             Self::RandomValues(_, _) => write!(f, "RandomValues"),
         }
     }
