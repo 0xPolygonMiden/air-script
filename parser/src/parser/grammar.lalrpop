@@ -260,7 +260,6 @@ BoundaryExponent: Expression = {
 
 BoundaryAtom: Expression = {
     "(" <BoundaryExpr> ")",
-    "$" <ident: Identifier> <idx: Index> => Expression::Rand(ident, idx),
     <n: Num_u64> => Expression::Const(n),
     <symbol_access: SymbolAccess> => Expression::SymbolAccess(symbol_access),
     <list_folding_type: ListFolding<BoundaryExpr>> => Expression::ListFolding(list_folding_type),
@@ -391,7 +390,6 @@ IntegrityExponent: Expression = {
 IntegrityAtom: Expression = {
     "(" <IntegrityExpr> ")",
     <col_access: TraceAccess> => Expression::TraceAccess(col_access),
-    "$" <ident: Identifier> <idx: Index> => Expression::Rand(ident, idx),
     <n: Num_u64> => Expression::Const(n),
     "!" <expr: IntegrityAtom> =>
         Expression::Sub(Box::new(Expression::Const(1)), Box::new(expr)),
@@ -442,7 +440,12 @@ SymbolAccess: SymbolAccess = {
     <ident: Identifier> <idx: Index> => 
         SymbolAccess::new(ident, AccessType::Vector(idx)),
     <ident: Identifier> <row: Index> <col: Index> =>
-        SymbolAccess::new(ident, AccessType::Matrix(row, col))
+        SymbolAccess::new(ident, AccessType::Matrix(row, col)),
+    // accessing the random values array
+    <ident: RandArrayAccess> => 
+        SymbolAccess::new(ident, AccessType::Default),
+    <ident: RandArrayAccess> <idx: Index> =>  
+        SymbolAccess::new(ident, AccessType::Vector(idx)),
 }
 
 TraceBindingAccess: TraceBindingAccess = {
@@ -524,6 +527,10 @@ Iterable: Iterable = {
 
 Range: Range = {
     <start: Num_u64> ".." <end: Num_u64> => Range::new(start as usize, end as usize)
+}
+
+RandArrayAccess: Identifier = {
+    "$" <n:identifier> => Identifier(format!("${n}"))
 }
 
 Identifier: Identifier = {
