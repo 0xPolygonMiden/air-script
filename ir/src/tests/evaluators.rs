@@ -1,10 +1,10 @@
 use super::{parse, AirIR};
 
-#[ignore]
 #[test]
 fn simple_evaluator() {
     let source = "
     ev advance_clock(main: [clk]):
+        let z = a + 1
         enf clk' = clk + 1
     
     trace_columns:
@@ -24,7 +24,30 @@ fn simple_evaluator() {
     assert!(result.is_ok());
 }
 
-#[ignore]
+#[test]
+fn evaluator_with_variables() {
+    let source = "
+    ev advance_clock(main: [clk]):
+        let z = clk + 1
+        enf clk' = z
+    
+    trace_columns:
+        main: [clk]
+    
+    public_inputs:
+        stack_inputs: [16]
+    
+    boundary_constraints:
+        enf clk.first = 0
+    
+    integrity_constraints:
+        enf advance_clock([clk])";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::new(parsed);
+    assert!(result.is_ok());
+}
+
 #[test]
 fn evaluator_with_main_and_aux_cols() {
     let source = "
@@ -53,7 +76,58 @@ fn evaluator_with_main_and_aux_cols() {
 
 #[ignore]
 #[test]
-fn ev_call_inside_evaluator() {
+fn ev_call_with_aux_only() {
+    let source = "
+    ev enforce_a(aux: [a, b]):
+        enf a' = a + 1
+    
+    trace_columns:
+        main: [clk]
+        aux: [a, b]
+    
+    public_inputs:
+        stack_inputs: [16]
+    
+    boundary_constraints:
+        enf clk.first = 0
+    
+    integrity_constraints:
+        enf enforce_a([a, b])";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::new(parsed);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn ev_call_inside_evaluator_with_main() {
+    let source = "
+    ev enforce_clk(main: [clk]):
+        enf clk' = clk + 1
+    
+    ev enforce_all_constraints(main: [clk]):
+        enf enforce_clk([clk])
+    
+    trace_columns:
+        main: [clk]
+    
+    public_inputs:
+        stack_inputs: [16]
+    
+    boundary_constraints:
+        enf clk.first = 0
+    
+    integrity_constraints:
+        enf enforce_all_constraints([clk])";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::new(parsed);
+    assert!(result.is_ok());
+}
+
+#[ignore]
+#[test]
+fn ev_call_inside_evaluator_with_aux() {
     let source = "
     ev enforce_clk(main: [clk]):
         enf clk' = clk + 1
