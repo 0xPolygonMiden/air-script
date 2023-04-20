@@ -246,3 +246,23 @@ ev hash_chiplet_bus_constraints(main: [s[3], r, h[12], i], aux: [p0]):
     p0' = p0 * ((get_f_bp(s) + get_f_sout(s)) * v_all + (get_f_mp(s) + get_f_mv(s) + get_f_mu(s)) * 
         v_leaf + get_f_abp(s) * v_abp + get_f_hout(s) * v_res + 1 - 
         (get_f_bp(s) + get_f_mp(s) + get_f_mv(s) + get_f_mu(s) + get_f_abp(s) + get_f_out(s)))
+
+
+# Enforce constraints for the hash chiplet sibling table.
+ev hash_sibling_table_constraints(main: [s[3], r, h[12], i], aux: [p1]):
+    # b is the value of the bit which is discarded during shift by one bit to the right.
+    let b = i - 2 * i'
+
+    let v_b = sum([$alpha[j + 4] * h[j] for j in 4..8])
+    let v_c = sum([$alpha[j + 4] * h[j] for j in 8..12])
+
+    # v_sibling represents an entry in the sibling table.
+    let v_sibling = $alpha[0] + $alpha[3] * i + b * v_b + (1 - b) * v_c
+
+    # Enforce constraint for updating p1.
+    enf p1' * ((get_f_mv(s) + get_f_mva(s)) * v_sibling + 1 - (get_f_mv(s) + get_f_mva(s))) = 
+        p1 * ((get_f_mu(s) + get_f_mua(s)) * v_sibling + 1 - (get_f_mu(s) + get_f_mua(s)))
+
+    # Enforce that computation of the old Merkle root is immediately followed by the computation of 
+    # the new Merkle root.
+    enf (get_f_bp(s) + get_f_mp(s) + get_f_mv(s) * (1 - p1)) = 0
