@@ -2,11 +2,11 @@ use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
-        build_trace_bindings, AccessType, ComprehensionContext, ConstantBinding, ConstantValueExpr, 
-        Expression, EvaluatorFunction, EvaluatorFunctionCall, Identifier, Iterable, 
-        ListComprehension, ListFolding, ListFoldingValueExpr, PeriodicColumn, PublicInput, 
-        RandBinding, RandomValues, Range, Source, SourceSection, SymbolAccess, TraceBinding, 
-        VariableBinding, VariableValueExpr, 
+        build_segment_bindings, build_trace_bindings, AccessType, ComprehensionContext, 
+        ConstantBinding, ConstantValueExpr, Expression, EvaluatorFunction, EvaluatorFunctionCall, 
+        Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, PeriodicColumn, 
+        PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, SymbolAccess, 
+        TraceBinding, VariableBinding, VariableValueExpr, 
     }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
@@ -61,12 +61,12 @@ Trace: Vec<Vec<TraceBinding>> = {
 
 MainTraceBindings: Vec<TraceBinding> = {
     "main" ":" <main_cols: Vector<TraceBinding>> => 
-        build_trace_bindings(0, Identifier("$main".to_string()), main_cols),
+        build_segment_bindings(0, Identifier("$main".to_string()), main_cols),
 }
 
 AuxTraceBindings: Vec<TraceBinding> = {
     "aux" ":" <aux_cols: Vector<TraceBinding>> => 
-        build_trace_bindings(1, Identifier("$aux".to_string()), aux_cols),
+        build_segment_bindings(1, Identifier("$aux".to_string()), aux_cols),
 }
 
 TraceBinding: (Identifier, u64) = {
@@ -167,25 +167,16 @@ RandElem: RandBinding = {
 // ================================================================================================
 
 EvaluatorFunction: EvaluatorFunction = {
-    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainTraceBindings> "," <aux_cols: AuxTraceBindings> ")" ":"
-        <integrity_stmts: IntegrityStmts> => {
-            EvaluatorFunction::new(
-                evaluator_fn_name,
-                vec![main_cols, aux_cols],
-                integrity_stmts)
-        },
-    "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainTraceBindings> ")" ":"
+    "ev" <evaluator_fn_name: Identifier> "(" <trace: EvaluatorBindings> ")" ":"
         <integrity_stmts: IntegrityStmts> => 
             EvaluatorFunction::new(
                 evaluator_fn_name,
-                vec![main_cols],
+                trace,
                 integrity_stmts),
-    "ev" <evaluator_fn_name: Identifier> "(" <aux_cols: AuxTraceBindings> ")" ":"
-        <integrity_stmts: IntegrityStmts> =>
-            EvaluatorFunction::new(
-                evaluator_fn_name,
-                vec![aux_cols],
-                integrity_stmts),
+}
+
+EvaluatorBindings: Vec<Vec<TraceBinding>> = {
+    <trace: CommaElems<Vector<TraceBinding>>> => build_trace_bindings(trace),
 }
 
 // BOUNDARY STATEMENTS

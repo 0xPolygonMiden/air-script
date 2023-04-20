@@ -13,15 +13,17 @@ use crate::{
 #[test]
 fn ev_fn_main_cols() {
     let source = "
-    ev advance_clock(main: [clk]):
+    ev advance_clock([clk]):
         enf clk' = clk + 1";
     let expected = Source(vec![SourceSection::EvaluatorFunction(
         EvaluatorFunction::new(
             Identifier("advance_clock".to_string()),
-            vec![vec![
-                TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
-                TraceBinding::new(Identifier("$main".to_string()), 0, 0, 1),
-            ]],
+            vec![vec![TraceBinding::new(
+                Identifier("clk".to_string()),
+                0,
+                0,
+                1,
+            )]],
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
                     SymbolAccess(SymbolAccess::new(
@@ -48,7 +50,7 @@ fn ev_fn_main_cols() {
 #[test]
 fn ev_fn_main_and_aux_cols() {
     let source = "
-    ev ev_func(main: [clk], aux: [a, b]):
+    ev ev_func([clk], [a, b]):
         let z = a + b
         enf clk' = clk + 1
         enf a' = a + z";
@@ -57,14 +59,10 @@ fn ev_fn_main_and_aux_cols() {
         EvaluatorFunction::new(
             Identifier("ev_func".to_string()),
             vec![
-                vec![
-                    TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
-                    TraceBinding::new(Identifier("$main".to_string()), 0, 0, 1),
-                ],
+                vec![TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1)],
                 vec![
                     TraceBinding::new(Identifier("a".to_string()), 1, 0, 1),
                     TraceBinding::new(Identifier("b".to_string()), 1, 1, 1),
-                    TraceBinding::new(Identifier("$aux".to_string()), 1, 0, 2),
                 ],
             ],
             vec![
@@ -178,21 +176,17 @@ fn ev_fn_call() {
 #[test]
 fn ev_fn_call_inside_ev_fn() {
     let source = "
-    ev ev_func(main: [clk], aux: [a, b]):
+    ev ev_func([clk], [a, b]):
         enf advance_clock([clk])";
 
     let expected = Source(vec![SourceSection::EvaluatorFunction(
         EvaluatorFunction::new(
             Identifier("ev_func".to_string()),
             vec![
-                vec![
-                    TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
-                    TraceBinding::new(Identifier("$main".to_string()), 0, 0, 1),
-                ],
+                vec![TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1)],
                 vec![
                     TraceBinding::new(Identifier("a".to_string()), 1, 0, 1),
                     TraceBinding::new(Identifier("b".to_string()), 1, 1, 1),
-                    TraceBinding::new(Identifier("$aux".to_string()), 1, 0, 2),
                 ],
             ],
             vec![Constraint(
