@@ -115,6 +115,7 @@ pub(crate) struct Evaluator {
 impl Evaluator {
     // --- CONSTRUCTOR ----------------------------------------------------------------------------
 
+    /// Creates a new [Evaluator] from the provided [AlgebraicGraph] and [ConstraintRoot] matrix.
     pub(super) fn new(graph: AlgebraicGraph, constraints: Vec<Vec<ConstraintRoot>>) -> Self {
         Self { constraints, graph }
     }

@@ -22,10 +22,11 @@ use variables::get_variable_expr;
 // CONSTRAINT BUILDER
 // ================================================================================================
 
-// TODO: docs
+/// A builder that constructs a constraint graph from a symbol table, a set of evaluators, and
+/// [BoundaryStmt] and [IntegrityStmt] statements that define variable bindings and constraints.
 #[derive(Default, Debug)]
 pub(super) struct ConstraintBuilder {
-    // TODO: docs
+    /// A symbol table that contains all symbols that are visible in the current context.
     symbol_table: SymbolTable,
 
     // --- CONTEXT VARIABLES ----------------------------------------------------------------------
@@ -33,7 +34,7 @@ pub(super) struct ConstraintBuilder {
     /// than one constraint is defined at any given boundary.
     constrained_boundaries: BTreeSet<ConstrainedBoundary>,
 
-    /// TODO: docs
+    /// A map of all evaluator functions that have been defined so far with their names as keys.
     evaluators: BTreeMap<String, Evaluator>,
 
     // --- ACCUMULATED CONTEXT DATA ---------------------------------------------------------------
@@ -51,6 +52,8 @@ pub(super) struct ConstraintBuilder {
 }
 
 impl ConstraintBuilder {
+    /// Initializes a new [ConstraintBuilder] from the specified [SymbolTable] and set of
+    /// evaluator functions.
     pub fn new(symbol_table: SymbolTable, evaluators: BTreeMap<String, Evaluator>) -> Self {
         let num_trace_segments = symbol_table.num_trace_segments();
         Self {
@@ -67,6 +70,7 @@ impl ConstraintBuilder {
         }
     }
 
+    /// Consumes this [ConstraintBuilder] and returns a tuple of [Declarations] and [Constraints].
     pub fn into_air(self) -> (Declarations, Constraints) {
         let constraints = Constraints::new(
             self.graph,
@@ -78,12 +82,17 @@ impl ConstraintBuilder {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    /// TODO: docs
+    /// Adds the specified operation to the graph and returns the index of its node.
     pub(super) fn insert_graph_node(&mut self, op: Operation) -> NodeIndex {
         self.graph.insert_node(op)
     }
 
-    /// TODO: docs
+    /// Processes the provided boundary and integrity statements, which consist of variables and
+    /// constraint definitions in the boundary and integrity contexts. The graph and the respective
+    /// [ConstraintRoot] matrices are updated.
+    ///
+    /// # Errors
+    /// Returns an error if any of the statements are invalid.
     pub(crate) fn insert_constraints(
         &mut self,
         boundary_stmts: Vec<ast::BoundaryStmt>,
@@ -106,9 +115,8 @@ impl ConstraintBuilder {
         Ok(())
     }
 
-    /// Takes two expressions which are expected to be equal and merges them into a constraint (a
-    /// subtree in the graph that must be equal to zero for a particular domain). The constraint is
-    /// then saved in the appropriate constraint list (boundary, validity, or transition).
+    /// Inserts a [ConstraintRoot] for the constraint specified by the root, trace_segment, and
+    /// domain into the correct constraints matrix (boundary_constraints or integrity_constraints).
     fn insert_constraint(
         &mut self,
         root: NodeIndex,
@@ -130,7 +138,8 @@ impl ConstraintBuilder {
         } else {
             if self.integrity_constraints.len() <= trace_segment {
                 // resize the integrity constraints vector to include the new trace segment
-                // this can be required when processing evaluators.
+                // this can be required when processing evaluators, since the trace declarations
+                // may not have been processed with the [ConstraintBuilder] was initialized.
                 self.integrity_constraints
                     .resize(trace_segment + 1, Vec::new());
             }
