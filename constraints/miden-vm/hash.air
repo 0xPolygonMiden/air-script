@@ -10,22 +10,23 @@ periodic_columns:
 
 ### Helper functions ##############################################################################
 
-# Returns binary negation of the value.
-fn binary_not(value: scalar) -> scalar:
-    return 1 - value
+# Set to 1 when selector flags are (1,0,0) on rows which are multiples of 8. This is flag of the 
+# single permutation, a 2-to-1 hash, or a linear hash of many elements.
+fn get_f_bp(s: vector[3]) -> scalar:
+    return cycle_row_0 & s[0] & !s[1] & !s[2]
 
 
 # Set to 1 when selector flags are (1,0,1) on rows which are multiples of 8. This is flag of 
 # the instruction that initiates Merkle path verification computation.
 fn get_f_mp(s: vector[3]) -> scalar:
-    return cycle_row_0 & s[0] & binary_not(s[1]) & s[2]
+    return cycle_row_0 & s[0] & !s[1] & s[2]
 
 
 # Set to 1 when selector flags are (1,1,0) on rows which are multiples of 8. This is flag of 
 # the instruction that initiates Merkle path verification for the "old" node value during 
 # Merkle root update computation.
 fn get_f_mv(s: vector[3]) -> scalar:
-    return cycle_row_0 & s[0] & s[1] & binary_not(s[2])
+    return cycle_row_0 & s[0] & s[1] & !s[2]
 
 
 # Set to 1 when selector flags are (1,1,1) on rows which are multiples of 8. This is flag of 
@@ -34,19 +35,30 @@ fn get_f_mv(s: vector[3]) -> scalar:
 fn get_f_mu(s: vector[3]) -> scalar:
     return cycle_row_0 & s[0] & s[1] & s[2]
 
+# Set to 1 when selector flags are (0,0,0) on rows which are 1 less than a multiple of 8. This is 
+# flag of the instruction that returns the result of the currently running computation.
+fn get_f_hout(s: vector[3]) -> scalar:
+    return cycle_row_7 & !s[0] & !s[1] & !s[2]
+
+
+# Set to 1 when selector flags are (0,0,1) on rows which are 1 less than a multiple of 8. This is 
+# flag of the instruction that returns the whole hasher state.
+fn get_f_sout(s: vector[3]) -> scalar:
+    return cycle_row_7 & !s[0] & !s[1] & s[2]
+
 
 # Set to 1 when selector flags are (1,0,0) on rows which are 1 less than a multiple of 8. This 
 # is flag of the instruction that absorbs a new set of elements into the hasher state when 
 # computing a linear hash of many elements.
 fn get_f_abp(s: vector[3]) -> scalar:
-    return cycle_row_7 & s[0] & binary_not(s[1]) & binary_not(s[2])
+    return cycle_row_7 & s[0] & !s[1] & !s[2]
 
 
 # Set to 1 when selector flags are (1,0,1) on rows which are 1 less than a multiple of 8. This 
 # is flag of the instruction that absorbs the next Merkle path node into the hasher state 
 # during Merkle path verification computation.
 fn get_f_mpa(s: vector[3]) -> scalar:
-    return cycle_row_7 & s[0] & binary_not(s[1]) & s[2]
+    return cycle_row_7 & s[0] & !s[1] & s[2]
 
 
 # Set to 1 when selector flags are (1,1,0) on rows which are 1 less than a multiple of 8. This 
@@ -54,7 +66,7 @@ fn get_f_mpa(s: vector[3]) -> scalar:
 # during Merkle path verification for the "old" node value during Merkle root update 
 # computation.
 fn get_f_mva(s: vector[3]) -> scalar:
-    return cycle_row_7 & s[0] & s[1] & binary_not(s[2])
+    return cycle_row_7 & s[0] & s[1] & !s[2]
 
 
 # Set to 1 when selector flags are (1,1,1) on rows which are 1 less than a multiple of 8. This 
@@ -65,23 +77,9 @@ fn get_f_mua(s: vector[3]) -> scalar:
     return cycle_row_7 & s[0] & s[1] & s[2]
 
 
-# We can define two flags:
-# 1. Flag f_hout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & binary_not(s[2]), 
-# which is set to 1 when selector flags are (0,0,0) on rows which are 1 less than a multiple 
-# of 8. This is flag of the instruction that returns the result of the currently running 
-# computation.
-# 2. Flag f_sout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & s[2], which is set to 1 
-# when selector flags are (0,0,1) on rows which are 1 less than a multiple of 8. This is flag 
-# of the instruction that returns the whole hasher state.
-#
 # Flag f_out is set to 1 when either f_hout = 1 or f_sout = 1 in the current row.
 fn get_f_out(s: vector[3]) -> scalar:
-    return cycle_row_7 & binary_not(s[0]) & binary_not(s[1])
-
-
-# Flag f_out_next is set to 1 when either f_hout = 1 or f_sout = 1 in the next row.
-fn get_f_out_next(s: vector[3]) -> scalar:
-    return cycle_row_6 & binary_not(s[0]') & binary_not(s[1]')
+    return cycle_row_7 & !s[0] & !s[1]
 
 
 ### Helper evaluators #############################################################################
@@ -98,8 +96,10 @@ ev is_unchanged(main: [column]):
 
 # Enforce selector columns constraints
 ev selector_columns(main: [s[3]]):
+    let s_next = [s_i' for s_i in s]
+
     let f_out = get_f_out(s)
-    let f_out_next = get_f_out_next(s)
+    let f_out_next = get_f_out(s_next)
     let f_abp = get_f_abp(s)
     let f_mpa = get_f_mpa(s)
     let f_mva = get_f_mva(s)
@@ -122,7 +122,7 @@ ev selector_columns(main: [s[3]]):
     enf s[0]' * f_comp = 0
 
     # Enforce that no invalid combinations of flags are allowed.
-    enf cycle_row_7 * binary_not(s[0]) * s[1] = 0
+    enf cycle_row_7 * !s[0] * s[1] = 0
 
 
 # Enforce node index constraints
@@ -203,3 +203,46 @@ ev hash_chiplet(main: [s[3], r, h[12], i]):
 
     # Multiset check constraints
     # TODO: Apply multiset check constraints
+
+
+# Enforce constraints for the hash chiplet bus.
+ev hash_chiplet_bus_constraints(main: [s[3], r, h[12], i], aux: [p0]):
+    let h_next = [h[i]' for i in 0..12]
+
+    let op_label = 2^3 * s[2] + 2^2 * s[1] + 2^1 * s[0] + 1
+    let transition_label = op_label + 2^4 * cycle_row_7  + 2^5 * cycle_row_0
+
+    # v_h is a common header.
+    let v_h = $alpha[0] + $alpha[1] * transition_label + $alpha[2] * r + $alpha[3] * i
+
+    # v_a, v_b and v_c are the first, second, and third words of the hasher state.
+    let v_a = sum([$alpha[j + 4] * h[j] for j in 0..4])
+    let v_b = sum([$alpha[j + 4] * h[j] for j in 4..8])
+    let v_b_next = sum([$alpha[j + 4] * h[j]' for j in 4..8])
+    let v_c = sum([$alpha[j + 4] * h[j] for j in 8..12])
+    let v_c_next = sum([$alpha[j + 4] * h[j]' for j in 8..12])
+
+    # v_d is the third word of the hasher state but computed using the same alphas values as used 
+    # for the second word.
+    let v_d = sum([$alpha[j] * h[j] for j in 8..12])
+    
+    # v_all represents the entire hasher state.
+    let v_all = v_h + v_a + v_b + v_c
+
+    # b is the value of the bit which is discarded during shift by one bit to the right.
+    let b = i - 2 * i'
+
+    # v_leaf represents the leaf of the path.
+    let v_leaf = v_h + (1 - b) * v_b + b * v_d
+
+    # v_abp represents delta between the last 8 elements of the hasher state during absorbing a new 
+    # set of elements into the state while computing a linear hash.
+    let v_abp = v_h + v_b_next + v_c_next - (v_b + v_c)
+
+    # v_res represents the second word of the hasher state.
+    let v_res = v_h + v_b
+
+    # Enforce constraints for updating column p0.
+    p0' = p0 * ((get_f_bp(s) + get_f_sout(s)) * v_all + (get_f_mp(s) + get_f_mv(s) + get_f_mu(s)) * 
+        v_leaf + get_f_abp(s) * v_abp + get_f_hout(s) * v_res + 1 - 
+        (get_f_bp(s) + get_f_mp(s) + get_f_mv(s) + get_f_mu(s) + get_f_abp(s) + get_f_out(s)))
