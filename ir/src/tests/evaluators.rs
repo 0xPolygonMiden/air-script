@@ -74,7 +74,6 @@ fn evaluator_with_main_and_aux_cols() {
     assert!(result.is_ok());
 }
 
-#[ignore]
 #[test]
 fn ev_call_with_aux_only() {
     let source = "
@@ -92,7 +91,7 @@ fn ev_call_with_aux_only() {
         enf clk.first = 0
     
     integrity_constraints:
-        enf enforce_a([a, b])";
+        enf enforce_a([], [a, b])";
 
     let parsed = parse(source).expect("Parsing failed");
     let result = AirIR::new(parsed);
@@ -125,7 +124,6 @@ fn ev_call_inside_evaluator_with_main() {
     assert!(result.is_ok());
 }
 
-#[ignore]
 #[test]
 fn ev_call_inside_evaluator_with_aux() {
     let source = "

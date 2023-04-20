@@ -48,6 +48,41 @@ fn ev_fn_main_cols() {
 }
 
 #[test]
+fn ev_fn_aux_cols() {
+    let source = "
+    ev foo([], [p]):
+        enf p' = p + 1";
+    let expected = Source(vec![SourceSection::EvaluatorFunction(
+        EvaluatorFunction::new(
+            Identifier("foo".to_string()),
+            vec![
+                vec![],
+                vec![TraceBinding::new(Identifier("p".to_string()), 1, 0, 1)],
+            ],
+            vec![Constraint(
+                ConstraintType::Inline(IntegrityConstraint::new(
+                    SymbolAccess(SymbolAccess::new(
+                        Identifier("p".to_string()),
+                        AccessType::Default,
+                        1,
+                    )),
+                    Add(
+                        Box::new(SymbolAccess(SymbolAccess::new(
+                            Identifier("p".to_string()),
+                            AccessType::Default,
+                            0,
+                        ))),
+                        Box::new(Const(1)),
+                    ),
+                )),
+                None,
+            )],
+        ),
+    )]);
+    build_parse_test!(source).expect_ast(expected);
+}
+
+#[test]
 fn ev_fn_main_and_aux_cols() {
     let source = "
     ev ev_func([clk], [a, b]):
@@ -206,8 +241,52 @@ fn ev_fn_call_inside_ev_fn() {
     build_parse_test!(source).expect_ast(expected);
 }
 
+#[test]
+fn ev_fn_call_with_more_than_two_args() {
+    let source = "
+    integrity_constraints:
+        enf advance_clock([a], [b], [c])";
+
+    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
+        ConstraintType::Evaluator(EvaluatorFunctionCall::new(
+            Identifier("advance_clock".to_string()),
+            vec![
+                vec![SymbolAccess::new(
+                    Identifier("a".to_string()),
+                    AccessType::Default,
+                    0,
+                )],
+                vec![SymbolAccess::new(
+                    Identifier("b".to_string()),
+                    AccessType::Default,
+                    0,
+                )],
+                vec![SymbolAccess::new(
+                    Identifier("c".to_string()),
+                    AccessType::Default,
+                    0,
+                )],
+            ],
+        )),
+        None,
+    )])]);
+
+    build_parse_test!(source).expect_ast(expected);
+}
+
 // INVALID USE OF EVALUATOR FUNCTIONS
 // ================================================================================================
+
+#[test]
+fn ev_fn_def_with_empty_final_arg() {
+    let source = "
+    ev ev_func([clk], []):
+        enf clk' = clk + 1";
+    let error = Error::ParseError(ParseError::InvalidEvaluatorFunction(
+        "The last trace segment in an evaluator definition cannot be empty.".to_string(),
+    ));
+    build_parse_test!(source).expect_error(error);
+}
 
 #[test]
 fn ev_fn_call_with_no_args() {
@@ -218,17 +297,6 @@ fn ev_fn_call_with_no_args() {
 }
 
 #[test]
-fn ev_fn_call_with_more_than_two_args() {
-    let source = "
-    integrity_constraints:
-        enf advance_clock([a], [b], [c])";
-    let error = Error::ParseError(ParseError::InvalidEvaluatorFunction(
-        "Evaluator function call must have 1 or 2 arguments".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
-}
-
-#[test]
 fn ev_fn_with_invalid_params() {
     let source = "
     ev advance_clock():
@@ -236,17 +304,17 @@ fn ev_fn_with_invalid_params() {
     build_parse_test!(source).expect_unrecognized_token();
 
     let source = "
-    ev advance_clock(main: [clk] aux: [a, b]):
+    ev advance_clock([clk] [a, b]):
         enf clk' = clk + 1";
     build_parse_test!(source).expect_unrecognized_token();
 
     let source = "
-    ev advance_clock(, aux: [a, b]):
+    ev advance_clock(, [a, b]):
         enf clk' = clk + 1";
     build_parse_test!(source).expect_unrecognized_token();
 
     let source = "
-    ev advance_clock(main: [clk],):
+    ev advance_clock([clk],):
         enf clk' = clk + 1";
     build_parse_test!(source).expect_unrecognized_token();
 }

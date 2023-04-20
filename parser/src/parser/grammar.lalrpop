@@ -176,7 +176,27 @@ EvaluatorFunction: EvaluatorFunction = {
 }
 
 EvaluatorBindings: Vec<Vec<TraceBinding>> = {
-    <trace: CommaElems<Vector<TraceBinding>>> => build_trace_bindings(trace),
+    <trace: CommaElems<EvaluatorSegmentBindings>> =>? {
+        let bindings = build_trace_bindings(trace);
+
+        // the last segment of trace columns cannot be empty.
+        if let Some(last_segment) = bindings.last() {
+            if last_segment.is_empty() {
+                return Err(ParseError::User {
+                    error: Error::ParseError(InvalidEvaluatorFunction(
+                        "The last trace segment in an evaluator definition cannot be empty."
+                            .to_string(),
+                    )),
+                });
+            }
+        }
+        Ok(bindings)
+    }
+}
+
+EvaluatorSegmentBindings: Vec<(Identifier, u64)> = {
+    <elems: Vector<TraceBinding>> => elems,
+    "[" "]" => Vec::new()
 }
 
 // BOUNDARY STATEMENTS
@@ -333,18 +353,14 @@ IntegrityVariableType: VariableValueExpr = {
 }
 
 EvaluatorFunctionCall: EvaluatorFunctionCall = {
-    <ident: Identifier> "(" <args: CommaElems<Vector<SymbolAccess>>> ")" =>? {
-        if args.len() > 2 {
-            return Err(ParseError::User {
-                error: Error::ParseError(
-                    InvalidEvaluatorFunction(
-                        "Evaluator function call must have 1 or 2 arguments".to_string()
-                    )
-                )
-            });
-        }
+    <ident: Identifier> "(" <args: CommaElems<EvaluatorArg>> ")" =>? {
         Ok(EvaluatorFunctionCall::new(ident, args))
     }
+}
+
+EvaluatorArg: Vec<SymbolAccess> = {
+    <elems: Vector<SymbolAccess>> => elems,
+    "[" "]" => Vec::new()
 }
 
 // --- INTEGRITY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
