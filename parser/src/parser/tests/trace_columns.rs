@@ -16,6 +16,7 @@ fn trace_columns() {
         TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
         TraceBinding::new(Identifier("fmp".to_string()), 0, 1, 1),
         TraceBinding::new(Identifier("ctx".to_string()), 0, 2, 1),
+        TraceBinding::new(Identifier("$main".to_string()), 0, 0, 3),
     ]])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -31,10 +32,12 @@ fn trace_columns_main_and_aux() {
             TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("fmp".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("ctx".to_string()), 0, 2, 1),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 3),
         ],
         vec![
             TraceBinding::new(Identifier("rc_bus".to_string()), 1, 0, 1),
             TraceBinding::new(Identifier("ch_bus".to_string()), 1, 1, 1),
+            TraceBinding::new(Identifier("$aux".to_string()), 1, 0, 2),
         ],
     ])]);
     build_parse_test!(source).expect_ast(expected);
@@ -56,11 +59,13 @@ fn trace_columns_groups() {
                 TraceBinding::new(Identifier("fmp".to_string()), 0, 1, 1),
                 TraceBinding::new(Identifier("ctx".to_string()), 0, 2, 1),
                 TraceBinding::new(Identifier("a".to_string()), 0, 3, 3),
+                TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
             ],
             vec![
                 TraceBinding::new(Identifier("rc_bus".to_string()), 1, 0, 1),
                 TraceBinding::new(Identifier("b".to_string()), 1, 1, 4),
                 TraceBinding::new(Identifier("ch_bus".to_string()), 1, 5, 1),
+                TraceBinding::new(Identifier("$aux".to_string()), 1, 0, 6),
             ],
         ]),
         IntegrityConstraints(vec![

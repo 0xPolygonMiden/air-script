@@ -14,9 +14,8 @@ fn random_values_fixed_list() {
     random_values:
         rand: [15]";
     let expected = Source(vec![RandomValues(RandomValues::new(
-        Identifier("rand".to_string()),
         15,
-        vec![],
+        vec![RandBinding::new(Identifier("$rand".to_string()), 15)],
     ))]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -27,9 +26,9 @@ fn random_values_ident_vector() {
     random_values:
         rand: [a, b[12], c]";
     let expected = Source(vec![RandomValues(RandomValues::new(
-        Identifier("rand".to_string()),
         14,
         vec![
+            RandBinding::new(Identifier("$rand".to_string()), 14),
             RandBinding::new(Identifier("a".to_string()), 1),
             RandBinding::new(Identifier("b".to_string()), 12),
             RandBinding::new(Identifier("c".to_string()), 1),
@@ -44,9 +43,8 @@ fn random_values_custom_name() {
     random_values:
         alphas: [14]";
     let expected = Source(vec![RandomValues(RandomValues::new(
-        Identifier("alphas".to_string()),
         14,
-        vec![],
+        vec![RandBinding::new(Identifier("$alphas".to_string()), 14)],
     ))]);
     build_parse_test!(source).expect_ast(expected);
 }

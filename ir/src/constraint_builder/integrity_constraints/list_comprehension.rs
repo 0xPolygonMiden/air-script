@@ -1,7 +1,7 @@
 use super::{
     AccessType, BTreeMap, ConstraintBuilder, Expression, Identifier, Iterable, ListComprehension,
     ListFolding, ListFoldingValueExpr, SemanticError, Symbol, SymbolAccess, SymbolBinding,
-    TraceAccess, VariableValueExpr,
+    VariableValueExpr,
 };
 
 /// Maps each identifier in the list comprehension to its corresponding [Iterable].
@@ -242,11 +242,9 @@ fn build_ident_expression(
     match symbol.binding() {
         SymbolBinding::Trace(trace_columns) => {
             validate_access(i, trace_columns.size())?;
-            let trace_segment = trace_columns.trace_segment();
-            Ok(Expression::TraceAccess(TraceAccess::new(
-                trace_segment,
-                trace_columns.offset() + i,
-                1,
+            Ok(Expression::SymbolAccess(SymbolAccess::new(
+                Identifier(symbol.name().to_string()),
+                AccessType::Vector(i),
                 offset,
             )))
         }

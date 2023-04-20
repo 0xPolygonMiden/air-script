@@ -30,6 +30,7 @@ fn bc_one_iterable_identifier_lc() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
@@ -100,6 +101,7 @@ fn bc_identifier_and_range_lc() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
@@ -183,6 +185,7 @@ fn bc_iterable_slice_lc() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
@@ -251,6 +254,7 @@ fn bc_two_iterable_identifier_lc() {
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
             TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 10),
         ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
@@ -332,6 +336,7 @@ fn bc_multiple_iterables_lc() {
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 3),
             TraceBinding::new(Identifier("c".to_string()), 0, 4, 4),
             TraceBinding::new(Identifier("d".to_string()), 0, 8, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 12),
         ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
@@ -438,6 +443,7 @@ fn ic_one_iterable_identifier_lc() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
@@ -531,6 +537,7 @@ fn ic_iterable_identifier_range_lc() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
@@ -620,6 +627,7 @@ fn ic_iterable_slice_lc() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
@@ -694,6 +702,7 @@ fn ic_two_iterable_identifier_lc() {
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
             TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 10),
         ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
@@ -781,6 +790,7 @@ fn ic_multiple_iterables_lc() {
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 3),
             TraceBinding::new(Identifier("c".to_string()), 0, 4, 4),
             TraceBinding::new(Identifier("d".to_string()), 0, 8, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 12),
         ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(

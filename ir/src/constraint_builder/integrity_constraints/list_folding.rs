@@ -1,6 +1,6 @@
 use super::{
-    ConstantValueExpr, ConstraintBuilder, Expression, ListFoldingValueExpr, SemanticError,
-    SymbolBinding, TraceAccess, VariableValueExpr, CURRENT_ROW,
+    AccessType, ConstantValueExpr, ConstraintBuilder, Expression, ListFoldingValueExpr,
+    SemanticError, SymbolAccess, SymbolBinding, VariableValueExpr, CURRENT_ROW,
 };
 
 // LIST FOLDING
@@ -37,13 +37,11 @@ impl ConstraintBuilder {
                     }
                     SymbolBinding::Trace(columns) => {
                         if columns.size() > 1 {
-                            let trace_segment = columns.trace_segment();
                             Ok((0..columns.size())
                                 .map(|i| {
-                                    Expression::TraceAccess(TraceAccess::new(
-                                        trace_segment,
-                                        columns.offset() + i,
-                                        1,
+                                    Expression::SymbolAccess(SymbolAccess::new(
+                                        ident.clone(),
+                                        AccessType::Vector(i),
                                         CURRENT_ROW,
                                     ))
                                 })

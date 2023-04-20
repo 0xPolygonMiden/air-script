@@ -41,6 +41,7 @@ fn full_air_file() {
             TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("fmp".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("ctx".to_string()), 0, 2, 1),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 3),
         ]]),
         // integrity_constraints:
         //     enf clk' = clk + 1

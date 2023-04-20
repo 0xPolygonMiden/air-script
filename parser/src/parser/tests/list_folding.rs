@@ -28,6 +28,7 @@ fn identifier_lf() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
@@ -78,6 +79,7 @@ fn vector_lf() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
@@ -161,6 +163,7 @@ fn bc_one_iterable_identifier_lf() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
@@ -239,6 +242,7 @@ fn bc_two_iterable_identifier_lf() {
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
             TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 10),
         ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
@@ -336,6 +340,7 @@ fn bc_two_iterables_identifier_range_lf() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         BoundaryConstraints(vec![
             BoundaryStmt::VariableBinding(VariableBinding::new(
@@ -433,6 +438,7 @@ fn ic_one_iterable_identifier_lf() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
@@ -517,6 +523,7 @@ fn ic_two_iterable_identifier_lf() {
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
             TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 10),
         ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
@@ -620,6 +627,7 @@ fn ic_two_iterables_identifier_range_lf() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(
@@ -723,6 +731,7 @@ fn ic_three_iterables_slice_identifier_range_lf() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 6),
             TraceBinding::new(Identifier("c".to_string()), 0, 7, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 11),
         ]]),
         IntegrityConstraints(vec![
             IntegrityStmt::VariableBinding(VariableBinding::new(

@@ -2,8 +2,7 @@ use super::{
     ast::{ConstraintType, IntegrityStmt},
     AccessType, BTreeMap, ConstantValueExpr, ConstraintBuilder, ConstraintDomain, Expression,
     Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, SemanticError,
-    Symbol, SymbolAccess, SymbolBinding, TraceAccess, VariableBinding, VariableValueExpr,
-    CURRENT_ROW,
+    Symbol, SymbolAccess, SymbolBinding, VariableBinding, VariableValueExpr, CURRENT_ROW,
 };
 
 mod list_comprehension;

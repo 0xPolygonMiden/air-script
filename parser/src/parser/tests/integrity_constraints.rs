@@ -5,8 +5,8 @@ use super::{
 use crate::{
     ast::{
         AccessType, ConstantBinding, ConstantValueExpr::*, ConstraintType, EvaluatorFunction,
-        EvaluatorFunctionCall, Expression::*, IntegrityStmt::*, SymbolAccess, TraceAccess,
-        VariableBinding, VariableValueExpr,
+        EvaluatorFunctionCall, Expression::*, IntegrityStmt::*, SymbolAccess, VariableBinding,
+        VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -305,9 +305,17 @@ fn integrity_constraint_with_indexed_trace_access() {
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
-                TraceAccess(TraceAccess::new(0, 0, 1, 1)),
+                SymbolAccess(SymbolAccess::new(
+                    Identifier("$main".to_string()),
+                    AccessType::Vector(0),
+                    1,
+                )),
                 Add(
-                    Box::new(TraceAccess(TraceAccess::new(0, 1, 1, 0))),
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("$main".to_string()),
+                        AccessType::Vector(1),
+                        0,
+                    ))),
                     Box::new(Const(1)),
                 ),
             )),
@@ -316,8 +324,16 @@ fn integrity_constraint_with_indexed_trace_access() {
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 Sub(
-                    Box::new(TraceAccess(TraceAccess::new(1, 0, 1, 1))),
-                    Box::new(TraceAccess(TraceAccess::new(1, 1, 1, 0))),
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("$aux".to_string()),
+                        AccessType::Vector(0),
+                        1,
+                    ))),
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("$aux".to_string()),
+                        AccessType::Vector(1),
+                        0,
+                    ))),
                 ),
                 Const(1),
             )),
@@ -344,6 +360,7 @@ fn ic_comprehension_one_iterable_identifier() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
             ConstraintType::Inline(IntegrityConstraint::new(
@@ -389,6 +406,7 @@ fn ic_comprehension_one_iterable_range() {
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
         SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
             ConstraintType::Inline(IntegrityConstraint::new(
@@ -435,6 +453,7 @@ fn ic_comprehension_with_selectors() {
             TraceBinding::new(Identifier("a".to_string()), 0, 2, 1),
             TraceBinding::new(Identifier("b".to_string()), 0, 3, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 4, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 8),
         ]]),
         SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
             ConstraintType::Inline(IntegrityConstraint::new(
@@ -492,7 +511,10 @@ fn ic_comprehension_with_evaluator_call() {
     let expected = Source(vec![
         SourceSection::EvaluatorFunction(EvaluatorFunction::new(
             Identifier("is_binary".to_string()),
-            vec![TraceBinding::new(Identifier("x".to_string()), 0, 0, 1)],
+            vec![
+                TraceBinding::new(Identifier("x".to_string()), 0, 0, 1),
+                TraceBinding::new(Identifier("$main".to_string()), 0, 0, 1),
+            ],
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
                     Exp(
@@ -517,6 +539,7 @@ fn ic_comprehension_with_evaluator_call() {
             TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
             TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 10),
         ]]),
         SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
             ConstraintType::Evaluator(EvaluatorFunctionCall::new(
@@ -552,7 +575,10 @@ fn ic_comprehension_with_evaluator_and_selectors() {
     let expected = Source(vec![
         SourceSection::EvaluatorFunction(EvaluatorFunction::new(
             Identifier("is_binary".to_string()),
-            vec![TraceBinding::new(Identifier("x".to_string()), 0, 0, 1)],
+            vec![
+                TraceBinding::new(Identifier("x".to_string()), 0, 0, 1),
+                TraceBinding::new(Identifier("$main".to_string()), 0, 0, 1),
+            ],
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
                     Exp(
@@ -578,6 +604,7 @@ fn ic_comprehension_with_evaluator_and_selectors() {
             TraceBinding::new(Identifier("b".to_string()), 0, 3, 1),
             TraceBinding::new(Identifier("c".to_string()), 0, 4, 4),
             TraceBinding::new(Identifier("d".to_string()), 0, 8, 4),
+            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 12),
         ]]),
         SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
             ConstraintType::Evaluator(EvaluatorFunctionCall::new(
