@@ -1,31 +1,37 @@
 mod BitwiseAir
 
-### Declarations ##################################################################################
+### Constants and periodic columns ################################################################
 
 periodic_columns:
     k0: [1, 0, 0, 0, 0, 0, 0, 0]
     k1: [1, 1, 1, 1, 1, 1, 1, 0]
 
-### Helper functions/evaluators ###################################################################
 
-# Enforces that column must be binary.
-ev is_binary(main: [a]):
-    enf a^2 - a = 0
+### Helper functions ##############################################################################
 
 # Returns value aggregated from limbs.
 fn aggregate(limb: vector[4]) -> scalar:
     return sum([2^i * a for (i, a) in (0..4, limb)])
 
+
+### Helper evaluators #############################################################################
+
+# Enforces that column must be binary.
+ev is_binary([a]):
+    enf a^2 = a
+
+
 # Enforces that the bitwise selector is valid.
-ev bitwise_selector(main: [s]):
+ev bitwise_selector([s]):
     # Enforce that selector must be binary
     enf is_binary([s])
 
     # Enforce that selector should stay the same throughout the cycle.
     enf s' = s when k1
 
+
 #! Enforces that the input to the bitwise chiplet is decomposed into limbs correctly.
-ev input_decomposition(main:[a, b, a_limb[4], b_limb[4]]):
+ev input_decomposition([a, b, a_limb[4], b_limb[4]]):
     # Enforce that the input is decomposed into valid bits
     enf is_binary([a]) for a in a_limb
     enf is_binary([b]) for b in b_limb 
@@ -46,9 +52,10 @@ ev input_decomposition(main:[a, b, a_limb[4], b_limb[4]]):
     enf a' = a * 16 + a_aggr when k1
     enf b' = b * 16 + b_aggr when k1
 
+
 # Enforces that the output of the bitwise operation is aggregated correctly from the decomposed
 # limbs.
-ev output_aggregation(main: [s, a, b, a_limb[4], b_limb[4], zp, z]):
+ev output_aggregation([s, a, b, a_limb[4], b_limb[4], zp, z]):
     # Enforce that in the first row, the aggregated output value of the previous row should be 0.
     enf zp = 0 when k0
 
@@ -70,10 +77,28 @@ ev output_aggregation(main: [s, a, b, a_limb[4], b_limb[4], zp, z]):
         z = zp * 16 + a_xor_b when s
         z = zp * 16 + a_and_b when !s
 
+
+# Enforces the constraints for bitwise chiplet bus.
+ev bus_constraints([a, b, z], [b_chip]):
+    # u_i represents reduction of a, b abd z into a single value for row i.
+    let u_i = $alpha[1] * a + $alpha[2] * b + $alpha[3] * z
+
+    # m represents inversion of k1 periodic column.
+    let m = 1 - k1
+
+    # v_i represents value that includes u_i into the product when k1 = 0.
+    let v_i = m * u_i
+
+    # Enforce the constraints for the two sides of the bus communication.
+    enf b_chip' * ($alpha[0] + u_i) = b_chip * (($alpha[0] + v_i) * m + 1 - m)
+
+
 ### Bitwise Chiplet Air Constraints ###############################################################
 
-# Enforces the constraints on the bitwise chiplet, given the columns of the bitwise execution trace.
-ev bitwise_chiplet(main: [s, a, b, a_limb[4], b_limb[4], zp, z]):
+# Enforces the constraints on the bitwise chiplet, given the columns of the bitwise execution 
+# trace.
+ev bitwise_chiplet(main: [s, a, b, a_limb[4], b_limb[4], zp, z], [b_chip]):
     enf bitwise_selector([s])
     enf input_decomposition([a, b, a_limb, b_limb])
     enf output_aggregation([s, a, b, a_limb, b_limb, zp, z])
+    enf bus_constraints([a, b, z], [b_chip])
