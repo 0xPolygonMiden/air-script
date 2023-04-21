@@ -17,7 +17,7 @@ pub use value::Value;
 
 /// SymbolTable for identifiers to track their types and information and enforce uniqueness of
 /// identifiers.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct SymbolTable {
     /// A map of all declared identifiers from their name (the key) to their type.
     symbols: BTreeMap<String, Symbol>,

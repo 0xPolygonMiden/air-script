@@ -17,7 +17,7 @@ impl ConstraintBuilder {
     /// In case the statement is a constraint, the constraint is turned into a subgraph which is
     /// added to the [AlgebraicGraph] (reusing any existing nodes). The index of its entry node
     /// is then saved in the integrity_constraints matrix.
-    pub(super) fn insert_integrity_stmt(
+    pub(super) fn process_integrity_stmt(
         &mut self,
         stmt: IntegrityStmt,
     ) -> Result<(), SemanticError> {
@@ -52,7 +52,9 @@ impl ConstraintBuilder {
                     self.symbol_table.insert_variable(variable)?
                 }
             }
-            IntegrityStmt::Constraint(ConstraintType::Evaluator(_), _) => todo!(),
+            IntegrityStmt::Constraint(ConstraintType::Evaluator(ev_call), _) => {
+                self.process_evaluator_call(ev_call)?;
+            }
             IntegrityStmt::ConstraintComprehension(_, _, _) => todo!(),
         }
 

@@ -169,24 +169,22 @@ RandElem: RandBinding = {
 EvaluatorFunction: EvaluatorFunction = {
     "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainTraceBindings> "," <aux_cols: AuxTraceBindings> ")" ":"
         <integrity_stmts: IntegrityStmts> => {
-            let mut cols = main_cols;
-            cols.extend(aux_cols);
             EvaluatorFunction::new(
                 evaluator_fn_name,
-                cols,
+                vec![main_cols, aux_cols],
                 integrity_stmts)
         },
     "ev" <evaluator_fn_name: Identifier> "(" <main_cols: MainTraceBindings> ")" ":"
         <integrity_stmts: IntegrityStmts> => 
             EvaluatorFunction::new(
                 evaluator_fn_name,
-                main_cols,
+                vec![main_cols],
                 integrity_stmts),
     "ev" <evaluator_fn_name: Identifier> "(" <aux_cols: AuxTraceBindings> ")" ":"
         <integrity_stmts: IntegrityStmts> =>
             EvaluatorFunction::new(
                 evaluator_fn_name,
-                aux_cols,
+                vec![aux_cols],
                 integrity_stmts),
 }
 

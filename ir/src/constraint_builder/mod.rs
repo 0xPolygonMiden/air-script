@@ -9,6 +9,9 @@ use super::{
 mod boundary_constraints;
 pub(crate) use boundary_constraints::ConstrainedBoundary;
 
+mod evaluators;
+pub(crate) use evaluators::Evaluator;
+
 mod integrity_constraints;
 
 mod expression;
@@ -19,16 +22,22 @@ use variables::get_variable_expr;
 // CONSTRAINT BUILDER
 // ================================================================================================
 
-// TODO: docs
+/// A builder that constructs a constraint graph from a symbol table, a set of evaluators, and
+/// [BoundaryStmt] and [IntegrityStmt] statements that define variable bindings and constraints.
 #[derive(Default, Debug)]
 pub(super) struct ConstraintBuilder {
-    // TODO: docs
+    /// A symbol table that contains all symbols that are visible in the current context.
     symbol_table: SymbolTable,
 
+    // --- CONTEXT VARIABLES ----------------------------------------------------------------------
     /// A set of all boundaries which have been constrained. This is used to ensure that no more
     /// than one constraint is defined at any given boundary.
     constrained_boundaries: BTreeSet<ConstrainedBoundary>,
 
+    /// A map of all evaluator functions that have been defined so far with their names as keys.
+    evaluators: BTreeMap<String, Evaluator>,
+
+    // --- ACCUMULATED CONTEXT DATA ---------------------------------------------------------------
     /// A directed acyclic graph which represents all of the constraints and their subexpressions.
     graph: AlgebraicGraph,
 
@@ -43,13 +52,16 @@ pub(super) struct ConstraintBuilder {
 }
 
 impl ConstraintBuilder {
-    pub fn new(symbol_table: SymbolTable) -> Self {
+    /// Initializes a new [ConstraintBuilder] from the specified [SymbolTable] and set of
+    /// evaluator functions.
+    pub fn new(symbol_table: SymbolTable, evaluators: BTreeMap<String, Evaluator>) -> Self {
         let num_trace_segments = symbol_table.num_trace_segments();
         Self {
             symbol_table,
 
             // context variables
             constrained_boundaries: BTreeSet::new(),
+            evaluators,
 
             // accumulated data in the current context
             boundary_constraints: vec![Vec::new(); num_trace_segments],
@@ -58,6 +70,7 @@ impl ConstraintBuilder {
         }
     }
 
+    /// Consumes this [ConstraintBuilder] and returns a tuple of [Declarations] and [Constraints].
     pub fn into_air(self) -> (Declarations, Constraints) {
         let constraints = Constraints::new(
             self.graph,
@@ -69,40 +82,41 @@ impl ConstraintBuilder {
 
     // --- MUTATORS -------------------------------------------------------------------------------
 
-    /// TODO: docs
+    /// Adds the specified operation to the graph and returns the index of its node.
     pub(super) fn insert_graph_node(&mut self, op: Operation) -> NodeIndex {
         self.graph.insert_node(op)
     }
 
-    // TODO: docs
-    pub(crate) fn insert_boundary_constraints(
+    /// Processes the provided boundary and integrity statements, which consist of variables and
+    /// constraint definitions in the boundary and integrity contexts. The graph and the respective
+    /// [ConstraintRoot] matrices are updated.
+    ///
+    /// # Errors
+    /// Returns an error if any of the statements are invalid.
+    pub(crate) fn insert_constraints(
         &mut self,
-        stmts: Vec<ast::BoundaryStmt>,
+        boundary_stmts: Vec<ast::BoundaryStmt>,
+        integrity_stmts: Vec<ast::IntegrityStmt>,
     ) -> Result<(), SemanticError> {
-        for stmt in stmts.into_iter() {
-            self.insert_boundary_stmt(stmt)?
+        // --- PROCESS BOUNDARY STATEMENTS --------------------------------------------------------
+
+        for stmt in boundary_stmts.into_iter() {
+            self.process_boundary_stmt(stmt)?
+        }
+        self.symbol_table.clear_variables();
+
+        // --- PROCESS INTEGRITY STATEMENTS -------------------------------------------------------
+
+        for stmt in integrity_stmts.into_iter() {
+            self.process_integrity_stmt(stmt)?
         }
         self.symbol_table.clear_variables();
 
         Ok(())
     }
 
-    // TODO: docs
-    pub(crate) fn insert_integrity_constraints(
-        &mut self,
-        stmts: Vec<ast::IntegrityStmt>,
-    ) -> Result<(), SemanticError> {
-        for stmt in stmts.into_iter() {
-            self.insert_integrity_stmt(stmt)?
-        }
-        self.symbol_table.clear_variables();
-
-        Ok(())
-    }
-
-    /// Takes two expressions which are expected to be equal and merges them into a constraint (a
-    /// subtree in the graph that must be equal to zero for a particular domain). The constraint is
-    /// then saved in the appropriate constraint list (boundary, validity, or transition).
+    /// Inserts a [ConstraintRoot] for the constraint specified by the root, trace_segment, and
+    /// domain into the correct constraints matrix (boundary_constraints or integrity_constraints).
     fn insert_constraint(
         &mut self,
         root: NodeIndex,
@@ -122,6 +136,13 @@ impl ConstraintBuilder {
         if domain.is_boundary() {
             self.boundary_constraints[trace_segment].push(constraint_root);
         } else {
+            if self.integrity_constraints.len() <= trace_segment {
+                // resize the integrity constraints vector to include the new trace segment
+                // this can be required when processing evaluators, since the trace declarations
+                // may not have been processed with the [ConstraintBuilder] was initialized.
+                self.integrity_constraints
+                    .resize(trace_segment + 1, Vec::new());
+            }
             self.integrity_constraints[trace_segment].push(constraint_root);
         }
 

@@ -51,6 +51,10 @@ impl SemanticError {
         )
     }
 
+    pub(crate) fn evaluator_fn_not_declared(name: &str) -> Self {
+        SemanticError::MissingDeclaration(format!("Evaluator function {name} was not declared."))
+    }
+
     // --- ILLEGAL IDENTIFIER ERRORS --------------------------------------------------------------
 
     pub(crate) fn duplicate_identifer(

@@ -511,10 +511,10 @@ fn ic_comprehension_with_evaluator_call() {
     let expected = Source(vec![
         SourceSection::EvaluatorFunction(EvaluatorFunction::new(
             Identifier("is_binary".to_string()),
-            vec![
+            vec![vec![
                 TraceBinding::new(Identifier("x".to_string()), 0, 0, 1),
                 TraceBinding::new(Identifier("$main".to_string()), 0, 0, 1),
-            ],
+            ]],
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
                     Exp(
@@ -575,10 +575,10 @@ fn ic_comprehension_with_evaluator_and_selectors() {
     let expected = Source(vec![
         SourceSection::EvaluatorFunction(EvaluatorFunction::new(
             Identifier("is_binary".to_string()),
-            vec![
+            vec![vec![
                 TraceBinding::new(Identifier("x".to_string()), 0, 0, 1),
                 TraceBinding::new(Identifier("$main".to_string()), 0, 0, 1),
-            ],
+            ]],
             vec![Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
                     Exp(

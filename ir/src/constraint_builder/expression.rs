@@ -85,7 +85,10 @@ impl ConstraintBuilder {
 
     // --- OPERATOR EXPRESSIONS -----------------------------------------------------------------
 
-    // TODO: docs
+    /// Inserts a new graph node with the exponentiation operation which raises `lhs` to `rhs`.
+    /// # Errors:
+    /// Returns an error if the exponent is not a constant, since this is not supported outside of
+    /// list comprehensions.
     fn insert_exp_op(
         &mut self,
         lhs: Expression,
