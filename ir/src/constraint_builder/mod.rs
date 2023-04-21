@@ -9,8 +9,8 @@ use super::{
 mod boundary_constraints;
 pub(crate) use boundary_constraints::ConstrainedBoundary;
 
-mod evaluator_functions;
-pub(crate) use evaluator_functions::Evaluator;
+mod evaluators;
+pub(crate) use evaluators::Evaluator;
 
 mod integrity_constraints;
 

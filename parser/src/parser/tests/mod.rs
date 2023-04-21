@@ -12,7 +12,7 @@ mod arithmetic_ops;
 mod boundary_constraints;
 mod comments;
 mod constants;
-mod evaluator_functions;
+mod evaluators;
 mod identifiers;
 mod integrity_constraints;
 mod list_comprehension;

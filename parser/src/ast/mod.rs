@@ -5,8 +5,8 @@ pub(crate) use air_script_core::{
 };
 
 // declaration modules
-pub mod evaluator_function;
-pub use evaluator_function::*;
+pub mod evaluators;
+pub use evaluators::*;
 
 pub mod periodic_columns;
 pub use periodic_columns::PeriodicColumn;
