@@ -77,9 +77,9 @@ pub enum SourceSection {
 // TRACE
 // ================================================================================================
 
-/// Given a trace segment and a vector of (Identifier, size) pairs, returns a vector of trace
+/// Given a named trace segment and a vector of (Identifier, size) pairs, returns a vector of trace
 /// bindings.
-pub fn build_trace_bindings(
+pub fn build_segment_bindings(
     trace_segment: TraceSegment,
     segment_name: Identifier,
     bindings: Vec<(Identifier, u64)>,
@@ -97,6 +97,25 @@ pub fn build_trace_bindings(
     // the size for the binding for the entire segment is the sum of the other sizes.
     let segment_binding = TraceBinding::new(segment_name, trace_segment, 0, offset);
     trace_cols.push(segment_binding);
+
+    trace_cols
+}
+
+/// Given a matrix of (Identifier, size) pairs representing a multi-segment execution trace, returns
+/// a matrix of trace bindings.
+pub fn build_trace_bindings(bindings: Vec<Vec<(Identifier, u64)>>) -> Vec<Vec<TraceBinding>> {
+    let mut trace_cols = Vec::new();
+
+    for (segment, bindings) in bindings.into_iter().enumerate() {
+        let mut segment_cols = Vec::new();
+        let mut offset = 0;
+        for (ident, size) in bindings.into_iter() {
+            let size = size as usize;
+            segment_cols.push(TraceBinding::new(ident, segment, offset, size));
+            offset += size;
+        }
+        trace_cols.push(segment_cols);
+    }
 
     trace_cols
 }
