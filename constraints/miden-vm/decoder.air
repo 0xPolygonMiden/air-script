@@ -15,62 +15,86 @@ fn binary_not(value: scalar) -> scalar:
 
 
 # Returns the f_join operation flag which is set when JOIN control operation is executed.
+#
+# Flag degree: 6
 fn f_join(b: vector[7]) -> scalar:
     return b[6] & !b[5] & b[4] & b[3] & !b[2] & b[1]
 
 
 # Returns the f_split operation flag which is set when SPLIT control operation is executed.
+#
+# Flag degree: 6
 fn f_split(b: vector[7]) -> scalar:
     return b[6] & !b[5] & b[4] & b[3] & b[2] & !b[1]
 
 
 # Returns the f_loop operation flag which is set when LOOP control operation is executed.
+#
+# Flag degree: 6
 fn f_loop(b: vector[7]) -> scalar:
     return b[6] & !b[5] & b[4] & b[3] & b[2] & b[1]
 
 
 # Returns the f_repeat operation flag which is set when REPEAT operation is executed.
+#
+# Flag degree: 4
 fn f_repeat(b: vector[7], extra: scalar) -> scalar:
     return extra & b[4] & !b[3] & b[2]
 
 
 # Returns the f_span operation flag which is set when SPAN operation is executed.
+#
+# Flag degree: 6
 fn f_span(b: vector[7]) -> scalar:
     return b[6] & !b[5] & b[4] & b[3] & !b[2] & !b[1]
 
 
 # Returns the f_respan operation flag which is set when RESPAN operation is executed.
+#
+# Flag degree: 4
 fn f_respan(b: vector[7], extra: scalar) -> scalar:
     return extra & b[4] & b[3] & !b[2]
 
 
 # Returns the f_call operation flag which is set when CALL control operation is executed.
+#
+# Flag degree: 4
 fn f_call(b: vector[7], extra: scalar) -> scalar:
     return extra & !b[4] & b[3] & b[2]
 
 
 # Returns the f_syscall operation flag which is set when SYSCALL control operation is executed.
+#
+# Flag degree: 4
 fn f_syscall(b: vector[7], extra: scalar) -> scalar:
     return extra & !b[4] & b[3] & !b[2]
 
 
 # Returns the f_end operation flag which is set when END operation is executed.
+#
+# Flag degree: 4
 fn f_end(b: vector[7], extra: scalar) -> scalar:
     return extra & b[4] & !b[3] & !b[2]
 
 
 # Returns the f_halt operation flag which is set when HALT operation is executed.
+#
+# Flag degree: 4
 fn f_halt(b: vector[7], extra: scalar) -> scalar:
     return extra & b[4] & b[3] & b[2]
 
 
 # Returns the f_push operation flag which is set when PUSH operation is executed.
+#
+# Flag degree: 4
 fn f_push(b: vector[7], extra: scalar) -> scalar:
     return extra & !b[4] & !b[3] & b[2]
 
 
-# Returns the f_ctrl flag which is set when any one of the control flow operations that has flags 
-# above (JOIN, SPLIT, LOOP, CALL, SYSCALL) is being executed.
+# Returns the f_ctrl flag which is set when any one of the control flow operations (JOIN, SPLIT, 
+# LOOP, REPEAT, SPAN, RESPAN, CALL, SYSCALL, END, HALT) is being executed.
+#
+# Flag degree: 4
 fn f_ctrl(b: vector[7], extra: scalar) -> scalar:
     # flag for SPAN, JOIN, SPLIT, LOOP
     let f_sjsl = b[6] & !b[5] & b[4] & b[3]
@@ -82,8 +106,10 @@ fn f_ctrl(b: vector[7], extra: scalar) -> scalar:
 
 
 # Returns f_ctrli flag which is set to 1 when a control flow operation that signifies the 
-# initialization of a control block is being executed on the VM.
-fn f_ctrli(b: vector[7], extra: scalar) -< scalar:
+# initialization of a control block (JOIN, SPLIT, LOOP, CALL, SYSCALL) is being executed on the VM.
+#
+# Flag degree: 6
+fn f_ctrli(b: vector[7], extra: scalar) -> scalar:
     return f_join(b) + f_split(b) + f_loop(b) + f_call(b, extra) + f_syscall(b, extra)
 
 
@@ -116,19 +142,24 @@ fn get_f_g1(op_batch_flags: vector[3]) -> scalar:
 ### Helper evaluators #############################################################################
 
 # Enforces that column must be binary.
-ev is_binary(main: [a]):
+ev is_binary([a]):
     enf a^2 = a
 
 
 # Enforces that value in column is copied over to the next row.
-ev is_unchanged(main: [column]):
-    ev column' = column
+ev is_unchanged([column]):
+    enf column' = column
 
 
 # Enforces decoder general constraints.
-ev general_constraints(main: [addr, op_bits[7], hasher[8], is_span, s0], aux: [extra]):
+#
+# Constraint degree: 9
+ev general_constraints([addr, op_bits[7], hasher[8], is_span, s0], [extra]):
     let op_bits_next = [op_bits[0]', op_bits[1]', op_bits[2]', op_bits[3]', op_bits[4]', op_bits[5]', op_bits[6]']
     let extra_next = extra'
+
+    # Enforce that `extra` column is set to 1 when op_bits[6] = 1 and op_bits[5] = 1
+    enf extra = 1 when op_bits[6] & op_bits[5]
 
     # Enforce that when SPLIT or LOOP operation is executed, the top of the operand stack must 
     # contain a binary value.
@@ -173,7 +204,9 @@ ev general_constraints(main: [addr, op_bits[7], hasher[8], is_span, s0], aux: [e
 
 
 # Enforces constraint for computing block hashes.
-ev block_hash_computation_constraints(main: [addr, op_bits[7], hasher[8]], aux: [extra, p[4]]):
+#
+# Constraint degree: 8
+ev block_hash_computation_constraints([addr, op_bits[7], hasher[8]], [extra, p[4]]):
     # Operation label for HASHER_LINER_HASH operation.
     let op_linhash = 3
 
@@ -230,7 +263,9 @@ ev block_hash_computation_constraints(main: [addr, op_bits[7], hasher[8]], aux: 
 
 
 # Enforces constraint for updating the block stack table.
-ev block_stack_table_constraints(main: [addr, op_bits[7], hasher[8], s0], aux: [extra, p[4]]):
+#
+# Constraint degree: 8
+ev block_stack_table_constraints([addr, op_bits[7], hasher[8], s0], [extra, p[4]]):
     # When JOIN operation is executed, row (addr', addr, 0) is added to the block stack table.
     let v_join = f_join(op_bits) * (alpha[0] + alpha[1] * addr' + alpha[2] * addr)
 
@@ -265,7 +300,9 @@ ev block_stack_table_constraints(main: [addr, op_bits[7], hasher[8], s0], aux: [
 
 
 # Enforces constraint for updating the block hash table.
-ev block_hash_table_constraints(main: [addr, op_bits[7], hasher[8], s0], aux: [extra, p[4]]):
+#
+# Constraint degree: 9
+ev block_hash_table_constraints([addr, op_bits[7], hasher[8], s0], [extra, p[4]]):
     let op_bits_next = [op_bits[0]', op_bits[1]', op_bits[2]', op_bits[3]', op_bits[4]', op_bits[5]', op_bits[6]']
     let extra_next = extra'
 
@@ -305,8 +342,10 @@ ev block_hash_table_constraints(main: [addr, op_bits[7], hasher[8], s0], aux: [e
     # TODO: add boundary constraints to the p[2] column.
 
 
-# Enforce that values in is_span column are set correctly. 
-ev inspan_column_constraints(main: [op_bits[7], is_span], aux: [extra]):
+# Enforce that values in is_span column are set correctly.
+#
+# Constraint degree: 7
+ev inspan_column_constraints([op_bits[7], is_span], [extra]):
     let op_bits_next = [op_bits[0]', op_bits[1]', op_bits[2]', op_bits[3]', op_bits[4]', op_bits[5]', op_bits[6]']
     let extra_next = extra'
 
@@ -328,14 +367,18 @@ ev inspan_column_constraints(main: [op_bits[7], is_span], aux: [extra]):
 
 # Enforce that when we are inside a span block, values in block address columns (denoted as addr) 
 # must remain the same.
-ev block_address_constraints(main: [addr, is_span]):
+#
+# Constraint degree: 2
+ev block_address_constraints([addr, is_span]):
     # Enforce that when we are inside a span block, values in block address columns must remain the
     # same.
     enf is_span * (addr' - addr) = 0
 
 
 # Enforce that values in group_count column are set correctly.
-ev group_count_constraints(main: [op_bits[7], hasher[8], is_span, group_count], aux: [extra]):
+#
+# Constraint degree: 7
+ev group_count_constraints([op_bits[7], hasher[8], is_span, group_count], [extra]):
     let op_bits_next = [op_bits[0]', op_bits[1]', op_bits[2]', op_bits[3]', op_bits[4]', op_bits[5]', op_bits[6]']
     let extra_next = extra'
     
@@ -361,7 +404,9 @@ ev group_count_constraints(main: [op_bits[7], hasher[8], is_span, group_count], 
 
 # Enforce that register hasher[0], which is used to keep track of operations to be executed in the 
 # current operation group, is set correctly.
-ev op_group_decoding_constraints(main: [op_bits[7], is_span, group_count, op_index], aux: [extra]):
+#
+# Constraint degree: 7
+ev op_group_decoding_constraints([op_bits[7], is_span, group_count, op_index], [extra]):
     let op_bits_next = [op_bits[0]', op_bits[1]', op_bits[2]', op_bits[3]', op_bits[4]', op_bits[5]', op_bits[6]']
     let extra_next = extra'
     
@@ -380,7 +425,9 @@ ev op_group_decoding_constraints(main: [op_bits[7], is_span, group_count, op_ind
 
 
 # Enforce that the values in op_index column are set correctly.
-ev op_index_constraints(main: [op_bits[7], is_span, group_count, op_index], aux: [extra]):
+#
+# Constraint degree: 9
+ev op_index_constraints([op_bits[7], is_span, group_count, op_index], [extra]):
     let ng = group_count' - group_count - f_push(op_bits, extra)
 
     # Enforce that when executing SPAN or RESPAN operations the next value of op_index must be set 
@@ -400,7 +447,9 @@ ev op_index_constraints(main: [op_bits[7], is_span, group_count, op_index], aux:
 
 
 # Enforce that values in operation batch flag columns (denoted op_batch_flags[]) are set correctly.
-ev op_batch_flag_constraints(main: [op_bits[7], hasher[8], op_batch_flags[3]], aux: [extra]):
+#
+# Constraint degree: 6
+ev op_batch_flag_constraints([op_bits[7], hasher[8], op_batch_flags[3]], [extra]):
     # Enforce that all batch flags are binary.
     enf is_binary(bc) for bc in op_batch_flags
 
@@ -424,7 +473,9 @@ ev op_batch_flag_constraints(main: [op_bits[7], hasher[8], op_batch_flags[3]], a
 # Enforce that all operation groups in a given batch are consumed before a new batch is started 
 # (i.e., via a RESPAN operation) or the execution of a span block is complete (i.e., via an END 
 # operation).
-ev op_group_table_constraints(main: [addr, op_bits[7], hasher[8], is_span, group_count, op_index, op_batch_flags[3], s0], aux: [extra, p[4]]):
+#
+# Constraint degree: 9
+ev op_group_table_constraints([addr, op_bits[7], hasher[8], is_span, group_count, op_index, op_batch_flags[3], s0], [extra, p[4]]):
     # Values of the rows to be added to the op group table when a SPAN or a RESPAN operation is 
     # executed.
     let v_i = alpha[0] + alpha[1] * addr' + alpha[2] * (group_count - i) + alpha[3] * hasher[i]
@@ -452,11 +503,13 @@ ev op_group_table_constraints(main: [addr, op_bits[7], hasher[8], is_span, group
     
 
 # Enforces proper decoding of span blocks.
-ev span_block_constraints(main: [addr, op_bits[7], hasher[8], is_span, group_count, op_index, op_batch_flags[3], s0], aux: [extra, p[4]]):
+#
+# Constraint degree: 9
+ev span_block_constraints([addr, op_bits[7], hasher[8], is_span, group_count, op_index, op_batch_flags[3], s0], [extra, p[4]]):
     enf inspan_column_constraints([op_bits, is_span], [extra])
     enf block_address_constraints([addr, is_span])
     enf group_count_constraints([op_bits, hasher, is_span, group_count], [extra])
-    enf op_group_decoding_constraints([op_bits, is_span, group_count, op_index], aux: [extra])
+    enf op_group_decoding_constraints([op_bits, is_span, group_count, op_index], [extra])
     enf op_index_constraints([op_bits, is_span, group_count, op_index], [extra])
     enf op_batch_flag_constraints([op_bits, hasher, op_batch_flags], [extra])
     enf op_group_table_constraints([addr, op_bits, hasher, is_span, group_count, op_index, op_batch_flags, s0], [extra, p])
@@ -467,7 +520,9 @@ ev span_block_constraints(main: [addr, op_bits[7], hasher[8], is_span, group_cou
 # Enforces the constraints on the decoder. The register `s0` in the main segment denotes the value 
 # at the top of the stack. In the aux segment `extra` denotes the register for degree reduxtion 
 # during flags computation, and p[4] columns denote multiset check columns.
-ev decoder_constraints(main: [addr, op_bits[7], hasher[8], is_span, group_count, op_index, op_batch_flags[3], s0], aux: [extra, p[4]]):
+#
+# Constraint degree: 9
+ev decoder_constraints([addr, op_bits[7], hasher[8], is_span, group_count, op_index, op_batch_flags[3], s0], [extra, p[4]]):
     enf general_constraints([addr, op_bits[7], hasher[8], is_span, s0], [extra])
     
     enf block_hash_computation_constraints([addr, op_bits[7], hasher[8]], [extra, p[4]])
