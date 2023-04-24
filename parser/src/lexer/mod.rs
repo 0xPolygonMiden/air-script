@@ -68,6 +68,10 @@ pub enum Token {
     #[token("ev")]
     EvaluatorFunction,
 
+    /// Keyword to declare the function section in the AIR constraints module.
+    #[token("fn")]
+    Function,
+
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Marks the beginning of boundary constraints section in the constraints file.
@@ -107,6 +111,20 @@ pub enum Token {
     /// Used to declare prod list folding operation in the AIR constraints module.
     #[token("prod")]
     Prod,
+
+    // FUNCTION KEYWORDS
+    // --------------------------------------------------------------------------------------------
+    #[token("return")]
+    Return,
+
+    #[token("scalar")]
+    Scalar,
+
+    #[token("vector")]
+    Vector,
+
+    #[token("matrix")]
+    Matrix,
 
     // GENERAL KEYWORDS
     // --------------------------------------------------------------------------------------------
@@ -172,6 +190,9 @@ pub enum Token {
 
     #[token(")")]
     Rparen,
+
+    #[token("->")]
+    Rarrow,
 
     #[token("..")]
     Range,

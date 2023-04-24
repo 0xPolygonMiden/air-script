@@ -1,4 +1,4 @@
-use super::{ListFolding, SymbolAccess};
+use super::{Identifier, ListFolding, SymbolAccess};
 
 /// Arithmetic expressions for evaluation of constraints.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -11,4 +11,5 @@ pub enum Expression {
     Mul(Box<Expression>, Box<Expression>),
     Exp(Box<Expression>, Box<Expression>),
     ListFolding(ListFolding),
+    FunctionCall(Identifier, Vec<Expression>),
 }

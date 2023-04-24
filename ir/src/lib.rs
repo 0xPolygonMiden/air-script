@@ -113,6 +113,7 @@ impl AirIR {
                     integrity_stmts.extend(stmts);
                 }
                 ast::SourceSection::EvaluatorFunction(ev_expr) => ev_decls.push(ev_expr),
+                ast::SourceSection::Function(_) => todo!()
             }
         }
 

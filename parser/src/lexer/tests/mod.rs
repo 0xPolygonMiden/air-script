@@ -7,6 +7,7 @@ mod arithmetic_ops;
 mod boundary_constraints;
 mod constants;
 mod evaluator_functions;
+mod functions;
 mod identifiers;
 mod list_comprehension;
 mod periodic_columns;

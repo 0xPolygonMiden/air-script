@@ -4,9 +4,10 @@ use crate::{
         integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
         build_segment_bindings, build_trace_bindings, AccessType, ComprehensionContext, 
         ConstantBinding, ConstantValueExpr, Expression, EvaluatorFunction, EvaluatorFunctionCall, 
-        Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, PeriodicColumn, 
-        PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, SymbolAccess, 
-        TraceBinding, VariableBinding, VariableValueExpr, 
+        Function, FunctionArgument, FunctionBody, FunctionParam, Identifier, Iterable, ListComprehension,
+        ListFolding, ListFoldingValueExpr, PeriodicColumn, PublicInput, RandBinding, RandomValues,
+        Range, Source, SourceSection, SymbolAccess, TraceBinding, ValueType, VariableBinding,
+        VariableValueExpr,
     }, error::{Error, ParseError::*}, lexer::Token
 };
 use std::str::FromStr;
@@ -24,11 +25,12 @@ pub Source: Source = {
 SourceSection: SourceSection = {
     AirDef => SourceSection::AirDef(<>),
     Constant => SourceSection::Constant(<>),
+    EvaluatorFunction => SourceSection::EvaluatorFunction(<>),
+    Function => SourceSection::Function(<>),
     Trace => SourceSection::Trace(<>),
     PublicInputs => SourceSection::PublicInputs(<>),
     PeriodicColumns => SourceSection::PeriodicColumns(<>),
     RandomValues => SourceSection::RandomValues(<>),
-    EvaluatorFunction => SourceSection::EvaluatorFunction(<>),
     BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
     IntegrityConstraints => SourceSection::IntegrityConstraints(<>),
 }
@@ -199,6 +201,38 @@ EvaluatorSegmentBindings: Vec<(Identifier, u64)> = {
     "[" "]" => Vec::new()
 }
 
+// FUNCTIONS
+// ================================================================================================
+
+Function: Function = {
+    "fn" <function_name: Identifier> "(" <params: CommaElems<FunctionParam>> ")" "->"
+        <return_types: ReturnTypes> ":" <body: FunctionBody> =>
+            Function::new(function_name, params, return_types, body),
+}
+
+ReturnTypes: Vec<ValueType> = {
+    <return_type: ValueType> => vec![return_type],
+}
+
+FunctionParam: FunctionParam = {
+    <name: Identifier> ":" <param_type: ValueType> => FunctionParam::new(name, param_type),
+}
+
+ValueType: ValueType = {
+    "scalar" => ValueType::Scalar,
+    "vector" <size: Size> => ValueType::Vector(size),
+    "matrix" <row_size: Size> <col_size: Size> => ValueType::Matrix(row_size, col_size),
+}
+
+FunctionBody: FunctionBody = {
+    <integrity_variables: IntegrityVariable*>
+    "return" <return_values: ReturnValues> => FunctionBody::new(integrity_variables, return_stmts)
+}
+
+ReturnValues: Vec<VariableValueExpr> = {
+    <return_stmt: VariableValueExpr> => vec![return_stmt],
+}
+
 // BOUNDARY STATEMENTS
 // ================================================================================================
 
@@ -223,7 +257,7 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
 }
 
 BoundaryStmt: BoundaryStmt = {
-    "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
+    "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableValue> =>
         BoundaryStmt::VariableBinding(VariableBinding::new(name, boundary_variable_type)),
     "enf" <boundary_constraint: BoundaryConstraintExpr> =>
         BoundaryStmt::Constraint(boundary_constraint),
@@ -237,7 +271,7 @@ BoundaryConstraintExpr: BoundaryConstraint = {
         BoundaryConstraint::new(column, boundary, value),
 }
 
-BoundaryVariableType: VariableValueExpr = {
+BoundaryVariableValue: VariableValueExpr = {
     <scalar_value: BoundaryExpr> => 
         VariableValueExpr::Scalar(scalar_value),
     <vector_value: Vector<BoundaryExpr>> => 
@@ -312,8 +346,6 @@ IntegrityStmts: Vec<IntegrityStmt> = {
 }
 
 IntegrityStmtGroup: Vec<IntegrityStmt> = {
-    "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
-        vec![IntegrityStmt::VariableBinding(VariableBinding::new(name, integrity_variable_type))],
     "enf" <integrity_constraint: IntegrityConstraintExpr> => vec![integrity_constraint],
     "match" "enf" ":" <integrity_stmts: IntegrityConstraintExpr+> => integrity_stmts,
     "enf" <integrity_constraint: IntegrityConstraintExpr>
@@ -325,6 +357,7 @@ IntegrityStmtGroup: Vec<IntegrityStmt> = {
 }
 
 IntegrityConstraintExpr: IntegrityStmt = {
+    <integrity_variable: IntegrityVariable> => integrity_variable,
     <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
         IntegrityStmt::Constraint(ConstraintType::Inline(IntegrityConstraint::new(lhs, rhs)), None),
     <evaluator_fn_call: EvaluatorFunctionCall> =>
@@ -341,7 +374,12 @@ IntegrityConstraintWithSelector: IntegrityStmt = {
         IntegrityStmt::Constraint(ConstraintType::Evaluator(evaluator_fn_call), Some(selectors)),
 }
 
-IntegrityVariableType: VariableValueExpr = {
+IntegrityVariable: IntegrityStmt = {
+    "let" <name: Identifier> "=" <variable_value_expr: VariableValueExpr> =>
+        IntegrityStmt::Variable(Variable::new(name, variable_value_expr)),
+}
+
+VariableValueExpr: VariableValueExpr = {
     <scalar_value: IntegrityExpr> =>
         VariableValueExpr::Scalar(scalar_value),
     <vector_value: Vector<IntegrityExpr>> =>
@@ -408,6 +446,13 @@ IntegrityAtom: Expression = {
     <symbol_access: SymbolAccess> => Expression::SymbolAccess(symbol_access),
     <list_folding_type: ListFolding<IntegrityExpr>> =>
         Expression::ListFolding(list_folding_type),
+    <function_call: FunctionCall> => function_call,
+}
+
+#[inline]
+FunctionCall: FunctionCall = {
+    <function_name: Identifier> "(" <args: CommaElems<VariableValueExpr>> ")" =>
+        Expression::FunctionCall(function_name, vec![args]),
 }
 
 // ATOMS
@@ -459,7 +504,6 @@ SymbolAccessBase: (Identifier, AccessType) = {
     // a named trace segment, e.g. $main, $aux, $rand
     <ident: DeclIdentRef> => (ident, AccessType::Default),
     <ident: DeclIdentRef> <idx: Index> => (ident, AccessType::Vector(idx))
-
 }
 
 ConstraintComprehension<T>: ComprehensionContext = {
@@ -553,6 +597,11 @@ extern {
         decl_ident_ref => Token::DeclIdentRef(<String>),
         r"[0-9]+" => Token::Num(<String>),
         "def" => Token::Def,
+        "fn" => Token::Function,
+        "return" => Token::Return,
+        "scalar" => Token::Scalar,
+        "vector" => Token::Vector,
+        "matrix" => Token::Matrix,
         "let" => Token::Let,
         "for" => Token::For,
         "in" => Token::In,
@@ -589,6 +638,7 @@ extern {
         "(" => Token::Lparen,
         ")" => Token::Rparen,
         "." => Token::Dot,
+        "->" => Token::Rarrow,
         ".." => Token::Range,
     }
 }

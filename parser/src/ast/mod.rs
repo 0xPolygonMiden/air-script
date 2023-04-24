@@ -8,6 +8,9 @@ pub(crate) use air_script_core::{
 pub mod evaluators;
 pub use evaluators::*;
 
+pub mod function;
+pub use function::*;
+
 pub mod periodic_columns;
 pub use periodic_columns::PeriodicColumn;
 
@@ -41,6 +44,8 @@ pub struct Source(pub Vec<SourceSection>);
 /// - EvaluatorFunction: Evaluator functions take descriptions of the main and auxiliary traces as
 ///   input, and enforce integrity constraints on those trace columns. Each [EvaluatorFunction]
 ///   source section declares a single evaluator function
+/// - Function: Functions are represented by a name and a list of parameters and returns an
+///   expression. Each [Function] source section declares a single function.
 /// - PeriodicColumns: Periodic columns are each represented by a fixed-size array with all of its
 ///   elements specified. The array length is expected to be a power of 2, but this is not checked
 ///   during parsing.
@@ -64,10 +69,11 @@ pub enum SourceSection {
     // type declarations
     Constant(ConstantBinding),
     EvaluatorFunction(EvaluatorFunction),
-    PeriodicColumns(Vec<PeriodicColumn>),
-    PublicInputs(Vec<PublicInput>),
-    RandomValues(RandomValues),
+    Function(Function),
     Trace(Vec<Vec<TraceBinding>>),
+    PublicInputs(Vec<PublicInput>),
+    PeriodicColumns(Vec<PeriodicColumn>),
+    RandomValues(RandomValues),
 
     // constraint definitions
     BoundaryConstraints(Vec<BoundaryStmt>),
