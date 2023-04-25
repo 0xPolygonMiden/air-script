@@ -94,6 +94,7 @@ fn random_values_index_access() {
             Const(0),
         )),
         None,
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }

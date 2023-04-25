@@ -63,6 +63,7 @@ fn full_air_file() {
                 ),
             )),
             None,
+            None,
         )]),
         // boundary_constraints:
         //     enf clk.first = 0
@@ -72,6 +73,7 @@ fn full_air_file() {
                 Boundary::First,
                 Expression::Const(0),
             ),
+            None,
         )]),
     ]);
     build_parse_test!(source.as_str()).expect_ast(expected);

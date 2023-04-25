@@ -22,7 +22,7 @@ impl ConstraintBuilder {
         stmt: IntegrityStmt,
     ) -> Result<(), SemanticError> {
         match stmt {
-            IntegrityStmt::Constraint(ConstraintType::Inline(constraint), _) => {
+            IntegrityStmt::Constraint(ConstraintType::Inline(constraint), _, _) => {
                 let (lhs, rhs) = constraint.into_parts();
                 // add the left hand side expression to the graph.
                 let lhs = self.insert_expr(lhs)?;
@@ -52,10 +52,9 @@ impl ConstraintBuilder {
                     self.symbol_table.insert_variable(variable)?
                 }
             }
-            IntegrityStmt::Constraint(ConstraintType::Evaluator(ev_call), _) => {
+            IntegrityStmt::Constraint(ConstraintType::Evaluator(ev_call), _, _) => {
                 self.process_evaluator_call(ev_call)?;
             }
-            IntegrityStmt::ConstraintComprehension(_, _, _) => todo!(),
         }
 
         Ok(())

@@ -36,6 +36,7 @@ fn integrity_constraints() {
             ),
         )),
         None,
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -71,6 +72,7 @@ fn multiple_integrity_constraints() {
                 ),
             )),
             None,
+            None,
         ),
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
@@ -88,6 +90,7 @@ fn multiple_integrity_constraints() {
                 ),
                 Const(1),
             )),
+            None,
             None,
         ),
     ])]);
@@ -116,6 +119,7 @@ fn integrity_constraint_with_periodic_col() {
             Const(0),
         )),
         None,
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -141,6 +145,7 @@ fn integrity_constraint_with_random_value() {
             ),
             Const(0),
         )),
+        None,
         None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
@@ -191,6 +196,7 @@ fn integrity_constraint_with_constants() {
                     ))),
                 ),
             )),
+            None,
             None,
         )]),
     ]);
@@ -291,6 +297,7 @@ fn integrity_constraint_with_variables() {
                 ),
             )),
             None,
+            None,
         ),
     ])]);
     build_parse_test!(source).expect_ast(expected);
@@ -320,6 +327,7 @@ fn integrity_constraint_with_indexed_trace_access() {
                 ),
             )),
             None,
+            None,
         ),
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
@@ -337,6 +345,7 @@ fn integrity_constraint_with_indexed_trace_access() {
                 ),
                 Const(1),
             )),
+            None,
             None,
         ),
     ])]);
@@ -362,7 +371,7 @@ fn ic_comprehension_one_iterable_identifier() {
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
             TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
-        SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
+        SourceSection::IntegrityConstraints(vec![Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 SymbolAccess(SymbolAccess::new(
                     Identifier("x".to_string()),
@@ -383,10 +392,10 @@ fn ic_comprehension_one_iterable_identifier() {
                 ),
             )),
             None,
-            vec![(
+            Some(vec![(
                 Identifier("x".to_string()),
                 Iterable::Identifier(Identifier("c".to_string())),
-            )],
+            )]),
         )]),
     ]);
     build_parse_test!(source).expect_ast(expected);
@@ -408,7 +417,7 @@ fn ic_comprehension_one_iterable_range() {
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
             TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
-        SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
+        SourceSection::IntegrityConstraints(vec![Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 SymbolAccess(SymbolAccess::new(
                     Identifier("x".to_string()),
@@ -429,10 +438,10 @@ fn ic_comprehension_one_iterable_range() {
                 ),
             )),
             None,
-            vec![(
+            Some(vec![(
                 Identifier("x".to_string()),
                 Iterable::Range(Range::new(1, 4)),
-            )],
+            )]),
         )]),
     ]);
     build_parse_test!(source).expect_ast(expected);
@@ -445,7 +454,7 @@ fn ic_comprehension_with_selectors() {
         main: [s[2], a, b, c[4]]
 
     integrity_constraints:
-        enf x = a + b when s[0] & s[1] for x in c";
+        enf x = a + b for x in c when s[0] & s[1]";
 
     let expected = Source(vec![
         SourceSection::Trace(vec![vec![
@@ -455,7 +464,7 @@ fn ic_comprehension_with_selectors() {
             TraceBinding::new(Identifier("c".to_string()), 0, 4, 4),
             TraceBinding::new(Identifier("$main".to_string()), 0, 0, 8),
         ]]),
-        SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
+        SourceSection::IntegrityConstraints(vec![Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
                 SymbolAccess(SymbolAccess::new(
                     Identifier("x".to_string()),
@@ -487,10 +496,10 @@ fn ic_comprehension_with_selectors() {
                     0,
                 ))),
             )),
-            vec![(
+            Some(vec![(
                 Identifier("x".to_string()),
                 Iterable::Identifier(Identifier("c".to_string())),
-            )],
+            )]),
         )]),
     ]);
     build_parse_test!(source).expect_ast(expected);
@@ -534,6 +543,7 @@ fn ic_comprehension_with_evaluator_call() {
                     )),
                 )),
                 None,
+                None,
             )],
         )),
         SourceSection::Trace(vec![vec![
@@ -543,7 +553,7 @@ fn ic_comprehension_with_evaluator_call() {
             TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
             TraceBinding::new(Identifier("$main".to_string()), 0, 0, 10),
         ]]),
-        SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
+        SourceSection::IntegrityConstraints(vec![Constraint(
             ConstraintType::Evaluator(EvaluatorFunctionCall::new(
                 Identifier("is_binary".to_string()),
                 vec![vec![SymbolAccess::new(
@@ -553,10 +563,10 @@ fn ic_comprehension_with_evaluator_call() {
                 )]],
             )),
             None,
-            vec![(
+            Some(vec![(
                 Identifier("x".to_string()),
                 Iterable::Identifier(Identifier("c".to_string())),
-            )],
+            )]),
         )]),
     ]);
     build_parse_test!(source).expect_ast(expected);
@@ -572,7 +582,7 @@ fn ic_comprehension_with_evaluator_and_selectors() {
         main: [s[2], a, b, c[4], d[4]]
 
     integrity_constraints:
-        enf is_binary([x]) when s[0] & s[1] for x in c";
+        enf is_binary([x]) for x in c when s[0] & s[1]";
 
     let expected = Source(vec![
         SourceSection::EvaluatorFunction(EvaluatorFunction::new(
@@ -600,6 +610,7 @@ fn ic_comprehension_with_evaluator_and_selectors() {
                     )),
                 )),
                 None,
+                None,
             )],
         )),
         SourceSection::Trace(vec![vec![
@@ -610,7 +621,7 @@ fn ic_comprehension_with_evaluator_and_selectors() {
             TraceBinding::new(Identifier("d".to_string()), 0, 8, 4),
             TraceBinding::new(Identifier("$main".to_string()), 0, 0, 12),
         ]]),
-        SourceSection::IntegrityConstraints(vec![ConstraintComprehension(
+        SourceSection::IntegrityConstraints(vec![Constraint(
             ConstraintType::Evaluator(EvaluatorFunctionCall::new(
                 Identifier("is_binary".to_string()),
                 vec![vec![SymbolAccess::new(
@@ -631,10 +642,10 @@ fn ic_comprehension_with_evaluator_and_selectors() {
                     0,
                 ))),
             )),
-            vec![(
+            Some(vec![(
                 Identifier("x".to_string()),
                 Iterable::Identifier(Identifier("c".to_string())),
-            )],
+            )]),
         )]),
     ]);
 

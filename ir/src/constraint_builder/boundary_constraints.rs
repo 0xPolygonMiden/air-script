@@ -46,7 +46,7 @@ impl ConstraintBuilder {
         stmt: BoundaryStmt,
     ) -> Result<(), SemanticError> {
         match stmt {
-            BoundaryStmt::Constraint(constraint) => {
+            BoundaryStmt::Constraint(constraint, _) => {
                 let (boundary, access, value) = constraint.into_parts();
 
                 let trace_access = self.symbol_table.get_trace_access(&access)?;
@@ -102,7 +102,6 @@ impl ConstraintBuilder {
             BoundaryStmt::VariableBinding(variable) => {
                 self.symbol_table.insert_variable(variable)?
             }
-            BoundaryStmt::ConstraintComprehension(_, _) => todo!(),
         }
 
         Ok(())

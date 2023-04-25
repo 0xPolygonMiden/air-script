@@ -8,8 +8,7 @@ use std::fmt::Display;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum BoundaryStmt {
-    Constraint(BoundaryConstraint),
-    ConstraintComprehension(BoundaryConstraint, ComprehensionContext),
+    Constraint(BoundaryConstraint, Option<ComprehensionContext>),
     VariableBinding(VariableBinding),
 }
 

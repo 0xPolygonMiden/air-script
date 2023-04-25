@@ -79,6 +79,7 @@ fn trace_columns_groups() {
                     Const(1),
                 )),
                 None,
+                None,
             ),
             Constraint(
                 ConstraintType::Inline(IntegrityConstraint::new(
@@ -96,6 +97,7 @@ fn trace_columns_groups() {
                         Box::new(Const(1)),
                     ),
                 )),
+                None,
                 None,
             ),
         ]),

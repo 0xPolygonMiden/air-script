@@ -30,6 +30,7 @@ fn single_addition() {
             Const(0),
         )),
         None,
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -60,6 +61,7 @@ fn multi_addition() {
             Const(0),
         )),
         None,
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -86,6 +88,7 @@ fn single_subtraction() {
             ),
             Const(0),
         )),
+        None,
         None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
@@ -117,6 +120,7 @@ fn multi_subtraction() {
             Const(0),
         )),
         None,
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -143,6 +147,7 @@ fn single_multiplication() {
             ),
             Const(0),
         )),
+        None,
         None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
@@ -174,6 +179,7 @@ fn multi_multiplication() {
             Const(0),
         )),
         None,
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -189,6 +195,7 @@ fn unit_with_parens() {
             Add(Box::new(Const(2)), Box::new(Const(1))),
             Const(3),
         )),
+        None,
         None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
@@ -220,6 +227,7 @@ fn ops_with_parens() {
             Const(4),
         )),
         None,
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -242,6 +250,7 @@ fn const_exponentiation() {
             ),
             Const(1),
         )),
+        None,
         None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
@@ -272,6 +281,7 @@ fn non_const_exponentiation() {
             ),
             Const(1),
         )),
+        None,
         None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
@@ -324,6 +334,7 @@ fn multi_arithmetic_ops_same_precedence() {
             Const(0),
         )),
         None,
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -365,6 +376,7 @@ fn multi_arithmetic_ops_different_precedence() {
             Const(0),
         )),
         None,
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -403,6 +415,7 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
             ),
             Const(0),
         )),
+        None,
         None,
     )])]);
     build_parse_test!(source).expect_ast(expected);

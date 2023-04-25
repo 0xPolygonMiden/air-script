@@ -29,6 +29,7 @@ fn single_selector() {
             AccessType::Default,
             0,
         ))),
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -105,6 +106,7 @@ fn chained_selectors() {
                 )),
             )),
         )),
+        None,
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -143,6 +145,7 @@ fn multiconstraint_selectors() {
                     ))),
                 )),
             )),
+            None,
         ),
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
@@ -170,6 +173,7 @@ fn multiconstraint_selectors() {
                     0,
                 ))),
             )),
+            None,
         ),
         Constraint(
             ConstraintType::Inline(IntegrityConstraint::new(
@@ -199,6 +203,7 @@ fn multiconstraint_selectors() {
                     ))),
                 )),
             )),
+            None,
         ),
     ])]);
     build_parse_test!(source).expect_ast(expected);

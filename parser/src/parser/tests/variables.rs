@@ -52,6 +52,7 @@ fn variables_with_and_operators() {
                 AccessType::Default,
                 0,
             ))),
+            None,
         ),
     ])]);
     build_parse_test!(source).expect_ast(expected);
@@ -120,6 +121,7 @@ fn variables_with_or_operators() {
                 AccessType::Default,
                 0,
             ))),
+            None,
         ),
     ])]);
     build_parse_test!(source).expect_ast(expected);

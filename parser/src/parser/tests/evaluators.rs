@@ -41,6 +41,7 @@ fn ev_fn_main_cols() {
                     ),
                 )),
                 None,
+                None,
             )],
         ),
     )]);
@@ -75,6 +76,7 @@ fn ev_fn_aux_cols() {
                         Box::new(Const(1)),
                     ),
                 )),
+                None,
                 None,
             )],
         ),
@@ -133,6 +135,7 @@ fn ev_fn_main_and_aux_cols() {
                         ),
                     )),
                     None,
+                    None,
                 ),
                 Constraint(
                     ConstraintType::Inline(IntegrityConstraint::new(
@@ -154,6 +157,7 @@ fn ev_fn_main_and_aux_cols() {
                             ))),
                         ),
                     )),
+                    None,
                     None,
                 ),
             ],
@@ -177,6 +181,7 @@ fn ev_fn_call_simple() {
                 0,
             )]],
         )),
+        None,
         None,
     )])]);
 
@@ -202,6 +207,7 @@ fn ev_fn_call() {
                 ),
             ]],
         )),
+        None,
         None,
     )])]);
 
@@ -233,6 +239,7 @@ fn ev_fn_call_inside_ev_fn() {
                         0,
                     )]],
                 )),
+                None,
                 None,
             )],
         ),
@@ -268,6 +275,7 @@ fn ev_fn_call_with_more_than_two_args() {
                 )],
             ],
         )),
+        None,
         None,
     )])]);
 

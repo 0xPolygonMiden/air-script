@@ -7,8 +7,11 @@ use super::{EvaluatorFunctionCall, Expression, VariableBinding};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum IntegrityStmt {
-    Constraint(ConstraintType, Option<Expression>),
-    ConstraintComprehension(ConstraintType, Option<Expression>, ComprehensionContext),
+    Constraint(
+        ConstraintType,
+        Option<Expression>,
+        Option<ComprehensionContext>,
+    ),
     VariableBinding(VariableBinding),
 }
 
