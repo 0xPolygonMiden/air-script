@@ -1,6 +1,5 @@
 use super::{parse, AirIR};
 
-#[ignore]
 #[test]
 fn single_selector() {
     let source = "
@@ -21,7 +20,6 @@ fn single_selector() {
     assert!(result.is_ok());
 }
 
-#[ignore]
 #[test]
 fn chained_selectors() {
     let source = "
@@ -42,7 +40,6 @@ fn chained_selectors() {
     assert!(result.is_ok());
 }
 
-#[ignore]
 #[test]
 fn multiconstraint_selectors() {
     let source = "

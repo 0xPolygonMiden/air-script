@@ -23,7 +23,7 @@ impl ConstraintBuilder {
     ) -> Result<(), SemanticError> {
         match stmt {
             IntegrityStmt::Constraint(constraint) => {
-                let (constraint_expr, _, _) = constraint.into_parts();
+                let (constraint_expr, _, selectors) = constraint.into_parts();
                 match constraint_expr {
                     ConstraintExpr::Inline(inline_constraint) => {
                         let (lhs, rhs) = inline_constraint.into_parts();
@@ -33,8 +33,15 @@ impl ConstraintBuilder {
                         // add the right hand side expression to the graph.
                         let rhs = self.insert_expr(rhs)?;
 
+                        // add the selectors expression to the graph
+                        let selectors = if let Some(selectors) = selectors {
+                            Some(self.insert_expr(selectors)?)
+                        } else {
+                            None
+                        };
+
                         // merge the two sides of the expression into a constraint.
-                        let root = self.merge_equal_exprs(lhs, rhs);
+                        let root = self.merge_equal_exprs(lhs, rhs, selectors);
 
                         // get the trace segment and domain of the constraint
                         // the default domain for integrity constraints is `EveryRow`
