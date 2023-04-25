@@ -1,5 +1,20 @@
 mod StacktAir
 
+### Constants and periodic columns ################################################################
+
+const BITWISE_AND = 2
+const BITWISE_XOR = 6
+
+const MEMORY_READ = 12
+const MEMORY_WRITE = 4
+
+const HASHER_LINEAR_HASH = 3
+const HASHER_MP_VERIFY = 11
+const HASHER_MR_UPDATE_OLD = 7
+const HASHER_MR_UPDATE_NEW = 15
+const HASHER_RETURN_HASH = 1
+const HASHER_RETURN_STATE = 9
+
 ### Helper functions ##############################################################################
 
 # Flags for the first bits (op_bits[6], op_bits[5], op_bits[4])
@@ -223,6 +238,109 @@ ev b0_b1_is_zero([op_bits[8]]):
     enf op_bits[6] & op_bits[5] & op_bits[1] = 0
 
 
+ev u32and_bus_constraint([stack_top[16]], [b_chip]):
+    # and_req_val represents bitwise operation request value.
+    let and_req_val = $alpha[0] + 
+                      $alpha[1] * BITWISE_AND + 
+                      $alpha[2] * stack_top[0] + 
+                      $alpha[3] * stack_top[1] + 
+                      $alpha[4] * stack_top[0]'
+
+    # Enforce u32and bus constraint.
+    enf b_chip' * and_req_val = b_chip
+
+
+ev u32xor_bus_constraint([stack_top[16]], [b_chip]):
+    # xor_req_val represents bitwise operation request value.
+    let xor_req_val = $alpha[0] + 
+                      $alpha[1] * BITWISE_XOR + 
+                      $alpha[2] * stack_top[0] + 
+                      $alpha[3] * stack_top[1] + 
+                      $alpha[4] * stack_top[0]'
+
+    # Enforce u32and bus constraint.
+    enf b_chip' * xor_req_val = b_chip
+
+
+ev mloadw_bus_constraint([s[16], clk], [b_chip]):
+    let v = sum([$alpha[i + 5] * s[3 - i]' for i in 0..4])
+    let u_mem = $alpha[0] + $alpha[1] * MEMORY_READ + $alpha[3] * s[0] + $alpha[4] * clk + v
+    enf b_chip' * u_mem = b_chip
+
+
+ev mload_bus_constraint([s[16], op_helpers[6], clk], [b_chip]):
+    let v = $alpha[5] * s[0]' + sum([$alpha[i + 5] * op_helpers[3 - i]' for i in 1..4])
+    let u_mem = $alpha[0] + $alpha[1] * MEMORY_READ + $alpha[3] * s[0] + $alpha[4] * clk + v
+    enf b_chip' * u_mem = b_chip
+
+
+ev mstorew_bus_constraint([s[16], clk], [b_chip]):
+    let v = sum([$alpha[i + 5] * s[3 - i]']) for i in 0..4
+    let u_mem = $alpha[0] + $alpha[1] * MEMORY_WRITE + $alpha[3] * s[0] + $alpha[4] * clk + v
+    enf b_chip' * u_mem = b_chip
+
+
+ev mstore_bus_constraint([s[16], op_helpers[6], clk], [b_chip]):
+    let v = $alpha[5] * s[0]' + sum([$alpha[i + 5] * op_helpers[3 - i]' for i in 1..4])
+    let u_mem = $alpha[0] + $alpha[1] * MEMORY_WRITE + $alpha[3] * s[0] + $alpha[4] * clk + v
+    enf b_chip' * u_mem = b_chip
+
+
+ev hperm_bus_constraint([s[16], op_helpers[6]], [b_chip]):
+    let v_input = $alpha[0] + 
+                  $alpha[1] * HASHER_LINEAR_HASH + 
+                  $alpha[2] * op_helpers[0] + 
+                  sum([$alpha[i + 4] * s[11 - i] for i in 0..12])
+
+    let v_output = $alpha[0] + 
+                   $alpha[1] * HASHER_RETURN_STATE + 
+                   $alpha[2] * (op_helpers[0] + 7) + 
+                   sum([$alpha[i + 4] * s[11 - i]' for i in 0..12])
+
+    enf b_chip' * v_input * v_output = b_chip
+
+
+ev mpverify_bus_constraint([s[16], op_helpers[6]], [b_chip]):
+    let v_input = $alpha[0] + 
+                  $alpha[1] * HASHER_MP_VERIFY + 
+                  $alpha[2] * op_helpers[0] + 
+                  $alpha[3] * s[5] + 
+                  sum([$alpha[i + 8] * s[3 - i] for i in 0..4])
+
+    let v_output = $alpha[0] + 
+                   $alpha[1] * HASHER_RETURN_HASH + 
+                   $alpha[2] * (op_helpers[0] + 8 * s[4] - 1) + 
+                   sum([$alpha[i + 8] * s[9 - i] for i in 0..4])
+
+    enf b_chip' * v_input * v_output = b_chip
+
+
+ev mrupdate_bus_constraint([s[16], op_helpers[6]], [b_chip]):
+    let v_input_old = $alpha[0] + 
+                      $alpha[1] * HASHER_MR_UPDATE_OLD + 
+                      $alpha[2] * op_helpers[0] + 
+                      $alpha[3] * s[5] + 
+                      sum([$alpha[i + 8] * s[3 - i] for i in 0..4])
+
+    let v_output_old = $alpha[0] + 
+                       $alpha[1] * HASHER_RETURN_HASH + 
+                       $alpha[2] * (op_helpers[0] + 8 * s[4] - 1) + 
+                       sum([$alpha[i + 8] * s[9 - i] for i in 0..4])
+
+    let v_input_new = $alpha[0] + 
+                      $alpha[1] * HASHER_MR_UPDATE_NEW + 
+                      $alpha[2] * (op_helpers[0] + 8 * s[4]) + 
+                      $alpha[3] * s[5] + 
+                      sum([$alpha[i + 8] * s[13 - i] for i in 0..4])
+
+    let v_output_new = $alpha[0] + 
+                       $alpha[1] * op_rethash + 
+                       $alpha[2] * (op_helpers[0] + 2 * 8 * s[4] - 1) + 
+                       sum([$alpha[i + 8] * s[3 - i]' for i in 0..4])
+
+    enf b_chip' * v_input_old * v_output_old * v_input_new * v_output_new = b_chip
+
+
 ### Stack Air Constraints #########################################################################
 
 # Enforces the constraints on the stack.
@@ -235,82 +353,82 @@ ev stack_constraints([stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6]
     let op_flags = compute_op_flags(op_bits)
 
     match enf:
-        noop([stack_top])                     when op_flags[0]
-        eqz([stack_top, stack_helpers[2]])    when op_flags[1]
-        neg([stack_top])                      when op_flags[2]
-        inv([stack_top])                      when op_flags[3]
-        incr([stack_top])                     when op_flags[4]
-        not([stack_top])                      when op_flags[5]
-        fmpadd([stack_top, fmp])              when op_flags[6]
-        mload([stack_top, op_helpers, clk])   when op_flags[7]
-        swap([stack_top])                     when op_flags[8]
+        noop([stack_top])                             when op_flags[0]
+        eqz([stack_top, stack_helpers[2]])            when op_flags[1]
+        neg([stack_top])                              when op_flags[2]
+        inv([stack_top])                              when op_flags[3]
+        incr([stack_top])                             when op_flags[4]
+        not([stack_top])                              when op_flags[5]
+        fmpadd([stack_top, fmp])                      when op_flags[6]
+        mload([stack_top, op_helpers, clk], [b_chip]) when op_flags[7]
+        swap([stack_top])                             when op_flags[8]
         # TODO: add match variant for caller 
         caller()
-        movup2([stack_top])                   when op_flags[10]
-        movdn2([stack_top])                   when op_flags[11]
-        movup3([stack_top])                   when op_flags[12]
-        movdn3([stack_top])                   when op_flags[13]
-        advpopw([stack_top])                  when op_flags[14]
-        expacc([stack_top, stack_helpers[2]]) when op_flags[15]
-        movup4([stack_top])                   when op_flags[16]
-        movdn4([stack_top])                   when op_flags[17]
-        movup5([stack_top])                   when op_flags[18]
-        movdn5([stack_top])                   when op_flags[19]
-        movup6([stack_top])                   when op_flags[20]
-        movdn6([stack_top])                   when op_flags[21]
-        movup7([stack_top])                   when op_flags[22]
-        movdn7([stack_top])                   when op_flags[23]
-        swapw([stack_top])                    when op_flags[24]
-        ext2mul([stack_top])                  when op_flags[25]
-        movup8([stack_top])                   when op_flags[26]
-        movdn8([stack_top])                   when op_flags[27]
-        swapw2([stack_top])                   when op_flags[28]
-        swapw3([stack_top])                   when op_flags[29]
-        swapdw([stack_top])                   when op_flags[30]
+        movup2([stack_top])                           when op_flags[10]
+        movdn2([stack_top])                           when op_flags[11]
+        movup3([stack_top])                           when op_flags[12]
+        movdn3([stack_top])                           when op_flags[13]
+        advpopw([stack_top])                          when op_flags[14]
+        expacc([stack_top, stack_helpers[2]])         when op_flags[15]
+        movup4([stack_top])                           when op_flags[16]
+        movdn4([stack_top])                           when op_flags[17]
+        movup5([stack_top])                           when op_flags[18]
+        movdn5([stack_top])                           when op_flags[19]
+        movup6([stack_top])                           when op_flags[20]
+        movdn6([stack_top])                           when op_flags[21]
+        movup7([stack_top])                           when op_flags[22]
+        movdn7([stack_top])                           when op_flags[23]
+        swapw([stack_top])                            when op_flags[24]
+        ext2mul([stack_top])                          when op_flags[25]
+        movup8([stack_top])                           when op_flags[26]
+        movdn8([stack_top])                           when op_flags[27]
+        swapw2([stack_top])                           when op_flags[28]
+        swapw3([stack_top])                           when op_flags[29]
+        swapdw([stack_top])                           when op_flags[30]
 
-        assert([stack_top])                   when op_flags[32]
-        eq([stack_top, stack_helpers[2]])     when op_flags[33]
-        add([stack_top])                      when op_flags[34]
-        mul([stack_top])                      when op_flags[35]
-        and([stack_top])                      when op_flags[36]
-        or([stack_top])                       when op_flags[37]
-        u32and([stack_top])                   when op_flags[38]
-        u32xor([stack_top])                   when op_flags[39]
+        assert([stack_top])                           when op_flags[32]
+        eq([stack_top, stack_helpers[2]])             when op_flags[33]
+        add([stack_top])                              when op_flags[34]
+        mul([stack_top])                              when op_flags[35]
+        and([stack_top])                              when op_flags[36]
+        or([stack_top])                               when op_flags[37]
+        u32and([stack_top], [b_chip])                 when op_flags[38]
+        u32xor([stack_top], [b_chip])                 when op_flags[39]
         # TODO: add match variant for frie2f4 
         frie2f4()
-        drop([stack_top])                     when op_flags[41]
-        cswap([stack_top])                    when op_flags[42]
-        cswapw([stack_top])                   when op_flags[43]
-        mloadw([stack_top, clk])              when op_flags[44]
-        mstore([stack_top, op_helpers, clk])  when op_flags[45]
-        mstorew([stack_top, clk])             when op_flags[46]
-        fmpupdate([stack_top, fmp])           when op_flags[47]
+        drop([stack_top])                             when op_flags[41]
+        cswap([stack_top])                            when op_flags[42]
+        cswapw([stack_top])                           when op_flags[43]
+        mloadw([stack_top, clk], [b_chip])            when op_flags[44]
+        mstore([stack_top, op_helpers, clk])          when op_flags[45]
+        mstorew([stack_top, clk], [b_chip])           when op_flags[46]
+        fmpupdate([stack_top, fmp])                   when op_flags[47]
 
-        pad([stack_top])                      when op_flags[48]
-        dup([stack_top])                      when op_flags[49]
-        dup1([stack_top])                     when op_flags[50]
-        dup2([stack_top])                     when op_flags[51]
-        dup3([stack_top])                     when op_flags[52]
-        dup4([stack_top])                     when op_flags[53]
-        dup5([stack_top])                     when op_flags[54]
-        dup6([stack_top])                     when op_flags[55]
-        dup7([stack_top])                     when op_flags[56]
-        dup9([stack_top])                     when op_flags[57]
-        dup11([stack_top])                    when op_flags[58]
-        dup13([stack_top])                    when op_flags[59]
-        dup15([stack_top])                    when op_flags[60]
-        advpop([stack_top])                   when op_flags[61]
-        sdepth([stack_top, stack_helpers[0]]) when op_flags[62]
-        clk([stack_top, clk])                 when op_flags[63]
+        pad([stack_top])                              when op_flags[48]
+        dup([stack_top])                              when op_flags[49]
+        dup1([stack_top])                             when op_flags[50]
+        dup2([stack_top])                             when op_flags[51]
+        dup3([stack_top])                             when op_flags[52]
+        dup4([stack_top])                             when op_flags[53]
+        dup5([stack_top])                             when op_flags[54]
+        dup6([stack_top])                             when op_flags[55]
+        dup7([stack_top])                             when op_flags[56]
+        dup9([stack_top])                             when op_flags[57]
+        dup11([stack_top])                            when op_flags[58]
+        dup13([stack_top])                            when op_flags[59]
+        dup15([stack_top])                            when op_flags[60]
+        advpop([stack_top])                           when op_flags[61]
+        sdepth([stack_top, stack_helpers[0]])         when op_flags[62]
+        clk([stack_top, clk])                         when op_flags[63]
 
-        u32add([stack_top, op_helpers])       when op_flags[64]
-        u32sub([stack_top, op_helpers])       when op_flags[65]
-        u32mul([stack_top, op_helpers])       when op_flags[66]
-        u32div([stack_top, op_helpers])       when op_flags[67]
-        u32split([stack_top, op_helpers])     when op_flags[68]
-        u32assert2([stack_top, op_helpers])   when op_flags[69]
-        u32add3([stack_top, op_helpers])      when op_flags[70]
-        u32madd([stack_top, op_helpers])      when op_flags[71]
+        u32add([stack_top, op_bits, op_helpers])      when op_flags[64]
+        u32sub([stack_top, op_bits, op_helpers])      when op_flags[65]
+        u32mul([stack_top, op_bits, op_helpers])      when op_flags[66]
+        u32div([stack_top, op_bits, op_helpers])      when op_flags[67]
+        u32split([stack_top, op_bits, op_helpers])    when op_flags[68]
+        u32assert2([stack_top, op_bits, op_helpers])  when op_flags[69]
+        u32add3([stack_top, op_bits, op_helpers])     when op_flags[70]
+        u32madd([stack_top, op_bits, op_helpers])     when op_flags[71]
 
 
 ev overflow_table_constraints(
@@ -376,8 +494,8 @@ ev fmpadd([s[16], fmp]):
     enf s[0]' = s[0] + fmp
     enf s[i]' = s[i] for i in 1..16
 
-# Bus constraint is implemented in a separate file
-ev mload([s[16], clk]):
+ev mload([s[16], op_helpers, clk], [b_chip]):
+    enf mload_bus_constraint([s, op_helpers, clk], [b_chip])
     enf s[i]' = s[i] for i in 1..16
 
 ev swap([s[16]]):
@@ -529,12 +647,12 @@ ev or([s[16]]):
     enf s[0]' = s[1] + s[0] - s[1] * s[0]
     enf s[i]' = s[i + 1] for i in 1..15
 
-# Bus constraint is implemented in a separate file
-ev u32and([s[16]]):
+ev u32and([s[16]], [b_chip]):
+    enf u32and_bus_constraint([s[16]], [b_chip])
     enf s[i]' = s[i + 1] for i in 1..15
 
-# Bus constraint is implemented in a separate file
-ev u32xor([s[16]]):
+ev u32xor([s[16]], [b_chip]):
+    enf u32xor_bus_constraint([s[16]], [b_chip])
     enf s[i]' = s[i + 1] for i in 1..15
 
 # TODO: add constraints
@@ -557,15 +675,17 @@ ev cswapw([s[16]]):
     enf s[i]' = s[i + 1] for i in 8..15
 
 # Bus constraint is implemented in a separate file
-ev mloadw([s[16], clk]):
+ev mloadw([s[16], clk], [b_chip]):
+    enf mloadw_bus_constraint([s, clk], [b_chip])
     enf s[i]' = s[i + 1] for i in 4..15
 
-# Bus constraint is implemented in a separate file
-ev mstore([s[16], clk]):
+ev mstore([s[16], op_helpers, clk]):
+    enf mstore_bus_constraint([s, op_helpers, clk], [b_chip])
     enf s[i]' = s[i + 1] for i in 0..15
 
 # Bus constraint is implemented in a separate file
-ev mstorew([s[16], clk]):
+ev mstorew([s[16], clk], [b_chip]):
+    enf mstorew_bus_constraint([s, clk], [b_chip])
     enf s[i]' = s[i + 1] for i in 0..15
 
 ev fmpupdate([s[16], fmp]):
@@ -702,13 +822,13 @@ ev u32madd([s[16], op_bits[8], op_helpers[6]]):
 
 # High-degree operations
 
-# Bus constraint is implemented in a separate file
-ev hperm([s[16], op_bits[8], op_helpers[6]]):
+ev hperm([s[16], op_bits[8], op_helpers[6]], [b_chip]):
+    enf hperm_bus_constraint([s, op_helpers], [b_chip])
     enf s[i]' = s[i] for i in 12..16
     enf b0_is_zero([op_bits])
 
-# Bus constraint is implemented in a separate file
-ev mpverify([s[16], op_bits[8], op_helpers[6]]):
+ev mpverify([s[16], op_bits[8], op_helpers[6]], [b_chip]):
+    enf mpverify_bus_constraint([s, op_helpers], [b_chip])
     enf s[i]' = s[i] for i in 0..16
     enf b0_is_zero([op_bits])
 
@@ -737,8 +857,8 @@ ev loop()
 
 # Very high-degree operations
 
-# Bus constraint is implemented in a separate file
 ev mrupdate([s[16], op_bits[8], op_helpers[6]]):
+    enf mrupdate_bus_constraint([s, op_helpers], [b_chip])
     enf s[i]' = s[i] for i in 4..16
     enf b0_b1_is_zero([op_bits])
 
