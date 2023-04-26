@@ -25,7 +25,7 @@ pub use symbol_table::Value;
 use symbol_table::{Symbol, SymbolBinding, SymbolTable};
 
 mod validation;
-use validation::{SemanticError, SourceValidator};
+use validation::{Section, SemanticError, SourceValidator};
 
 #[cfg(test)]
 mod tests;
@@ -80,16 +80,16 @@ impl AirIR {
                 }
                 ast::SourceSection::Trace(trace_bindings) => {
                     if !trace_bindings.is_empty() {
-                        validator.exists("main_trace_columns");
+                        validator.exists(Section::MainTraceColumns);
                     }
                     if trace_bindings.len() > 1 {
-                        validator.exists("aux_trace_columns");
+                        validator.exists(Section::AuxTraceColumns);
                     }
                     // accumulate and save the trace bindings for later processing.
                     trace_decls.push(trace_bindings);
                 }
                 ast::SourceSection::PublicInputs(inputs) => {
-                    validator.exists("public_inputs");
+                    validator.exists(Section::PublicInputs);
                     // accumulate and save the public input bindings for later processing.
                     pub_input_decls.extend(inputs);
                 }
@@ -98,17 +98,17 @@ impl AirIR {
                     symbol_table.insert_periodic_columns(columns)?;
                 }
                 ast::SourceSection::RandomValues(values) => {
-                    validator.exists("random_values");
+                    validator.exists(Section::RandomValues);
                     // process & validate the random value declarations
                     symbol_table.insert_random_values(values)?;
                 }
                 ast::SourceSection::BoundaryConstraints(stmts) => {
-                    validator.exists("boundary_constraints");
+                    validator.exists(Section::BoundaryConstraints);
                     // save the boundary statements for processing after the SymbolTable is built.
                     boundary_stmts.extend(stmts);
                 }
                 ast::SourceSection::IntegrityConstraints(stmts) => {
-                    validator.exists("integrity_constraints");
+                    validator.exists(Section::IntegrityConstraints);
                     // save the integrity statements for processing after the SymbolTable is built.
                     integrity_stmts.extend(stmts);
                 }
