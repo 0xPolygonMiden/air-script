@@ -10,6 +10,15 @@ pub(crate) struct SourceValidator {
     random_values_exists: bool,
 }
 
+pub enum Section {
+    MainTraceColumns,
+    AuxTraceColumns,
+    PublicInputs,
+    BoundaryConstraints,
+    IntegrityConstraints,
+    RandomValues,
+}
+
 impl SourceValidator {
     pub fn new() -> Self {
         SourceValidator {
@@ -23,15 +32,14 @@ impl SourceValidator {
     }
 
     /// If the declaration exists, sets corresponding boolean flag to true.
-    pub fn exists(&mut self, section: &str) {
+    pub fn exists(&mut self, section: Section) {
         match section {
-            "main_trace_columns" => self.main_trace_columns_exists = true,
-            "aux_trace_columns" => self.aux_trace_columns_exists = true,
-            "public_inputs" => self.public_inputs_exists = true,
-            "boundary_constraints" => self.boundary_constraints_exists = true,
-            "integrity_constraints" => self.integrity_constraints_exists = true,
-            "random_values" => self.random_values_exists = true,
-            _ => unreachable!(),
+            Section::MainTraceColumns => self.main_trace_columns_exists = true,
+            Section::AuxTraceColumns => self.aux_trace_columns_exists = true,
+            Section::PublicInputs => self.public_inputs_exists = true,
+            Section::BoundaryConstraints => self.boundary_constraints_exists = true,
+            Section::IntegrityConstraints => self.integrity_constraints_exists = true,
+            Section::RandomValues => self.random_values_exists = true,
         }
     }
 

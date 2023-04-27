@@ -7,4 +7,4 @@ mod error;
 pub(super) use error::SemanticError;
 
 mod validator;
-pub(super) use validator::SourceValidator;
+pub(super) use validator::{Section, SourceValidator};
