@@ -5,7 +5,7 @@ use super::{
     Symbol, SymbolAccess, SymbolBinding, VariableBinding, VariableValueExpr, CURRENT_ROW,
 };
 
-mod list_comprehension;
+mod comprehension;
 mod list_folding;
 
 impl ConstraintBuilder {
@@ -23,33 +23,55 @@ impl ConstraintBuilder {
     ) -> Result<(), SemanticError> {
         match stmt {
             IntegrityStmt::Constraint(constraint) => {
-                let (constraint_expr, _, selectors) = constraint.into_parts();
+                let (constraint_expr, cc_context, selectors) = constraint.into_parts();
                 match constraint_expr {
                     ConstraintExpr::Inline(inline_constraint) => {
-                        let (lhs, rhs) = inline_constraint.into_parts();
-                        // add the left hand side expression to the graph.
-                        let lhs = self.insert_expr(lhs)?;
-
-                        // add the right hand side expression to the graph.
-                        let rhs = self.insert_expr(rhs)?;
-
-                        // add the selectors expression to the graph
-                        let selectors = if let Some(selectors) = selectors {
-                            Some(self.insert_expr(selectors)?)
+                        let constraints = if let Some(cc_context) = cc_context {
+                            let constraint_exprs = self.unfold_cc(
+                                &ConstraintExpr::Inline(inline_constraint),
+                                &cc_context,
+                            )?;
+                            constraint_exprs
+                                .into_iter()
+                                .map(|expr| {
+                                    if let ConstraintExpr::Inline(constraint) = expr {
+                                        constraint
+                                    } else {
+                                        unreachable!("Unexpected Evaluator variant")
+                                    }
+                                })
+                                .collect::<Vec<_>>()
                         } else {
-                            None
+                            vec![inline_constraint]
                         };
+                        for constraint in constraints {
+                            // get the left and right hand side of the constraint
+                            let (lhs, rhs) = constraint.into_parts();
 
-                        // merge the two sides of the expression into a constraint.
-                        let root = self.merge_equal_exprs(lhs, rhs, selectors);
+                            // add the left hand side expression to the graph.
+                            let lhs = self.insert_expr(lhs)?;
 
-                        // get the trace segment and domain of the constraint
-                        // the default domain for integrity constraints is `EveryRow`
-                        let (trace_segment, domain) =
-                            self.graph.node_details(&root, ConstraintDomain::EveryRow)?;
+                            // add the right hand side expression to the graph.
+                            let rhs = self.insert_expr(rhs)?;
 
-                        // save the constraint information
-                        self.insert_constraint(root, trace_segment.into(), domain)?;
+                            // add the selectors expression to the graph
+                            let selectors = if let Some(selectors) = selectors.clone() {
+                                Some(self.insert_expr(selectors)?)
+                            } else {
+                                None
+                            };
+
+                            // merge the two sides of the expression into a constraint.
+                            let root = self.merge_equal_exprs(lhs, rhs, selectors);
+
+                            // get the trace segment and domain of the constraint
+                            // the default domain for integrity constraints is `EveryRow`
+                            let (trace_segment, domain) =
+                                self.graph.node_details(&root, ConstraintDomain::EveryRow)?;
+
+                            // save the constraint information
+                            self.insert_constraint(root, trace_segment.into(), domain)?;
+                        }
                     }
                     ConstraintExpr::Evaluator(ev_call) => {
                         self.process_evaluator_call(ev_call)?;
