@@ -1,0 +1,61 @@
+mod RangeCheckerAir
+
+### Helper functions ##############################################################################
+
+# Returns binary negation of the value.
+fn binary_not(e: scalar) -> scalar:
+    return 1 - e
+
+# Returns array of mutually exclusive multiplicity flags.
+# f[0] set to 1 when we don't include the value into the running product.
+# f[1] set to 1 when we include the value into the running product.
+# f[2] set to 1 when we include two copies of the value into the running product.
+# f[3] set to 1 when we include four copies of the value into the running product.
+fn get_multiplicity_flags(s0: scalar, s1: scalar) -> vector[4]:
+    return [!s0 & !s1, s0 & !s1, !s0 & s1, s0 & s1]
+
+
+### Helper evaluators #############################################################################
+
+# Enforces that column must be binary.
+ev is_binary([v]):
+    enf v^2 = v
+
+# Enforces correct transition from 8-bit to 16-bit section of the table.
+ev transition_8_to_16_bit_validity([t, v]):
+    # Ensure that values in column t can flip from 0 to 1 only once
+    enf t * binary_not(t') = 0
+
+    # Ensure that when column t flips, column v must equal 255
+    enf v = 255 when t' & !t
+
+    # Ensure that when column t flips, v' must be reset to 0
+    enf v' = 0 when t' & !t
+
+# Enforces the internal correctness of the 16-bit section of the Range Checker.
+ev range_checker_8bit([t, s0, s1, v], [p0]):
+    let val = $alpha[0] + v
+    let f = get_multiplicity_flags(s0, s1)
+
+    # z represents how a row in the execution trace is reduced to a single value.
+    let z = val^4 * f[3] + val^2 * f[2] + val * f[1] + f[0]
+    enf p0' * (($alpha[0] + v' - v) * t - t + 1) = p0 * (z - z * t + t)
+
+    # TODO: add boundary constraints p0.first = 1 and p0.last = 1
+
+
+### Range checker Air Constraints #################################################################
+
+ev range_checker([t, s0, s1, v], [p0]):
+    # Check selector flags are binary.
+    let selectors = [t, s0, s1]
+    enf check_binary([s]) for s in selectors
+
+    # Constrain the row transitions in the 8-bit section of the table.
+    enf change(v) * (change(v) - 1) = 0 when !t0'
+
+    # Constrain the transition from 8-bit to 16-bit section of the table.
+    enf transition_8_to_16_bit_validity([t, v])
+
+    # Constrain the row transitions in the 16-bit section of the table.
+    enf range_checker_8bit([t, s0, s1, v], [p0])
