@@ -153,3 +153,14 @@ fn selectors() {
     let expected = expect_file!["selectors/selectors.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn constraint_comprehension() {
+    let generated_air =
+        Test::new("tests/constraint_comprehension/constraint_comprehension.air".to_string())
+            .transpile()
+            .unwrap();
+
+    let expected = expect_file!["constraint_comprehension/constraint_comprehension.rs"];
+    expected.assert_eq(&generated_air);
+}
