@@ -1,10 +1,10 @@
 use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
-        integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
+        integrity_constraints::{ConstraintExpr, IntegrityConstraint, IntegrityStmt},
         build_segment_bindings, build_trace_bindings, AccessType, ComprehensionContext, 
         ConstantBinding, ConstantValueExpr, Expression, EvaluatorFunction, EvaluatorFunctionCall, 
-        Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, PeriodicColumn, 
+        Identifier, InlineConstraintExpr, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, PeriodicColumn, 
         PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, SymbolAccess, 
         TraceBinding, VariableBinding, VariableValueExpr, 
     }, error::{Error, ParseError::*}, lexer::Token
@@ -206,7 +206,7 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
     "boundary_constraints" ":" <boundary_stmts: BoundaryStmt+> =>? {
         // check if at least one boundary constraint is defined
         let boundary_constraints_exist = boundary_stmts.iter().any(|stmt| match stmt {
-            BoundaryStmt::Constraint(_) | BoundaryStmt::ConstraintComprehension(_, _) => true,
+            BoundaryStmt::Constraint(_) => true,
             _ => false,
         });
         if !boundary_constraints_exist {
@@ -227,14 +227,12 @@ BoundaryStmt: BoundaryStmt = {
         BoundaryStmt::VariableBinding(VariableBinding::new(name, boundary_variable_type)),
     "enf" <boundary_constraint: BoundaryConstraintExpr> =>
         BoundaryStmt::Constraint(boundary_constraint),
-    "enf" <boundary_constraint: BoundaryConstraintExpr>
-        <comprehension: ConstraintComprehension<BoundaryExpr>> =>
-        BoundaryStmt::ConstraintComprehension(boundary_constraint, comprehension),
 }
 
 BoundaryConstraintExpr: BoundaryConstraint = {
-    <column: SymbolAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
-        BoundaryConstraint::new(column, boundary, value),
+    <column: SymbolAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr>
+        <comprehension: ConstraintComprehension<BoundaryExpr>?> =>
+            BoundaryConstraint::new(column, boundary, value, comprehension),
 }
 
 BoundaryVariableType: VariableValueExpr = {
@@ -294,7 +292,7 @@ IntegrityStmts: Vec<IntegrityStmt> = {
         let integrity_stmts: Vec<IntegrityStmt> = integrity_stmts_groups.into_iter().flatten().collect();
         // check if at least one integrity constraint is defined
         let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
-            IntegrityStmt::Constraint(_, _) | IntegrityStmt::ConstraintComprehension(_, _, _) => true,
+            IntegrityStmt::Constraint(_) => true,
             _ => false,
         });
         if !integrity_constraints_exist {
@@ -316,29 +314,23 @@ IntegrityStmtGroup: Vec<IntegrityStmt> = {
         vec![IntegrityStmt::VariableBinding(VariableBinding::new(name, integrity_variable_type))],
     "enf" <integrity_constraint: IntegrityConstraintExpr> => vec![integrity_constraint],
     "match" "enf" ":" <integrity_stmts: IntegrityConstraintExpr+> => integrity_stmts,
-    "enf" <integrity_constraint: IntegrityConstraintExpr>
-        <comprehension: ConstraintComprehension<IntegrityExpr>> => match integrity_constraint {
-            IntegrityStmt::Constraint(constraint_type, selectors) =>
-                return vec![IntegrityStmt::ConstraintComprehension(constraint_type, selectors, comprehension)],
-            _ => unreachable!() // this should never happen
-        }
 }
 
 IntegrityConstraintExpr: IntegrityStmt = {
-    <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
-        IntegrityStmt::Constraint(ConstraintType::Inline(IntegrityConstraint::new(lhs, rhs)), None),
-    <evaluator_fn_call: EvaluatorFunctionCall> =>
-        IntegrityStmt::Constraint(ConstraintType::Evaluator(evaluator_fn_call), None),
-    <integrity_stmt_with_selector: IntegrityConstraintWithSelector> =>
-        integrity_stmt_with_selector,
+    <constraint: IntegrityConstraintExprValue>
+        <comprehension: ConstraintComprehension<IntegrityExpr>?>
+        <selectors: WithSelectors?> =>
+            IntegrityStmt::Constraint(IntegrityConstraint::new(constraint, comprehension, selectors)),
 }
 
-IntegrityConstraintWithSelector: IntegrityStmt = {
-    <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> "when" <selectors: IntegrityExpr> =>
-        IntegrityStmt::Constraint(ConstraintType::Inline(IntegrityConstraint::new(lhs, rhs)),
-        Some(selectors)),
-    <evaluator_fn_call: EvaluatorFunctionCall> "when" <selectors: IntegrityExpr> =>
-        IntegrityStmt::Constraint(ConstraintType::Evaluator(evaluator_fn_call), Some(selectors)),
+IntegrityConstraintExprValue: ConstraintExpr = {
+    <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
+        ConstraintExpr::Inline(InlineConstraintExpr::new(lhs, rhs)),
+    <evaluator_fn_call: EvaluatorFunctionCall> => ConstraintExpr::Evaluator(evaluator_fn_call)
+}
+
+WithSelectors: Expression = {
+    "when" <selectors: IntegrityExpr> => selectors,
 }
 
 IntegrityVariableType: VariableValueExpr = {

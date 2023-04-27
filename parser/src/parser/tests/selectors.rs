@@ -1,5 +1,7 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
-use crate::ast::{AccessType, ConstraintType, Expression::*, IntegrityStmt::*, SymbolAccess};
+use crate::ast::{
+    AccessType, ConstraintExpr, Expression::*, InlineConstraintExpr, IntegrityStmt::*, SymbolAccess,
+};
 
 // SELECTORS
 // ================================================================================================
@@ -10,25 +12,28 @@ fn single_selector() {
     integrity_constraints:
         enf clk' = clk when n1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        ConstraintType::Inline(IntegrityConstraint::new(
-            // clk' = clk
-            SymbolAccess(SymbolAccess::new(
-                Identifier("clk".to_string()),
-                AccessType::Default,
-                1,
+        IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
+                // clk' = clk
+                SymbolAccess(SymbolAccess::new(
+                    Identifier("clk".to_string()),
+                    AccessType::Default,
+                    1,
+                )),
+                SymbolAccess(SymbolAccess::new(
+                    Identifier("clk".to_string()),
+                    AccessType::Default,
+                    0,
+                )),
             )),
-            SymbolAccess(SymbolAccess::new(
-                Identifier("clk".to_string()),
+            None,
+            // n1
+            Some(SymbolAccess(SymbolAccess::new(
+                Identifier("n1".to_string()),
                 AccessType::Default,
                 0,
-            )),
-        )),
-        // n1
-        Some(SymbolAccess(SymbolAccess::new(
-            Identifier("n1".to_string()),
-            AccessType::Default,
-            0,
-        ))),
+            ))),
+        ),
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -39,72 +44,75 @@ fn chained_selectors() {
     integrity_constraints:
         enf clk' = clk when (n1 & !n2) | !n3";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        ConstraintType::Inline(IntegrityConstraint::new(
-            // clk' = clk
-            SymbolAccess(SymbolAccess::new(
-                Identifier("clk".to_string()),
-                AccessType::Default,
-                1,
+        IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
+                // clk' = clk
+                SymbolAccess(SymbolAccess::new(
+                    Identifier("clk".to_string()),
+                    AccessType::Default,
+                    1,
+                )),
+                SymbolAccess(SymbolAccess::new(
+                    Identifier("clk".to_string()),
+                    AccessType::Default,
+                    0,
+                )),
             )),
-            SymbolAccess(SymbolAccess::new(
-                Identifier("clk".to_string()),
-                AccessType::Default,
-                0,
-            )),
-        )),
-        // (n1 & !n2) | !n3
-        Some(Sub(
-            Box::new(Add(
-                Box::new(Mul(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("n1".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
+            None,
+            // (n1 & !n2) | !n3
+            Some(Sub(
+                Box::new(Add(
+                    Box::new(Mul(
+                        Box::new(SymbolAccess(SymbolAccess::new(
+                            Identifier("n1".to_string()),
+                            AccessType::Default,
+                            0,
+                        ))),
+                        Box::new(Sub(
+                            Box::new(Const(1)),
+                            Box::new(SymbolAccess(SymbolAccess::new(
+                                Identifier("n2".to_string()),
+                                AccessType::Default,
+                                0,
+                            ))),
+                        )),
+                    )),
                     Box::new(Sub(
                         Box::new(Const(1)),
                         Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("n2".to_string()),
+                            Identifier("n3".to_string()),
                             AccessType::Default,
                             0,
                         ))),
                     )),
                 )),
-                Box::new(Sub(
-                    Box::new(Const(1)),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("n3".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                )),
-            )),
-            Box::new(Mul(
                 Box::new(Mul(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("n1".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
+                    Box::new(Mul(
+                        Box::new(SymbolAccess(SymbolAccess::new(
+                            Identifier("n1".to_string()),
+                            AccessType::Default,
+                            0,
+                        ))),
+                        Box::new(Sub(
+                            Box::new(Const(1)),
+                            Box::new(SymbolAccess(SymbolAccess::new(
+                                Identifier("n2".to_string()),
+                                AccessType::Default,
+                                0,
+                            ))),
+                        )),
+                    )),
                     Box::new(Sub(
                         Box::new(Const(1)),
                         Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("n2".to_string()),
+                            Identifier("n3".to_string()),
                             AccessType::Default,
                             0,
                         ))),
                     )),
                 )),
-                Box::new(Sub(
-                    Box::new(Const(1)),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("n3".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                )),
             )),
-        )),
+        ),
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -118,8 +126,8 @@ fn multiconstraint_selectors() {
             clk' = clk when n1 & n2
             clk' = 1 when !n1 & !n2";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 // clk' = 0 when n1 & !n2
                 SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
@@ -128,6 +136,7 @@ fn multiconstraint_selectors() {
                 )),
                 Const(0),
             )),
+            None,
             Some(Mul(
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("n1".to_string()),
@@ -143,9 +152,9 @@ fn multiconstraint_selectors() {
                     ))),
                 )),
             )),
-        ),
-        Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        )),
+        Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 // clk' = clk when n1 & n2
                 SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
@@ -158,6 +167,7 @@ fn multiconstraint_selectors() {
                     0,
                 )),
             )),
+            None,
             Some(Mul(
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("n1".to_string()),
@@ -170,9 +180,9 @@ fn multiconstraint_selectors() {
                     0,
                 ))),
             )),
-        ),
-        Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        )),
+        Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 // clk' = 1 when !n1 & !n2
                 SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
@@ -181,6 +191,7 @@ fn multiconstraint_selectors() {
                 )),
                 Const(1),
             )),
+            None,
             Some(Mul(
                 Box::new(Sub(
                     Box::new(Const(1)),
@@ -199,7 +210,7 @@ fn multiconstraint_selectors() {
                     ))),
                 )),
             )),
-        ),
+        )),
     ])]);
     build_parse_test!(source).expect_ast(expected);
 }

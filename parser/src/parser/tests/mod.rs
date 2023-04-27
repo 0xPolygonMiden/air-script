@@ -46,23 +46,26 @@ fn full_air_file() {
         // integrity_constraints:
         //     enf clk' = clk + 1
         SourceSection::IntegrityConstraints(vec![IntegrityStmt::Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
-                // clk' = clk + 1
-                Expression::SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    1,
-                )),
-                Expression::Add(
-                    Box::new(Expression::SymbolAccess(SymbolAccess::new(
+            IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
+                    // clk' = clk + 1
+                    Expression::SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(Expression::Const(1)),
-                ),
-            )),
-            None,
+                        1,
+                    )),
+                    Expression::Add(
+                        Box::new(Expression::SymbolAccess(SymbolAccess::new(
+                            Identifier("clk".to_string()),
+                            AccessType::Default,
+                            0,
+                        ))),
+                        Box::new(Expression::Const(1)),
+                    ),
+                )),
+                None,
+                None,
+            ),
         )]),
         // boundary_constraints:
         //     enf clk.first = 0
@@ -71,6 +74,7 @@ fn full_air_file() {
                 SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
                 Boundary::First,
                 Expression::Const(0),
+                None,
             ),
         )]),
     ]);

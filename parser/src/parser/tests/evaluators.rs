@@ -1,8 +1,9 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::{
     ast::{
-        AccessType, ConstraintType, EvaluatorFunction, EvaluatorFunctionCall, Expression::*,
-        IntegrityStmt::*, Range, SymbolAccess, TraceBinding, VariableBinding, VariableValueExpr,
+        AccessType, ConstraintExpr, EvaluatorFunction, EvaluatorFunctionCall, Expression::*,
+        InlineConstraintExpr, IntegrityStmt::*, Range, SymbolAccess, TraceBinding, VariableBinding,
+        VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -24,8 +25,8 @@ fn ev_fn_main_cols() {
                 0,
                 1,
             )]],
-            vec![Constraint(
-                ConstraintType::Inline(IntegrityConstraint::new(
+            vec![Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
                     SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
@@ -41,7 +42,8 @@ fn ev_fn_main_cols() {
                     ),
                 )),
                 None,
-            )],
+                None,
+            ))],
         ),
     )]);
     build_parse_test!(source).expect_ast(expected);
@@ -59,8 +61,8 @@ fn ev_fn_aux_cols() {
                 vec![],
                 vec![TraceBinding::new(Identifier("p".to_string()), 1, 0, 1)],
             ],
-            vec![Constraint(
-                ConstraintType::Inline(IntegrityConstraint::new(
+            vec![Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
                     SymbolAccess(SymbolAccess::new(
                         Identifier("p".to_string()),
                         AccessType::Default,
@@ -76,7 +78,8 @@ fn ev_fn_aux_cols() {
                     ),
                 )),
                 None,
-            )],
+                None,
+            ))],
         ),
     )]);
     build_parse_test!(source).expect_ast(expected);
@@ -116,8 +119,8 @@ fn ev_fn_main_and_aux_cols() {
                         ))),
                     )),
                 )),
-                Constraint(
-                    ConstraintType::Inline(IntegrityConstraint::new(
+                Constraint(IntegrityConstraint::new(
+                    ConstraintExpr::Inline(InlineConstraintExpr::new(
                         SymbolAccess(SymbolAccess::new(
                             Identifier("clk".to_string()),
                             AccessType::Default,
@@ -133,9 +136,10 @@ fn ev_fn_main_and_aux_cols() {
                         ),
                     )),
                     None,
-                ),
-                Constraint(
-                    ConstraintType::Inline(IntegrityConstraint::new(
+                    None,
+                )),
+                Constraint(IntegrityConstraint::new(
+                    ConstraintExpr::Inline(InlineConstraintExpr::new(
                         SymbolAccess(SymbolAccess::new(
                             Identifier("a".to_string()),
                             AccessType::Default,
@@ -155,7 +159,8 @@ fn ev_fn_main_and_aux_cols() {
                         ),
                     )),
                     None,
-                ),
+                    None,
+                )),
             ],
         ),
     )]);
@@ -169,15 +174,18 @@ fn ev_fn_call_simple() {
         enf advance_clock([clk])";
 
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        ConstraintType::Evaluator(EvaluatorFunctionCall::new(
-            Identifier("advance_clock".to_string()),
-            vec![vec![SymbolAccess::new(
-                Identifier("clk".to_string()),
-                AccessType::Default,
-                0,
-            )]],
-        )),
-        None,
+        IntegrityConstraint::new(
+            ConstraintExpr::Evaluator(EvaluatorFunctionCall::new(
+                Identifier("advance_clock".to_string()),
+                vec![vec![SymbolAccess::new(
+                    Identifier("clk".to_string()),
+                    AccessType::Default,
+                    0,
+                )]],
+            )),
+            None,
+            None,
+        ),
     )])]);
 
     build_parse_test!(source).expect_ast(expected);
@@ -190,19 +198,22 @@ fn ev_fn_call() {
         enf advance_clock([a, b[1], c[2..4]])";
 
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        ConstraintType::Evaluator(EvaluatorFunctionCall::new(
-            Identifier("advance_clock".to_string()),
-            vec![vec![
-                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
-                SymbolAccess::new(Identifier("b".to_string()), AccessType::Vector(1), 0),
-                SymbolAccess::new(
-                    Identifier("c".to_string()),
-                    AccessType::Slice(Range::new(2, 4)),
-                    0,
-                ),
-            ]],
-        )),
-        None,
+        IntegrityConstraint::new(
+            ConstraintExpr::Evaluator(EvaluatorFunctionCall::new(
+                Identifier("advance_clock".to_string()),
+                vec![vec![
+                    SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
+                    SymbolAccess::new(Identifier("b".to_string()), AccessType::Vector(1), 0),
+                    SymbolAccess::new(
+                        Identifier("c".to_string()),
+                        AccessType::Slice(Range::new(2, 4)),
+                        0,
+                    ),
+                ]],
+            )),
+            None,
+            None,
+        ),
     )])]);
 
     build_parse_test!(source).expect_ast(expected);
@@ -224,8 +235,8 @@ fn ev_fn_call_inside_ev_fn() {
                     TraceBinding::new(Identifier("b".to_string()), 1, 1, 1),
                 ],
             ],
-            vec![Constraint(
-                ConstraintType::Evaluator(EvaluatorFunctionCall::new(
+            vec![Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Evaluator(EvaluatorFunctionCall::new(
                     Identifier("advance_clock".to_string()),
                     vec![vec![SymbolAccess::new(
                         Identifier("clk".to_string()),
@@ -234,7 +245,8 @@ fn ev_fn_call_inside_ev_fn() {
                     )]],
                 )),
                 None,
-            )],
+                None,
+            ))],
         ),
     )]);
 
@@ -248,27 +260,30 @@ fn ev_fn_call_with_more_than_two_args() {
         enf advance_clock([a], [b], [c])";
 
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        ConstraintType::Evaluator(EvaluatorFunctionCall::new(
-            Identifier("advance_clock".to_string()),
-            vec![
-                vec![SymbolAccess::new(
-                    Identifier("a".to_string()),
-                    AccessType::Default,
-                    0,
-                )],
-                vec![SymbolAccess::new(
-                    Identifier("b".to_string()),
-                    AccessType::Default,
-                    0,
-                )],
-                vec![SymbolAccess::new(
-                    Identifier("c".to_string()),
-                    AccessType::Default,
-                    0,
-                )],
-            ],
-        )),
-        None,
+        IntegrityConstraint::new(
+            ConstraintExpr::Evaluator(EvaluatorFunctionCall::new(
+                Identifier("advance_clock".to_string()),
+                vec![
+                    vec![SymbolAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                        0,
+                    )],
+                    vec![SymbolAccess::new(
+                        Identifier("b".to_string()),
+                        AccessType::Default,
+                        0,
+                    )],
+                    vec![SymbolAccess::new(
+                        Identifier("c".to_string()),
+                        AccessType::Default,
+                        0,
+                    )],
+                ],
+            )),
+            None,
+            None,
+        ),
     )])]);
 
     build_parse_test!(source).expect_ast(expected);
