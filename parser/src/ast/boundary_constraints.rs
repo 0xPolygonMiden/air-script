@@ -8,7 +8,7 @@ use std::fmt::Display;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum BoundaryStmt {
-    Constraint(BoundaryConstraint, Option<ComprehensionContext>),
+    Constraint(BoundaryConstraint),
     VariableBinding(VariableBinding),
 }
 
@@ -18,14 +18,21 @@ pub struct BoundaryConstraint {
     access: SymbolAccess,
     boundary: Boundary,
     value: Expression,
+    comprehension_context: Option<ComprehensionContext>,
 }
 
 impl BoundaryConstraint {
-    pub fn new(access: SymbolAccess, boundary: Boundary, value: Expression) -> Self {
+    pub fn new(
+        access: SymbolAccess,
+        boundary: Boundary,
+        value: Expression,
+        comprehension_context: Option<ComprehensionContext>,
+    ) -> Self {
         Self {
             access,
             boundary,
             value,
+            comprehension_context,
         }
     }
 
@@ -42,8 +49,24 @@ impl BoundaryConstraint {
         &self.value
     }
 
-    pub fn into_parts(self) -> (Boundary, SymbolAccess, Expression) {
-        (self.boundary, self.access, self.value)
+    pub fn comprehension_context(&self) -> Option<&ComprehensionContext> {
+        self.comprehension_context.as_ref()
+    }
+
+    pub fn into_parts(
+        self,
+    ) -> (
+        Boundary,
+        SymbolAccess,
+        Expression,
+        Option<ComprehensionContext>,
+    ) {
+        (
+            self.boundary,
+            self.access,
+            self.value,
+            self.comprehension_context,
+        )
     }
 }
 

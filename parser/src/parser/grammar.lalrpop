@@ -1,10 +1,10 @@
 use crate::{
     ast::{
         boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
-        integrity_constraints::{ConstraintType, IntegrityConstraint, IntegrityStmt},
+        integrity_constraints::{ConstraintExpr, IntegrityConstraint, IntegrityStmt},
         build_segment_bindings, build_trace_bindings, AccessType, ComprehensionContext, 
         ConstantBinding, ConstantValueExpr, Expression, EvaluatorFunction, EvaluatorFunctionCall, 
-        Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, PeriodicColumn, 
+        Identifier, InlineConstraintExpr, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, PeriodicColumn, 
         PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, SymbolAccess, 
         TraceBinding, VariableBinding, VariableValueExpr, 
     }, error::{Error, ParseError::*}, lexer::Token
@@ -206,7 +206,7 @@ BoundaryConstraints: Vec<BoundaryStmt> = {
     "boundary_constraints" ":" <boundary_stmts: BoundaryStmt+> =>? {
         // check if at least one boundary constraint is defined
         let boundary_constraints_exist = boundary_stmts.iter().any(|stmt| match stmt {
-            BoundaryStmt::Constraint(_, _) => true,
+            BoundaryStmt::Constraint(_) => true,
             _ => false,
         });
         if !boundary_constraints_exist {
@@ -226,15 +226,13 @@ BoundaryStmt: BoundaryStmt = {
     "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
         BoundaryStmt::VariableBinding(VariableBinding::new(name, boundary_variable_type)),
     "enf" <boundary_constraint: BoundaryConstraintExpr> =>
-        BoundaryStmt::Constraint(boundary_constraint, None),
-    "enf" <boundary_constraint: BoundaryConstraintExpr>
-        <comprehension: ConstraintComprehension<BoundaryExpr>> =>
-        BoundaryStmt::Constraint(boundary_constraint, Some(comprehension)),
+        BoundaryStmt::Constraint(boundary_constraint),
 }
 
 BoundaryConstraintExpr: BoundaryConstraint = {
-    <column: SymbolAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr> =>
-        BoundaryConstraint::new(column, boundary, value),
+    <column: SymbolAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr>
+        <comprehension: ConstraintComprehension<BoundaryExpr>?> =>
+            BoundaryConstraint::new(column, boundary, value, comprehension),
 }
 
 BoundaryVariableType: VariableValueExpr = {
@@ -294,7 +292,7 @@ IntegrityStmts: Vec<IntegrityStmt> = {
         let integrity_stmts: Vec<IntegrityStmt> = integrity_stmts_groups.into_iter().flatten().collect();
         // check if at least one integrity constraint is defined
         let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
-            IntegrityStmt::Constraint(_, _, _) => true,
+            IntegrityStmt::Constraint(_) => true,
             _ => false,
         });
         if !integrity_constraints_exist {
@@ -322,13 +320,13 @@ IntegrityConstraintExpr: IntegrityStmt = {
     <constraint: IntegrityConstraintExprValue>
         <comprehension: ConstraintComprehension<IntegrityExpr>?>
         <selectors: WithSelectors?> =>
-            IntegrityStmt::Constraint(constraint, selectors, comprehension),
+            IntegrityStmt::Constraint(IntegrityConstraint::new(constraint, comprehension, selectors)),
 }
 
-IntegrityConstraintExprValue: ConstraintType = {
+IntegrityConstraintExprValue: ConstraintExpr = {
     <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
-        ConstraintType::Inline(IntegrityConstraint::new(lhs, rhs)),
-    <evaluator_fn_call: EvaluatorFunctionCall> => ConstraintType::Evaluator(evaluator_fn_call)
+        ConstraintExpr::Inline(InlineConstraintExpr::new(lhs, rhs)),
+    <evaluator_fn_call: EvaluatorFunctionCall> => ConstraintExpr::Evaluator(evaluator_fn_call)
 }
 
 WithSelectors: Expression = {

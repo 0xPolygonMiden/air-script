@@ -1,7 +1,7 @@
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
 use crate::ast::{
-    AccessType, ConstraintType, Expression::*, IntegrityStmt::*, SymbolAccess, VariableBinding,
-    VariableValueExpr,
+    AccessType, ConstraintExpr, Expression::*, InlineConstraintExpr, IntegrityStmt::*,
+    SymbolAccess, VariableBinding, VariableValueExpr,
 };
 
 // VARIABLES
@@ -31,8 +31,8 @@ fn variables_with_and_operators() {
                 )),
             )),
         )),
-        Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
                     AccessType::Default,
@@ -47,13 +47,13 @@ fn variables_with_and_operators() {
                     Box::new(Const(1)),
                 ),
             )),
+            None,
             Some(SymbolAccess(SymbolAccess::new(
                 Identifier("flag".to_string()),
                 AccessType::Default,
                 0,
             ))),
-            None,
-        ),
+        )),
     ])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -100,8 +100,8 @@ fn variables_with_or_operators() {
                 )),
             )),
         )),
-        Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
                     AccessType::Default,
@@ -116,13 +116,13 @@ fn variables_with_or_operators() {
                     Box::new(Const(1)),
                 ),
             )),
+            None,
             Some(SymbolAccess(SymbolAccess::new(
                 Identifier("flag".to_string()),
                 AccessType::Default,
                 0,
             ))),
-            None,
-        ),
+        )),
     ])]);
     build_parse_test!(source).expect_ast(expected);
 }

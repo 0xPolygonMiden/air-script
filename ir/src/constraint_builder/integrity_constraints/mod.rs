@@ -1,5 +1,5 @@
 use super::{
-    ast::{ConstraintType, IntegrityStmt},
+    ast::{ConstraintExpr, IntegrityStmt},
     AccessType, BTreeMap, ConstantValueExpr, ConstraintBuilder, ConstraintDomain, Expression,
     Identifier, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, SemanticError,
     Symbol, SymbolAccess, SymbolBinding, VariableBinding, VariableValueExpr, CURRENT_ROW,
@@ -22,24 +22,32 @@ impl ConstraintBuilder {
         stmt: IntegrityStmt,
     ) -> Result<(), SemanticError> {
         match stmt {
-            IntegrityStmt::Constraint(ConstraintType::Inline(constraint), _, _) => {
-                let (lhs, rhs) = constraint.into_parts();
-                // add the left hand side expression to the graph.
-                let lhs = self.insert_expr(lhs)?;
+            IntegrityStmt::Constraint(constraint) => {
+                let (constraint_expr, _, _) = constraint.into_parts();
+                match constraint_expr {
+                    ConstraintExpr::Inline(inline_constraint) => {
+                        let (lhs, rhs) = inline_constraint.into_parts();
+                        // add the left hand side expression to the graph.
+                        let lhs = self.insert_expr(lhs)?;
 
-                // add the right hand side expression to the graph.
-                let rhs = self.insert_expr(rhs)?;
+                        // add the right hand side expression to the graph.
+                        let rhs = self.insert_expr(rhs)?;
 
-                // merge the two sides of the expression into a constraint.
-                let root = self.merge_equal_exprs(lhs, rhs);
+                        // merge the two sides of the expression into a constraint.
+                        let root = self.merge_equal_exprs(lhs, rhs);
 
-                // get the trace segment and domain of the constraint
-                // the default domain for integrity constraints is `EveryRow`
-                let (trace_segment, domain) =
-                    self.graph.node_details(&root, ConstraintDomain::EveryRow)?;
+                        // get the trace segment and domain of the constraint
+                        // the default domain for integrity constraints is `EveryRow`
+                        let (trace_segment, domain) =
+                            self.graph.node_details(&root, ConstraintDomain::EveryRow)?;
 
-                // save the constraint information
-                self.insert_constraint(root, trace_segment.into(), domain)?;
+                        // save the constraint information
+                        self.insert_constraint(root, trace_segment.into(), domain)?;
+                    }
+                    ConstraintExpr::Evaluator(ev_call) => {
+                        self.process_evaluator_call(ev_call)?;
+                    }
+                }
             }
             IntegrityStmt::VariableBinding(variable) => {
                 if let VariableValueExpr::ListComprehension(list_comprehension) = variable.value() {
@@ -51,9 +59,6 @@ impl ConstraintBuilder {
                 } else {
                     self.symbol_table.insert_variable(variable)?
                 }
-            }
-            IntegrityStmt::Constraint(ConstraintType::Evaluator(ev_call), _, _) => {
-                self.process_evaluator_call(ev_call)?;
             }
         }
 

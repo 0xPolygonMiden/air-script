@@ -4,9 +4,9 @@ use super::{
 };
 use crate::{
     ast::{
-        AccessType, ConstantBinding, ConstantValueExpr::*, ConstraintType, EvaluatorFunction,
-        EvaluatorFunctionCall, Expression::*, IntegrityStmt::*, SymbolAccess, VariableBinding,
-        VariableValueExpr,
+        AccessType, ConstantBinding, ConstantValueExpr::*, ConstraintExpr, EvaluatorFunction,
+        EvaluatorFunctionCall, Expression::*, InlineConstraintExpr, IntegrityStmt::*, SymbolAccess,
+        VariableBinding, VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -20,23 +20,25 @@ fn integrity_constraints() {
     integrity_constraints:
         enf clk' = clk + 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        ConstraintType::Inline(IntegrityConstraint::new(
-            SymbolAccess(SymbolAccess::new(
-                Identifier("clk".to_string()),
-                AccessType::Default,
-                1,
-            )),
-            Add(
-                Box::new(SymbolAccess(SymbolAccess::new(
+        IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
+                SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
                     AccessType::Default,
-                    0,
-                ))),
-                Box::new(Const(1)),
-            ),
-        )),
-        None,
-        None,
+                    1,
+                )),
+                Add(
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("clk".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
+                    Box::new(Const(1)),
+                ),
+            )),
+            None,
+            None,
+        ),
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -55,8 +57,8 @@ fn multiple_integrity_constraints() {
         enf clk' = clk + 1
         enf clk' - clk = 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 SymbolAccess(SymbolAccess::new(
                     Identifier("clk".to_string()),
                     AccessType::Default,
@@ -73,9 +75,9 @@ fn multiple_integrity_constraints() {
             )),
             None,
             None,
-        ),
-        Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        )),
+        Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 Sub(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
@@ -92,7 +94,7 @@ fn multiple_integrity_constraints() {
             )),
             None,
             None,
-        ),
+        )),
     ])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -103,23 +105,25 @@ fn integrity_constraint_with_periodic_col() {
     integrity_constraints:
         enf k0 + b = 0";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        ConstraintType::Inline(IntegrityConstraint::new(
-            Add(
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("k0".to_string()),
-                    AccessType::Default,
-                    0,
-                ))),
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("b".to_string()),
-                    AccessType::Default,
-                    0,
-                ))),
-            ),
-            Const(0),
-        )),
-        None,
-        None,
+        IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
+                Add(
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("k0".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("b".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
+                ),
+                Const(0),
+            )),
+            None,
+            None,
+        ),
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -130,23 +134,25 @@ fn integrity_constraint_with_random_value() {
     integrity_constraints:
         enf a + $rand[1] = 0";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        ConstraintType::Inline(IntegrityConstraint::new(
-            Add(
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("a".to_string()),
-                    AccessType::Default,
-                    0,
-                ))),
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("$rand".to_string()),
-                    AccessType::Vector(1),
-                    0,
-                ))),
-            ),
-            Const(0),
-        )),
-        None,
-        None,
+        IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
+                Add(
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("a".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("$rand".to_string()),
+                        AccessType::Vector(1),
+                        0,
+                    ))),
+                ),
+                Const(0),
+            )),
+            None,
+            None,
+        ),
     )])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -169,8 +175,8 @@ fn integrity_constraint_with_constants() {
             Identifier("C".to_string()),
             Matrix(vec![vec![0, 1], vec![1, 0]]),
         )),
-        SourceSection::IntegrityConstraints(vec![Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
@@ -198,7 +204,7 @@ fn integrity_constraint_with_constants() {
             )),
             None,
             None,
-        )]),
+        ))]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -269,8 +275,8 @@ fn integrity_constraint_with_variables() {
                 ],
             ]),
         )),
-        Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 Add(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
@@ -298,7 +304,7 @@ fn integrity_constraint_with_variables() {
             )),
             None,
             None,
-        ),
+        )),
     ])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -310,8 +316,8 @@ fn integrity_constraint_with_indexed_trace_access() {
         enf $main[0]' = $main[1] + 1
         enf $aux[0]' - $aux[1] = 1";
     let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 SymbolAccess(SymbolAccess::new(
                     Identifier("$main".to_string()),
                     AccessType::Vector(0),
@@ -328,9 +334,9 @@ fn integrity_constraint_with_indexed_trace_access() {
             )),
             None,
             None,
-        ),
-        Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        )),
+        Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 Sub(
                     Box::new(SymbolAccess(SymbolAccess::new(
                         Identifier("$aux".to_string()),
@@ -347,7 +353,7 @@ fn integrity_constraint_with_indexed_trace_access() {
             )),
             None,
             None,
-        ),
+        )),
     ])]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -371,8 +377,8 @@ fn ic_comprehension_one_iterable_identifier() {
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
             TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
-        SourceSection::IntegrityConstraints(vec![Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 SymbolAccess(SymbolAccess::new(
                     Identifier("x".to_string()),
                     AccessType::Default,
@@ -391,12 +397,12 @@ fn ic_comprehension_one_iterable_identifier() {
                     ))),
                 ),
             )),
-            None,
             Some(vec![(
                 Identifier("x".to_string()),
                 Iterable::Identifier(Identifier("c".to_string())),
             )]),
-        )]),
+            None,
+        ))]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -417,8 +423,8 @@ fn ic_comprehension_one_iterable_range() {
             TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
             TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
         ]]),
-        SourceSection::IntegrityConstraints(vec![Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 SymbolAccess(SymbolAccess::new(
                     Identifier("x".to_string()),
                     AccessType::Default,
@@ -437,12 +443,12 @@ fn ic_comprehension_one_iterable_range() {
                     ))),
                 ),
             )),
-            None,
             Some(vec![(
                 Identifier("x".to_string()),
                 Iterable::Range(Range::new(1, 4)),
             )]),
-        )]),
+            None,
+        ))]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -464,8 +470,8 @@ fn ic_comprehension_with_selectors() {
             TraceBinding::new(Identifier("c".to_string()), 0, 4, 4),
             TraceBinding::new(Identifier("$main".to_string()), 0, 0, 8),
         ]]),
-        SourceSection::IntegrityConstraints(vec![Constraint(
-            ConstraintType::Inline(IntegrityConstraint::new(
+        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Inline(InlineConstraintExpr::new(
                 SymbolAccess(SymbolAccess::new(
                     Identifier("x".to_string()),
                     AccessType::Default,
@@ -484,6 +490,10 @@ fn ic_comprehension_with_selectors() {
                     ))),
                 ),
             )),
+            Some(vec![(
+                Identifier("x".to_string()),
+                Iterable::Identifier(Identifier("c".to_string())),
+            )]),
             Some(Mul(
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("s".to_string()),
@@ -496,11 +506,7 @@ fn ic_comprehension_with_selectors() {
                     0,
                 ))),
             )),
-            Some(vec![(
-                Identifier("x".to_string()),
-                Iterable::Identifier(Identifier("c".to_string())),
-            )]),
-        )]),
+        ))]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -526,8 +532,8 @@ fn ic_comprehension_with_evaluator_call() {
                 0,
                 1,
             )]],
-            vec![Constraint(
-                ConstraintType::Inline(IntegrityConstraint::new(
+            vec![Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
                     Exp(
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("x".to_string()),
@@ -544,7 +550,7 @@ fn ic_comprehension_with_evaluator_call() {
                 )),
                 None,
                 None,
-            )],
+            ))],
         )),
         SourceSection::Trace(vec![vec![
             TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
@@ -553,8 +559,8 @@ fn ic_comprehension_with_evaluator_call() {
             TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
             TraceBinding::new(Identifier("$main".to_string()), 0, 0, 10),
         ]]),
-        SourceSection::IntegrityConstraints(vec![Constraint(
-            ConstraintType::Evaluator(EvaluatorFunctionCall::new(
+        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Evaluator(EvaluatorFunctionCall::new(
                 Identifier("is_binary".to_string()),
                 vec![vec![SymbolAccess::new(
                     Identifier("x".to_string()),
@@ -562,12 +568,12 @@ fn ic_comprehension_with_evaluator_call() {
                     0,
                 )]],
             )),
-            None,
             Some(vec![(
                 Identifier("x".to_string()),
                 Iterable::Identifier(Identifier("c".to_string())),
             )]),
-        )]),
+            None,
+        ))]),
     ]);
     build_parse_test!(source).expect_ast(expected);
 }
@@ -593,8 +599,8 @@ fn ic_comprehension_with_evaluator_and_selectors() {
                 0,
                 1,
             )]],
-            vec![Constraint(
-                ConstraintType::Inline(IntegrityConstraint::new(
+            vec![Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
                     Exp(
                         Box::new(SymbolAccess(SymbolAccess::new(
                             Identifier("x".to_string()),
@@ -611,7 +617,7 @@ fn ic_comprehension_with_evaluator_and_selectors() {
                 )),
                 None,
                 None,
-            )],
+            ))],
         )),
         SourceSection::Trace(vec![vec![
             TraceBinding::new(Identifier("s".to_string()), 0, 0, 2),
@@ -621,8 +627,8 @@ fn ic_comprehension_with_evaluator_and_selectors() {
             TraceBinding::new(Identifier("d".to_string()), 0, 8, 4),
             TraceBinding::new(Identifier("$main".to_string()), 0, 0, 12),
         ]]),
-        SourceSection::IntegrityConstraints(vec![Constraint(
-            ConstraintType::Evaluator(EvaluatorFunctionCall::new(
+        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
+            ConstraintExpr::Evaluator(EvaluatorFunctionCall::new(
                 Identifier("is_binary".to_string()),
                 vec![vec![SymbolAccess::new(
                     Identifier("x".to_string()),
@@ -630,6 +636,10 @@ fn ic_comprehension_with_evaluator_and_selectors() {
                     0,
                 )]],
             )),
+            Some(vec![(
+                Identifier("x".to_string()),
+                Iterable::Identifier(Identifier("c".to_string())),
+            )]),
             Some(Mul(
                 Box::new(SymbolAccess(SymbolAccess::new(
                     Identifier("s".to_string()),
@@ -642,11 +652,7 @@ fn ic_comprehension_with_evaluator_and_selectors() {
                     0,
                 ))),
             )),
-            Some(vec![(
-                Identifier("x".to_string()),
-                Iterable::Identifier(Identifier("c".to_string())),
-            )]),
-        )]),
+        ))]),
     ]);
 
     build_parse_test!(source).expect_ast(expected);

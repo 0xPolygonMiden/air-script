@@ -1,8 +1,9 @@
 use super::{
-    build_parse_test, AccessType, Error, Expression::*, Identifier, IntegrityConstraint,
-    IntegrityStmt::*, ParseError, Source, SourceSection::*, SymbolAccess, TraceBinding,
+    build_parse_test, AccessType, Error, Expression::*, Identifier, InlineConstraintExpr,
+    IntegrityConstraint, IntegrityStmt::*, ParseError, Source, SourceSection::*, SymbolAccess,
+    TraceBinding,
 };
-use crate::ast::ConstraintType;
+use crate::ast::ConstraintExpr;
 
 // TRACE COLUMNS
 // ================================================================================================
@@ -69,8 +70,8 @@ fn trace_columns_groups() {
             ],
         ]),
         IntegrityConstraints(vec![
-            Constraint(
-                ConstraintType::Inline(IntegrityConstraint::new(
+            Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
                     SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Vector(1),
@@ -80,9 +81,9 @@ fn trace_columns_groups() {
                 )),
                 None,
                 None,
-            ),
-            Constraint(
-                ConstraintType::Inline(IntegrityConstraint::new(
+            )),
+            Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
                     SymbolAccess(SymbolAccess::new(
                         Identifier("clk".to_string()),
                         AccessType::Default,
@@ -99,7 +100,7 @@ fn trace_columns_groups() {
                 )),
                 None,
                 None,
-            ),
+            )),
         ]),
     ]);
     build_parse_test!(source).expect_ast(expected);

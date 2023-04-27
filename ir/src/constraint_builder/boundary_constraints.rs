@@ -46,8 +46,8 @@ impl ConstraintBuilder {
         stmt: BoundaryStmt,
     ) -> Result<(), SemanticError> {
         match stmt {
-            BoundaryStmt::Constraint(constraint, _) => {
-                let (boundary, access, value) = constraint.into_parts();
+            BoundaryStmt::Constraint(constraint) => {
+                let (boundary, access, value, _) = constraint.into_parts();
 
                 let trace_access = self.symbol_table.get_trace_access(&access)?;
                 let domain = boundary.into();

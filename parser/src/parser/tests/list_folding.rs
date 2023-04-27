@@ -3,9 +3,9 @@ use air_script_core::{Iterable, ListComprehension, ListFolding, ListFoldingValue
 use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
 use crate::{
     ast::{
-        AccessType, Boundary, BoundaryConstraint, BoundaryStmt, ConstraintType, Expression::*,
-        IntegrityStmt, SourceSection::*, SymbolAccess, TraceBinding, VariableBinding,
-        VariableValueExpr,
+        AccessType, Boundary, BoundaryConstraint, BoundaryStmt, ConstraintExpr, Expression::*,
+        InlineConstraintExpr, IntegrityStmt, SourceSection::*, SymbolAccess, TraceBinding,
+        VariableBinding, VariableValueExpr,
     },
     error::{Error, ParseError},
 };
@@ -43,25 +43,23 @@ fn identifier_lf() {
                     ListFoldingValueExpr::Identifier(Identifier("c".to_string())),
                 ))),
             )),
-            BoundaryStmt::Constraint(
-                BoundaryConstraint::new(
-                    SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
-                    Boundary::First,
-                    Add(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("x".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("y".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                    ),
+            BoundaryStmt::Constraint(BoundaryConstraint::new(
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
+                Boundary::First,
+                Add(
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("y".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
                 ),
                 None,
-            ),
+            )),
         ]),
     ]);
     build_parse_test!(source).expect_ast(expected);
@@ -129,25 +127,23 @@ fn vector_lf() {
                     ]),
                 ))),
             )),
-            BoundaryStmt::Constraint(
-                BoundaryConstraint::new(
-                    SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
-                    Boundary::First,
-                    Add(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("x".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("y".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                    ),
+            BoundaryStmt::Constraint(BoundaryConstraint::new(
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
+                Boundary::First,
+                Add(
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("y".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
                 ),
                 None,
-            ),
+            )),
         ]),
     ]);
 
@@ -210,25 +206,23 @@ fn bc_one_iterable_identifier_lf() {
                     )),
                 ))),
             )),
-            BoundaryStmt::Constraint(
-                BoundaryConstraint::new(
-                    SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
-                    Boundary::First,
-                    Add(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("x".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("y".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                    ),
+            BoundaryStmt::Constraint(BoundaryConstraint::new(
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
+                Boundary::First,
+                Add(
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("y".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
                 ),
                 None,
-            ),
+            )),
         ]),
     ]);
 
@@ -312,25 +306,23 @@ fn bc_two_iterable_identifier_lf() {
                     )),
                 ))),
             )),
-            BoundaryStmt::Constraint(
-                BoundaryConstraint::new(
-                    SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
-                    Boundary::First,
-                    Add(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("x".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("y".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                    ),
+            BoundaryStmt::Constraint(BoundaryConstraint::new(
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
+                Boundary::First,
+                Add(
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("y".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
                 ),
                 None,
-            ),
+            )),
         ]),
     ]);
 
@@ -413,25 +405,23 @@ fn bc_two_iterables_identifier_range_lf() {
                     )),
                 ))),
             )),
-            BoundaryStmt::Constraint(
-                BoundaryConstraint::new(
-                    SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
-                    Boundary::First,
-                    Add(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("x".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("y".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                    ),
+            BoundaryStmt::Constraint(BoundaryConstraint::new(
+                SymbolAccess::new(Identifier("a".to_string()), AccessType::Default, 0),
+                Boundary::First,
+                Add(
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("x".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
+                    Box::new(SymbolAccess(SymbolAccess::new(
+                        Identifier("y".to_string()),
+                        AccessType::Default,
+                        0,
+                    ))),
                 ),
                 None,
-            ),
+            )),
         ]),
     ]);
 
@@ -494,8 +484,8 @@ fn ic_one_iterable_identifier_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(
-                ConstraintType::Inline(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
                     SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
@@ -516,7 +506,7 @@ fn ic_one_iterable_identifier_lf() {
                 )),
                 None,
                 None,
-            ),
+            )),
         ]),
     ]);
 
@@ -600,8 +590,8 @@ fn ic_two_iterable_identifier_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(
-                ConstraintType::Inline(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
                     SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
@@ -622,7 +612,7 @@ fn ic_two_iterable_identifier_lf() {
                 )),
                 None,
                 None,
-            ),
+            )),
         ]),
     ]);
 
@@ -705,8 +695,8 @@ fn ic_two_iterables_identifier_range_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(
-                ConstraintType::Inline(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
                     SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
@@ -727,7 +717,7 @@ fn ic_two_iterables_identifier_range_lf() {
                 )),
                 None,
                 None,
-            ),
+            )),
         ]),
     ]);
 
@@ -832,8 +822,8 @@ fn ic_three_iterables_slice_identifier_range_lf() {
                     )),
                 ))),
             )),
-            IntegrityStmt::Constraint(
-                ConstraintType::Inline(IntegrityConstraint::new(
+            IntegrityStmt::Constraint(IntegrityConstraint::new(
+                ConstraintExpr::Inline(InlineConstraintExpr::new(
                     SymbolAccess(SymbolAccess::new(
                         Identifier("a".to_string()),
                         AccessType::Default,
@@ -854,7 +844,7 @@ fn ic_three_iterables_slice_identifier_range_lf() {
                 )),
                 None,
                 None,
-            ),
+            )),
         ]),
     ]);
 
