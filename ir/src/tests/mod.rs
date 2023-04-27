@@ -4,6 +4,7 @@ use parser::parse;
 mod access;
 mod boundary_constraints;
 mod constant;
+mod constraint_comprehension;
 mod evaluators;
 mod integrity_constraints;
 mod list_comprehension;
