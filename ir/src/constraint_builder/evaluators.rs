@@ -46,14 +46,18 @@ impl ConstraintBuilder {
 
             // clone the evaluator function's graph and constraint roots and update trace access
             // indices and graph node indices according to the specified offsets
-            let (ev_call_graph, mut constraints) =
+            let (ev_call_graph, constraints) =
                 evaluator.clone_with_offsets(&trace_offsets, node_idx_offset);
 
             // extend the constraint graph with all of the nodes from the evaluator graph
             self.graph.extend(ev_call_graph);
 
             // add the roots of the evaluator function call's constraints
-            self.integrity_constraints.append(&mut constraints);
+            self.integrity_constraints
+                .resize_with(constraints.len(), Vec::new);
+            for (segment, segment_constraints) in constraints.into_iter().enumerate() {
+                self.integrity_constraints[segment].extend(segment_constraints);
+            }
         } else {
             return Err(SemanticError::evaluator_fn_not_declared(&name));
         }
