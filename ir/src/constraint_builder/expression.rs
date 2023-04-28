@@ -9,8 +9,18 @@ impl ConstraintBuilder {
     ///
     /// TODO: we can optimize this in the future in the case where lhs or rhs equals zero to just
     /// return the other expression.
-    pub(crate) fn merge_equal_exprs(&mut self, lhs: NodeIndex, rhs: NodeIndex) -> NodeIndex {
-        self.insert_graph_node(Operation::Sub(lhs, rhs))
+    pub(crate) fn merge_equal_exprs(
+        &mut self,
+        lhs: NodeIndex,
+        rhs: NodeIndex,
+        selectors: Option<NodeIndex>,
+    ) -> NodeIndex {
+        if let Some(selectors) = selectors {
+            let constraint = self.insert_graph_node(Operation::Sub(lhs, rhs));
+            self.insert_graph_node(Operation::Mul(constraint, selectors))
+        } else {
+            self.insert_graph_node(Operation::Sub(lhs, rhs))
+        }
     }
 
     /// Adds the expression to the graph and returns the [ExprDetails] of the constraint.

@@ -94,7 +94,7 @@ impl ConstraintBuilder {
                 }
 
                 // merge the two sides of the expression into a constraint.
-                let root = self.merge_equal_exprs(lhs, rhs);
+                let root = self.merge_equal_exprs(lhs, rhs, None);
 
                 // save the constraint information
                 self.insert_constraint(root, lhs_segment.into(), domain)?

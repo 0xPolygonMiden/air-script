@@ -143,3 +143,13 @@ fn list_folding() {
     let expected = expect_file!["list_folding/list_folding.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn selectors() {
+    let generated_air = Test::new("tests/selectors/selectors.air".to_string())
+        .transpile()
+        .unwrap();
+
+    let expected = expect_file!["selectors/selectors.rs"];
+    expected.assert_eq(&generated_air);
+}
