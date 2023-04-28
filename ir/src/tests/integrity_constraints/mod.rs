@@ -1,5 +1,7 @@
 use super::{parse, AirIR};
 
+mod comprehension;
+
 #[test]
 fn integrity_constraints() {
     let source = "
