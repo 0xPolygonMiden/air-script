@@ -132,18 +132,38 @@ impl AlgebraicGraph {
 
     /// Clones the graph, updates all nodes that reference the trace according to the provided set
     /// of offsets, and returns the new graph.
-    pub(crate) fn clone_with_offsets(&self, offsets: &[Vec<usize>]) -> Self {
+    pub(crate) fn clone_with_offsets(
+        &self,
+        offsets: &[Vec<usize>],
+        node_idx_offset: usize,
+    ) -> Self {
         let nodes = self
             .nodes
             .iter()
-            .map(|node| match node.op() {
-                Operation::Value(Value::TraceElement(trace_access)) => {
-                    let value = Value::TraceElement(trace_access.clone_with_offsets(offsets));
-                    Node {
-                        op: Operation::Value(value),
+            .map(|node| {
+                let op = match node.op() {
+                    Operation::Value(Value::TraceElement(trace_access)) => {
+                        let value = Value::TraceElement(trace_access.clone_with_offsets(offsets));
+                        Operation::Value(value)
                     }
-                }
-                _ => node.clone(),
+                    Operation::Add(lhs, rhs) => Operation::Add(
+                        lhs.clone_with_offset(node_idx_offset),
+                        rhs.clone_with_offset(node_idx_offset),
+                    ),
+                    Operation::Sub(lhs, rhs) => Operation::Sub(
+                        lhs.clone_with_offset(node_idx_offset),
+                        rhs.clone_with_offset(node_idx_offset),
+                    ),
+                    Operation::Mul(lhs, rhs) => Operation::Mul(
+                        lhs.clone_with_offset(node_idx_offset),
+                        rhs.clone_with_offset(node_idx_offset),
+                    ),
+                    Operation::Exp(lhs, rhs) => {
+                        Operation::Exp(lhs.clone_with_offset(node_idx_offset), *rhs)
+                    }
+                    _ => node.op().clone(),
+                };
+                Node { op }
             })
             .collect::<Vec<_>>();
 
