@@ -154,3 +154,26 @@ fn ev_call_inside_evaluator_with_aux() {
     let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
+
+#[test]
+fn ev_fn_call_with_column_group() {
+    let source = "
+    ev clk_selectors([selectors[3], clk]):
+        enf (clk' - clk) * selectors[0] * selectors[1] * selectors[2] = 0
+    
+    trace_columns:
+        main: [s[3], clk]
+        
+    public_inputs:
+        stack_inputs: [16]
+        
+    boundary_constraints:
+        enf clk.first = 0
+        
+    integrity_constraints:
+        enf clk_selectors([s, clk])";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::new(parsed);
+    assert!(result.is_ok());
+}
