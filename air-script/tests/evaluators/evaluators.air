@@ -1,0 +1,20 @@
+def EvaluatorsAir
+
+ev is_unchanged([x]):
+    enf x' = x
+
+ev is_binary([x]):
+    enf x^2 = x
+
+trace_columns:
+    main: [b]
+
+public_inputs:
+    stack_inputs: [16]
+
+boundary_constraints:
+    enf b.first = 0
+
+integrity_constraints:
+    enf is_unchanged([b])
+    enf is_binary([b])

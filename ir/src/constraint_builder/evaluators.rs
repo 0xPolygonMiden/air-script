@@ -136,7 +136,9 @@ impl Evaluator {
         node_idx_offset: usize,
     ) -> (AlgebraicGraph, Vec<Vec<ConstraintRoot>>) {
         // clone the graph, updating the nodes which reference the trace by the offsets.
-        let ev_call_graph = self.graph.clone_with_offsets(trace_offsets);
+        let ev_call_graph = self
+            .graph
+            .clone_with_offsets(trace_offsets, node_idx_offset);
 
         // create a new set of [ConstraintRoot] with updated [NodeIndex] for each constraint
         let constraints = self

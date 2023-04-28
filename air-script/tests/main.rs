@@ -77,6 +77,16 @@ fn constants() {
 }
 
 #[test]
+fn evaluators() {
+    let generated_air = Test::new("tests/evaluators/evaluators.air".to_string())
+        .transpile()
+        .unwrap();
+
+    let expected = expect_file!["evaluators/evaluators.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
 fn variables() {
     let generated_air = Test::new("tests/variables/variables.air".to_string())
         .transpile()
