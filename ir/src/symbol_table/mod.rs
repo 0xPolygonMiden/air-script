@@ -243,10 +243,11 @@ impl SymbolTable {
                 ));
             }
         };
+
         Ok(TraceAccess::new(
             columns.trace_segment(),
             col_offset,
-            1,
+            columns.size(),
             symbol_access.offset(),
         ))
     }
