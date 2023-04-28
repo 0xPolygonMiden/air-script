@@ -1,4 +1,4 @@
-use super::{parse, AirIR};
+use super::super::{parse, AirIR};
 
 #[test]
 fn list_comprehension() {

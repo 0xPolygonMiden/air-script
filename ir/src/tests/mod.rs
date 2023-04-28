@@ -6,7 +6,6 @@ mod boundary_constraints;
 mod constant;
 mod evaluators;
 mod integrity_constraints;
-mod list_comprehension;
 mod list_folding;
 mod pub_inputs;
 mod random_values;

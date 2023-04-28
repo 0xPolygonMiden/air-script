@@ -1,6 +1,4 @@
-use super::{
-    ComprehensionContext, Expression, Identifier, Iterable, SymbolAccess, VariableBinding,
-};
+use super::{ComprehensionContext, Expression, SymbolAccess, VariableBinding};
 use std::fmt::Display;
 
 // BOUNDARY STATEMENTS
@@ -83,47 +81,5 @@ impl Display for Boundary {
             Boundary::First => write!(f, "first boundary"),
             Boundary::Last => write!(f, "last boundary"),
         }
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct BoundaryConstraintComprehension {
-    access: SymbolAccess,
-    boundary: Boundary,
-    expr: Expression,
-    context: ComprehensionContext,
-}
-
-impl BoundaryConstraintComprehension {
-    pub fn new(
-        access: SymbolAccess,
-        boundary: Boundary,
-        expr: Expression,
-        context: ComprehensionContext,
-    ) -> Self {
-        Self {
-            access,
-            boundary,
-            expr,
-            context,
-        }
-    }
-
-    pub fn access(&self) -> &SymbolAccess {
-        &self.access
-    }
-
-    pub fn boundary(&self) -> Boundary {
-        self.boundary
-    }
-
-    /// Returns the expression that is evaluated for each member of the list.
-    pub fn expression(&self) -> &Expression {
-        &self.expr
-    }
-
-    /// Returns the context of the boundary constraint comprehension.
-    pub fn context(&self) -> &[(Identifier, Iterable)] {
-        &self.context
     }
 }

@@ -1,6 +1,4 @@
-use air_script_core::ComprehensionContext;
-
-use super::{EvaluatorFunctionCall, Expression, VariableBinding};
+use super::{ComprehensionContext, EvaluatorFunctionCall, Expression, VariableBinding};
 
 // INTEGRITY STATEMENTS
 // ================================================================================================

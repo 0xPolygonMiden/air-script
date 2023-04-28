@@ -1,43 +1,29 @@
 use super::{
-    AccessType, BTreeMap, ConstraintBuilder, Expression, Identifier, Iterable, ListComprehension,
-    ListFolding, ListFoldingValueExpr, SemanticError, Symbol, SymbolAccess, SymbolBinding,
-    VariableValueExpr,
+    AccessType, BTreeMap, ComprehensionContext, ConstraintBuilder, Expression, Identifier,
+    Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, NodeIndex, SemanticError,
+    Symbol, SymbolAccess, SymbolBinding, VariableValueExpr,
 };
+pub mod constraint_comprehension;
+pub mod list_comprehension;
 
-/// Maps each identifier in the list comprehension to its corresponding [Iterable].
+/// Maps each identifier in the list or constraint comprehension to its corresponding [Iterable].
 /// For e.g. if the list comprehension is:
 /// \[x + y for (x, y) in (a, b)\],
+/// the IterableContext will be:
+/// { x: Identifier(a), y: Identifier(b) }
+/// Similarly if the constraint comprehension is:
+/// enf x = y for (x, y) in (a, b),
 /// the IterableContext will be:
 /// { x: Identifier(a), y: Identifier(b) }
 type IterableContext = BTreeMap<Identifier, Iterable>;
 
 impl ConstraintBuilder {
-    /// Unfolds a list comprehension into a vector of expressions.
-    ///
-    /// # Errors
-    /// - Returns an error if there is an error while parsing any of the expressions in the expanded
-    /// vector from the list comprehension.
-    pub fn unfold_lc(&self, lc: &ListComprehension) -> Result<Vec<Expression>, SemanticError> {
-        let num_iterations = self.get_num_iterations(lc)?;
-        if num_iterations == 0 {
-            return Err(SemanticError::InvalidListComprehension(
-                "List comprehensions must have at least one iteration.".to_string(),
-            ));
-        }
-
-        let iterable_context = build_iterable_context(lc)?;
-        let vector = (0..num_iterations)
-            .map(|i| self.parse_lc_expr(lc.expression(), &iterable_context, i))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(vector)
-    }
-
-    /// Parses a list comprehension expression and creates an expression based on the index of the
-    /// expression in the list comprehension.
+    /// Parses a comprehension expression and creates an expression based on the index of the
+    /// expression in the list or constraint comprehension.
     ///
     /// # Errors
     /// - Returns an error if there is an error while parsing the sub-expression.
-    fn parse_lc_expr(
+    fn parse_comprehension_expr(
         &self,
         expression: &Expression,
         iterable_context: &IterableContext,
@@ -48,23 +34,23 @@ impl ConstraintBuilder {
                 self.parse_symbol_access(symbol_access, iterable_context, i)
             }
             Expression::Add(lhs, rhs) => {
-                let lhs = self.parse_lc_expr(lhs, iterable_context, i)?;
-                let rhs = self.parse_lc_expr(rhs, iterable_context, i)?;
+                let lhs = self.parse_comprehension_expr(lhs, iterable_context, i)?;
+                let rhs = self.parse_comprehension_expr(rhs, iterable_context, i)?;
                 Ok(Expression::Add(Box::new(lhs), Box::new(rhs)))
             }
             Expression::Sub(lhs, rhs) => {
-                let lhs = self.parse_lc_expr(lhs, iterable_context, i)?;
-                let rhs = self.parse_lc_expr(rhs, iterable_context, i)?;
+                let lhs = self.parse_comprehension_expr(lhs, iterable_context, i)?;
+                let rhs = self.parse_comprehension_expr(rhs, iterable_context, i)?;
                 Ok(Expression::Sub(Box::new(lhs), Box::new(rhs)))
             }
             Expression::Mul(lhs, rhs) => {
-                let lhs = self.parse_lc_expr(lhs, iterable_context, i)?;
-                let rhs = self.parse_lc_expr(rhs, iterable_context, i)?;
+                let lhs = self.parse_comprehension_expr(lhs, iterable_context, i)?;
+                let rhs = self.parse_comprehension_expr(rhs, iterable_context, i)?;
                 Ok(Expression::Mul(Box::new(lhs), Box::new(rhs)))
             }
             Expression::Exp(lhs, rhs) => {
-                let lhs = self.parse_lc_expr(lhs, iterable_context, i)?;
-                let rhs = self.parse_lc_expr(rhs, iterable_context, i)?;
+                let lhs = self.parse_comprehension_expr(lhs, iterable_context, i)?;
+                let rhs = self.parse_comprehension_expr(rhs, iterable_context, i)?;
                 Ok(Expression::Exp(Box::new(lhs), Box::new(rhs)))
             }
             Expression::ListFolding(lf_type) => self.parse_list_folding(lf_type, expression, i),
@@ -72,7 +58,7 @@ impl ConstraintBuilder {
         }
     }
 
-    /// Parses an identifier in a list comprehension expression.
+    /// Parses an identifier in a list or constraint comprehension expression.
     ///
     /// # Errors
     /// - Returns an error if the iterable is an identifier and that identifier does not correspond to
@@ -90,7 +76,7 @@ impl ConstraintBuilder {
         let iterable = iterable_context.get(symbol_access.ident());
         match iterable {
             // if the corresponding iterable is not present in the iterable context that means the
-            // identifier is not part of the list comprehension and we just return it as it is.
+            // identifier is not part of the comprehension and we just return it as it is.
             None => Ok(Expression::SymbolAccess(symbol_access.clone())),
             Some(iterable_type) => match iterable_type {
                 Iterable::Identifier(ident) => {
@@ -107,10 +93,10 @@ impl ConstraintBuilder {
         }
     }
 
-    /// Parses a list folding expression inside a list comprehension expression.
+    /// Parses a list folding expression inside a list or constraint comprehension expression.
     ///
     /// # Errors
-    /// - Returns an error if there is an error while unfolding the list comprehension.
+    /// - Returns an error if there is an error while unfolding the comprehension expression.
     fn parse_list_folding(
         &self,
         lf_type: &ListFolding,
@@ -122,16 +108,16 @@ impl ConstraintBuilder {
                 let list = self.build_list_from_list_folding_value(lf_value_type)?;
                 let iterable_context =
                     if let ListFoldingValueExpr::ListComprehension(lc) = lf_value_type {
-                        build_iterable_context(lc)?
+                        build_iterable_context(&lc.context().to_vec())?
                     } else {
                         BTreeMap::new()
                     };
                 if list.is_empty() {
                     return Err(SemanticError::list_folding_empty_list(lf_value_type));
                 }
-                let mut acc = self.parse_lc_expr(expression, &iterable_context, i)?;
+                let mut acc = self.parse_comprehension_expr(expression, &iterable_context, i)?;
                 for elem in list.iter().skip(1) {
-                    let expr = self.parse_lc_expr(elem, &iterable_context, i)?;
+                    let expr = self.parse_comprehension_expr(elem, &iterable_context, i)?;
                     acc = match lf_type {
                         ListFolding::Sum(_) => Expression::Add(Box::new(acc), Box::new(expr)),
                         ListFolding::Prod(_) => Expression::Mul(Box::new(acc), Box::new(expr)),
@@ -142,23 +128,26 @@ impl ConstraintBuilder {
         }
     }
 
-    /// Validates and returns the length of a list comprehension. Checks that the length of all iterables
-    /// in the list comprehension is the same.
+    /// Validates and returns the length of a list or constraint comprehension. Checks that the
+    /// length of all iterables in the list or constraint comprehension is the same.
     ///
     /// # Errors
-    /// - Returns an error if the length of any of the iterables in the list comprehension is not the
+    /// - Returns an error if the length of any of the iterables in the comprehension is not the
     ///   same.
-    fn get_num_iterations(&self, lc: &ListComprehension) -> Result<usize, SemanticError> {
-        let lc_len = self.get_iterable_len(&lc.context()[0].1)?;
-        for (_, iterable) in lc.context().iter().skip(1) {
+    fn get_num_iterations(
+        &self,
+        comprehension_context: &[(Identifier, Iterable)],
+    ) -> Result<usize, SemanticError> {
+        let comprehension_len = self.get_iterable_len(&comprehension_context[0].1)?;
+        for (_, iterable) in comprehension_context.iter().skip(1) {
             let iterable_len = self.get_iterable_len(iterable)?;
-            if iterable_len != lc_len {
-                return Err(SemanticError::InvalidListComprehension(
-                    "All iterables in a list comprehension must have the same length".to_string(),
+            if iterable_len != comprehension_len {
+                return Err(SemanticError::InvalidComprehension(
+                    "All iterables in a comprehension must have the same length".to_string(),
                 ));
             }
         }
-        Ok(lc_len)
+        Ok(comprehension_len)
     }
 
     /// Returns the length of an iterable.
@@ -175,16 +164,16 @@ impl ConstraintBuilder {
                 match symbol.binding() {
                     SymbolBinding::Variable(variable_type) => match variable_type {
                         VariableValueExpr::Vector(vector) => Ok(vector.len()),
-                        _ => Err(SemanticError::InvalidListComprehension(format!(
-                            "VariableBinding {} should be a vector for a valid list comprehension.",
-                            symbol.name()
+                        _ => Err(SemanticError::InvalidComprehension(format!(
+                            "VariableBinding {} should be a vector for a valid comprehension.",
+                            symbol.name(),
                         ))),
                     },
                     SymbolBinding::PublicInput(size) => Ok(*size),
                     SymbolBinding::Trace(trace_columns) => Ok(trace_columns.size()),
-                    _ => Err(SemanticError::InvalidListComprehension(format!(
-                        "SymbolBinding {} not supported for list comprehensions",
-                        symbol.binding()
+                    _ => Err(SemanticError::InvalidComprehension(format!(
+                        "SymbolBinding {} not supported for comprehensions",
+                        symbol.binding(),
                     ))),
                 }
             }
@@ -203,24 +192,26 @@ fn validate_access(i: usize, size: usize) -> Result<(), SemanticError> {
         Ok(())
     } else {
         Err(SemanticError::IndexOutOfRange(format!(
-            "Invalid access index {i} used in list comprehension"
+            "Invalid access index {i} used in comprehension"
         )))
     }
 }
 
-/// Builds an [IterableContext] from a given list comprehension.
+/// Builds an [IterableContext] from a given list or constraint comprehension.
 ///
 /// # Errors
-/// - Returns an error if there are duplicate members in the list comprehension.
-fn build_iterable_context(lc: &ListComprehension) -> Result<IterableContext, SemanticError> {
+/// - Returns an error if there are duplicate members in the comprehension context.
+fn build_iterable_context(
+    comprehension_context: &ComprehensionContext,
+) -> Result<IterableContext, SemanticError> {
     let mut iterable_context = IterableContext::new();
-    for (member, iterable) in lc.context() {
+    for (member, iterable) in comprehension_context {
         if iterable_context
             .insert(member.clone(), iterable.clone())
             .is_some()
         {
-            return Err(SemanticError::InvalidListComprehension(format!(
-                "Duplicate member {member} in list comprehension"
+            return Err(SemanticError::InvalidComprehension(format!(
+                "Duplicate member {member} in comprehension"
             )));
         }
     }
@@ -255,7 +246,7 @@ fn build_ident_expression(
                     Ok(vector[i].clone())
                 }
                 // TODO: Handle matrix access
-                _ => Err(SemanticError::InvalidListComprehension(format!(
+                _ => Err(SemanticError::InvalidComprehension(format!(
                     "Iterable {} should be a vector",
                     symbol.name()
                 )))?,
@@ -268,7 +259,7 @@ fn build_ident_expression(
                 SymbolAccess::new(Identifier(symbol.name().to_string()), access_type, offset);
             Ok(Expression::SymbolAccess(symbol_access))
         }
-        _ => Err(SemanticError::InvalidListComprehension(
+        _ => Err(SemanticError::InvalidComprehension(
             "{ident_type} is an invalid type for a vector".to_string(),
         ))?,
     }
@@ -303,9 +294,9 @@ fn build_slice_ident_expression(
                     Ok(vector[range_start + i].clone())
                 }
                 // TODO: Handle matrix access
-                _ => Err(SemanticError::InvalidListComprehension(format!(
-                    "VariableBinding {} should be a vector for a valid list comprehension",
-                    symbol.name()
+                _ => Err(SemanticError::InvalidComprehension(format!(
+                    "VariableBinding {} should be a vector for a valid comprehension",
+                    symbol.name(),
                 )))?,
             }
         }
@@ -316,7 +307,7 @@ fn build_slice_ident_expression(
                 SymbolAccess::new(Identifier(symbol.name().to_string()), access_type, offset);
             Ok(Expression::SymbolAccess(symbol_access))
         }
-        _ => Err(SemanticError::InvalidListComprehension(
+        _ => Err(SemanticError::InvalidComprehension(
             "{ident_type} is an invalid type for a vector".to_string(),
         ))?,
     }
