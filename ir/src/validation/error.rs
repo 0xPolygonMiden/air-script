@@ -157,6 +157,15 @@ impl SemanticError {
         ))
     }
 
+    pub(crate) fn evaluator_trace_segment_mismatch(
+        trace_segment: u8,
+        required_segment: usize,
+    ) -> Self {
+        SemanticError::InvalidUsage(format!(
+            "Evaluator function expected binding in trace segment {required_segment}, but was given binding in trace segment {trace_segment}.",
+        ))
+    }
+
     // --- INVALID CONSTRAINT ERRORS --------------------------------------------------------------
 
     pub(crate) fn incompatible_constraint_domains(
