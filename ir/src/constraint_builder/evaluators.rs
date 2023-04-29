@@ -1,6 +1,7 @@
 use super::{
     ast::{EvaluatorFunction, EvaluatorFunctionCall},
-    AlgebraicGraph, BTreeMap, ConstraintBuilder, ConstraintRoot, SemanticError, SymbolAccess,
+    AlgebraicGraph, BTreeMap, ConstraintBuilder, ConstraintRoot, NodeIndex, Operation,
+    SemanticError, SymbolAccess,
 };
 
 impl ConstraintBuilder {
@@ -33,6 +34,7 @@ impl ConstraintBuilder {
     pub(super) fn process_evaluator_call(
         &mut self,
         ev_call: EvaluatorFunctionCall,
+        selectors: Option<NodeIndex>,
     ) -> Result<(), SemanticError> {
         let (name, args) = ev_call.into_parts();
 
@@ -52,11 +54,25 @@ impl ConstraintBuilder {
             // extend the constraint graph with all of the nodes from the evaluator graph
             self.graph.extend(ev_call_graph);
 
+            if constraints.len() > self.integrity_constraints.len() {
+                self.integrity_constraints
+                    .resize_with(constraints.len(), Vec::new);
+            }
+
             // add the roots of the evaluator function call's constraints
-            self.integrity_constraints
-                .resize_with(constraints.len(), Vec::new);
             for (segment, segment_constraints) in constraints.into_iter().enumerate() {
-                self.integrity_constraints[segment].extend(segment_constraints);
+                if let Some(selectors) = selectors {
+                    for constraint in segment_constraints {
+                        let constraint_with_selectors = self
+                            .insert_graph_node(Operation::Mul(*constraint.node_index(), selectors));
+                        self.integrity_constraints[segment].push(ConstraintRoot::new(
+                            constraint_with_selectors,
+                            constraint.domain(),
+                        ));
+                    }
+                } else {
+                    self.integrity_constraints[segment].extend(segment_constraints);
+                }
             }
         } else {
             return Err(SemanticError::evaluator_fn_not_declared(&name));
