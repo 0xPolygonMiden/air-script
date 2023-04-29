@@ -162,6 +162,13 @@ fn selectors() {
 
     let expected = expect_file!["selectors/selectors.rs"];
     expected.assert_eq(&generated_air);
+
+    let generated_air = Test::new("tests/selectors/selectors_with_evaluators.air".to_string())
+        .transpile()
+        .unwrap();
+
+    let expected = expect_file!["selectors/selectors.rs"];
+    expected.assert_eq(&generated_air);
 }
 
 #[test]

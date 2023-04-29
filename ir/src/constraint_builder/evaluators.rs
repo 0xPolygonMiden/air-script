@@ -65,10 +65,13 @@ impl ConstraintBuilder {
                     for constraint in segment_constraints {
                         let constraint_with_selectors = self
                             .insert_graph_node(Operation::Mul(*constraint.node_index(), selectors));
-                        self.integrity_constraints[segment].push(ConstraintRoot::new(
-                            constraint_with_selectors,
-                            constraint.domain(),
-                        ));
+
+                        // get the segment and domain of the constraint with selectors
+                        let (trace_segment, domain) = self
+                            .graph
+                            .node_details(&constraint_with_selectors, constraint.domain())?;
+                        self.integrity_constraints[trace_segment as usize]
+                            .push(ConstraintRoot::new(constraint_with_selectors, domain));
                     }
                 } else {
                     self.integrity_constraints[segment].extend(segment_constraints);
