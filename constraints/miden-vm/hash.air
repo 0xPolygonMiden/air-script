@@ -10,22 +10,17 @@ periodic_columns:
 
 ### Helper functions ##############################################################################
 
-# Returns binary negation of the value.
-fn binary_not(value: scalar) -> scalar:
-    return 1 - value
-
-
 # Set to 1 when selector flags are (1,0,1) on rows which are multiples of 8. This is flag of 
 # the instruction that initiates Merkle path verification computation.
 fn get_f_mp(s: vector[3]) -> scalar:
-    return cycle_row_0 & s[0] & binary_not(s[1]) & s[2]
+    return cycle_row_0 & s[0] & !s[1] & s[2]
 
 
 # Set to 1 when selector flags are (1,1,0) on rows which are multiples of 8. This is flag of 
 # the instruction that initiates Merkle path verification for the "old" node value during 
 # Merkle root update computation.
 fn get_f_mv(s: vector[3]) -> scalar:
-    return cycle_row_0 & s[0] & s[1] & binary_not(s[2])
+    return cycle_row_0 & s[0] & s[1] & !s[2]
 
 
 # Set to 1 when selector flags are (1,1,1) on rows which are multiples of 8. This is flag of 
@@ -39,14 +34,14 @@ fn get_f_mu(s: vector[3]) -> scalar:
 # is flag of the instruction that absorbs a new set of elements into the hasher state when 
 # computing a linear hash of many elements.
 fn get_f_abp(s: vector[3]) -> scalar:
-    return cycle_row_7 & s[0] & binary_not(s[1]) & binary_not(s[2])
+    return cycle_row_7 & s[0] & !s[1] & !s[2]
 
 
 # Set to 1 when selector flags are (1,0,1) on rows which are 1 less than a multiple of 8. This 
 # is flag of the instruction that absorbs the next Merkle path node into the hasher state 
 # during Merkle path verification computation.
 fn get_f_mpa(s: vector[3]) -> scalar:
-    return cycle_row_7 & s[0] & binary_not(s[1]) & s[2]
+    return cycle_row_7 & s[0] & !s[1] & s[2]
 
 
 # Set to 1 when selector flags are (1,1,0) on rows which are 1 less than a multiple of 8. This 
@@ -54,7 +49,7 @@ fn get_f_mpa(s: vector[3]) -> scalar:
 # during Merkle path verification for the "old" node value during Merkle root update 
 # computation.
 fn get_f_mva(s: vector[3]) -> scalar:
-    return cycle_row_7 & s[0] & s[1] & binary_not(s[2])
+    return cycle_row_7 & s[0] & s[1] & !s[2]
 
 
 # Set to 1 when selector flags are (1,1,1) on rows which are 1 less than a multiple of 8. This 
@@ -66,22 +61,22 @@ fn get_f_mua(s: vector[3]) -> scalar:
 
 
 # We can define two flags:
-# 1. Flag f_hout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & binary_not(s[2]), 
+# 1. Flag f_hout = cycle_row_7 & !s[0] & !s[1] & !s[2],
 # which is set to 1 when selector flags are (0,0,0) on rows which are 1 less than a multiple 
 # of 8. This is flag of the instruction that returns the result of the currently running 
 # computation.
-# 2. Flag f_sout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & s[2], which is set to 1 
+# 2. Flag f_sout = cycle_row_7 & !s[0] & !s[1] & s[2], which is set to 1 
 # when selector flags are (0,0,1) on rows which are 1 less than a multiple of 8. This is flag 
 # of the instruction that returns the whole hasher state.
 #
 # Flag f_out is set to 1 when either f_hout = 1 or f_sout = 1 in the current row.
 fn get_f_out(s: vector[3]) -> scalar:
-    return cycle_row_7 & binary_not(s[0]) & binary_not(s[1])
+    return cycle_row_7 & !s[0] & !s[1]
 
 
 # Flag f_out_next is set to 1 when either f_hout = 1 or f_sout = 1 in the next row.
-fn get_f_out_next(s: vector[3]) -> scalar:
-    return cycle_row_6 & binary_not(s[0]') & binary_not(s[1]')
+fn get_f_out_next(s_next: vector[3]) -> scalar:
+    return cycle_row_6 & !s_next[0] & !s_next[1]
 
 ### Helper evaluators #############################################################################
 
@@ -97,8 +92,9 @@ ev is_unchanged([column]):
 
 # Enforce selector columns constraints
 ev selector_columns([s[3]]):
+    let s_next = [s' for s in s]
     let f_out = get_f_out(s)
-    let f_out_next = get_f_out_next(s)
+    let f_out_next = get_f_out_next(s_next)
     let f_abp = get_f_abp(s)
     let f_mpa = get_f_mpa(s)
     let f_mva = get_f_mva(s)
@@ -121,7 +117,7 @@ ev selector_columns([s[3]]):
     enf s[0]' * f_comp = 0
 
     # Enforce that no invalid combinations of flags are allowed.
-    enf cycle_row_7 * binary_not(s[0]) * s[1] = 0
+    enf cycle_row_7 * !s[0] * s[1] = 0
 
 
 # Enforce node index constraints
