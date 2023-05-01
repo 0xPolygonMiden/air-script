@@ -177,3 +177,27 @@ fn ev_fn_call_with_column_group() {
     let result = AirIR::new(parsed);
     assert!(result.is_ok());
 }
+
+#[test]
+fn err_ev_fn_call_wrong_segment_columns() {
+    let source = "
+    ev is_binary([x]):
+        enf x^2 = x
+    
+    trace_columns:
+        main: [b]
+        aux: [c]
+    
+    public_inputs:
+        stack_inputs: [16]
+    
+    boundary_constraints:
+        enf b.first = 0
+    
+    integrity_constraints:
+        enf is_binary([c])";
+
+    let parsed = parse(source).expect("Parsing failed");
+    let result = AirIR::new(parsed);
+    assert!(result.is_err());
+}

@@ -78,10 +78,17 @@ impl ConstraintBuilder {
     ) -> Result<Vec<Vec<usize>>, SemanticError> {
         // get the offsets for the trace binding accesses as a vector of indices
         let mut offsets: Vec<Vec<usize>> = Vec::new();
-        for segment in args.iter() {
+        for (segment, segment_binding_access) in args.iter().enumerate() {
             let mut segment_offsets = Vec::new();
-            for trace_binding_access in segment {
+            for trace_binding_access in segment_binding_access {
                 let trace_access = self.symbol_table.get_trace_access(trace_binding_access)?;
+
+                if trace_access.trace_segment() as usize != segment {
+                    return Err(SemanticError::evaluator_trace_segment_mismatch(
+                        trace_access.trace_segment(),
+                        segment,
+                    ));
+                }
 
                 // bindings referencing more than one trace element must be split into one offset
                 // per trace element.
