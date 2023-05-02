@@ -10,16 +10,8 @@ use memory::memory_chiplet
 ev is_binary(main: [a]):
     enf a^2 = a
 
-# Enforces that constraints are only ever selected for one chiplet at a time.
-ev chiplet_constraints(main: [s[3], chiplet_columns[15]]):
-    match enf: 
-        hash_chiplet([s[1], s[2], chip_columns]) when !s[0]
-        bitwise_chiplet([s[2], chip_columns]) when s[0] & !s[1]
-        memory_chiplet([chip_columns]) when s[0] & s[1] & !s[2]'
-
-
 # Enforces that the chiplet selector columns are set correctly.
-enf chiplet_selector_constraints(main: [s[3]]):
+enf chiplet_selectors(main: [s[3]]):
     # Enforce that selectors are binary.
     enf is_binary([s[0]])
     enf is_binary([s[1]]) when s[0]
@@ -34,7 +26,9 @@ enf chiplet_selector_constraints(main: [s[3]]):
 
 ### Chiplets Constraints ##########################################################################
 
-ev chiplets_constraints(main: [s[3], chiplet_columns[15]]):
-    enf chiplet_selector_constraints([s])
-
-    enf chiplet_constraints([s, chiplet_columns])
+ev chiplets(main: [s[3], chiplet_columns[15]]):
+    enf chiplet_selectors([s])
+    match enf: 
+        hash_chiplet([s[1], s[2], chiplet_columns]) when !s[0]
+        bitwise_chiplet([s[2], chiplet_columns]) when s[0] & !s[1]
+        memory_chiplet([chiplet_columns]) when s[0] & s[1] & !s[2]'
