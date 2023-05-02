@@ -244,10 +244,21 @@ impl SymbolTable {
             }
         };
 
+        let size = match symbol_access.access_type() {
+            AccessType::Default => columns.size(),
+            AccessType::Vector(_) => 1,
+            _ => {
+                return Err(SemanticError::invalid_access_type(
+                    symbol,
+                    symbol_access.access_type(),
+                ));
+            }
+        };
+
         Ok(TraceAccess::new(
             columns.trace_segment(),
             col_offset,
-            columns.size(),
+            size,
             symbol_access.offset(),
         ))
     }
