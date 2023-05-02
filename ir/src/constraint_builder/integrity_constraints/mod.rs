@@ -41,7 +41,7 @@ impl ConstraintBuilder {
                             self.process_integrity_constraint(inline_constraint, selectors)?;
                         }
                         ConstraintExpr::Evaluator(ev_call) => {
-                            self.process_evaluator_call(ev_call)?;
+                            self.process_evaluator_call(ev_call, selectors)?;
                         }
                     }
                 };

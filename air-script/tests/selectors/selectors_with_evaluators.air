@@ -1,0 +1,25 @@
+def SelectorsAir
+
+ev next_is_zero([clk]):
+    enf clk' = 0
+
+ev is_unchanged([clk, s]):
+    enf clk' = clk when s
+
+ev next_is_one([clk]):
+    enf clk' = 1
+
+trace_columns:
+    main: [s[3], clk]
+    
+public_inputs:
+    stack_inputs: [16]
+
+boundary_constraints:
+    enf clk.first = 0
+
+integrity_constraints:
+    enf next_is_zero([clk]) when s[0] & !s[1]
+    match enf:
+        is_unchanged([clk, s[0]]) when s[1] & s[2]
+        next_is_one([clk]) when !s[1] & !s[2]
