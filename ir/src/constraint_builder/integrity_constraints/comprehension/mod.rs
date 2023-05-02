@@ -1,7 +1,8 @@
 use super::{
-    AccessType, BTreeMap, ComprehensionContext, ConstraintBuilder, Expression, Identifier,
-    Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, NodeIndex, SemanticError,
-    Symbol, SymbolAccess, SymbolBinding, VariableValueExpr,
+    AccessType, BTreeMap, ComprehensionContext, ConstraintBuilder, ConstraintExpr,
+    EvaluatorFunctionCall, Expression, Identifier, InlineConstraintExpr, Iterable,
+    ListComprehension, ListFolding, ListFoldingValueExpr, NodeIndex, SemanticError, Symbol,
+    SymbolAccess, SymbolBinding, VariableValueExpr,
 };
 pub mod constraint_comprehension;
 pub mod list_comprehension;

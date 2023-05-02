@@ -9,7 +9,7 @@ ev is_binary([x]):
     enf x^2 = x
 
 ev are_all_binary([c[3]]):
-    enf c^2 = c for c in c
+    enf is_binary([c]) for c in c
 
 trace_columns:
     main: [b, c[3], d[3]]

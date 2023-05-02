@@ -1,5 +1,5 @@
 use super::{
-    ast::{ConstraintExpr, InlineConstraintExpr, IntegrityStmt},
+    ast::{ConstraintExpr, EvaluatorFunctionCall, InlineConstraintExpr, IntegrityStmt},
     AccessType, BTreeMap, ComprehensionContext, ConstantValueExpr, ConstraintBuilder,
     ConstraintDomain, Expression, Identifier, Iterable, ListComprehension, ListFolding,
     ListFoldingValueExpr, NodeIndex, SemanticError, Symbol, SymbolAccess, SymbolBinding,

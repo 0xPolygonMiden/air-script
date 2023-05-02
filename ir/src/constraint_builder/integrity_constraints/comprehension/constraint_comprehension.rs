@@ -1,7 +1,6 @@
-use parser::ast::{ConstraintExpr, InlineConstraintExpr};
-
 use super::{
-    build_iterable_context, ComprehensionContext, ConstraintBuilder, NodeIndex, SemanticError,
+    build_iterable_context, ComprehensionContext, ConstraintBuilder, ConstraintExpr,
+    EvaluatorFunctionCall, Expression, Identifier, InlineConstraintExpr, NodeIndex, SemanticError,
 };
 
 impl ConstraintBuilder {
@@ -45,8 +44,29 @@ impl ConstraintBuilder {
                     )?;
                 }
             }
-            ConstraintExpr::Evaluator(_) => {
-                todo!()
+            ConstraintExpr::Evaluator(ev_call) => {
+                for i in 0..num_iterations {
+                    let mut symbols = Vec::new();
+                    for segment in ev_call.args() {
+                        let mut segment_symbols = Vec::new();
+                        for arg in segment {
+                            let arg_parsed = self.parse_symbol_access(arg, &iterable_context, i)?;
+                            let arg_symbol = if let Expression::SymbolAccess(symbol) = arg_parsed {
+                                symbol
+                            } else {
+                                return Err(SemanticError::invalid_evaluator_args(
+                                    ev_call.name(),
+                                    arg_parsed,
+                                ))?;
+                            };
+                            segment_symbols.push(arg_symbol);
+                        }
+                        symbols.push(segment_symbols);
+                    }
+                    let ev_call_parsed =
+                        EvaluatorFunctionCall::new(Identifier(ev_call.name().to_string()), symbols);
+                    self.process_evaluator_call(ev_call_parsed, selectors)?;
+                }
             }
         }
         Ok(())
