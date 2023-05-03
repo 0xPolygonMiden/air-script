@@ -1,0 +1,133 @@
+use.std::crypto::fri::frie2f4
+use.std::crypto::fri::ext2fri
+use.std::crypto::fri::helper
+
+# same files as the implementation in miden-vm, it probably makes sense for the
+# codegen to keep this since it is easier to read the code
+use.stark::deep_queries
+use.stark::random_coin
+use.stark::ood_frames
+use.stark::public_inputs
+use.stark::utils
+use.stark::constants # assuming constants can be imported
+use.stark::constraints # assuming constants can be imported
+
+#! Input: [log(trace_length), num_queries, log(blowup), grinding]
+#! Output: []
+export.verify
+    # push constants to memory, e.g. [0,0,0,1]
+    exec.setup
+    #=> [log(trace_length), num_queries, log(blowup), grinding]
+
+    # Initialize the seed using proof context
+    exec.random_coin::init_seed
+    #=> [C]
+    
+    # Load public inputs
+    push.PUBLIC_INPUTS_PTR
+    exec.public_inputs::load
+    #=> [...]
+
+    # Load main trace commitment and re-seed with it
+    push.0.0.0.0
+    adv_loadw          
+    mem_storew.MAIN_TRACE_COM_PTR
+    #=> [main_trace_commitment]
+    exec.random_coin::reseed         
+    # => [...]
+
+    # Draw random ExtFelt for the auxiliary trace (this should be conditional on the number of traces in the Air definition)
+    push.AUX_RAND_ELEM_PTR
+    exec.random_coin::generate_aux_randomness
+    # Reseed with auxiliary trace commitment
+    push.0.0.0.0
+    adv_loadw
+    mem_storew.AUX_TRACE_COM_PTR
+    exec.random_coin::reseed
+    #=> [...]
+ 
+    # Draw constraint composition coefficients
+    push.COMPOSITION_COEF_PTR
+    exec.random_coin::generate_constraint_composition_coefficients
+    #=> [...]
+
+    # Reseed with constraint composition polynomial commitment
+    push.0.0.0.0
+    adv_loadw
+    mem_storew.COMPOSITION_POLY_COM_PTR
+    exec.random_coin::reseed
+    exec.random_coin::generate_z_z8
+    #=> [...]
+   
+    # Read the OOD frames for the main trace
+    exec.ood_frames::load_evaluation_frame
+    #=> [CURENT_ROW_HASH, NEXT_ROW_HASH, ...]
+
+    exec.random_coin::reseed
+    exec.random_coin::reseed
+    
+    exec.ood_frames::load_constraint_evaluations
+    # => [CONSTR_EVAL_HASH, ...]
+
+    exec.random_coin::reseed
+    
+    # Compute `H(z)`
+    exec.ood_frames::compute_Hz
+    # => [res1, res0, ...]
+
+    exec.constraints::evaluate_constraints
+    #=> [...]
+
+    # Draw random coefficients for computing DEEP composition polynomial.
+    push.DEEP_RAND_CC_PTR
+    exec.random_coin::generate_deep_composition_random_coefficients
+
+    # Compute constants needed for computing FRI queries. These are:
+    exec.helper::generate_fri_parameters
+    # => [num_fri_layers, ...]
+
+    # Reseed with FRI layer commitments 
+    push.FRI_COM_PTR
+    exec.helper::load_fri_layer_commitments
+    #=> [...]
+
+    # Check commitment to remainder polynomial coefficients.
+    # Load the NTT of remainder polynomial into memory.
+    # Check the NTT relationship.
+    exec.helper::load_and_verify_remainder
+    #=> [...]
+
+    # Check PoW nonce
+    exec.utils::check_pow
+    #=> [...]
+
+    # Draw random query indices
+    push.FRI_QUERIES_PTR
+    exec.random_coin::generate_list_indices
+    # => [...]
+    
+    # Compute deep compostion polynomial queries
+    exec.deep_queries::compute_deep_composition_polynomial_queries
+    # => [...]
+
+    # Get domain generator and a pointer to the remainder codeword
+    push.0.0.0.0
+    mem_loadw.TMP0
+    push.0.0
+    mem_loadw.TMP8
+    swap.3
+    drop drop drop
+    #=>[ptr_remainder, g]
+
+    # Get the pointer to the first layer commitment
+    push.FRI_COM_PTR
+
+    # Get the pointer to the first FRI query
+    push.FRI_QUERIES_PTR
+    #=> [ptr_query, ptr_layer, ptr_remainder, domain_gen]
+
+    # Call FRI verifier
+    exec.frie2f4::verify
+    #=> []
+end
+

@@ -1,0 +1,262 @@
+# NOTES:
+#
+# The idea is to introduce a middle IR to better represent VM operations that
+# AIR IR can't. The goals are: 1. to model what is required of the VM by the
+# stark verifier 2. to easily support transformations on it, it should be
+# somewhat easy to transform this middle IR to another representation (in
+# constrast to emitting masm directly).
+#
+# The middle IR will also represent an acyclic graph, because the VM doesn't
+# support recursion, the IR can then be lowered to MASM. Stack layout and memory
+# spill off is done by the lowering to MASM, the initial plan is to make it very
+# simple, emitting very inefficient code in order to have an working example
+# sooner than later, later on the IR and lowering can be have optimizations
+# applied (hopefully leveraging the work from the compiler team, but since that
+# is not in a usable state yet, I'm not sure if that will be a viable strategy,
+# depends on what IRs they write). The initial prototype idea is to transform
+# the acyclic graph into a binary tree, by cloning shared nodes in the graph,
+# and then emit the tree as the masm code.
+#
+# I'm making a few assumptions 1. this is not intended to generate a stark
+# verifier as library, but as an application, so it can do things like
+# using hardcoded constants for memory addreses instead of passing these by
+# parameter 2. the emitted code will have to interface with pre-existing
+# code, so it needs a way of representing data that is not controlled by
+# it, e.g. data loaded to main memory from the advice tape, and calls to
+# stdlib procedures.
+#
+# How the code will endup looking depends a lot on how the translations AIR IR
+# -> Middle IR -> MASM are done. Below is a rough sketch of what I expect the
+# first unoptimized version will emit.
+#
+# Properties of the middle IR and its builder:
+#
+# - Readable to express STARK algorithms in the IR compiler, without the MASM
+#   complexities
+# - Global internal symbol table, to identify name collisions when modifying the
+#   IR and emit readable comments
+# - Not stack based, since it needs to track things like the two elements of a
+#   ext2 field to operate on them.
+# - Some support for canonicalization, e.g. `add(x, y)` is the same as `add(y, x)`,
+#   the idea is to make it easier to find common nodes which represent the same
+#   computation.
+#     - Unique nodes, e.g. `ir.get_or_create(add(x, y))` and `ir.get_or_create(add(y, x))`, 
+#       return the same node
+# - Single threaded
+# - Support to replace a symbol with a constant to produce a new node, to
+#   support precomputing values and to reuse expressions. e.g. group evalution
+#
+# To clarify the above, the idea is to implement the feature gradually with many
+# small PRs, for that end it is useful to be able to express small pieces of the
+# program as an IR, like just the linear combination, then unit test that piece,
+# do the same for degree adjustment and merge the two to compute the constraint
+# evalution, each step should be unit testable and reviewable in isolation.
+#
+# Properties of lowering this IR to MASM:
+# - Support to translate any IR node to a proc, to support easy unit testing / property testing
+#    - E.g. `node.get_symbols()` returns the symbols in the AST that are
+#    unbound, `node.to_masm(symbols)` generates a procedure that expect the
+#    data passed on stack as determined by `symbols`
+# - Single threaded
+
+
+# Input: [n, ...]
+# Output: [g, ...]
+proc.get_root_unity
+   # compute rigth shift value
+   push.TWO_ADICITY swap sub
+
+   # compute 1 << shift
+   push.1 swap exp
+
+   # compute root-of-unity
+   push.TWO_ADIC_ROOT_OF_UNITY exp
+end
+
+# Input: [...]
+# Output: [...]
+proc.compute_divisor
+    # NOTES: The divisor needs:
+    # 1. trace length
+    # 2. number of transition exemptions (which is a constant)
+
+    # NOTE:
+    # - `trace_len` is a power-of-two starting a length 8, and being at max usize (64).
+    # - the numerator is defined as `(trace_len, ONE)`
+
+    # LOAD TRACE LENGTH
+    push.TRACE_LEN_ADDR mem_load
+    # => [trace_len, ...]
+    dup.0 ilog2
+    # => [n, trace_len, ...]
+    dup.0 exec.get_root_unity
+    # => [g, trace_len, ...]
+
+    # COMPUTE EXEMPTIONS
+    dup.0 dup.2 sub.EXEMPTIONS exp
+    # => [g**n, g, trace_len, ...]
+    repeat.EXEMPTIONS
+        swap dup.0 dup.2 mul
+        # => [g**n+1, g, g**n, trace_len, ...]
+    end
+
+    # SAVE TO MEMORY
+    # move g to front
+    # => [g, g**n+1, g**n, trace_len, ...]
+    swap
+
+    # TODO: store to memory 
+end
+
+# Input: [...]
+# Output: [degree, ...]
+proc.divisor_degree
+    # LOAD TRACE LENGTH
+    push.TRACE_LEN_ADDR mem_load add.1
+    # => [numerator_degree, ...]
+
+    sub.EXEMPTIONS
+    # => [degree, ...]
+end
+
+# Input: [...]
+# Output: [comp_degree, ...]
+proc.compositional_degree
+    # LOAD TRACE LENGTH
+    push.TRACE_LEN_ADDR mem_load
+
+    # LOAD BLOW FACTOR
+    push.BLOW_FACTOR_ADDR mem_load
+    
+    # trace_len * blow_factor - 1
+    mul sub.1
+    # => [comp_degree, ...]
+end
+
+# Input: [...]
+# Output: [trace_poly_degree, ...]
+proc.trace_poly_degree
+    # LOAD TRACE LENGTH
+    push.TRACE_LEN_ADDR mem_load
+    
+    # trace_len - 1
+    sub.1
+    # => [trace_poly_degree, ...]
+end
+
+# NOTE: Expressions generated per constraint (since the base and cycles are
+# constants), sharing IR nodes will probably be useful here, that should allow
+# for the results to be shared/cached.
+#
+# Input: [...]
+# Output: [degree, ...]
+proc.get_evaluation_degree_clk
+    # LOAD TRACE LENGTH
+    push.TRACE_LEN_ADDR mem_load
+
+    # COMPUTE RESULT `degree = base * (trace_len - 1)`
+    sub.1 push.BASE
+    # => [degree, ...]
+end
+
+# Input: [z_1, z_0, ...]
+# Output: []
+export.evaluate_constraints
+    # push accumulator for evaluations to stack
+    push.0.0
+    # => [acc_1, acc_0, z_1, z_0, ...]
+
+    exec.compute_divisor
+
+    # LOAD CURR AND NEXT VALUES
+    # --------------------------------------------------------------------------------------------
+
+    # load clk
+    padw push.OOD_TRACE_CURRENT_PTR mem_loadw
+    # => [clk, _, _, _, acc_1, acc_0, z_1, z_0, ..]
+    swap drop swap drop swap drop
+    # => [clk, acc_1, acc_0, z_1, z_0, ..]
+
+    # load clk'
+    padw push.OOD_TRACE_CURRENT_PTR mem_loadw
+    # => [_, clk', _, _, clk, acc_1, acc_0, z_1, z_0, ..]
+    drop swap drop swap drop
+    # => [clk', clk, acc_0, acc_1, z_1, z_0, ..]
+
+    # COMPUTE TRANSITION CONSTRAINT FOR CLK
+    # --------------------------------------------------------------------------------------------
+
+    # NOTE: may need a cyclic value, something like the following would be done:
+    # push.TRACE_LEN_ADDR mem_load div dup.6 dup.6 <eval_poly>
+
+    # Where clk_cons = clk + 1 - clk'
+    swap add.1 sub
+    # => [clk_cons, acc_1, acc_0, z_1, z_0, ..]
+
+    # ACCUMULATE VALUE (there are many bugs in the code below)
+    # --------------------------------------------------------------------------------------------
+
+    # Note: the computation of the degree below should probably be cached when
+    # there are more than one constraint. This could be implemented manually,
+    # that is one of the reasons why the IR should be able to represent
+    # pre-defined values in memory, so that two pieces of the program can be
+    # manually stiched together, the first computes the value and caches it,
+    # the later uses the memory position of that value. A better approach is to
+    # have an optimizing compiler, but that needs a cost model to find the
+    # cycle count, which will also be needed for the sway/move compilers, so it
+    # may make sense to wait until that is available.
+
+    # compute degree_adjustment for transition constraint
+    exec.divisor_degree exec.compositional_degree add
+    # => [target_degree, clk_cons, acc_1, acc_0, z_1, z_0, ..]
+    exec.get_evaluation_degree_clk sub
+    # => [degree, clk_cons, acc_1, acc_0, z_1, z_0, ..]
+
+    # compute x**degree_adjustment
+    dup.5 dup.5 movup.2 exp
+    # => [xp, clk_cons, acc_1, acc_0, z_1, z_0, ..]
+
+    # LOAD COEFICIENTS AND DO LINEAR INTERPOLATION
+    push.TRANSITION_COEF_ADDR mem_loadw
+    # => [coef_1, coef_1, coef_0, coef_0, xp, clk_cons, acc_1, acc_0, z_1, z_0, ..]
+    movup.4 exec.mul_base
+    # => [xp * coef_1, xp * coef_1, coef_0, coef_0, clk_cons, acc_1, acc_0, z_1, z_0, ..]
+    ext2add
+    # => [xp * coef_1 + coef_0, xp * coef_1 + coef_0, clk_cons, acc_1, acc_0, z_1, z_0, ..]
+    exec.mul_base
+
+    # MERGE RESULT
+    # => [xp * coef_1 + coef_0, xp * coef_1 + coef_0, clk_cons, acc_1, acc_0, z_1, z_0, ..]
+    movup.4 movup.4 ext2add exec.mul_base
+    # => [acc_1, acc_0, z_1, z_0, ..]
+
+    # ONCE ALL TRANSITION CONSTRAINTS HAVE BEEN DONE, APPLY THE DIVISOR
+    # --------------------------------------------------------------------------------------------
+
+    # compute degree adjustment for the boundary constraint
+    exec.compositional_degree push.CLK_DIVISOR_DEGREE add
+    exec.trace_poly_degree sub
+    # => [degree_adjustment, acc_1, acc_0, z_1, z_0, ..]
+
+    # compute xp
+    dup.4 dup.4 exp
+    # => [xp, acc_1, acc_0, z_1, z_0, ..]
+
+    # load clk
+    padw push.OOD_TRACE_CURRENT_PTR mem_loadw
+    # => [clk, _, _, _, acc_1, acc_0, z_1, z_0, ..]
+    swap drop swap drop swap drop
+    # => [clk, acc_1, acc_0, z_1, z_0, ..]
+
+    # LOAD COEFICIENTS AND DO LINEAR INTERPOLATION
+    push.BOUNDARY_COEF_ADDR mem_loadw
+    # => [coef_1, coef_1, coef_0, coef_0, xp, clk_cons, acc_1, acc_0, z_1, z_0, ..]
+    movup.4 exec.mul_base
+    # => [xp * coef_1, xp * coef_1, coef_0, coef_0, clk_cons, acc_1, acc_0, z_1, z_0, ..]
+    ext2add
+    # => [xp * coef_1 + coef_0, xp * coef_1 + coef_0, clk_cons, acc_1, acc_0, z_1, z_0, ..]
+    exec.mul_base
+
+    # TODO:
+    # - evaluate divisor
+end
