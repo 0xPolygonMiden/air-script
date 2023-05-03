@@ -7,11 +7,11 @@ use memory::memory_chiplet
 ### Helper evaluators #############################################################################
 
 # Enforces that the provided columns must be binary.
-ev is_binary(main: [a]):
+ev is_binary([a]):
     enf a^2 = a
 
 # Enforces that the chiplet selector columns are set correctly.
-enf chiplet_selectors(main: [s[3]]):
+ev chiplet_selectors([s[3]]):
     # Enforce that selectors are binary.
     enf is_binary([s[0]])
     enf is_binary([s[1]]) when s[0]
@@ -26,7 +26,9 @@ enf chiplet_selectors(main: [s[3]]):
 
 ### Chiplets Constraints ##########################################################################
 
-ev chiplets(main: [s[3], chiplet_columns[15]]):
+# Enforce the constraints on the hash, bitwise or memory chiplet, given the columns of the chiplet 
+# module trace.
+ev chiplets([s[3], chiplet_columns[15]]):
     enf chiplet_selectors([s])
     match enf: 
         hash_chiplet([s[1], s[2], chiplet_columns]) when !s[0]
