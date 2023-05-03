@@ -180,4 +180,12 @@ fn constraint_comprehension() {
 
     let expected = expect_file!["constraint_comprehension/constraint_comprehension.rs"];
     expected.assert_eq(&generated_air);
+
+    let generated_air =
+        Test::new("tests/constraint_comprehension/cc_with_evaluators.air".to_string())
+            .transpile()
+            .unwrap();
+
+    let expected = expect_file!["constraint_comprehension/constraint_comprehension.rs"];
+    expected.assert_eq(&generated_air);
 }

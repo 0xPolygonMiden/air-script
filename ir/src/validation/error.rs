@@ -1,6 +1,6 @@
 use super::{
-    AccessType, ConstrainedBoundary, ConstraintDomain, Symbol, SymbolBinding, TraceAccess,
-    TraceSegment, MIN_CYCLE_LENGTH,
+    AccessType, ConstrainedBoundary, ConstraintDomain, Expression, Symbol, SymbolBinding,
+    TraceAccess, TraceSegment, MIN_CYCLE_LENGTH,
 };
 
 #[derive(Debug)]
@@ -154,6 +154,12 @@ impl SemanticError {
     pub(crate) fn trace_segment_access_out_of_bounds(trace_segment: usize, size: usize) -> Self {
         SemanticError::IndexOutOfRange(format!(
             "Trace segment index '{trace_segment}' is greater than the number of segments in the trace ({size}).",
+        ))
+    }
+
+    pub(crate) fn invalid_evaluator_args(evaluator_name: &str, actual_args: Expression) -> Self {
+        SemanticError::InvalidUsage(format!(
+            "Evaluator function {evaluator_name} expected SymbolAccess arguments, but was given {actual_args:?} arguments.",
         ))
     }
 

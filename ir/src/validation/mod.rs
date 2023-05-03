@@ -1,6 +1,6 @@
 use super::{
-    constraints::ConstraintDomain, AccessType, ConstrainedBoundary, Symbol, SymbolBinding,
-    TraceAccess, TraceSegment, MIN_CYCLE_LENGTH,
+    constraints::ConstraintDomain, AccessType, ConstrainedBoundary, Expression, Symbol,
+    SymbolBinding, TraceAccess, TraceSegment, MIN_CYCLE_LENGTH,
 };
 
 mod error;
