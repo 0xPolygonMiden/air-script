@@ -1,13 +1,10 @@
 use super::{
-    build_parse_test, AccessType, Boundary, BoundaryConstraint, Identifier, Iterable, Range,
-    Source, SourceSection, SymbolAccess, TraceBinding,
+    AccessType, Boundary, BoundaryConstraint, Identifier, Iterable, ParseTest, Range, Source,
+    SourceSection, SymbolAccess, TraceBinding,
 };
-use crate::{
-    ast::{
-        BoundaryStmt::*, ConstantBinding, ConstantValueExpr::*, Expression::*, PublicInput,
-        VariableBinding, VariableValueExpr,
-    },
-    error::{Error, ParseError},
+use crate::ast::{
+    BoundaryStmt::*, ConstantBinding, ConstantValueExpr::*, Expression::*, PublicInput,
+    VariableBinding, VariableValueExpr,
 };
 
 // BOUNDARY STATEMENTS
@@ -26,7 +23,7 @@ fn boundary_constraint_at_first() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -42,7 +39,7 @@ fn boundary_constraint_at_last() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -50,7 +47,7 @@ fn error_invalid_boundary() {
     let source = "
     boundary_constraints:
         enf clk.0 = 15";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
@@ -73,7 +70,7 @@ fn multiple_boundary_constraints() {
             None,
         )),
     ])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -96,7 +93,7 @@ fn boundary_constraint_with_pub_input() {
             None,
         ))]),
     ]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -122,7 +119,7 @@ fn boundary_constraint_with_expr() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -168,7 +165,7 @@ fn boundary_constraint_with_const() {
             None,
         ))]),
     ]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -254,7 +251,7 @@ fn boundary_constraint_with_variables() {
             None,
         )),
     ])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 // CONSTRAINT COMPREHENSION
@@ -287,7 +284,7 @@ fn bc_comprehension_one_iterable_identifier() {
         ))]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -317,7 +314,7 @@ fn bc_comprehension_one_iterable_range() {
         ))]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -346,7 +343,7 @@ fn bc_comprehension_one_iterable_slice() {
             )]),
         ))]),
     ]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -387,7 +384,7 @@ fn bc_comprehension_two_iterable_identifiers() {
         ))]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 // INVALID BOUNDARY CONSTRAINT COMPREHENSION
@@ -402,10 +399,7 @@ fn err_bc_comprehension_one_member_two_iterables() {
     boundary_constraints:
         enf a.first = c for c in (c, d)";
 
-    let error = Error::ParseError(ParseError::InvalidConstraintComprehension(
-        "Number of members and iterables must match".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
 }
 
 #[test]
@@ -417,10 +411,7 @@ fn err_bc_comprehension_two_members_one_iterables() {
     boundary_constraints:
         enf a.first = c + d for (c, d) in c";
 
-    let error = Error::ParseError(ParseError::InvalidConstraintComprehension(
-        "Number of members and iterables must match".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
 }
 
 // INVALID BOUNDARY CONSTRAINTS
@@ -431,7 +422,7 @@ fn err_invalid_variable() {
     let source = "
     boundary_constraints:
         let a = 2^2 + [1]";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
@@ -441,10 +432,7 @@ fn err_missing_boundary_constraint() {
         let a = 2^2
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]";
-    let error = Error::ParseError(ParseError::MissingBoundaryConstraint(
-        "Declaration of at least one boundary constraint is required".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "at least one boundary constraint must be declared");
 }
 
 #[test]
@@ -453,5 +441,5 @@ fn err_empty_boundary_constraints() {
     boundary_constraints:
     integrity_constraints:
         enf clk' = clk + 1";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }

@@ -12,7 +12,7 @@ fn first_boundary_constant() {
         Token::Dot,
         Token::First,
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -26,7 +26,7 @@ fn last_boundary_constant() {
         Token::Dot,
         Token::Last,
         Token::Equal,
-        Token::Num("15".to_string()),
+        Token::Num(15),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -41,9 +41,9 @@ fn boundary_with_pub_input() {
         Token::First,
         Token::Equal,
         Token::Ident("stack_inputs".to_string()),
-        Token::Lsqb,
-        Token::Num("0".to_string()),
-        Token::Rsqb,
+        Token::LBracket,
+        Token::Num(0),
+        Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -57,14 +57,14 @@ fn boundary_expression() {
         Token::Dot,
         Token::First,
         Token::Equal,
-        Token::Num("5".to_string()),
+        Token::Num(5),
         Token::Plus,
         Token::Ident("stack_inputs".to_string()),
-        Token::Lsqb,
-        Token::Num("3".to_string()),
-        Token::Rsqb,
+        Token::LBracket,
+        Token::Num(3),
+        Token::RBracket,
         Token::Plus,
-        Token::Num("6".to_string()),
+        Token::Num(6),
     ];
     expect_valid_tokenization(source, tokens);
 }

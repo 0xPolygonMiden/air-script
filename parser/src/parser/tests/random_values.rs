@@ -1,7 +1,7 @@
 use super::{
-    build_parse_test, AccessType, Error, Expression::*, Identifier, InlineConstraintExpr,
-    IntegrityConstraint, IntegrityStmt::*, ParseError, RandBinding, RandomValues, Source,
-    SourceSection, SourceSection::*, SymbolAccess,
+    AccessType, Expression::*, Identifier, InlineConstraintExpr, IntegrityConstraint,
+    IntegrityStmt::*, ParseTest, RandBinding, RandomValues, Source, SourceSection,
+    SourceSection::*, SymbolAccess,
 };
 use crate::ast::ConstraintExpr;
 
@@ -17,7 +17,7 @@ fn random_values_fixed_list() {
         15,
         vec![RandBinding::new(Identifier("$rand".to_string()), 15)],
     ))]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -34,7 +34,7 @@ fn random_values_ident_vector() {
             RandBinding::new(Identifier("c".to_string()), 1),
         ],
     ))]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -46,7 +46,7 @@ fn random_values_custom_name() {
         14,
         vec![RandBinding::new(Identifier("$alphas".to_string()), 14)],
     ))]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -54,10 +54,7 @@ fn random_values_empty_list_error() {
     let source = "
     random_values:
         rand: []";
-    let error = Error::ParseError(ParseError::InvalidRandomValues(
-        "Random Values section cannot be empty".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error)
+    ParseTest::new().expect_diagnostic(source, "random values cannot be empty");
 }
 
 #[test]
@@ -66,10 +63,7 @@ fn random_values_multiple_declaration_error() {
     random_values:
         rand: [12]
         alphas: [a, b[2]]";
-    let error = Error::ParseError(ParseError::InvalidRandomValues(
-        "No more than one set of random values can be declared".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error)
+    ParseTest::new().expect_diagnostic(source, "only one declaration may appear in random_values");
 }
 
 #[test]
@@ -98,5 +92,5 @@ fn random_values_index_access() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }

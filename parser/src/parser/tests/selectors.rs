@@ -1,4 +1,4 @@
-use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
+use super::{Identifier, IntegrityConstraint, ParseTest, Source, SourceSection};
 use crate::ast::{
     AccessType, ConstraintExpr, Expression::*, InlineConstraintExpr, IntegrityStmt::*, SymbolAccess,
 };
@@ -35,7 +35,7 @@ fn single_selector() {
             ))),
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn chained_selectors() {
             )),
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -212,5 +212,5 @@ fn multiconstraint_selectors() {
             )),
         )),
     ])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }

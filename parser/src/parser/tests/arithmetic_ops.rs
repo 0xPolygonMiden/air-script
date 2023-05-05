@@ -1,6 +1,6 @@
 use super::{
-    build_parse_test, AccessType, ConstraintExpr, Expression::*, Identifier, InlineConstraintExpr,
-    IntegrityConstraint, IntegrityStmt::*, Source, SourceSection::*, SymbolAccess,
+    AccessType, ConstraintExpr, Expression::*, Identifier, InlineConstraintExpr,
+    IntegrityConstraint, IntegrityStmt::*, ParseTest, Source, SourceSection::*, SymbolAccess,
 };
 
 // EXPRESSIONS
@@ -33,7 +33,7 @@ fn single_addition() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn multi_addition() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn single_subtraction() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -129,7 +129,7 @@ fn multi_subtraction() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn single_multiplication() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -192,7 +192,7 @@ fn multi_multiplication() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn unit_with_parens() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -244,7 +244,7 @@ fn ops_with_parens() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -270,7 +270,7 @@ fn const_exponentiation() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -303,7 +303,7 @@ fn non_const_exponentiation() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -312,7 +312,7 @@ fn err_ops_without_matching_closing_parens() {
     let source = "
     integrity_constraints:
         enf (clk' + clk * 2 = 4";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source)
 }
 
 #[test]
@@ -321,7 +321,7 @@ fn err_closing_paren_without_opening_paren() {
     let source = "
     integrity_constraints:
         enf clk' + clk) * 2 = 4";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source)
 }
 
 #[test]
@@ -357,7 +357,7 @@ fn multi_arithmetic_ops_same_precedence() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -401,7 +401,7 @@ fn multi_arithmetic_ops_different_precedence() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }
 
 #[test]
@@ -443,5 +443,5 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected)
 }

@@ -1,13 +1,10 @@
 use air_script_core::{Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, Range};
 
-use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
-use crate::{
-    ast::{
-        AccessType, Boundary, BoundaryConstraint, BoundaryStmt, ConstraintExpr, Expression::*,
-        InlineConstraintExpr, IntegrityStmt, SourceSection::*, SymbolAccess, TraceBinding,
-        VariableBinding, VariableValueExpr,
-    },
-    error::{Error, ParseError},
+use super::{Identifier, IntegrityConstraint, ParseTest, Source};
+use crate::ast::{
+    AccessType, Boundary, BoundaryConstraint, BoundaryStmt, ConstraintExpr, Expression::*,
+    InlineConstraintExpr, IntegrityStmt, SourceSection::*, SymbolAccess, TraceBinding,
+    VariableBinding, VariableValueExpr,
 };
 
 // LIST FOLDING
@@ -62,7 +59,7 @@ fn identifier_lf() {
             )),
         ]),
     ]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -147,7 +144,7 @@ fn vector_lf() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -226,7 +223,7 @@ fn bc_one_iterable_identifier_lf() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -326,7 +323,7 @@ fn bc_two_iterable_identifier_lf() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -425,7 +422,7 @@ fn bc_two_iterables_identifier_range_lf() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -510,7 +507,7 @@ fn ic_one_iterable_identifier_lf() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -616,7 +613,7 @@ fn ic_two_iterable_identifier_lf() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -721,7 +718,7 @@ fn ic_two_iterables_identifier_range_lf() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -848,7 +845,7 @@ fn ic_three_iterables_slice_identifier_range_lf() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 // INVALID LIST FOLDING
@@ -864,8 +861,5 @@ fn err_ic_lf_single_members_double_iterables() {
         let x = sum([c for c in (c, d)])
         enf a = x";
 
-    let error = Error::ParseError(ParseError::InvalidListComprehension(
-        "Number of members and iterables must match".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
 }

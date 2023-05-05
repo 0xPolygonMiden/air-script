@@ -11,8 +11,8 @@ random_values:
         Token::Colon,
         Token::Ident("rand".to_string()),
         Token::Colon,
-        Token::Lsqb,
-        Token::Rsqb,
+        Token::LBracket,
+        Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -28,9 +28,9 @@ random_values:
         Token::Colon,
         Token::Ident("rand".to_string()),
         Token::Colon,
-        Token::Lsqb,
-        Token::Num("15".to_string()),
-        Token::Rsqb,
+        Token::LBracket,
+        Token::Num(15),
+        Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -46,16 +46,16 @@ random_values:
         Token::Colon,
         Token::Ident("rand".to_string()),
         Token::Colon,
-        Token::Lsqb,
+        Token::LBracket,
         Token::Ident("a".to_string()),
         Token::Comma,
         Token::Ident("b".to_string()),
-        Token::Lsqb,
-        Token::Num("12".to_string()),
-        Token::Rsqb,
+        Token::LBracket,
+        Token::Num(12),
+        Token::RBracket,
         Token::Comma,
         Token::Ident("c".to_string()),
-        Token::Rsqb,
+        Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -73,11 +73,11 @@ fn random_values_index_access() {
         Token::Ident("a".to_string()),
         Token::Plus,
         Token::DeclIdentRef("$alphas".to_string()),
-        Token::Lsqb,
-        Token::Num("1".to_string()),
-        Token::Rsqb,
+        Token::LBracket,
+        Token::Num(1),
+        Token::RBracket,
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
