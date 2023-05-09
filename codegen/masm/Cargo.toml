@@ -1,0 +1,15 @@
+[package]
+name = "air-codegen-masm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ir = { package = "air-ir", path="../../ir", version="0.2.0" }
+winter-prover = { package = "winter-prover", version = "0.6", default-features = false }
+processor = { package = "miden-processor", git = "https://github.com/0xPolygonMiden/miden-vm", features = ["internals"], default-features = false }
+
+[dev-dependencies]
+miden = "0.3.0"
+miden-diagnostics = { git = "https://github.com/0xpolygonmiden/miden-diagnostics" }
+parser = { package = "air-parser", path = "../../parser", version = "0.2.0" }
+assembly = { package = "miden-assembly", git = "https://github.com/0xPolygonMiden/miden-vm", default-features = false }
