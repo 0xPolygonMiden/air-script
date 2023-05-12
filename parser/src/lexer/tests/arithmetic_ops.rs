@@ -10,13 +10,13 @@ fn chained_add_ops() {
     let tokens = vec![
         Token::Enf,
         Token::Ident("clk".to_string()),
-        Token::Next,
+        Token::Quote,
         Token::Plus,
         Token::Ident("clk".to_string()),
         Token::Plus,
-        Token::Num("1".to_string()),
+        Token::Num(1),
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -27,13 +27,13 @@ fn chained_sub_ops() {
     let tokens = vec![
         Token::Enf,
         Token::Ident("clk".to_string()),
-        Token::Next,
+        Token::Quote,
         Token::Minus,
         Token::Ident("clk".to_string()),
         Token::Minus,
-        Token::Num("1".to_string()),
+        Token::Num(1),
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -44,13 +44,13 @@ fn chained_mul_ops() {
     let tokens = vec![
         Token::Enf,
         Token::Ident("clk".to_string()),
-        Token::Next,
-        Token::Mul,
+        Token::Quote,
+        Token::Star,
         Token::Ident("clk".to_string()),
-        Token::Mul,
-        Token::Num("1".to_string()),
+        Token::Star,
+        Token::Num(1),
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -61,15 +61,15 @@ fn exp_op() {
     let tokens = vec![
         Token::Enf,
         Token::Ident("clk".to_string()),
-        Token::Next,
-        Token::Exp,
-        Token::Num("2".to_string()),
+        Token::Quote,
+        Token::Caret,
+        Token::Num(2),
         Token::Minus,
         Token::Ident("clk".to_string()),
         Token::Minus,
-        Token::Num("1".to_string()),
+        Token::Num(1),
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -80,15 +80,15 @@ fn ops_with_parens() {
     let tokens = vec![
         Token::Enf,
         Token::Ident("clk".to_string()),
-        Token::Next,
+        Token::Quote,
         Token::Minus,
-        Token::Lparen,
+        Token::LParen,
         Token::Ident("clk".to_string()),
         Token::Plus,
-        Token::Num("1".to_string()),
-        Token::Rparen,
+        Token::Num(1),
+        Token::RParen,
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -99,17 +99,17 @@ fn ops_without_matching_closing_parens() {
     let source = "enf (clk' - (clk + 1) = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Lparen,
+        Token::LParen,
         Token::Ident("clk".to_string()),
-        Token::Next,
+        Token::Quote,
         Token::Minus,
-        Token::Lparen,
+        Token::LParen,
         Token::Ident("clk".to_string()),
         Token::Plus,
-        Token::Num("1".to_string()),
-        Token::Rparen,
+        Token::Num(1),
+        Token::RParen,
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }

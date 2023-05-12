@@ -1,11 +1,8 @@
-use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
-use crate::{
-    ast::{
-        AccessType, ConstraintExpr, EvaluatorFunction, EvaluatorFunctionCall, Expression::*,
-        InlineConstraintExpr, IntegrityStmt::*, Range, SymbolAccess, TraceBinding, VariableBinding,
-        VariableValueExpr,
-    },
-    error::{Error, ParseError},
+use super::{Identifier, IntegrityConstraint, ParseTest, Source, SourceSection};
+use crate::ast::{
+    AccessType, ConstraintExpr, EvaluatorFunction, EvaluatorFunctionCall, Expression::*,
+    InlineConstraintExpr, IntegrityStmt::*, Range, SymbolAccess, TraceBinding, VariableBinding,
+    VariableValueExpr,
 };
 
 // EVALUATOR FUNCTIONS
@@ -46,7 +43,7 @@ fn ev_fn_main_cols() {
             ))],
         ),
     )]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -82,7 +79,7 @@ fn ev_fn_aux_cols() {
             ))],
         ),
     )]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -164,7 +161,7 @@ fn ev_fn_main_and_aux_cols() {
             ],
         ),
     )]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -188,7 +185,7 @@ fn ev_fn_call_simple() {
         ),
     )])]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -216,7 +213,7 @@ fn ev_fn_call() {
         ),
     )])]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -250,7 +247,7 @@ fn ev_fn_call_inside_ev_fn() {
         ),
     )]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -286,7 +283,7 @@ fn ev_fn_call_with_more_than_two_args() {
         ),
     )])]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 // INVALID USE OF EVALUATOR FUNCTIONS
@@ -297,10 +294,7 @@ fn ev_fn_def_with_empty_final_arg() {
     let source = "
     ev ev_func([clk], []):
         enf clk' = clk + 1";
-    let error = Error::ParseError(ParseError::InvalidEvaluatorFunction(
-        "The last trace segment in an evaluator definition cannot be empty.".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "the last trace segment cannot be empty");
 }
 
 #[test]
@@ -308,7 +302,7 @@ fn ev_fn_call_with_no_args() {
     let source = "
     integrity_constraints:
         enf advance_clock()";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
@@ -316,20 +310,20 @@ fn ev_fn_with_invalid_params() {
     let source = "
     ev advance_clock():
         enf clk' = clk + 1";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 
     let source = "
     ev advance_clock([clk] [a, b]):
         enf clk' = clk + 1";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 
     let source = "
     ev advance_clock(, [a, b]):
         enf clk' = clk + 1";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 
     let source = "
     ev advance_clock([clk],):
         enf clk' = clk + 1";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }

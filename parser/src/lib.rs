@@ -3,17 +3,28 @@ extern crate lalrpop_util;
 
 pub mod ast;
 
-mod error;
-use error::Error;
-
 mod lexer;
-use lexer::{Lexer, Token};
-
 mod parser;
-use crate::parser::SourceParser;
+
+pub use crate::parser::{ParseError, Parser};
+
+use std::sync::Arc;
+
+use miden_diagnostics::{CodeMap, DiagnosticsHandler};
 
 /// Parses the provided source and returns the AST.
-pub fn parse(source: &str) -> Result<ast::Source, lalrpop_util::ParseError<usize, Token, Error>> {
-    let lex = Lexer::new(source).spanned().map(Token::to_spanned);
-    SourceParser::new().parse(lex)
+pub fn parse(
+    diagnostics: &DiagnosticsHandler,
+    codemap: Arc<CodeMap>,
+    source: &str,
+) -> Result<ast::Source, ParseError> {
+    let parser = Parser::new((), codemap);
+    match parser.parse_string::<ast::Source, _, _>(diagnostics, source) {
+        Ok(ast) => Ok(ast),
+        Err(ParseError::Lexer(err)) => {
+            diagnostics.emit(err);
+            Err(ParseError::Failed)
+        }
+        Err(err) => Err(err),
+    }
 }

@@ -1,13 +1,10 @@
 use air_script_core::{Iterable, ListComprehension, Range};
 
-use super::{build_parse_test, Identifier, IntegrityConstraint, Source};
-use crate::{
-    ast::{
-        AccessType, Boundary, BoundaryConstraint, BoundaryStmt, ConstraintExpr, Expression::*,
-        InlineConstraintExpr, IntegrityStmt, SourceSection::*, SymbolAccess, TraceBinding,
-        VariableBinding, VariableValueExpr,
-    },
-    error::{Error, ParseError},
+use super::{Identifier, IntegrityConstraint, ParseTest, Source};
+use crate::ast::{
+    AccessType, Boundary, BoundaryConstraint, BoundaryStmt, ConstraintExpr, Expression::*,
+    InlineConstraintExpr, IntegrityStmt, SourceSection::*, SymbolAccess, TraceBinding,
+    VariableBinding, VariableValueExpr,
 };
 
 // LIST COMPREHENSION
@@ -84,7 +81,7 @@ fn bc_one_iterable_identifier_lc() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -169,7 +166,7 @@ fn bc_identifier_and_range_lc() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -238,7 +235,7 @@ fn bc_iterable_slice_lc() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -321,7 +318,7 @@ fn bc_two_iterable_identifier_lc() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -426,7 +423,7 @@ fn bc_multiple_iterables_lc() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -525,7 +522,7 @@ fn ic_one_iterable_identifier_lc() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -616,7 +613,7 @@ fn ic_iterable_identifier_range_lc() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -691,7 +688,7 @@ fn ic_iterable_slice_lc() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -780,7 +777,7 @@ fn ic_two_iterable_identifier_lc() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -891,7 +888,7 @@ fn ic_multiple_iterables_lc() {
         ]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 // INVALID LIST COMPREHENSION
@@ -907,10 +904,7 @@ fn err_bc_lc_one_member_two_iterables() {
         let x = [c for c in (c, d)]
         enf a.first = x";
 
-    let error = Error::ParseError(ParseError::InvalidListComprehension(
-        "Number of members and iterables must match".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
 }
 
 #[test]
@@ -923,10 +917,7 @@ fn err_bc_lc_two_members_one_iterables() {
         let x = [c + d for (c, d) in c]
         enf a.first = x";
 
-    let error = Error::ParseError(ParseError::InvalidListComprehension(
-        "Number of members and iterables must match".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
 }
 
 #[test]
@@ -939,10 +930,7 @@ fn err_ic_lc_one_member_two_iterables() {
         let x = [c for c in (c, d)]
         enf a = x";
 
-    let error = Error::ParseError(ParseError::InvalidListComprehension(
-        "Number of members and iterables must match".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
 }
 
 #[test]
@@ -955,8 +943,5 @@ fn err_ic_lc_two_members_one_iterable() {
         let x = [c + d for (c, d) in c]
         enf a = x";
 
-    let error = Error::ParseError(ParseError::InvalidListComprehension(
-        "Number of members and iterables must match".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
 }

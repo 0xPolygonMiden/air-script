@@ -1,18 +1,10 @@
-use crate::{
-    ast::{
-        boundary_constraints::{Boundary, BoundaryConstraint, BoundaryStmt},
-        integrity_constraints::{ConstraintExpr, IntegrityConstraint, IntegrityStmt},
-        build_segment_bindings, build_trace_bindings, AccessType, ComprehensionContext, 
-        ConstantBinding, ConstantValueExpr, Expression, EvaluatorFunction, EvaluatorFunctionCall, 
-        Identifier, InlineConstraintExpr, Iterable, ListComprehension, ListFolding, ListFoldingValueExpr, PeriodicColumn, 
-        PublicInput, RandBinding, RandomValues, Range, Source, SourceSection, SymbolAccess, 
-        TraceBinding, VariableBinding, VariableValueExpr, 
-    }, error::{Error, ParseError::*}, lexer::Token
-};
-use std::str::FromStr;
-use lalrpop_util::ParseError;
+use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan};
 
-grammar;
+use crate::parser::ParseError;
+use crate::lexer::Token;
+use crate::ast::*;
+
+grammar(diagnostics: &DiagnosticsHandler);
 
 // AST NODE
 // ================================================================================================
@@ -44,18 +36,24 @@ AirDef: Identifier = {
 // ================================================================================================
 
 Trace: Vec<Vec<TraceBinding>> = {
-    "trace_columns" ":" <main_cols: MainTraceBindings?> <aux_cols: AuxTraceBindings?> =>?
+    <l:@L> "trace_columns" ":" <main_cols: MainTraceBindings?> <aux_cols: AuxTraceBindings?> <r:@R> =>?
         match (main_cols, aux_cols) {
             (Some(main_cols), Some(aux_cols)) => Ok(vec![main_cols, aux_cols]),
             (Some(main_cols), None) => Ok(vec![main_cols]),
-            (None, Some(_aux_cols)) => Err(ParseError::User {
-                error: Error::ParseError(
-                    MissingMainTraceCols("Declaration of main trace columns is required".to_string())
-                )
-            }),
-            (None, None) => Err(ParseError::User {
-                error: Error::ParseError(InvalidTraceCols("Trace Columns cannot be empty".to_string()))
-            })
+            (None, Some(_aux_cols)) => {
+                diagnostics.diagnostic(Severity::Error)
+                    .with_message("declaration of main trace columns is required")
+                    .with_primary_label(span!(l, r), "missing 'main' declaration in this section")
+                    .emit();
+                Err(ParseError::Failed.into())
+            }
+            (None, None) => {
+                diagnostics.diagnostic(Severity::Error)
+                    .with_message("trace_columns section cannot be empty")
+                    .with_primary_label(span!(l, r), "missing 'main' declaration in this section")
+                    .emit();
+                Err(ParseError::Failed.into())
+            }
         }
 }
 
@@ -87,14 +85,14 @@ Constant: ConstantBinding = {
 }
 
 ConstName: Identifier = {
-    <name: Identifier> =>? if name.0.chars().all(|v| v.is_uppercase()) {
+    <l:@L> <name: Identifier> <r:@R> =>? if name.0.chars().all(|v| v.is_uppercase()) {
         Ok(Identifier(name.to_string()))
     } else {
-        Err(ParseError::User {
-            error: Error::ParseError(InvalidConst(
-                format!("The constant name should be uppercase: {}", <>).to_string()
-            ))
-        })
+        diagnostics.diagnostic(Severity::Error)
+            .with_message("constant identifiers must be uppercase, e.g. FOO")
+            .with_primary_label(span!(l, r), "invalid name appears here")
+            .emit();
+        Err(ParseError::Failed.into())
     }
 }
 
@@ -127,35 +125,33 @@ PeriodicColumn: PeriodicColumn = {
 // ================================================================================================
 
 RandomValues: RandomValues = {
-    "random_values" ":" <rand_values: RandValuesDecl+> =>? match rand_values.len() {
-        1 => Ok(rand_values[0].clone()),
-        _ => Err(ParseError::User{
-            error: Error::ParseError(
-                InvalidRandomValues("No more than one set of random values can be declared".to_string())
-            )
-        })
+    "random_values" ":" <rand_values: RandValuesDecl> <l:@L> <extra: RandValuesDecl*> <r:@R> =>? {
+        if !extra.is_empty() {
+            diagnostics.diagnostic(Severity::Warning)
+                .with_message("only one declaration may appear in random_values")
+                .with_primary_label(span!(l, r), "these declarations will be ignored")
+                .emit();
+        }
+        Ok(rand_values)
     }
 }
 
 RandValuesDecl: RandomValues = {
     <name: DeclIdentifier> ":" <size: Size> => 
         RandomValues::new(size, vec![RandBinding::new(name, size)]),
-    <DeclIdentifier> ":" "[" "]" =>? 
-        Err(
-            ParseError::User{
-                error: Error::ParseError(
-                    InvalidRandomValues(
-                        "Random Values section cannot be empty".to_string()
-                    )
-                )
-            }
-        ),
+    <l:@L> <ignored: DeclIdentifier> ":" "[" "]" <r:@R> =>? {
+        diagnostics.diagnostic(Severity::Error)
+            .with_message("random values cannot be empty")
+            .with_primary_label(span!(l, r), "invalid declaration occurs here")
+            .emit();
+        Err(ParseError::Failed.into())
+    },
     <name: DeclIdentifier> ":" <rand_vec: Vector<RandElem>> => {
         let num_values = rand_vec.iter().map(|v| v.size()).sum();
         let mut rand_values = vec![RandBinding::new(name, num_values)];
         rand_values.extend(rand_vec);
         RandomValues::new(num_values, rand_values)
-    }
+    },
 }
 
 RandElem: RandBinding = {
@@ -176,47 +172,41 @@ EvaluatorFunction: EvaluatorFunction = {
 }
 
 EvaluatorBindings: Vec<Vec<TraceBinding>> = {
-    <trace: CommaElems<EvaluatorSegmentBindings>> =>? {
-        let bindings = build_trace_bindings(trace);
+    <l:@L> <trace: CommaElems<EvaluatorSegmentBindings>> <r:@R> =>? {
+        let mut bindings = build_trace_bindings(trace);
 
         // the last segment of trace columns cannot be empty.
-        if let Some(last_segment) = bindings.last() {
+        if let Some((span, last_segment)) = bindings.last() {
             if last_segment.is_empty() {
-                return Err(ParseError::User {
-                    error: Error::ParseError(InvalidEvaluatorFunction(
-                        "The last trace segment in an evaluator definition cannot be empty."
-                            .to_string(),
-                    )),
-                });
+                diagnostics.diagnostic(Severity::Error)
+                  .with_message("invalid evaluator function definition")
+                  .with_primary_label(*span, "the last trace segment cannot be empty")
+                  .emit();
+                return Err(ParseError::Failed.into());
             }
         }
-        Ok(bindings)
+        Ok(bindings.drain(..).map(|(_, seg)| seg).collect())
     }
 }
 
-EvaluatorSegmentBindings: Vec<(Identifier, u64)> = {
-    <elems: Vector<TraceBinding>> => elems,
-    "[" "]" => Vec::new()
+EvaluatorSegmentBindings: (SourceSpan, Vec<(Identifier, u64)>) = {
+    <l:@L> <elems: Vector<TraceBinding>> <r:@R> => (span!(l, r), elems),
+    <l:@L> "[" "]" <r:@R> => (span!(l, r), vec![]),
 }
 
 // BOUNDARY STATEMENTS
 // ================================================================================================
 
 BoundaryConstraints: Vec<BoundaryStmt> = {
-    "boundary_constraints" ":" <boundary_stmts: BoundaryStmt+> =>? {
+    <l:@L> "boundary_constraints" ":" <boundary_stmts: BoundaryStmt+> <r:@R> =>? {
         // check if at least one boundary constraint is defined
-        let boundary_constraints_exist = boundary_stmts.iter().any(|stmt| match stmt {
-            BoundaryStmt::Constraint(_) => true,
-            _ => false,
-        });
+        let boundary_constraints_exist = boundary_stmts.iter().any(|stmt| matches!(stmt, BoundaryStmt::Constraint(_)));
         if !boundary_constraints_exist {
-            return Err(ParseError::User {
-                error: Error::ParseError(
-                    MissingBoundaryConstraint(
-                        "Declaration of at least one boundary constraint is required".to_string()
-                    )
-                )
-            });
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("at least one boundary constraint must be declared")
+                .with_primary_label(span!(l, r), "missing constraint declaration in this section")
+                .emit();
+            return Err(ParseError::Failed.into());
         }
         Ok(boundary_stmts)
     }
@@ -288,7 +278,7 @@ IntegrityConstraints: Vec<IntegrityStmt> = {
 }
 
 IntegrityStmts: Vec<IntegrityStmt> = {
-    <integrity_stmts_groups: IntegrityStmtGroup+> =>? {
+    <l:@L> <integrity_stmts_groups: IntegrityStmtGroup+> <r:@R> =>? {
         let integrity_stmts: Vec<IntegrityStmt> = integrity_stmts_groups.into_iter().flatten().collect();
         // check if at least one integrity constraint is defined
         let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
@@ -296,13 +286,11 @@ IntegrityStmts: Vec<IntegrityStmt> = {
             _ => false,
         });
         if !integrity_constraints_exist {
-            return Err(ParseError::User {
-                error: Error::ParseError(
-                    MissingIntegrityConstraint(
-                        "Declaration of at least one integrity constraint is required".to_string()
-                    )
-                )
-            });
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("at least one integrity constraint must be declared")
+                .with_primary_label(span!(l, r), "missing constraint declaration in this section")
+                .emit();
+            return Err(ParseError::Failed.into());
         }
         Ok(integrity_stmts)
     },
@@ -455,26 +443,26 @@ SymbolAccessBase: (Identifier, AccessType) = {
 }
 
 ConstraintComprehension<T>: ComprehensionContext = {
-    "for" <members: Members> "in" <iterables: Iterables> =>?
+    <l:@L> "for" <members: Members> "in" <iterables: Iterables> <r:@R> =>?
         if members.len() != iterables.len() {
-            Err(ParseError::User {
-                error: Error::ParseError(InvalidConstraintComprehension(
-                    "Number of members and iterables must match".to_string()
-                ))
-            })
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("bindings and iterables lengths are mismatched")
+                .with_primary_label(span!(l, r), "in this comprehension")
+                .emit();
+            Err(ParseError::Failed.into())
         } else {
             Ok(members.into_iter().zip(iterables).collect::<Vec<_>>())
         }
 }
 
 ListComprehension<T>: ListComprehension = {
-    <expr: T> "for" <members: Members> "in" <iterables: Iterables> =>?
+    <l:@L> <expr: T> "for" <members: Members> "in" <iterables: Iterables> <r:@R> =>?
         if members.len() != iterables.len() {
-            Err(ParseError::User {
-                error: Error::ParseError(InvalidListComprehension(
-                    "Number of members and iterables must match".to_string()
-                ))
-            })
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("bindings and iterables lengths are mismatched")
+                .with_primary_label(span!(l, r), "in this comprehension")
+                .emit();
+            Err(ParseError::Failed.into())
         } else {
             Ok(ListComprehension::new(expr, members.into_iter().zip(iterables).collect::<Vec<_>>()))
         }
@@ -515,7 +503,7 @@ Range: Range = {
 }
 
 DeclIdentRef: Identifier = {
-    <ident: decl_ident_ref> => Identifier(ident.to_string())
+    <ident: decl_ident_ref> => Identifier(ident)
 }
 
 DeclIdentifier: Identifier = {
@@ -527,23 +515,20 @@ Identifier: Identifier = {
 }
 
 Num_u64: u64 = {
-    r"[0-9]+" =>? u64::from_str(&<>)
-        .map_err(|_| ParseError::User {
-            error: Error::ParseError(InvalidInt(format!("Int too big : {}", <>).to_string()))
-        })
+    int,
 }
 
 // LEXER
 // ================================================================================================
 
 extern {
-    type Error = Error;
-    type Location = usize;
+    type Error = ParseError;
+    type Location = miden_diagnostics::SourceIndex;
 
     enum Token {
         identifier => Token::Ident(<String>),
         decl_ident_ref => Token::DeclIdentRef(<String>),
-        r"[0-9]+" => Token::Num(<String>),
+        int => Token::Num(<u64>),
         "def" => Token::Def,
         "let" => Token::Let,
         "for" => Token::For,
@@ -552,8 +537,8 @@ extern {
         "prod" => Token::Prod,
         "const" => Token::Const,
         "trace_columns" => Token::TraceColumns,
-        "main" => Token::MainDecl,
-        "aux" => Token::AuxDecl,
+        "main" => Token::Main,
+        "aux" => Token::Aux,
         "public_inputs" => Token::PublicInputs,
         "periodic_columns" => Token::PeriodicColumns,
         "random_values" => Token::RandomValues,
@@ -561,26 +546,26 @@ extern {
         "first" => Token::First,
         "last" => Token::Last,
         "integrity_constraints" => Token::IntegrityConstraints,
-        "ev" => Token::EvaluatorFunction,
+        "ev" => Token::Ev,
         "enf" => Token::Enf,
         "when" => Token::When,
         "match" => Token::Match,
-        "'" => Token::Next,
+        "'" => Token::Quote,
         "=" => Token::Equal,
         "+" => Token::Plus,
         "-" => Token::Minus,
-        "*" => Token::Mul,
-        "^" => Token::Exp,
-        "&" => Token::And,
-        "|" => Token::Or,
-        "!" => Token::Not,
+        "*" => Token::Star,
+        "^" => Token::Caret,
+        "&" => Token::Ampersand,
+        "|" => Token::Bar,
+        "!" => Token::Bang,
         ":" => Token::Colon,
         "," => Token::Comma,
-        "[" => Token::Lsqb,
-        "]" => Token::Rsqb,
-        "(" => Token::Lparen,
-        ")" => Token::Rparen,
+        "[" => Token::LBracket,
+        "]" => Token::RBracket,
+        "(" => Token::LParen,
+        ")" => Token::RParen,
         "." => Token::Dot,
-        ".." => Token::Range,
+        ".." => Token::DotDot,
     }
 }

@@ -1,9 +1,12 @@
-use std::{fs, path::PathBuf};
-use structopt::StructOpt;
+use std::{fs, path::PathBuf, sync::Arc};
 
 use codegen_winter::CodeGenerator;
 use ir::AirIR;
-use parser::parse;
+use miden_diagnostics::{
+    term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
+};
+use parser::{ast::Source, Parser};
+use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -42,20 +45,19 @@ impl TranspileCmd {
             }
         };
 
-        // load source input from file
-        let source = fs::read_to_string(input_path).map_err(|err| {
-            format!(
-                "Failed to open input file `{:?}` - {}",
-                &self.input_file, err
-            )
-        })?;
+        let codemap = Arc::new(CodeMap::new());
+        let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
+        let diagnostics = DiagnosticsHandler::new(Default::default(), codemap.clone(), emitter);
+        let parser = Parser::new((), codemap);
 
-        // parse the input file to the internal representation
-        let parsed = parse(source.as_str());
-        if let Err(err) = parsed {
-            return Err(format!("{err:?}"));
-        }
-        let parsed = parsed.unwrap();
+        // Parse from file to internal representation
+        let parsed = match parser.parse_file::<Source, _, _>(&diagnostics, input_path) {
+            Ok(ast) => ast,
+            Err(err) => {
+                diagnostics.emit(err);
+                return Err("parsing failed".into());
+            }
+        };
 
         let ir = AirIR::new(parsed);
         if let Err(err) = ir {

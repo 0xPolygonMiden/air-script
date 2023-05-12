@@ -1,12 +1,8 @@
-use super::SourceParser;
-use crate::{
-    ast::*,
-    build_parse_test,
-    error::{Error, ParseError},
-};
-use std::fs;
+use crate::ast::*;
 
 mod utils;
+
+use self::utils::ParseTest;
 
 mod arithmetic_ops;
 mod boundary_constraints;
@@ -30,8 +26,6 @@ mod variables;
 
 #[test]
 fn full_air_file() {
-    let source =
-        fs::read_to_string("src/parser/tests/input/system.air").expect("Could not read file");
     let expected = Source(vec![
         // def SystemAir
         SourceSection::AirDef(Identifier("SystemAir".to_string())),
@@ -78,5 +72,6 @@ fn full_air_file() {
             ),
         )]),
     ]);
-    build_parse_test!(source.as_str()).expect_ast(expected);
+
+    ParseTest::new().expect_ast_from_file("src/parser/tests/input/system.air", expected);
 }

@@ -1,4 +1,4 @@
-use super::{build_parse_test, Identifier, Source, SourceSection::*};
+use super::{Identifier, ParseTest, Source, SourceSection::*};
 
 // COMMENTS
 // ================================================================================================
@@ -7,14 +7,14 @@ use super::{build_parse_test, Identifier, Source, SourceSection::*};
 fn simple_comment() {
     let source = "# Simple Comment";
     let expected = Source(vec![]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
 fn inline_comment() {
     let source = "def SystemAir # Simple Comment";
     let expected = Source(vec![AirDef(Identifier("SystemAir".to_string()))]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -23,5 +23,5 @@ fn multiline_comments() {
     # Comment line 2
     def SystemAir";
     let expected = Source(vec![AirDef(Identifier("SystemAir".to_string()))]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }

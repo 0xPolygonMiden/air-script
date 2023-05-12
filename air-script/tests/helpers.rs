@@ -1,6 +1,5 @@
 use codegen_winter::CodeGenerator;
 use ir::AirIR;
-use parser::parse;
 use std::fs;
 
 #[derive(Debug)]
@@ -46,5 +45,31 @@ impl Test {
         // generate Rust code targeting Winterfell
         let codegen = CodeGenerator::new(&ir);
         Ok(codegen.generate())
+    }
+}
+
+/// Parses the provided source and returns the AST.
+fn parse(source: &str) -> Result<parser::ast::Source, parser::ParseError> {
+    use miden_diagnostics::{term::termcolor::ColorChoice, *};
+    use parser::{ast, ParseError, Parser};
+    use std::sync::Arc;
+
+    let codemap = Arc::new(CodeMap::new());
+    let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
+    let config = DiagnosticsConfig {
+        verbosity: Verbosity::Warning,
+        warnings_as_errors: true,
+        no_warn: false,
+        display: Default::default(),
+    };
+    let diagnostics = DiagnosticsHandler::new(config, codemap.clone(), emitter);
+    let parser = Parser::new((), codemap);
+    match parser.parse_string::<ast::Source, _, _>(&diagnostics, source) {
+        Ok(ast) => Ok(ast),
+        Err(ParseError::Lexer(err)) => {
+            diagnostics.emit(err);
+            Err(ParseError::Failed)
+        }
+        Err(err) => Err(err),
     }
 }

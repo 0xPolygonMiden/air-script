@@ -1,4 +1,4 @@
-use super::{build_parse_test, Identifier, PublicInput, Source, SourceSection::*};
+use super::{Identifier, ParseTest, PublicInput, Source, SourceSection::*};
 
 // PUBLIC INPUTS
 // ================================================================================================
@@ -13,7 +13,7 @@ fn public_inputs() {
         PublicInput::new(Identifier("program_hash".to_string()), 4),
         PublicInput::new(Identifier("stack_inputs".to_string()), 16),
     ])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -21,5 +21,5 @@ fn error_no_public_input() {
     let source = "
     public_inputs:
     ";
-    assert!(build_parse_test!(source).parse().is_err());
+    assert!(ParseTest::new().parse(source).is_err());
 }

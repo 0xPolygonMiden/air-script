@@ -4,6 +4,8 @@ pub(crate) use air_script_core::{
     TraceBinding, TraceSegment, VariableBinding, VariableValueExpr,
 };
 
+use miden_diagnostics::SourceSpan;
+
 // declaration modules
 pub mod evaluators;
 pub use evaluators::*;
@@ -103,10 +105,12 @@ pub fn build_segment_bindings(
 
 /// Given a matrix of (Identifier, size) pairs representing a multi-segment execution trace, returns
 /// a matrix of trace bindings.
-pub fn build_trace_bindings(bindings: Vec<Vec<(Identifier, u64)>>) -> Vec<Vec<TraceBinding>> {
+pub fn build_trace_bindings(
+    bindings: Vec<(SourceSpan, Vec<(Identifier, u64)>)>,
+) -> Vec<(SourceSpan, Vec<TraceBinding>)> {
     let mut trace_cols = Vec::new();
 
-    for (segment, bindings) in bindings.into_iter().enumerate() {
+    for (segment, (span, bindings)) in bindings.into_iter().enumerate() {
         let mut segment_cols = Vec::new();
         let mut offset = 0;
         for (ident, size) in bindings.into_iter() {
@@ -114,7 +118,7 @@ pub fn build_trace_bindings(bindings: Vec<Vec<(Identifier, u64)>>) -> Vec<Vec<Tr
             segment_cols.push(TraceBinding::new(ident, segment, offset, size));
             offset += size;
         }
-        trace_cols.push(segment_cols);
+        trace_cols.push((span, segment_cols));
     }
 
     trace_cols

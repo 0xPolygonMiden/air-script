@@ -1,7 +1,6 @@
 use super::{
-    build_parse_test, AccessType, Error, Expression::*, Identifier, InlineConstraintExpr,
-    IntegrityConstraint, IntegrityStmt::*, ParseError, Source, SourceSection::*, SymbolAccess,
-    TraceBinding,
+    AccessType, Expression::*, Identifier, InlineConstraintExpr, IntegrityConstraint,
+    IntegrityStmt::*, ParseTest, Source, SourceSection::*, SymbolAccess, TraceBinding,
 };
 use crate::ast::ConstraintExpr;
 
@@ -19,7 +18,7 @@ fn trace_columns() {
         TraceBinding::new(Identifier("ctx".to_string()), 0, 2, 1),
         TraceBinding::new(Identifier("$main".to_string()), 0, 0, 3),
     ]])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -41,7 +40,7 @@ fn trace_columns_main_and_aux() {
             TraceBinding::new(Identifier("$aux".to_string()), 1, 0, 2),
         ],
     ])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -103,7 +102,7 @@ fn trace_columns_groups() {
             )),
         ]),
     ]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -111,10 +110,7 @@ fn empty_trace_columns_error() {
     let source = "
     trace_columns:";
     // Trace columns cannot be empty
-    let error = Error::ParseError(ParseError::InvalidTraceCols(
-        "Trace Columns cannot be empty".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "trace_columns section cannot be empty");
 }
 
 #[test]
@@ -130,8 +126,5 @@ fn main_trace_cols_missing_error() {
     boundary_constraints:
         enf clk.first = 0";
 
-    let error = Error::ParseError(ParseError::MissingMainTraceCols(
-        "Declaration of main trace columns is required".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "declaration of main trace columns is required");
 }

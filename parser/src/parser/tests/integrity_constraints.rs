@@ -1,14 +1,11 @@
 use super::{
-    build_parse_test, Identifier, IntegrityConstraint, Iterable, Range, Source, SourceSection,
+    Identifier, IntegrityConstraint, Iterable, ParseTest, Range, Source, SourceSection,
     TraceBinding,
 };
-use crate::{
-    ast::{
-        AccessType, ConstantBinding, ConstantValueExpr::*, ConstraintExpr, EvaluatorFunction,
-        EvaluatorFunctionCall, Expression::*, InlineConstraintExpr, IntegrityStmt::*, SymbolAccess,
-        VariableBinding, VariableValueExpr,
-    },
-    error::{Error, ParseError},
+use crate::ast::{
+    AccessType, ConstantBinding, ConstantValueExpr::*, ConstraintExpr, EvaluatorFunction,
+    EvaluatorFunctionCall, Expression::*, InlineConstraintExpr, IntegrityStmt::*, SymbolAccess,
+    VariableBinding, VariableValueExpr,
 };
 
 // INTEGRITY STATEMENTS
@@ -40,14 +37,14 @@ fn integrity_constraints() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
 fn integrity_constraints_invalid() {
     let source = "integrity_constraints:
         enf clk' = clk = 1";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
@@ -96,7 +93,7 @@ fn multiple_integrity_constraints() {
             None,
         )),
     ])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -125,7 +122,7 @@ fn integrity_constraint_with_periodic_col() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -154,7 +151,7 @@ fn integrity_constraint_with_random_value() {
             None,
         ),
     )])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -206,7 +203,7 @@ fn integrity_constraint_with_constants() {
             None,
         ))]),
     ]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -306,7 +303,7 @@ fn integrity_constraint_with_variables() {
             None,
         )),
     ])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -355,7 +352,7 @@ fn integrity_constraint_with_indexed_trace_access() {
             None,
         )),
     ])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 // CONSTRAINT COMPREHENSION
@@ -404,7 +401,7 @@ fn ic_comprehension_one_iterable_identifier() {
             None,
         ))]),
     ]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -450,7 +447,7 @@ fn ic_comprehension_one_iterable_range() {
             None,
         ))]),
     ]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -508,7 +505,7 @@ fn ic_comprehension_with_selectors() {
             )),
         ))]),
     ]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -575,7 +572,7 @@ fn ic_comprehension_with_evaluator_call() {
             None,
         ))]),
     ]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -655,7 +652,7 @@ fn ic_comprehension_with_evaluator_and_selectors() {
         ))]),
     ]);
 
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 // INVALID INTEGRITY CONSTRAINT COMPREHENSION
@@ -670,10 +667,7 @@ fn err_ic_comprehension_one_member_two_iterables() {
     integrity_constraints:
         enf a = c for c in (c, d)";
 
-    let error = Error::ParseError(ParseError::InvalidConstraintComprehension(
-        "Number of members and iterables must match".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
 }
 
 #[test]
@@ -685,10 +679,7 @@ fn err_ic_comprehension_two_members_one_iterable() {
     integrity_constraints:
         enf a = c + d for (c, d) in c";
 
-    let error = Error::ParseError(ParseError::InvalidConstraintComprehension(
-        "Number of members and iterables must match".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
 }
 
 // INVALID INTEGRITY CONSTRAINTS
@@ -701,17 +692,15 @@ fn err_missing_integrity_constraint() {
         let a = 2^2
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]";
-    let error = Error::ParseError(ParseError::MissingIntegrityConstraint(
-        "Declaration of at least one integrity constraint is required".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new()
+        .expect_diagnostic(source, "at least one integrity constraint must be declared");
 }
 
 #[test]
 fn ic_invalid() {
     let source = "integrity_constraints:
         enf clk' = clk = 1";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
@@ -719,7 +708,7 @@ fn error_invalid_next_usage() {
     let source = "
     integrity_constraints:
         enf clk'' = clk + 1";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
@@ -729,5 +718,5 @@ fn err_empty_integrity_constraints() {
         
     boundary_constraints:
         enf clk.first = 1";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }

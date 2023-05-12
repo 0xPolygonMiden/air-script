@@ -1,4 +1,4 @@
-use super::{build_parse_test, Identifier, IntegrityConstraint, Source, SourceSection};
+use super::{Identifier, IntegrityConstraint, ParseTest, Source, SourceSection};
 use crate::ast::{
     AccessType, ConstraintExpr, Expression::*, InlineConstraintExpr, IntegrityStmt::*,
     SymbolAccess, VariableBinding, VariableValueExpr,
@@ -55,7 +55,7 @@ fn variables_with_and_operators() {
             ))),
         )),
     ])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn variables_with_or_operators() {
             ))),
         )),
     ])]);
-    build_parse_test!(source).expect_ast(expected);
+    ParseTest::new().expect_ast(source, expected);
 }
 
 // VARIABLES INVALID USAGE
@@ -135,7 +135,7 @@ fn err_vector_defined_outside_boundary_or_integrity_constraints() {
     let source = "
         const A = 1
         let a = 0";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
@@ -143,7 +143,7 @@ fn err_vector_variable_with_trailing_comma() {
     let source = "
     integrity_constraints:
         let a = [1, ]";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
@@ -151,21 +151,21 @@ fn err_matrix_variable_with_trailing_comma() {
     let source = "
     integrity_constraints:
         let a = [[1, 2], ]";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
 fn err_matrix_variable_mixed_element_types() {
     let source = "integrity_constraints:
     let a = [[1, 2], 1]";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
 fn err_invalid_matrix_element() {
     let source = "integrity_constraints:
     let a = [[1, 2], [3, [4, 5]]]";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
@@ -175,5 +175,5 @@ fn err_matrix_variable_from_vector_and_reference() {
     let b = [5, 6]
     let c = [b, [7, 8]]
     let d = [[7, 8], a[0]]";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }

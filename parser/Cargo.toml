@@ -10,11 +10,14 @@ categories = ["compilers", "cryptography", "parser-implementations"]
 keywords = ["air", "stark", "zero-knowledge", "zkp"]
 edition = "2021"
 rust-version = "1.65"
+
 [build-dependencies]
-lalrpop = "0.19.7"
+lalrpop = { version = "0.20.0", default-features = false }
 
 [dependencies]
 air-script-core = { package = "air-script-core", path="../air-script-core", version="0.2.0" }
-lalrpop-util = { version = "0.19.7" }
-logos = "0.12.0"
+miden-diagnostics = { git = "https://github.com/0xPolygonMiden/miden-diagnostics" }
+miden-parsing = { git = "https://github.com/0xPolygonMiden/miden-parsing" }
+lalrpop-util = { version = "0.20.0" }
 regex = "1"
+thiserror = "1.0"
