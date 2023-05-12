@@ -23,7 +23,7 @@ ir = { package = "air-ir", path = "../ir", version = "0.2.0" }
 log = { version = "0.4", default-features = false }
 miden-diagnostics = { git = "https://github.com/0xPolygonMiden/miden-diagnostics" }
 parser = { package = "air-parser", path = "../parser", version = "0.2.0" }
-structopt = "0.3.26"
+clap = {version = "4.2", features = ["derive"]}
 
 [dev-dependencies]
 winter-air = { package = "winter-air", version = "0.5.1", default-features = false }

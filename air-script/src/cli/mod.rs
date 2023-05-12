@@ -1,2 +1,2 @@
 mod transpile;
-pub use transpile::TranspileCmd;
+pub use transpile::Transpile;
