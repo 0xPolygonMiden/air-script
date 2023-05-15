@@ -1,7 +1,7 @@
 use miden_diagnostics::SourceIndex;
 
 use super::{expect_any_error, expect_error_at_location, expect_valid_tokenization};
-use crate::lexer::{LexicalError, Token};
+use crate::lexer::{LexicalError, Symbol, Token};
 
 // IDENTIFIERS VALID TOKENIZATION
 // ================================================================================================
@@ -11,10 +11,10 @@ fn keywords_with_identifiers() {
     let source = "enf clk' = clk + 1";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Quote,
         Token::Equal,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Plus,
         Token::Num(1),
     ];
@@ -26,11 +26,11 @@ fn keyword_and_identifier_without_space() {
     let source = "enfclk' = clkdef + 1";
     let tokens = vec![
         // enfclk' is considered as an identifier by logos
-        Token::Ident("enfclk".to_string()),
+        Token::Ident(Symbol::intern("enfclk")),
         Token::Quote,
         Token::Equal,
         // clkdef is considered as an identifier by logos
-        Token::Ident("clkdef".to_string()),
+        Token::Ident(Symbol::intern("clkdef")),
         Token::Plus,
         Token::Num(1),
     ];
@@ -43,10 +43,10 @@ fn number_and_identier_without_space() {
     let tokens = vec![
         Token::Enf,
         Token::Num(1),
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Quote,
         Token::Equal,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Plus,
         Token::Num(1),
     ];
@@ -58,12 +58,12 @@ fn valid_tokenization_next_token() {
     let source = "enf clk'' = clk + 1";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Quote,
         // This is a parsing error, not a scanning error.
         Token::Quote,
         Token::Equal,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Plus,
         Token::Num(1),
     ];
@@ -75,23 +75,23 @@ fn valid_tokenization_indexed_trace_access() {
     let source = "enf $main[0]' = $main[1] + $aux[0] + $aux[1]'";
     let tokens = vec![
         Token::Enf,
-        Token::DeclIdentRef("$main".to_string()),
+        Token::DeclIdentRef(Symbol::intern("$main")),
         Token::LBracket,
         Token::Num(0),
         Token::RBracket,
         Token::Quote,
         Token::Equal,
-        Token::DeclIdentRef("$main".to_string()),
+        Token::DeclIdentRef(Symbol::intern("$main")),
         Token::LBracket,
         Token::Num(1),
         Token::RBracket,
         Token::Plus,
-        Token::DeclIdentRef("$aux".to_string()),
+        Token::DeclIdentRef(Symbol::intern("$aux")),
         Token::LBracket,
         Token::Num(0),
         Token::RBracket,
         Token::Plus,
-        Token::DeclIdentRef("$aux".to_string()),
+        Token::DeclIdentRef(Symbol::intern("$aux")),
         Token::LBracket,
         Token::Num(1),
         Token::RBracket,

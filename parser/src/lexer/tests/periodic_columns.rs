@@ -1,4 +1,4 @@
-use super::{expect_valid_tokenization, Token};
+use super::{expect_valid_tokenization, Symbol, Token};
 
 #[test]
 fn periodic_columns_kw() {
@@ -17,7 +17,7 @@ periodic_columns:
     let tokens = vec![
         Token::PeriodicColumns,
         Token::Colon,
-        Token::Ident("k0".to_string()),
+        Token::Ident(Symbol::intern("k0")),
         Token::Colon,
         Token::LBracket,
         Token::Num(1),
@@ -28,7 +28,7 @@ periodic_columns:
         Token::Comma,
         Token::Num(0),
         Token::RBracket,
-        Token::Ident("k1".to_string()),
+        Token::Ident(Symbol::intern("k1")),
         Token::Colon,
         Token::LBracket,
         Token::Num(0),
