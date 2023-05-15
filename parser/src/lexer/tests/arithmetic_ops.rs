@@ -1,5 +1,5 @@
 use super::expect_valid_tokenization;
-use crate::lexer::Token;
+use crate::{lexer::Token, Symbol};
 
 // EXPRESSIONS VALID TOKENIZATION
 // ================================================================================================
@@ -9,10 +9,10 @@ fn chained_add_ops() {
     let source = "enf clk' + clk + 1 = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Quote,
         Token::Plus,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Plus,
         Token::Num(1),
         Token::Equal,
@@ -26,10 +26,10 @@ fn chained_sub_ops() {
     let source = "enf clk' - clk - 1 = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Quote,
         Token::Minus,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Minus,
         Token::Num(1),
         Token::Equal,
@@ -43,10 +43,10 @@ fn chained_mul_ops() {
     let source = "enf clk' * clk * 1 = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Quote,
         Token::Star,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Star,
         Token::Num(1),
         Token::Equal,
@@ -60,12 +60,12 @@ fn exp_op() {
     let source = "enf clk'^2 - clk - 1 = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Quote,
         Token::Caret,
         Token::Num(2),
         Token::Minus,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Minus,
         Token::Num(1),
         Token::Equal,
@@ -79,11 +79,11 @@ fn ops_with_parens() {
     let source = "enf clk' - (clk + 1) = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Quote,
         Token::Minus,
         Token::LParen,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Plus,
         Token::Num(1),
         Token::RParen,
@@ -100,11 +100,11 @@ fn ops_without_matching_closing_parens() {
     let tokens = vec![
         Token::Enf,
         Token::LParen,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Quote,
         Token::Minus,
         Token::LParen,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Plus,
         Token::Num(1),
         Token::RParen,

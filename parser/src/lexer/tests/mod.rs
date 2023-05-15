@@ -1,5 +1,6 @@
 use crate::lexer::{Lexer, LexicalError, Token};
 use crate::parser::ParseError;
+use crate::Symbol;
 
 mod arithmetic_ops;
 mod boundary_constraints;
@@ -7,6 +8,7 @@ mod constants;
 mod evaluator_functions;
 mod identifiers;
 mod list_comprehension;
+mod modules;
 mod periodic_columns;
 mod pub_inputs;
 mod random_values;
@@ -49,9 +51,10 @@ fn expect_error_at_location(source: &str, expected: LexicalError, line: u32, col
 
     let loc = match &err {
         LexicalError::InvalidInt { span, .. } => codemap.location(span).unwrap(),
-        LexicalError::UnexpectedCharacter { start, .. } => codemap
-            .location_at_index(start.source_id(), start.index())
-            .unwrap(),
+        LexicalError::UnexpectedCharacter { start, .. } => {
+            let span = miden_diagnostics::SourceSpan::new(*start, *start);
+            codemap.location(&span).unwrap()
+        }
     };
     assert_eq!(err, expected);
     assert_eq!(loc.line, LineIndex(line));

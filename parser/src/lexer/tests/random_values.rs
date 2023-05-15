@@ -1,4 +1,4 @@
-use super::{expect_valid_tokenization, Token};
+use super::{expect_valid_tokenization, Symbol, Token};
 
 #[test]
 fn random_values_empty_list() {
@@ -9,7 +9,7 @@ random_values:
     let tokens = vec![
         Token::RandomValues,
         Token::Colon,
-        Token::Ident("rand".to_string()),
+        Token::Ident(Symbol::intern("rand")),
         Token::Colon,
         Token::LBracket,
         Token::RBracket,
@@ -26,7 +26,7 @@ random_values:
     let tokens = vec![
         Token::RandomValues,
         Token::Colon,
-        Token::Ident("rand".to_string()),
+        Token::Ident(Symbol::intern("rand")),
         Token::Colon,
         Token::LBracket,
         Token::Num(15),
@@ -44,17 +44,17 @@ random_values:
     let tokens = vec![
         Token::RandomValues,
         Token::Colon,
-        Token::Ident("rand".to_string()),
+        Token::Ident(Symbol::intern("rand")),
         Token::Colon,
         Token::LBracket,
-        Token::Ident("a".to_string()),
+        Token::Ident(Symbol::intern("a")),
         Token::Comma,
-        Token::Ident("b".to_string()),
+        Token::Ident(Symbol::intern("b")),
         Token::LBracket,
         Token::Num(12),
         Token::RBracket,
         Token::Comma,
-        Token::Ident("c".to_string()),
+        Token::Ident(Symbol::intern("c")),
         Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
@@ -70,9 +70,9 @@ fn random_values_index_access() {
         Token::IntegrityConstraints,
         Token::Colon,
         Token::Enf,
-        Token::Ident("a".to_string()),
+        Token::Ident(Symbol::intern("a")),
         Token::Plus,
-        Token::DeclIdentRef("$alphas".to_string()),
+        Token::DeclIdentRef(Symbol::intern("$alphas")),
         Token::LBracket,
         Token::Num(1),
         Token::RBracket,

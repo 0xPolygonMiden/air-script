@@ -1,4 +1,4 @@
-use super::{expect_valid_tokenization, Token};
+use super::{expect_valid_tokenization, Symbol, Token};
 
 // BOUNDARY STATEMENTS VALID TOKENIZATION
 // ================================================================================================
@@ -8,7 +8,7 @@ fn first_boundary_constant() {
     let source = "enf clk.first = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::First,
         Token::Equal,
@@ -22,7 +22,7 @@ fn last_boundary_constant() {
     let source = "enf clk.last = 15";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::Last,
         Token::Equal,
@@ -36,11 +36,11 @@ fn boundary_with_pub_input() {
     let source = "enf clk.first = stack_inputs[0]";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::First,
         Token::Equal,
-        Token::Ident("stack_inputs".to_string()),
+        Token::Ident(Symbol::intern("stack_inputs")),
         Token::LBracket,
         Token::Num(0),
         Token::RBracket,
@@ -53,13 +53,13 @@ fn boundary_expression() {
     let source = "enf clk.first = 5 + stack_inputs[3] + 6";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::First,
         Token::Equal,
         Token::Num(5),
         Token::Plus,
-        Token::Ident("stack_inputs".to_string()),
+        Token::Ident(Symbol::intern("stack_inputs")),
         Token::LBracket,
         Token::Num(3),
         Token::RBracket,
