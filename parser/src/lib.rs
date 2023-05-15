@@ -2,11 +2,12 @@
 extern crate lalrpop_util;
 
 pub mod ast;
-
 mod lexer;
 mod parser;
+pub mod symbols;
 
-pub use crate::parser::{ParseError, Parser};
+pub use self::parser::{ParseError, Parser};
+pub use self::symbols::Symbol;
 
 use std::sync::Arc;
 
