@@ -1,46 +1,100 @@
-use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan};
+use std::sync::Arc;
+use std::collections::HashSet;
 
-use crate::parser::ParseError;
-use crate::lexer::Token;
+use miden_diagnostics::{CodeMap, DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
+
 use crate::ast::*;
+use crate::lexer::Token;
+use crate::parser::ParseError;
+use crate::{symbols, Symbol};
 
-grammar(diagnostics: &DiagnosticsHandler);
+grammar(diagnostics: &DiagnosticsHandler, codemap: &Arc<CodeMap>, next_var: &mut usize);
+
+// MACROS
+// ================================================================================================
+
+// Comma-delimited with at least one element
+Comma<T>: Vec<T> = {
+    <v:(<T> ",")*> <e:T> => {
+        let mut v = v;
+        v.push(e);
+        v
+    }
+};
 
 // AST NODE
 // ================================================================================================
 
 pub Source: Source = {
-    SourceSection* => Source(<>)
+    <Program> => Source::Program(<>),
+    <Module*> =>? Library::new(diagnostics, codemap.clone(), <>)
+        .map_err(|err| ParseError::from(err).into())
+        .map(Source::Library),
 }
 
-SourceSection: SourceSection = {
-    AirDef => SourceSection::AirDef(<>),
-    Constant => SourceSection::Constant(<>),
-    Trace => SourceSection::Trace(<>),
-    PublicInputs => SourceSection::PublicInputs(<>),
-    PeriodicColumns => SourceSection::PeriodicColumns(<>),
-    RandomValues => SourceSection::RandomValues(<>),
-    EvaluatorFunction => SourceSection::EvaluatorFunction(<>),
-    BoundaryConstraints => SourceSection::BoundaryConstraints(<>),
-    IntegrityConstraints => SourceSection::IntegrityConstraints(<>),
+pub Program: Program = {
+    <root:Root> <modules:Module*> =>? {
+        let root_name = root.name;
+        let mut modules = modules;
+        modules.push(root);
+        let library = match Library::new(diagnostics, codemap.clone(), modules) {
+            Ok(lib) => lib,
+            Err(err) => return Err(ParseError::from(err).into()),
+        };
+        Program::load(diagnostics, root_name, library)
+            .map_err(|err| ParseError::from(err).into())
+    }
 }
 
-// AIR DEF
-// ================================================================================================
+pub AnyModule: Module = {
+    Root,
+    Module,
+}
 
-AirDef: Identifier = {
-    "def" <f: Identifier> => f
+Root: Module = {
+    <l:@L> "def" <name:Identifier> <decls:Declaration*> <r:@R> =>? {
+        Module::from_declarations(diagnostics, ModuleType::Root, span!(l, r), name, decls)
+            .map_err(|err| ParseError::InvalidModule(err).into())
+    }
+}
+
+Module: Module = {
+    <l:@L> "mod" <name:Identifier> <decls:Declaration*> <r:@R> =>? {
+        Module::from_declarations(diagnostics, ModuleType::Library, span!(l, r), name, decls)
+            .map_err(|err| ParseError::InvalidModule(err).into())
+    }
+}
+
+Declaration: Declaration = {
+    Import => Declaration::Import(<>),
+    Constant => Declaration::Constant(<>),
+    PeriodicColumns => Declaration::PeriodicColumns(<>),
+    RandomValues => Declaration::RandomValues(<>),
+    EvaluatorFunction => Declaration::EvaluatorFunction(<>),
+    <l:@L> <trace:Trace> <r:@R> => Declaration::Trace(Span::new(span!(l, r), trace)),
+    <PublicInputs> => Declaration::PublicInputs(<>),
+    <BoundaryConstraints> => Declaration::BoundaryConstraints(<>),
+    <IntegrityConstraints> => Declaration::IntegrityConstraints(<>),
+}
+
+Import: Span<Import> = {
+    <l:@L> "use" <module:Identifier> "::" "*" <r:@R> => Span::new(span!(l, r), Import::All { module: Identifier::new(span!(l, r), module.name()) }),
+    <l:@L> "use" <module:Identifier> "::" <item:Identifier> <r:@R> => {
+        let mut items: HashSet<Identifier> = HashSet::default();
+        items.insert(item);
+        Span::new(span!(l, r), Import::Partial { module, items })
+    }
 }
 
 // TRACE COLUMNS
 // ================================================================================================
 
-Trace: Vec<Vec<TraceBinding>> = {
-    <l:@L> "trace_columns" ":" <main_cols: MainTraceBindings?> <aux_cols: AuxTraceBindings?> <r:@R> =>?
-        match (main_cols, aux_cols) {
-            (Some(main_cols), Some(aux_cols)) => Ok(vec![main_cols, aux_cols]),
-            (Some(main_cols), None) => Ok(vec![main_cols]),
-            (None, Some(_aux_cols)) => {
+Trace: Vec<TraceSegment> = {
+    <l:@L> "trace_columns" ":" <main: MainTraceBindings?> <aux: AuxTraceBindings?> <r:@R> =>?
+        match (main, aux) {
+            (Some(main), Some(aux)) => Ok(vec![main, aux]),
+            (Some(main), None) => Ok(vec![main]),
+            (None, Some(_)) => {
                 diagnostics.diagnostic(Severity::Error)
                     .with_message("declaration of main trace columns is required")
                     .with_primary_label(span!(l, r), "missing 'main' declaration in this section")
@@ -57,183 +111,152 @@ Trace: Vec<Vec<TraceBinding>> = {
         }
 }
 
-MainTraceBindings: Vec<TraceBinding> = {
-    "main" ":" <main_cols: Vector<TraceBinding>> => 
-        build_segment_bindings(0, Identifier("$main".to_string()), main_cols),
+MainSegmentId: Identifier = {
+    <l:@L> "main" <r:@R> => Identifier::new(span!(l, r), symbols::Main),
 }
 
-AuxTraceBindings: Vec<TraceBinding> = {
-    "aux" ":" <aux_cols: Vector<TraceBinding>> => 
-        build_segment_bindings(1, Identifier("$aux".to_string()), aux_cols),
+AuxSegmentId: Identifier = {
+    <l:@L> "aux" <r:@R> => Identifier::new(span!(l, r), symbols::Aux),
 }
 
-TraceBinding: (Identifier, u64) = {
-    <name: Identifier> => (name, 1),
-    <name: Identifier> <size: Size> => (name, size)
+MainTraceBindings: TraceSegment = {
+    <l:@L> <name:MainSegmentId> ":" <bindings: Vector<TraceBinding>> <r:@R> =>
+        TraceSegment::new(span!(l, r), 0, name, bindings),
+}
+
+AuxTraceBindings: TraceSegment = {
+    <l:@L> <name:AuxSegmentId> ":" <bindings: Vector<TraceBinding>> <r:@R> =>
+        TraceSegment::new(span!(l, r), 1, name, bindings),
+}
+
+TraceBinding: Span<(Identifier, usize)> = {
+    <name: Identifier> => Span::new(name.span(), (name, 1)),
+    <l:@L> <name: Identifier> <size: Size> <r:@R> => Span::new(span!(l, r), (name, size as usize)),
 }
 
 // CONSTANTS
 // ================================================================================================
 
-Constant: ConstantBinding = {
-    "const" <name: ConstName> "=" <scalar_value: Num_u64> => 
-        ConstantBinding::new(name, ConstantValueExpr::Scalar(scalar_value)),
-    "const" <name: ConstName> "=" <vector_value: Vector<Num_u64>> =>
-        ConstantBinding::new(name, ConstantValueExpr::Vector(vector_value)),
-    "const" <name: ConstName> "=" <matrix_value: Matrix<Num_u64>> =>
-        ConstantBinding::new(name, ConstantValueExpr::Matrix(matrix_value)),
+Constant: Constant = {
+    <l:@L> "const" <name: Identifier> "=" <value: ConstExpr> <r:@R>
+        => Constant::new(span!(l, r), name, value),
 }
 
-ConstName: Identifier = {
-    <l:@L> <name: Identifier> <r:@R> =>? if name.0.chars().all(|v| v.is_uppercase()) {
-        Ok(Identifier(name.to_string()))
-    } else {
-        diagnostics.diagnostic(Severity::Error)
-            .with_message("constant identifiers must be uppercase, e.g. FOO")
-            .with_primary_label(span!(l, r), "invalid name appears here")
-            .emit();
-        Err(ParseError::Failed.into())
-    }
+ConstExpr: ConstantExpr = {
+    <Num_u64> => ConstantExpr::Scalar(<>),
+    <Vector<Num_u64>> => ConstantExpr::Vector(<>),
+    <Matrix<Num_u64>> => ConstantExpr::Matrix(<>),
 }
 
 // PUBLIC INPUTS
 // ================================================================================================
 
 // At least one public input is required.
-PublicInputs: Vec<PublicInput> = {
-    "public_inputs" ":" <pub_inputs: PublicInput+> => pub_inputs
+PublicInputs: Span<Vec<PublicInput>> = {
+    <l:@L> "public_inputs" ":" <inputs:PublicInput+> <r:@R> => Span::new(span!(l, r), inputs)
 }
 
 PublicInput: PublicInput = {
-    <name: Identifier> ":" <size: Size> => PublicInput::new(name, size),
+    <l:@L> <name: Identifier> ":" <size: Size> <r:@R>
+        => PublicInput::new(span!(l, r), name, size),
 }
 
 // PERIODIC COLUMNS
 // ================================================================================================
 
 // Periodic columns are not required, and there is no limit to the number that can be provided.
-PeriodicColumns: Vec<PeriodicColumn> = {
-    "periodic_columns" ":" <periodic_columns: PeriodicColumn*> => periodic_columns
+PeriodicColumns: Span<Vec<PeriodicColumn>> = {
+    <l:@L> "periodic_columns" ":" <columns:PeriodicColumn*> <r:@R>
+        => Span::new(span!(l, r), columns)
 }
 
 PeriodicColumn: PeriodicColumn = {
-    <name: Identifier> ":" <values: Vector<Num_u64>> =>
-        PeriodicColumn::new(name, values),
+    <l:@L> <name: Identifier> ":" <values: Vector<Num_u64>> <r:@R>
+        => PeriodicColumn::new(span!(l, r), name, values),
 }
 
 // RANDOM VALUES
 // ================================================================================================
 
 RandomValues: RandomValues = {
-    "random_values" ":" <rand_values: RandValuesDecl> <l:@L> <extra: RandValuesDecl*> <r:@R> =>? {
+    "random_values" ":" <random_values: RandValuesDef> <l:@L> <extra: RandValuesDef*> <r:@R> =>? {
         if !extra.is_empty() {
             diagnostics.diagnostic(Severity::Warning)
                 .with_message("only one declaration may appear in random_values")
                 .with_primary_label(span!(l, r), "these declarations will be ignored")
                 .emit();
         }
-        Ok(rand_values)
+        Ok(random_values)
     }
 }
 
-RandValuesDecl: RandomValues = {
-    <name: DeclIdentifier> ":" <size: Size> => 
-        RandomValues::new(size, vec![RandBinding::new(name, size)]),
-    <l:@L> <ignored: DeclIdentifier> ":" "[" "]" <r:@R> =>? {
+RandValuesDef: RandomValues = {
+    <l:@L> <name: Identifier> ":" <size: Size> <r:@R> => {
+        let name = Identifier::new(name.span(), Symbol::intern(format!("${}", &name)));
+        RandomValues::with_size(span!(l, r), name, size as usize)
+    },
+    <l:@L> <ignored: Identifier> ":" "[" "]" <r:@R> =>? {
         diagnostics.diagnostic(Severity::Error)
             .with_message("random values cannot be empty")
             .with_primary_label(span!(l, r), "invalid declaration occurs here")
             .emit();
         Err(ParseError::Failed.into())
     },
-    <name: DeclIdentifier> ":" <rand_vec: Vector<RandElem>> => {
-        let num_values = rand_vec.iter().map(|v| v.size()).sum();
-        let mut rand_values = vec![RandBinding::new(name, num_values)];
-        rand_values.extend(rand_vec);
-        RandomValues::new(num_values, rand_values)
+    <l:@L> <name: Identifier> ":" <bindings: Vector<RandBinding>> <r:@R> => {
+        let name = Identifier::new(name.span(), Symbol::intern(format!("${}", &name)));
+        RandomValues::new(span!(l, r), name, bindings)
     },
 }
 
-RandElem: RandBinding = {
-    <name: Identifier> => RandBinding::new(name, 1),
-    <name: Identifier> <size: Size> => RandBinding::new(name, size)
+RandBinding: Span<(Identifier, usize)> = {
+    <name: Identifier> => Span::new(name.span(), (name, 1)),
+    <l:@L> <name: Identifier> <size: Size> <r:@R> => Span::new(span!(l, r), (name, size as usize)),
 }
 
 // EVALUATOR FUNCTIONS
 // ================================================================================================
 
 EvaluatorFunction: EvaluatorFunction = {
-    "ev" <evaluator_fn_name: Identifier> "(" <trace: EvaluatorBindings> ")" ":"
-        <integrity_stmts: IntegrityStmts> => 
-            EvaluatorFunction::new(
-                evaluator_fn_name,
-                trace,
-                integrity_stmts),
+    <l:@L> "ev" <name: FunctionIdentifier> "(" <params: EvaluatorBindings> ")" ":" <body: StatementBlock> <r:@R>
+        => EvaluatorFunction::new(span!(l, r), name, params, body)
 }
 
-EvaluatorBindings: Vec<Vec<TraceBinding>> = {
-    <l:@L> <trace: CommaElems<EvaluatorSegmentBindings>> <r:@R> =>? {
-        let mut bindings = build_trace_bindings(trace);
+EvaluatorBindings: Vec<TraceSegment> = {
+    <l:@L> <trace: Comma<EvaluatorSegmentBindings>> <r:@R> =>? {
+        let mut segments = Vec::with_capacity(trace.len());
+
+        for (segment, (span, bindings)) in trace.into_iter().enumerate() {
+            // We generate a name for these segments to distinguish them from direct references
+            // to the actual main/aux columns. This is useful during the inlining phase
+            let segment_name = Identifier::new(span, Symbol::intern(format!("%{}", *next_var)));
+            *next_var += 1;
+            segments.push(TraceSegment::new(span, segment, segment_name, bindings));
+        }
 
         // the last segment of trace columns cannot be empty.
-        if let Some((span, last_segment)) = bindings.last() {
-            if last_segment.is_empty() {
+        if let Some(segment) = segments.last() {
+            if segment.is_empty() {
                 diagnostics.diagnostic(Severity::Error)
                   .with_message("invalid evaluator function definition")
-                  .with_primary_label(*span, "the last trace segment cannot be empty")
+                  .with_primary_label(segment.span(), "the last trace segment cannot be empty")
                   .emit();
                 return Err(ParseError::Failed.into());
             }
         }
-        Ok(bindings.drain(..).map(|(_, seg)| seg).collect())
+        Ok(segments)
     }
 }
 
-EvaluatorSegmentBindings: (SourceSpan, Vec<(Identifier, u64)>) = {
+EvaluatorSegmentBindings: (SourceSpan, Vec<Span<(Identifier, usize)>>) = {
     <l:@L> <elems: Vector<TraceBinding>> <r:@R> => (span!(l, r), elems),
     <l:@L> "[" "]" <r:@R> => (span!(l, r), vec![]),
 }
 
-// BOUNDARY STATEMENTS
+// BOUNDARY CONSTRAINTS
 // ================================================================================================
 
-BoundaryConstraints: Vec<BoundaryStmt> = {
-    <l:@L> "boundary_constraints" ":" <boundary_stmts: BoundaryStmt+> <r:@R> =>? {
-        // check if at least one boundary constraint is defined
-        let boundary_constraints_exist = boundary_stmts.iter().any(|stmt| matches!(stmt, BoundaryStmt::Constraint(_)));
-        if !boundary_constraints_exist {
-            diagnostics.diagnostic(Severity::Error)
-                .with_message("at least one boundary constraint must be declared")
-                .with_primary_label(span!(l, r), "missing constraint declaration in this section")
-                .emit();
-            return Err(ParseError::Failed.into());
-        }
-        Ok(boundary_stmts)
-    }
-}
-
-BoundaryStmt: BoundaryStmt = {
-    "let" <name: Identifier> "=" <boundary_variable_type: BoundaryVariableType> =>
-        BoundaryStmt::VariableBinding(VariableBinding::new(name, boundary_variable_type)),
-    "enf" <boundary_constraint: BoundaryConstraintExpr> =>
-        BoundaryStmt::Constraint(boundary_constraint),
-}
-
-BoundaryConstraintExpr: BoundaryConstraint = {
-    <column: SymbolAccess> "." <boundary: Boundary> "=" <value: BoundaryExpr>
-        <comprehension: ConstraintComprehension<BoundaryExpr>?> =>
-            BoundaryConstraint::new(column, boundary, value, comprehension),
-}
-
-BoundaryVariableType: VariableValueExpr = {
-    <scalar_value: BoundaryExpr> => 
-        VariableValueExpr::Scalar(scalar_value),
-    <vector_value: Vector<BoundaryExpr>> => 
-        VariableValueExpr::Vector(vector_value),
-    <matrix_value: Matrix<BoundaryExpr>> =>
-        VariableValueExpr::Matrix(matrix_value),
-    "[" <list_comprehension: ListComprehension<BoundaryExpr>> "]" =>
-        VariableValueExpr::ListComprehension(list_comprehension),
+BoundaryConstraints: Span<Vec<Statement>> = {
+    <l:@L> "boundary_constraints" ":" <body: StatementBlock> <r:@R> => Span::new(span!(l, r), body),
 }
 
 Boundary: Boundary = {
@@ -241,206 +264,189 @@ Boundary: Boundary = {
     "last" => Boundary::Last
 }
 
-// --- BOUNDARY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
-
-BoundaryExpr: Expression = {
-    <lexpr: BoundaryExpr> "+" <rexpr: BoundaryFactor> =>
-        Expression::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: BoundaryExpr> "-" <rexpr: BoundaryFactor> =>
-        Expression::Sub(Box::new(lexpr), Box::new(rexpr)),
-    BoundaryFactor
-}
-
-BoundaryFactor: Expression = {
-    <lexpr: BoundaryFactor> "*" <rexpr: BoundaryExponent> =>
-        Expression::Mul(Box::new(lexpr), Box::new(rexpr)),
-    BoundaryExponent
-}
-
-BoundaryExponent: Expression = {
-    <lexpr: BoundaryExponent> "^" <rexpr: BoundaryAtom> =>
-        Expression::Exp(Box::new(lexpr), Box::new(rexpr)),
-    BoundaryAtom
-}
-
-BoundaryAtom: Expression = {
-    "(" <BoundaryExpr> ")",
-    <n: Num_u64> => Expression::Const(n),
-    <symbol_access: SymbolAccess> => Expression::SymbolAccess(symbol_access),
-    <list_folding_type: ListFolding<BoundaryExpr>> => Expression::ListFolding(list_folding_type),
-}
-
 // INTEGRITY CONSTRAINTS
 // ================================================================================================
 
-IntegrityConstraints: Vec<IntegrityStmt> = {
-    "integrity_constraints" ":" <integrity_stmts: IntegrityStmts> => integrity_stmts
+IntegrityConstraints: Span<Vec<Statement>> = {
+    <l:@L> "integrity_constraints" ":" <body: StatementBlock> <r:@R>
+        => Span::new(span!(l, r), body)
 }
 
-IntegrityStmts: Vec<IntegrityStmt> = {
-    <l:@L> <integrity_stmts_groups: IntegrityStmtGroup+> <r:@R> =>? {
-        let integrity_stmts: Vec<IntegrityStmt> = integrity_stmts_groups.into_iter().flatten().collect();
-        // check if at least one integrity constraint is defined
-        let integrity_constraints_exist = integrity_stmts.iter().any(|stmt| match stmt {
-            IntegrityStmt::Constraint(_) => true,
-            _ => false,
-        });
-        if !integrity_constraints_exist {
-            diagnostics.diagnostic(Severity::Error)
-                .with_message("at least one integrity constraint must be declared")
-                .with_primary_label(span!(l, r), "missing constraint declaration in this section")
-                .emit();
-            return Err(ParseError::Failed.into());
-        }
-        Ok(integrity_stmts)
-    },
-    
-}
-
-IntegrityStmtGroup: Vec<IntegrityStmt> = {
-    "let" <name: Identifier> "=" <integrity_variable_type: IntegrityVariableType> =>
-        vec![IntegrityStmt::VariableBinding(VariableBinding::new(name, integrity_variable_type))],
-    "enf" <integrity_constraint: IntegrityConstraintExpr> => vec![integrity_constraint],
-    "match" "enf" ":" <integrity_stmts: IntegrityConstraintExpr+> => integrity_stmts,
-}
-
-IntegrityConstraintExpr: IntegrityStmt = {
-    <constraint: IntegrityConstraintExprValue>
-        <comprehension: ConstraintComprehension<IntegrityExpr>?>
-        <selectors: WithSelectors?> =>
-            IntegrityStmt::Constraint(IntegrityConstraint::new(constraint, comprehension, selectors)),
-}
-
-IntegrityConstraintExprValue: ConstraintExpr = {
-    <lhs: IntegrityExpr> "=" <rhs: IntegrityExpr> =>
-        ConstraintExpr::Inline(InlineConstraintExpr::new(lhs, rhs)),
-    <evaluator_fn_call: EvaluatorFunctionCall> => ConstraintExpr::Evaluator(evaluator_fn_call)
-}
-
-WithSelectors: Expression = {
-    "when" <selectors: IntegrityExpr> => selectors,
-}
-
-IntegrityVariableType: VariableValueExpr = {
-    <scalar_value: IntegrityExpr> =>
-        VariableValueExpr::Scalar(scalar_value),
-    <vector_value: Vector<IntegrityExpr>> =>
-        VariableValueExpr::Vector(vector_value),
-    <matrix_value: Matrix<IntegrityExpr>> =>
-        VariableValueExpr::Matrix(matrix_value),
-    "[" <list_comprehension: ListComprehension<IntegrityExpr>> "]" =>
-        VariableValueExpr::ListComprehension(list_comprehension),
-}
-
-EvaluatorFunctionCall: EvaluatorFunctionCall = {
-    <ident: Identifier> "(" <args: CommaElems<EvaluatorArg>> ")" =>? {
-        Ok(EvaluatorFunctionCall::new(ident, args))
-    }
-}
-
-EvaluatorArg: Vec<SymbolAccess> = {
-    <elems: Vector<SymbolAccess>> => elems,
-    "[" "]" => Vec::new()
-}
-
-// --- INTEGRITY CONSTRAINT EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
-
-IntegrityExpr: Expression = {
-    <lexpr: IntegrityExpr> "&" <rexpr: IntegritySum> =>
-        Expression::Mul(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: IntegrityExpr> "|" <rexpr: IntegritySum> =>
-        Expression::Sub(
-            Box::new(Expression::Add(
-                Box::new(lexpr.clone()), Box::new(rexpr.clone()))
-            ),
-            Box::new(Expression::Mul(
-                Box::new(lexpr), Box::new(rexpr))
-            )
-        ),
-    IntegritySum
-}
-
-IntegritySum: Expression = {
-    <lexpr: IntegritySum> "+" <rexpr: IntegrityFactor> =>
-        Expression::Add(Box::new(lexpr), Box::new(rexpr)),
-    <lexpr: IntegritySum> "-" <rexpr: IntegrityFactor> =>
-        Expression::Sub(Box::new(lexpr), Box::new(rexpr)),
-    IntegrityFactor
-}
-
-IntegrityFactor: Expression = {
-    <lexpr: IntegrityFactor> "*" <rexpr: IntegrityExponent> =>
-        Expression::Mul(Box::new(lexpr), Box::new(rexpr)),
-    IntegrityExponent
-}
-
-IntegrityExponent: Expression = {
-    <lexpr: IntegrityExponent> "^" <rexpr: IntegrityAtom> =>
-        Expression::Exp(Box::new(lexpr), Box::new(rexpr)),
-    IntegrityAtom
-}
-
-IntegrityAtom: Expression = {
-    "(" <IntegrityExpr> ")",
-    <n: Num_u64> => Expression::Const(n),
-    "!" <expr: IntegrityAtom> =>
-        Expression::Sub(Box::new(Expression::Const(1)), Box::new(expr)),
-    <symbol_access: SymbolAccess> => Expression::SymbolAccess(symbol_access),
-    <list_folding_type: ListFolding<IntegrityExpr>> =>
-        Expression::ListFolding(list_folding_type),
-}
-
-// ATOMS
+// STATEMENTS
 // ================================================================================================
 
-CommaElems<T>: Vec<T> = {
-    <e:T> <v:("," <T>)*> => {
-        let mut v = v;
-        v.insert(0, e);
-        v
+Statement: Statement = {
+    <Let> => Statement::Let(<>),
+    ConstraintStatement,
+}
+
+StatementBlock: Vec<Statement> = {
+    <Let> => vec![Statement::Let(<>)],
+    <stmts:ConstraintStatement+> <last:Let> => {
+        let mut stmts = stmts;
+        stmts.push(Statement::Let(last));
+        stmts
+    },
+    <ConstraintStatement+>,
+}
+
+Let: Let = {
+    <l:@L> "let" <name: Identifier> "=" <value: Expr> <r:@R> <body: StatementBlock>
+        => Let::new(span!(l, r), name, value, body)
+}
+
+ConstraintStatement: Statement = {
+    "enf" <ConstraintExpr> => <>,
+}
+
+// This grammar rules handles two types of constraints: simple and comprehension constraints.
+// These constraints come in four syntax varieties:
+//
+// 1. `enf x' = x + y for x in xs when x`
+// 2. `enf x' = x + y for x in xs`
+// 3. `enf x' = x + y when x`
+// 4. `enf x' = x + y`
+//
+// 1 and 2 are called "comprehension" constraints, i.e. it expresses a set of
+// constraints for every element in a set of iterables, with an optional selector that causes the
+// constraint to be vacuously true when the condition is false (or put another way, the constraint
+// is only meaningful/enforced when the condition is true).
+//
+// 4 is called a "simple" constraint, i.e. it expresses a single constraint that is always enforced.
+//
+// 3 appears to be "simple" as well, except that it has a selector applied, which makes it somewhat
+// of an odd duck. To keep the AST simple, we perform a simple transformation to constraints of this
+// specific variation, such that they appear to be "comprehension" constraints. For a more visual
+// example of what this transformation does, assume the following constraint of form 3 was written:
+//
+//    enf x' = x + y when x & y
+//
+// This will be transformed into form 1, like so:
+//
+//    enf x' = x + y for %0 in 0..1 when x & y
+//
+// Where `%0` is a generated variable (i.e. inexpressible in the language itself to avoid name conflicts).
+//
+ConstraintExpr: Statement = {
+    <l:@L> <expr: ScalarConstraintExpr> <comprehension: ConstraintComprehension<ScalarExpr>?> <selector: WithSelector?> <r:@R> => {
+        // If we parsed a comprehension, we've parsed either form 1 or 2
+        if let Some(context) = comprehension {
+            Statement::EnforceAll(ListComprehension::new(span!(l, r), expr, context, selector))
+        } else {
+            // If we didn't parse this as a comprehension, but a selector is present, the constraint is in form 3,
+            // so transform it into form 1. Otherwise, if no selector is present, this is form 4, i.e. simple.
+            if selector.is_some() {
+                let generated_name = format!("%{}", *next_var);
+                *next_var += 1;
+                let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
+                let context = vec![(generated_binding, Expr::Range(Span::new(SourceSpan::UNKNOWN, 0..1)))];
+                Statement::EnforceAll(ListComprehension::new(span!(l, r), expr, context, selector))
+            } else {
+                Statement::Enforce(expr)
+            }
+        }
     }
 }
 
-Tuple<T>: Vec<T> = {
-    "(" <e:T> <v:("," <T>)+> ")" => {
-        let mut v = v;
-        v.insert(0, e);
-        v
+ScalarConstraintExpr: ScalarExpr = {
+    FunctionCall,
+    <l:@L> <lhs: ScalarExpr> "=" <rhs: ScalarExpr> <r:@R>
+        => ScalarExpr::Binary(BinaryExpr::new(span!(l, r), BinaryOp::Eq, lhs, rhs)),
+}
+
+WithSelector: ScalarExpr = {
+    "when" <ScalarExpr>,
+}
+
+Expr: Expr = {
+    <ScalarExpr> =>? {
+        match Expr::try_from(<>) {
+            Ok(expr) => Ok(expr),
+            Err(err) => Err(ParseError::from(err).into())
+        }
+    },
+    <l:@L> <value:Vector<ScalarExpr>> <r:@R> => Expr::Vector(Span::new(span!(l, r), value)),
+    <l:@L> <value:Matrix<ScalarExpr>> <r:@R> => Expr::Matrix(Span::new(span!(l, r), value)),
+    "[" <ListComprehension<ScalarExpr>> "]" => Expr::ListComprehension(<>),
+    <l:@L> "[" "]" <r:@R> => Expr::Vector(Span::new(span!(l, r), vec![])),
+}
+
+// --- SCALAR EXPRESSIONS WITH PRECEDENCE (LOWEST TO HIGHEST) ----------------------
+
+ScalarExpr: ScalarExpr = {
+    ScalarExprBase,
+}
+
+ScalarExprBase: ScalarExpr = {
+    #[precedence(level="0")]
+    SymbolAccess,
+    <Int> => ScalarExpr::Const(<>),
+    "(" <ScalarExpr> ")",
+
+    #[precedence(level="1")]
+    FunctionCall,
+
+    #[precedence(level="2")]
+    <l:@L> "!" <expr:ScalarExprBase> <r:@R>
+        => ScalarExpr::Binary(BinaryExpr::new(span!(l, r), BinaryOp::Sub, ScalarExpr::Const(Span::new(span!(l, r), 1)), expr)),
+
+    #[precedence(level="3")] #[assoc(side="left")]
+    <l:@L> <lhs: ScalarExprBase> "^" <rhs: ScalarExprBase> <r:@R>
+        => ScalarExpr::Binary(BinaryExpr::new(span!(l, r), BinaryOp::Exp, lhs, rhs)),
+
+    #[precedence(level="4")] #[assoc(side="left")]
+    <l:@L> <lhs: ScalarExprBase> "*" <rhs: ScalarExprBase> <r:@R>
+        => ScalarExpr::Binary(BinaryExpr::new(span!(l, r), BinaryOp::Mul, lhs, rhs)),
+
+    #[precedence(level="5")] #[assoc(side="left")]
+    <l:@L> <lhs: ScalarExprBase> "+" <rhs: ScalarExprBase> <r:@R>
+        => ScalarExpr::Binary(BinaryExpr::new(span!(l, r), BinaryOp::Add, lhs, rhs)),
+    <l:@L> <lhs: ScalarExprBase> "-" <rhs: ScalarExprBase> <r:@R>
+        => ScalarExpr::Binary(BinaryExpr::new(span!(l, r), BinaryOp::Sub, lhs, rhs)),
+
+    #[precedence(level="6")] #[assoc(side="left")]
+    <l:@L> <lhs:ScalarExprBase> "&" <rhs:ScalarExprBase> <r:@R>
+        => ScalarExpr::Binary(BinaryExpr::new(span!(l, r), BinaryOp::Mul, lhs, rhs)),
+    <l:@L> <lhs:ScalarExprBase> "|" <rhs:ScalarExprBase> <r:@R> => {
+        let lhs2 = ScalarExpr::Binary(BinaryExpr::new(span!(l, r), BinaryOp::Add, lhs.clone(), rhs.clone()));
+        let rhs2 = ScalarExpr::Binary(BinaryExpr::new(span!(l, r), BinaryOp::Mul, lhs, rhs));
+        return ScalarExpr::Binary(BinaryExpr::new(span!(l, r), BinaryOp::Sub, lhs2, rhs2));
     }
 }
 
-Vector<T>: Vec<T> = {
-    "[" <elems: CommaElems<T>> "]" => elems
+FunctionCall: ScalarExpr = {
+    <l:@L> <callee: FunctionIdentifier> "(" <args: Comma<Expr>> ")" <r:@R> => {
+        ScalarExpr::Call(Call::new(span!(l, r), callee, args))
+    }
 }
 
-Matrix<T>: Vec<Vec<T>> = {
-    <elems: Vector<Vector<T>>> => elems
+SymbolAccess: ScalarExpr = {
+    <l:@L> <symbol_access: SymbolAccessBaseSpanned> "." <boundary: Boundary> <r:@R>
+        => ScalarExpr::BoundedSymbolAccess(BoundedSymbolAccess::new(span!(l, r), SymbolAccess::new(symbol_access.span(), symbol_access.item.0, symbol_access.item.1, 0), boundary)),
+    <l:@L> <symbol_access: SymbolAccessBaseSpanned> "'" <r:@R>
+        => ScalarExpr::SymbolAccess(SymbolAccess::new(span!(l, r), symbol_access.item.0, symbol_access.item.1, 1)),
+    <symbol_access: SymbolAccessBaseSpanned>
+        => ScalarExpr::SymbolAccess(SymbolAccess::new(symbol_access.span(), symbol_access.item.0, symbol_access.item.1, 0)),
 }
 
-Size: u64 = {
-    "[" <size: Num_u64> "]" => size
-}
-
-Index: usize = {
-    "[" <idx: Num_u64> "]" => idx as usize
-}
-
-SymbolAccess: SymbolAccess = {
-    <symbol_access: SymbolAccessBase> => SymbolAccess::new(symbol_access.0, symbol_access.1, 0),
-    <symbol_access: SymbolAccessBase> "'" => SymbolAccess::new(symbol_access.0, symbol_access.1, 1)
+SymbolAccessBaseSpanned: Span<(Identifier, AccessType)> = {
+    <l:@L> <base:SymbolAccessBase> <r:@R> => Span::new(span!(l, r), base),
 }
 
 SymbolAccessBase: (Identifier, AccessType) = {
     <ident: Identifier> => (ident, AccessType::Default),
     <ident: Identifier> "[" <range: Range> "]" => (ident, AccessType::Slice(range)),
-    <ident: Identifier> <idx: Index> =>  (ident, AccessType::Vector(idx)),
+    <ident: Identifier> <idx: Index> =>  (ident, AccessType::Index(idx)),
     <ident: Identifier> <row: Index> <col: Index> => (ident, AccessType::Matrix(row, col)),
     // accessing an identifier used in a section declaration, like the full random values array or
     // a named trace segment, e.g. $main, $aux, $rand
-    <ident: DeclIdentRef> => (ident, AccessType::Default),
-    <ident: DeclIdentRef> <idx: Index> => (ident, AccessType::Vector(idx))
+    <ident: DeclIdentifier> => (ident, AccessType::Default),
+    <ident: DeclIdentifier> <idx: Index> => (ident, AccessType::Index(idx))
 
 }
+
+// COMPREHENSIONS
+// ================================================================================================
 
 ConstraintComprehension<T>: ComprehensionContext = {
     <l:@L> "for" <members: Members> "in" <iterables: Iterables> <r:@R> =>?
@@ -449,7 +455,7 @@ ConstraintComprehension<T>: ComprehensionContext = {
                 .with_message("bindings and iterables lengths are mismatched")
                 .with_primary_label(span!(l, r), "in this comprehension")
                 .emit();
-            Err(ParseError::Failed.into())
+            Err(ParseError::InvalidModule(ModuleError::Invalid).into())
         } else {
             Ok(members.into_iter().zip(iterables).collect::<Vec<_>>())
         }
@@ -462,56 +468,65 @@ ListComprehension<T>: ListComprehension = {
                 .with_message("bindings and iterables lengths are mismatched")
                 .with_primary_label(span!(l, r), "in this comprehension")
                 .emit();
-            Err(ParseError::Failed.into())
+            Err(ParseError::InvalidModule(ModuleError::Invalid).into())
         } else {
-            Ok(ListComprehension::new(expr, members.into_iter().zip(iterables).collect::<Vec<_>>()))
+            Ok(ListComprehension::new(span!(l, r), expr, members.into_iter().zip(iterables).collect::<Vec<_>>(), None))
         }
-}
-
-ListFolding<T>: ListFolding = {
-    "sum" "(" <list_folding_value_type: ListFoldingValueExpr<T>> ")" =>
-        ListFolding::Sum(list_folding_value_type),
-    "prod" "(" <list_folding_value_type: ListFoldingValueExpr<T>> ")" =>
-        ListFolding::Prod(list_folding_value_type),
-}
-
-ListFoldingValueExpr<T>: ListFoldingValueExpr = {
-    <name: Identifier> => ListFoldingValueExpr::Identifier(name),
-    <vector: Vector<T>> => ListFoldingValueExpr::Vector(vector),
-    "[" <list_comprehension: ListComprehension<T>> "]" =>
-        ListFoldingValueExpr::ListComprehension(list_comprehension)
 }
 
 Members: Vec<Identifier> = {
     <member: Identifier> => vec![member],
-    "(" <members: CommaElems<Identifier>> ")" => members
+    "(" <members: Comma<Identifier>> ")" => members
 }
 
-Iterables: Vec<Iterable> = {
+Iterables: Vec<Expr> = {
     <iterable: Iterable> => vec![iterable],
-    "(" <iterables: CommaElems<Iterable>> ")" => iterables
+    "(" <iterables: Comma<Iterable>> ")" => iterables
 }
 
-Iterable: Iterable = {
-    <ident: Identifier> => Iterable::Identifier(ident),
-    <range: Range> => Iterable::Range(range),
-    <ident: Identifier> "[" <range: Range> "]" => Iterable::Slice(ident, range)
+Iterable: Expr = {
+    <ident: Identifier> => Expr::SymbolAccess(SymbolAccess::new(ident.span(), ident, AccessType::Default, 0)),
+    <l:@L> <range: Range> <r:@R> => Expr::Range(Span::new(span!(l, r), range)),
+    <l:@L> <ident: Identifier> "[" <range: Range> "]" <r:@R> => Expr::SymbolAccess(SymbolAccess::new(span!(l, r), ident, AccessType::Slice(range), 0)),
 }
 
 Range: Range = {
-    <start: Num_u64> ".." <end: Num_u64> => Range::new(start as usize, end as usize)
+    <start: Num_u64> ".." <end: Num_u64> => Range { start: start as usize, end: end as usize }
 }
 
-DeclIdentRef: Identifier = {
-    <ident: decl_ident_ref> => Identifier(ident)
+// ATOMS
+// ================================================================================================
+
+Vector<T>: Vec<T> = {
+    "[" <Comma<T>> "]" => <>,
+}
+
+Matrix<T>: Vec<Vec<T>> = {
+    Vector<Vector<T>>,
+}
+
+Size: u64 = {
+    "[" <Num_u64> "]" => <>
+}
+
+Index: usize = {
+    "[" <idx: Num_u64> "]" => idx as usize
 }
 
 DeclIdentifier: Identifier = {
-    <ident: identifier> => Identifier(format!("${ident}"))
+    <l:@L> <name:decl_ident_ref> <r:@R> => Identifier::new(span!(l, r), name)
 }
 
 Identifier: Identifier = {
-    <ident: identifier> => Identifier(ident.to_string())
+    <l:@L> <name:identifier> <r:@R> => Identifier::new(span!(l, r), name)
+}
+
+FunctionIdentifier: Identifier = {
+    <l:@L> <name:function_identifier> <r:@R> => Identifier::new(span!(l, r), name)
+}
+
+Int: Span<u64> = {
+   <l:@L> <i:Num_u64> <r:@R> => Span::new(span!(l, r), i),
 }
 
 Num_u64: u64 = {
@@ -526,15 +541,16 @@ extern {
     type Location = miden_diagnostics::SourceIndex;
 
     enum Token {
-        identifier => Token::Ident(<String>),
-        decl_ident_ref => Token::DeclIdentRef(<String>),
+        identifier => Token::Ident(<Symbol>),
+        decl_ident_ref => Token::DeclIdentRef(<Symbol>),
+        function_identifier => Token::FunctionIdent(<Symbol>),
         int => Token::Num(<u64>),
         "def" => Token::Def,
+        "mod" => Token::Mod,
+        "use" => Token::Use,
         "let" => Token::Let,
         "for" => Token::For,
         "in" => Token::In,
-        "sum" => Token::Sum,
-        "prod" => Token::Prod,
         "const" => Token::Const,
         "trace_columns" => Token::TraceColumns,
         "main" => Token::Main,
@@ -549,7 +565,6 @@ extern {
         "ev" => Token::Ev,
         "enf" => Token::Enf,
         "when" => Token::When,
-        "match" => Token::Match,
         "'" => Token::Quote,
         "=" => Token::Equal,
         "+" => Token::Plus,
@@ -560,6 +575,7 @@ extern {
         "|" => Token::Bar,
         "!" => Token::Bang,
         ":" => Token::Colon,
+        "::" => Token::ColonColon,
         "," => Token::Comma,
         "[" => Token::LBracket,
         "]" => Token::RBracket,
