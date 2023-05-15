@@ -18,5 +18,6 @@ lalrpop = { version = "0.20.0", default-features = false }
 miden-diagnostics = { git = "https://github.com/0xPolygonMiden/miden-diagnostics" }
 miden-parsing = { git = "https://github.com/0xPolygonMiden/miden-parsing" }
 lalrpop-util = { version = "0.20.0" }
+lazy_static = "1.4"
 regex = "1"
 thiserror = "1.0"
