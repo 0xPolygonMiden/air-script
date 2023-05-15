@@ -14,16 +14,27 @@ pub mod predefined {
     #![allow(non_upper_case_globals)]
     use super::Symbol;
 
-    // EXAMPLE USAGE:
-    // pub const False: Symbol = Symbol::new(0);
-    // pub const True: Symbol = Symbol::new(1);
+    /// The symbol `$main`
+    pub const Main: Symbol = Symbol::new(0);
+    /// The symbol `$aux`
+    pub const Aux: Symbol = Symbol::new(1);
+    /// The symbol `$builtin`
+    pub const Builtin: Symbol = Symbol::new(2);
+    /// The symbol `sum`
+    pub const Sum: Symbol = Symbol::new(3);
+    /// The symbol `prod`
+    pub const Prod: Symbol = Symbol::new(4);
 
     pub(super) const __SYMBOLS: &[(Symbol, &str)] = &[
-        // EXAMPLE USAGE:
-        // (False, "false"),
-        // (True, "true"),
+        (Main, "$main"),
+        (Aux, "$aux"),
+        (Builtin, "$builtin"),
+        (Sum, "sum"),
+        (Prod, "prod"),
     ];
 }
+
+pub use self::predefined::*;
 
 struct SymbolTable {
     interner: RwLock<Interner>,

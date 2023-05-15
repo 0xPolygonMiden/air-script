@@ -30,6 +30,10 @@ pub type Parser = miden_parsing::Parser<()>;
 pub enum ParseError {
     #[error(transparent)]
     Lexer(#[from] LexicalError),
+    #[error(transparent)]
+    InvalidModule(#[from] ast::ModuleError),
+    #[error(transparent)]
+    InvalidExpr(#[from] ast::InvalidExprError),
     #[error("error reading {path:?}: {source}")]
     FileError {
         source: std::io::Error,
@@ -58,6 +62,8 @@ impl PartialEq for ParseError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Lexer(l), Self::Lexer(r)) => l == r,
+            (Self::InvalidModule(l), Self::InvalidModule(r)) => l == r,
+            (Self::InvalidExpr(l), Self::InvalidExpr(r)) => l == r,
             (Self::FileError { .. }, Self::FileError { .. }) => true,
             (Self::InvalidToken(_), Self::InvalidToken(_)) => true,
             (
@@ -118,6 +124,8 @@ impl ToDiagnostic for ParseError {
     fn to_diagnostic(self) -> Diagnostic {
         match self {
             Self::Lexer(err) => err.to_diagnostic(),
+            Self::InvalidModule(err) => err.to_diagnostic(),
+            Self::InvalidExpr(err) => err.to_diagnostic(),
             Self::InvalidToken(start) => Diagnostic::error()
                 .with_message("invalid token")
                 .with_labels(vec![Label::primary(
@@ -193,10 +201,97 @@ impl miden_parsing::Parse for ast::Source {
 
     fn parse_tokens<S: IntoIterator<Item = Lexed>>(
         diagnostics: &DiagnosticsHandler,
-        _codemap: Arc<CodeMap>,
+        codemap: Arc<CodeMap>,
         tokens: S,
     ) -> Result<Self, Self::Error> {
-        let result = Self::Parser::new().parse(diagnostics, tokens);
+        let mut next_var = 0;
+        let result = Self::Parser::new().parse(diagnostics, &codemap, &mut next_var, tokens);
+        match result {
+            Ok(ast) => {
+                if diagnostics.has_errors() {
+                    return Err(ParseError::Failed);
+                }
+                Ok(ast)
+            }
+            Err(lalrpop_util::ParseError::User { error }) => Err(error),
+            Err(err) => Err(err.into()),
+        }
+    }
+}
+
+impl miden_parsing::Parse for ast::Program {
+    type Parser = grammar::ProgramParser;
+    type Error = ParseError;
+    type Config = ();
+    type Token = Lexed;
+
+    fn root_file_error(source: std::io::Error, path: std::path::PathBuf) -> Self::Error {
+        ParseError::FileError { source, path }
+    }
+
+    fn parse<S>(
+        parser: &Parser,
+        diagnostics: &DiagnosticsHandler,
+        source: S,
+    ) -> Result<Self, Self::Error>
+    where
+        S: Source,
+    {
+        let scanner = Scanner::new(source);
+        let lexer = Lexer::new(scanner);
+        Self::parse_tokens(diagnostics, parser.codemap.clone(), lexer)
+    }
+
+    fn parse_tokens<S: IntoIterator<Item = Lexed>>(
+        diagnostics: &DiagnosticsHandler,
+        codemap: Arc<CodeMap>,
+        tokens: S,
+    ) -> Result<Self, Self::Error> {
+        let mut next_var = 0;
+        let result = Self::Parser::new().parse(diagnostics, &codemap, &mut next_var, tokens);
+        match result {
+            Ok(ast) => {
+                if diagnostics.has_errors() {
+                    return Err(ParseError::Failed);
+                }
+                Ok(ast)
+            }
+            Err(lalrpop_util::ParseError::User { error }) => Err(error),
+            Err(err) => Err(err.into()),
+        }
+    }
+}
+
+impl miden_parsing::Parse for ast::Module {
+    type Parser = grammar::AnyModuleParser;
+    type Error = ParseError;
+    type Config = ();
+    type Token = Lexed;
+
+    fn root_file_error(source: std::io::Error, path: std::path::PathBuf) -> Self::Error {
+        ParseError::FileError { source, path }
+    }
+
+    fn parse<S>(
+        parser: &Parser,
+        diagnostics: &DiagnosticsHandler,
+        source: S,
+    ) -> Result<Self, Self::Error>
+    where
+        S: Source,
+    {
+        let scanner = Scanner::new(source);
+        let lexer = Lexer::new(scanner);
+        Self::parse_tokens(diagnostics, parser.codemap.clone(), lexer)
+    }
+
+    fn parse_tokens<S: IntoIterator<Item = Lexed>>(
+        diagnostics: &DiagnosticsHandler,
+        codemap: Arc<CodeMap>,
+        tokens: S,
+    ) -> Result<Self, Self::Error> {
+        let mut next_var = 0;
+        let result = Self::Parser::new().parse(diagnostics, &codemap, &mut next_var, tokens);
         match result {
             Ok(ast) => {
                 if diagnostics.has_errors() {

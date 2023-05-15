@@ -1,0 +1,115 @@
+///! This module provides AST structures for statements which may appear in one of the following:
+///!
+///! * Evaluator function bodies
+///! * The `boundary_constraints` section
+///! * The `integrity_constraints` section
+///!
+///! Statements do not return any value, unlike expressions.
+use std::fmt;
+
+use miden_diagnostics::{SourceSpan, Spanned};
+
+use super::*;
+
+/// Statements are top-level expressions in the body of evaluators,
+/// or in the `boundary_constraints` or `integrity_constraints` sections.
+/// These expressions are called statements because they do not evaluate
+/// to a value, instead they are evaluated sequentially.
+#[derive(Debug, Clone, PartialEq, Eq, Spanned)]
+pub enum Statement {
+    /// Binds an identifier to an expression in the following statements, e.g. `let x = y * 2`
+    ///
+    /// A let statement contains all following statements in its containing block as
+    /// the "body" of the let. In other words, it imposes a new lexical scope within the
+    /// block in which the variable it binds is visible. Because of this, a let statement
+    /// will always be the last statement in a block when one is present.
+    ///
+    /// Furthermore, the parser guarantees that a let statement always has a body, which
+    /// by induction guarantees that a let statement will always have a constraint in its body
+    /// at some point, otherwise parsing would fail. This guarantee holds during all analyses
+    /// and transformations.
+    Let(Let),
+    /// Declares a constraint to be enforced on a single value.
+    ///
+    /// This variant accepts a [ScalarExpr] for simplicity in the parser, but is expected to always
+    /// be either a call to an evaluator function, or a binary expression of the form `lhs = rhs`,
+    /// i.e. an equality. This is validated by the semantic analyzer.
+    Enforce(ScalarExpr),
+    /// Declares a constraint to be enforced over a vector of values produced by a comprehension.
+    ///
+    /// Just like `Enforce`, except the constraint is contained in the body of a list comprehension,
+    /// and must be enforced on every value produced by that comprehension.
+    EnforceAll(ListComprehension),
+}
+impl Statement {
+    /// Checks this statement to see if it contains any constraints
+    ///
+    /// This is primarily necessary because `let` statements have a body, which is
+    /// also composed of statements, and so may be nested arbitrarily deep, containing
+    /// one or more constraints in its body.
+    pub fn has_constraints(&self) -> bool {
+        match self {
+            Self::Enforce(_) | Self::EnforceAll(_) => true,
+            Self::Let(Let { body, .. }) => body.iter().any(|s| s.has_constraints()),
+        }
+    }
+}
+
+/// A `let` statement binds `name` to the value of `expr` in `body`.
+#[derive(Clone, Spanned)]
+pub struct Let {
+    #[span]
+    pub span: SourceSpan,
+    /// The identifier to be bound
+    pub name: Identifier,
+    /// The expression to bind
+    pub value: Expr,
+    /// The statements for which this binding will be visible.
+    ///
+    /// For example, given the following:
+    ///
+    /// ```airscript
+    /// integrity_constraints:
+    ///     let x = 2
+    ///     let y = x^2
+    ///     enf clk = x
+    ///     enf clk' = clk + y
+    /// ```
+    ///
+    /// When parsed, the syntax tree for the `integrity_constraints` block
+    /// would have a single [Statement], the [Let] corresponding to `let x = 2`.
+    /// The `body` of that let would also contain a single [Statement], another
+    /// [Let] corresponding to `let y = x^2`, which in turn would contain the
+    /// two constraint statements in its `body`.
+    ///
+    /// In other words, when present, a [Let] introduces a new block/lexical scope,
+    /// and all subsequent statements are included in that block. The `body` of a [Let]
+    /// is that block. A [Let] will always be the final statement in its containing block,
+    /// e.g. `integrity_constraints`, but may be preceded by any number of non-[Let] statements.
+    pub body: Vec<Statement>,
+}
+impl Let {
+    pub fn new(span: SourceSpan, name: Identifier, value: Expr, body: Vec<Statement>) -> Self {
+        Self {
+            span,
+            name,
+            value,
+            body,
+        }
+    }
+}
+impl Eq for Let {}
+impl PartialEq for Let {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.value == other.value && self.body == other.body
+    }
+}
+impl fmt::Debug for Let {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Let")
+            .field("name", &self.name)
+            .field("value", &self.value)
+            .field("body", &self.body)
+            .finish()
+    }
+}
