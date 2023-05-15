@@ -15,7 +15,6 @@ rust-version = "1.65"
 lalrpop = { version = "0.20.0", default-features = false }
 
 [dependencies]
-air-script-core = { package = "air-script-core", path="../air-script-core", version="0.2.0" }
 miden-diagnostics = { git = "https://github.com/0xPolygonMiden/miden-diagnostics" }
 miden-parsing = { git = "https://github.com/0xPolygonMiden/miden-parsing" }
 lalrpop-util = { version = "0.20.0" }

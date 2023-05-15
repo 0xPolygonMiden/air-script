@@ -12,6 +12,5 @@ edition = "2021"
 rust-version = "1.65"
 
 [dependencies]
-air-script-core = { package = "air-script-core", path="../air-script-core", version="0.2.0" }
 parser = { package = "air-parser", path = "../parser", version = "0.2.0" }
 miden-diagnostics = { git = "https://github.com/0xpolygonmiden/miden-diagnostics" }
