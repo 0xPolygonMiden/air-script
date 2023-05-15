@@ -6,7 +6,7 @@ use core::{fmt, mem, num::IntErrorKind};
 use miden_diagnostics::{Diagnostic, SourceIndex, SourceSpan, ToDiagnostic};
 use miden_parsing::{Scanner, Source};
 
-use crate::parser::ParseError;
+use crate::{parser::ParseError, Symbol};
 
 /// The value produced by the Lexer when iterated
 pub type Lexed = Result<(SourceIndex, Token, SourceIndex), ParseError>;
@@ -78,17 +78,23 @@ pub enum Token {
     // --------------------------------------------------------------------------------------------
     /// Identifiers should start with alphabet followed by one or more alpha numeric characters
     /// or an underscore.
-    Ident(String),
+    Ident(Symbol),
     /// A reference to an identifier used for a section declaration, such as the random values
     /// array or a trace segment like "main" or "aux".
-    DeclIdentRef(String),
+    DeclIdentRef(Symbol),
+    /// A function identifier
+    FunctionIdent(Symbol),
     /// Integers should only contain numeric characters.
     Num(u64),
 
     // DECLARATION KEYWORDS
     // --------------------------------------------------------------------------------------------
-    /// Used to declare AIR constraints module.
+    /// Used to declare AIR program.
     Def,
+    /// Used to declare AIR module.
+    Mod,
+    /// Used to import items from an AIR module.
+    Use,
     /// Used to declare intermediate variables in the AIR constraints module.
     Let,
     /// Used to declare constants in the AIR constraints module.
@@ -126,22 +132,18 @@ pub enum Token {
     // --------------------------------------------------------------------------------------------
     For,
     In,
-    /// Used to declare sum list folding operation in the AIR constraints module.
-    Sum,
-    /// Used to declare prod list folding operation in the AIR constraints module.
-    Prod,
 
     // GENERAL KEYWORDS
     // --------------------------------------------------------------------------------------------
     /// Keyword to signify that a constraint needs to be enforced
     Enf,
-    Match,
     When,
 
     // PUNCTUATION
     // --------------------------------------------------------------------------------------------
     Quote,
     Colon,
+    ColonColon,
     Comma,
     Dot,
     DotDot,
@@ -162,6 +164,8 @@ impl Token {
     pub fn from_keyword_or_ident(s: &str) -> Self {
         match s {
             "def" => Self::Def,
+            "mod" => Self::Mod,
+            "use" => Self::Use,
             "let" => Self::Let,
             "const" => Self::Const,
             "trace_columns" => Self::TraceColumns,
@@ -177,12 +181,9 @@ impl Token {
             "last" => Self::Last,
             "for" => Self::For,
             "in" => Self::In,
-            "sum" => Self::Sum,
-            "prod" => Self::Prod,
             "enf" => Self::Enf,
-            "match" => Self::Match,
             "when" => Self::When,
-            other => Self::Ident(other.to_string()),
+            other => Self::Ident(Symbol::intern(other)),
         }
     }
 }
@@ -210,6 +211,11 @@ impl PartialEq for Token {
                     return i == i2;
                 }
             }
+            Self::FunctionIdent(i) => {
+                if let Self::FunctionIdent(i2) = other {
+                    return i == i2;
+                }
+            }
             _ => return mem::discriminant(self) == mem::discriminant(other),
         }
         false
@@ -223,8 +229,11 @@ impl fmt::Display for Token {
             Self::Comment => write!(f, "COMMENT"),
             Self::Ident(ref id) => write!(f, "{}", id),
             Self::DeclIdentRef(ref id) => write!(f, "{}", id),
+            Self::FunctionIdent(ref id) => write!(f, "{}", id),
             Self::Num(ref i) => write!(f, "{}", i),
             Self::Def => write!(f, "def"),
+            Self::Mod => write!(f, "mod"),
+            Self::Use => write!(f, "use"),
             Self::Let => write!(f, "let"),
             Self::Const => write!(f, "const"),
             Self::TraceColumns => write!(f, "trace_columns"),
@@ -240,13 +249,11 @@ impl fmt::Display for Token {
             Self::IntegrityConstraints => write!(f, "integrity_constraints"),
             Self::For => write!(f, "for"),
             Self::In => write!(f, "in"),
-            Self::Sum => write!(f, "sum"),
-            Self::Prod => write!(f, "prod"),
             Self::Enf => write!(f, "enf"),
-            Self::Match => write!(f, "match"),
             Self::When => write!(f, "when"),
             Self::Quote => write!(f, "'"),
             Self::Colon => write!(f, ":"),
+            Self::ColonColon => write!(f, "::"),
             Self::Comma => write!(f, ","),
             Self::Dot => write!(f, "."),
             Self::DotDot => write!(f, ".."),
@@ -349,10 +356,12 @@ where
         }
 
         let token = std::mem::replace(&mut self.token, Token::Eof);
+        let start = self.token_start;
+        let end = self.token_end;
         self.advance();
         match token {
             Token::Error(err) => Some(Err(err.into())),
-            token => Some(Ok((self.token_start, token, self.token_end))),
+            token => Some(Ok((start, token, end))),
         }
     }
 
@@ -460,7 +469,10 @@ where
                 '.' => pop2!(self, Token::DotDot),
                 _ => pop!(self, Token::Dot),
             },
-            ':' => pop!(self, Token::Colon),
+            ':' => match self.peek() {
+                ':' => pop2!(self, Token::ColonColon),
+                _ => pop!(self, Token::Colon),
+            },
             '\'' => pop!(self, Token::Quote),
             '(' => pop!(self, Token::LParen),
             ')' => pop!(self, Token::RParen),
@@ -523,7 +535,7 @@ where
 
         self.skip_ident();
 
-        Token::DeclIdentRef(self.slice().to_string())
+        Token::DeclIdentRef(Symbol::intern(self.slice()))
     }
 
     #[inline]
@@ -533,7 +545,11 @@ where
 
         self.skip_ident();
 
-        Token::from_keyword_or_ident(self.slice())
+        let next = self.read();
+        match Token::from_keyword_or_ident(self.slice()) {
+            Token::Ident(id) if next == '(' => Token::FunctionIdent(id),
+            token => token,
+        }
     }
 
     #[inline]
@@ -543,7 +559,11 @@ where
 
         self.skip_ident();
 
-        Token::Ident(self.slice().to_string())
+        if self.read() == '(' {
+            Token::FunctionIdent(Symbol::intern(self.slice()))
+        } else {
+            Token::Ident(Symbol::intern(self.slice()))
+        }
     }
 
     fn skip_ident(&mut self) {
