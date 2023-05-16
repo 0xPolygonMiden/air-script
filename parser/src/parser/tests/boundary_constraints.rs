@@ -1,257 +1,229 @@
-use super::{
-    AccessType, Boundary, BoundaryConstraint, Identifier, Iterable, ParseTest, Range, Source,
-    SourceSection, SymbolAccess, TraceBinding,
-};
-use crate::ast::{
-    BoundaryStmt::*, ConstantBinding, ConstantValueExpr::*, Expression::*, PublicInput,
-    VariableBinding, VariableValueExpr,
-};
+use miden_diagnostics::{SourceSpan, Span};
+
+use crate::ast::*;
+
+use super::ParseTest;
 
 // BOUNDARY STATEMENTS
 // ================================================================================================
 
+const BASE_MODULE: &str = r#"
+def test
+
+trace_columns:
+    main: [clk]
+
+public_inputs:
+    inputs: [2]
+
+integrity_constraints:
+    enf clk = 0
+
+"#;
+
+/// Constructs a module containing the following:
+///
+/// ```airscript
+/// def test
+///
+/// trace_columns:
+///     main: [clk]
+///
+/// public_inputs:
+///     inputs: [2]
+///
+/// integrity_constraints:
+///     enf clk = 0
+/// ```
+///
+/// This is used as a common base for most tests in this module
+fn test_module() -> Module {
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(access!(clk), int!(0)))],
+    ));
+    expected
+}
+
 #[test]
 fn boundary_constraint_at_first() {
-    let source = "
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     boundary_constraints:
-        enf clk.first = 0";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
-        BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
-            Boundary::First,
-            Const(0),
-            None,
-        ),
-    )])]);
-    ParseTest::new().expect_ast(source, expected);
+        enf clk.first = 0"
+    );
+
+    let mut expected = test_module();
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 #[test]
 fn boundary_constraint_at_last() {
-    let source = "
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     boundary_constraints:
-        enf clk.last = 15";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
-        BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
-            Boundary::Last,
-            Const(15),
-            None,
-        ),
-    )])]);
-    ParseTest::new().expect_ast(source, expected);
+        enf clk.last = 15"
+    );
+
+    let mut expected = test_module();
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::Last),
+            int!(15)
+        ))],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 #[test]
 fn error_invalid_boundary() {
-    let source = "
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     boundary_constraints:
-        enf clk.0 = 15";
-    ParseTest::new().expect_unrecognized_token(source);
+        enf clk.0 = 15"
+    );
+
+    ParseTest::new().expect_unrecognized_token(&source);
 }
 
 #[test]
 fn multiple_boundary_constraints() {
-    let source = "
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     boundary_constraints:
         enf clk.first = 0
-        enf clk.last = 1";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
-        Constraint(BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
-            Boundary::First,
-            Const(0),
-            None,
-        )),
-        Constraint(BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
-            Boundary::Last,
-            Const(1),
-            None,
-        )),
-    ])]);
-    ParseTest::new().expect_ast(source, expected);
+        enf clk.last = 1"
+    );
+
+    let mut expected = test_module();
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![
+            enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0))),
+            enforce!(eq!(bounded_access!(clk, Boundary::Last), int!(1))),
+        ],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 #[test]
 fn boundary_constraint_with_pub_input() {
-    let source = "
-    public_inputs:
-        a: [16]
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     boundary_constraints:
-        enf clk.first = a[0]";
-    let expected = Source(vec![
-        SourceSection::PublicInputs(vec![PublicInput::new(Identifier("a".to_string()), 16)]),
-        SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
-            Boundary::First,
-            SymbolAccess(SymbolAccess::new(
-                Identifier("a".to_string()),
-                AccessType::Vector(0),
-                0,
-            )),
-            None,
-        ))]),
-    ]);
-    ParseTest::new().expect_ast(source, expected);
+        enf clk.first = inputs[0]"
+    );
+
+    let mut expected = test_module();
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            access!(inputs[0])
+        ))],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 #[test]
 fn boundary_constraint_with_expr() {
-    let source = "
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     boundary_constraints:
-        enf clk.first = 5 + a[3] + 6";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![Constraint(
-        BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
-            Boundary::First,
-            Add(
-                Box::new(Add(
-                    Box::new(Const(5)),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("a".to_string()),
-                        AccessType::Vector(3),
-                        0,
-                    ))),
-                )),
-                Box::new(Const(6)),
-            ),
-            None,
-        ),
-    )])]);
-    ParseTest::new().expect_ast(source, expected);
+        enf clk.first = 5 + inputs[1] + 6"
+    );
+
+    let mut expected = test_module();
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            add!(add!(int!(5), access!(inputs[1])), int!(6))
+        ))],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 #[test]
 fn boundary_constraint_with_const() {
-    let source = "
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     const A = 1
     const B = [0, 1]
     const C = [[0, 1], [1, 0]]
+
     boundary_constraints:
-        enf clk.first = A + B[1] - C[0][1]";
-    let expected = Source(vec![
-        SourceSection::Constant(ConstantBinding::new(Identifier("A".to_string()), Scalar(1))),
-        SourceSection::Constant(ConstantBinding::new(
-            Identifier("B".to_string()),
-            Vector(vec![0, 1]),
-        )),
-        SourceSection::Constant(ConstantBinding::new(
-            Identifier("C".to_string()),
-            Matrix(vec![vec![0, 1], vec![1, 0]]),
-        )),
-        SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
-            Boundary::First,
-            Sub(
-                Box::new(Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("A".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("B".to_string()),
-                        AccessType::Vector(1),
-                        0,
-                    ))),
-                )),
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("C".to_string()),
-                    AccessType::Matrix(0, 1),
-                    0,
-                ))),
-            ),
-            None,
-        ))]),
-    ]);
-    ParseTest::new().expect_ast(source, expected);
+        enf clk.first = A + B[1] - C[0][1]"
+    );
+
+    let mut expected = test_module();
+    expected.constants.insert(ident!(A), constant!(A = 1));
+    expected.constants.insert(ident!(B), constant!(B = [0, 1]));
+    expected
+        .constants
+        .insert(ident!(C), constant!(C = [[0, 1], [1, 0]]));
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            sub!(add!(access!(A), access!(B[1])), access!(C[0][1]))
+        ))],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 #[test]
 fn boundary_constraint_with_variables() {
-    let source = "
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     boundary_constraints:
         let a = 2^2
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]
-        enf clk.first = 5 + a[3] + 6";
-    let expected = Source(vec![SourceSection::BoundaryConstraints(vec![
-        VariableBinding(VariableBinding::new(
-            Identifier("a".to_string()),
-            VariableValueExpr::Scalar(Exp(Box::new(Const(2)), Box::new(Const(2)))),
-        )),
-        VariableBinding(VariableBinding::new(
-            Identifier("b".to_string()),
-            VariableValueExpr::Vector(vec![
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("a".to_string()),
-                    AccessType::Default,
-                    0,
-                )),
-                Mul(
-                    Box::new(Const(2)),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("a".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                ),
-            ]),
-        )),
-        VariableBinding(VariableBinding::new(
-            Identifier("c".to_string()),
-            VariableValueExpr::Matrix(vec![
-                vec![
-                    Sub(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("a".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(Const(1)),
-                    ),
-                    Exp(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("a".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(Const(2)),
-                    ),
-                ],
-                vec![
-                    SymbolAccess(SymbolAccess::new(
-                        Identifier("b".to_string()),
-                        AccessType::Vector(0),
-                        0,
-                    )),
-                    SymbolAccess(SymbolAccess::new(
-                        Identifier("b".to_string()),
-                        AccessType::Vector(1),
-                        0,
-                    )),
-                ],
-            ]),
-        )),
-        Constraint(BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("clk".to_string()), AccessType::Default, 0),
-            Boundary::First,
-            Add(
-                Box::new(Add(
-                    Box::new(Const(5)),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("a".to_string()),
-                        AccessType::Vector(3),
-                        0,
-                    ))),
-                )),
-                Box::new(Const(6)),
-            ),
-            None,
-        )),
-    ])]);
-    ParseTest::new().expect_ast(source, expected);
+        enf clk.first = 5 + a[3] + 6"
+    );
+
+    let mut expected = test_module();
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![let_!(a = expr!(exp!(int!(2), int!(2))) =>
+                   let_!(b = vector!(access!(a), mul!(int!(2), access!(a))) =>
+                         let_!(c = matrix!([sub!(access!(a), int!(1)), exp!(access!(a), int!(2))], [access!(b[0]), access!(b[1])]) =>
+                             enforce!(eq!(bounded_access!(clk, Boundary::First), add!(add!(int!(5), access!(a[3])), int!(6)))))))],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 // CONSTRAINT COMPREHENSION
@@ -259,132 +231,82 @@ fn boundary_constraint_with_variables() {
 
 #[test]
 fn bc_comprehension_one_iterable_identifier() {
-    let source = "
-    trace_columns:
-        main: [a, b, c[4]]
+    let source = format!(
+        "
+    {BASE_MODULE}
 
     boundary_constraints:
-        enf x.first = 0 for x in c";
+        enf x.first = 0 for x in inputs"
+    );
 
-    let expected = Source(vec![
-        SourceSection::Trace(vec![vec![
-            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
-            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
-            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
-            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
-        ]]),
-        SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("x".to_string()), AccessType::Default, 0),
-            Boundary::First,
-            Const(0),
-            Some(vec![(
-                Identifier("x".to_string()),
-                Iterable::Identifier(Identifier("c".to_string())),
-            )]),
-        ))]),
-    ]);
-
-    ParseTest::new().expect_ast(source, expected);
+    let mut expected = test_module();
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!(((x, expr!(access!(inputs)))) => eq!(bounded_access!(x, Boundary::First), int!(0)))
+        )],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 #[test]
 fn bc_comprehension_one_iterable_range() {
-    let source = "
-    trace_columns:
-        main: [a, b, c[4]]
+    let source = format!(
+        "
+    {BASE_MODULE}
 
     boundary_constraints:
-        enf x.first = 0 for x in (0..4)";
+        enf x.first = 0 for x in (0..4)"
+    );
 
-    let expected = Source(vec![
-        SourceSection::Trace(vec![vec![
-            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
-            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
-            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
-            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
-        ]]),
-        SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("x".to_string()), AccessType::Default, 0),
-            Boundary::First,
-            Const(0),
-            Some(vec![(
-                Identifier("x".to_string()),
-                Iterable::Range(Range::new(0, 4)),
-            )]),
-        ))]),
-    ]);
-
-    ParseTest::new().expect_ast(source, expected);
+    let mut expected = test_module();
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!(((x, range!(0..4))) => eq!(bounded_access!(x, Boundary::First), int!(0)))
+        )],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 #[test]
 fn bc_comprehension_one_iterable_slice() {
-    let source = "
-    trace_columns:
-        main: [a, b, c[4]]
+    let source = format!(
+        "
+    {BASE_MODULE}
 
     boundary_constraints:
-        enf x.first = 0 for x in c[1..3]";
+        enf x.first = 0 for x in inputs[0..1]"
+    );
 
-    let expected = Source(vec![
-        SourceSection::Trace(vec![vec![
-            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
-            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
-            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
-            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
-        ]]),
-        SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("x".to_string()), AccessType::Default, 0),
-            Boundary::First,
-            Const(0),
-            Some(vec![(
-                Identifier("x".to_string()),
-                Iterable::Slice(Identifier("c".to_string()), Range::new(1, 3)),
-            )]),
-        ))]),
-    ]);
-    ParseTest::new().expect_ast(source, expected);
+    let mut expected = test_module();
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!(((x, expr!(slice!(inputs, 0..1)))) => eq!(bounded_access!(x, Boundary::First), int!(0)))
+        )],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 #[test]
 fn bc_comprehension_two_iterable_identifiers() {
-    let source = "
-    trace_columns:
-        main: [a, b, c[4], d[4]]
+    let source = format!(
+        "
+    {BASE_MODULE}
 
     boundary_constraints:
-        enf x.first = y for (x, y) in (c, d)";
+        enf x.first = y for (x, y) in (inputs, inputs)"
+    );
 
-    let expected = Source(vec![
-        SourceSection::Trace(vec![vec![
-            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
-            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
-            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
-            TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
-            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 10),
-        ]]),
-        SourceSection::BoundaryConstraints(vec![Constraint(BoundaryConstraint::new(
-            SymbolAccess::new(Identifier("x".to_string()), AccessType::Default, 0),
-            Boundary::First,
-            SymbolAccess(SymbolAccess::new(
-                Identifier("y".to_string()),
-                AccessType::Default,
-                0,
-            )),
-            Some(vec![
-                (
-                    Identifier("x".to_string()),
-                    Iterable::Identifier(Identifier("c".to_string())),
-                ),
-                (
-                    Identifier("y".to_string()),
-                    Iterable::Identifier(Identifier("d".to_string())),
-                ),
-            ]),
-        ))]),
-    ]);
-
-    ParseTest::new().expect_ast(source, expected);
+    let mut expected = test_module();
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!(((x, expr!(access!(inputs))), (y, expr!(access!(inputs)))) => eq!(bounded_access!(x, Boundary::First), access!(y)))
+        )],
+    ));
+    ParseTest::new().expect_module_ast(&source, expected);
 }
 
 // INVALID BOUNDARY CONSTRAINT COMPREHENSION
@@ -392,26 +314,30 @@ fn bc_comprehension_two_iterable_identifiers() {
 
 #[test]
 fn err_bc_comprehension_one_member_two_iterables() {
-    let source = "
-    trace_columns:
-        main: [a, b, c[4]]
+    let source = format!(
+        "
+    {BASE_MODULE}
 
     boundary_constraints:
-        enf a.first = c for c in (c, d)";
+        enf clk.first = c for c in (inputs, inputs)"
+    );
 
-    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
+    ParseTest::new()
+        .expect_module_diagnostic(&source, "bindings and iterables lengths are mismatched");
 }
 
 #[test]
 fn err_bc_comprehension_two_members_one_iterables() {
-    let source = "
-    trace_columns:
-        main: [a, b, c[4]]
+    let source = format!(
+        "
+    {BASE_MODULE}
 
     boundary_constraints:
-        enf a.first = c + d for (c, d) in c";
+        enf clk.first = c + d for (c, d) in inputs"
+    );
 
-    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
+    ParseTest::new()
+        .expect_module_diagnostic(&source, "bindings and iterables lengths are mismatched");
 }
 
 // INVALID BOUNDARY CONSTRAINTS
@@ -419,27 +345,38 @@ fn err_bc_comprehension_two_members_one_iterables() {
 
 #[test]
 fn err_invalid_variable() {
-    let source = "
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     boundary_constraints:
-        let a = 2^2 + [1]";
-    ParseTest::new().expect_unrecognized_token(source);
+        let a = 2^2 + [1]"
+    );
+    ParseTest::new().expect_unrecognized_token(&source);
 }
 
 #[test]
 fn err_missing_boundary_constraint() {
-    let source = "
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     boundary_constraints:
         let a = 2^2
         let b = [a, 2 * a]
-        let c = [[a - 1, a^2], [b[0], b[1]]]";
-    ParseTest::new().expect_diagnostic(source, "at least one boundary constraint must be declared");
+        let c = [[a - 1, a^2], [b[0], b[1]]]"
+    );
+    ParseTest::new().expect_module_diagnostic(&source, "expected one of: '\"enf\"', '\"let\"'");
 }
 
 #[test]
 fn err_empty_boundary_constraints() {
-    let source = "
+    let source = format!(
+        "
+    {BASE_MODULE}
+
     boundary_constraints:
-    integrity_constraints:
-        enf clk' = clk + 1";
-    ParseTest::new().expect_unrecognized_token(source);
+    "
+    );
+    assert_module_error!(&source, crate::parser::ParseError::UnexpectedEof { .. });
 }

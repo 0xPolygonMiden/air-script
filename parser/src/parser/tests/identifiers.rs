@@ -8,13 +8,20 @@ use super::ParseTest;
 fn error_invalid_int() {
     let num: u128 = u64::max_value() as u128 + 1;
     let source = format!(
-        "
+        r#"
+    def test
+
+    trace_columns:
+        main: [clk]
+
     integrity_constraints:
-        enf clk' = clk + {}",
+        enf clk' = clk + {}
+    "#,
         num
     );
+
     // Integers can only be of type u64.
-    ParseTest::new().expect_diagnostic(&source, "value is too big");
+    ParseTest::new().expect_program_diagnostic(&source, "value is too big");
 }
 
 // UNRECOGNIZED TOKEN ERRORS
@@ -23,7 +30,12 @@ fn error_invalid_int() {
 #[test]
 fn error_constraint_without_section() {
     // Constraints outside of valid sections are not allowed.
-    let source = "enf clk' = clk + 1";
+    let source = r#"
+    def test
+
+    enf clk' = clk + 1
+    "#;
+
     ParseTest::new().expect_unrecognized_token(source);
 }
 
@@ -33,8 +45,15 @@ fn error_identifier_starting_with_int() {
     // lexer considers the integer 1 and alphabetic clk' to be separate tokens
     // hence this fails at parser level since a valid identifier is expected
     // at that position which 1 is not.
-    let source = "
+    let source = r#"
+    def test
+
+    trace_columns:
+        main: [clk]
+
     integrity_constraints:
-        enf 1clk' = clk + 1";
+        enf 1clk' = clk + 1
+    "#;
+
     ParseTest::new().expect_unrecognized_token(source);
 }
