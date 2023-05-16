@@ -1,25 +1,12 @@
 use std::sync::Arc;
 
 use miden_diagnostics::{CodeMap, DiagnosticsConfig, DiagnosticsHandler, Emitter, Verbosity};
+use pretty_assertions::assert_eq;
 
 use crate::{
-    ast::Source,
+    ast::{Module, Program},
     parser::{ParseError, Parser},
 };
-
-macro_rules! assert_matches {
-    ($left:expr, $(|)? $( $pattern:pat_param )|+ $( if $guard: expr )? $(,)?) => {
-        match $left {
-            $( $pattern )|+ $( if $guard )? => {}
-            ref left_val => {
-                panic!(r#"assertion failed: `(left matches right)`
-                left: `{:?}`,
-                right: `{:?}`"#,
-                            left_val, stringify!($($pattern)|+ $(if $guard)?));
-            }
-        }
-    }
-}
 
 struct SplitEmitter {
     capture: miden_diagnostics::CaptureEmitter,
@@ -100,34 +87,47 @@ impl ParseTest {
         }
     }
 
-    pub fn parse_file(&self, path: &str) -> Result<Source, ParseError> {
+    #[allow(unused)]
+    pub fn parse_module_from_file(&self, path: &str) -> Result<Module, ParseError> {
         self.parser
-            .parse_file::<Source, _, _>(&self.diagnostics, path)
+            .parse_file::<Module, _, _>(&self.diagnostics, path)
     }
 
-    pub fn parse(&self, source: &str) -> Result<Source, ParseError> {
+    pub fn parse_program_from_file(&self, path: &str) -> Result<Program, ParseError> {
         self.parser
-            .parse_string::<Source, _, _>(&self.diagnostics, source)
+            .parse_file::<Program, _, _>(&self.diagnostics, path)
+    }
+
+    pub fn parse_module(&self, source: &str) -> Result<Module, ParseError> {
+        self.parser
+            .parse_string::<Module, _, _>(&self.diagnostics, source)
+    }
+
+    pub fn parse_program(&self, source: &str) -> Result<Program, ParseError> {
+        self.parser
+            .parse_string::<Program, _, _>(&self.diagnostics, source)
     }
 
     // TEST METHODS
     // --------------------------------------------------------------------------------------------
 
-    /// Checks that source is valid and asserts that appropriate error is returned if there
-    /// is a problem while parsing the source.
-    #[allow(unused)]
     #[track_caller]
-    pub fn expect_error(&self, source: &str, expected: ParseError) {
-        if let Err(err) = self.parse(source) {
-            assert_eq!(err, expected)
+    pub fn expect_program_diagnostic(&self, source: &str, expected: &str) {
+        if let Err(err) = self.parse_program(source) {
+            self.diagnostics.emit(err);
+            assert!(
+                self.emitter.captured().contains(expected),
+                "expected diagnostic output to contain the string: '{}'",
+                expected
+            );
         } else {
             panic!("expected parsing to fail, but it succeeded");
         }
     }
 
     #[track_caller]
-    pub fn expect_diagnostic(&self, source: &str, expected: &str) {
-        if let Err(err) = self.parse(source) {
+    pub fn expect_module_diagnostic(&self, source: &str, expected: &str) {
+        if let Err(err) = self.parse_module(source) {
             self.diagnostics.emit(err);
             assert!(
                 self.emitter.captured().contains(expected),
@@ -142,18 +142,19 @@ impl ParseTest {
     /// If an unrecognized token is present in the source string, return UnrecognizedToken error.
     #[track_caller]
     pub fn expect_unrecognized_token(&self, source: &str) {
-        if let Err(err) = self.parse(source) {
+        if let Err(err) = self.parse_program(source) {
             assert_matches!(err, ParseError::UnrecognizedToken { .. })
         } else {
             panic!("expected unrecognized token error, but parsing succeeded");
         }
     }
 
-    /// Builds an AST from the given source string and asserts that executing the test will result
+    /// Parses a [Program] from the given source string and asserts that executing the test will result
     /// in the expected AST.
+    #[allow(unused)]
     #[track_caller]
-    pub fn expect_ast(&self, source: &str, expected: Source) {
-        match self.parse(source) {
+    pub fn expect_program_ast(&self, source: &str, expected: Program) {
+        match self.parse_program(source) {
             Err(err) => {
                 self.diagnostics.emit(err);
                 panic!("expected parsing to succeed, see diagnostics for details");
@@ -162,11 +163,38 @@ impl ParseTest {
         }
     }
 
-    /// Builds an AST from the given source path and asserts that executing the test will result
+    /// Parses a [Module] from the given source string and asserts that executing the test will result
     /// in the expected AST.
     #[track_caller]
-    pub fn expect_ast_from_file(&self, path: &str, expected: Source) {
-        match self.parse_file(path) {
+    pub fn expect_module_ast(&self, source: &str, expected: Module) {
+        match self.parse_module(source) {
+            Err(err) => {
+                self.diagnostics.emit(err);
+                panic!("expected parsing to succeed, see diagnostics for details");
+            }
+            Ok(ast) => assert_eq!(ast, expected),
+        }
+    }
+
+    /// Parses a [Program] from the given source path and asserts that executing the test will result
+    /// in the expected AST.
+    #[track_caller]
+    pub fn expect_program_ast_from_file(&self, path: &str, expected: Program) {
+        match self.parse_program_from_file(path) {
+            Err(err) => {
+                self.diagnostics.emit(err);
+                panic!("expected parsing to succeed, see diagnostics for details");
+            }
+            Ok(ast) => assert_eq!(ast, expected),
+        }
+    }
+
+    /// Parses a [Module] from the given source path and asserts that executing the test will result
+    /// in the expected AST.
+    #[allow(unused)]
+    #[track_caller]
+    pub fn expect_module_ast_from_file(&self, path: &str, expected: Module) {
+        match self.parse_module_from_file(path) {
             Err(err) => {
                 self.diagnostics.emit(err);
                 panic!("expected parsing to succeed, see diagnostics for details");

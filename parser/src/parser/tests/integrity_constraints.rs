@@ -1,12 +1,8 @@
-use super::{
-    Identifier, IntegrityConstraint, Iterable, ParseTest, Range, Source, SourceSection,
-    TraceBinding,
-};
-use crate::ast::{
-    AccessType, ConstantBinding, ConstantValueExpr::*, ConstraintExpr, EvaluatorFunction,
-    EvaluatorFunctionCall, Expression::*, InlineConstraintExpr, IntegrityStmt::*, SymbolAccess,
-    VariableBinding, VariableValueExpr,
-};
+use miden_diagnostics::{SourceSpan, Span};
+
+use crate::ast::*;
+
+use super::ParseTest;
 
 // INTEGRITY STATEMENTS
 // ================================================================================================
@@ -14,345 +10,348 @@ use crate::ast::{
 #[test]
 fn integrity_constraints() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         enf clk' = clk + 1";
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    1,
-                )),
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("clk".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(Const(1)),
-                ),
-            )),
-            None,
-            None,
-        ),
-    )])]);
-    ParseTest::new().expect_ast(source, expected);
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(access!(clk, 1), add!(access!(clk), int!(1))))],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
-fn integrity_constraints_invalid() {
-    let source = "integrity_constraints:
+fn err_integrity_constraints_invalid() {
+    let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
+    integrity_constraints:
         enf clk' = clk = 1";
+
     ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
 fn multiple_integrity_constraints() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         enf clk' = clk + 1
         enf clk' - clk = 1";
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    1,
-                )),
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("clk".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(Const(1)),
-                ),
-            )),
-            None,
-            None,
-        )),
-        Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                Sub(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("clk".to_string()),
-                        AccessType::Default,
-                        1,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("clk".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                ),
-                Const(1),
-            )),
-            None,
-            None,
-        )),
-    ])]);
-    ParseTest::new().expect_ast(source, expected);
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![
+            enforce!(eq!(access!(clk, 1), add!(access!(clk), int!(1)))),
+            enforce!(eq!(sub!(access!(clk, 1), access!(clk)), int!(1))),
+        ],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn integrity_constraint_with_periodic_col() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [b]
+
+    public_inputs:
+        inputs: [2]
+
+    periodic_columns:
+        k0: [1, 0]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         enf k0 + b = 0";
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("k0".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("b".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                ),
-                Const(0),
-            )),
-            None,
-            None,
-        ),
-    )])]);
-    ParseTest::new().expect_ast(source, expected);
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(b, 1)]));
+    expected.periodic_columns.insert(
+        ident!(k0),
+        PeriodicColumn::new(SourceSpan::UNKNOWN, ident!(k0), vec![1, 0]),
+    );
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(add!(access!(k0), access!(b)), int!(0)))],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn integrity_constraint_with_random_value() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [a]
+        aux: [aux0[2]]
+
+    public_inputs:
+        inputs: [2]
+
+    random_values:
+        rand: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         enf a + $rand[1] = 0";
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("a".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("$rand".to_string()),
-                        AccessType::Vector(1),
-                        0,
-                    ))),
-                ),
-                Const(0),
-            )),
-            None,
-            None,
-        ),
-    )])]);
-    ParseTest::new().expect_ast(source, expected);
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(a, 1)]));
+    expected
+        .trace_columns
+        .push(trace_segment!(1, "$aux", [(aux0, 2)]));
+    expected.random_values = Some(random_values!("$rand", 2));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            add!(access!(a), access!("$rand"[1])),
+            int!(0)
+        ))],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn integrity_constraint_with_constants() {
     let source = "
-        const A = 0
-        const B = [0, 1]
-        const C = [[0, 1], [1, 0]]
+    def test
+
+    trace_columns:
+        main: [clk]
+
+    const A = 0
+    const B = [0, 1]
+    const C = [[0, 1], [1, 0]]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         enf clk + A = B[1] + C[1][1]";
-    let expected = Source(vec![
-        SourceSection::Constant(ConstantBinding::new(Identifier("A".to_string()), Scalar(0))),
-        SourceSection::Constant(ConstantBinding::new(
-            Identifier("B".to_string()),
-            Vector(vec![0, 1]),
-        )),
-        SourceSection::Constant(ConstantBinding::new(
-            Identifier("C".to_string()),
-            Matrix(vec![vec![0, 1], vec![1, 0]]),
-        )),
-        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("clk".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("A".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                ),
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("B".to_string()),
-                        AccessType::Vector(1),
-                        0,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("C".to_string()),
-                        AccessType::Matrix(1, 1),
-                        0,
-                    ))),
-                ),
-            )),
-            None,
-            None,
-        ))]),
-    ]);
-    ParseTest::new().expect_ast(source, expected);
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected.constants.insert(ident!(A), constant!(A = 0));
+    expected.constants.insert(ident!(B), constant!(B = [0, 1]));
+    expected
+        .constants
+        .insert(ident!(C), constant!(C = [[0, 1], [1, 0]]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            add!(access!(clk), access!(A)),
+            add!(access!(B[1]), access!(C[1][1]))
+        ))],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn integrity_constraint_with_variables() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         let a = 2^2
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]
         enf clk + a = b[1] + c[1][1]";
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        VariableBinding(VariableBinding::new(
-            Identifier("a".to_string()),
-            VariableValueExpr::Scalar(Exp(Box::new(Const(2)), Box::new(Const(2)))),
-        )),
-        VariableBinding(VariableBinding::new(
-            Identifier("b".to_string()),
-            VariableValueExpr::Vector(vec![
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("a".to_string()),
-                    AccessType::Default,
-                    0,
-                )),
-                Mul(
-                    Box::new(Const(2)),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("a".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                ),
-            ]),
-        )),
-        VariableBinding(VariableBinding::new(
-            Identifier("c".to_string()),
-            VariableValueExpr::Matrix(vec![
-                vec![
-                    Sub(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("a".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(Const(1)),
-                    ),
-                    Exp(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("a".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(Const(2)),
-                    ),
-                ],
-                vec![
-                    SymbolAccess(SymbolAccess::new(
-                        Identifier("b".to_string()),
-                        AccessType::Vector(0),
-                        0,
-                    )),
-                    SymbolAccess(SymbolAccess::new(
-                        Identifier("b".to_string()),
-                        AccessType::Vector(1),
-                        0,
-                    )),
-                ],
-            ]),
-        )),
-        Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("clk".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("a".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                ),
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("b".to_string()),
-                        AccessType::Vector(1),
-                        0,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("c".to_string()),
-                        AccessType::Matrix(1, 1),
-                        0,
-                    ))),
-                ),
-            )),
-            None,
-            None,
-        )),
-    ])]);
-    ParseTest::new().expect_ast(source, expected);
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![let_!(a = expr!(exp!(int!(2), int!(2))) =>
+                 let_!(b = vector!(access!(a), mul!(int!(2), access!(a))) =>
+                     let_!(c = matrix!([sub!(access!(a), int!(1)), exp!(access!(a), int!(2))], [access!(b[0]), access!(b[1])]) =>
+                         enforce!(eq!(add!(access!(clk), access!(a)), add!(access!(b[1]), access!(c[1][1])))))))],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn integrity_constraint_with_indexed_trace_access() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [a, b]
+        aux: [c, d]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         enf $main[0]' = $main[1] + 1
         enf $aux[0]' - $aux[1] = 1";
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("$main".to_string()),
-                    AccessType::Vector(0),
-                    1,
-                )),
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("$main".to_string()),
-                        AccessType::Vector(1),
-                        0,
-                    ))),
-                    Box::new(Const(1)),
-                ),
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(a, 1), (b, 1)]));
+    expected
+        .trace_columns
+        .push(trace_segment!(1, "$aux", [(c, 1), (d, 1)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![
+            enforce!(eq!(
+                access!("$main"[0], 1),
+                add!(access!("$main"[1]), int!(1))
             )),
-            None,
-            None,
-        )),
-        Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                Sub(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("$aux".to_string()),
-                        AccessType::Vector(0),
-                        1,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("$aux".to_string()),
-                        AccessType::Vector(1),
-                        0,
-                    ))),
-                ),
-                Const(1),
+            enforce!(eq!(
+                sub!(access!("$aux"[0], 1), access!("$aux"[1])),
+                int!(1)
             )),
-            None,
-            None,
-        )),
-    ])]);
-    ParseTest::new().expect_ast(source, expected);
+        ],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 // CONSTRAINT COMPREHENSION
@@ -361,298 +360,232 @@ fn integrity_constraint_with_indexed_trace_access() {
 #[test]
 fn ic_comprehension_one_iterable_identifier() {
     let source = "
+    def test
+
     trace_columns:
         main: [a, b, c[4]]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
 
     integrity_constraints:
         enf x = a + b for x in c";
 
-    let expected = Source(vec![
-        SourceSection::Trace(vec![vec![
-            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
-            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
-            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
-            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
-        ]]),
-        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("x".to_string()),
-                    AccessType::Default,
-                    0,
-                )),
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("a".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("b".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                ),
-            )),
-            Some(vec![(
-                Identifier("x".to_string()),
-                Iterable::Identifier(Identifier("c".to_string())),
-            )]),
-            None,
-        ))]),
-    ]);
-    ParseTest::new().expect_ast(source, expected);
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(a, 1), (b, 1), (c, 4)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!(((x, expr!(access!(c)))) => eq!(access!(x), add!(access!(a), access!(b))))
+        )],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn ic_comprehension_one_iterable_range() {
     let source = "
+    def test
+
     trace_columns:
         main: [a, b, c[4]]
-    
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         enf x = a + b for x in (1..4)";
 
-    let expected = Source(vec![
-        SourceSection::Trace(vec![vec![
-            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
-            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
-            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
-            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
-        ]]),
-        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("x".to_string()),
-                    AccessType::Default,
-                    0,
-                )),
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("a".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("b".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                ),
-            )),
-            Some(vec![(
-                Identifier("x".to_string()),
-                Iterable::Range(Range::new(1, 4)),
-            )]),
-            None,
-        ))]),
-    ]);
-    ParseTest::new().expect_ast(source, expected);
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(a, 1), (b, 1), (c, 4)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!(((x, range!(1..4))) => eq!(access!(x), add!(access!(a), access!(b))))
+        )],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn ic_comprehension_with_selectors() {
     let source = "
+    def test
+
     trace_columns:
         main: [s[2], a, b, c[4]]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
 
     integrity_constraints:
         enf x = a + b for x in c when s[0] & s[1]";
 
-    let expected = Source(vec![
-        SourceSection::Trace(vec![vec![
-            TraceBinding::new(Identifier("s".to_string()), 0, 0, 2),
-            TraceBinding::new(Identifier("a".to_string()), 0, 2, 1),
-            TraceBinding::new(Identifier("b".to_string()), 0, 3, 1),
-            TraceBinding::new(Identifier("c".to_string()), 0, 4, 4),
-            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 8),
-        ]]),
-        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("x".to_string()),
-                    AccessType::Default,
-                    0,
-                )),
-                Add(
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("a".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("b".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                ),
-            )),
-            Some(vec![(
-                Identifier("x".to_string()),
-                Iterable::Identifier(Identifier("c".to_string())),
-            )]),
-            Some(Mul(
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("s".to_string()),
-                    AccessType::Vector(0),
-                    0,
-                ))),
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("s".to_string()),
-                    AccessType::Vector(1),
-                    0,
-                ))),
-            )),
-        ))]),
-    ]);
-    ParseTest::new().expect_ast(source, expected);
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(s, 2), (a, 1), (b, 1), (c, 4)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!(((x, expr!(access!(c)))) => eq!(access!(x), add!(access!(a), access!(b))), when and!(access!(s[0]), access!(s[1])))
+        )],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn ic_comprehension_with_evaluator_call() {
     let source = "
+    def test
+
     ev is_binary([x]):
         enf x^2 = x
 
     trace_columns:
         main: [a, b, c[4], d[4]]
 
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         enf is_binary([x]) for x in c";
 
-    let expected = Source(vec![
-        SourceSection::EvaluatorFunction(EvaluatorFunction::new(
-            Identifier("is_binary".to_string()),
-            vec![vec![TraceBinding::new(
-                Identifier("x".to_string()),
-                0,
-                0,
-                1,
-            )]],
-            vec![Constraint(IntegrityConstraint::new(
-                ConstraintExpr::Inline(InlineConstraintExpr::new(
-                    Exp(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("x".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(Const(2)),
-                    ),
-                    SymbolAccess(SymbolAccess::new(
-                        Identifier("x".to_string()),
-                        AccessType::Default,
-                        0,
-                    )),
-                )),
-                None,
-                None,
-            ))],
-        )),
-        SourceSection::Trace(vec![vec![
-            TraceBinding::new(Identifier("a".to_string()), 0, 0, 1),
-            TraceBinding::new(Identifier("b".to_string()), 0, 1, 1),
-            TraceBinding::new(Identifier("c".to_string()), 0, 2, 4),
-            TraceBinding::new(Identifier("d".to_string()), 0, 6, 4),
-            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 10),
-        ]]),
-        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Evaluator(EvaluatorFunctionCall::new(
-                Identifier("is_binary".to_string()),
-                vec![vec![SymbolAccess::new(
-                    Identifier("x".to_string()),
-                    AccessType::Default,
-                    0,
-                )]],
-            )),
-            Some(vec![(
-                Identifier("x".to_string()),
-                Iterable::Identifier(Identifier("c".to_string())),
-            )]),
-            None,
-        ))]),
-    ]);
-    ParseTest::new().expect_ast(source, expected);
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(a, 1), (b, 1), (c, 4), (d, 4)]));
+    expected.evaluators.insert(
+        ident!(is_binary),
+        EvaluatorFunction::new(
+            SourceSpan::UNKNOWN,
+            ident!(is_binary),
+            vec![trace_segment!(0, "%0", [(x, 1)])],
+            vec![enforce!(eq!(exp!(access!(x), int!(2)), access!(x)))],
+        ),
+    );
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!(((x, expr!(access!(c)))) => call!(is_binary(vector!(access!(x)))))
+        )],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn ic_comprehension_with_evaluator_and_selectors() {
     let source = "
+    def test
+
     ev is_binary([x]):
         enf x^2 = x
 
     trace_columns:
         main: [s[2], a, b, c[4], d[4]]
 
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         enf is_binary([x]) for x in c when s[0] & s[1]";
 
-    let expected = Source(vec![
-        SourceSection::EvaluatorFunction(EvaluatorFunction::new(
-            Identifier("is_binary".to_string()),
-            vec![vec![TraceBinding::new(
-                Identifier("x".to_string()),
-                0,
-                0,
-                1,
-            )]],
-            vec![Constraint(IntegrityConstraint::new(
-                ConstraintExpr::Inline(InlineConstraintExpr::new(
-                    Exp(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("x".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(Const(2)),
-                    ),
-                    SymbolAccess(SymbolAccess::new(
-                        Identifier("x".to_string()),
-                        AccessType::Default,
-                        0,
-                    )),
-                )),
-                None,
-                None,
-            ))],
-        )),
-        SourceSection::Trace(vec![vec![
-            TraceBinding::new(Identifier("s".to_string()), 0, 0, 2),
-            TraceBinding::new(Identifier("a".to_string()), 0, 2, 1),
-            TraceBinding::new(Identifier("b".to_string()), 0, 3, 1),
-            TraceBinding::new(Identifier("c".to_string()), 0, 4, 4),
-            TraceBinding::new(Identifier("d".to_string()), 0, 8, 4),
-            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 12),
-        ]]),
-        SourceSection::IntegrityConstraints(vec![Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Evaluator(EvaluatorFunctionCall::new(
-                Identifier("is_binary".to_string()),
-                vec![vec![SymbolAccess::new(
-                    Identifier("x".to_string()),
-                    AccessType::Default,
-                    0,
-                )]],
-            )),
-            Some(vec![(
-                Identifier("x".to_string()),
-                Iterable::Identifier(Identifier("c".to_string())),
-            )]),
-            Some(Mul(
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("s".to_string()),
-                    AccessType::Vector(0),
-                    0,
-                ))),
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("s".to_string()),
-                    AccessType::Vector(1),
-                    0,
-                ))),
-            )),
-        ))]),
-    ]);
-
-    ParseTest::new().expect_ast(source, expected);
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected.trace_columns.push(trace_segment!(
+        0,
+        "$main",
+        [(s, 2), (a, 1), (b, 1), (c, 4), (d, 4)]
+    ));
+    expected.evaluators.insert(
+        ident!(is_binary),
+        EvaluatorFunction::new(
+            SourceSpan::UNKNOWN,
+            ident!(is_binary),
+            vec![trace_segment!(0, "%0", [(x, 1)])],
+            vec![enforce!(eq!(exp!(access!(x), int!(2)), access!(x)))],
+        ),
+    );
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!(((x, expr!(access!(c)))) => call!(is_binary(vector!(access!(x)))), when and!(access!(s[0]), access!(s[1])))
+        )],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 // INVALID INTEGRITY CONSTRAINT COMPREHENSION
@@ -661,25 +594,31 @@ fn ic_comprehension_with_evaluator_and_selectors() {
 #[test]
 fn err_ic_comprehension_one_member_two_iterables() {
     let source = "
+    def test
+
     trace_columns:
         main: [a, b, c[4]]
 
     integrity_constraints:
         enf a = c for c in (c, d)";
 
-    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
+    ParseTest::new()
+        .expect_module_diagnostic(source, "bindings and iterables lengths are mismatched");
 }
 
 #[test]
 fn err_ic_comprehension_two_members_one_iterable() {
     let source = "
+    def test
+
     trace_columns:
         main: [a, b, c[4]]
 
     integrity_constraints:
         enf a = c + d for (c, d) in c";
 
-    ParseTest::new().expect_diagnostic(source, "bindings and iterables lengths are mismatched");
+    ParseTest::new()
+        .expect_module_diagnostic(source, "bindings and iterables lengths are mismatched");
 }
 
 // INVALID INTEGRITY CONSTRAINTS
@@ -688,17 +627,27 @@ fn err_ic_comprehension_two_members_one_iterable() {
 #[test]
 fn err_missing_integrity_constraint() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+
     integrity_constraints:
         let a = 2^2
         let b = [a, 2 * a]
         let c = [[a - 1, a^2], [b[0], b[1]]]";
-    ParseTest::new()
-        .expect_diagnostic(source, "at least one integrity constraint must be declared");
+    ParseTest::new().expect_module_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
 }
 
 #[test]
 fn ic_invalid() {
-    let source = "integrity_constraints:
+    let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+
+    integrity_constraints:
         enf clk' = clk = 1";
     ParseTest::new().expect_unrecognized_token(source);
 }
@@ -706,6 +655,11 @@ fn ic_invalid() {
 #[test]
 fn error_invalid_next_usage() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+
     integrity_constraints:
         enf clk'' = clk + 1";
     ParseTest::new().expect_unrecognized_token(source);
@@ -714,6 +668,11 @@ fn error_invalid_next_usage() {
 #[test]
 fn err_empty_integrity_constraints() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+
     integrity_constraints:
         
     boundary_constraints:
