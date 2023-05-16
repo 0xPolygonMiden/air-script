@@ -1,122 +1,163 @@
-use super::{
-    AccessType, Expression::*, Identifier, InlineConstraintExpr, IntegrityConstraint,
-    IntegrityStmt::*, ParseTest, Source, SourceSection::*, SymbolAccess, TraceBinding,
-};
-use crate::ast::ConstraintExpr;
+use miden_diagnostics::{SourceSpan, Span};
+
+use crate::ast::*;
+
+use super::ParseTest;
 
 // TRACE COLUMNS
 // ================================================================================================
 
 #[test]
 fn trace_columns() {
-    let source = "
+    let source = r#"
+    def test
+
     trace_columns:
-        main: [clk, fmp, ctx]";
-    let expected = Source(vec![Trace(vec![vec![
-        TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
-        TraceBinding::new(Identifier("fmp".to_string()), 0, 1, 1),
-        TraceBinding::new(Identifier("ctx".to_string()), 0, 2, 1),
-        TraceBinding::new(Identifier("$main".to_string()), 0, 0, 3),
-    ]])]);
-    ParseTest::new().expect_ast(source, expected);
+        main: [clk, fmp, ctx]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
+    integrity_constraints:
+        enf clk = 0
+    "#;
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1), (fmp, 1), (ctx, 1)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(access!(clk), int!(0)))],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn trace_columns_main_and_aux() {
-    let source = "
+    let source = r#"
+    def test
+
     trace_columns:
         main: [clk, fmp, ctx]
-        aux: [rc_bus, ch_bus]";
-    let expected = Source(vec![Trace(vec![
-        vec![
-            TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
-            TraceBinding::new(Identifier("fmp".to_string()), 0, 1, 1),
-            TraceBinding::new(Identifier("ctx".to_string()), 0, 2, 1),
-            TraceBinding::new(Identifier("$main".to_string()), 0, 0, 3),
-        ],
-        vec![
-            TraceBinding::new(Identifier("rc_bus".to_string()), 1, 0, 1),
-            TraceBinding::new(Identifier("ch_bus".to_string()), 1, 1, 1),
-            TraceBinding::new(Identifier("$aux".to_string()), 1, 0, 2),
-        ],
-    ])]);
-    ParseTest::new().expect_ast(source, expected);
+        aux: [rc_bus, ch_bus]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
+    integrity_constraints:
+        enf clk = 0
+    "#;
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1), (fmp, 1), (ctx, 1)]));
+    expected
+        .trace_columns
+        .push(trace_segment!(1, "$aux", [(rc_bus, 1), (ch_bus, 1)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(access!(clk), int!(0)))],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn trace_columns_groups() {
-    let source = "
+    let source = r#"
+    def test
+
     trace_columns:
         main: [clk, fmp, ctx, a[3]]
         aux: [rc_bus, b[4], ch_bus]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
         enf a[1]' = 1
-        enf clk' = clk - 1";
-    let expected = Source(vec![
-        Trace(vec![
-            vec![
-                TraceBinding::new(Identifier("clk".to_string()), 0, 0, 1),
-                TraceBinding::new(Identifier("fmp".to_string()), 0, 1, 1),
-                TraceBinding::new(Identifier("ctx".to_string()), 0, 2, 1),
-                TraceBinding::new(Identifier("a".to_string()), 0, 3, 3),
-                TraceBinding::new(Identifier("$main".to_string()), 0, 0, 6),
-            ],
-            vec![
-                TraceBinding::new(Identifier("rc_bus".to_string()), 1, 0, 1),
-                TraceBinding::new(Identifier("b".to_string()), 1, 1, 4),
-                TraceBinding::new(Identifier("ch_bus".to_string()), 1, 5, 1),
-                TraceBinding::new(Identifier("$aux".to_string()), 1, 0, 6),
-            ],
-        ]),
-        IntegrityConstraints(vec![
-            Constraint(IntegrityConstraint::new(
-                ConstraintExpr::Inline(InlineConstraintExpr::new(
-                    SymbolAccess(SymbolAccess::new(
-                        Identifier("a".to_string()),
-                        AccessType::Vector(1),
-                        1,
-                    )),
-                    Const(1),
-                )),
-                None,
-                None,
-            )),
-            Constraint(IntegrityConstraint::new(
-                ConstraintExpr::Inline(InlineConstraintExpr::new(
-                    SymbolAccess(SymbolAccess::new(
-                        Identifier("clk".to_string()),
-                        AccessType::Default,
-                        1,
-                    )),
-                    Sub(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("clk".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(Const(1)),
-                    ),
-                )),
-                None,
-                None,
-            )),
-        ]),
-    ]);
-    ParseTest::new().expect_ast(source, expected);
+        enf clk' = clk - 1
+    "#;
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected.trace_columns.push(trace_segment!(
+        0,
+        "$main",
+        [(clk, 1), (fmp, 1), (ctx, 1), (a, 3)]
+    ));
+    expected.trace_columns.push(trace_segment!(
+        1,
+        "$aux",
+        [(rc_bus, 1), (b, 4), (ch_bus, 1)]
+    ));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![
+            enforce!(eq!(access!(a[1], 1), int!(1))),
+            enforce!(eq!(access!(clk, 1), sub!(access!(clk), int!(1)))),
+        ],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
-fn empty_trace_columns_error() {
-    let source = "
-    trace_columns:";
+fn err_empty_trace_columns() {
+    let source = r#"
+    def test
+
+    trace_columns:
+    "#;
+
     // Trace columns cannot be empty
-    ParseTest::new().expect_diagnostic(source, "trace_columns section cannot be empty");
+    ParseTest::new().expect_module_diagnostic(source, "trace_columns section cannot be empty");
 }
 
 #[test]
-fn main_trace_cols_missing_error() {
+fn err_main_trace_cols_missing() {
     // returns an error if main trace columns are not defined
-    let source = "
+    let source = r#"
+    def test
+
     trace_columns:
         aux: [clk]
     public_inputs:
@@ -124,7 +165,9 @@ fn main_trace_cols_missing_error() {
     integrity_constraints:
         enf clk' = clk + 1
     boundary_constraints:
-        enf clk.first = 0";
+        enf clk.first = 0
+    "#;
 
-    ParseTest::new().expect_diagnostic(source, "declaration of main trace columns is required");
+    ParseTest::new()
+        .expect_module_diagnostic(source, "declaration of main trace columns is required");
 }

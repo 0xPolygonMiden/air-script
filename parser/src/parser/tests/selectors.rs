@@ -1,216 +1,93 @@
-use super::{Identifier, IntegrityConstraint, ParseTest, Source, SourceSection};
-use crate::ast::{
-    AccessType, ConstraintExpr, Expression::*, InlineConstraintExpr, IntegrityStmt::*, SymbolAccess,
-};
+use miden_diagnostics::{SourceSpan, Span};
+
+use crate::ast::*;
+
+use super::ParseTest;
 
 // SELECTORS
 // ================================================================================================
 
 #[test]
 fn single_selector() {
-    let source = "
+    let source = r#"
+    def test
+
+    trace_columns:
+        main: [clk, n1]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
-        enf clk' = clk when n1";
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                // clk' = clk
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    1,
-                )),
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    0,
-                )),
-            )),
-            None,
-            // n1
-            Some(SymbolAccess(SymbolAccess::new(
-                Identifier("n1".to_string()),
-                AccessType::Default,
-                0,
-            ))),
-        ),
-    )])]);
-    ParseTest::new().expect_ast(source, expected);
+        enf clk' = clk when n1
+    "#;
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1), (n1, 1)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!((("%0", range!(0..1))) => eq!(access!(clk, 1), access!(clk)), when access!(n1))
+        )],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn chained_selectors() {
-    let source = "
-    integrity_constraints:
-        enf clk' = clk when (n1 & !n2) | !n3";
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                // clk' = clk
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    1,
-                )),
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    0,
-                )),
-            )),
-            None,
-            // (n1 & !n2) | !n3
-            Some(Sub(
-                Box::new(Add(
-                    Box::new(Mul(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("n1".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(Sub(
-                            Box::new(Const(1)),
-                            Box::new(SymbolAccess(SymbolAccess::new(
-                                Identifier("n2".to_string()),
-                                AccessType::Default,
-                                0,
-                            ))),
-                        )),
-                    )),
-                    Box::new(Sub(
-                        Box::new(Const(1)),
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("n3".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                    )),
-                )),
-                Box::new(Mul(
-                    Box::new(Mul(
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("n1".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                        Box::new(Sub(
-                            Box::new(Const(1)),
-                            Box::new(SymbolAccess(SymbolAccess::new(
-                                Identifier("n2".to_string()),
-                                AccessType::Default,
-                                0,
-                            ))),
-                        )),
-                    )),
-                    Box::new(Sub(
-                        Box::new(Const(1)),
-                        Box::new(SymbolAccess(SymbolAccess::new(
-                            Identifier("n3".to_string()),
-                            AccessType::Default,
-                            0,
-                        ))),
-                    )),
-                )),
-            )),
-        ),
-    )])]);
-    ParseTest::new().expect_ast(source, expected);
-}
+    let source = r#"
+    def test
 
-#[test]
-fn multiconstraint_selectors() {
-    let source = "
+    trace_columns:
+        main: [clk, n1, n2, n3]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
-        enf clk' = 0 when n1 & !n2
-        match enf:
-            clk' = clk when n1 & n2
-            clk' = 1 when !n1 & !n2";
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![
-        Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                // clk' = 0 when n1 & !n2
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    1,
-                )),
-                Const(0),
-            )),
-            None,
-            Some(Mul(
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("n1".to_string()),
-                    AccessType::Default,
-                    0,
-                ))),
-                Box::new(Sub(
-                    Box::new(Const(1)),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("n2".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                )),
-            )),
-        )),
-        Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                // clk' = clk when n1 & n2
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    1,
-                )),
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    0,
-                )),
-            )),
-            None,
-            Some(Mul(
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("n1".to_string()),
-                    AccessType::Default,
-                    0,
-                ))),
-                Box::new(SymbolAccess(SymbolAccess::new(
-                    Identifier("n2".to_string()),
-                    AccessType::Default,
-                    0,
-                ))),
-            )),
-        )),
-        Constraint(IntegrityConstraint::new(
-            ConstraintExpr::Inline(InlineConstraintExpr::new(
-                // clk' = 1 when !n1 & !n2
-                SymbolAccess(SymbolAccess::new(
-                    Identifier("clk".to_string()),
-                    AccessType::Default,
-                    1,
-                )),
-                Const(1),
-            )),
-            None,
-            Some(Mul(
-                Box::new(Sub(
-                    Box::new(Const(1)),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("n1".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                )),
-                Box::new(Sub(
-                    Box::new(Const(1)),
-                    Box::new(SymbolAccess(SymbolAccess::new(
-                        Identifier("n2".to_string()),
-                        AccessType::Default,
-                        0,
-                    ))),
-                )),
-            )),
-        )),
-    ])]);
-    ParseTest::new().expect_ast(source, expected);
+        enf clk' = clk when (n1 & !n2) | !n3
+    "#;
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected.trace_columns.push(trace_segment!(
+        0,
+        "$main",
+        [(clk, 1), (n1, 1), (n2, 1), (n3, 1)]
+    ));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce_all!(
+            lc!((("%0", range!(0..1))) => eq!(access!(clk, 1), access!(clk)), when or!(and!(access!(n1), not!(access!(n2))), not!(access!(n3))))
+        )],
+    ));
+
+    ParseTest::new().expect_module_ast(source, expected);
 }
