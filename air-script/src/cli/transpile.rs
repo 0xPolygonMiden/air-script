@@ -1,3 +1,4 @@
+use clap::Args;
 use std::{fs, path::PathBuf, sync::Arc};
 
 use codegen_winter::CodeGenerator;
@@ -6,37 +7,27 @@ use miden_diagnostics::{
     term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
 };
 use parser::{ast::Source, Parser};
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
-#[structopt(
-    name = "Transpile",
-    about = "Transpile AirScript source code to Rust targeting Winterfell"
-)]
-pub struct TranspileCmd {
+#[derive(Args)]
+pub struct Transpile {
     /// Path to input file
-    #[structopt(short = "i", long = "input", parse(from_os_str))]
-    input_file: Option<PathBuf>,
-    /// Path to output file
-    #[structopt(short = "o", long = "output", parse(from_os_str))]
-    output_file: Option<PathBuf>,
+    input: PathBuf,
+
+    #[arg(
+        short,
+        long,
+        help = "Output filename, default to the input file with the .rs extension"
+    )]
+    output: Option<PathBuf>,
 }
 
-impl TranspileCmd {
+impl Transpile {
     pub fn execute(&self) -> Result<(), String> {
         println!("============================================================");
         println!("Transpiling...");
 
-        // get the input path
-        let input_path = match &self.input_file {
-            Some(path) => path.clone(),
-            None => {
-                return Err("No input file specified".to_string());
-            }
-        };
-
-        // get the output path
-        let output_path = match &self.output_file {
+        let input_path = &self.input;
+        let output_path = match &self.output {
             Some(path) => path.clone(),
             None => {
                 let mut path = input_path.clone();
