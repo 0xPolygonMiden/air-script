@@ -55,7 +55,7 @@ impl Emitter for SplitEmitter {
 /// - ParseError test: check that the parsed values are valid.
 ///   * InvalidInt: This error is returned if the parsed number is not a valid u64.
 pub struct ParseTest {
-    diagnostics: Arc<DiagnosticsHandler>,
+    pub diagnostics: Arc<DiagnosticsHandler>,
     emitter: Arc<SplitEmitter>,
     parser: Parser,
 }
@@ -87,7 +87,13 @@ impl ParseTest {
         }
     }
 
-    #[allow(unused)]
+    /// This adds a new in-memory file to the [CodeMap] for this test.
+    ///
+    /// This is used when we want to write a test with imports, without having to place files on disk
+    pub fn add_virtual_file<P: AsRef<std::path::Path>>(&self, name: P, content: String) {
+        self.parser.codemap.add(name.as_ref(), content);
+    }
+
     pub fn parse_module_from_file(&self, path: &str) -> Result<Module, ParseError> {
         self.parser
             .parse_file::<Module, _, _>(&self.diagnostics, path)
