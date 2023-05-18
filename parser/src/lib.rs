@@ -6,6 +6,7 @@ mod lexer;
 mod parser;
 mod sema;
 pub mod symbols;
+pub mod transforms;
 
 pub use self::parser::{ParseError, Parser};
 pub use self::symbols::Symbol;
@@ -42,6 +43,25 @@ pub(crate) fn parse_module_from_file<P: AsRef<Path>>(
 ) -> Result<ast::Module, ParseError> {
     let parser = Parser::new((), codemap);
     match parser.parse_file::<ast::Module, _, _>(diagnostics, path) {
+        ok @ Ok(_) => ok,
+        Err(ParseError::Lexer(err)) => {
+            diagnostics.emit(err);
+            Err(ParseError::Failed)
+        }
+        err @ Err(_) => err,
+    }
+}
+
+/// Parses a [Module] from a file already in the codemap
+///
+/// This is primarily intended for use in the import resolution phase.
+pub(crate) fn parse_module(
+    diagnostics: &DiagnosticsHandler,
+    codemap: Arc<CodeMap>,
+    source: Arc<miden_diagnostics::SourceFile>,
+) -> Result<ast::Module, ParseError> {
+    let parser = Parser::new((), codemap);
+    match parser.parse::<ast::Module, _>(diagnostics, source) {
         ok @ Ok(_) => ok,
         Err(ParseError::Lexer(err)) => {
             diagnostics.emit(err);
