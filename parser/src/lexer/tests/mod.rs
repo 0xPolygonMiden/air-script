@@ -48,10 +48,10 @@ fn expect_error_at_location(source: &str, expected: LexicalError, line: u32, col
         .expect("expected lexical error, but lexing completed successfully");
 
     let loc = match &err {
-        LexicalError::InvalidInt { span, .. } => codemap.location_for_span(*span).unwrap(),
-        LexicalError::UnexpectedCharacter { start, .. } => {
-            codemap.location(start.source_id(), start.index()).unwrap()
-        }
+        LexicalError::InvalidInt { span, .. } => codemap.location(span).unwrap(),
+        LexicalError::UnexpectedCharacter { start, .. } => codemap
+            .location_at_index(start.source_id(), start.index())
+            .unwrap(),
     };
     assert_eq!(err, expected);
     assert_eq!(loc.line, LineIndex(line));
