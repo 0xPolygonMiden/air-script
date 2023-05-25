@@ -45,7 +45,14 @@ fn test_simple_arithmetic() {
     let b_prime = b;
     let main_frame = to_stack_order(&[a, a_prime, b, b_prime]);
     let aux_frame = to_stack_order(&[]);
-    let code = test_code(code, main_frame, aux_frame, trace_len, z);
+    let code = test_code(
+        code,
+        main_frame,
+        aux_frame,
+        trace_len,
+        z,
+        &["compute_evaluate_transitions"],
+    );
     let program = Assembler::default().compile(code).unwrap();
 
     let mut process: Process<MemAdviceProvider> = Process::new(
@@ -112,7 +119,14 @@ fn test_exp() {
     let b_prime = b;
     let main_frame = to_stack_order(&[a, a_prime, b, b_prime]);
     let aux_frame = to_stack_order(&[]);
-    let code = test_code(code, main_frame, aux_frame, trace_len, z);
+    let code = test_code(
+        code,
+        main_frame,
+        aux_frame,
+        trace_len,
+        z,
+        &["compute_evaluate_transitions"],
+    );
     let program = Assembler::default().compile(code).unwrap();
 
     let mut process: Process<MemAdviceProvider> = Process::new(
@@ -180,7 +194,14 @@ fn test_long_trace() {
     let e_prime = e;
     let main_frame = to_stack_order(&[a, a_prime, b, b_prime, c, c_prime, d, d_prime, e, e_prime]);
     let aux_frame = to_stack_order(&[]);
-    let code = test_code(code, main_frame, aux_frame, trace_len, z);
+    let code = test_code(
+        code,
+        main_frame,
+        aux_frame,
+        trace_len,
+        z,
+        &["compute_evaluate_transitions"],
+    );
     let program = Assembler::default().compile(code).unwrap();
 
     let mut process: Process<MemAdviceProvider> = Process::new(
@@ -235,7 +256,14 @@ fn test_vector() {
     let fmp_1_prime = fmp_1;
     let main_frame = to_stack_order(&[clk, clk_prime, fmp_0, fmp_0_prime, fmp_1, fmp_1_prime]);
     let aux_frame = to_stack_order(&[]);
-    let code = test_code(code, main_frame, aux_frame, trace_len, z);
+    let code = test_code(
+        code,
+        main_frame,
+        aux_frame,
+        trace_len,
+        z,
+        &["compute_evaluate_transitions"],
+    );
     let program = Assembler::default().compile(code).unwrap();
 
     let mut process: Process<MemAdviceProvider> = Process::new(
@@ -291,7 +319,14 @@ fn test_multiple_rows() {
 
     let main_frame = to_stack_order(&[a, a_prime, b, b_prime]);
     let aux_frame = to_stack_order(&[]);
-    let code = test_code(code, main_frame, aux_frame, trace_len, z);
+    let code = test_code(
+        code,
+        main_frame,
+        aux_frame,
+        trace_len,
+        z,
+        &["compute_evaluate_transitions"],
+    );
     let program = Assembler::default().compile(code).unwrap();
 
     let mut process: Process<MemAdviceProvider> = Process::new(

@@ -46,7 +46,14 @@ fn test_simple_aux() {
     let b_prime = b;
     let main_frame = to_stack_order(&[a, a_prime]);
     let aux_frame = to_stack_order(&[b, b_prime]);
-    let code = test_code(code, main_frame, aux_frame, trace_len, z);
+    let code = test_code(
+        code,
+        main_frame,
+        aux_frame,
+        trace_len,
+        z,
+        &["compute_evaluate_transitions"],
+    );
     let program = Assembler::default().compile(code).unwrap();
 
     let mut process: Process<MemAdviceProvider> = Process::new(

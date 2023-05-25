@@ -40,7 +40,14 @@ fn test_simple_periodic() {
     let a_prime = a;
     let main_frame = to_stack_order(&[a, a_prime]);
     let aux_frame = to_stack_order(&[]);
-    let code = test_code(code, main_frame, aux_frame, trace_len, z);
+    let code = test_code(
+        code,
+        main_frame,
+        aux_frame,
+        trace_len,
+        z,
+        &["cache_periodic_polys", "compute_evaluate_transitions"],
+    );
     let program = Assembler::default().compile(code).unwrap();
 
     let mut process: Process<MemAdviceProvider> = Process::new(
