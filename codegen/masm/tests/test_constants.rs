@@ -1,4 +1,4 @@
-use air_codegen_masm::code_gen;
+use air_codegen_masm::{code_gen, constants};
 use assembly::Assembler;
 use ir::AirIR;
 use processor::{
@@ -7,7 +7,7 @@ use processor::{
 };
 
 mod utils;
-use utils::{parse, test_code, to_stack_order};
+use utils::{parse, test_code, to_stack_order, Data};
 
 static CONSTANTS_AIR: &str = "
 def ConstantsAir
@@ -41,21 +41,36 @@ fn test_constants() {
     let ast = parse(CONSTANTS_AIR);
     let ir = AirIR::new(ast).expect("build AirIR failed");
     let code = code_gen(&ir).expect("codegen failed");
-    let trace_len = 2u64.pow(4);
-    let z = QuadExtension::new(Felt::new(1), Felt::ZERO);
 
+    let trace_len = 2u64.pow(4);
+    let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
+    let z = one;
     let a = QuadExtension::new(Felt::new(19), Felt::ZERO);
     let b = QuadExtension::new(Felt::new(23), Felt::ZERO);
     let c = QuadExtension::new(Felt::new(29), Felt::ZERO);
     let a_prime = a + A;
     let b_prime = B_0 * b;
     let c_prime = (C_0_0 + B_0) * c;
-    let main_frame = to_stack_order(&[a, a_prime, b, b_prime, c, c_prime]);
-    let aux_frame = to_stack_order(&[]);
+
     let code = test_code(
         code,
-        main_frame,
-        aux_frame,
+        vec![
+            Data {
+                data: to_stack_order(&[a, a_prime, b, b_prime, c, c_prime]),
+                address: constants::OOD_FRAME_ADDRESS,
+                descriptor: "main_trace",
+            },
+            Data {
+                data: to_stack_order(&[]),
+                address: constants::OOD_AUX_FRAME_ADDRESS,
+                descriptor: "aux_trace",
+            },
+            Data {
+                data: to_stack_order(&vec![one; 3]),
+                address: constants::COMPOSITION_COEF_ADDRESS,
+                descriptor: "composition_coefficients",
+            },
+        ],
         trace_len,
         z,
         &["compute_evaluate_transitions"],

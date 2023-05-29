@@ -142,8 +142,12 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965000 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966016 movdn.3 movdn.3 drop drop ext2mul
     # constraint 1 for main
     padw mem_loadw.500000001 drop drop padw mem_loadw.4294965000 drop drop padw mem_loadw.4294965000 movdn.3 movdn.3 drop drop ext2sub ext2mul push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966016 drop drop ext2mul
     # constraint 2 for main
     padw mem_loadw.4294965003 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
@@ -160,6 +164,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965003 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966017 movdn.3 movdn.3 drop drop ext2mul
     # constraint 3 for main
     padw mem_loadw.4294965004 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
@@ -176,6 +182,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965004 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966017 drop drop ext2mul
     # constraint 4 for main
     padw mem_loadw.4294965005 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
@@ -192,6 +200,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965005 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966018 movdn.3 movdn.3 drop drop ext2mul
     # constraint 5 for main
     padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
@@ -208,6 +218,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966018 drop drop ext2mul
     # constraint 6 for main
     padw mem_loadw.4294965007 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
@@ -224,6 +236,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965007 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966019 movdn.3 movdn.3 drop drop ext2mul
     # constraint 7 for main
     padw mem_loadw.4294965008 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
@@ -240,6 +254,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965008 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966019 drop drop ext2mul
     # constraint 8 for main
     padw mem_loadw.4294965009 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
@@ -256,6 +272,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965009 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966020 movdn.3 movdn.3 drop drop ext2mul
     # constraint 9 for main
     padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
@@ -272,6 +290,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966020 drop drop ext2mul
     # constraint 10 for main
     padw mem_loadw.500000000 drop drop padw mem_loadw.4294965001 movdn.3 movdn.3 drop drop push.2 push.0
     # push the accumulator to the stack
@@ -328,6 +348,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop ext2mul ext2add ext2sub ext2mul push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966021 movdn.3 movdn.3 drop drop ext2mul
     # constraint 11 for main
     padw mem_loadw.500000000 drop drop padw mem_loadw.4294965002 movdn.3 movdn.3 drop drop push.2 push.0
     # push the accumulator to the stack
@@ -384,6 +406,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop ext2mul ext2add ext2sub ext2mul push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966021 drop drop ext2mul
     # constraint 12 for main
     padw mem_loadw.500000001 drop drop padw mem_loadw.4294965001 drop drop padw mem_loadw.4294965001 movdn.3 movdn.3 drop drop push.16 push.0 ext2mul push.2 push.0
     # push the accumulator to the stack
@@ -440,6 +464,8 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop ext2mul ext2add ext2sub ext2mul push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966022 movdn.3 movdn.3 drop drop ext2mul
     # constraint 13 for main
     padw mem_loadw.500000001 drop drop padw mem_loadw.4294965002 drop drop padw mem_loadw.4294965002 movdn.3 movdn.3 drop drop push.16 push.0 ext2mul push.2 push.0
     # push the accumulator to the stack
@@ -496,10 +522,16 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop ext2mul ext2add ext2sub ext2mul push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966022 drop drop ext2mul
     # constraint 14 for main
     padw mem_loadw.500000000 drop drop padw mem_loadw.4294965011 movdn.3 movdn.3 drop drop ext2mul push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966023 movdn.3 movdn.3 drop drop ext2mul
     # constraint 15 for main
     padw mem_loadw.500000001 drop drop padw mem_loadw.4294965012 movdn.3 movdn.3 drop drop padw mem_loadw.4294965011 drop drop ext2sub ext2mul push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966023 drop drop ext2mul
     # constraint 16 for main
     push.1 push.0 padw mem_loadw.4294965000 movdn.3 movdn.3 drop drop ext2sub padw mem_loadw.4294965012 movdn.3 movdn.3 drop drop padw mem_loadw.4294965011 movdn.3 movdn.3 drop drop push.16 push.0 ext2mul push.2 push.0
     # push the accumulator to the stack
@@ -610,81 +642,15 @@ proc.compute_evaluate_transitions
     drop drop
     # => [r1, r0, ...] (2 cycles)
     padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop ext2add push.2 push.0 padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop ext2mul padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop ext2mul ext2sub ext2mul ext2add ext2sub ext2mul ext2add push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966024 movdn.3 movdn.3 drop drop ext2mul
 end # END PROC compute_evaluate_transitions
 
 proc.evaluate_transitions
     exec.cache_periodic_polys
     exec.compute_evaluate_transitions
-    # Compute the numerator of the constraint polynomial
-    push.0 push.0
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 16 into the numerator
-    padw mem_loadw.4294966024 movdn.3 movdn.3 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 15 into the numerator
-    padw mem_loadw.4294966023 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 14 into the numerator
-    padw mem_loadw.4294966023 movdn.3 movdn.3 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 13 into the numerator
-    padw mem_loadw.4294966022 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 12 into the numerator
-    padw mem_loadw.4294966022 movdn.3 movdn.3 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 11 into the numerator
-    padw mem_loadw.4294966021 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 10 into the numerator
-    padw mem_loadw.4294966021 movdn.3 movdn.3 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 9 into the numerator
-    padw mem_loadw.4294966020 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 8 into the numerator
-    padw mem_loadw.4294966020 movdn.3 movdn.3 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 7 into the numerator
-    padw mem_loadw.4294966019 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 6 into the numerator
-    padw mem_loadw.4294966019 movdn.3 movdn.3 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 5 into the numerator
-    padw mem_loadw.4294966018 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 4 into the numerator
-    padw mem_loadw.4294966018 movdn.3 movdn.3 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 3 into the numerator
-    padw mem_loadw.4294966017 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 2 into the numerator
-    padw mem_loadw.4294966017 movdn.3 movdn.3 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 1 into the numerator
-    padw mem_loadw.4294966016 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 0 into the numerator
-    padw mem_loadw.4294966016 movdn.3 movdn.3 drop drop ext2mul ext2add # accumulate the contraint into the numerator
+    # Accumulate the numerator of the constraint polynomial
+    ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add
 end # END PROC evaluate_transitions
 
 proc.evaluate_boundary

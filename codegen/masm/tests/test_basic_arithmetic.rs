@@ -1,4 +1,4 @@
-use air_codegen_masm::code_gen;
+use air_codegen_masm::{code_gen, constants};
 use assembly::Assembler;
 use ir::AirIR;
 use processor::{
@@ -7,7 +7,7 @@ use processor::{
 };
 
 mod utils;
-use utils::{parse, test_code, to_stack_order};
+use utils::{parse, test_code, to_stack_order, Data};
 
 static ARITH_AIR: &str = "
 def SimpleArithmetic
@@ -36,19 +36,34 @@ fn test_simple_arithmetic() {
     let ast = parse(ARITH_AIR);
     let ir = AirIR::new(ast).expect("build AirIR failed");
     let code = code_gen(&ir).expect("codegen failed");
-    let trace_len = 2u64.pow(4);
-    let z = QuadExtension::new(Felt::new(1), Felt::ZERO);
 
+    let trace_len = 2u64.pow(4);
+    let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
+    let z = one;
     let a = QuadExtension::new(Felt::new(3), Felt::ZERO);
     let b = QuadExtension::new(Felt::new(7), Felt::ZERO);
     let a_prime = a;
     let b_prime = b;
-    let main_frame = to_stack_order(&[a, a_prime, b, b_prime]);
-    let aux_frame = to_stack_order(&[]);
+
     let code = test_code(
         code,
-        main_frame,
-        aux_frame,
+        vec![
+            Data {
+                data: to_stack_order(&[a, a_prime, b, b_prime]),
+                address: constants::OOD_FRAME_ADDRESS,
+                descriptor: "main_trace",
+            },
+            Data {
+                data: to_stack_order(&[]),
+                address: constants::OOD_AUX_FRAME_ADDRESS,
+                descriptor: "aux_trace",
+            },
+            Data {
+                data: to_stack_order(&vec![one; 6]),
+                address: constants::COMPOSITION_COEF_ADDRESS,
+                descriptor: "composition_coefficients",
+            },
+        ],
         trace_len,
         z,
         &["compute_evaluate_transitions"],
@@ -110,19 +125,34 @@ fn test_exp() {
     let ast = parse(EXP_AIR);
     let ir = AirIR::new(ast).expect("build AirIR failed");
     let code = code_gen(&ir).expect("codegen failed");
-    let trace_len = 2u64.pow(4);
-    let z = QuadExtension::new(Felt::new(1), Felt::ZERO);
 
+    let trace_len = 2u64.pow(4);
+    let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
+    let z = one;
     let a = QuadExtension::<Felt>::ZERO;
     let b = QuadExtension::new(Felt::new(3), Felt::ZERO);
     let a_prime = a;
     let b_prime = b;
-    let main_frame = to_stack_order(&[a, a_prime, b, b_prime]);
-    let aux_frame = to_stack_order(&[]);
+
     let code = test_code(
         code,
-        main_frame,
-        aux_frame,
+        vec![
+            Data {
+                data: to_stack_order(&[a, a_prime, b, b_prime]),
+                address: constants::OOD_FRAME_ADDRESS,
+                descriptor: "main_trace",
+            },
+            Data {
+                data: to_stack_order(&[]),
+                address: constants::OOD_AUX_FRAME_ADDRESS,
+                descriptor: "aux_trace",
+            },
+            Data {
+                data: to_stack_order(&vec![one; 5]),
+                address: constants::COMPOSITION_COEF_ADDRESS,
+                descriptor: "composition_coefficients",
+            },
+        ],
         trace_len,
         z,
         &["compute_evaluate_transitions"],
@@ -179,9 +209,10 @@ fn test_long_trace() {
     let ast = parse(LONG_TRACE);
     let ir = AirIR::new(ast).expect("build AirIR failed");
     let code = code_gen(&ir).expect("codegen failed");
-    let trace_len = 2u64.pow(4);
-    let z = QuadExtension::new(Felt::new(1), Felt::ZERO);
 
+    let trace_len = 2u64.pow(4);
+    let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
+    let z = one;
     let a = QuadExtension::new(Felt::new(2), Felt::ZERO);
     let b = QuadExtension::new(Felt::new(3), Felt::ZERO);
     let c = QuadExtension::new(Felt::new(5), Felt::ZERO);
@@ -192,12 +223,26 @@ fn test_long_trace() {
     let c_prime = c;
     let d_prime = d;
     let e_prime = e;
-    let main_frame = to_stack_order(&[a, a_prime, b, b_prime, c, c_prime, d, d_prime, e, e_prime]);
-    let aux_frame = to_stack_order(&[]);
+
     let code = test_code(
         code,
-        main_frame,
-        aux_frame,
+        vec![
+            Data {
+                data: to_stack_order(&[a, a_prime, b, b_prime, c, c_prime, d, d_prime, e, e_prime]),
+                address: constants::OOD_FRAME_ADDRESS,
+                descriptor: "main_trace",
+            },
+            Data {
+                data: to_stack_order(&[]),
+                address: constants::OOD_AUX_FRAME_ADDRESS,
+                descriptor: "aux_trace",
+            },
+            Data {
+                data: to_stack_order(&vec![one; 1]),
+                address: constants::COMPOSITION_COEF_ADDRESS,
+                descriptor: "composition_coefficients",
+            },
+        ],
         trace_len,
         z,
         &["compute_evaluate_transitions"],
@@ -245,9 +290,10 @@ fn test_vector() {
     let ast = parse(VECTOR);
     let ir = AirIR::new(ast).expect("build AirIR failed");
     let code = code_gen(&ir).expect("codegen failed");
-    let trace_len = 2u64.pow(4);
-    let z = QuadExtension::new(Felt::new(1), Felt::ZERO);
 
+    let trace_len = 2u64.pow(4);
+    let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
+    let z = one;
     let clk = QuadExtension::new(Felt::new(2), Felt::ZERO);
     let fmp_0 = QuadExtension::new(Felt::new(3), Felt::ZERO);
     let fmp_1 = QuadExtension::new(Felt::new(5), Felt::ZERO);
@@ -256,10 +302,26 @@ fn test_vector() {
     let fmp_1_prime = fmp_1;
     let main_frame = to_stack_order(&[clk, clk_prime, fmp_0, fmp_0_prime, fmp_1, fmp_1_prime]);
     let aux_frame = to_stack_order(&[]);
+
     let code = test_code(
         code,
-        main_frame,
-        aux_frame,
+        vec![
+            Data {
+                data: main_frame,
+                address: constants::OOD_FRAME_ADDRESS,
+                descriptor: "main_trace",
+            },
+            Data {
+                data: aux_frame,
+                address: constants::OOD_AUX_FRAME_ADDRESS,
+                descriptor: "aux_trace",
+            },
+            Data {
+                data: to_stack_order(&vec![one; 1]),
+                address: constants::COMPOSITION_COEF_ADDRESS,
+                descriptor: "composition_coefficients",
+            },
+        ],
         trace_len,
         z,
         &["compute_evaluate_transitions"],
@@ -308,21 +370,35 @@ fn test_multiple_rows() {
     let ast = parse(MULTIPLE_ROWS_AIR);
     let ir = AirIR::new(ast).expect("build AirIR failed");
     let code = code_gen(&ir).expect("codegen failed");
-    let trace_len = 2u64.pow(4);
-    let z = QuadExtension::new(Felt::new(1), Felt::ZERO);
 
+    let trace_len = 2u64.pow(4);
+    let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
+    let z = one;
     let two = QuadExtension::new(Felt::new(2), Felt::ZERO);
     let a = QuadExtension::new(Felt::new(3), Felt::ZERO);
     let b = QuadExtension::new(Felt::new(7), Felt::ZERO);
     let a_prime = a * two;
     let b_prime = a + b;
 
-    let main_frame = to_stack_order(&[a, a_prime, b, b_prime]);
-    let aux_frame = to_stack_order(&[]);
     let code = test_code(
         code,
-        main_frame,
-        aux_frame,
+        vec![
+            Data {
+                data: to_stack_order(&[a, a_prime, b, b_prime]),
+                address: constants::OOD_FRAME_ADDRESS,
+                descriptor: "main_trace",
+            },
+            Data {
+                data: to_stack_order(&[]),
+                address: constants::OOD_AUX_FRAME_ADDRESS,
+                descriptor: "aux_trace",
+            },
+            Data {
+                data: to_stack_order(&vec![one; 2]),
+                address: constants::COMPOSITION_COEF_ADDRESS,
+                descriptor: "composition_coefficients",
+            },
+        ],
         trace_len,
         z,
         &["compute_evaluate_transitions"],

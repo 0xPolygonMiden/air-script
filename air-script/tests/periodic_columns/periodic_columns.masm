@@ -125,23 +125,19 @@ end # END PROC cache_periodic_polys
 proc.compute_evaluate_transitions
     # constraint 0 for main
     padw mem_loadw.500000000 drop drop padw mem_loadw.4294965001 movdn.3 movdn.3 drop drop padw mem_loadw.4294965002 movdn.3 movdn.3 drop drop ext2add ext2mul push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966016 movdn.3 movdn.3 drop drop ext2mul
     # constraint 1 for main
     padw mem_loadw.500000001 drop drop padw mem_loadw.4294965000 drop drop padw mem_loadw.4294965000 movdn.3 movdn.3 drop drop ext2sub ext2mul push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966016 drop drop ext2mul
 end # END PROC compute_evaluate_transitions
 
 proc.evaluate_transitions
     exec.cache_periodic_polys
     exec.compute_evaluate_transitions
-    # Compute the numerator of the constraint polynomial
-    push.0 push.0
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 1 into the numerator
-    padw mem_loadw.4294966016 drop drop ext2mul ext2add # accumulate the contraint into the numerator
-    # Save the accumulator
-    movdn.2 movdn.2
-    # Accumulate constraint 0 into the numerator
-    padw mem_loadw.4294966016 movdn.3 movdn.3 drop drop ext2mul ext2add # accumulate the contraint into the numerator
+    # Accumulate the numerator of the constraint polynomial
+    ext2add ext2add
 end # END PROC evaluate_transitions
 
 proc.evaluate_boundary

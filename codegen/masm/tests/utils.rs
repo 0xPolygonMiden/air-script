@@ -9,6 +9,15 @@ use processor::{
 };
 use std::sync::Arc;
 
+pub struct Data<'a, T>
+where
+    T: Default + std::fmt::Display,
+{
+    pub data: Vec<T>,
+    pub address: u64,
+    pub descriptor: &'a str,
+}
+
 pub fn parse(source: &str) -> Source {
     let codemap = Arc::new(CodeMap::new());
     let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
@@ -42,27 +51,33 @@ where
     }
 }
 
-fn push_data_to_code<T>(code: &mut String, addr: u64, data: Vec<T>)
+/// Helper to initialize the VM's memory.
+///
+/// This writes the data directly to the assembly code instead of using procedures and advice
+/// inputs. This makes it easy to print the code and debug directly it in the VM.
+fn push_to_memory<T>(code: &mut String, memory: &mut Data<T>)
 where
-    T: std::fmt::Display,
+    T: Default + std::fmt::Display,
 {
-    code.push_str(&format!("    push.{} # push address\n", addr,));
+    code.push_str(&format!("    # initialize {}\n", memory.descriptor));
+    code.push_str(&format!("    push.{} # memory address\n", memory.address));
 
-    for (i, data) in data.chunks(4).enumerate() {
+    pad_to_word_len(&mut memory.data);
+    for (i, data) in memory.data.chunks(4).enumerate() {
         code.push_str(&format!(
-            "        push.{}.{}.{}.{} dup.4 add.{} mem_storew dropw # load data row {}\n",
+            "        push.{}.{}.{}.{} dup.4 add.{} mem_storew dropw # row {}\n",
             data[3], data[2], data[1], data[0], i, i,
         ));
     }
 
     code.push_str("    drop # clean address\n");
+    code.push_str(&format!("    # finished {}\n\n", memory.descriptor));
 }
 
 /// Given the generated procedures as `code` and `frame_data`, returns the test code.
 pub fn test_code<T>(
     mut code: String,
-    mut main_frame_data: Vec<T>,
-    mut aux_frame_data: Vec<T>,
+    memory: Vec<Data<T>>,
     trace_len: u64,
     z: QuadExtension<Felt>,
     execs: &[&str],
@@ -74,40 +89,51 @@ where
         trace_len.is_power_of_two(),
         "trace_len must be a power of two"
     );
-    assert!(
-        main_frame_data.len() != 0,
-        "main frame data must be non-empty"
-    );
 
-    pad_to_word_len(&mut main_frame_data);
-    pad_to_word_len(&mut aux_frame_data);
+    // asserts there is no overlap between the memory ranges
+    let mut ranges: Vec<(u64, u64)> = memory
+        .iter()
+        .map(|data| (data.address, data.address + data.data.len() as u64))
+        .collect();
+    ranges.sort();
 
-    let main_frame_end: u64 =
-        constants::OOD_FRAME_ADDRESS + u64::try_from(main_frame_data.len()).unwrap();
-    let has_space = main_frame_end <= constants::OOD_AUX_FRAME_ADDRESS;
-    assert!(has_space, "main frame data would overwrite aux frame");
+    for check in ranges.windows(2) {
+        let first = check[0];
+        let second = check[1];
+        assert!(first.1 <= second.0, "memory ranges overlap");
+    }
+
+    let main_memory_pos = ranges
+        .binary_search_by_key(&constants::OOD_FRAME_ADDRESS, |&(address, _)| address)
+        .expect("main trace memory missing");
+
+    assert!(ranges[main_memory_pos].1 > 0, "main trace memory is empty");
 
     code.push_str("# END CODEGEN | START TESTCODE\n");
     code.push_str("begin\n");
+
+    // save the trace length
     code.push_str(&format!(
         "    push.{} push.{} mem_store # trace_len\n",
         trace_len,
         constants::TRACE_LEN_ADDRESS
     ));
 
+    // save the out-of-domain element
     let [z_0, z_1] = z.to_base_elements();
     code.push_str(&format!(
-        "    push.{}.{}.0.0 push.{} mem_storew dropw # z\n",
+        "    push.{}.{}.0.0 push.{} mem_storew dropw # z\n\n",
         z_0.as_int(),
         z_1.as_int(),
         constants::Z_ADDRESS,
     ));
-    code.push_str("    # main trace data \n");
-    push_data_to_code(&mut code, constants::OOD_FRAME_ADDRESS, main_frame_data);
-    if aux_frame_data.len() > 0 {
-        code.push_str("    # aux trace data \n");
-        push_data_to_code(&mut code, constants::OOD_AUX_FRAME_ADDRESS, aux_frame_data);
+
+    // initialize the memory
+    for mut data in memory {
+        push_to_memory(&mut code, &mut data);
     }
+
+    // call procedures to test
     for proc in execs {
         code.push_str(&format!("    exec.{}\n", proc));
     }

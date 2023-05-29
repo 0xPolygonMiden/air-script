@@ -28,7 +28,8 @@ pub struct CodeGenerator<'ast> {
     /// Periodic columns are visited in order, and the counter is the same as the columns ID.
     periodic_column: u64,
 
-    /// Counts how many transition constraint roots have been visited so far.
+    /// Counts how many transition constraint roots have been visited so far. Used for
+    /// documentation and to load the composition coefficients.
     transition_contraint: usize,
 
     /// Map of the constants found while visitint the [AirIR].
@@ -251,7 +252,6 @@ impl<'ast> CodeGenerator<'ast> {
     fn gen_compute_evaluate_transitions(&mut self) -> Result<(), CodegenError> {
         self.writer.proc("compute_evaluate_transitions");
         walk_integrity_constraints(self, self.ir, MAIN_TRACE)?;
-        self.transition_contraint = 0; // reset counter
         walk_integrity_constraints(self, self.ir, AUX_TRACE)?;
         self.writer.end();
 
@@ -271,32 +271,13 @@ impl<'ast> CodeGenerator<'ast> {
         self.writer.exec("compute_evaluate_transitions");
 
         self.writer
-            .header("Compute the numerator of the constraint polynomial");
-
-        // NOTE: The values are in the stack order, so start with the last constraint from the
-        // auxiliary trace, and finish on the first constraint of the main trace.
-
-        // push accumulator to the stack
-        self.writer.push(0);
-        self.writer.push(0);
+            .header("Accumulate the numerator of the constraint polynomial");
 
         let total_len = self.ir.integrity_constraints(MAIN_TRACE).len()
             + self.ir.integrity_constraints(AUX_TRACE).len();
-        let total_len: u64 = total_len.try_into().unwrap();
 
-        for i in (0..total_len).rev() {
-            self.writer.header("Save the accumulator");
-            self.writer.movdn(2);
-            self.writer.movdn(2);
-
-            self.writer
-                .header(format!("Accumulate constraint {} into the numerator", i));
-            load_quadratic_element(&mut self.writer, self.config.composition_coef_address, i)?;
-            self.writer.ext2mul();
-
+        for _ in 0..total_len {
             self.writer.ext2add();
-            self.writer
-                .comment("accumulate the contraint into the numerator");
         }
 
         self.writer.end();
@@ -396,6 +377,18 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         ));
 
         self.visit_node_index(constraint.node_index())?;
+
+        self.writer
+            .header("Multiply by the composition coefficient");
+
+        load_quadratic_element(
+            &mut self.writer,
+            self.config.composition_coef_address,
+            self.transition_contraint
+                .try_into()
+                .or(Err(CodegenError::InvalidIndex))?,
+        )?;
+        self.writer.ext2mul();
 
         self.transition_contraint += 1;
         Ok(())
