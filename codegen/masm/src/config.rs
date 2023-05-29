@@ -1,3 +1,5 @@
+use crate::constants;
+
 pub struct CodegenConfig {
     // Memory location of the trace length using the following format:
     //
@@ -32,4 +34,19 @@ pub struct CodegenConfig {
     /// Memory range used to store exponentiations of Z, each address contains one point to be used
     /// on the evaluation of each periodic polynimal.
     pub z_exp_address: u64,
+}
+
+impl Default for CodegenConfig {
+    fn default() -> Self {
+        CodegenConfig {
+            trace_len_address: constants::TRACE_LEN_ADDRESS,
+            z_address: constants::Z_ADDRESS,
+            ood_frame_address: constants::OOD_FRAME_ADDRESS,
+            ood_aux_frame_address: constants::OOD_AUX_FRAME_ADDRESS,
+            composition_coef_address: constants::COMPOSITION_COEF_ADDRESS,
+            aux_rand_address: constants::AUX_RAND_ELEM_PTR,
+            periodic_values_address: constants::PERIODIC_VALUES_ADDRESS,
+            z_exp_address: constants::Z_EXP_ADDRESS,
+        }
+    }
 }

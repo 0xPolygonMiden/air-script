@@ -16,7 +16,7 @@ use winter_prover::math::fft;
 use crate::config::CodegenConfig;
 use crate::writer::Writer;
 
-pub struct Codegen<'ast> {
+pub struct CodeGenerator<'ast> {
     /// Miden Assembly writer.
     ///
     /// Track indentation level, and performs basic validations for generated instructions and
@@ -97,9 +97,9 @@ fn quadratic_element_square(writer: &mut Writer, n: u32) {
     }
 }
 
-impl<'ast> Codegen<'ast> {
-    pub fn new(ir: &'ast AirIR, config: CodegenConfig) -> Codegen<'ast> {
-        Codegen {
+impl<'ast> CodeGenerator<'ast> {
+    pub fn new(ir: &'ast AirIR, config: CodegenConfig) -> CodeGenerator<'ast> {
+        CodeGenerator {
             writer: Writer::new(),
             constants: BTreeMap::new(),
             transition_contraint: 0,
@@ -263,7 +263,11 @@ impl<'ast> Codegen<'ast> {
     /// Evaluates the transition constraints for both the main and auxiliary traces.
     fn gen_evaluate_transitions(&mut self) -> Result<(), CodegenError> {
         self.writer.proc("evaluate_transitions");
-        self.writer.exec("cache_periodic_polys");
+
+        if !self.ir.periodic_columns().is_empty() {
+            self.writer.exec("cache_periodic_polys");
+        }
+
         self.writer.exec("compute_evaluate_transitions");
 
         self.writer
@@ -285,10 +289,8 @@ impl<'ast> Codegen<'ast> {
             self.writer.movdn(2);
             self.writer.movdn(2);
 
-            self.writer.header(format!(
-                "Accumulate the {}-th constraint into the numerator",
-                i
-            ));
+            self.writer
+                .header(format!("Accumulate constraint {} into the numerator", i));
             load_quadratic_element(&mut self.writer, self.config.composition_coef_address, i)?;
             self.writer.ext2mul();
 
@@ -323,7 +325,7 @@ pub enum CodegenError {
     InvalidIndex,
 }
 
-impl<'ast> AirVisitor<'ast> for Codegen<'ast> {
+impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
     type Value = ();
     type Error = CodegenError;
 
@@ -345,8 +347,10 @@ impl<'ast> AirVisitor<'ast> for Codegen<'ast> {
         walk_integrity_constraint_degrees(self, self.ir, MAIN_TRACE)?;
         walk_integrity_constraint_degrees(self, self.ir, AUX_TRACE)?;
 
-        self.gen_cache_z_exp()?;
-        self.gen_evaluate_periodic_polys()?;
+        if !self.ir.periodic_columns().is_empty() {
+            self.gen_cache_z_exp()?;
+            self.gen_evaluate_periodic_polys()?;
+        }
         self.gen_compute_evaluate_transitions()?;
         self.gen_evaluate_transitions()?;
         self.gen_evaluate_boundary()?;
@@ -380,18 +384,18 @@ impl<'ast> AirVisitor<'ast> for Codegen<'ast> {
         constraint: &'ast ConstraintRoot,
         trace_segment: u8,
     ) -> Result<Self::Value, Self::Error> {
-        self.visit_node_index(constraint.node_index())?;
-
         let segment = if trace_segment == MAIN_TRACE {
             "main"
         } else {
             "aux"
         };
 
-        self.writer.comment(format!(
+        self.writer.header(format!(
             "constraint {} for {}",
             self.transition_contraint, segment
         ));
+
+        self.visit_node_index(constraint.node_index())?;
 
         self.transition_contraint += 1;
         Ok(())

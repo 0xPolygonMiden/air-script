@@ -1,12 +1,17 @@
-use clap::Args;
+use clap::{Args, ValueEnum};
 use std::{fs, path::PathBuf, sync::Arc};
 
-use codegen_winter::CodeGenerator;
 use ir::AirIR;
 use miden_diagnostics::{
     term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
 };
 use parser::{ast::Source, Parser};
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum Target {
+    Winterfell,
+    Masm,
+}
 
 #[derive(Args)]
 pub struct Transpile {
@@ -16,9 +21,16 @@ pub struct Transpile {
     #[arg(
         short,
         long,
-        help = "Output filename, default to the input file with the .rs extension"
+        help = "Output filename, defaults to the input file with the .rs extension for Winterfell or .masm for MASM"
     )]
     output: Option<PathBuf>,
+
+    #[arg(
+        short,
+        long,
+        help = "Defines the target language, defaults to Winterfell"
+    )]
+    target: Option<Target>,
 }
 
 impl Transpile {
@@ -27,14 +39,6 @@ impl Transpile {
         println!("Transpiling...");
 
         let input_path = &self.input;
-        let output_path = match &self.output {
-            Some(path) => path.clone(),
-            None => {
-                let mut path = input_path.clone();
-                path.set_extension("rs");
-                path
-            }
-        };
 
         let codemap = Arc::new(CodeMap::new());
         let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
@@ -56,11 +60,27 @@ impl Transpile {
         }
         let ir = ir.unwrap();
 
-        // generate Rust code targeting Winterfell
-        let codegen = CodeGenerator::new(&ir);
+        let (code, extension) = match self.target.unwrap_or(Target::Winterfell) {
+            Target::Winterfell => (codegen_winter::CodeGenerator::new(&ir).generate(), "rs"),
+            Target::Masm => (
+                codegen_masm::CodeGenerator::new(&ir, codegen_masm::CodegenConfig::default())
+                    .generate()
+                    .expect("code generation failed"),
+                "masm",
+            ),
+        };
+
+        let output_path = match &self.output {
+            Some(path) => path.clone(),
+            None => {
+                let mut path = input_path.clone();
+                path.set_extension(extension);
+                path
+            }
+        };
 
         // write transpiled output to the output path
-        let result = fs::write(output_path.clone(), codegen.generate());
+        let result = fs::write(output_path.clone(), code);
         if let Err(err) = result {
             return Err(format!("{err:?}"));
         }

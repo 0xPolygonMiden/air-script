@@ -1,4 +1,3 @@
-use codegen_winter::CodeGenerator;
 use ir::AirIR;
 use std::fs;
 
@@ -7,6 +6,11 @@ pub enum TestError {
     IO(String),
     Parse(String),
     IR(String),
+}
+
+pub enum Target {
+    Winterfell,
+    Masm,
 }
 
 pub struct Test {
@@ -18,7 +22,7 @@ impl Test {
         Test { input_path }
     }
 
-    pub fn transpile(&self) -> Result<String, TestError> {
+    pub fn transpile(&self, target: Target) -> Result<String, TestError> {
         // load source input from file
         let source = fs::read_to_string(&self.input_path).map_err(|err| {
             TestError::IO(format!(
@@ -42,9 +46,17 @@ impl Test {
             ))
         })?;
 
+        let code = match target {
+            Target::Winterfell => codegen_winter::CodeGenerator::new(&ir).generate(),
+            Target::Masm => {
+                codegen_masm::CodeGenerator::new(&ir, codegen_masm::CodegenConfig::default())
+                    .generate()
+                    .expect("code generation failed")
+            }
+        };
+
         // generate Rust code targeting Winterfell
-        let codegen = CodeGenerator::new(&ir);
-        Ok(codegen.generate())
+        Ok(code)
     }
 }
 

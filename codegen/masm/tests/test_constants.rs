@@ -52,7 +52,14 @@ fn test_constants() {
     let c_prime = (C_0_0 + B_0) * c;
     let main_frame = to_stack_order(&[a, a_prime, b, b_prime, c, c_prime]);
     let aux_frame = to_stack_order(&[]);
-    let code = test_code(code, main_frame, aux_frame, trace_len, z);
+    let code = test_code(
+        code,
+        main_frame,
+        aux_frame,
+        trace_len,
+        z,
+        &["compute_evaluate_transitions"],
+    );
     let program = Assembler::default().compile(code).unwrap();
 
     let mut process: Process<MemAdviceProvider> = Process::new(

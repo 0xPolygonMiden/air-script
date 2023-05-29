@@ -65,6 +65,7 @@ pub fn test_code<T>(
     mut aux_frame_data: Vec<T>,
     trace_len: u64,
     z: QuadExtension<Felt>,
+    execs: &[&str],
 ) -> String
 where
     T: Default + std::fmt::Display,
@@ -107,8 +108,9 @@ where
         code.push_str("    # aux trace data \n");
         push_data_to_code(&mut code, constants::OOD_AUX_FRAME_ADDRESS, aux_frame_data);
     }
-    code.push_str("    exec.cache_periodic_polys\n");
-    code.push_str("    exec.compute_evaluate_transitions\n");
+    for proc in execs {
+        code.push_str(&format!("    exec.{}\n", proc));
+    }
     code.push_str("end\n");
 
     code
