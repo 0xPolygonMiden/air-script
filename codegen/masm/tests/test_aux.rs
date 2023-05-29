@@ -1,4 +1,4 @@
-use air_codegen_masm::code_gen;
+use air_codegen_masm::{code_gen, constants};
 use assembly::Assembler;
 use ir::AirIR;
 use processor::{
@@ -7,7 +7,7 @@ use processor::{
 };
 
 mod utils;
-use utils::{parse, test_code, to_stack_order};
+use utils::{parse, test_code, to_stack_order, Data};
 
 static SIMPLE_AUX_AIR: &str = "
 def SimpleAux
@@ -37,19 +37,34 @@ fn test_simple_aux() {
     let ast = parse(SIMPLE_AUX_AIR);
     let ir = AirIR::new(ast).expect("build AirIR failed");
     let code = code_gen(&ir).expect("codegen failed");
-    let trace_len = 2u64.pow(4);
-    let z = QuadExtension::new(Felt::new(1), Felt::ZERO);
 
+    let trace_len = 2u64.pow(4);
+    let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
+    let z = one.clone();
     let a = QuadExtension::new(Felt::new(3), Felt::ZERO);
     let b = QuadExtension::new(Felt::new(7), Felt::ZERO);
     let a_prime = a;
     let b_prime = b;
-    let main_frame = to_stack_order(&[a, a_prime]);
-    let aux_frame = to_stack_order(&[b, b_prime]);
+
     let code = test_code(
         code,
-        main_frame,
-        aux_frame,
+        vec![
+            Data {
+                data: to_stack_order(&[a, a_prime]),
+                address: constants::OOD_FRAME_ADDRESS,
+                descriptor: "main_trace",
+            },
+            Data {
+                data: to_stack_order(&[b, b_prime]),
+                address: constants::OOD_AUX_FRAME_ADDRESS,
+                descriptor: "aux_trace",
+            },
+            Data {
+                data: to_stack_order(&vec![one; 6]),
+                address: constants::COMPOSITION_COEF_ADDRESS,
+                descriptor: "composition_coefficients",
+            },
+        ],
         trace_len,
         z,
         &["compute_evaluate_transitions"],
@@ -67,12 +82,12 @@ fn test_simple_aux() {
     // results are in stack-order
     #[rustfmt::skip]
     let expected = to_stack_order(&[
-        b * a,
-        b - a,
-        b + a,
-        a * a,
-        a - a,
-        a + a,
+        b * a, // result: 21
+        b - a, // result: 4
+        b + a, // result: 10
+        a * a, // result: 9
+        a - a, // result: 0
+        a + a, // result: 6
     ]);
 
     assert!(
