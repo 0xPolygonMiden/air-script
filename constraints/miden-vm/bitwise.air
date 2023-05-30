@@ -1,59 +1,82 @@
 mod BitwiseAir
 
-### Declarations ##################################################################################
+### Constants and periodic columns ################################################################
 
 periodic_columns:
     k0: [1, 0, 0, 0, 0, 0, 0, 0]
     k1: [1, 1, 1, 1, 1, 1, 1, 0]
 
-### Helper functions/evaluators ###################################################################
 
-# Enforces that column must be binary.
-ev is_binary(main: [a]):
-    enf a^2 - a = 0
+### Helper functions ##############################################################################
 
 # Returns value aggregated from limbs.
 fn aggregate(limb: vector[4]) -> scalar:
     return sum([2^i * a for (i, a) in (0..4, limb)])
 
+
+### Helper evaluators #############################################################################
+
+# Enforces that column must be binary.
+#
+# Constraint degree: 2
+ev is_binary([a]):
+    enf a^2 = a
+
+
 # Enforces that the bitwise selector is valid.
-ev bitwise_selector(main: [s]):
-    # Enforce that selector must be binary
+#
+# Max constraint degree: 2
+ev bitwise_selector([s]):
+    # Enforce that selector must be binary.
+    # Constraint degree: 2
     enf is_binary([s])
 
     # Enforce that selector should stay the same throughout the cycle.
+    # Constraint degree: 2
     enf s' = s when k1
 
-#! Enforces that the input to the bitwise chiplet is decomposed into limbs correctly.
-ev input_decomposition(main:[a, b, a_limb[4], b_limb[4]]):
-    # Enforce that the input is decomposed into valid bits
+
+# Enforces that the input to the bitwise chiplet is decomposed into limbs correctly.
+#
+# Max constraint degree: 2
+ev input_decomposition([a, b, a_limb[4], b_limb[4]]):
+    # Enforce that the input is decomposed into valid bits.
+    # Constraints degree: 2
     enf is_binary([a]) for a in a_limb
     enf is_binary([b]) for b in b_limb 
 
     # Enforce that the value in the first row of column `a` of the current 8-row cycle should be 
     # the aggregation of the decomposed bit columns `a_limb`.
     let a_aggr = aggregate(a_limb)
+    # Constraint degree: 2
     enf a = a_aggr when k0
 
     # Enforce that the value in the first row of column `b` of the current 8-row cycle should be 
     # the aggregation of the decomposed bit columns `b_limb`.
     let b_aggr = aggregate(b_limb)
+    # Constraint degree: 2
     enf b = b_aggr when k0
 
     # Enforce that for all rows in an 8-row cycle, except for the last one, the values in a and b
     # columns are increased by the values contained in the individual bit columns a_limb and 
     # b_limb.
+    # Constraints degree: 2
     enf a' = a * 16 + a_aggr when k1
     enf b' = b * 16 + b_aggr when k1
 
+
 # Enforces that the output of the bitwise operation is aggregated correctly from the decomposed
 # limbs.
-ev output_aggregation(main: [s, a, b, a_limb[4], b_limb[4], zp, z]):
+#
+# Max constraint degree: 3
+ev output_aggregation([s, a, b, a_limb[4], b_limb[4], zp, z]):
     # Enforce that in the first row, the aggregated output value of the previous row should be 0.
+    # Constraint degree: 2
     enf zp = 0 when k0
 
     # Enforce that for each row except the last, the aggregated output value must equal the
     # previous aggregated output value in the next row.
+    # Constraint degree: 2
     enf zp' = z when k1
 
     # Enforce that for all rows the value in the z column is computed by multiplying the previous
@@ -64,16 +87,40 @@ ev output_aggregation(main: [s, a, b, a_limb[4], b_limb[4], zp, z]):
     # XOR is enforced when s = 1. Because the selectors for the AND and XOR operations are mutually
     # exclusive, the constraints for different operations can be aggregated into the same result
     # indices.
+    # Constraints degree: 3
     let a_and_b = sum([2^i * a * b for (i, a, b) in (0..4, a_limb, b_limb)])
     let a_xor_b = sum([2^i * (a + b - 2 * a * b) for (i, a, b) in (0..4, a_limb, b_limb)])
     match enf:
         z = zp * 16 + a_xor_b when s
         z = zp * 16 + a_and_b when !s
 
+
+# Enforces the constraint for the bitwise chiplet bus.
+#
+# Constraint degree: 4
+ev bitwise_chiplet_bus([a, b, z], [b_chip]):
+    # u_i represents reduction of a, b abd z into a single value for row i.
+    let u_i = $alpha[1] * a + $alpha[2] * b + $alpha[3] * z
+
+    # m represents inversion of k1 periodic column.
+    let m = !k1
+
+    # v_i represents value that includes u_i into the product when k1 = 0.
+    let v_i = m * u_i
+
+    # Enforce the constraints for the two sides of the bus communication.
+    # Constraint degree: 4
+    enf b_chip' * ($alpha[0] + u_i) = b_chip * (($alpha[0] + v_i) * m + 1 - m)
+
+
 ### Bitwise Chiplet Air Constraints ###############################################################
 
-# Enforces the constraints on the bitwise chiplet, given the columns of the bitwise execution trace.
-ev bitwise_chiplet(main: [s, a, b, a_limb[4], b_limb[4], zp, z]):
+# Enforces the constraints on the bitwise chiplet, given the columns of the bitwise execution 
+# trace.
+#
+# Max constraint degree: 4
+ev bitwise_chiplet(main: [s, a, b, a_limb[4], b_limb[4], zp, z], [b_chip]):
     enf bitwise_selector([s])
     enf input_decomposition([a, b, a_limb, b_limb])
     enf output_aggregation([s, a, b, a_limb, b_limb, zp, z])
+    enf bitwise_chiplet_bus([a, b, z], [b_chip])
