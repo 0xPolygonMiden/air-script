@@ -103,7 +103,12 @@ where
     for check in ranges.windows(2) {
         let first = check[0];
         let second = check[1];
-        assert!(first.1 <= second.0, "memory ranges overlap");
+        assert!(
+            first.1 <= second.0,
+            "memory ranges overlap {:?} {:?}",
+            first,
+            second
+        );
     }
 
     let main_memory_pos = ranges

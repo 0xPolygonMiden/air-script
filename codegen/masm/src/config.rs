@@ -26,7 +26,18 @@ pub struct CodegenConfig {
     pub ood_aux_frame_address: u32,
 
     // Memory range for the composition coefficients.
+    //
+    // The coefficients are organized as follows:
+    //
+    // 1. Transition constraint coefficients for the main trace
+    // 2. Transition constraint coefficients for the aux trace
+    // 3. Boundary constraint coefficients for the main trace
+    // 4. Boundary constraint coefficients for the aux trace
+    //
     pub composition_coef_address: u32,
+
+    // Memory range for the public inputs.
+    pub public_inputs_address: u32,
 
     pub aux_rand_address: u32,
     pub periodic_values_address: u32,
@@ -44,6 +55,7 @@ impl Default for CodegenConfig {
             ood_frame_address: constants::OOD_FRAME_ADDRESS,
             ood_aux_frame_address: constants::OOD_AUX_FRAME_ADDRESS,
             composition_coef_address: constants::COMPOSITION_COEF_ADDRESS,
+            public_inputs_address: constants::PUBLIC_INPUTS_ADDRESS,
             aux_rand_address: constants::AUX_RAND_ELEM_PTR,
             periodic_values_address: constants::PERIODIC_VALUES_ADDRESS,
             z_exp_address: constants::Z_EXP_ADDRESS,

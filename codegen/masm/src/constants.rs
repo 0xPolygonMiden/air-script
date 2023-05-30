@@ -4,6 +4,9 @@ pub const AUX_TRACE: u8 = 1;
 // https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/verifier.masm#L21
 pub const COMPOSITION_COEF_ADDRESS: u32 = 4294966016;
 
+// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/verifier.masm#L15
+pub const PUBLIC_INPUTS_ADDRESS: u32 = 4294960000;
+
 // https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/ood_frames.masm#L2
 pub const OOD_FRAME_ADDRESS: u32 = 4294965000;
 
