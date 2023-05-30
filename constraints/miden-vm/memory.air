@@ -2,10 +2,6 @@ mod MemoryChipletAir
 
 ### Helper functions ##############################################################################
 
-fn delta(v: scalar) -> scalar:
-    return v' - v
-
-
 # Returns the n0 flag which is set to 1 when context changes and 0 otherwise.
 fn get_n0(ctx: scalar, ctx_next: scalar, t_next: scalar) -> scalar:
     return (ctx_next - ctx) * t_next
@@ -18,24 +14,25 @@ fn get_n1(addr: scalar, addr_next: scalar, t_next: scalar) -> scalar:
 
 ### Helper evaluators #############################################################################
 
-# Enforces that the provided columns must be zero.
-ev is_zero(main: [values[4]]):
-    enf v = 0 for v in values
-
-
-# Enforces that values in the columns in the current row must be equal to the values in the next 
-# row.
-ev is_unchanged(main: [values[4]]):
-    enf v' = v for v in values
-
-
-# Enforces that the provided columns must be binary.
-ev is_binary(main: [a]):
+# Enforces that column must be binary.
+# Constraint degree: 2
+ev is_binary([a]):
     enf a^2 = a
 
 
+# Enforces that value in column is copied over to the next row.
+# Constraint degree: 1
+ev is_unchanged([column]):
+    enf column' = column
+
+
+# Enforces that the provided columns must be zero.
+ev is_zero([column]):
+    enf column = 0 
+
+
 # Enforces that created flags have valid values during the program execution.
-ev flags_validity(main: [ctx, addr, t]):
+ev flags_validity([ctx, addr, t]):
     # n0 = 1 when context changes and 0 otherwise.
     let n0 = get_n0(ctx, ctx', t')
 
@@ -57,7 +54,7 @@ ev flags_validity(main: [ctx, addr, t]):
 
 
 # Enforces that selectors take the correct values under certain conditions.
-ev enforce_selectors(main: [s[2], ctx, addr, t]):
+ev enforce_selectors([s[2], ctx, addr, t]):
     # Enforce that values in the selectior columns must be binary.
     # s[0] is set to 0 for write operations and to 1 for read operations.
     enf is_binary([selector]) for selector in s
@@ -79,7 +76,7 @@ ev enforce_selectors(main: [s[2], ctx, addr, t]):
 
 # Enforces that the delta between two consecutive contexts, addresses, or clock cycles is updated 
 # and decomposed into the `d1` and `d0` columns correctly.
-ev enforce_delta(main: [ctx, addr, clk, d[2], t]):
+ev enforce_delta([ctx, addr, clk, d[2], t]):
     # n0 = 1 when context changes and 0 otherwise.
     let n0 = get_n0(ctx, ctx', t')
 
@@ -98,19 +95,32 @@ ev enforce_delta(main: [ctx, addr, clk, d[2], t]):
 
 # Enforces that memory is initialized to zero when it is read before being written and that when 
 # existing memory values are read they remain unchanged.
-ev enforce_values(main: [s[2], v[4]]):
+ev enforce_values([s[2], v[4]]):
     # Enforce that values at a given memory address are always initialized to 0.
-    enf is_zero([v]) when s[0] & !s[1]
+    enf is_zero([v_i]) for v_i in v when s[0] & !s[1]
 
     # Enforce that for the same context/address combination, the v columns of the current row are
     # equal to the corresponding v columns of the next row
-    enf is_unchanged([v]) when s[1]
+    enf is_unchanged([v_i]) for v_i in v when s[1]
+
+
+# Enforces that values of memory table rows are included into the chiplet bus.
+ev chiplet_bus([s[2], ctx, addr, clk, v[4]], [b_chip]): 
+    # Calculate the operation label for the memory access operation.
+    let op_mem = s[0] * 2^3 + 4
+
+    # v_mem represents a row in the memory table.
+    let v_mem = $alpha[0] + $alpha[1] * op_mem + $alpha[2] * ctx + $alpha[3] * addr +
+        $alpha[4] * clk + sum([$alpha[j + 5] * v[j] for j in 0..4])
+
+    # Enforce that values of memory table rows are included into the chiplet bus.
+    enf b_chip' = b_chip * v_mem
 
 
 ### Memory Chiplet Air Constraints ################################################################
 
 # Enforces the constraints on the memory chiplet, given the columns of the memory execution trace.
-ev memory_chiplet(main: [s[2], ctx, addr, clk, v[4], d[2], t]):
+ev memory_chiplet([s[2], ctx, addr, clk, v[4], d[2], t], [b_chip]):
     enf flags_validity([ctx, addr, t])
 
     enf enforce_selectors([s, ctx, addr, t])
@@ -121,4 +131,4 @@ ev memory_chiplet(main: [s[2], ctx, addr, clk, v[4], d[2], t]):
 
     enf enforce_values([s, v])
 
-    # TODO: add constraint for chiplet bus
+    enf chiplet_bus([s[2], ctx, addr, clk, v[4]], [b_chip])
