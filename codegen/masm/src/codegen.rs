@@ -26,11 +26,11 @@ pub struct CodeGenerator<'ast> {
     /// Counts how many periodic columns have been visited so far.
     ///
     /// Periodic columns are visited in order, and the counter is the same as the columns ID.
-    periodic_column: u64,
+    periodic_column: u32,
 
     /// Counts how many transition constraint roots have been visited so far. Used for
     /// documentation and to load the composition coefficients.
-    transition_contraint: usize,
+    transition_contraint: u32,
 
     /// Map of the constants found while visitint the [AirIR].
     ///
@@ -50,7 +50,7 @@ pub struct CodeGenerator<'ast> {
 /// of the word must be kept. Values of periodic columns are stored at distinct memory addresses
 /// such that each value occupies a single memory word with the two most significant word elements
 /// set to zeros (i.e., [q0, q1, 0, 0])
-fn periodic_column_to_target_el(column: u64) -> u64 {
+fn periodic_column_to_target_el(column: u32) -> u32 {
     // each period column has its own address, and the element is in the lower half
     (column * 2) + 1
 }
@@ -61,10 +61,10 @@ fn periodic_column_to_target_el(column: u64) -> u64 {
 /// values are store in higher half of the word, while odd values are stored in the lower half.
 fn load_quadratic_element(
     writer: &mut Writer,
-    base_addr: u64,
-    element: u64,
+    base_addr: u32,
+    element: u32,
 ) -> Result<(), CodegenError> {
-    let target_word: u64 = element / 2;
+    let target_word: u32 = element / 2;
     let address = base_addr + target_word;
 
     // Load data from memory
@@ -135,10 +135,13 @@ impl<'ast> CodeGenerator<'ast> {
         // - the periodic columns are powers-of-two.
         //   Ref: https://github.com/0xPolygonMiden/air-script/blob/next/ir/src/symbol_table/mod.rs#L305-L309
 
-        let mut m: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
+        let mut m: BTreeMap<u64, Vec<u32>> = BTreeMap::new();
         for (p, c) in self.ir.periodic_columns().iter().enumerate() {
             let idx = p.try_into().or(Err(CodegenError::InvalidIndex))?;
-            let len = c.len().try_into().expect("length should fit in u64");
+            let len = c
+                .len()
+                .try_into()
+                .expect("length will be used as a memory address, it must fit in a u32");
             m.entry(len).or_insert(vec![]).push(idx);
         }
 
@@ -604,11 +607,11 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
                 // curr and next values of a single variable.
                 //
                 // Layout defined at: https://github.com/0xPolygonMiden/miden-vm/issues/875
-                let target_word: u64 = access
+                let target_word: u32 = access
                     .col_idx()
                     .try_into()
                     .map_err(|_| CodegenError::InvalidIndex)?;
-                let el_pos: u64 = access
+                let el_pos: u32 = access
                     .row_offset()
                     .try_into()
                     .or(Err(CodegenError::InvalidIndex))?;
@@ -623,7 +626,7 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
                 load_quadratic_element(&mut self.writer, base_address, target_element)?;
             }
             Value::PeriodicColumn(column, _) => {
-                let column: u64 = (*column).try_into().or(Err(CodegenError::InvalidIndex))?;
+                let column: u32 = (*column).try_into().or(Err(CodegenError::InvalidIndex))?;
                 load_quadratic_element(
                     &mut self.writer,
                     self.config.periodic_values_address,
