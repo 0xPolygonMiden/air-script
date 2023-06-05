@@ -1,10 +1,11 @@
-use super::{parse, AirIR};
+use super::{compile, expect_diagnostic};
 
 mod comprehension;
 
 #[test]
 fn integrity_constraints() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -14,15 +15,13 @@ fn integrity_constraints() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn ic_using_parens() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -32,15 +31,13 @@ fn ic_using_parens() {
     integrity_constraints:
         enf clk' = (clk + 1)";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn ic_op_mul() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -49,15 +46,14 @@ fn ic_op_mul() {
         enf clk.first = 0
     integrity_constraints:
         enf clk' * clk = 1";
-    let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn ic_op_exp() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -66,16 +62,15 @@ fn ic_op_exp() {
         enf clk.first = 0
     integrity_constraints:
         enf clk'^2 - clk = 1";
-    let parsed = parse(source).expect("Parsing failed");
 
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn err_non_const_exp_outside_lc() {
     // non const exponents are not allowed outside of list comprehensions
     let source = "
+    def test
     trace_columns:
         main: [clk, fmp[2], ctx]
         aux: [a, b, c[4], d[4]]
@@ -88,7 +83,5 @@ fn err_non_const_exp_outside_lc() {
     integrity_constraints:
         enf clk = 2^ctx";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "expected exponent to be a constant");
 }

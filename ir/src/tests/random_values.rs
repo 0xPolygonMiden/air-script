@@ -1,8 +1,9 @@
-use super::{parse, AirIR};
+use super::{compile, expect_diagnostic};
 
 #[test]
 fn random_values_indexed_access() {
     let source = "
+    def test
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -16,14 +17,13 @@ fn random_values_indexed_access() {
     integrity_constraints:
         enf c' = $rand[3] + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn random_values_custom_name() {
     let source = "
+    def test
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -37,14 +37,13 @@ fn random_values_custom_name() {
     integrity_constraints:
         enf c' = $alphas[3] + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn random_values_named_access() {
     let source = "
+    def test
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -58,14 +57,13 @@ fn random_values_named_access() {
     integrity_constraints:
         enf c' = m + n[2] + $rand[1]";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
-fn err_random_values_out_of_bounds() {
-    let source_fixed_list = "
+fn err_random_values_out_of_bounds_no_bindings() {
+    let source = "
+    def test
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -79,11 +77,16 @@ fn err_random_values_out_of_bounds() {
     integrity_constraints:
         enf a' = $rand[4] + 1";
 
-    let parsed = parse(source_fixed_list).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
+}
 
-    let source_ident_vector_sub_vec = "
+#[test]
+fn err_random_values_out_of_bounds_binding_ref() {
+    let source = "
+    def test
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -97,11 +100,16 @@ fn err_random_values_out_of_bounds() {
     integrity_constraints:
         enf a' = m + 1";
 
-    let parsed = parse(source_ident_vector_sub_vec).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
+}
 
-    let source_ident_vector_index = "
+#[test]
+fn err_random_values_out_of_bounds_global_ref() {
+    let source = "
+    def test
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -115,14 +123,16 @@ fn err_random_values_out_of_bounds() {
     integrity_constraints:
         enf a' = m + 1";
 
-    let parsed = parse(source_ident_vector_index).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
 }
 
 #[test]
 fn err_random_values_without_aux_cols() {
     let source = "
+    def test
     trace_columns:
         main: [a, b[12]]
     public_inputs:
@@ -135,14 +145,16 @@ fn err_random_values_without_aux_cols() {
     integrity_constraints:
         enf a' = a + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "declaring random_values requires an aux trace_columns declaration",
+    );
 }
 
 #[test]
 fn err_random_values_in_bc_against_main_cols() {
     let source = "
+    def test
     trace_columns:
         main: [a, b[12]]
         aux: [c, d]
@@ -156,7 +168,5 @@ fn err_random_values_in_bc_against_main_cols() {
     integrity_constraints:
         enf c' = $rand[3] + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "Boundary constraints require both sides of the constraint to apply to the same trace segment");
 }
