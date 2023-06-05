@@ -1,6 +1,10 @@
-use super::{AirIR, Impl, PeriodicColumn};
+use std::collections::BTreeMap;
 
-pub(super) fn add_fn_get_periodic_column_values(impl_ref: &mut Impl, ir: &AirIR) {
+use air_ir::{Air, PeriodicColumn, QualifiedIdentifier};
+
+use super::Impl;
+
+pub(super) fn add_fn_get_periodic_column_values(impl_ref: &mut Impl, ir: &Air) {
     // define the function.
     let get_periodic_column_values = impl_ref
         .new_fn("get_periodic_column_values")
@@ -8,20 +12,21 @@ pub(super) fn add_fn_get_periodic_column_values(impl_ref: &mut Impl, ir: &AirIR)
         .ret("Vec<Vec<Felt>>");
 
     // output the periodic columns.
-    get_periodic_column_values.line(ir.periodic_columns().to_string());
+    let periodic_columns = &ir.periodic_columns;
+    get_periodic_column_values.line(periodic_columns.codegen());
 }
 
 /// Code generation trait for generating Rust code strings from Periodic Columns.
 trait Codegen {
-    fn to_string(&self) -> String;
+    fn codegen(&self) -> String;
 }
 
-impl Codegen for &[PeriodicColumn] {
-    fn to_string(&self) -> String {
+impl Codegen for &BTreeMap<QualifiedIdentifier, PeriodicColumn> {
+    fn codegen(&self) -> String {
         let mut columns = vec![];
-        for column in *self {
+        for column in self.values() {
             let mut rows = vec![];
-            for row in column {
+            for row in column.values.iter().copied() {
                 match row {
                     0 => {
                         rows.push("Felt::ZERO".to_string());
@@ -29,7 +34,7 @@ impl Codegen for &[PeriodicColumn] {
                     1 => {
                         rows.push("Felt::ONE".to_string());
                     }
-                    _ => {
+                    row => {
                         rows.push(format!("Felt::new({row})"));
                     }
                 }

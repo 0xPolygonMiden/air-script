@@ -1,11 +1,13 @@
-use super::{AirIR, Codegen, ElemType, Impl};
+use air_ir::{Air, TraceSegmentId};
+
+use super::{Codegen, ElemType, Impl};
 
 // HELPERS TO GENERATE THE WINTERFELL TRANSITION CONSTRAINT METHODS
 // ================================================================================================
 
 /// Adds an implementation of the "evaluate_transition" method to the referenced Air implementation
-/// based on the data in the provided AirIR.
-pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
+/// based on the data in the provided Air.
+pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &Air) {
     // define the function.
     let evaluate_transition = impl_ref
         .new_fn("evaluate_transition")
@@ -24,8 +26,8 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &AirIR) {
 }
 
 /// Adds an implementation of the "evaluate_aux_transition" method to the referenced Air implementation
-/// based on the data in the provided AirIR.
-pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
+/// based on the data in the provided Air.
+pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &Air) {
     // define the function.
     let evaluate_aux_transition = impl_ref
         .new_fn("evaluate_aux_transition")
@@ -51,7 +53,7 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &AirIR) {
 
 /// Iterates through the integrity constraints in the IR, and appends a line of generated code to
 /// the provided codegen function body for each constraint.
-fn add_constraints(func_body: &mut codegen::Function, ir: &AirIR, trace_segment: u8) {
+fn add_constraints(func_body: &mut codegen::Function, ir: &Air, trace_segment: TraceSegmentId) {
     for (idx, constraint) in ir.integrity_constraints(trace_segment).iter().enumerate() {
         func_body.line(format!(
             "result[{}] = {};",

@@ -1,5 +1,5 @@
+use air_ir::Air;
 use codegen::{Impl, Scope};
-use ir::AirIR;
 
 mod imports;
 use imports::add_imports;
@@ -22,7 +22,7 @@ impl CodeGenerator {
 
     /// Builds a new Rust scope that represents a Winterfell Air trait implementation for the
     /// provided AirIR.
-    pub fn new(ir: &AirIR) -> Self {
+    pub fn new(ir: &Air) -> Self {
         let mut scope = Scope::new();
 
         // add winterfell imports.
