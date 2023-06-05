@@ -369,7 +369,19 @@ Expr: Expr = {
             Err(err) => Err(ParseError::from(SemanticAnalysisError::InvalidExpr(err)).into())
         }
     },
-    <l:@L> <value:Vector<ScalarExpr>> <r:@R> => Expr::Vector(Span::new(span!(l, r), value)),
+    <l:@L> <value:Vector<ScalarExpr>> <r:@R> =>? {
+        let mut value = value;
+        let mut elems = vec![];
+        for v in value.drain(..) {
+            match Expr::try_from(v) {
+                Ok(expr) => {
+                    elems.push(expr);
+                }
+                Err(err) => return Err(ParseError::from(SemanticAnalysisError::InvalidExpr(err)).into()),
+            }
+        }
+        Ok(Expr::Vector(Span::new(span!(l, r), elems)))
+    },
     <l:@L> <value:Matrix<ScalarExpr>> <r:@R> => Expr::Matrix(Span::new(span!(l, r), value)),
     "[" <ListComprehension<ScalarExpr>> "]" => Expr::ListComprehension(<>),
     <l:@L> "[" "]" <r:@R> => Expr::Vector(Span::new(span!(l, r), vec![])),
