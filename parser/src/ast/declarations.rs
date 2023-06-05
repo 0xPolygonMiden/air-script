@@ -428,6 +428,20 @@ impl fmt::Debug for RandomValues {
             .finish()
     }
 }
+impl fmt::Display for RandomValues {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(name) = self.name.as_str().strip_prefix('$') {
+            write!(f, "{}: ", name)?;
+        } else {
+            write!(f, "{}: ", self.name)?;
+        }
+        if self.bindings.is_empty() {
+            write!(f, "[{}]", self.size)
+        } else {
+            write!(f, "{}", DisplayList(self.bindings.as_slice()))
+        }
+    }
+}
 
 /// Declaration of a random value binding used in [RandomValues].
 ///
@@ -504,6 +518,15 @@ impl fmt::Debug for RandBinding {
             .field("size", &self.size)
             .field("offset", &self.offset)
             .finish()
+    }
+}
+impl fmt::Display for RandBinding {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.size == 1 {
+            write!(f, "{}", self.name)
+        } else {
+            write!(f, "{}[{}]", self.name, self.size)
+        }
     }
 }
 

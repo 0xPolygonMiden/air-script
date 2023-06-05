@@ -114,6 +114,11 @@ impl From<ResolvableIdentifier> for NamespacedIdentifier {
         }
     }
 }
+impl fmt::Display for NamespacedIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self.as_ref(), f)
+    }
+}
 
 /// Represents an identifier qualified with both its parent module and namespace.
 ///
@@ -142,6 +147,11 @@ impl AsRef<Identifier> for QualifiedIdentifier {
     #[inline]
     fn as_ref(&self) -> &Identifier {
         self.item.as_ref()
+    }
+}
+impl fmt::Display for QualifiedIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}::{}", &self.module, &self.item)
     }
 }
 
@@ -220,6 +230,16 @@ impl AsRef<Identifier> for ResolvableIdentifier {
         }
     }
 }
+impl fmt::Display for ResolvableIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Local(id) => write!(f, "{}", id),
+            Self::Global(id) => write!(f, "{}", id),
+            Self::Resolved(qid) => write!(f, "{}", qid),
+            Self::Unresolved(nid) => write!(f, "{}", nid),
+        }
+    }
+}
 
 /// Expressions which are valid in the body of a `let` statement, or in a function call.
 #[derive(Clone, PartialEq, Eq, Spanned)]
@@ -290,31 +310,23 @@ impl fmt::Debug for Expr {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Const(ref expr) => write!(f, "{}", expr.ty()),
-            Self::Range(_) => f.write_str("range"),
-            Self::Vector(ref expr) => write!(f, "vector of length {}", expr.len()),
-            Self::Matrix(ref expr) => write!(
-                f,
-                "matrix of {} rows and {} columns",
-                expr.len(),
-                expr.first().unwrap().len()
-            ),
-            Self::ListComprehension(_) => write!(f, "list comprehension"),
-            Self::SymbolAccess(ref expr) => {
-                if let Some(ty) = expr.ty.as_ref() {
-                    write!(f, "{}", ty)
-                } else {
-                    f.write_str("variable of unknown type")
+            Self::Const(ref expr) => write!(f, "{}", &expr),
+            Self::Range(ref range) => write!(f, "{}..{}", range.start, range.end),
+            Self::Vector(ref expr) => write!(f, "{}", DisplayList(expr.as_slice())),
+            Self::Matrix(ref expr) => {
+                f.write_str("[")?;
+                for (i, col) in expr.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{}", DisplayList(col.as_slice()))?;
                 }
+                f.write_str("]")
             }
-            Self::Binary(_) => f.write_str("binary operator expression"),
-            Self::Call(ref call) => {
-                if let Some(ty) = call.ty.as_ref() {
-                    write!(f, "{}", ty)
-                } else {
-                    f.write_str("call producing a result of unknown type")
-                }
-            }
+            Self::ListComprehension(ref expr) => write!(f, "{}", DisplayBracketed(expr)),
+            Self::SymbolAccess(ref expr) => write!(f, "{}", expr),
+            Self::Binary(ref expr) => write!(f, "{}", expr),
+            Self::Call(ref expr) => write!(f, "{}", expr),
         }
     }
 }
@@ -432,23 +444,11 @@ impl fmt::Debug for ScalarExpr {
 impl fmt::Display for ScalarExpr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Const(_) => f.write_str("scalar constant"),
-            Self::SymbolAccess(ref expr) => {
-                if let Some(ty) = expr.ty.as_ref() {
-                    write!(f, "{}", ty)
-                } else {
-                    f.write_str("variable of unknown type")
-                }
-            }
-            Self::BoundedSymbolAccess(_) => f.write_str("trace column"),
-            Self::Binary(_) => f.write_str("scalar expression"),
-            Self::Call(ref call) => {
-                if let Some(ty) = call.ty.as_ref() {
-                    write!(f, "{}", ty)
-                } else {
-                    f.write_str("call producing a result of unknown type")
-                }
-            }
+            Self::Const(ref value) => write!(f, "{}", value),
+            Self::SymbolAccess(ref expr) => write!(f, "{}", expr),
+            Self::BoundedSymbolAccess(ref expr) => write!(f, "{}.{}", &expr.column, &expr.boundary),
+            Self::Binary(ref expr) => write!(f, "{}", expr),
+            Self::Call(ref call) => write!(f, "{}", call),
         }
     }
 }
@@ -487,6 +487,11 @@ impl fmt::Debug for BinaryExpr {
             .finish()
     }
 }
+impl fmt::Display for BinaryExpr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {} {}", &self.lhs, &self.op, &self.rhs)
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum BinaryOp {
@@ -503,6 +508,17 @@ pub enum BinaryOp {
     /// NOTE: This is only used in constraints to assert equality, it is invalid in other contexts
     Eq,
 }
+impl fmt::Display for BinaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Add => f.write_str("+"),
+            Self::Sub => f.write_str("-"),
+            Self::Mul => f.write_str("*"),
+            Self::Exp => f.write_str("^"),
+            Self::Eq => f.write_str("="),
+        }
+    }
+}
 
 /// Describes the type of boundary in the boundary constraint.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -513,8 +529,8 @@ pub enum Boundary {
 impl fmt::Display for Boundary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self {
-            Self::First => write!(f, "first boundary"),
-            Self::Last => write!(f, "last boundary"),
+            Self::First => write!(f, "first"),
+            Self::Last => write!(f, "last"),
         }
     }
 }
@@ -623,6 +639,22 @@ impl fmt::Debug for SymbolAccess {
             .field("offset", &self.offset)
             .field("ty", &self.ty)
             .finish()
+    }
+}
+impl fmt::Display for SymbolAccess {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.name)?;
+        match &self.access_type {
+            AccessType::Default => (),
+            AccessType::Index(idx) => write!(f, "[{}]", idx)?,
+            AccessType::Slice(range) => write!(f, "[{}..{}]", range.start, range.end)?,
+            AccessType::Matrix(row, col) => write!(f, "[{}][{}]", row, col)?,
+        }
+        // TODO: When we change the syntax to support arbitrary offsets, we'll need to update this
+        for _ in 0..self.offset {
+            f.write_str("'")?;
+        }
+        Ok(())
     }
 }
 
@@ -734,6 +766,31 @@ impl fmt::Debug for ListComprehension {
             .finish()
     }
 }
+impl fmt::Display for ListComprehension {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.bindings.len() == 1 {
+            write!(
+                f,
+                "{} for {} in {}",
+                &self.body, &self.bindings[0], &self.iterables[0]
+            )?;
+        } else {
+            write!(
+                f,
+                "{} for {} in {}",
+                &self.body,
+                DisplayTuple(self.bindings.as_slice()),
+                DisplayTuple(self.iterables.as_slice())
+            )?;
+        }
+
+        if let Some(selector) = self.selector.as_ref() {
+            write!(f, " when {}", selector)
+        } else {
+            Ok(())
+        }
+    }
+}
 
 /// Represents a function call (either a pure function or an evaluator).
 ///
@@ -820,5 +877,10 @@ impl fmt::Debug for Call {
             .field("args", &self.args)
             .field("ty", &self.ty)
             .finish()
+    }
+}
+impl fmt::Display for Call {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{}", self.callee, DisplayTuple(self.args.as_slice()))
     }
 }
