@@ -1,14 +1,14 @@
-///! This module provides AST structures which represent the various types of
-///! expressions, or types which are used primarily in expressions.
-///!
-///! Expressions always evaluate to a value, unlike statements, and as a result
-///! they can generally be arbitrarily nested to represent complex computations.
-///!
-///! However, in AirScript, the evaluation of constraints places limits on the types
-///! of values on which they can be enforced. Correspondingly, certain expressions are
-///! only usable in intermediate contexts (e.g. those which produce vectors/matrices), and
-///! must be reduced to scalars in constraints. As a result, we distinguish between scalar
-///! and non-scalar expression types.
+//! This module provides AST structures which represent the various types of
+//! expressions, or types which are used primarily in expressions.
+//!
+//! Expressions always evaluate to a value, unlike statements, and as a result
+//! they can generally be arbitrarily nested to represent complex computations.
+//!
+//! However, in AirScript, the evaluation of constraints places limits on the types
+//! of values on which they can be enforced. Correspondingly, certain expressions are
+//! only usable in intermediate contexts (e.g. those which produce vectors/matrices), and
+//! must be reduced to scalars in constraints. As a result, we distinguish between scalar
+//! and non-scalar expression types.
 use std::{convert::AsRef, fmt};
 
 use miden_diagnostics::{SourceSpan, Span, Spanned};

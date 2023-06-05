@@ -1,10 +1,10 @@
-///! This module provides AST structures for statements which may appear in one of the following:
-///!
-///! * Evaluator function bodies
-///! * The `boundary_constraints` section
-///! * The `integrity_constraints` section
-///!
-///! Statements do not return any value, unlike expressions.
+//! This module provides AST structures for statements which may appear in one of the following:
+//!
+//! * Evaluator function bodies
+//! * The `boundary_constraints` section
+//! * The `integrity_constraints` section
+//!
+//! Statements do not return any value, unlike expressions.
 use std::fmt;
 
 use miden_diagnostics::{SourceSpan, Spanned};
