@@ -1,12 +1,12 @@
-///! This module provides infrastructure for the visitor pattern over the AirScript AST
-///!
-///! Implementations of [VisitMut] need only provide implementations of trait functions for
-///! the specific AST nodes which they are interested in, or which provide important context.
-///! By default, with no trait functions overridden, a visitor will simply traverse the AST
-///! top-down. When you override one of the trait functions, it is up to the implementation to
-///! drive the visitor down to children of the corresponding node type, if desired. For that purpose,
-///! this module exposes a number of `visit_mut_*` functions which can be called to perform the
-///! default visitor traversal for that node.
+//! This module provides infrastructure for the visitor pattern over the AirScript AST
+//!
+//! Implementations of [VisitMut] need only provide implementations of trait functions for
+//! the specific AST nodes which they are interested in, or which provide important context.
+//! By default, with no trait functions overridden, a visitor will simply traverse the AST
+//! top-down. When you override one of the trait functions, it is up to the implementation to
+//! drive the visitor down to children of the corresponding node type, if desired. For that purpose,
+//! this module exposes a number of `visit_mut_*` functions which can be called to perform the
+//! default visitor traversal for that node.
 use core::ops::ControlFlow;
 
 use crate::ast;
