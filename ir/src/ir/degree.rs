@@ -8,8 +8,6 @@
 
 use super::MIN_CYCLE_LENGTH;
 
-// INTEGRITY CONSTRAINT DEGREE
-// ================================================================================================
 /// Degree descriptor of an integrity constraint.
 ///
 /// Describes constraint degree as a combination of multiplications of periodic and trace
@@ -38,12 +36,12 @@ impl IntegrityConstraintDegree {
     /// For example, if a constraint involves multiplication of two trace columns, `degree`
     /// should be set to 2. If a constraint involves multiplication of three trace columns,
     /// `degree` should be set to 3 etc.
-    pub(super) fn new(degree: usize) -> Self {
+    pub fn new(degree: usize) -> Self {
         assert!(
             degree > 0,
             "integrity constraint degree must be at least one, but was zero"
         );
-        IntegrityConstraintDegree {
+        Self {
             base: degree,
             cycles: vec![],
         }
@@ -59,7 +57,7 @@ impl IntegrityConstraintDegree {
     /// # Panics
     /// Panics if:
     /// * Any of the values in the `cycles` vector is smaller than two or is not powers of two.
-    pub(super) fn with_cycles(base_degree: usize, cycles: Vec<usize>) -> Self {
+    pub fn with_cycles(base_degree: usize, cycles: Vec<usize>) -> Self {
         assert!(
             base_degree > 0,
             "integrity constraint degree must be at least one, but was zero"
@@ -74,7 +72,7 @@ impl IntegrityConstraintDegree {
                 "cycle length must be a power of two, but was {cycle} for cycle {i}"
             );
         }
-        IntegrityConstraintDegree {
+        Self {
             base: base_degree,
             cycles,
         }
