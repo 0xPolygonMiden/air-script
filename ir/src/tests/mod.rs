@@ -1,5 +1,3 @@
-use crate::AirIR;
-
 mod access;
 mod boundary_constraints;
 mod constant;
@@ -13,31 +11,128 @@ mod source_sections;
 mod trace;
 mod variables;
 
+pub use crate::CompileError;
+
 use std::sync::Arc;
 
-use miden_diagnostics::*;
-use parser::{ast, ParseError, Parser};
+use air_pass::Pass;
+use miden_diagnostics::{CodeMap, DiagnosticsConfig, DiagnosticsHandler, Verbosity};
 
-/// Parses the provided source and returns the AST.
-pub fn parse(source: &str) -> Result<ast::Source, ParseError> {
-    use miden_diagnostics::term::termcolor::ColorChoice;
-
-    let codemap = Arc::new(CodeMap::new());
-    let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
-    let config = DiagnosticsConfig {
-        verbosity: Verbosity::Warning,
-        warnings_as_errors: true,
-        no_warn: false,
-        display: Default::default(),
-    };
-    let diagnostics = DiagnosticsHandler::new(config, codemap.clone(), emitter);
-    let parser = Parser::new((), codemap);
-    match parser.parse_string::<ast::Source, _, _>(&diagnostics, source) {
-        Ok(ast) => Ok(ast),
-        Err(ParseError::Lexer(err)) => {
-            diagnostics.emit(err);
-            Err(ParseError::Failed)
+pub fn compile(source: &str) -> Result<crate::Air, ()> {
+    let compiler = Compiler::default();
+    match compiler.compile(source) {
+        Ok(air) => Ok(air),
+        Err(err) => {
+            compiler.diagnostics.emit(err);
+            compiler.emitter.print_captured_to_stderr();
+            Err(())
         }
-        Err(err) => Err(err),
+    }
+}
+
+#[track_caller]
+pub fn expect_diagnostic(source: &str, expected: &str) {
+    let compiler = Compiler::default();
+    let err = match compiler.compile(source) {
+        Ok(ref ast) => {
+            panic!("expected compilation to fail, got {:#?}", ast);
+        }
+        Err(err) => err,
+    };
+    compiler.diagnostics.emit(err);
+    let found = compiler.emitter.captured().contains(expected);
+    if !found {
+        compiler.emitter.print_captured_to_stderr();
+    }
+    assert!(
+        found,
+        "expected diagnostic output to contain the string: '{}'",
+        expected
+    );
+}
+
+struct Compiler {
+    codemap: Arc<CodeMap>,
+    emitter: Arc<SplitEmitter>,
+    diagnostics: Arc<DiagnosticsHandler>,
+}
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new(DiagnosticsConfig {
+            verbosity: Verbosity::Warning,
+            warnings_as_errors: true,
+            no_warn: false,
+            display: Default::default(),
+        })
+    }
+}
+impl Compiler {
+    pub fn new(config: DiagnosticsConfig) -> Self {
+        let codemap = Arc::new(CodeMap::new());
+        let emitter = Arc::new(SplitEmitter::new());
+        let diagnostics = Arc::new(DiagnosticsHandler::new(
+            config,
+            codemap.clone(),
+            emitter.clone(),
+        ));
+
+        Self {
+            codemap,
+            emitter,
+            diagnostics,
+        }
+    }
+
+    pub fn compile(&self, source: &str) -> Result<crate::Air, CompileError> {
+        air_parser::parse(&self.diagnostics, self.codemap.clone(), source)
+            .map_err(CompileError::Parse)
+            .and_then(|ast| {
+                let mut pipeline =
+                    air_parser::transforms::ConstantPropagation::new(&self.diagnostics)
+                        .chain(air_parser::transforms::Inlining::new(&self.diagnostics))
+                        .chain(crate::passes::AstToAir::new(&self.diagnostics));
+                pipeline.run(ast)
+            })
+    }
+}
+
+struct SplitEmitter {
+    capture: miden_diagnostics::CaptureEmitter,
+    default: miden_diagnostics::DefaultEmitter,
+}
+impl SplitEmitter {
+    #[inline]
+    pub fn new() -> Self {
+        use miden_diagnostics::term::termcolor::ColorChoice;
+
+        Self {
+            capture: Default::default(),
+            default: miden_diagnostics::DefaultEmitter::new(ColorChoice::Auto),
+        }
+    }
+
+    pub fn captured(&self) -> String {
+        self.capture.captured()
+    }
+
+    pub fn print_captured_to_stderr(&self) {
+        use miden_diagnostics::Emitter;
+        use std::io::Write;
+
+        let mut copy = self.default.buffer();
+        let captured = self.capture.captured();
+        copy.write_all(captured.as_bytes()).unwrap();
+        self.default.print(copy).unwrap();
+    }
+}
+impl miden_diagnostics::Emitter for SplitEmitter {
+    #[inline]
+    fn buffer(&self) -> miden_diagnostics::term::termcolor::Buffer {
+        self.capture.buffer()
+    }
+
+    #[inline]
+    fn print(&self, buffer: miden_diagnostics::term::termcolor::Buffer) -> std::io::Result<()> {
+        self.capture.print(buffer)
     }
 }
