@@ -26,50 +26,50 @@ end # END PROC compute_evaluate_integrity_constraints
 proc.compute_evaluate_boundary_constraints
     # boundary constraint 0 for main
     padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop
-    # Load public input stack_inputs pos 0 with final offset 4
-    padw mem_loadw.4294800002 movdn.3 movdn.3 drop drop ext2sub
+    # Load public input stack_inputs pos 0 with final offset 8
+    padw mem_loadw.4294800004 movdn.3 movdn.3 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900200 drop drop ext2mul
     # boundary constraint 1 for main
     padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop
-    # Load public input stack_inputs pos 1 with final offset 4
-    padw mem_loadw.4294800002 drop drop ext2sub
+    # Load public input stack_inputs pos 1 with final offset 8
+    padw mem_loadw.4294800004 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900201 movdn.3 movdn.3 drop drop ext2mul
     # boundary constraint 2 for main
     padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop
-    # Load public input stack_inputs pos 2 with final offset 4
-    padw mem_loadw.4294800003 movdn.3 movdn.3 drop drop ext2sub
+    # Load public input stack_inputs pos 2 with final offset 8
+    padw mem_loadw.4294800005 movdn.3 movdn.3 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900201 drop drop ext2mul
     # boundary constraint 3 for main
     padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop
-    # Load public input stack_inputs pos 3 with final offset 4
-    padw mem_loadw.4294800003 drop drop ext2sub
+    # Load public input stack_inputs pos 3 with final offset 8
+    padw mem_loadw.4294800005 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900202 movdn.3 movdn.3 drop drop ext2mul
     # boundary constraint 4 for main
     padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop
-    # Load public input stack_outputs pos 0 with final offset 8
-    padw mem_loadw.4294800004 movdn.3 movdn.3 drop drop ext2sub
+    # Load public input stack_outputs pos 0 with final offset 12
+    padw mem_loadw.4294800006 movdn.3 movdn.3 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900202 drop drop ext2mul
     # boundary constraint 5 for main
     padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop
-    # Load public input stack_outputs pos 1 with final offset 8
-    padw mem_loadw.4294800004 drop drop ext2sub
+    # Load public input stack_outputs pos 1 with final offset 12
+    padw mem_loadw.4294800006 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900203 movdn.3 movdn.3 drop drop ext2mul
     # boundary constraint 6 for main
     padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop
-    # Load public input stack_outputs pos 2 with final offset 8
-    padw mem_loadw.4294800005 movdn.3 movdn.3 drop drop ext2sub
+    # Load public input stack_outputs pos 2 with final offset 12
+    padw mem_loadw.4294800007 movdn.3 movdn.3 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900203 drop drop ext2mul
     # boundary constraint 7 for main
     padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop
-    # Load public input stack_outputs pos 3 with final offset 8
-    padw mem_loadw.4294800005 drop drop ext2sub
+    # Load public input stack_outputs pos 3 with final offset 12
+    padw mem_loadw.4294800007 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900204 movdn.3 movdn.3 drop drop ext2mul
 end # END PROC compute_evaluate_boundary_constraints
