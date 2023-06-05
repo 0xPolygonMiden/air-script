@@ -29,12 +29,32 @@ pub enum Statement {
     /// at some point, otherwise parsing would fail. This guarantee holds during all analyses
     /// and transformations.
     Let(Let),
+    /// Represents a value expression in the tail position of a block
+    ///
+    /// This is only used in pure function contexts, and during certain transformations. It
+    /// is not valid in any position but the last statement of a block, and that block must
+    /// be in an expression context (i.e. pure function body, let-bound expression that expands
+    /// during inlining to a block of statements that are used to build up a value).
+    Expr(Expr),
     /// Declares a constraint to be enforced on a single value.
     ///
     /// This variant accepts a [ScalarExpr] for simplicity in the parser, but is expected to always
     /// be either a call to an evaluator function, or a binary expression of the form `lhs = rhs`,
     /// i.e. an equality. This is validated by the semantic analyzer.
     Enforce(ScalarExpr),
+    /// Declares a constraint to be conditionally enforced.
+    ///
+    /// This has all the same semantics as `Enforce`, except it has a condition expression which
+    /// determines if the constraint will be enforced.
+    ///
+    /// This variant is only present in the AST after inlining is performed, even though the parser
+    /// could produce it directly from the parse tree. This is because this variant is equivalent to
+    /// a comprehension constraint with a single element, so we transform all syntax corresponding to
+    /// `EnforceIf` into `EnforceAll` form so we can reuse all of the analyses/optimizations/transformations
+    /// for both. However, when lowering to the IR, we perform inlining/unrolling of comprehensions, and
+    /// at that time we need `EnforceIf` in order to represent unrolled constraints which have a selector
+    /// that is only resolvable at runtime.
+    EnforceIf(#[span] ScalarExpr, ScalarExpr),
     /// Declares a constraint to be enforced over a vector of values produced by a comprehension.
     ///
     /// Just like `Enforce`, except the constraint is contained in the body of a list comprehension,
@@ -49,8 +69,9 @@ impl Statement {
     /// one or more constraints in its body.
     pub fn has_constraints(&self) -> bool {
         match self {
-            Self::Enforce(_) | Self::EnforceAll(_) => true,
+            Self::Enforce(_) | Self::EnforceIf(_, _) | Self::EnforceAll(_) => true,
             Self::Let(Let { body, .. }) => body.iter().any(|s| s.has_constraints()),
+            Self::Expr(_) => false,
         }
     }
 
@@ -103,6 +124,14 @@ impl Let {
             value,
             body,
         }
+    }
+
+    pub fn ty(&self) -> Option<Type> {
+        self.body.last().and_then(|stmt| match stmt {
+            Statement::Let(ref nested) => nested.ty(),
+            Statement::Expr(ref expr) => expr.ty(),
+            _ => None,
+        })
     }
 }
 impl Eq for Let {}
