@@ -1,5 +1,6 @@
 mod graph;
 mod ir;
+pub mod passes;
 #[cfg(test)]
 mod tests;
 
