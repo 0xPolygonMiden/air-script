@@ -273,7 +273,7 @@ impl<'a> SemanticAnalysis<'a> {
     }
 
     /// Run semantic analysis on the given module
-    pub fn run(mut self, module: &mut Module) -> Result<(), ModuleError> {
+    pub fn run(mut self, module: &mut Module) -> Result<(), SemanticAnalysisError> {
         if let ControlFlow::Break(err) = self.visit_mut_module(module) {
             return Err(err);
         }
@@ -307,8 +307,8 @@ impl<'a> SemanticAnalysis<'a> {
     }
 }
 
-impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
-    fn visit_mut_module(&mut self, module: &mut Module) -> ControlFlow<ModuleError> {
+impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
+    fn visit_mut_module(&mut self, module: &mut Module) -> ControlFlow<SemanticAnalysisError> {
         self.current_module = Some(module.name);
 
         // Register all globals implicitly defined in the module before all locally bound names
@@ -453,7 +453,7 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
                     .with_primary_label(periodic.name.span(), "this name is already in use")
                     .with_secondary_label(prev.span(), "previously declared here")
                     .emit();
-                return ControlFlow::Break(ModuleError::Invalid);
+                return ControlFlow::Break(SemanticAnalysisError::Invalid);
             }
             assert_eq!(
                 self.locals.insert(
@@ -488,7 +488,7 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
 
         // We're done
         if self.has_type_errors || self.has_undefined_variables {
-            ControlFlow::Break(ModuleError::Invalid)
+            ControlFlow::Break(SemanticAnalysisError::Invalid)
         } else {
             ControlFlow::Continue(())
         }
@@ -497,7 +497,7 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
     fn visit_mut_evaluator_function(
         &mut self,
         function: &mut EvaluatorFunction,
-    ) -> ControlFlow<ModuleError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         // Only allow integrity constraints in this context
         self.allowed_constraints = AllowedConstraintsType::Integrity;
         // Start a new lexical scope
@@ -580,7 +580,7 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
     fn visit_mut_boundary_constraints(
         &mut self,
         body: &mut Vec<Statement>,
-    ) -> ControlFlow<ModuleError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         // Only allow boundary constraints in this context
         self.allowed_constraints = AllowedConstraintsType::Boundary;
         // Save the current bindings set, as we're entering a new lexical scope
@@ -825,7 +825,10 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
     /// the body of a list comprehension. The comprehension itself is validated normally, but the body of the comprehension
     /// must be checked using `visit_mut_enforce`, rather than `visit_mut_scalar_expr`. We do this by setting a flag in the
     /// state that is checked in `visit_mut_list_comprehension` to enable checks that are specific to constraints.
-    fn visit_mut_enforce_all(&mut self, expr: &mut ListComprehension) -> ControlFlow<ModuleError> {
+    fn visit_mut_enforce_all(
+        &mut self,
+        expr: &mut ListComprehension,
+    ) -> ControlFlow<SemanticAnalysisError> {
         self.in_constraint_comprehension = true;
         let result = self.visit_mut_list_comprehension(expr);
         self.in_constraint_comprehension = false;
@@ -833,7 +836,7 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
         result
     }
 
-    fn visit_mut_let(&mut self, expr: &mut Let) -> ControlFlow<ModuleError> {
+    fn visit_mut_let(&mut self, expr: &mut Let) -> ControlFlow<SemanticAnalysisError> {
         // Visit the binding expression first
         self.visit_mut_expr(&mut expr.value)?;
 
@@ -873,7 +876,7 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
     fn visit_mut_list_comprehension(
         &mut self,
         expr: &mut ListComprehension,
-    ) -> ControlFlow<ModuleError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         // Visit the iterables first, and resolve their identifiers
         for iterable in expr.iterables.iter_mut() {
             self.visit_mut_expr(iterable)?;
@@ -957,7 +960,7 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
                             "this expression is not a valid iterable",
                         )
                         .emit();
-                    return ControlFlow::Break(ModuleError::Invalid);
+                    return ControlFlow::Break(SemanticAnalysisError::Invalid);
                 }
                 Err(_) => {
                     // The iterable type is undefined/unresolvable
@@ -1002,12 +1005,12 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
         expr.ty = result_ty;
 
         // Restore the original lexical scope
-        self.locals = prev;
+        self.locals.exit();
 
         ControlFlow::Continue(())
     }
 
-    fn visit_mut_call(&mut self, expr: &mut Call) -> ControlFlow<ModuleError> {
+    fn visit_mut_call(&mut self, expr: &mut Call) -> ControlFlow<SemanticAnalysisError> {
         // Ensure the callee exists, and resolve the type if possible
         self.visit_mut_resolvable_identifier(&mut expr.callee)?;
 
@@ -1040,7 +1043,7 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
                             "instead a reference to this declaration was given",
                         )
                         .emit();
-                    return ControlFlow::Break(ModuleError::Invalid);
+                    return ControlFlow::Break(SemanticAnalysisError::Invalid);
                 }
             }
             Err(_) => {
@@ -1314,7 +1317,7 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
     fn visit_mut_bounded_symbol_access(
         &mut self,
         expr: &mut BoundedSymbolAccess,
-    ) -> ControlFlow<ModuleError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         // Any access to a bounded symbol is to be considered invalid, because the only places
         // in which they are valid are explicitly checked in the handling of `visit_mut_enforce`
         // Visit the underlying access first
@@ -1326,10 +1329,13 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
                 "references to column boundaries are not permitted here",
             )
             .emit();
-        ControlFlow::Break(ModuleError::Invalid)
+        ControlFlow::Break(SemanticAnalysisError::Invalid)
     }
 
-    fn visit_mut_symbol_access(&mut self, expr: &mut SymbolAccess) -> ControlFlow<ModuleError> {
+    fn visit_mut_symbol_access(
+        &mut self,
+        expr: &mut SymbolAccess,
+    ) -> ControlFlow<SemanticAnalysisError> {
         self.visit_mut_resolvable_identifier(&mut expr.name)?;
 
         let resolved_binding_ty = match self.resolvable_binding_type(&expr.name) {
@@ -1393,7 +1399,7 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
     fn visit_mut_resolvable_identifier(
         &mut self,
         expr: &mut ResolvableIdentifier,
-    ) -> ControlFlow<ModuleError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         let current_module = self.current_module.unwrap();
         match expr {
             // If already resolved, and referencing a local variable, there is nothing to do
