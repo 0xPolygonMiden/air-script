@@ -8,214 +8,39 @@ use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned}
 
 use crate::{
     ast::{visit::VisitMut, *},
+    sema::SemanticAnalysisError,
     symbols::{self, Symbol},
 };
 
-use super::Imported;
-
-/// Represents the graph of dependencies between module items and items they
-/// reference, either in the same module, or via imports.
-///
-/// The dependency graph is used to construct the final [Program] representation,
-/// containing only those parts of the program which are referenced from the root
-/// module.
-pub type DependencyGraph = petgraph::graphmap::DiGraphMap<QualifiedIdentifier, DependencyType>;
-
-/// Represents the graph of dependencies between modules, with no regard to what
-/// items in those modules are actually used. In other words, this graph tells us
-/// what modules depend on what other modules in the program.
-pub type ModuleGraph = petgraph::graphmap::DiGraphMap<ModuleId, ()>;
-
-/// Represents the type of edges in the dependency graph
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum DependencyType {
-    /// Depends on an imported constant
-    Constant,
-    /// Depends on an imported evaluator function
-    Evaluator,
-    /// Depends on an imported function
-    Function,
-    /// Depends on a periodic_columns declaration (not visible as an export)
-    PeriodicColumn,
-}
-
-/// Represents the type signature of a function
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FunctionType {
-    /// An evaluator function, which has no results, and has
-    /// a complex type signature due to the nature of trace bindings
-    Evaluator(Vec<TraceSegment>),
-    /// A standard function with one or more inputs, and a result
-    #[allow(dead_code)]
-    Function(Vec<Type>, Type),
-}
-impl FunctionType {
-    pub fn result(&self) -> Option<Type> {
-        match self {
-            Self::Evaluator(_) => None,
-            Self::Function(_, result) => Some(*result),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Spanned)]
-pub struct TraceRef {
-    /// The span of the declaration this is derived from
-    #[span]
-    pub span: SourceSpan,
-    pub segment: TraceSegmentId,
-    pub index: usize,
-    pub size: usize,
-}
-impl TraceRef {
-    /// Returns a [Type] that describes what type of value this binding represents
-    pub fn ty(&self) -> Type {
-        if self.size == 1 {
-            Type::Felt
-        } else {
-            Type::Vector(self.size)
-        }
-    }
-
-    /// Derive a new [TraceBinding] derived from the current one given an [AccessType]
-    pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
-        match access_type {
-            AccessType::Default => Ok(*self),
-            AccessType::Slice(_) if self.size == 1 => Err(InvalidAccessError::SliceOfScalar),
-            AccessType::Slice(range) if range.end > self.size => {
-                Err(InvalidAccessError::IndexOutOfBounds)
-            }
-            AccessType::Slice(range) => {
-                let index = self.index + range.start;
-                Ok(Self {
-                    index,
-                    size: range.end - range.start,
-                    ..*self
-                })
-            }
-            AccessType::Index(_) if self.size == 1 => Err(InvalidAccessError::IndexIntoScalar),
-            AccessType::Index(idx) if idx >= self.size => Err(InvalidAccessError::IndexOutOfBounds),
-            AccessType::Index(idx) => {
-                let index = self.index + idx;
-                Ok(Self {
-                    index,
-                    size: 1,
-                    ..*self
-                })
-            }
-            AccessType::Matrix(_, _) => Err(InvalidAccessError::IndexIntoScalar),
-        }
-    }
-}
-
-/// This type provides type and contextual information about a binding,
-/// i.e. not only does it tell us the type of a binding, but what type
-/// of value was bound. This is used during analysis to check whether a
-/// particular access is valid for the context it is in, as well as to
-/// propagate type information while retaining information about where
-/// the type was derived from.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BindingType {
-    /// A local variable whose value is not an alias of a global/module declaration
-    Local(Type),
-    /// A local variable that aliases a global/module declaration
-    Alias(Box<BindingType>),
-    /// A direct reference to a constant declaration
-    Constant(Type),
-    /// A type associated with a function signature
-    ///
-    /// The result type is None if the function is an evaluator
-    Function(FunctionType),
-    /// A function parameter corresponding to trace columns
-    TraceParam(TraceRef),
-    /// A direct reference to one or more contiguous trace columns
-    TraceColumn(TraceRef),
-    /// A potentially non-contiguous set of trace columns
-    Vector(Vec<BindingType>),
-    /// A direct reference to a random value binding
-    RandomValue(RandBinding),
-    /// A direct reference to a public input
-    PublicInput(Type),
-    /// A direct reference to a periodic column
-    PeriodicColumn(usize),
-}
-impl BindingType {
-    /// Get the value type of this binding, if applicable
-    pub fn ty(&self) -> Option<Type> {
-        match self {
-            Self::TraceColumn(tb) | Self::TraceParam(tb) => Some(tb.ty()),
-            Self::Vector(elems) => Some(Type::Vector(elems.len())),
-            Self::RandomValue(rb) => Some(rb.ty()),
-            Self::Alias(aliased) => aliased.ty(),
-            Self::Local(ty) | Self::Constant(ty) | Self::PublicInput(ty) => Some(*ty),
-            Self::PeriodicColumn(_) => Some(Type::Felt),
-            Self::Function(ty) => ty.result(),
-        }
-    }
-
-    pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
-        match self {
-            Self::Alias(aliased) => aliased.access(access_type),
-            Self::Local(ty) => ty.access(access_type).map(Self::Local),
-            Self::Constant(ty) => ty
-                .access(access_type)
-                .map(|t| Self::Alias(Box::new(Self::Constant(t)))),
-            Self::TraceColumn(tb) => tb.access(access_type).map(Self::TraceColumn),
-            Self::TraceParam(tb) => tb.access(access_type).map(Self::TraceParam),
-            Self::Vector(elems) => match access_type {
-                AccessType::Default => Ok(Self::Vector(elems.clone())),
-                AccessType::Index(idx) if idx >= elems.len() => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                }
-                AccessType::Index(idx) => Ok(elems[idx].clone()),
-                AccessType::Slice(range) if range.end > elems.len() => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                }
-                AccessType::Slice(range) => {
-                    Ok(Self::Vector(elems[range.start..range.end].to_vec()))
-                }
-                AccessType::Matrix(row, _) if row >= elems.len() => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                }
-                AccessType::Matrix(row, col) => elems[row].access(AccessType::Index(col)),
-            },
-            Self::RandomValue(tb) => tb
-                .access(access_type)
-                .map(|tb| Self::Alias(Box::new(Self::RandomValue(tb)))),
-            Self::PublicInput(ty) => ty.access(access_type).map(Self::PublicInput),
-            Self::PeriodicColumn(period) => match access_type {
-                AccessType::Default => Ok(Self::PeriodicColumn(*period)),
-                _ => Err(InvalidAccessError::IndexIntoScalar),
-            },
-            Self::Function(_) => Err(InvalidAccessError::InvalidBinding),
-        }
-    }
-}
-impl fmt::Display for BindingType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Alias(aliased) => write!(f, "{}", aliased),
-            Self::Local(_) => f.write_str("local"),
-            Self::Constant(_) => f.write_str("constant"),
-            Self::Vector(_) => f.write_str("vector"),
-            Self::Function(_) => f.write_str("function"),
-            Self::TraceColumn(_) | Self::TraceParam(_) => f.write_str("trace column(s)"),
-            Self::RandomValue(_) => f.write_str("random value(s)"),
-            Self::PublicInput(_) => f.write_str("public input(s)"),
-            Self::PeriodicColumn(_) => f.write_str("periodic column(s)"),
-        }
-    }
-}
+use super::*;
 
 /// A helper enum for representing what constraint mode is active
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum AllowedConstraintsType {
+enum ConstraintMode {
     /// A context in which constraints are not permitted
     None,
     /// A context in which only boundary constraints are permitted
     Boundary,
     /// A context in which only integrity constraints are permitted
     Integrity,
+}
+impl ConstraintMode {
+    pub const fn is_boundary(self) -> bool {
+        matches!(self, Self::Boundary)
+    }
+
+    pub const fn is_integrity(self) -> bool {
+        matches!(self, Self::Integrity)
+    }
+}
+impl fmt::Display for ConstraintMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::None => f.write_str("disabled"),
+            Self::Boundary => f.write_str("boundary"),
+            Self::Integrity => f.write_str("integrity"),
+        }
+    }
 }
 
 /// This pass is used to perform a variety of semantic analysis tasks in a single traversal of a module AST
@@ -238,10 +63,11 @@ pub struct SemanticAnalysis<'a> {
     deps: &'a mut DependencyGraph,
     imported: Imported,
     globals: HashMap<Identifier, BindingType>,
-    locals: HashMap<NamespacedIdentifier, BindingType>,
+    locals: LexicalScope<NamespacedIdentifier, BindingType>,
     referenced: HashMap<QualifiedIdentifier, DependencyType>,
     current_module: Option<ModuleId>,
-    allowed_constraints: AllowedConstraintsType,
+    constraint_mode: ConstraintMode,
+    saw_random_values: bool,
     has_undefined_variables: bool,
     has_type_errors: bool,
     in_constraint_comprehension: bool,
@@ -265,7 +91,8 @@ impl<'a> SemanticAnalysis<'a> {
             locals: Default::default(),
             referenced: Default::default(),
             current_module: None,
-            allowed_constraints: AllowedConstraintsType::None,
+            constraint_mode: ConstraintMode::None,
+            saw_random_values: false,
             has_undefined_variables: false,
             has_type_errors: false,
             in_constraint_comprehension: false,
@@ -399,13 +226,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
             let namespaced_name = NamespacedIdentifier::Binding(constant.name);
             // See if a constant with the same name was previously imported
             if let Some((prev, _)) = self.imported.get_key_value(&namespaced_name) {
-                self.diagnostics
-                    .diagnostic(Severity::Error)
-                    .with_message("declaration conflicts with an imported item")
-                    .with_primary_label(constant.span(), "this name is already in use")
-                    .with_secondary_label(prev.span(), "it was declared via this import")
-                    .emit();
-                return ControlFlow::Break(ModuleError::NameConflict(constant.name.span()));
+                self.declaration_import_conflict(constant.span(), prev.span())?;
             }
             // It should be impossible for there to be a local by this name at this point
             assert_eq!(
@@ -421,13 +242,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         for (function_name, function) in module.evaluators.iter() {
             let namespaced_name = NamespacedIdentifier::Function(*function_name);
             if let Some((prev, _)) = self.imported.get_key_value(&namespaced_name) {
-                self.diagnostics
-                    .diagnostic(Severity::Error)
-                    .with_message("declaration conflicts with an imported item")
-                    .with_primary_label(namespaced_name.span(), "this name is already in use")
-                    .with_secondary_label(prev.span(), "it was declared via this import")
-                    .emit();
-                return ControlFlow::Break(ModuleError::NameConflict(function_name.span()));
+                self.declaration_import_conflict(namespaced_name.span(), prev.span())?;
             }
             assert_eq!(
                 self.locals.insert(
@@ -499,9 +314,9 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         function: &mut EvaluatorFunction,
     ) -> ControlFlow<SemanticAnalysisError> {
         // Only allow integrity constraints in this context
-        self.allowed_constraints = AllowedConstraintsType::Integrity;
+        self.constraint_mode = ConstraintMode::Integrity;
         // Start a new lexical scope
-        let prev = self.locals.clone();
+        self.locals.enter();
         // Track referenced imports in a new context, as we want to update the dependency graph
         // for this function using only those imports referenced from this function body
         let referenced = mem::take(&mut self.referenced);
@@ -509,37 +324,8 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         // Add the set of parameters to the current scope, check for conflicts
         for trace_segment in function.params.iter_mut() {
             for trace_binding in trace_segment.bindings.iter() {
-                if let Some((prev, prev_binding)) = self.globals.get_key_value(&trace_binding.name)
-                {
-                    // Warn if we shadow other global declarations
-                    self.diagnostics
-                        .diagnostic(Severity::Warning)
-                        .with_message(format!(
-                            "trace binding shadows {} declaration in root module",
-                            prev_binding
-                        ))
-                        .with_primary_label(
-                            trace_binding.name.span(),
-                            "this name shadows a previous declaration",
-                        )
-                        .with_secondary_label(prev.span(), "previously declared here")
-                        .emit();
-                }
-                let namespaced_name = NamespacedIdentifier::Binding(trace_binding.name);
-                if let Some((prev, prev_binding)) = self.locals.get_key_value(&namespaced_name) {
-                    self.diagnostics
-                        .diagnostic(Severity::Warning)
-                        .with_message(format!(
-                            "trace binding would shadow {} declaration",
-                            prev_binding
-                        ))
-                        .with_primary_label(
-                            trace_binding.name.span(),
-                            "this name shadows a previous declaration",
-                        )
-                        .with_secondary_label(prev.span(), "previously declared here")
-                        .emit();
-                }
+                let name = trace_binding.name.unwrap();
+                let namespaced_name = NamespacedIdentifier::Binding(name);
                 self.locals.insert(
                     namespaced_name,
                     BindingType::TraceParam(TraceBinding {
@@ -570,9 +356,9 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         // Restore the original references metadata
         self.referenced = referenced;
         // Restore the original lexical scope
-        self.locals = prev;
+        self.locals.exit();
         // Disallow constraints
-        self.allowed_constraints = AllowedConstraintsType::None;
+        self.constraint_mode = ConstraintMode::None;
 
         ControlFlow::Continue(())
     }
@@ -582,15 +368,17 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         body: &mut Vec<Statement>,
     ) -> ControlFlow<SemanticAnalysisError> {
         // Only allow boundary constraints in this context
-        self.allowed_constraints = AllowedConstraintsType::Boundary;
+        self.constraint_mode = ConstraintMode::Boundary;
+        self.saw_random_values = false;
         // Save the current bindings set, as we're entering a new lexical scope
-        let prev = self.locals.clone();
+        self.locals.enter();
         // Visit all of the statements, check variable usage, and track referenced imports
         self.visit_mut_statement_block(body)?;
         // Restore the original lexical scope
-        self.locals = prev;
+        self.locals.exit();
         // Disallow any constraints
-        self.allowed_constraints = AllowedConstraintsType::None;
+        self.constraint_mode = ConstraintMode::None;
+        self.saw_random_values = false;
 
         ControlFlow::Continue(())
     }
@@ -598,226 +386,35 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
     fn visit_mut_integrity_constraints(
         &mut self,
         body: &mut Vec<Statement>,
-    ) -> ControlFlow<ModuleError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         // Only allow integrity constraints in this context
-        self.allowed_constraints = AllowedConstraintsType::Integrity;
+        self.constraint_mode = ConstraintMode::Integrity;
         // Save the current bindings set, as we're entering a new lexical scope
-        let prev = self.locals.clone();
+        self.locals.enter();
         // Visit all of the statements, check variable usage, and track referenced imports
         self.visit_mut_statement_block(body)?;
         // Restore the original lexical scope
-        self.locals = prev;
+        self.locals.exit();
         // Disallow any constraints
-        self.allowed_constraints = AllowedConstraintsType::None;
+        self.constraint_mode = ConstraintMode::None;
 
         ControlFlow::Continue(())
     }
 
-    // Visit scalar constraints and ensure that they are valid semantically, and have correct types
-    fn visit_mut_enforce(&mut self, expr: &mut ScalarExpr) -> ControlFlow<ModuleError> {
+    /// Visit scalar constraints and ensure that they are valid semantically, and have correct types
+    fn visit_mut_enforce(&mut self, expr: &mut ScalarExpr) -> ControlFlow<SemanticAnalysisError> {
         // Verify that constraints are permitted here
-        match self.allowed_constraints {
-            AllowedConstraintsType::None => {
-                self.diagnostics
-                    .diagnostic(Severity::Error)
-                    .with_message("invalid constraint")
-                    .with_primary_label(
-                        expr.span(),
-                        "constraints are not permitted in this context",
-                    )
-                    .emit();
-                ControlFlow::Break(ModuleError::Invalid)
+        match self.constraint_mode {
+            ConstraintMode::None => {
+                self.invalid_constraint(
+                    expr.span(),
+                    "constraints are not permitted in this context",
+                )
+                .emit();
+                ControlFlow::Break(SemanticAnalysisError::Invalid)
             }
-            AllowedConstraintsType::Boundary => {
-                // Only equality expressions are permitted in boundary constraints
-                match expr {
-                    ScalarExpr::Binary(ref mut expr) if expr.op == BinaryOp::Eq => {
-                        // Ensure that the left-hand expression is a boundary access
-                        match expr.lhs.as_mut() {
-                            ScalarExpr::BoundedSymbolAccess(ref mut access) => {
-                                // Visit the expression operands
-                                self.visit_mut_symbol_access(&mut access.column)?;
-
-                                // Ensure the referenced symbol was a trace column, and that it produces a scalar value
-                                let found = match self.resolvable_binding_type(&access.column.name)
-                                {
-                                    Ok(ty) => match &ty.item {
-                                        BindingType::TraceColumn(tr)
-                                        | BindingType::TraceParam(tr) => {
-                                            if tr.size == 1 {
-                                                ty
-                                            } else {
-                                                self.diagnostics.diagnostic(Severity::Error)
-                                                        .with_message("invalid constraint")
-                                                        .with_primary_label(access.span(), "boundary constraints must reference a single trace column")
-                                                        .with_secondary_label(ty.span(), format!("but this value is a set of {} columns", tr.size))
-                                                        .emit();
-                                                return ControlFlow::Break(ModuleError::Invalid);
-                                            }
-                                        }
-                                        _ => {
-                                            self.diagnostics.diagnostic(Severity::Error)
-                                                    .with_message("invalid constraint")
-                                                    .with_primary_label(access.span(), "boundary constraints must reference a single trace column")
-                                                    .with_secondary_label(ty.span(), format!("but this value is a {}", &ty))
-                                                    .emit();
-                                            return ControlFlow::Break(ModuleError::Invalid);
-                                        }
-                                    },
-                                    Err(_) => {
-                                        // We've already raised a diagnostic for the undefined variable
-                                        return ControlFlow::Break(ModuleError::Invalid);
-                                    }
-                                };
-                                // Validate that the symbol access produces a scalar value
-                                //
-                                // If no type is known, a diagnostic is already emitted, so proceed as if it is valid
-                                if let Some(ty) = access.column.ty.as_ref() {
-                                    if !ty.is_scalar() {
-                                        // Invalid constraint, only scalar values are allowed
-                                        self.diagnostics.diagnostic(Severity::Error)
-                                            .with_message("invalid constraint")
-                                            .with_primary_label(access.span(), format!("expected a scalar value here, but this expression has type '{}'", &ty))
-                                            .with_secondary_label(found.span(), "the type is inferred from this declaration")
-                                            .emit();
-                                        return ControlFlow::Break(ModuleError::Invalid);
-                                    }
-                                }
-
-                                // Verify that the right-hand expression evaluates to a scalar
-                                //
-                                // The only way this is not the case, is if it is a a symbol access which produces an aggregate
-                                self.visit_mut_scalar_expr(expr.rhs.as_mut())?;
-                                if let ScalarExpr::SymbolAccess(access) = expr.rhs.as_ref() {
-                                    // Ensure this access produces a scalar, or if the type is unknown, assume it is valid
-                                    // because a diagnostic will have already been emitted
-                                    if !access.ty.as_ref().map(|t| t.is_scalar()).unwrap_or(true) {
-                                        self.diagnostics.diagnostic(Severity::Error)
-                                            .with_message("invalid constraint")
-                                            .with_primary_label(access.span(), format!("expected a scalar value here, but this expression has type '{}'", access.ty.as_ref().unwrap()))
-                                            .emit();
-                                        return ControlFlow::Break(ModuleError::Invalid);
-                                    }
-                                }
-
-                                ControlFlow::Continue(())
-                            }
-                            other => {
-                                self.diagnostics.diagnostic(Severity::Error)
-                                    .with_message("invalid boundary constraint")
-                                    .with_primary_label(other.span(), "expected this to be a reference to a trace column boundary, e.g. `a.first`")
-                                    .with_note("The given constraint is not a boundary constraint, and only boundary constraints are valid here.")
-                                    .emit();
-                                ControlFlow::Break(ModuleError::Invalid)
-                            }
-                        }
-                    }
-                    ScalarExpr::Call(ref expr) => {
-                        self.diagnostics.diagnostic(Severity::Error)
-                            .with_message("invalid boundary constraint")
-                            .with_primary_label(expr.span(), "expected an equality expression here")
-                            .with_note("Calls to evaluator functions are only permitted in integrity constraints")
-                            .emit();
-                        ControlFlow::Break(ModuleError::Invalid)
-                    }
-                    expr => {
-                        self.diagnostics.diagnostic(Severity::Error)
-                            .with_message("invalid boundary constraint")
-                            .with_primary_label(expr.span(), "expected an equality expression here")
-                            .with_note("Boundary constraints must be expressed as an equality, e.g. `a.first = 0`")
-                            .emit();
-                        ControlFlow::Break(ModuleError::Invalid)
-                    }
-                }
-            }
-            AllowedConstraintsType::Integrity => {
-                // If a boundary access is encountered at any point, an error will be raised, so
-                // we do not need to validate that the constraint has no boundary references.
-                //
-                // However, we do need to validate two things:
-                //
-                // 1. That the constraint produces a scalar value
-                // 2. That the expression is either an equality, or a call to an evaluator function
-                //
-                match expr {
-                    ScalarExpr::Binary(ref mut expr) if expr.op == BinaryOp::Eq => {
-                        self.visit_mut_binary_expr(expr)
-                    }
-                    ScalarExpr::Call(ref mut expr) => {
-                        // Visit the call normally, so we can resolve the callee identifier
-                        self.visit_mut_call(expr)?;
-
-                        // Check that the call references an evaluator
-                        //
-                        // If unresolved, we've already raised a diagnostic for the invalid call
-                        match expr.callee {
-                            ResolvableIdentifier::Resolved(callee) => {
-                                match callee.id() {
-                                    id @ NamespacedIdentifier::Function(_) => {
-                                        match self.locals.get_key_value(&id) {
-                                            // Binding is to a local evaluator
-                                            Some((_, BindingType::Function(FunctionType::Evaluator(_)))) => ControlFlow::Continue(()),
-                                            // Binding is to a local non-evaluator function
-                                            Some((local_name, _)) => {
-                                                self.diagnostics.diagnostic(Severity::Error)
-                                                    .with_message("invalid integrity constraint")
-                                                    .with_primary_label(id.span(), "calls in constraints must be to evaluator functions")
-                                                    .with_secondary_label(local_name.span(), "this function is not an evaluator")
-                                                    .emit();
-                                                ControlFlow::Break(ModuleError::Invalid)
-                                            }
-                                            None => {
-                                                // If the call was resolved, it must be to an imported function,
-                                                // and we will have already validated the reference
-                                                let (import_id, module_id) = self.imported.get_key_value(&id).unwrap();
-                                                let module = self.library.get(module_id).unwrap();
-                                                if module.evaluators.get(&id.id()).is_none() {
-                                                    self.diagnostics.diagnostic(Severity::Error)
-                                                        .with_message("invalid integrity constraint")
-                                                        .with_primary_label(id.span(), "calls in constraints must be to evaluator functions")
-                                                        .with_secondary_label(import_id.span(), "the function imported here is not an evaluator")
-                                                        .emit();
-                                                    return ControlFlow::Break(ModuleError::Invalid);
-                                                }
-                                                ControlFlow::Continue(())
-                                            }
-                                        }
-                                    }
-                                    // We take care to only allow constructing Call with a function identifier, but it
-                                    // is possible for someone to unintentionally set the callee to a binding identifer, which is
-                                    // a compiler internal error, hence the panic
-                                    id => panic!("invalid callee identifier, expected function id, got binding: {:#?}", id),
-                                }
-                            }
-                            ResolvableIdentifier::Local(id) => {
-                                self.diagnostics.diagnostic(Severity::Error)
-                                    .with_message("invalid call target")
-                                    .with_primary_label(id.span(), "local variables are not callable")
-                                    .with_note("A local binding by this name is in scope, but no such function is declared in this module. Are you missing an import?")
-                                    .emit();
-                                ControlFlow::Break(ModuleError::Invalid)
-                            }
-                            ResolvableIdentifier::Global(id) => {
-                                self.diagnostics.diagnostic(Severity::Error)
-                                    .with_message("invalid call target")
-                                    .with_primary_label(id.span(), "global declarations are not callable")
-                                    .with_note("A global declaration with this name is in scope, but no such function is declared in this module. Are you missing an import?")
-                                    .emit();
-                                ControlFlow::Break(ModuleError::Invalid)
-                            }
-                            ResolvableIdentifier::Unresolved(_) => ControlFlow::Continue(()),
-                        }
-                    }
-                    expr => {
-                        self.diagnostics.diagnostic(Severity::Error)
-                            .with_message("invalid integrity constraint")
-                            .with_primary_label(expr.span(), "expected either an equality expression, or a call to an evaluator here")
-                            .with_note("Integrity constraints must be expressed as an equality, e.g. `a = 0`, or a call, e.g. `evaluator(a)`")
-                            .emit();
-                        ControlFlow::Break(ModuleError::Invalid)
-                    }
-                }
-            }
+            ConstraintMode::Boundary => self.visit_mut_boundary_constraint(expr),
+            ConstraintMode::Integrity => self.visit_mut_integrity_constraint(expr),
         }
     }
 
@@ -841,23 +438,12 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         self.visit_mut_expr(&mut expr.value)?;
 
         // Start new lexical scope for the body
-        let prev = self.locals.clone();
+        self.locals.enter();
 
         // Check if the new binding shadows a previous local declaration
         let namespaced_name = NamespacedIdentifier::Binding(expr.name);
-        if let Some((prev, prev_binding)) = self.locals.get_key_value(&namespaced_name) {
-            self.diagnostics
-                .diagnostic(Severity::Warning)
-                .with_message(format!(
-                    "let-bound variable shadows previous {} declaration",
-                    prev_binding
-                ))
-                .with_primary_label(
-                    expr.name.span(),
-                    "this binding shadows a previous declaration",
-                )
-                .with_secondary_label(prev.span(), "previously declared here")
-                .emit();
+        if let Some(prev) = self.locals.get_key(&namespaced_name) {
+            self.warn_declaration_shadowed(expr.name.span(), prev.span());
         } else {
             let binding_ty = self.expr_binding_type(&expr.value).unwrap();
             self.locals
@@ -868,7 +454,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         self.visit_mut_statement_block(&mut expr.body)?;
 
         // Restore the original lexical scope
-        self.locals = prev;
+        self.locals.exit();
 
         ControlFlow::Continue(())
     }
@@ -883,7 +469,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         }
 
         // Start a new lexical scope
-        let prev = self.locals.clone();
+        self.locals.enter();
 
         // Track the result type of this comprehension expression
         let mut result_ty = None;
@@ -902,25 +488,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
                     )
                     .with_secondary_label(prev.span(), "previously bound here")
                     .emit();
-                return ControlFlow::Break(ModuleError::NameConflict(binding.span()));
-            }
-
-            if let Some((prev, prev_binding)) = self
-                .locals
-                .get_key_value(&NamespacedIdentifier::Binding(binding))
-            {
-                self.diagnostics
-                    .diagnostic(Severity::Warning)
-                    .with_message(format!(
-                        "comprehension binding shadows previous {} declaration",
-                        prev_binding,
-                    ))
-                    .with_primary_label(
-                        binding.span(),
-                        "this binding shadows a previous declaration",
-                    )
-                    .with_secondary_label(prev.span(), "previously declared here")
-                    .emit();
+                return ControlFlow::Break(SemanticAnalysisError::NameConflict(binding.span()));
             }
 
             bound.insert(binding);
@@ -929,26 +497,22 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
             let iterable_ty = iterable.ty().unwrap();
             if let Some(expected_ty) = result_ty.replace(iterable_ty) {
                 if expected_ty != iterable_ty {
-                    self.diagnostics
-                        .diagnostic(Severity::Error)
-                        .with_message("invalid list comprehension")
-                        .with_primary_label(
-                            iterable.span(),
-                            format!(
-                                "expected an iterable of type {} here, got {}",
-                                &expected_ty, &iterable_ty
-                            ),
-                        )
-                        .with_secondary_label(
-                            expr.iterables[0].span(),
-                            "expected type was derived here",
-                        )
-                        .emit();
+                    self.has_type_errors = true;
+                    self.type_mismatch(
+                        Some(&iterable_ty),
+                        iterable.span(),
+                        &expected_ty,
+                        expr.iterables[0].span(),
+                        expr.span(),
+                    );
                 }
             }
             match self.expr_binding_type(iterable) {
                 Ok(iterable_binding_ty) => {
-                    binding_tys.push((binding, iterable.span(), Some(iterable_binding_ty)));
+                    let binding_ty = iterable_binding_ty
+                        .access(AccessType::Index(0))
+                        .expect("unexpected scalar iterable");
+                    binding_tys.push((binding, iterable.span(), Some(binding_ty)));
                 }
                 Err(InvalidAccessError::InvalidBinding) => {
                     // We tried to call an evaluator function
@@ -1022,16 +586,19 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
                 if let BindingType::Function(ref fty) = binding_ty.item {
                     // There must be an evaluator by this name
                     let qid = expr.callee.resolved().unwrap();
-                    let dependency_type = match fty {
-                        FunctionType::Evaluator(_) => DependencyType::Evaluator,
-                        _ => DependencyType::Function,
-                    };
-                    let prev = self.referenced.insert(qid, dependency_type);
-                    if prev.is_some() {
-                        assert_eq!(prev, Some(dependency_type));
+                    // Builtin functions are ignored here
+                    if !qid.is_builtin() {
+                        let dependency_type = match fty {
+                            FunctionType::Evaluator(_) => DependencyType::Evaluator,
+                            _ => DependencyType::Function,
+                        };
+                        let prev = self.referenced.insert(qid, dependency_type);
+                        if prev.is_some() {
+                            assert_eq!(prev, Some(dependency_type));
+                        }
+                        // TODO: When we have non-evaluator functions, we must fetch the type in its signature here,
+                        // and store it as the type of the Call expression
                     }
-                    // TODO: When we have non-evaluator functions, we must fetch the type in its signature here,
-                    // and store it as the type of the Call expression
                 } else {
                     self.has_type_errors = true;
                     self.diagnostics
@@ -1059,259 +626,47 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
 
         // Validate arguments for builtin functions, which currently consist only of the sum/prod reducers
         if expr.is_builtin() {
-            match expr.callee.as_ref().name() {
-                // The known reducers - each takes a single argument, which must be an aggregate or comprehension
-                symbols::Sum | symbols::Prod => {
-                    match expr.args.as_slice() {
-                        [arg] => {
-                            match self.expr_binding_type(arg) {
-                                Ok(binding_ty) => {
-                                    if !binding_ty.ty().map(|t| t.is_aggregate()).unwrap_or(false) {
-                                        self.has_type_errors = true;
-                                        self.diagnostics.diagnostic(Severity::Error)
-                                            .with_message("invalid call")
-                                            .with_primary_label(expr.span(), "this function expects an argument of aggregate type")
-                                            .with_secondary_label(arg.span(), format!("but this argument is a {}", &binding_ty))
-                                            .emit();
-                                    }
-                                }
-                                Err(_) => {
-                                    // We've already raised a diagnostic for this when visiting the access expression
-                                    assert!(self.has_undefined_variables || self.has_type_errors);
-                                }
-                            }
-                        }
-                        _ => {
-                            self.has_type_errors = true;
-                            self.diagnostics
-                                .diagnostic(Severity::Error)
-                                .with_message("invalid call")
-                                .with_primary_label(
-                                    expr.span(),
-                                    format!(
-                                        "the callee expects a single argument, but got {}",
-                                        expr.args.len()
-                                    ),
-                                )
-                                .emit();
-                        }
-                    }
-                }
-                other => unimplemented!("unrecognized builtin function: {}", other),
-            }
-            return ControlFlow::Continue(());
+            self.validate_call_to_builtin(expr)?;
         }
 
         // Validate arguments for evaluator functions:
         //
         // * Must be trace bindings or aliases of same
         // * Must match the type signature of the callee
-        if let Ok(Span {
-            item: BindingType::Function(FunctionType::Evaluator(ref params)),
-            ..
-        }) = callee_binding_ty
-        {
-            for (arg, param) in expr.args.iter().zip(params.iter()) {
-                // We're expecting either a vector of bindings, or an aggregate binding
-                match arg {
-                    Expr::SymbolAccess(ref access) => {
-                        match self.access_binding_type(access) {
-                            Ok(BindingType::TraceColumn(tr) | BindingType::TraceParam(tr)) => {
-                                if tr.size == param.size {
-                                    // Success, the argument and parameter types match up, but
-                                    // we must make sure the segments also match
-                                    let same_segment = tr.segment == param.id;
-                                    if !same_segment {
-                                        let expected_segment = segment_id_to_name(param.id);
-                                        let segment_name = segment_id_to_name(tr.segment);
-                                        self.has_type_errors = true;
-                                        self.diagnostics
-                                            .diagnostic(Severity::Error)
-                                            .with_message("invalid evaluator function argument")
-                                            .with_primary_label(
-                                                arg.span(),
-                                                format!(
-                                                    "callee expects columns from the {} trace",
-                                                    expected_segment
-                                                ),
-                                            )
-                                            .with_secondary_label(
-                                                tr.span,
-                                                format!(
-                                                    "but this column is from the {} trace",
-                                                    segment_name
-                                                ),
-                                            )
-                                            .emit();
-                                    }
-                                } else {
-                                    self.has_type_errors = true;
-                                    self.diagnostics.diagnostic(Severity::Error)
-                                                .with_message("invalid call")
-                                                .with_primary_label(expr.span(), "type mismatch in function argument")
-                                                .with_secondary_label(arg.span(), format!("callee expects {} trace columns here, but this binding provides {}", param.size, tr.size))
-                                                .emit();
-                                }
-                            }
-                            Ok(BindingType::Vector(ref elems)) => {
-                                let mut size = 0;
-                                for elem in elems.iter() {
-                                    match elem {
-                                        BindingType::TraceColumn(tr)
-                                        | BindingType::TraceParam(tr) => {
-                                            if tr.segment == param.id {
-                                                size += tr.size;
-                                            } else {
-                                                let expected_segment = segment_id_to_name(param.id);
-                                                let segment_name = segment_id_to_name(tr.segment);
-                                                self.has_type_errors = true;
-                                                self.diagnostics
-                                                    .diagnostic(Severity::Error)
-                                                    .with_message("invalid evaluator function argument")
-                                                    .with_primary_label(
-                                                        arg.span(),
-                                                        format!(
-                                                            "callee expects columns from the {} trace",
-                                                            expected_segment
-                                                        ),
-                                                    )
-                                                    .with_secondary_label(
-                                                        tr.span,
-                                                        format!(
-                                                            "but this column is from the {} trace",
-                                                            segment_name
-                                                        ),
-                                                    )
-                                                    .emit();
-                                                return ControlFlow::Continue(());
-                                            }
-                                        }
-                                        invalid => {
-                                            self.has_type_errors = true;
-                                            self.diagnostics
-                                                .diagnostic(Severity::Error)
-                                                .with_message("invalid call")
-                                                .with_primary_label(
-                                                    expr.span(),
-                                                    "type mismatch in function argument",
-                                                )
-                                                .with_secondary_label(
-                                                    access.span(),
-                                                    format!(
-                                                        "expected trace column(s), got {}",
-                                                        &invalid
-                                                    ),
-                                                )
-                                                .emit();
-                                            return ControlFlow::Continue(());
-                                        }
-                                    }
-                                }
-
-                                if size != param.size {
-                                    self.has_type_errors = true;
-                                    self.diagnostics.diagnostic(Severity::Error)
-                                                .with_message("invalid call")
-                                                .with_primary_label(expr.span(), "type mismatch in function argument")
-                                                .with_secondary_label(arg.span(), format!("callee expects {} trace columns here, but this binding provides {}", param.size, size))
-                                                .emit();
-                                }
-                            }
-                            Ok(binding_ty) => {
-                                self.has_type_errors = true;
-                                self.diagnostics.diagnostic(Severity::Error)
-                                            .with_message("invalid call")
-                                            .with_primary_label(expr.span(), "invalid argument for evaluator function")
-                                            .with_secondary_label(arg.span(), format!("expected a trace binding, or vector of trace bindings here, but got a {}", &binding_ty))
-                                            .emit();
-                            }
-                            Err(_) => {
-                                // We've already raised a diagnostic for this when visiting the access expression
-                                assert!(self.has_undefined_variables || self.has_type_errors);
-                            }
-                        }
-                    }
-                    Expr::Vector(ref elems) => {
-                        // We need to make sure that the number of columns represented by the vector corresponds to those
-                        // expected by the callee, which requires us to first check each element of the vector, and then
-                        // at the end determine if the sizes line up
-                        let mut size = 0;
-                        for elem in elems.iter() {
-                            match self.scalar_expr_binding_type(elem) {
-                                Ok(BindingType::TraceColumn(tr) | BindingType::TraceParam(tr)) => {
-                                    if tr.segment == param.id {
-                                        size += tr.size;
-                                    } else {
-                                        let expected_segment = segment_id_to_name(param.id);
-                                        let segment_name = segment_id_to_name(tr.segment);
-                                        self.has_type_errors = true;
-                                        self.diagnostics
-                                            .diagnostic(Severity::Error)
-                                            .with_message("invalid evaluator function argument")
-                                            .with_primary_label(
-                                                arg.span(),
-                                                format!(
-                                                    "callee expects columns from the {} trace",
-                                                    expected_segment
-                                                ),
-                                            )
-                                            .with_secondary_label(
-                                                elem.span(),
-                                                format!(
-                                                    "but this column is from the {} trace",
-                                                    segment_name
-                                                ),
-                                            )
-                                            .emit();
-                                        return ControlFlow::Continue(());
-                                    }
-                                }
-                                Ok(invalid) => {
-                                    self.has_type_errors = true;
-                                    self.diagnostics
-                                        .diagnostic(Severity::Error)
-                                        .with_message("invalid call")
-                                        .with_primary_label(
-                                            arg.span(),
-                                            "invalid argument for evaluator function",
-                                        )
-                                        .with_secondary_label(
-                                            elem.span(),
-                                            format!(
-                                                "expected a trace binding here, but got a {}",
-                                                &invalid
-                                            ),
-                                        )
-                                        .emit();
-                                }
-                                Err(_) => {
-                                    // We've already raised a diagnostic for this when visiting the access expression
-                                    assert!(self.has_undefined_variables || self.has_type_errors);
-                                }
-                            }
-                        }
-                        if size != param.size {
-                            self.has_type_errors = true;
-                            self.diagnostics.diagnostic(Severity::Error)
-                                .with_message("invalid call")
-                                .with_primary_label(expr.span(), "type mismatch in function argument")
-                                .with_secondary_label(arg.span(), format!("callee expects {} trace columns here, but this argument only provides {}", param.size, size))
-                                .emit();
-                        }
-                    }
-                    wrong => {
-                        self.has_type_errors = true;
-                        self.diagnostics.diagnostic(Severity::Error)
-                            .with_message("invalid call")
-                            .with_primary_label(expr.span(), "invalid argument for evaluator function")
-                            .with_secondary_label(arg.span(), format!("expected a trace binding, or vector of trace bindings here, but got a {}", wrong))
-                            .emit();
-                    }
+        if let Ok(ty) = callee_binding_ty {
+            if let BindingType::Function(FunctionType::Evaluator(ref params)) = ty.item {
+                for (arg, param) in expr.args.iter().zip(params.iter()) {
+                    self.validate_evaluator_argument(expr.span(), arg, param)?;
                 }
             }
         }
 
         ControlFlow::Continue(())
+    }
+
+    fn visit_mut_binary_expr(
+        &mut self,
+        expr: &mut BinaryExpr,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        self.visit_mut_scalar_expr(expr.lhs.as_mut())?;
+        self.visit_mut_scalar_expr(expr.rhs.as_mut())?;
+
+        // Validate the operand types
+        match (expr.lhs.ty(), expr.rhs.ty()) {
+            (Ok(Some(lty)), Ok(Some(rty))) => {
+                if lty != rty {
+                    self.type_mismatch(
+                        Some(&lty),
+                        expr.lhs.span(),
+                        &rty,
+                        expr.rhs.span(),
+                        expr.span(),
+                    );
+                }
+                ControlFlow::Continue(())
+            }
+            _ => ControlFlow::Continue(()),
+        }
     }
 
     fn visit_mut_bounded_symbol_access(
@@ -1348,6 +703,31 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
             Err(_) => return ControlFlow::Continue(()),
         };
 
+        // Check if:
+        //
+        // * This is an invalid trace access with offset in a boundary constraint
+        // * This is an invalid periodic column access in a boundary constraint
+        // * This is an invalid public input access in an integrity constraint
+        match &resolved_binding_ty.item {
+            BindingType::TraceColumn(_) | BindingType::TraceParam(_) => {
+                if self.constraint_mode.is_boundary() && expr.offset > 0 {
+                    self.has_type_errors = true;
+                    self.diagnostics.diagnostic(Severity::Error)
+                        .with_message("invalid expression")
+                        .with_primary_label(expr.span(), "invalid access of a trace column with offset")
+                        .with_note("It is not allowed to access trace columns with an offset in boundary constraints.")
+                        .emit();
+                }
+            }
+            ty @ BindingType::PeriodicColumn(_) if self.constraint_mode.is_boundary() => {
+                self.invalid_access_in_constraint(expr.span(), ty);
+            }
+            ty @ BindingType::PublicInput(_) if self.constraint_mode.is_integrity() => {
+                self.invalid_access_in_constraint(expr.span(), ty);
+            }
+            _ => (),
+        }
+
         if let ResolvableIdentifier::Resolved(qid) = &expr.name {
             // Determine the type of dependency this represents in the dependency graph
             let dep_type = match &resolved_binding_ty.item {
@@ -1374,7 +754,16 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         let resolved_binding_ty = resolved_binding_ty.item;
         match resolved_binding_ty.access(expr.access_type.clone()) {
             Ok(binding_ty) => {
-                assert_eq!(expr.ty.replace(binding_ty.ty().unwrap()), None);
+                match expr.access_type {
+                    // The only way to distinguish trace bindings of size 1 that are single columns vs vectors
+                    // with a single column is dependent on the access type. A slice of columns of size 1 must
+                    // be captured as a vector of size 1
+                    AccessType::Slice(ref range) => {
+                        assert_eq!(expr.ty.replace(Type::Vector(range.end - range.start)), None)
+                    }
+                    // All other access types can be derived from the binding type
+                    _ => assert_eq!(expr.ty.replace(binding_ty.ty().unwrap()), None),
+                }
                 ControlFlow::Continue(())
             }
             Err(err) => {
@@ -1494,6 +883,589 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
 }
 
 impl<'a> SemanticAnalysis<'a> {
+    /// Validate arguments for builtin functions, which currently consist only of the sum/prod reducers
+    fn validate_call_to_builtin(&mut self, call: &Call) -> ControlFlow<SemanticAnalysisError> {
+        match call.callee.as_ref().name() {
+            // The known reducers - each takes a single argument, which must be an aggregate or comprehension
+            symbols::Sum | symbols::Prod => {
+                match call.args.as_slice() {
+                    [arg] => {
+                        match self.expr_binding_type(arg) {
+                            Ok(binding_ty) => {
+                                if !binding_ty.ty().map(|t| t.is_aggregate()).unwrap_or(false) {
+                                    self.has_type_errors = true;
+                                    self.diagnostics
+                                        .diagnostic(Severity::Error)
+                                        .with_message("invalid call")
+                                        .with_primary_label(
+                                            call.span(),
+                                            "this function expects an argument of aggregate type",
+                                        )
+                                        .with_secondary_label(
+                                            arg.span(),
+                                            "but this argument is a field element",
+                                        )
+                                        .emit();
+                                }
+                            }
+                            Err(_) => {
+                                // We've already raised a diagnostic for this when visiting the access expression
+                                assert!(self.has_undefined_variables || self.has_type_errors);
+                            }
+                        }
+                    }
+                    _ => {
+                        self.has_type_errors = true;
+                        self.diagnostics
+                            .diagnostic(Severity::Error)
+                            .with_message("invalid call")
+                            .with_primary_label(
+                                call.span(),
+                                format!(
+                                    "the callee expects a single argument, but got {}",
+                                    call.args.len()
+                                ),
+                            )
+                            .emit();
+                    }
+                }
+            }
+            other => unimplemented!("unrecognized builtin function: {}", other),
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn validate_evaluator_argument(
+        &mut self,
+        span: SourceSpan,
+        arg: &Expr,
+        param: &TraceSegment,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        // We're expecting either a vector of bindings, or an aggregate binding
+        match arg {
+            Expr::SymbolAccess(ref access) => {
+                match self.access_binding_type(access) {
+                    Ok(BindingType::TraceColumn(tr) | BindingType::TraceParam(tr)) => {
+                        if tr.size == param.size {
+                            // Success, the argument and parameter types match up, but
+                            // we must make sure the segments also match
+                            let same_segment = tr.segment == param.id;
+                            if !same_segment {
+                                let expected_segment = segment_id_to_name(param.id);
+                                let segment_name = segment_id_to_name(tr.segment);
+                                self.has_type_errors = true;
+                                self.diagnostics
+                                    .diagnostic(Severity::Error)
+                                    .with_message("invalid evaluator function argument")
+                                    .with_primary_label(
+                                        arg.span(),
+                                        format!(
+                                            "callee expects columns from the {} trace",
+                                            expected_segment
+                                        ),
+                                    )
+                                    .with_secondary_label(
+                                        tr.span,
+                                        format!(
+                                            "but this column is from the {} trace",
+                                            segment_name
+                                        ),
+                                    )
+                                    .emit();
+                            }
+                        } else {
+                            self.has_type_errors = true;
+                            self.diagnostics.diagnostic(Severity::Error)
+                                .with_message("invalid call")
+                                .with_primary_label(span, "type mismatch in function argument")
+                                .with_secondary_label(arg.span(), format!("callee expects {} trace columns here, but this binding provides {}", param.size, tr.size))
+                                .emit();
+                        }
+                    }
+                    Ok(BindingType::Vector(ref elems)) => {
+                        let mut size = 0;
+                        for elem in elems.iter() {
+                            match elem {
+                                BindingType::TraceColumn(tr) | BindingType::TraceParam(tr) => {
+                                    if tr.segment == param.id {
+                                        size += tr.size;
+                                    } else {
+                                        let expected_segment = segment_id_to_name(param.id);
+                                        let segment_name = segment_id_to_name(tr.segment);
+                                        self.has_type_errors = true;
+                                        self.diagnostics
+                                            .diagnostic(Severity::Error)
+                                            .with_message("invalid evaluator function argument")
+                                            .with_primary_label(
+                                                arg.span(),
+                                                format!(
+                                                    "callee expects columns from the {} trace",
+                                                    expected_segment
+                                                ),
+                                            )
+                                            .with_secondary_label(
+                                                tr.span,
+                                                format!(
+                                                    "but this column is from the {} trace",
+                                                    segment_name
+                                                ),
+                                            )
+                                            .emit();
+                                        return ControlFlow::Continue(());
+                                    }
+                                }
+                                invalid => {
+                                    self.has_type_errors = true;
+                                    self.diagnostics
+                                        .diagnostic(Severity::Error)
+                                        .with_message("invalid call")
+                                        .with_primary_label(
+                                            span,
+                                            "type mismatch in function argument",
+                                        )
+                                        .with_secondary_label(
+                                            access.span(),
+                                            format!("expected trace column(s), got {}", &invalid),
+                                        )
+                                        .emit();
+                                    return ControlFlow::Continue(());
+                                }
+                            }
+                        }
+
+                        if size != param.size {
+                            self.has_type_errors = true;
+                            self.type_mismatch(
+                                Some(&Type::Vector(param.size)),
+                                arg.span(),
+                                &Type::Vector(size),
+                                param.span(),
+                                span,
+                            );
+                        }
+                    }
+                    Ok(binding_ty) => {
+                        self.has_type_errors = true;
+                        let expected = BindingType::TraceParam(TraceBinding::new(
+                            param.span(),
+                            param.name,
+                            param.id,
+                            0,
+                            param.size,
+                            Type::Vector(param.size),
+                        ));
+                        self.binding_mismatch(
+                            &binding_ty,
+                            arg.span(),
+                            &expected,
+                            param.span(),
+                            span,
+                        );
+                    }
+                    Err(_) => {
+                        // We've already raised a diagnostic for this when visiting the access expression
+                        assert!(self.has_undefined_variables || self.has_type_errors);
+                    }
+                }
+            }
+            Expr::Vector(ref elems) => {
+                // We need to make sure that the number of columns represented by the vector corresponds to those
+                // expected by the callee, which requires us to first check each element of the vector, and then
+                // at the end determine if the sizes line up
+                let mut size = 0;
+                for elem in elems.iter() {
+                    match self.expr_binding_type(elem) {
+                        Ok(BindingType::TraceColumn(tr) | BindingType::TraceParam(tr)) => {
+                            if tr.segment == param.id {
+                                size += tr.size;
+                            } else {
+                                let expected_segment = segment_id_to_name(param.id);
+                                let segment_name = segment_id_to_name(tr.segment);
+                                self.has_type_errors = true;
+                                self.diagnostics
+                                    .diagnostic(Severity::Error)
+                                    .with_message("invalid evaluator function argument")
+                                    .with_primary_label(
+                                        arg.span(),
+                                        format!(
+                                            "callee expects columns from the {} trace",
+                                            expected_segment
+                                        ),
+                                    )
+                                    .with_secondary_label(
+                                        elem.span(),
+                                        format!(
+                                            "but this column is from the {} trace",
+                                            segment_name
+                                        ),
+                                    )
+                                    .emit();
+                                return ControlFlow::Continue(());
+                            }
+                        }
+                        Ok(invalid) => {
+                            self.has_type_errors = true;
+                            self.diagnostics
+                                .diagnostic(Severity::Error)
+                                .with_message("invalid call")
+                                .with_primary_label(
+                                    arg.span(),
+                                    "invalid argument for evaluator function",
+                                )
+                                .with_secondary_label(
+                                    elem.span(),
+                                    format!(
+                                        "expected a trace binding here, but got a {}",
+                                        &invalid
+                                    ),
+                                )
+                                .emit();
+                        }
+                        Err(_) => {
+                            // We've already raised a diagnostic for this when visiting the access expression
+                            assert!(self.has_undefined_variables || self.has_type_errors);
+                        }
+                    }
+                }
+                if size != param.size {
+                    self.has_type_errors = true;
+                    self.diagnostics.diagnostic(Severity::Error)
+                                .with_message("invalid call")
+                                .with_primary_label(span, "type mismatch in function argument")
+                                .with_secondary_label(arg.span(), format!("callee expects {} trace columns here, but this argument only provides {}", param.size, size))
+                                .emit();
+                }
+            }
+            wrong => {
+                self.has_type_errors = true;
+                self.diagnostics.diagnostic(Severity::Error)
+                            .with_message("invalid call")
+                            .with_primary_label(span, "invalid argument for evaluator function")
+                            .with_secondary_label(arg.span(), format!("expected a trace binding, or vector of trace bindings here, but got a {}", wrong))
+                            .emit();
+            }
+        }
+
+        ControlFlow::Continue(())
+    }
+
+    fn visit_mut_boundary_constraint(
+        &mut self,
+        expr: &mut ScalarExpr,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        // Only equality expressions are permitted in boundary constraints
+        let constraint_span = expr.span();
+        match expr {
+            ScalarExpr::Binary(ref mut expr) if expr.op == BinaryOp::Eq => {
+                // Ensure that the left-hand expression is a boundary access
+                match expr.lhs.as_mut() {
+                    ScalarExpr::BoundedSymbolAccess(ref mut access) => {
+                        // Visit the expression operands
+                        self.visit_mut_symbol_access(&mut access.column)?;
+
+                        // Ensure the referenced symbol was a trace column, and that it produces a scalar value
+                        let (found, segment) =
+                            match self.resolvable_binding_type(&access.column.name) {
+                                Ok(ty) => match ty.item.access(access.column.access_type.clone()) {
+                                    Ok(BindingType::TraceColumn(tb))
+                                    | Ok(BindingType::TraceParam(tb)) => {
+                                        if tb.is_scalar() {
+                                            (ty, tb.segment)
+                                        } else {
+                                            let inferred = tb.ty();
+                                            return self.type_mismatch(
+                                                Some(&inferred),
+                                                access.span(),
+                                                &Type::Felt,
+                                                ty.span(),
+                                                constraint_span,
+                                            );
+                                        }
+                                    }
+                                    Ok(aty) => {
+                                        let expected = BindingType::TraceColumn(TraceBinding::new(
+                                            constraint_span,
+                                            Identifier::new(constraint_span, symbols::Main),
+                                            0,
+                                            0,
+                                            1,
+                                            Type::Felt,
+                                        ));
+                                        return self.binding_mismatch(
+                                            &aty,
+                                            access.span(),
+                                            &expected,
+                                            ty.span(),
+                                            constraint_span,
+                                        );
+                                    }
+                                    _ => return ControlFlow::Break(SemanticAnalysisError::Invalid),
+                                },
+                                Err(_) => {
+                                    // We've already raised a diagnostic for the undefined variable
+                                    return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                                }
+                            };
+
+                        // Validate that the symbol access produces a scalar value
+                        //
+                        // If no type is known, a diagnostic is already emitted, so proceed as if it is valid
+                        if let Some(ty) = access.column.ty.as_ref() {
+                            if !ty.is_scalar() {
+                                // Invalid constraint, only scalar values are allowed
+                                self.type_mismatch(
+                                    Some(ty),
+                                    access.span(),
+                                    &Type::Felt,
+                                    found.span(),
+                                    constraint_span,
+                                )?;
+                            }
+                        }
+
+                        // Verify that the right-hand expression evaluates to a scalar
+                        //
+                        // The only way this is not the case, is if it is a a symbol access which produces an aggregate
+                        self.visit_mut_scalar_expr(expr.rhs.as_mut())?;
+                        if let ScalarExpr::SymbolAccess(access) = expr.rhs.as_ref() {
+                            // Ensure this access produces a scalar, or if the type is unknown, assume it is valid
+                            // because a diagnostic will have already been emitted
+                            if !access.ty.as_ref().map(|t| t.is_scalar()).unwrap_or(true) {
+                                self.type_mismatch(
+                                    access.ty.as_ref(),
+                                    access.span(),
+                                    &Type::Felt,
+                                    access.name.span(),
+                                    constraint_span,
+                                )?;
+                            }
+                        }
+
+                        // If we observed a random value and this constraint is
+                        // against the main trace segment, raise a validation error
+                        if segment == 0 && self.saw_random_values {
+                            self.has_type_errors = true;
+                            self.invalid_constraint(expr.lhs.span(), "this constrains a column in the main trace segment")
+                                .with_secondary_label(expr.rhs.span(), "but this expression references random values")
+                                .with_note("Constraints involving random values are only valid with auxiliary trace segments")
+                                .emit();
+                        }
+
+                        ControlFlow::Continue(())
+                    }
+                    other => {
+                        self.invalid_constraint(other.span(), "expected this to be a reference to a trace column boundary, e.g. `a.first`")
+                            .with_note("The given constraint is not a boundary constraint, and only boundary constraints are valid here.")
+                            .emit();
+                        ControlFlow::Break(SemanticAnalysisError::Invalid)
+                    }
+                }
+            }
+            ScalarExpr::Call(ref expr) => {
+                self.invalid_constraint(expr.span(), "expected an equality expression here")
+                    .with_note(
+                        "Calls to evaluator functions are only permitted in integrity constraints",
+                    )
+                    .emit();
+                ControlFlow::Break(SemanticAnalysisError::Invalid)
+            }
+            expr => {
+                self.invalid_constraint(expr.span(), "expected an equality expression here")
+                    .with_note(
+                        "Boundary constraints must be expressed as an equality, e.g. `a.first = 0`",
+                    )
+                    .emit();
+                ControlFlow::Break(SemanticAnalysisError::Invalid)
+            }
+        }
+    }
+
+    fn visit_mut_integrity_constraint(
+        &mut self,
+        expr: &mut ScalarExpr,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        // If a boundary access is encountered at any point, an error will be raised, so
+        // we do not need to validate that the constraint has no boundary references.
+        //
+        // However, we do need to validate two things:
+        //
+        // 1. That the constraint produces a scalar value
+        // 2. That the expression is either an equality, or a call to an evaluator function
+        //
+        match expr {
+            ScalarExpr::Binary(ref mut expr) if expr.op == BinaryOp::Eq => {
+                self.visit_mut_binary_expr(expr)
+            }
+            ScalarExpr::Call(ref mut expr) => {
+                // Visit the call normally, so we can resolve the callee identifier
+                self.visit_mut_call(expr)?;
+
+                // Check that the call references an evaluator
+                //
+                // If unresolved, we've already raised a diagnostic for the invalid call
+                match expr.callee {
+                    ResolvableIdentifier::Resolved(callee) => {
+                        match callee.id() {
+                            id @ NamespacedIdentifier::Function(_) => {
+                                match self.locals.get_key_value(&id) {
+                                    // Binding is to a local evaluator
+                                    Some((_, BindingType::Function(FunctionType::Evaluator(_)))) => ControlFlow::Continue(()),
+                                    // Binding is to a local non-evaluator function
+                                    Some((local_name, _)) => {
+                                        self.invalid_constraint(id.span(), "calls in constraints must be to evaluator functions")
+                                            .with_secondary_label(local_name.span(), "this function is not an evaluator")
+                                            .emit();
+                                        ControlFlow::Break(SemanticAnalysisError::Invalid)
+                                    }
+                                    None => {
+                                        // If the call was resolved, it must be to an imported function,
+                                        // and we will have already validated the reference
+                                        let (import_id, module_id) = self.imported.get_key_value(&id).unwrap();
+                                        let module = self.library.get(module_id).unwrap();
+                                        if module.evaluators.get(&id.id()).is_none() {
+                                            self.invalid_constraint(id.span(), "calls in constraints must be to evaluator functions")
+                                                .with_secondary_label(import_id.span(), "the function imported here is not an evaluator")
+                                                .emit();
+                                            return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                                        }
+                                        ControlFlow::Continue(())
+                                    }
+                                }
+                            }
+                            // We take care to only allow constructing Call with a function identifier, but it
+                            // is possible for someone to unintentionally set the callee to a binding identifer, which is
+                            // a compiler internal error, hence the panic
+                            id => panic!("invalid callee identifier, expected function id, got binding: {:#?}", id),
+                        }
+                    }
+                    ResolvableIdentifier::Local(id) => {
+                        self.invalid_callee(id.span(), "local variables", "A local binding with this name is in scope, but no such function is declared in this module. Are you missing an import?")
+                    }
+                    ResolvableIdentifier::Global(id) => {
+                        self.invalid_callee(id.span(), "global declarations", "A global declaration with this name is in scope, but no such function is declared in this module. Are you missing an import?")
+                    }
+                    ResolvableIdentifier::Unresolved(_) => ControlFlow::Continue(()),
+                }
+            }
+            expr => {
+                self.invalid_constraint(expr.span(), "expected either an equality expression, or a call to an evaluator here")
+                    .with_note("Integrity constraints must be expressed as an equality, e.g. `a = 0`, or a call, e.g. `evaluator(a)`")
+                    .emit();
+                ControlFlow::Break(SemanticAnalysisError::Invalid)
+            }
+        }
+    }
+
+    fn declaration_import_conflict(
+        &self,
+        decl: SourceSpan,
+        import: SourceSpan,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        self.diagnostics
+            .diagnostic(Severity::Error)
+            .with_message("declaration conflicts with an imported item")
+            .with_primary_label(decl, "this name is already in use")
+            .with_secondary_label(import, "it was declared via this import")
+            .emit();
+        ControlFlow::Break(SemanticAnalysisError::NameConflict(decl))
+    }
+
+    fn warn_declaration_shadowed(&self, decl: SourceSpan, shadowed: SourceSpan) {
+        self.diagnostics
+            .diagnostic(Severity::Warning)
+            .with_message("declaration shadowed")
+            .with_primary_label(decl, "this binding shadows a previous declaration")
+            .with_secondary_label(shadowed, "previously declared here")
+            .emit();
+    }
+
+    fn invalid_callee(
+        &self,
+        span: SourceSpan,
+        invalid_items: &str,
+        note: &str,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        self.diagnostics
+            .diagnostic(Severity::Error)
+            .with_message("invalid callee")
+            .with_primary_label(span, format!("{invalid_items} are not callable"))
+            .with_note(note)
+            .emit();
+        ControlFlow::Break(SemanticAnalysisError::Invalid)
+    }
+
+    fn invalid_constraint(
+        &self,
+        span: SourceSpan,
+        label: impl ToString,
+    ) -> miden_diagnostics::InFlightDiagnostic<'_> {
+        self.diagnostics
+            .diagnostic(Severity::Error)
+            .with_message("invalid constraint")
+            .with_primary_label(span, label)
+    }
+
+    fn binding_mismatch(
+        &mut self,
+        inferred_type: &BindingType,
+        at: SourceSpan,
+        expected_type: &BindingType,
+        from: SourceSpan,
+        expected_by: SourceSpan,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        self.has_type_errors = true;
+        self.diagnostics
+            .diagnostic(Severity::Error)
+            .with_message("type mismatch")
+            .with_primary_label(at, format!("this binding is {inferred_type}"))
+            .with_secondary_label(from, "which was inferred from the this expression")
+            .with_secondary_label(expected_by, format!("but {expected_type} is expected here"))
+            .emit();
+        ControlFlow::Break(SemanticAnalysisError::Invalid)
+    }
+
+    fn type_mismatch(
+        &mut self,
+        inferred_type: Option<&Type>,
+        at: SourceSpan,
+        expected_type: &Type,
+        from: SourceSpan,
+        expected_by: SourceSpan,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        self.has_type_errors = true;
+        let primary_label = match inferred_type {
+            Some(t) => format!("this expression has type {}", t),
+            None => "the type of this expression is unknown".to_string(),
+        };
+        self.diagnostics
+            .diagnostic(Severity::Error)
+            .with_message("type mismatch")
+            .with_primary_label(at, primary_label)
+            .with_secondary_label(from, "which was inferred from the type of this expression")
+            .with_secondary_label(
+                expected_by,
+                format!(
+                    "but this expression expects it to have type {}",
+                    expected_type
+                ),
+            )
+            .emit();
+        ControlFlow::Break(SemanticAnalysisError::Invalid)
+    }
+
+    fn invalid_access_in_constraint(&mut self, span: SourceSpan, ty: &BindingType) {
+        self.has_type_errors = true;
+        let mode = self.constraint_mode;
+        self.diagnostics
+            .diagnostic(Severity::Error)
+            .with_message("invalid access")
+            .with_primary_label(span, format!("cannot access {ty} here"))
+            .with_note(format!(
+                "It is not allowed to access {ty} in {mode} constraints."
+            ))
+            .emit();
+    }
+
     fn expr_binding_type(&self, expr: &Expr) -> Result<BindingType, InvalidAccessError> {
         match expr {
             Expr::Const(constant) => Ok(BindingType::Local(constant.ty())),
@@ -1501,7 +1473,7 @@ impl<'a> SemanticAnalysis<'a> {
             Expr::Vector(ref elems) => {
                 let mut binding_tys = Vec::with_capacity(elems.len());
                 for elem in elems.iter() {
-                    binding_tys.push(self.scalar_expr_binding_type(elem)?);
+                    binding_tys.push(self.expr_binding_type(elem)?);
                 }
 
                 Ok(BindingType::Vector(binding_tys))
@@ -1525,20 +1497,6 @@ impl<'a> SemanticAnalysis<'a> {
                         self.expr_binding_type(&lc.iterables[0])
                     }
                 }
-            }
-        }
-    }
-
-    fn scalar_expr_binding_type(
-        &self,
-        expr: &ScalarExpr,
-    ) -> Result<BindingType, InvalidAccessError> {
-        match expr {
-            ScalarExpr::SymbolAccess(ref expr) => self.access_binding_type(expr),
-            ScalarExpr::Call(Call { ty: None, .. }) => Err(InvalidAccessError::InvalidBinding),
-            ScalarExpr::Call(Call { ty: Some(ty), .. }) => Ok(BindingType::Local(*ty)),
-            ScalarExpr::Const(_) | ScalarExpr::Binary(_) | ScalarExpr::BoundedSymbolAccess(_) => {
-                Ok(BindingType::Local(Type::Felt))
             }
         }
     }
@@ -1594,6 +1552,21 @@ impl<'a> SemanticAnalysis<'a> {
                 .get_key_value(&qid.item)
                 .map(|(k, v)| Span::new(k.span(), v.clone()))
                 .ok_or(InvalidAccessError::UndefinedVariable)
+        } else if qid.is_builtin() {
+            // If this is a builtin function, there is no definition,
+            // so we hardcode the type information here
+            match qid.name() {
+                symbols::Sum | symbols::Prod => {
+                    // NOTE: We're using `usize::MAX` elements to indicate a vector of any size, but we
+                    // should probably add this to the Type enum and handle it elsewhere. For the time
+                    // being, functions are not implemented, so the only place this comes up is with these
+                    // list folding builtins
+                    let folder_ty =
+                        FunctionType::Function(vec![Type::Vector(usize::MAX)], Type::Felt);
+                    Ok(Span::new(qid.span(), BindingType::Function(folder_ty)))
+                }
+                name => unimplemented!("unsupported builtin: {}", name),
+            }
         } else {
             // This is an imported item, and it must exist or we would have failed during
             // import resolution. It must also be a constant, as function identifiers are
