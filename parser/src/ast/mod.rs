@@ -68,16 +68,16 @@ pub struct Program {
     /// The name of an AirScript program is the name of its root module.
     pub name: Identifier,
     /// The set of used constants referenced in this program.
-    pub constants: HashMap<QualifiedIdentifier, Constant>,
+    pub constants: BTreeMap<QualifiedIdentifier, Constant>,
     /// The set of used evaluator functions referenced in this program.
     pub evaluators: BTreeMap<QualifiedIdentifier, EvaluatorFunction>,
     /// The set of used periodic columns referenced in this program.
-    pub periodic_columns: HashMap<QualifiedIdentifier, PeriodicColumn>,
+    pub periodic_columns: BTreeMap<QualifiedIdentifier, PeriodicColumn>,
     /// The set of public inputs defined in the root module
     ///
     /// NOTE: Public inputs are only visible in the root module, so we do
     /// not use [QualifiedIdentifier] as a key into this collection.
-    pub public_inputs: HashMap<Identifier, PublicInput>,
+    pub public_inputs: BTreeMap<Identifier, PublicInput>,
     /// The set of random values defined in the root module, if present
     pub random_values: Option<RandomValues>,
     /// The set of trace columns defined in the root module
