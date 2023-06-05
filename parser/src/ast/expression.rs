@@ -47,6 +47,11 @@ impl Identifier {
     pub fn is_generated(&self) -> bool {
         self.0.as_str().starts_with('%')
     }
+
+    /// Returns true if this identifier has the `$` prefix associated with special identifiers
+    pub fn is_special(&self) -> bool {
+        self.0.as_str().starts_with('$')
+    }
 }
 impl PartialEq<&str> for Identifier {
     #[inline]
