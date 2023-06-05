@@ -1,29 +1,29 @@
-///! This module provides AST structures which represent declarations permitted at module scope.
-///!
-///! There are no expressions/statements permitted in the top-level of a module, only declarations.
-///! These declarations define named items which are used by functions/constraints during evaluation.
-///!
-///! Some declarations introduce identifiers at global scope, i.e. they are implicitly defined in all
-///! modules regardless of imports. Currently, this is only the `random_values` section.
-///!
-///! Certain declarations are only permitted in the root module of an AirScript program, as they are
-///! also effectively global:
-///!
-///! * `trace_columns`
-///! * `public_inputs`
-///! * `random_values`
-///! * `boundary_constraints`
-///! * `integrity_constraints`
-///!
-///! All other declarations are module-scoped, and must be explicitly imported by a module which wishes
-///! to reference them. Not all items are importable however, only the following:
-///!
-///! * constants
-///! * evaluators
-///! * pure functions
-///!
-///! There is no notion of public/private visiblity, so any declaration of the above types may be
-///! imported into another module, and "wildcard" imports will import all importable items.
+//! This module provides AST structures which represent declarations permitted at module scope.
+//!
+//! There are no expressions/statements permitted in the top-level of a module, only declarations.
+//! These declarations define named items which are used by functions/constraints during evaluation.
+//!
+//! Some declarations introduce identifiers at global scope, i.e. they are implicitly defined in all
+//! modules regardless of imports. Currently, this is only the `random_values` section.
+//!
+//! Certain declarations are only permitted in the root module of an AirScript program, as they are
+//! also effectively global:
+//!
+//! * `trace_columns`
+//! * `public_inputs`
+//! * `random_values`
+//! * `boundary_constraints`
+//! * `integrity_constraints`
+//!
+//! All other declarations are module-scoped, and must be explicitly imported by a module which wishes
+//! to reference them. Not all items are importable however, only the following:
+//!
+//! * constants
+//! * evaluators
+//! * pure functions
+//!
+//! There is no notion of public/private visiblity, so any declaration of the above types may be
+//! imported into another module, and "wildcard" imports will import all importable items.
 use std::{collections::HashSet, fmt};
 
 use miden_diagnostics::{SourceSpan, Spanned};
