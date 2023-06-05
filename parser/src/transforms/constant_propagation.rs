@@ -1,14 +1,16 @@
-use std::{collections::HashMap, ops::ControlFlow};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::ControlFlow,
+};
 
-use miden_diagnostics::{SourceSpan, Span, Spanned};
+use air_pass::Pass;
+use miden_diagnostics::{DiagnosticsHandler, Span, Spanned};
 
-use crate::ast::{visit::VisitMut, *};
-
-#[derive(Debug, thiserror::Error)]
-pub enum InvalidConstantError {
-    #[error("this value is too large for an exponent")]
-    InvalidExponent(SourceSpan),
-}
+use crate::{
+    ast::{visit::VisitMut, *},
+    sema::{LexicalScope, SemanticAnalysisError},
+    symbols,
+};
 
 /// This pass performs constant propagation on a [Program], replacing all uses of a constant
 /// with the constant itself, converting accesses into constant aggregates with the accessed
@@ -18,28 +20,41 @@ pub enum InvalidConstantError {
 /// It is expected that the provided [Program] has already been run through semantic analysis,
 /// so it will panic if it encounters invalid constructions to help catch bugs in the semantic
 /// analysis pass, should they exist.
-#[derive(Default)]
-pub struct ConstantPropagator {
+pub struct ConstantPropagation<'a> {
+    #[allow(unused)]
+    diagnostics: &'a DiagnosticsHandler,
     global: HashMap<QualifiedIdentifier, Span<ConstantExpr>>,
-    local: HashMap<Identifier, Span<ConstantExpr>>,
+    local: LexicalScope<Identifier, Span<ConstantExpr>>,
+    /// The set of identifiers which are live (in use) in the current scope
+    live: HashSet<Identifier>,
     in_constraint_comprehension: bool,
 }
-impl ConstantPropagator {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self::default()
-    }
+impl<'p> Pass for ConstantPropagation<'p> {
+    type Input<'a> = Program;
+    type Output<'a> = Program;
+    type Error = SemanticAnalysisError;
 
-    pub fn run(mut self, program: &mut Program) -> Result<(), InvalidConstantError> {
+    fn run<'a>(&mut self, mut program: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
         self.global.reserve(program.constants.len());
 
-        match self.run_visitor(program) {
-            ControlFlow::Continue(()) => Ok(()),
+        match self.run_visitor(&mut program) {
+            ControlFlow::Continue(()) => Ok(program),
             ControlFlow::Break(err) => Err(err),
         }
     }
+}
+impl<'a> ConstantPropagation<'a> {
+    pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
+        Self {
+            diagnostics,
+            global: Default::default(),
+            local: Default::default(),
+            live: Default::default(),
+            in_constraint_comprehension: false,
+        }
+    }
 
-    fn run_visitor(&mut self, program: &mut Program) -> ControlFlow<InvalidConstantError> {
+    fn run_visitor(&mut self, program: &mut Program) -> ControlFlow<SemanticAnalysisError> {
         // Record all of the constant declarations
         for (name, constant) in program.constants.iter() {
             assert_eq!(
@@ -62,7 +77,7 @@ impl ConstantPropagator {
     fn try_fold_binary_expr(
         &mut self,
         expr: &mut BinaryExpr,
-    ) -> Result<Option<u64>, InvalidConstantError> {
+    ) -> Result<Option<Span<u64>>, SemanticAnalysisError> {
         // Visit operands first to ensure they are reduced to constants if possible
         if let ControlFlow::Break(err) = self.visit_mut_scalar_expr(expr.lhs.as_mut()) {
             return Err(err);
@@ -71,31 +86,15 @@ impl ConstantPropagator {
             return Err(err);
         }
         // If both operands are constant, fold
-        if let (ScalarExpr::Const(l), ScalarExpr::Const(r)) = (expr.lhs.as_mut(), expr.rhs.as_mut())
-        {
-            let folded = match expr.op {
-                BinaryOp::Add => l.item + r.item,
-                BinaryOp::Sub => l.item - r.item,
-                BinaryOp::Mul => l.item * r.item,
-                BinaryOp::Exp => match r.item.try_into() {
-                    Ok(exp) => l.item.pow(exp),
-                    Err(_) => return Err(InvalidConstantError::InvalidExponent(expr.span())),
-                },
-                // This op cannot be folded
-                BinaryOp::Eq => return Ok(None),
-            };
-            Ok(Some(folded))
-        } else {
-            Ok(None)
-        }
+        try_fold_binary_expr(expr).map_err(SemanticAnalysisError::InvalidExpr)
     }
 }
-impl VisitMut<InvalidConstantError> for ConstantPropagator {
+impl<'a> VisitMut<SemanticAnalysisError> for ConstantPropagation<'a> {
     /// Fold constant expressions
     fn visit_mut_scalar_expr(
         &mut self,
         expr: &mut ScalarExpr,
-    ) -> ControlFlow<InvalidConstantError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         match expr {
             // Expression is already folded
             ScalarExpr::Const(_) => ControlFlow::Continue(()),
@@ -123,31 +122,35 @@ impl VisitMut<InvalidConstantError> for ConstantPropagator {
                             AccessType::Index(idx) => {
                                 *expr = ScalarExpr::Const(Span::new(span, value[idx]));
                             }
-                            ref ty => panic!(
-                                "invalid constant reference, expected scalar access, got {:?}",
-                                ty
-                            ),
+                            // This access cannot be resolved here, so we need to record the fact
+                            // that there are still live uses of this binding
+                            _ => {
+                                self.live.insert(*sym.name.as_ref());
+                            }
                         },
                         ConstantExpr::Matrix(value) => match sym.access_type {
                             AccessType::Matrix(row, col) => {
                                 *expr = ScalarExpr::Const(Span::new(span, value[row][col]));
                             }
-                            ref ty => panic!(
-                                "invalid constant reference, expected scalar access, got {:?}",
-                                ty
-                            ),
+                            // This access cannot be resolved here, so we need to record the fact
+                            // that there are still live uses of this binding
+                            _ => {
+                                self.live.insert(*sym.name.as_ref());
+                            }
                         },
                     }
+                } else {
+                    // This value is not constant, so there are live uses of this symbol
+                    self.live.insert(*sym.name.as_ref());
                 }
                 ControlFlow::Continue(())
             }
             // Fold constant expressions
             ScalarExpr::Binary(ref mut binary_expr) => {
-                let span = binary_expr.span();
                 match self.try_fold_binary_expr(binary_expr) {
                     Ok(maybe_folded) => {
                         if let Some(folded) = maybe_folded {
-                            *expr = ScalarExpr::Const(Span::new(span, folded));
+                            *expr = ScalarExpr::Const(folded);
                         }
                         ControlFlow::Continue(())
                     }
@@ -161,7 +164,7 @@ impl VisitMut<InvalidConstantError> for ConstantPropagator {
         }
     }
 
-    fn visit_mut_expr(&mut self, expr: &mut Expr) -> ControlFlow<InvalidConstantError> {
+    fn visit_mut_expr(&mut self, expr: &mut Expr) -> ControlFlow<SemanticAnalysisError> {
         let span = expr.span();
         match expr {
             // Already constant
@@ -227,42 +230,101 @@ impl VisitMut<InvalidConstantError> for ConstantPropagator {
                             }
                         },
                     }
+                } else {
+                    // This reference is not constant, so we have to record a live use here
+                    self.live.insert(*access.name.as_ref());
+                }
+                ControlFlow::Continue(())
+            }
+            Expr::Call(ref mut call) if call.is_builtin() => {
+                self.visit_mut_call(call)?;
+                match call.callee.as_ref().name() {
+                    name @ (symbols::Sum | symbols::Prod) => {
+                        assert_eq!(call.args.len(), 1);
+                        if let Expr::Const(ref value) = &call.args[0] {
+                            let span = value.span();
+                            match &value.item {
+                                ConstantExpr::Vector(ref elems) => {
+                                    let folded = if name == symbols::Sum {
+                                        elems.iter().sum::<u64>()
+                                    } else {
+                                        elems.iter().product::<u64>()
+                                    };
+                                    *expr =
+                                        Expr::Const(Span::new(span, ConstantExpr::Scalar(folded)));
+                                }
+                                invalid => {
+                                    panic!("bad argument to list folding builtin: {:#?}", invalid)
+                                }
+                            }
+                        }
+                    }
+                    invalid => unimplemented!("unknown builtin function: {}", invalid),
                 }
                 ControlFlow::Continue(())
             }
             Expr::Call(ref mut call) => self.visit_mut_call(call),
-            Expr::Binary(ref mut binary_expr) => {
-                let span = binary_expr.span();
-                match self.try_fold_binary_expr(binary_expr) {
-                    Ok(maybe_folded) => {
-                        if let Some(folded) = maybe_folded {
-                            *expr = Expr::Const(Span::new(span, ConstantExpr::Scalar(folded)));
-                        }
-                        ControlFlow::Continue(())
+            Expr::Binary(ref mut binary_expr) => match self.try_fold_binary_expr(binary_expr) {
+                Ok(maybe_folded) => {
+                    if let Some(folded) = maybe_folded {
+                        *expr = Expr::Const(Span::new(
+                            folded.span(),
+                            ConstantExpr::Scalar(folded.item),
+                        ));
                     }
-                    Err(err) => ControlFlow::Break(err),
+                    ControlFlow::Continue(())
                 }
-            }
+                Err(err) => ControlFlow::Break(err),
+            },
             // Ranges are constant
             Expr::Range(_) => ControlFlow::Continue(()),
             // Visit vector elements, and promote the vector to `Expr::Const` if possible
             Expr::Vector(ref mut vector) => {
+                if vector.is_empty() {
+                    return ControlFlow::Continue(());
+                }
+
                 let mut is_constant = true;
                 for elem in vector.iter_mut() {
-                    self.visit_mut_scalar_expr(elem)?;
+                    self.visit_mut_expr(elem)?;
                     is_constant &= elem.is_constant();
                 }
+
                 if is_constant {
-                    let vector = ConstantExpr::Vector(
-                        vector
-                            .iter()
-                            .map(|sexpr| match sexpr {
-                                ScalarExpr::Const(elem) => elem.item,
-                                _ => unreachable!(),
-                            })
-                            .collect(),
-                    );
-                    *expr = Expr::Const(Span::new(span, vector));
+                    let ty = match vector.first().and_then(|e| e.ty()).unwrap() {
+                        Type::Felt => Type::Vector(vector.len()),
+                        Type::Vector(n) => Type::Matrix(vector.len(), n),
+                        _ => unreachable!(),
+                    };
+
+                    let new_expr = match ty {
+                        Type::Vector(_) => ConstantExpr::Vector(
+                            vector
+                                .iter()
+                                .map(|expr| match expr {
+                                    Expr::Const(Span {
+                                        item: ConstantExpr::Scalar(v),
+                                        ..
+                                    }) => *v,
+                                    _ => unreachable!(),
+                                })
+                                .collect(),
+                        ),
+                        Type::Matrix(_, _) => ConstantExpr::Matrix(
+                            vector
+                                .iter()
+                                .map(|expr| match expr {
+                                    Expr::Const(Span {
+                                        item: ConstantExpr::Vector(vs),
+                                        ..
+                                    }) => vs.clone(),
+                                    _ => unreachable!(),
+                                })
+                                .collect(),
+                        ),
+                        _ => unreachable!(),
+                    };
+                    *expr = Expr::Const(Span::new(span, new_expr));
                 }
                 ControlFlow::Continue(())
             }
@@ -310,7 +372,7 @@ impl VisitMut<InvalidConstantError> for ConstantPropagator {
                 }
 
                 // Start a new lexical scope
-                let prev = self.local.clone();
+                self.local.enter();
 
                 // All iterables must be the same length, so determine the number of
                 // steps based on the length of the first iterable
@@ -385,7 +447,7 @@ impl VisitMut<InvalidConstantError> for ConstantPropagator {
                 }
 
                 // Exit lexical scope
-                self.local = prev;
+                self.local.exit();
 
                 // If we reach here, the comprehension was expanded to a constant vector
                 *expr = Expr::Const(Span::new(span, ConstantExpr::Vector(folded)));
@@ -397,7 +459,7 @@ impl VisitMut<InvalidConstantError> for ConstantPropagator {
     fn visit_mut_statement_block(
         &mut self,
         statements: &mut Vec<Statement>,
-    ) -> ControlFlow<InvalidConstantError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         let mut current_statement = 0;
 
         let mut buffer = vec![];
@@ -415,7 +477,8 @@ impl VisitMut<InvalidConstantError> for ConstantPropagator {
                     // Visit the binding expression first
                     self.visit_mut_expr(&mut expr.value)?;
                     // Enter a new lexical scope
-                    let prev = self.local.clone();
+                    let prev_live = core::mem::take(&mut self.live);
+                    self.local.enter();
                     // If the value is constant, record it in our bindings map
                     let is_constant = expr.value.is_constant();
                     if is_constant {
@@ -441,12 +504,18 @@ impl VisitMut<InvalidConstantError> for ConstantPropagator {
                     // If this let is constant, then the binding is no longer
                     // used in the body after constant propagation, flatten its
                     // body into the current block.
-                    if is_constant {
+                    let is_live = self.live.contains(&expr.name);
+                    if is_constant && !is_live {
                         buffer.append(&mut expr.body);
                     }
 
+                    // Propagate liveness from the body of the let to its parent scope
+                    let mut live = core::mem::take(&mut self.live);
+                    live.remove(&expr.name);
+                    self.live = &prev_live | &live;
+
                     // Restore the previous scope
-                    self.local = prev;
+                    self.local.exit();
                 }
                 Statement::Enforce(ref mut expr) => {
                     self.visit_mut_enforce(expr)?;
@@ -456,6 +525,11 @@ impl VisitMut<InvalidConstantError> for ConstantPropagator {
                     self.visit_mut_list_comprehension(expr)?;
                     self.in_constraint_comprehension = false;
                 }
+                Statement::Expr(ref mut expr) => {
+                    self.visit_mut_expr(expr)?;
+                }
+                // This statement type is only present in the AST after inlining
+                Statement::EnforceIf(_, _) => unreachable!(),
             }
 
             // If we have a non-empty buffer, then we are collapsing a let into the current block,
@@ -480,7 +554,44 @@ impl VisitMut<InvalidConstantError> for ConstantPropagator {
     }
 
     /// It should not be possible to reach this, as we handle statements at the block level
-    fn visit_mut_statement(&mut self, _: &mut Statement) -> ControlFlow<InvalidConstantError> {
+    fn visit_mut_statement(&mut self, _: &mut Statement) -> ControlFlow<SemanticAnalysisError> {
         panic!("unexpectedly reached visit_mut_statement");
+    }
+}
+
+/// This function attempts to folds a binary operator expression into a constant value.
+///
+/// If the operands are both constant, the operator is applied, and if the result does not
+/// overflow/underflow, then `Ok(Some)` is returned with the result of the evaluation.
+///
+/// If the operands are not both constant, or the operation would overflow/underflow, then
+/// `Ok(None)` is returned.
+///
+/// If the operands are constant, or there is some validation error with the expression,
+/// `Err(InvalidExprError)` will be returned.
+pub(crate) fn try_fold_binary_expr(
+    expr: &BinaryExpr,
+) -> Result<Option<Span<u64>>, InvalidExprError> {
+    // If both operands are constant, fold
+    if let (ScalarExpr::Const(l), ScalarExpr::Const(r)) = (expr.lhs.as_ref(), expr.rhs.as_ref()) {
+        let folded = match expr.op {
+            BinaryOp::Add => l.item.checked_add(r.item),
+            BinaryOp::Sub => l.item.checked_sub(r.item),
+            BinaryOp::Mul => l.item.checked_mul(r.item),
+            BinaryOp::Exp => match r.item.try_into() {
+                Ok(exp) => l.item.checked_pow(exp),
+                Err(_) => return Err(InvalidExprError::InvalidExponent(expr.span())),
+            },
+            // This op cannot be folded
+            BinaryOp::Eq => return Ok(None),
+        };
+        Ok(folded.map(|v| Span::new(expr.span(), v)))
+    } else {
+        // If we observe a non-constant power in an exponentiation operation, raise an error
+        if expr.op == BinaryOp::Exp && !expr.rhs.is_constant() {
+            Err(InvalidExprError::NonConstantExponent(expr.rhs.span()))
+        } else {
+            Ok(None)
+        }
     }
 }
