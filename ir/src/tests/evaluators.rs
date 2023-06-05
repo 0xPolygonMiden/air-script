@@ -1,10 +1,10 @@
-use super::{parse, AirIR};
+use super::{compile, expect_diagnostic};
 
 #[test]
 fn simple_evaluator() {
     let source = "
+    def test
     ev advance_clock([clk]):
-        let z = a + 1
         enf clk' = clk + 1
     
     trace_columns:
@@ -19,14 +19,13 @@ fn simple_evaluator() {
     integrity_constraints:
         enf advance_clock([clk])";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn evaluator_with_variables() {
     let source = "
+    def test
     ev advance_clock([clk]):
         let z = clk + 1
         enf clk' = z
@@ -43,14 +42,13 @@ fn evaluator_with_variables() {
     integrity_constraints:
         enf advance_clock([clk])";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn evaluator_with_main_and_aux_cols() {
     let source = "
+    def test
     ev enforce_constraints([clk], [a, b]):
         let z = a + b
         enf clk' = clk + 1
@@ -69,14 +67,13 @@ fn evaluator_with_main_and_aux_cols() {
     integrity_constraints:
         enf enforce_constraints([clk], [a, b])";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn ev_call_with_aux_only() {
     let source = "
+    def test
     ev enforce_a([], [a, b]):
         enf a' = a + 1
     
@@ -93,14 +90,13 @@ fn ev_call_with_aux_only() {
     integrity_constraints:
         enf enforce_a([], [a, b])";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn ev_call_inside_evaluator_with_main() {
     let source = "
+    def test
     ev enforce_clk([clk]):
         enf clk' = clk + 1
     
@@ -119,14 +115,13 @@ fn ev_call_inside_evaluator_with_main() {
     integrity_constraints:
         enf enforce_all_constraints([clk])";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn ev_call_inside_evaluator_with_aux() {
     let source = "
+    def test
     ev enforce_clk([clk]):
         enf clk' = clk + 1
     
@@ -150,14 +145,13 @@ fn ev_call_inside_evaluator_with_aux() {
     integrity_constraints:
         enf enforce_all_constraints([clk], [a, b])";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn ev_fn_call_with_column_group() {
     let source = "
+    def test
     ev clk_selectors([selectors[3], clk]):
         enf (clk' - clk) * selectors[0] * selectors[1] * selectors[2] = 0
     
@@ -173,14 +167,13 @@ fn ev_fn_call_with_column_group() {
     integrity_constraints:
         enf clk_selectors([s, clk])";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn err_ev_fn_call_wrong_segment_columns() {
     let source = "
+    def test
     ev is_binary([x]):
         enf x^2 = x
     
@@ -197,7 +190,5 @@ fn err_ev_fn_call_wrong_segment_columns() {
     integrity_constraints:
         enf is_binary([c])";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "callee expects columns from the $main trace");
 }

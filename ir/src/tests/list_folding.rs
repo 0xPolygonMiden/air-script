@@ -1,8 +1,9 @@
-use super::{parse, AirIR};
+use super::compile;
 
 #[test]
 fn list_folding_on_const() {
     let source = "
+    def test
     const A = [1, 2, 3]
     trace_columns:
         main: [clk, fmp[2], ctx]
@@ -16,14 +17,13 @@ fn list_folding_on_const() {
         let y = prod(A)
         enf clk = y - x";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn list_folding_on_variable() {
     let source = "
+    def test
     trace_columns:
         main: [clk, fmp[2], ctx]
         aux: [a, b, c[4], d[4]]
@@ -37,14 +37,13 @@ fn list_folding_on_variable() {
         let z = prod(x)
         enf clk = z - y";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn list_folding_on_vector() {
     let source = "
+    def test
     trace_columns:
         main: [clk, fmp[2], ctx]
         aux: [a, b, c[4], d[4]]
@@ -57,14 +56,13 @@ fn list_folding_on_vector() {
         let y = prod([c[0], c[2], 2 * a])
         enf clk = y - x";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn list_folding_on_lc() {
     let source = "
+    def test
     const A = [1, 2, 3]
     trace_columns:
         main: [clk, fmp[2], ctx]
@@ -78,14 +76,13 @@ fn list_folding_on_lc() {
         let y = prod([c + d for (c, d) in (c, d)])    
         enf clk = y - x";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn list_folding_in_lc() {
     let source = "
+    def test
     trace_columns:
         main: [clk, fmp[4], ctx]
         aux: [a, b, c[4], d[4]]
@@ -100,8 +97,5 @@ fn list_folding_in_lc() {
         let y = [m + x for m in fmp]
         enf clk = y[0]";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }

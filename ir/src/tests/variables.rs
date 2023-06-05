@@ -1,8 +1,9 @@
-use super::{parse, AirIR};
+use super::{compile, expect_diagnostic};
 
 #[test]
-fn bc_scalar_variable() {
+fn let_scalar_constant_in_boundary_constraint() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -13,15 +14,13 @@ fn bc_scalar_variable() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
-fn bc_vector_variable() {
+fn let_vector_constant_in_boundary_constraint() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -32,15 +31,13 @@ fn bc_vector_variable() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
-fn bc_with_variables() {
+fn multi_constraint_nested_let_with_expressions_in_boundary_constraint() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -56,15 +53,13 @@ fn bc_with_variables() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
-fn bc_variable_in_both_domains() {
+fn let_scalar_constant_in_boundary_constraint_both_domains() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -76,15 +71,13 @@ fn bc_variable_in_both_domains() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
-fn err_bc_variable_ref_next() {
+fn invalid_column_offset_in_boundary_constraint() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -96,15 +89,13 @@ fn err_bc_variable_ref_next() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "invalid access of a trace column with offset");
 }
 
 #[test]
-fn ic_with_variables() {
+fn nested_let_with_expressions_in_integrity_constraint() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -118,15 +109,13 @@ fn ic_with_variables() {
         let c = [[clk' - clk, clk - a], [1 + 8, 2^2]]
         enf c[0][0] = 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
-fn ic_variables_access_vector_from_matrix() {
+fn nested_let_with_vector_access_in_integrity_constraint() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -142,17 +131,15 @@ fn ic_variables_access_vector_from_matrix() {
         let e = d
         enf clk' = c[0] + e[2][0] + e[0][1]";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
-fn err_ic_variables_vector_with_inlined_vector() {
+fn invalid_matrix_literal_with_leading_vector_binding() {
     // We can not parse matrix variable that consists of inlined vector and scalar elements.
     // VariableBinding `d` is parsed as a vector and can not contain inlined vectors.
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -165,14 +152,15 @@ fn err_ic_variables_vector_with_inlined_vector() {
         let d = [a[0], [3, 4]]
         enf clk' = d[0][0]";
 
-    parse(source).expect_err("Parsing failed");
+    expect_diagnostic(source, "expected one of: '\"!\"', '\"(\"', 'decl_ident_ref', 'function_identifier', 'identifier', 'int'");
 }
 
 #[test]
-fn err_ic_variables_matrix_with_vector_reference() {
+fn invalid_matrix_literal_with_trailing_vector_binding() {
     // We can not parse matrix variable that consists of inlined vector and scalar elements
     // VariableBinding `d` is parsed as a matrix and can not contain references to vectors.
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -185,12 +173,13 @@ fn err_ic_variables_matrix_with_vector_reference() {
         let d = [[3, 4], a[0]]
         enf clk' = d[0][0]";
 
-    parse(source).expect_err("Parsing failed");
+    expect_diagnostic(source, "expected one of: '\"[\"'");
 }
 
 #[test]
-fn err_bc_variable_access_before_declaration() {
+fn invalid_variable_access_before_declaration() {
     let source = "
+    def test
     const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
@@ -203,14 +192,13 @@ fn err_bc_variable_access_before_declaration() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "this variable is not defined");
 }
 
 #[test]
-fn err_ic_variable_access_before_declaration() {
+fn invalid_trailing_let() {
     let source = "
+    def test
     const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
@@ -223,14 +211,13 @@ fn err_ic_variable_access_before_declaration() {
         enf clk' = clk + a
         let a = 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
 }
 
 #[test]
-fn err_variable_def_in_other_section() {
+fn invalid_reference_to_variable_defined_in_other_section() {
     let source = "
+    def test
     const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
@@ -243,31 +230,13 @@ fn err_variable_def_in_other_section() {
     integrity_constraints:
         enf clk' = clk + a";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
-
-    let source = "
-    const A = [[2, 3], [1, 0]]
-    trace_columns:
-        main: [clk]
-    public_inputs:
-        stack_inputs: [16]
-    integrity_constraints:
-        let a = 1
-        enf clk' = clk + 1
-    boundary_constraints:
-        enf clk.first = 0
-        enf clk.last = a";
-
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "this variable is not defined");
 }
 
 #[test]
-fn err_bc_variable_vector_invalid_access() {
+fn invalid_vector_variable_access_out_of_bounds() {
     let source = "
+    def test
     const A = [[2, 3], [1, 0]]
     trace_columns:
         main: [clk]
@@ -280,34 +249,16 @@ fn err_bc_variable_vector_invalid_access() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
 }
 
 #[test]
-fn err_ic_variable_vector_invalid_access() {
+fn invalid_matrix_column_variable_access_out_of_bounds() {
     let source = "
-    const A = [[2, 3], [1, 0]]
-    trace_columns:
-        main: [clk]
-    public_inputs:
-        stack_inputs: [16]
-    boundary_constraints:
-        enf clk.first = 0
-        enf clk.last = 1
-    integrity_constraints:
-        let a = [1, 2]
-        enf clk' = clk + a[2]";
-
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
-}
-
-#[test]
-fn err_bc_variable_matrix_invalid_access() {
-    let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -319,11 +270,16 @@ fn err_bc_variable_matrix_invalid_access() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
+}
 
+#[test]
+fn invalid_matrix_row_variable_access_out_of_bounds() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -335,49 +291,16 @@ fn err_bc_variable_matrix_invalid_access() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
 }
 
 #[test]
-fn err_ic_variable_matrix_invalid_access() {
+fn invalid_index_into_scalar_variable() {
     let source = "
-    trace_columns:
-        main: [clk]
-    public_inputs:
-        stack_inputs: [16]
-    boundary_constraints:
-        enf clk.first = 0
-        enf clk.last = 1
-    integrity_constraints:
-        let a = [[1, 2, 3], [4, 5, 6]]
-        enf clk' = clk + a[1][3]";
-
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
-
-    let source = "
-    trace_columns:
-        main: [clk]
-    public_inputs:
-        stack_inputs: [16]
-    boundary_constraints:
-        enf clk.first = 0
-        enf clk.last = 1
-    integrity_constraints:
-        let a = [[1, 2, 3], [4, 5, 6]]
-        enf clk' = clk + a[2][0]";
-
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
-}
-
-#[test]
-fn err_ic_invalid_rand_access() {
-    let source = "
+    def test
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -394,15 +317,13 @@ fn err_ic_invalid_rand_access() {
         let a = $alphas[0]
         enf clk' = clk + a[0]";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "attempted to index into a scalar value");
 }
 
 #[test]
-fn ic_variable_trace_access() {
+fn trace_binding_access_in_integrity_constraint() {
     let source = "
+    def test
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -419,8 +340,5 @@ fn ic_variable_trace_access() {
         let a = x
         enf clk' = clk + a[0]";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
