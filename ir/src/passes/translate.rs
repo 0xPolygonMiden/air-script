@@ -166,7 +166,6 @@ impl<'a> AirBuilder<'a> {
                 let values = values
                     .item
                     .clone()
-                    .into_iter()
                     .map(|v| self.insert_constant(v as u64))
                     .collect();
                 self.bindings

@@ -487,8 +487,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for ConstantPropagation<'a> {
                                 self.local.insert(expr.name, value.clone());
                             }
                             Expr::Range(ref range) => {
-                                let vector =
-                                    range.item.clone().into_iter().map(|i| i as u64).collect();
+                                let vector = range.item.clone().map(|i| i as u64).collect();
                                 self.local.insert(
                                     expr.name,
                                     Span::new(range.span(), ConstantExpr::Vector(vector)),
