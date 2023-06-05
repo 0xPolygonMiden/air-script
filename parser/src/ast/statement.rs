@@ -53,6 +53,13 @@ impl Statement {
             Self::Let(Let { body, .. }) => body.iter().any(|s| s.has_constraints()),
         }
     }
+
+    pub fn display(&self, indent: usize) -> DisplayStatement<'_> {
+        DisplayStatement {
+            statement: self,
+            indent,
+        }
+    }
 }
 
 /// A `let` statement binds `name` to the value of `expr` in `body`.
