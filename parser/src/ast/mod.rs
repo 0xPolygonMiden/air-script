@@ -1,4 +1,5 @@
 mod declarations;
+mod display;
 mod errors;
 mod expression;
 mod module;
@@ -7,6 +8,7 @@ mod trace;
 pub mod visit;
 
 pub use self::declarations::*;
+pub(crate) use self::display::*;
 pub use self::errors::*;
 pub use self::expression::*;
 pub use self::module::*;
@@ -286,6 +288,90 @@ impl PartialEq for Program {
             && self.trace_columns == other.trace_columns
             && self.boundary_constraints == other.boundary_constraints
             && self.integrity_constraints == other.integrity_constraints
+    }
+}
+impl fmt::Display for Program {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "def {}\n", self.name)?;
+
+        writeln!(f, "trace_columns:")?;
+        for segment in self.trace_columns.iter() {
+            writeln!(f, "    {}", segment)?;
+        }
+        f.write_str("\n")?;
+
+        writeln!(f, "public_inputs:")?;
+        for public_input in self.public_inputs.values() {
+            writeln!(f, "    {}: [{}]", public_input.name, public_input.size)?;
+        }
+        f.write_str("\n")?;
+
+        if let Some(rv) = self.random_values.as_ref() {
+            writeln!(f, "random_values:")?;
+            writeln!(f, "    {}", rv)?;
+            f.write_str("\n")?;
+        }
+
+        if !self.periodic_columns.is_empty() {
+            writeln!(f, "periodic_columns:")?;
+            for (qid, column) in self.periodic_columns.iter() {
+                if qid.module == self.name {
+                    writeln!(
+                        f,
+                        "    {}: {}",
+                        &qid.item,
+                        DisplayList(column.values.as_slice())
+                    )?;
+                } else {
+                    writeln!(f, "    {}: {}", qid, DisplayList(column.values.as_slice()))?;
+                }
+            }
+            f.write_str("\n")?;
+        }
+
+        if !self.constants.is_empty() {
+            for (qid, constant) in self.constants.iter() {
+                if qid.module == self.name {
+                    writeln!(f, "    const {} = {}", &qid.item, &constant.value)?;
+                } else {
+                    writeln!(f, "    const {} = {}", qid, &constant.value)?;
+                }
+            }
+            f.write_str("\n")?;
+        }
+
+        writeln!(f, "boundary_constraints:")?;
+        for statement in self.boundary_constraints.iter() {
+            writeln!(f, "{}", statement.display(1))?;
+        }
+        f.write_str("\n")?;
+
+        writeln!(f, "integrity_constraints:")?;
+        for statement in self.integrity_constraints.iter() {
+            writeln!(f, "{}", statement.display(1))?;
+        }
+        f.write_str("\n")?;
+
+        for (qid, evaluator) in self.evaluators.iter() {
+            f.write_str("ev ")?;
+            if qid.module == self.name {
+                writeln!(
+                    f,
+                    "{}{}",
+                    &qid.item,
+                    DisplayTuple(evaluator.params.as_slice())
+                )?;
+            } else {
+                writeln!(f, "{}{}", qid, DisplayTuple(evaluator.params.as_slice()))?;
+            }
+
+            for statement in evaluator.body.iter() {
+                writeln!(f, "{}", statement.display(1))?;
+            }
+            f.write_str("\n")?;
+        }
+
+        Ok(())
     }
 }
 
