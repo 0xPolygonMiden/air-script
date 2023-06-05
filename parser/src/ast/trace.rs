@@ -208,8 +208,8 @@ impl<'a> fmt::Debug for FormatConstrainedFlags<'a> {
 pub struct TraceBinding {
     #[span]
     pub span: SourceSpan,
-    /// The name of this binding
-    pub name: Identifier,
+    /// The name of this binding, if applicable
+    pub name: Option<Identifier>,
     /// The id of the segment to which this binding belongs
     pub segment: TraceSegmentId,
     /// The offset to the first column of the segment which is bound by this binding
@@ -231,7 +231,7 @@ impl TraceBinding {
     ) -> Self {
         Self {
             span,
-            name,
+            name: Some(name),
             segment,
             offset,
             size,
