@@ -5,6 +5,7 @@ mod expression;
 mod module;
 mod statement;
 mod trace;
+mod types;
 pub mod visit;
 
 pub use self::declarations::*;
@@ -14,6 +15,7 @@ pub use self::expression::*;
 pub use self::module::*;
 pub use self::statement::*;
 pub use self::trace::*;
+pub use self::types::*;
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
