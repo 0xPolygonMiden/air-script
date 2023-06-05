@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
@@ -51,11 +51,11 @@ pub struct Module {
     pub span: SourceSpan,
     pub name: ModuleId,
     pub ty: ModuleType,
-    pub imports: HashMap<ModuleId, Import>,
-    pub constants: HashMap<Identifier, Constant>,
+    pub imports: BTreeMap<ModuleId, Import>,
+    pub constants: BTreeMap<Identifier, Constant>,
     pub evaluators: BTreeMap<Identifier, EvaluatorFunction>,
-    pub periodic_columns: HashMap<Identifier, PeriodicColumn>,
-    pub public_inputs: HashMap<Identifier, PublicInput>,
+    pub periodic_columns: BTreeMap<Identifier, PeriodicColumn>,
+    pub public_inputs: BTreeMap<Identifier, PublicInput>,
     pub random_values: Option<RandomValues>,
     pub trace_columns: Vec<TraceSegment>,
     pub boundary_constraints: Option<Span<Vec<Statement>>>,
@@ -76,11 +76,11 @@ impl Module {
             span,
             name,
             ty,
-            imports: HashMap::default(),
-            constants: HashMap::default(),
-            evaluators: BTreeMap::default(),
-            periodic_columns: HashMap::default(),
-            public_inputs: HashMap::default(),
+            imports: Default::default(),
+            constants: Default::default(),
+            evaluators: Default::default(),
+            periodic_columns: Default::default(),
+            public_inputs: Default::default(),
             random_values: None,
             trace_columns: vec![],
             boundary_constraints: None,

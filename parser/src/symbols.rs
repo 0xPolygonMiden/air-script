@@ -24,6 +24,10 @@ pub mod predefined {
     pub const Sum: Symbol = Symbol::new(3);
     /// The symbol `prod`
     pub const Prod: Symbol = Symbol::new(4);
+    /// The symbol `program_hash`
+    pub const ProgramHash: Symbol = Symbol::new(5);
+    /// The symbol `stack_inputs`
+    pub const StackInputs: Symbol = Symbol::new(6);
 
     pub(super) const __SYMBOLS: &[(Symbol, &str)] = &[
         (Main, "$main"),
@@ -31,6 +35,8 @@ pub mod predefined {
         (Builtin, "$builtin"),
         (Sum, "sum"),
         (Prod, "prod"),
+        (ProgramHash, "program_hash"),
+        (StackInputs, "stack_inputs"),
     ];
 }
 
