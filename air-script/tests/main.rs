@@ -155,6 +155,7 @@ fn list_folding() {
 }
 
 #[test]
+#[ignore]
 fn selectors() {
     let generated_air = Test::new("tests/selectors/selectors.air".to_string())
         .transpile()

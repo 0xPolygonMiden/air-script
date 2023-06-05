@@ -1,12 +1,13 @@
-use clap::Args;
 use std::{fs, path::PathBuf, sync::Arc};
 
+use air_ir::CompileError;
+use air_pass::Pass;
+
+use clap::Args;
 use codegen_winter::CodeGenerator;
-use ir::AirIR;
 use miden_diagnostics::{
     term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
 };
-use parser::{ast::Source, Parser};
 
 #[derive(Args)]
 pub struct Transpile {
@@ -39,35 +40,37 @@ impl Transpile {
         let codemap = Arc::new(CodeMap::new());
         let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
         let diagnostics = DiagnosticsHandler::new(Default::default(), codemap.clone(), emitter);
-        let parser = Parser::new((), codemap);
 
         // Parse from file to internal representation
-        let parsed = match parser.parse_file::<Source, _, _>(&diagnostics, input_path) {
-            Ok(ast) => ast,
+        let air = air_parser::parse_file(&diagnostics, codemap, input_path)
+            .map_err(CompileError::Parse)
+            .and_then(|ast| {
+                let mut pipeline = air_parser::transforms::ConstantPropagation::new(&diagnostics)
+                    .chain(air_parser::transforms::Inlining::new(&diagnostics))
+                    .chain(air_ir::passes::AstToAir::new(&diagnostics));
+                pipeline.run(ast)
+            });
+
+        match air {
+            Ok(air) => {
+                // generate Rust code targeting Winterfell
+                let codegen = CodeGenerator::new(&air);
+
+                // write transpiled output to the output path
+                let result = fs::write(output_path.clone(), codegen.generate());
+                if let Err(err) = result {
+                    return Err(format!("{err:?}"));
+                }
+
+                println!("Success! Transpiled to {}", output_path.display());
+                println!("============================================================");
+
+                Ok(())
+            }
             Err(err) => {
                 diagnostics.emit(err);
-                return Err("parsing failed".into());
+                Err("compilation failed".into())
             }
-        };
-
-        let ir = AirIR::new(parsed);
-        if let Err(err) = ir {
-            return Err(format!("{err:?}"));
         }
-        let ir = ir.unwrap();
-
-        // generate Rust code targeting Winterfell
-        let codegen = CodeGenerator::new(&ir);
-
-        // write transpiled output to the output path
-        let result = fs::write(output_path.clone(), codegen.generate());
-        if let Err(err) = result {
-            return Err(format!("{err:?}"));
-        }
-
-        println!("Success! Transpiled to {}", output_path.display());
-        println!("============================================================");
-
-        Ok(())
     }
 }
