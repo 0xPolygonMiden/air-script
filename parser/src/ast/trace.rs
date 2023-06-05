@@ -40,7 +40,18 @@ impl TraceSegment {
         let mut offset = 0;
         for binding in raw_bindings.into_iter() {
             let (name, size) = binding.item;
-            bindings.push(TraceBinding::new(binding.span(), name, id, offset, size));
+            let ty = match size {
+                1 => Type::Felt,
+                n => Type::Vector(n),
+            };
+            bindings.push(TraceBinding::new(
+                binding.span(),
+                name,
+                id,
+                offset,
+                size,
+                ty,
+            ));
             offset += size;
         }
 
@@ -205,6 +216,8 @@ pub struct TraceBinding {
     pub offset: usize,
     /// The number of columns which are bound
     pub size: usize,
+    /// The effective type of this binding
+    pub ty: Type,
 }
 impl TraceBinding {
     /// Creates a new trace binding.
@@ -214,6 +227,7 @@ impl TraceBinding {
         segment: TraceSegmentId,
         offset: usize,
         size: usize,
+        ty: Type,
     ) -> Self {
         Self {
             span,
@@ -221,41 +235,47 @@ impl TraceBinding {
             segment,
             offset,
             size,
+            ty,
         }
     }
 
     /// Returns a [Type] that describes what type of value this binding represents
+    #[inline]
     pub fn ty(&self) -> Type {
-        if self.size == 1 {
-            Type::Felt
-        } else {
-            Type::Vector(self.size)
-        }
+        self.ty
+    }
+
+    #[inline]
+    pub fn is_scalar(&self) -> bool {
+        self.ty.is_scalar()
     }
 
     /// Derive a new [TraceBinding] derived from the current one given an [AccessType]
     pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
         match access_type {
             AccessType::Default => Ok(*self),
-            AccessType::Slice(_) if self.size == 1 => Err(InvalidAccessError::SliceOfScalar),
+            AccessType::Slice(_) if self.is_scalar() => Err(InvalidAccessError::SliceOfScalar),
             AccessType::Slice(range) if range.end > self.size => {
                 Err(InvalidAccessError::IndexOutOfBounds)
             }
             AccessType::Slice(range) => {
                 let offset = self.offset + range.start;
+                let size = range.end - range.start;
                 Ok(Self {
                     offset,
-                    size: range.end - range.start,
+                    size,
+                    ty: Type::Vector(size),
                     ..*self
                 })
             }
-            AccessType::Index(_) if self.size == 1 => Err(InvalidAccessError::IndexIntoScalar),
+            AccessType::Index(_) if self.is_scalar() => Err(InvalidAccessError::IndexIntoScalar),
             AccessType::Index(idx) if idx >= self.size => Err(InvalidAccessError::IndexOutOfBounds),
             AccessType::Index(idx) => {
                 let offset = self.offset + idx;
                 Ok(Self {
                     offset,
                     size: 1,
+                    ty: Type::Felt,
                     ..*self
                 })
             }
@@ -270,6 +290,7 @@ impl PartialEq for TraceBinding {
             && self.name == other.name
             && self.offset == other.offset
             && self.size == other.size
+            && self.ty == other.ty
     }
 }
 impl fmt::Debug for TraceBinding {

@@ -339,7 +339,11 @@ impl RandomValues {
         let mut offset = 0;
         for binding in raw_bindings.into_iter() {
             let (name, size) = binding.item;
-            bindings.push(RandBinding::new(binding.span(), name, size, offset));
+            let ty = match size {
+                1 => Type::Felt,
+                n => Type::Vector(n),
+            };
+            bindings.push(RandBinding::new(binding.span(), name, size, offset, ty));
             offset += size;
         }
 
@@ -394,48 +398,62 @@ pub struct RandBinding {
     pub size: usize,
     /// The offset in the random values array where this binding begins
     pub offset: usize,
+    /// The type of this binding
+    pub ty: Type,
 }
 impl RandBinding {
-    pub const fn new(span: SourceSpan, name: Identifier, size: usize, offset: usize) -> Self {
+    pub const fn new(
+        span: SourceSpan,
+        name: Identifier,
+        size: usize,
+        offset: usize,
+        ty: Type,
+    ) -> Self {
         Self {
             span,
             name,
             size,
             offset,
+            ty,
         }
     }
 
     #[inline]
     pub fn ty(&self) -> Type {
-        match self.size {
-            1 => Type::Felt,
-            n => Type::Vector(n),
-        }
+        self.ty
+    }
+
+    #[inline]
+    pub fn is_scalar(&self) -> bool {
+        self.ty.is_scalar()
     }
 
     /// Derive a new [RandBinding] derived from the current one given an [AccessType]
     pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
         match access_type {
             AccessType::Default => Ok(*self),
-            AccessType::Slice(_) if self.size == 1 => Err(InvalidAccessError::SliceOfScalar),
+            AccessType::Slice(_) if self.is_scalar() => Err(InvalidAccessError::SliceOfScalar),
             AccessType::Slice(range) if range.end > self.size => {
                 Err(InvalidAccessError::IndexOutOfBounds)
             }
             AccessType::Slice(range) => {
                 let offset = self.offset + range.start;
+                let size = range.end - range.start;
                 Ok(Self {
                     offset,
-                    size: range.end - range.start,
+                    size,
+                    ty: Type::Vector(size),
                     ..*self
                 })
             }
-            AccessType::Index(_) if self.size == 1 => Err(InvalidAccessError::IndexIntoScalar),
+            AccessType::Index(_) if self.is_scalar() => Err(InvalidAccessError::IndexIntoScalar),
             AccessType::Index(idx) if idx >= self.size => Err(InvalidAccessError::IndexOutOfBounds),
             AccessType::Index(idx) => {
                 let offset = self.offset + idx;
                 Ok(Self {
                     offset,
                     size: 1,
+                    ty: Type::Felt,
                     ..*self
                 })
             }
@@ -446,7 +464,10 @@ impl RandBinding {
 impl Eq for RandBinding {}
 impl PartialEq for RandBinding {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.size == other.size && self.offset == other.offset
+        self.name == other.name
+            && self.size == other.size
+            && self.offset == other.offset
+            && self.ty == other.ty
     }
 }
 impl fmt::Debug for RandBinding {
@@ -455,6 +476,7 @@ impl fmt::Debug for RandBinding {
             .field("name", &self.name)
             .field("size", &self.size)
             .field("offset", &self.offset)
+            .field("ty", &self.ty)
             .finish()
     }
 }
