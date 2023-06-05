@@ -600,6 +600,7 @@ mod constant_propagation;
 mod constants;
 mod evaluators;
 mod identifiers;
+mod inlining;
 mod integrity_constraints;
 mod list_comprehension;
 mod modules;
