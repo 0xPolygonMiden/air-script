@@ -163,6 +163,16 @@ macro_rules! access {
         })
     };
 
+    ($name:literal, $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ResolvableIdentifier::Local(ident!($name)),
+            access_type: AccessType::Default,
+            offset: 0,
+            ty: Some($ty),
+        })
+    };
+
     ($name:ident [ $idx:literal ]) => {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
@@ -406,8 +416,12 @@ macro_rules! constant {
 }
 
 macro_rules! vector {
+    ($($value:literal),*) => {
+        Expr::Const(miden_diagnostics::Span::new(miden_diagnostics::SourceSpan::UNKNOWN, ConstantExpr::Vector(vec![$($value),*])))
+    };
+
     ($($value:expr),*) => {
-        Expr::Vector(miden_diagnostics::Span::new(miden_diagnostics::SourceSpan::UNKNOWN, vec![$($value),*]))
+        Expr::Vector(miden_diagnostics::Span::new(miden_diagnostics::SourceSpan::UNKNOWN, vec![$(expr!($value)),*]))
     }
 }
 
@@ -421,11 +435,19 @@ macro_rules! let_ {
     ($name:ident = $value:expr => $($body:expr),+) => {
         Statement::Let(Let::new(miden_diagnostics::SourceSpan::UNKNOWN, ident!($name), $value, vec![$($body),+]))
     };
+
+    ($name:literal = $value:expr => $($body:expr),+) => {
+        Statement::Let(Let::new(miden_diagnostics::SourceSpan::UNKNOWN, ident!($name), $value, vec![$($body),+]))
+    };
 }
 
 macro_rules! enforce {
     ($expr:expr) => {
         Statement::Enforce($expr)
+    };
+
+    ($expr:expr, when $selector:expr) => {
+        Statement::EnforceIf($expr, $selector)
     };
 }
 
