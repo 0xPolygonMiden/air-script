@@ -170,8 +170,16 @@ pub trait VisitMut<T> {
     fn visit_mut_enforce(&mut self, expr: &mut ast::ScalarExpr) -> ControlFlow<T> {
         visit_mut_scalar_expr(self, expr)
     }
+    fn visit_mut_enforce_if(
+        &mut self,
+        expr: &mut ast::ScalarExpr,
+        selector: &mut ast::ScalarExpr,
+    ) -> ControlFlow<T> {
+        self.visit_mut_enforce(expr)?;
+        self.visit_mut_scalar_expr(selector)
+    }
     fn visit_mut_enforce_all(&mut self, expr: &mut ast::ListComprehension) -> ControlFlow<T> {
-        visit_mut_list_comprehension(self, expr)
+        self.visit_mut_list_comprehension(expr)
     }
     fn visit_mut_integrity_constraints(
         &mut self,
@@ -290,6 +298,13 @@ where
     fn visit_mut_enforce(&mut self, expr: &mut ast::ScalarExpr) -> ControlFlow<T> {
         (**self).visit_mut_enforce(expr)
     }
+    fn visit_mut_enforce_if(
+        &mut self,
+        expr: &mut ast::ScalarExpr,
+        selector: &mut ast::ScalarExpr,
+    ) -> ControlFlow<T> {
+        (**self).visit_mut_enforce_if(expr, selector)
+    }
     fn visit_mut_enforce_all(&mut self, expr: &mut ast::ListComprehension) -> ControlFlow<T> {
         (**self).visit_mut_enforce_all(expr)
     }
@@ -404,7 +419,10 @@ pub fn visit_mut_trace_binding<V, T>(
 where
     V: ?Sized + VisitMut<T>,
 {
-    visitor.visit_mut_identifier(&mut expr.name)
+    if let Some(name) = expr.name.as_mut() {
+        visitor.visit_mut_identifier(name)?;
+    }
+    ControlFlow::Continue(())
 }
 
 pub fn visit_mut_evaluator_function<V, T>(
@@ -441,7 +459,10 @@ pub fn visit_mut_evaluator_trace_binding<V, T>(
 where
     V: ?Sized + VisitMut<T>,
 {
-    visitor.visit_mut_identifier(&mut expr.name)
+    if let Some(name) = expr.name.as_mut() {
+        visitor.visit_mut_identifier(name)?;
+    }
+    ControlFlow::Continue(())
 }
 
 pub fn visit_mut_periodic_column<V, T>(
@@ -504,7 +525,11 @@ where
     match expr {
         ast::Statement::Let(ref mut expr) => visitor.visit_mut_let(expr),
         ast::Statement::Enforce(ref mut expr) => visitor.visit_mut_enforce(expr),
+        ast::Statement::EnforceIf(ref mut expr, ref mut selector) => {
+            visitor.visit_mut_enforce_if(expr, selector)
+        }
         ast::Statement::EnforceAll(ref mut expr) => visitor.visit_mut_enforce_all(expr),
+        ast::Statement::Expr(ref mut expr) => visitor.visit_mut_expr(expr),
     }
 }
 
@@ -528,7 +553,7 @@ where
         ast::Expr::Const(_) | ast::Expr::Range(_) => ControlFlow::Continue(()),
         ast::Expr::Vector(ref mut exprs) => {
             for expr in exprs.iter_mut() {
-                visitor.visit_mut_scalar_expr(expr)?;
+                visitor.visit_mut_expr(expr)?;
             }
             ControlFlow::Continue(())
         }
