@@ -3,10 +3,14 @@ use std::collections::HashSet;
 
 use miden_diagnostics::{CodeMap, DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
-use crate::ast::*;
-use crate::lexer::Token;
-use crate::parser::ParseError;
-use crate::{symbols, Symbol};
+use crate::{
+    ast::*,
+    lexer::Token,
+    parser::ParseError,
+    sema::SemanticAnalysisError,
+    symbols,
+    Symbol
+};
 
 grammar(diagnostics: &DiagnosticsHandler, codemap: &Arc<CodeMap>, next_var: &mut usize);
 
@@ -54,14 +58,14 @@ pub AnyModule: Module = {
 Root: Module = {
     <l:@L> "def" <name:Identifier> <decls:Declaration*> <r:@R> =>? {
         Module::from_declarations(diagnostics, ModuleType::Root, span!(l, r), name, decls)
-            .map_err(|err| ParseError::InvalidModule(err).into())
+            .map_err(|err| ParseError::Analysis(err).into())
     }
 }
 
 Module: Module = {
     <l:@L> "mod" <name:Identifier> <decls:Declaration*> <r:@R> =>? {
         Module::from_declarations(diagnostics, ModuleType::Library, span!(l, r), name, decls)
-            .map_err(|err| ParseError::InvalidModule(err).into())
+            .map_err(|err| ParseError::Analysis(err).into())
     }
 }
 
@@ -362,7 +366,7 @@ Expr: Expr = {
     <ScalarExpr> =>? {
         match Expr::try_from(<>) {
             Ok(expr) => Ok(expr),
-            Err(err) => Err(ParseError::from(err).into())
+            Err(err) => Err(ParseError::from(SemanticAnalysisError::InvalidExpr(err)).into())
         }
     },
     <l:@L> <value:Vector<ScalarExpr>> <r:@R> => Expr::Vector(Span::new(span!(l, r), value)),
@@ -455,7 +459,7 @@ ConstraintComprehension<T>: ComprehensionContext = {
                 .with_message("bindings and iterables lengths are mismatched")
                 .with_primary_label(span!(l, r), "in this comprehension")
                 .emit();
-            Err(ParseError::InvalidModule(ModuleError::Invalid).into())
+            Err(ParseError::Analysis(SemanticAnalysisError::Invalid).into())
         } else {
             Ok(members.into_iter().zip(iterables).collect::<Vec<_>>())
         }
@@ -468,7 +472,7 @@ ListComprehension<T>: ListComprehension = {
                 .with_message("bindings and iterables lengths are mismatched")
                 .with_primary_label(span!(l, r), "in this comprehension")
                 .emit();
-            Err(ParseError::InvalidModule(ModuleError::Invalid).into())
+            Err(ParseError::Analysis(SemanticAnalysisError::Invalid).into())
         } else {
             Ok(ListComprehension::new(span!(l, r), expr, members.into_iter().zip(iterables).collect::<Vec<_>>(), None))
         }

@@ -21,8 +21,11 @@ use miden_diagnostics::{
 };
 use miden_parsing::{Scanner, Source};
 
-use crate::ast;
-use crate::lexer::{Lexed, Lexer, LexicalError, Token};
+use crate::{
+    ast,
+    lexer::{Lexed, Lexer, LexicalError, Token},
+    sema,
+};
 
 pub type Parser = miden_parsing::Parser<()>;
 
@@ -31,9 +34,7 @@ pub enum ParseError {
     #[error(transparent)]
     Lexer(#[from] LexicalError),
     #[error(transparent)]
-    InvalidModule(#[from] ast::ModuleError),
-    #[error(transparent)]
-    InvalidExpr(#[from] ast::InvalidExprError),
+    Analysis(#[from] sema::SemanticAnalysisError),
     #[error("error reading {path:?}: {source}")]
     FileError {
         source: std::io::Error,
@@ -62,8 +63,7 @@ impl PartialEq for ParseError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Lexer(l), Self::Lexer(r)) => l == r,
-            (Self::InvalidModule(l), Self::InvalidModule(r)) => l == r,
-            (Self::InvalidExpr(l), Self::InvalidExpr(r)) => l == r,
+            (Self::Analysis(l), Self::Analysis(r)) => l == r,
             (Self::FileError { .. }, Self::FileError { .. }) => true,
             (Self::InvalidToken(_), Self::InvalidToken(_)) => true,
             (
@@ -124,8 +124,7 @@ impl ToDiagnostic for ParseError {
     fn to_diagnostic(self) -> Diagnostic {
         match self {
             Self::Lexer(err) => err.to_diagnostic(),
-            Self::InvalidModule(err) => err.to_diagnostic(),
-            Self::InvalidExpr(err) => err.to_diagnostic(),
+            Self::Analysis(err) => err.to_diagnostic(),
             Self::InvalidToken(start) => Diagnostic::error()
                 .with_message("invalid token")
                 .with_labels(vec![Label::primary(
