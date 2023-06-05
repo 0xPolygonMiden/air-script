@@ -323,7 +323,13 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
             assert_eq!(
                 self.globals.insert(
                     rv.name,
-                    BindingType::RandomValue(RandBinding::new(rv.name.span(), rv.name, rv.size, 0))
+                    BindingType::RandomValue(RandBinding::new(
+                        rv.name.span(),
+                        rv.name,
+                        rv.size,
+                        0,
+                        Type::Vector(rv.size)
+                    ))
                 ),
                 None
             );
@@ -344,11 +350,13 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
                 assert_eq!(
                     self.locals.insert(
                         NamespacedIdentifier::Binding(segment.name),
-                        BindingType::TraceColumn(TraceRef {
-                            span: segment.name.span(),
+                        BindingType::TraceColumn(TraceBinding {
+                            span: segment.span(),
                             segment: segment.id,
-                            index: 0,
-                            size: segment.size
+                            name: Some(segment.name),
+                            offset: 0,
+                            size: segment.size,
+                            ty: Type::Vector(segment.size),
                         })
                     ),
                     None
@@ -356,12 +364,14 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
                 for binding in segment.bindings.iter().copied() {
                     assert_eq!(
                         self.locals.insert(
-                            NamespacedIdentifier::Binding(binding.name),
-                            BindingType::TraceColumn(TraceRef {
+                            NamespacedIdentifier::Binding(binding.name.unwrap()),
+                            BindingType::TraceColumn(TraceBinding {
                                 span: segment.name.span(),
                                 segment: segment.id,
-                                index: binding.offset,
+                                name: binding.name,
+                                offset: binding.offset,
                                 size: binding.size,
+                                ty: binding.ty,
                             })
                         ),
                         None
@@ -532,11 +542,13 @@ impl<'a> VisitMut<ModuleError> for SemanticAnalysis<'a> {
                 }
                 self.locals.insert(
                     namespaced_name,
-                    BindingType::TraceParam(TraceRef {
+                    BindingType::TraceParam(TraceBinding {
                         span: trace_binding.span,
+                        name: Some(name),
                         segment: trace_segment.id,
-                        index: trace_binding.offset,
+                        offset: trace_binding.offset,
                         size: trace_binding.size,
+                        ty: trace_binding.ty,
                     }),
                 );
             }
