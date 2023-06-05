@@ -1,8 +1,9 @@
+use air_pass::Pass;
 use miden_diagnostics::SourceSpan;
 
 use pretty_assertions::assert_eq;
 
-use crate::{ast::*, transforms::ConstantPropagator};
+use crate::{ast::*, transforms::ConstantPropagation};
 
 use super::ParseTest;
 
@@ -48,7 +49,7 @@ fn test_constant_propagation() {
     let path = std::env::current_dir().unwrap().join("lib.air");
     test.add_virtual_file(path, lib.to_string());
 
-    let mut program = match test.parse_program(root) {
+    let program = match test.parse_program(root) {
         Err(err) => {
             test.diagnostics.emit(err);
             panic!("expected parsing to succeed, see diagnostics for details");
@@ -56,8 +57,8 @@ fn test_constant_propagation() {
         Ok(ast) => ast,
     };
 
-    let pass = ConstantPropagator::new();
-    pass.run(&mut program).unwrap();
+    let mut pass = ConstantPropagation::new(&test.diagnostics);
+    let program = pass.run(program).unwrap();
 
     let mut expected = Program::new(ident!(root));
     expected.trace_columns.push(trace_segment!(
