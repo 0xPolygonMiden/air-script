@@ -1,3 +1,3 @@
 mod constant_propagation;
 
-pub use self::constant_propagation::{ConstantPropagator, InvalidConstantError};
+pub use self::constant_propagation::ConstantPropagation;
