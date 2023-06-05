@@ -104,6 +104,22 @@ impl fmt::Debug for TraceSegment {
             .finish()
     }
 }
+impl fmt::Display for TraceSegment {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if !self.name.is_generated() {
+            if let Some(name) = self.name.as_str().strip_prefix('$') {
+                write!(f, "{}: ", name)?;
+            } else {
+                write!(f, "{}: ", self.name)?;
+            }
+        }
+        if self.bindings.is_empty() {
+            write!(f, "[{}]", self.size)
+        } else {
+            write!(f, "{}", DisplayList(self.bindings.as_slice()))
+        }
+    }
+}
 impl Eq for TraceSegment {}
 impl PartialEq for TraceSegment {
     fn eq(&self, other: &Self) -> bool {
@@ -263,49 +279,25 @@ impl fmt::Debug for TraceBinding {
             .field("segment", &self.segment)
             .field("offset", &self.offset)
             .field("size", &self.size)
+            .field("ty", &self.ty)
             .finish()
     }
 }
-
-/// [TraceAccess] is like [SymbolAccess], but is used to describe an access to a specific trace column or columns.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TraceAccess {
-    /// The trace segment being accessed
-    pub segment: TraceSegmentId,
-    /// The index of the first column at which the access begins
-    pub column: TraceColumnIndex,
-    /// The number of columns being accessed
-    pub size: usize,
-    /// The offset from the current row.
-    ///
-    /// Defaults to 0, which indicates no offset/the current row.
-    ///
-    /// For example, if accessing a trace column with `a'`, where `a` is bound to a single column,
-    /// the row offset would be `1`, as the `'` modifier indicates the "next" row.
-    pub row_offset: usize,
-}
-impl TraceAccess {
-    /// Creates a new [TraceAccess].
-    pub const fn new(
-        segment: TraceSegmentId,
-        column: TraceColumnIndex,
-        size: usize,
-        row_offset: usize,
-    ) -> Self {
-        Self {
-            segment,
-            column,
-            size,
-            row_offset,
-        }
-    }
-
-    /// Creates a new [TraceAccess] with a new column index that is updated according to the
-    /// provided offsets. All other data is left unchanged.
-    pub fn clone_with_offsets(&self, offsets: &[Vec<usize>]) -> Self {
-        Self {
-            column: offsets[self.segment][self.column],
-            ..*self
+impl fmt::Display for TraceBinding {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.size == 1 {
+            write!(
+                f,
+                "{}",
+                self.name.as_ref().map(|n| n.as_str()).unwrap_or("?")
+            )
+        } else {
+            write!(
+                f,
+                "{}[{}]",
+                self.name.as_ref().map(|n| n.as_str()).unwrap_or("?"),
+                self.size
+            )
         }
     }
 }
