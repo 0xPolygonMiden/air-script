@@ -1,7 +1,8 @@
-use super::{
-    AccessType, AirIR, ElemType, IntegrityConstraintDegree, NodeIndex, Operation, TraceAccess,
-    Value,
+use air_ir::{
+    Air, IntegrityConstraintDegree, NodeIndex, Operation, TraceAccess, TraceSegmentId, Value,
 };
+
+use super::ElemType;
 
 // RUST STRING GENERATION FOR THE CONSTRAINT GRAPH
 // ================================================================================================
@@ -10,11 +11,11 @@ use super::{
 /// the [AlgebraicGraph].
 /// TODO: replace panics with errors
 pub trait Codegen {
-    fn to_string(&self, ir: &AirIR, elem_type: ElemType, trace_segment: u8) -> String;
+    fn to_string(&self, ir: &Air, elem_type: ElemType, trace_segment: TraceSegmentId) -> String;
 }
 
 impl Codegen for IntegrityConstraintDegree {
-    fn to_string(&self, _ir: &AirIR, _elem_type: ElemType, _trace_segment: u8) -> String {
+    fn to_string(&self, _ir: &Air, _elem_type: ElemType, _trace_segment: TraceSegmentId) -> String {
         if self.cycles().is_empty() {
             format!("TransitionConstraintDegree::new({})", self.base())
         } else {
@@ -34,22 +35,18 @@ impl Codegen for IntegrityConstraintDegree {
 }
 
 impl Codegen for TraceAccess {
-    fn to_string(&self, _ir: &AirIR, _elem_type: ElemType, trace_segment: u8) -> String {
-        let frame = if let 0 = self.trace_segment() {
-            "main"
-        } else {
-            "aux"
-        };
-        let row_offset = match self.row_offset() {
+    fn to_string(&self, _ir: &Air, _elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
+        let frame = if self.segment == 0 { "main" } else { "aux" };
+        let row_offset = match self.row_offset {
             0 => {
-                format!("current[{}]", self.col_idx())
+                format!("current[{}]", self.column)
             }
             1 => {
-                format!("next[{}]", self.col_idx())
+                format!("next[{}]", self.column)
             }
             _ => panic!("Winterfell doesn't support row offsets greater than 1."),
         };
-        if self.trace_segment() == 0 && self.trace_segment() != trace_segment {
+        if self.segment == 0 && self.segment != trace_segment {
             format!("E::from({frame}_{row_offset})")
         } else {
             format!("{frame}_{row_offset}")
@@ -58,14 +55,14 @@ impl Codegen for TraceAccess {
 }
 
 impl Codegen for NodeIndex {
-    fn to_string(&self, ir: &AirIR, elem_type: ElemType, trace_segment: u8) -> String {
+    fn to_string(&self, ir: &Air, elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
         let op = ir.constraint_graph().node(self).op();
         op.to_string(ir, elem_type, trace_segment)
     }
 }
 
 impl Codegen for Operation {
-    fn to_string(&self, ir: &AirIR, elem_type: ElemType, trace_segment: u8) -> String {
+    fn to_string(&self, ir: &Air, elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
         match self {
             Operation::Value(value) => value.to_string(ir, elem_type, trace_segment),
             Operation::Add(_, _) => binary_op_to_string(ir, self, elem_type, trace_segment),
@@ -99,45 +96,34 @@ impl Codegen for Operation {
 }
 
 impl Codegen for Value {
-    fn to_string(&self, ir: &AirIR, elem_type: ElemType, trace_segment: u8) -> String {
+    fn to_string(&self, ir: &Air, elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
         match self {
             // TODO: move constant handling to a helper function
-            Value::InlineConstant(0) => match elem_type {
+            Value::Constant(0) => match elem_type {
                 ElemType::Base => "Felt::ZERO".to_string(),
                 ElemType::Ext => "E::ZERO".to_string(),
             },
-            Value::InlineConstant(1) => match elem_type {
+            Value::Constant(1) => match elem_type {
                 ElemType::Base => "Felt::ONE".to_string(),
                 ElemType::Ext => "E::ONE".to_string(),
             },
-            Value::InlineConstant(value) => match elem_type {
+            Value::Constant(value) => match elem_type {
                 ElemType::Base => format!("Felt::new({value})"),
                 ElemType::Ext => format!("E::from({value}_u64)"),
             },
-            Value::BoundConstant(symbol_access) => {
-                let name = symbol_access.name().to_string();
-                let access_type = symbol_access.access_type();
-                let base_value = match access_type {
-                    AccessType::Default => name,
-                    AccessType::Vector(idx) => format!("{name}[{idx}]"),
-                    AccessType::Matrix(row_idx, col_idx) => {
-                        format!("{name}[{row_idx}][{col_idx}]",)
-                    }
-                    AccessType::Slice(_) => panic!("unsupported access type"),
-                };
-                match elem_type {
-                    ElemType::Base => base_value,
-                    ElemType::Ext => format!("E::from({base_value})"),
-                }
-            }
-            Value::TraceElement(trace_access) => {
+            Value::TraceAccess(trace_access) => {
                 trace_access.to_string(ir, elem_type, trace_segment)
             }
-            Value::PeriodicColumn(col_idx, _) => {
-                format!("periodic_values[{col_idx}]")
+            Value::PeriodicColumn(pc) => {
+                let index = ir
+                    .periodic_columns
+                    .iter()
+                    .position(|(qid, _)| qid == &pc.name)
+                    .unwrap();
+                format!("periodic_values[{index}]")
             }
-            Value::PublicInput(ident, idx) => {
-                format!("self.{ident}[{idx}]")
+            Value::PublicInput(air_ir::PublicInputAccess { name, index }) => {
+                format!("self.{name}[{index}]")
             }
             Value::RandomValue(idx) => {
                 format!("aux_rand_elements.get_segment_elements(0)[{idx}]")
@@ -147,7 +133,7 @@ impl Codegen for Value {
 }
 
 /// Returns true if the operation at the specified node index is a leaf node in the constraint graph.
-fn is_leaf(idx: &NodeIndex, ir: &AirIR) -> bool {
+fn is_leaf(idx: &NodeIndex, ir: &Air) -> bool {
     !matches!(
         ir.constraint_graph().node(idx).op(),
         Operation::Add(_, _) | Operation::Sub(_, _) | Operation::Mul(_, _) | Operation::Exp(_, _)
@@ -156,10 +142,10 @@ fn is_leaf(idx: &NodeIndex, ir: &AirIR) -> bool {
 
 /// Returns a string representation of a binary operation.
 fn binary_op_to_string(
-    ir: &AirIR,
+    ir: &Air,
     op: &Operation,
     elem_type: ElemType,
-    trace_segment: u8,
+    trace_segment: TraceSegmentId,
 ) -> String {
     match op {
         Operation::Add(l_idx, r_idx) => {
