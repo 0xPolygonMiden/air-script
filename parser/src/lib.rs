@@ -9,6 +9,7 @@ pub mod symbols;
 pub mod transforms;
 
 pub use self::parser::{ParseError, Parser};
+pub use self::sema::{LexicalScope, SemanticAnalysisError};
 pub use self::symbols::Symbol;
 
 use std::path::Path;
