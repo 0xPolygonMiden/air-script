@@ -1,8 +1,9 @@
-use super::super::{parse, AirIR};
+use super::super::compile;
 
 #[test]
 fn constraint_comprehension() {
     let source = "
+    def test
     trace_columns:
         main: [clk, fmp[2], ctx]
         aux: [a, b, c[4], d[4]]
@@ -13,14 +14,13 @@ fn constraint_comprehension() {
     integrity_constraints:
         enf c = d for (c, d) in (c, d)";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn ic_comprehension_with_selectors() {
     let source = "
+    def test
     trace_columns:
         main: [clk, fmp[2], ctx]
         aux: [a, b, c[4], d[4]]
@@ -31,7 +31,5 @@ fn ic_comprehension_with_selectors() {
     integrity_constraints:
         enf c = d for (c, d) in (c, d) when !fmp[0]";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
