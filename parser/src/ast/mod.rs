@@ -28,7 +28,11 @@ use miden_diagnostics::{
     CodeMap, DiagnosticsHandler, FileName, Severity, SourceSpan, Span, Spanned,
 };
 
-use crate::{parser::ParseError, sema, Symbol};
+use crate::{
+    parser::ParseError,
+    sema::{self, SemanticAnalysisError},
+    Symbol,
+};
 
 /// This structure is used to represent parsing arbitrary AirScript files which may
 /// or may not contain a root module.
@@ -128,7 +132,7 @@ impl Program {
         diagnostics: &DiagnosticsHandler,
         root: ModuleId,
         mut library: Library,
-    ) -> Result<Self, ModuleError> {
+    ) -> Result<Self, SemanticAnalysisError> {
         use crate::sema::DependencyType;
         use petgraph::visit::DfsPostOrder;
 
@@ -136,7 +140,7 @@ impl Program {
 
         // Validate that the root module is contained in the library
         if !library.contains(&root) {
-            return Err(ModuleError::MissingRoot);
+            return Err(SemanticAnalysisError::MissingRoot);
         }
 
         // Add root-only items from root module to program
@@ -162,14 +166,14 @@ impl Program {
                         let import_module = modgraph.add_node(import.module());
                         // If an attempt is made to import the root module, raise an error
                         if import_module == root {
-                            return Err(ModuleError::RootImport(import.module().span()));
+                            return Err(SemanticAnalysisError::RootImport(import.module().span()));
                         }
 
                         assert_eq!(modgraph.add_edge(module_name, import_module, ()), None);
                         worklist.push_back(import_module);
                     }
                 } else {
-                    return Err(ModuleError::MissingModule(module_name));
+                    return Err(SemanticAnalysisError::MissingModule(module_name));
                 }
             }
         }
@@ -391,7 +395,7 @@ impl Library {
         diagnostics: &DiagnosticsHandler,
         codemap: Arc<CodeMap>,
         mut modules: Vec<Module>,
-    ) -> Result<Self, ModuleError> {
+    ) -> Result<Self, SemanticAnalysisError> {
         use std::collections::hash_map::Entry;
 
         let mut lib = Library::default();
@@ -424,7 +428,7 @@ impl Library {
         }
 
         if let Some(span) = found_duplicate {
-            return Err(ModuleError::NameConflict(span));
+            return Err(SemanticAnalysisError::NameConflict(span));
         }
 
         // Perform import resolution
@@ -495,7 +499,7 @@ impl Library {
                                     .with_message("invalid module declaration")
                                     .with_primary_label(imported_module.name.span(), "module names must be the same as the name of the file they are defined in")
                                     .emit();
-                                return Err(ModuleError::ImportFailed(import.span()));
+                                return Err(SemanticAnalysisError::ImportFailed(import.span()));
                             } else {
                                 // We parsed the module successfully, so add it to the library
                                 if !imported_module.imports.is_empty() {
@@ -511,12 +515,12 @@ impl Library {
                         }
                         Err(ParseError::Failed) => {
                             // Nothing interesting to emit as a diagnostic here, so just return an error
-                            return Err(ModuleError::ImportFailed(import.span()));
+                            return Err(SemanticAnalysisError::ImportFailed(import.span()));
                         }
                         Err(err) => {
                             // Emit the error as a diagnostic and return an ImportError instead
                             diagnostics.emit(err);
-                            return Err(ModuleError::ImportFailed(import.span()));
+                            return Err(SemanticAnalysisError::ImportFailed(import.span()));
                         }
                     }
                 }
