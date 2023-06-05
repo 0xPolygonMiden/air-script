@@ -49,7 +49,7 @@ impl SymbolTable {
 unsafe impl Sync for SymbolTable {}
 
 /// A symbol is an interned string.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Symbol(SymbolIndex);
 
 impl Symbol {
@@ -90,6 +90,16 @@ impl fmt::Debug for Symbol {
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&self.as_str(), f)
+    }
+}
+impl PartialOrd for Symbol {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for Symbol {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.as_str().cmp(other.as_str())
     }
 }
 impl<T: Deref<Target = str>> PartialEq<T> for Symbol {
