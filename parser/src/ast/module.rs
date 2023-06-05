@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
-use super::*;
+use crate::{ast::*, sema::SemanticAnalysisError};
 
 /// This is a type alias used to clarify that an identifier refers to a module
 pub type ModuleId = Identifier;
@@ -100,7 +100,7 @@ impl Module {
         span: SourceSpan,
         name: Identifier,
         mut declarations: Vec<Declaration>,
-    ) -> Result<Self, ModuleError> {
+    ) -> Result<Self, SemanticAnalysisError> {
         let mut module = Self::new(ty, span, name);
 
         // Keep track of named items in this module while building it from
@@ -129,7 +129,7 @@ impl Module {
                 Declaration::PublicInputs(mut inputs) => {
                     if module.is_library() {
                         invalid_section_in_library(diagnostics, "public_inputs", span);
-                        return Err(ModuleError::RootSectionInLibrary(span));
+                        return Err(SemanticAnalysisError::RootSectionInLibrary(span));
                     }
                     for input in inputs.item.drain(..) {
                         module.declare_public_input(diagnostics, &mut names, input)?;
@@ -156,7 +156,7 @@ impl Module {
                     .with_message("missing trace_columns section")
                     .with_note("Root modules must contain a trace_columns section with at least a `main` trace declared")
                     .emit();
-                return Err(ModuleError::Invalid);
+                return Err(SemanticAnalysisError::Invalid);
             }
 
             if !module.trace_columns.iter().any(|ts| ts.name == "$main") {
@@ -164,15 +164,15 @@ impl Module {
                     .with_message("missing main trace declaration")
                     .with_note("Root modules must contain a trace_columns section with at least a `main` trace declared")
                     .emit();
-                return Err(ModuleError::Invalid);
+                return Err(SemanticAnalysisError::Invalid);
             }
 
             if module.boundary_constraints.is_none() || module.integrity_constraints.is_none() {
-                return Err(ModuleError::MissingConstraints);
+                return Err(SemanticAnalysisError::MissingConstraints);
             }
 
             if module.public_inputs.is_empty() {
-                return Err(ModuleError::MissingPublicInputs);
+                return Err(SemanticAnalysisError::MissingPublicInputs);
             }
 
             if module.random_values.is_some()
@@ -188,7 +188,7 @@ impl Module {
                         "this declaration is invalid",
                     )
                     .emit();
-                return Err(ModuleError::Invalid);
+                return Err(SemanticAnalysisError::Invalid);
             }
         }
 
@@ -200,14 +200,14 @@ impl Module {
         diagnostics: &DiagnosticsHandler,
         names: &mut HashSet<NamespacedIdentifier>,
         import: Span<Import>,
-    ) -> Result<(), ModuleError> {
-        use std::collections::hash_map::Entry;
+    ) -> Result<(), SemanticAnalysisError> {
+        use std::collections::btree_map::Entry;
 
         let span = import.span();
         match import.item {
             Import::All { module: name } => {
                 if name == self.name {
-                    return Err(ModuleError::ImportSelf(name.span()));
+                    return Err(SemanticAnalysisError::ImportSelf(name.span()));
                 }
                 match self.imports.entry(name) {
                     Entry::Occupied(mut entry) => {
@@ -249,7 +249,7 @@ impl Module {
                 mut items,
             } => {
                 if name == self.name {
-                    return Err(ModuleError::ImportSelf(name.span()));
+                    return Err(SemanticAnalysisError::ImportSelf(name.span()));
                 }
                 match self.imports.entry(name) {
                     Entry::Occupied(mut entry) => match entry.get_mut() {
@@ -294,7 +294,7 @@ impl Module {
                                         prev.span(),
                                         item.span(),
                                     );
-                                    return Err(ModuleError::NameConflict(item.span()));
+                                    return Err(SemanticAnalysisError::NameConflict(item.span()));
                                 }
                             }
                         }
@@ -313,7 +313,7 @@ impl Module {
                                     prev.span(),
                                     item.span(),
                                 );
-                                return Err(ModuleError::NameConflict(item.span()));
+                                return Err(SemanticAnalysisError::NameConflict(item.span()));
                             }
                         }
                         entry.insert(Import::Partial {
@@ -333,7 +333,7 @@ impl Module {
         diagnostics: &DiagnosticsHandler,
         names: &mut HashSet<NamespacedIdentifier>,
         constant: Constant,
-    ) -> Result<(), ModuleError> {
+    ) -> Result<(), SemanticAnalysisError> {
         if !constant.name.is_uppercase() {
             diagnostics
                 .diagnostic(Severity::Error)
@@ -343,17 +343,20 @@ impl Module {
                     "this is an invalid constant identifier",
                 )
                 .emit();
-            return Err(ModuleError::Invalid);
+            return Err(SemanticAnalysisError::Invalid);
         }
 
         if let Some(prev) = names.replace(NamespacedIdentifier::Binding(constant.name)) {
             conflicting_declaration(diagnostics, "constant", prev.span(), constant.name.span());
-            return Err(ModuleError::NameConflict(constant.name.span()));
+            return Err(SemanticAnalysisError::NameConflict(constant.name.span()));
         }
 
         // Validate constant expression
         if let ConstantExpr::Matrix(ref matrix) = &constant.value {
-            let expected_len = matrix.first().unwrap().len();
+            let expected_len = matrix
+                .first()
+                .expect("expected matrix to have at least one row")
+                .len();
             for vector in matrix.iter().skip(1) {
                 if expected_len != vector.len() {
                     diagnostics
@@ -367,7 +370,7 @@ impl Module {
                             "Matrix constants must have the same number of columns in each row",
                         )
                         .emit();
-                    return Err(ModuleError::Invalid);
+                    return Err(SemanticAnalysisError::Invalid);
                 }
             }
         }
@@ -381,10 +384,10 @@ impl Module {
         diagnostics: &DiagnosticsHandler,
         names: &mut HashSet<NamespacedIdentifier>,
         evaluator: EvaluatorFunction,
-    ) -> Result<(), ModuleError> {
+    ) -> Result<(), SemanticAnalysisError> {
         if let Some(prev) = names.replace(NamespacedIdentifier::Function(evaluator.name)) {
             conflicting_declaration(diagnostics, "evaluator", prev.span(), evaluator.name.span());
-            return Err(ModuleError::NameConflict(evaluator.name.span()));
+            return Err(SemanticAnalysisError::NameConflict(evaluator.name.span()));
         }
 
         self.evaluators.insert(evaluator.name, evaluator);
@@ -397,7 +400,7 @@ impl Module {
         diagnostics: &DiagnosticsHandler,
         names: &mut HashSet<NamespacedIdentifier>,
         column: PeriodicColumn,
-    ) -> Result<(), ModuleError> {
+    ) -> Result<(), SemanticAnalysisError> {
         if let Some(prev) = names.replace(NamespacedIdentifier::Binding(column.name)) {
             conflicting_declaration(
                 diagnostics,
@@ -405,7 +408,7 @@ impl Module {
                 prev.span(),
                 column.name.span(),
             );
-            return Err(ModuleError::NameConflict(column.name.span()));
+            return Err(SemanticAnalysisError::NameConflict(column.name.span()));
         }
 
         match column.period() {
@@ -419,7 +422,7 @@ impl Module {
                     .with_message("invalid periodic column declaration")
                     .with_primary_label(column.span(), "periodic columns must have a non-zero cycle length which is a power of two")
                     .emit();
-                Err(ModuleError::Invalid)
+                Err(SemanticAnalysisError::Invalid)
             }
         }
     }
@@ -429,14 +432,14 @@ impl Module {
         diagnostics: &DiagnosticsHandler,
         names: &mut HashSet<NamespacedIdentifier>,
         input: PublicInput,
-    ) -> Result<(), ModuleError> {
+    ) -> Result<(), SemanticAnalysisError> {
         if self.is_library() {
-            return Err(ModuleError::RootSectionInLibrary(input.span()));
+            return Err(SemanticAnalysisError::RootSectionInLibrary(input.span()));
         }
 
         if let Some(prev) = names.replace(NamespacedIdentifier::Binding(input.name)) {
             conflicting_declaration(diagnostics, "public input", prev.span(), input.name.span());
-            Err(ModuleError::NameConflict(input.name.span()))
+            Err(SemanticAnalysisError::NameConflict(input.name.span()))
         } else {
             assert_eq!(self.public_inputs.insert(input.name, input), None);
             Ok(())
@@ -448,11 +451,11 @@ impl Module {
         diagnostics: &DiagnosticsHandler,
         names: &mut HashSet<NamespacedIdentifier>,
         rv: RandomValues,
-    ) -> Result<(), ModuleError> {
+    ) -> Result<(), SemanticAnalysisError> {
         let span = rv.span();
         if self.is_library() {
             invalid_section_in_library(diagnostics, "random_values", span);
-            return Err(ModuleError::RootSectionInLibrary(span));
+            return Err(SemanticAnalysisError::RootSectionInLibrary(span));
         }
 
         for binding in rv.bindings.iter() {
@@ -463,7 +466,7 @@ impl Module {
                     prev.span(),
                     binding.name.span(),
                 );
-                return Err(ModuleError::NameConflict(binding.name.span()));
+                return Err(SemanticAnalysisError::NameConflict(binding.name.span()));
             }
         }
 
@@ -476,7 +479,7 @@ impl Module {
                 .with_note("Only a single random_values declaration is allowed at a time")
                 .emit();
             self.random_values.replace(prev);
-            Err(ModuleError::NameConflict(span))
+            Err(SemanticAnalysisError::NameConflict(span))
         } else {
             Ok(())
         }
@@ -487,11 +490,11 @@ impl Module {
         diagnostics: &DiagnosticsHandler,
         names: &mut HashSet<NamespacedIdentifier>,
         mut segments: Span<Vec<TraceSegment>>,
-    ) -> Result<(), ModuleError> {
+    ) -> Result<(), SemanticAnalysisError> {
         let span = segments.span();
         if self.is_library() {
             invalid_section_in_library(diagnostics, "trace_columns", span);
-            return Err(ModuleError::RootSectionInLibrary(span));
+            return Err(SemanticAnalysisError::RootSectionInLibrary(span));
         }
 
         for segment in segments.iter() {
@@ -502,17 +505,18 @@ impl Module {
                     prev.span(),
                     segment.name.span(),
                 );
-                return Err(ModuleError::NameConflict(segment.name.span()));
+                return Err(SemanticAnalysisError::NameConflict(segment.name.span()));
             }
             for binding in segment.bindings.iter() {
-                if let Some(prev) = names.replace(NamespacedIdentifier::Binding(binding.name)) {
+                let binding_name = binding.name.expect("expected binding name");
+                if let Some(prev) = names.replace(NamespacedIdentifier::Binding(binding_name)) {
                     conflicting_declaration(
                         diagnostics,
                         "trace binding",
                         prev.span(),
-                        binding.name.span(),
+                        binding_name.span(),
                     );
-                    return Err(ModuleError::NameConflict(binding.name.span()));
+                    return Err(SemanticAnalysisError::NameConflict(binding_name.span()));
                 }
             }
         }
@@ -526,16 +530,16 @@ impl Module {
         &mut self,
         diagnostics: &DiagnosticsHandler,
         statements: Span<Vec<Statement>>,
-    ) -> Result<(), ModuleError> {
+    ) -> Result<(), SemanticAnalysisError> {
         let span = statements.span();
         if self.is_library() {
             invalid_section_in_library(diagnostics, "boundary_constraints", span);
-            return Err(ModuleError::RootSectionInLibrary(span));
+            return Err(SemanticAnalysisError::RootSectionInLibrary(span));
         }
 
         if let Some(prev) = self.boundary_constraints.as_ref() {
             conflicting_declaration(diagnostics, "boundary_constraints", prev.span(), span);
-            return Err(ModuleError::Invalid);
+            return Err(SemanticAnalysisError::Invalid);
         }
 
         if !statements.iter().any(|s| s.has_constraints()) {
@@ -544,7 +548,7 @@ impl Module {
                 .with_message("at least one boundary constraint must be declared")
                 .with_primary_label(span, "missing constraint declaration in this section")
                 .emit();
-            return Err(ModuleError::Invalid);
+            return Err(SemanticAnalysisError::Invalid);
         }
 
         self.boundary_constraints = Some(statements);
@@ -556,16 +560,16 @@ impl Module {
         &mut self,
         diagnostics: &DiagnosticsHandler,
         statements: Span<Vec<Statement>>,
-    ) -> Result<(), ModuleError> {
+    ) -> Result<(), SemanticAnalysisError> {
         let span = statements.span();
         if self.is_library() {
             invalid_section_in_library(diagnostics, "integrity_constraints", span);
-            return Err(ModuleError::RootSectionInLibrary(span));
+            return Err(SemanticAnalysisError::RootSectionInLibrary(span));
         }
 
         if let Some(prev) = self.integrity_constraints.as_ref() {
             conflicting_declaration(diagnostics, "integrity_constraints", prev.span(), span);
-            return Err(ModuleError::Invalid);
+            return Err(SemanticAnalysisError::Invalid);
         }
 
         if !statements.iter().any(|s| s.has_constraints()) {
@@ -574,7 +578,7 @@ impl Module {
                 .with_message("at least one integrity constraint must be declared")
                 .with_primary_label(span, "missing constraint declaration in this section")
                 .emit();
-            return Err(ModuleError::Invalid);
+            return Err(SemanticAnalysisError::Invalid);
         }
 
         self.integrity_constraints = Some(statements);

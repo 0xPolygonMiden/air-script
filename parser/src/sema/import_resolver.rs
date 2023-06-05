@@ -3,7 +3,10 @@ use std::ops::ControlFlow;
 
 use miden_diagnostics::{DiagnosticsHandler, Severity, Spanned};
 
-use crate::ast::{visit::VisitMut, *};
+use crate::{
+    ast::{visit::VisitMut, *},
+    sema::SemanticAnalysisError,
+};
 
 pub type Imported = HashMap<NamespacedIdentifier, ModuleId>;
 
@@ -30,7 +33,7 @@ impl<'a> ImportResolver<'a> {
     }
 
     /// Run the resolver on the given module
-    pub fn run(mut self, module: &mut Module) -> Result<Imported, ModuleError> {
+    pub fn run(mut self, module: &mut Module) -> Result<Imported, SemanticAnalysisError> {
         match self.visit_mut_module(module) {
             ControlFlow::Break(err) => Err(err),
             ControlFlow::Continue(_) => Ok(self.imported),
@@ -38,8 +41,8 @@ impl<'a> ImportResolver<'a> {
     }
 }
 
-impl<'a> VisitMut<ModuleError> for ImportResolver<'a> {
-    fn visit_mut_module(&mut self, module: &mut Module) -> ControlFlow<ModuleError> {
+impl<'a> VisitMut<SemanticAnalysisError> for ImportResolver<'a> {
+    fn visit_mut_module(&mut self, module: &mut Module) -> ControlFlow<SemanticAnalysisError> {
         // We have to steal the imports temporarily
         let mut imports = core::mem::take(&mut module.imports);
         for import in imports.values_mut() {
@@ -48,7 +51,7 @@ impl<'a> VisitMut<ModuleError> for ImportResolver<'a> {
                     let imported_from = match self
                         .library
                         .get(from)
-                        .ok_or(ModuleError::ImportUndefined(*from))
+                        .ok_or(SemanticAnalysisError::ImportUndefined(*from))
                     {
                         Ok(value) => value,
                         Err(err) => return ControlFlow::Break(err),
@@ -66,7 +69,7 @@ impl<'a> VisitMut<ModuleError> for ImportResolver<'a> {
                     let imported_from = match self
                         .library
                         .get(from)
-                        .ok_or(ModuleError::ImportUndefined(*from))
+                        .ok_or(SemanticAnalysisError::ImportUndefined(*from))
                     {
                         Ok(value) => value,
                         Err(err) => return ControlFlow::Break(err),
@@ -99,7 +102,7 @@ impl<'a> ImportResolver<'a> {
         from: ModuleId,
         item: Identifier,
         export: Export<'_>,
-    ) -> ControlFlow<ModuleError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         match export {
             Export::Constant(_) => self.import_constant(module, from, item),
             Export::Evaluator(_) => self.import_evaluator(module, from, item),
@@ -112,12 +115,12 @@ impl<'a> ImportResolver<'a> {
         module: &mut Module,
         from: ModuleId,
         item: Identifier,
-    ) -> ControlFlow<ModuleError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         use std::collections::hash_map::Entry;
 
         let namespaced_name = NamespacedIdentifier::Binding(item);
         match module.constants.get(&item) {
-            Some(exists) => ControlFlow::Break(ModuleError::ImportConflict {
+            Some(exists) => ControlFlow::Break(SemanticAnalysisError::ImportConflict {
                 item,
                 prev: exists.name.span(),
             }),
@@ -140,7 +143,7 @@ impl<'a> ImportResolver<'a> {
                             ControlFlow::Continue(())
                         } else {
                             // Conflict is with another imported name, raise an error
-                            ControlFlow::Break(ModuleError::ImportConflict {
+                            ControlFlow::Break(SemanticAnalysisError::ImportConflict {
                                 item,
                                 prev: id.span(),
                             })
@@ -161,12 +164,12 @@ impl<'a> ImportResolver<'a> {
         module: &mut Module,
         from: ModuleId,
         item: Identifier,
-    ) -> ControlFlow<ModuleError> {
+    ) -> ControlFlow<SemanticAnalysisError> {
         use std::collections::hash_map::Entry;
 
         let namespaced_name = NamespacedIdentifier::Function(item);
         match module.evaluators.get(&item) {
-            Some(exists) => ControlFlow::Break(ModuleError::ImportConflict {
+            Some(exists) => ControlFlow::Break(SemanticAnalysisError::ImportConflict {
                 item,
                 prev: exists.name.span(),
             }),
@@ -189,7 +192,7 @@ impl<'a> ImportResolver<'a> {
                             ControlFlow::Continue(())
                         } else {
                             // Conflict is with another import, raise an error
-                            ControlFlow::Break(ModuleError::ImportConflict {
+                            ControlFlow::Break(SemanticAnalysisError::ImportConflict {
                                 item,
                                 prev: id.span(),
                             })
