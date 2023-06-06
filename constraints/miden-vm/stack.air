@@ -229,7 +229,9 @@ ev b0_b1_is_zero([op_bits[8]]):
 # TODO: add docs for columns
 # stack_helpers consists of [bookkeeping[0], bookkeeping[1], h0]
 # op_bits consists of [op_bits[7], extra]
-ev stack_constraints([stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6], clk, fmp]):
+ev stack_constraints([stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6], clk, fmp], [p1]):
+    enf overflow_table_constraints([stack_top, stack_helpers, op_bits, op_helpers, clk, fmp], [p1])
+
     let op_flags = compute_op_flags(op_bits)
 
     match enf:
@@ -312,8 +314,8 @@ ev stack_constraints([stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6]
 
 
 ev overflow_table_constraints(
-    main: [stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6], clk, fmp], 
-    aux: [p1]
+    [stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6], clk, fmp], 
+    [p1]
 ):
     # Flag to indicate whether the overflow table contains values (overflow flag).
     let f_ov = (stack_helpers[0] - 16) * stack_helpers[2]
