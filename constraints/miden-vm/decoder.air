@@ -216,76 +216,6 @@ ev general([addr, op_bits[7], hasher[8], in_span, s0, extra]):
     enf 1 - in_span - get_f_ctrl(op_bits, extra) = 0
 
 
-# Enforces the constraint for computing block hashes.
-#
-# Max constraint degree: 8
-ev block_hash_computation([addr, op_bits[7], hasher[8], extra], [p[4]]):
-    # Get flags required for the block hash computation constraint
-    let f_ctrli = get_f_ctrli(op_bits, extra)
-    let f_span = get_f_span(op_bits)
-    let f_respan = get_f_respan(op_bits, extra)
-    let f_end = get_f_end(op_bits, extra)
-
-    # Label specifying that we are starting a new hash computation.
-    let m_bp = get_transition_label(HASHER_LINEAR_HASH)
-
-    # Label specifying that we are absorbing the next sequence of 8 elements into an ongoing hash 
-    # computation.
-    let m_abp = get_transition_label(HASHER_LINEAR_HASH)
-
-    # Label specifying that we are reading the result of a hash computation.
-    let m_hout = get_transition_label(HASHER_RETURN_HASH)
-
-    # `alpha` is the global random values array.
-    let rate_sum = sum([$alpha[i + 8] * hasher[i] for i in 0..8])
-    let digest_sum = sum([$alpha[i + 8] * hasher[i] for i in 0..4])
-
-    # Variable for initiating a hasher with address addr' and absorbing 8 elements from the hasher
-    # state (hasher[0], ..., hasher[7]) into it.
-    let h_init = $alpha[0] + $alpha[1] * m_bp + $alpha[2] * addr' + rate_sum
-
-    # Variable for the absorption.
-    let h_abp = $alpha[0] + $alpha[1] * m_abp + $alpha[2] * addr' + rate_sum
-
-    # Variable for the result.
-    let h_res = $alpha[0] + $alpha[1] * m_hout + $alpha[2] * (addr + 7) + digest_sum
-
-    # Opcode value of the opcode being executed on the virtual machine.
-    let opcode_value = sum([op_bits[i] * 2^i for i in 0..7])
-
-    # When a control block initializer operation (JOIN, SPLIT, LOOP, CALL, SYSCALL) is executed, a 
-    # new hasher is initialized and the contents of hasher[0], ..., hasher[7] are absorbed into the
-    # hasher. 
-    #
-    # Value degree: 7
-    let u_ctrli = f_ctrli * (h_init + $alpha[5] * opcode_value)
-
-    # When SPAN operation is executed, a new hasher is initialized and contents of 
-    # hasher[0], ..., hasher[7] are absorbed into the hasher.
-    #
-    # Value degree: 7
-    let u_span = f_span * h_init
-
-    # When RESPAN operation is executed, contents of hasher[0], ..., hasher[7] (which contain the 
-    # new operation batch) are absorbed into the hasher.
-    #
-    # Value degree: 5
-    let u_respan = f_respan * h_abp
-
-    # When END operation is executed, the hash result is copied into registers 
-    # hasher[0], ..., hasher[3].
-    #
-    # Value degree: 5
-    let u_end = f_end * h_res
-
-    # Enforce the block hash computation constraint. We need to add 1 and subtract the sum of the 
-    # relevant operation flags to ensure that when none of the flags is set to 1, the above 
-    # constraint reduces to p[0]' = p[0].
-    # Constraint degree: 8
-    enf p[0]' * (u_ctrli + u_span + u_respan + u_end + 1 - 
-        (f_ctrli + f_span + f_respan + f_end)) = p[0]
-
-
 # Enforces the constraint for updating the block stack table.
 #
 # Max constraint degree: 8
@@ -638,7 +568,7 @@ ev span_block([addr, op_bits[7], hasher[8], in_span, group_count, op_index, op_b
 ev decoder_constraints([addr, op_bits[7], hasher[8], in_span, group_count, op_index, op_batch_flags[3], s0, extra], [p[4]]):
     enf general([addr, op_bits[7], hasher[8], in_span, s0, extra])
     
-    enf block_hash_computation([addr, op_bits[7], hasher[8], extra], [p[4]])
+    # Block hash computation constraint (chiplet bus constraint) is implemented in the `chiplet_bus.air` file.
 
     enf block_stack_table([addr, op_bits[7], hasher[8], s0, extra], [p[4]])
 

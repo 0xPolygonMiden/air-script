@@ -1,0 +1,506 @@
+mod ChipletBus
+
+### Constants and periodic columns ################################################################
+
+const MEMORY_READ = 12
+const MEMORY_WRITE = 4
+
+const HASHER_LINEAR_HASH = 3
+const HASHER_MP_VERIFY = 11
+const HASHER_MR_UPDATE_OLD = 7
+const HASHER_MR_UPDATE_NEW = 15
+const HASHER_RETURN_HASH = 1
+const HASHER_RETURN_STATE = 9
+
+periodic_columns:
+    k0: [1, 0, 0, 0, 0, 0, 0, 0]
+    k1: [1, 1, 1, 1, 1, 1, 1, 0]
+
+### Helper functions ##############################################################################
+
+# Returns the f_join operation flag which is set when JOIN control operation is executed.
+#
+# Flag degree: 5
+fn get_f_join(op_bits: vector[9]) -> scalar:
+    return op_bits[7] & !op_bits[3] & op_bits[2] & op_bits[1] & op_bits[0]
+
+
+# Returns the f_split operation flag which is set when SPLIT control operation is executed.
+#
+# Flag degree: 5
+fn get_f_split(op_bits: vector[9]) -> scalar:
+    return op_bits[7] & !op_bits[3] & op_bits[2] & !op_bits[1] & !op_bits[0]
+
+
+# Returns the f_loop operation flag which is set when LOOP control operation is executed.
+#
+# Flag degree: 5
+fn get_f_loop(op_bits: vector[9]) -> scalar:
+    return op_bits[7] & !op_bits[3] & op_bits[2] & !op_bits[1] & op_bits[0]
+
+
+# Returns the f_call operation flag which is set when CALL control operation is executed.
+#
+# Flag degree: 4
+fn get_f_call(op_bits: vector[9]) -> scalar:
+    return op_bits[8] & !op_bits[4] & op_bits[3] & op_bits[2]
+
+
+# Returns the f_syscall operation flag which is set when SYSCALL control operation is executed.
+#
+# Flag degree: 4
+fn get_f_syscall(op_bits: vector[9]) -> scalar:
+    return op_bits[8] & !op_bits[4] & op_bits[3] & !op_bits[2]
+
+
+# Returns the f_span operation flag which is set when SPAN operation is executed.
+#
+# Flag degree: 5
+fn get_f_span(op_bits: vector[9]) -> scalar:
+    return op_bits[7] & !op_bits[3] & op_bits[2] & op_bits[1] & !op_bits[0]
+
+
+# Returns the f_respan operation flag which is set when RESPAN operation is executed.
+#
+# Flag degree: 4
+fn get_f_respan(op_bits: vector[9]) -> scalar:
+    return op_bits[8] & op_bits[4] & op_bits[3] & !op_bits[2]
+
+
+# Returns the f_end operation flag which is set when END operation is executed.
+#
+# Flag degree: 4
+fn get_f_end(op_bits: vector[9]) -> scalar:
+    return op_bits[8] & op_bits[4] & !op_bits[3] & !op_bits[2]
+
+
+# Returns f_ctrli flag which is set to 1 when a control flow operation that signifies the 
+# initialization of a control block (JOIN, SPLIT, LOOP, CALL, SYSCALL) is being executed on the VM.
+#
+# Flag degree: 5
+fn get_f_ctrli(op_bits: vector[9]) -> scalar:
+    return get_f_join(op_bits) + get_f_split(op_bits) + get_f_loop(op_bits) + get_f_call(op_bits) + get_f_syscall(op_bits)
+
+
+# Returns transition label, composed of the operation label and the periodic columns that uniquely 
+# identify each transition function.
+fn get_transition_label(op_label: scalar) -> scalar:
+    return op_label + 2^4 * cycle_row_7 + 2^5 * cycle_row_0
+
+
+# Set to 1 when selector flags are (1,0,0) on rows which are multiples of 8. This flag indicates 
+# that we are initiating computation of a single permutation, a 2-to-1 hash, or a linear hash of 
+# many elements.
+fn get_f_bp(s: vector[3]) -> scalar:
+    return cycle_row_0 & s[0] & !s[1] & !s[2]
+
+
+# Set to 1 when selector flags are (0,0,0) on rows which are 1 less than a multiple of 8. This flag
+# indicates that the result of the currently running computation is returned.
+fn get_f_hout(s: vector[3]) -> scalar:
+    return cycle_row_7 & !s[0] & !s[1] & !s[2]
+
+
+# Set to 1 when selector flags are (0,0,1) on rows which are 1 less than a multiple of 8. This flag
+# indicates that the entire hasher state is returned.
+fn get_f_sout(s: vector[3]) -> scalar:
+    return cycle_row_7 & !s[0] & !s[1] & s[2]
+
+
+# Flag f_out is set to 1 when either f_hout = 1 or f_sout = 1 in the current row.
+fn get_f_out(s: vector[3]) -> scalar:
+    return cycle_row_7 & !s[0] & !s[1]
+
+
+# Set to 1 when selector flags are (1,0,1) on rows which are multiples of 8. This is flag of the 
+# instruction that initiates Merkle path verification computation.
+fn get_f_mp(s: vector[3]) -> scalar:
+    return cycle_row_0 & s[0] & !s[1] & s[2]
+
+
+# Set to 1 when selector flags are (1,1,0) on rows which are multiples of 8. This is flag of the 
+# instruction that initiates Merkle path verification for the "old" node value during Merkle root 
+# update computation.
+fn get_f_mv(s: vector[3]) -> scalar:
+    return cycle_row_0 & s[0] & s[1] & !s[2]
+
+
+# Set to 1 when selector flags are (1,1,1) on rows which are multiples of 8. This is flag of the 
+# instruction that initiates Merkle path verification for the "new" node value during Merkle root 
+# update computation.
+fn get_f_mu(s: vector[3]) -> scalar:
+    return cycle_row_0 & s[0] & s[1] & s[2]
+
+
+# Set to 1 when selector flags are (1,0,0) on rows which are 1 less than a multiple of 8. This 
+# is flag of the instruction that absorbs a new set of elements into the hasher state when 
+# computing a linear hash of many elements.
+fn get_f_abp(s: vector[3]) -> scalar:
+    return cycle_row_7 & s[0] & !s[1] & !s[2]
+
+
+fn get_hash_response_value(
+    s: vector[3], 
+    r: scalar, 
+    hasher: vector[12], 
+    hasher_next: vector[12], 
+    i: scalar, 
+    i_next: scalar
+) -> scalar:
+    # Compute falgs required for the chiplet bus constraint.
+    let f_bp = get_f_bp(s)
+    let f_sout = get_f_sout(s)
+    let f_hout = get_f_hout(s)
+    let f_out = get_f_out(s)
+    let f_mp = get_f_mp(s)
+    let f_mv = get_f_mv(s)
+    let f_mu = get_f_mu(s)
+    let f_abp = get_f_abp(s)
+
+    let op_label = 2^3 * s[2] + 2^2 * s[1] + 2^1 * s[0] + 1
+    let transition_label = get_transition_label(op_label)
+
+    # v_h is a common header.
+    let v_h = $alpha[0] + $alpha[1] * transition_label + $alpha[2] * r + $alpha[3] * i
+
+    # v_a, v_b and v_c are the first, second, and third words of the hasher state.
+    let v_a = sum([$alpha[j + 4] * hasher[j] for j in 0..4])
+    let v_b = sum([$alpha[j + 4] * hasher[j] for j in 4..8])
+    let v_b_next = sum([$alpha[j + 4] * hasher_next[j] for j in 4..8])
+    let v_c = sum([$alpha[j + 4] * hasher[j] for j in 8..12])
+    let v_c_next = sum([$alpha[j + 4] * hasher_next[j] for j in 8..12])
+
+    # v_d is the third word of the hasher state but computed using the same alphas values as used 
+    # for the second word.
+    let v_d = sum([$alpha[j] * hasher[j] for j in 8..12])
+    
+    # v_all represents the entire hasher state.
+    let v_all = v_h + v_a + v_b + v_c
+
+    # b is the value of the bit which is discarded during shift by one bit to the right.
+    let b = i - 2 * i_next
+
+    # v_leaf represents the leaf of the path.
+    let v_leaf = v_h + (1 - b) * v_b + b * v_d
+
+    # v_abp represents delta between the last 8 elements of the hasher state during absorption a 
+    # new set of elements into the state while computing a linear hash.
+    let v_abp = v_h + v_b_next + v_c_next - (v_b + v_c)
+
+    # v_res represents returning the hash result, taken from the second word of the hasher state.
+    let v_res = v_h + v_b
+
+    let hash_response_value = ((f_bp + f_sout) * v_all + (f_mp + f_mv + f_mu) * v_leaf + f_abp * v_abp + 
+                f_hout * v_res + 1 - (f_bp + f_mp + f_mv + f_mu + f_abp + f_out))
+
+    return hash_response_value
+
+
+### Helper evaluators #############################################################################
+
+# Enforces that register extra0 is set to 1 when high-degree operations are executed.
+ev extra0([op_bits[9]]):
+    op_bits[7] = 1 when op_bits[6] & !op_bits[5] & op_bits[4]
+
+# Enforces that register extra1 is set to 1 when very high-degree operations are executed.
+ev extra1([op_bits[9]]):
+    op_bits[8] = 1 when op_bits[6] & op_bits[5]
+
+
+# - BITWISE ---------------------------------------------------------------------------------------
+
+# Enforces the constraint for the bitwise chiplet bus.
+#
+# Constraint degree: 4
+ev bitwise([stack[16], a, b, z], [b_chip]):
+    # Calculate the operation label for the bitwise operation.
+    let op_bitwise = s * 2^2 + 2
+
+    # req_val represents bitwise operation request value.
+    let req_val = $alpha[0] + 
+                  $alpha[1] * op_bitwise + 
+                  $alpha[2] * stack[0] + 
+                  $alpha[3] * stack[1] + 
+                  $alpha[4] * stack[0]'
+
+    # u_i represents reduction of a, b abd z into a single value for row i.
+    let u_i = $alpha[0] + 
+              $alpha[1] * op_bitwise + 
+              $alpha[2] * a + 
+              $alpha[3] * b + 
+              $alpha[4] * z
+
+    # m represents inversion of k1 periodic column.
+    let m = !k1
+
+    # v_i represents value that includes u_i into the product when k1 = 0.
+    let v_i = m * u_i
+
+    # Enforce the constraints for the two sides of the bus communication.
+    # Constraint degree: 4
+    enf b_chip' * req_val = b_chip * (v_i * m + 1 - m)
+
+
+# - MEMORY ----------------------------------------------------------------------------------------
+
+ev mloadw([stack[16], ctx, addr, clk, v[4]], [b_chip]):
+    let mem_state = sum([$alpha[i + 5] * stack[3 - i]' for i in 0..4])
+    let u_mem = $alpha[0] + 
+                $alpha[1] * MEMORY_READ + 
+                $alpha[2] * ctx + 
+                $alpha[3] * stack[0] + 
+                $alpha[4] * clk + mem_state
+
+    # v_mem represents a row in the memory table.
+    let v_mem = $alpha[0] + 
+                $alpha[1] * MEMORY_READ + 
+                $alpha[2] * ctx + 
+                $alpha[3] * addr +
+                $alpha[4] * clk + 
+                sum([$alpha[j + 5] * v[j] for j in 0..4])
+
+    # Enforce the constraint for the two sides of the bus communication.
+    enf b_chip' * u_mem = b_chip * v_mem
+
+
+ev mload([stack[16], op_helpers[6], ctx, addr, clk, v[4]], [b_chip]):
+    let mem_state = $alpha[5] * stack[0]' + sum([$alpha[i + 5] * op_helpers[3 - i]' for i in 1..4])
+    let u_mem = $alpha[0] + 
+                $alpha[1] * MEMORY_READ + 
+                $alpha[2] * ctx + 
+                $alpha[3] * stack[0] + 
+                $alpha[4] * clk + mem_state
+
+    # v_mem represents a row in the memory table.
+    let v_mem = $alpha[0] + 
+                $alpha[1] * MEMORY_READ + 
+                $alpha[2] * ctx + 
+                $alpha[3] * addr +
+                $alpha[4] * clk + 
+                sum([$alpha[j + 5] * v[j] for j in 0..4])
+
+    # Enforce the constraint for the two sides of the bus communication.
+    enf b_chip' * u_mem = b_chip * v_mem
+
+
+ev mstorew([stack[16], ctx, addr, clk, v[4]], [b_chip]):
+    let mem_state = sum([$alpha[i + 5] * stack[3 - i]'] for i in 0..4) 
+    let u_mem = $alpha[0] + 
+                $alpha[1] * MEMORY_WRITE + 
+                $alpha[2] * ctx + 
+                $alpha[3] * stack[0] + 
+                $alpha[4] * clk + mem_state
+
+    # v_mem represents a row in the memory table.
+    let v_mem = $alpha[0] + 
+                $alpha[1] * MEMORY_WRITE + 
+                $alpha[2] * ctx + 
+                $alpha[3] * addr +
+                $alpha[4] * clk + 
+                sum([$alpha[j + 5] * v[j] for j in 0..4])
+
+    # Enforce the constraint for the two sides of the bus communication.
+    enf b_chip' * u_mem = b_chip * v_mem
+
+
+ev mstore([stack[16], op_helpers[6], ctx, addr, clk, v[4]], [b_chip]):
+    let mem_state = $alpha[5] * stack[0]' + sum([$alpha[i + 5] * op_helpers[3 - i]' for i in 1..4])
+    let u_mem = $alpha[0] + 
+                $alpha[1] * MEMORY_WRITE + 
+                $alpha[2] * ctx + 
+                $alpha[3] * stack[0] + 
+                $alpha[4] * clk + mem_state
+
+    # v_mem represents a row in the memory table.
+    let v_mem = $alpha[0] + 
+                $alpha[1] * MEMORY_WRITE + 
+                $alpha[2] * ctx + 
+                $alpha[3] * addr +
+                $alpha[4] * clk + 
+                sum([$alpha[j + 5] * v[j] for j in 0..4])
+
+    # Enforce the constraint for the two sides of the bus communication.
+    enf b_chip' * u_mem = b_chip * v_mem
+
+
+ev mstream([stack[16], ctx, addr, clk, v[4]], [b_chip]):
+    let v1 = sum([$alpha[i + 5] * stack[7 - i]' for i in 0..4])
+    let v2 = sum([$alpha[i + 5] * stack[3 - i]' for i in 0..4])
+    let u_mem1 = $alpha[0] + 
+                 $alpha[1] * MEMORY_READ + 
+                 $alpha[2] * ctx + 
+                 $alpha[3] * stack[12] + 
+                 $alpha[4] * clk + v1
+
+    let u_mem2 = $alpha[0] + 
+                 $alpha[1] * MEMORY_READ + 
+                 $alpha[2] * ctx + 
+                 $alpha[3] * (stack[12] + 1) + 
+                 $alpha[4] * clk + v2
+
+    let u_mem = u_mem1 * u_mem2
+
+    # v_mem represents a row in the memory table.
+    let v_mem = $alpha[0] + 
+                $alpha[1] * MEMORY_READ + 
+                $alpha[2] * ctx + 
+                $alpha[3] * addr +
+                $alpha[4] * clk + 
+                sum([$alpha[j + 5] * v[j] for j in 0..4])
+
+    # Enforce the constraint for the two sides of the bus communication.
+    enf b_chip' * u_mem = b_chip * v_mem
+
+
+# - HASH ------------------------------------------------------------------------------------------
+
+ev hperm([stack[16], op_helpers[6], selector[3], row, hasher[12], index], [b_chip]):
+    let v_input = $alpha[0] + 
+                  $alpha[1] * HASHER_LINEAR_HASH + 
+                  $alpha[2] * op_helpers[0] + 
+                  sum([$alpha[i + 4] * stack[11 - i] for i in 0..12])
+
+    let v_output = $alpha[0] + 
+                   $alpha[1] * HASHER_RETURN_STATE + 
+                   $alpha[2] * (op_helpers[0] + 7) + 
+                   sum([$alpha[i + 4] * stack[11 - i]' for i in 0..12])
+
+    let response_value = get_hash_response_value(selector, row, hasher, hasher', index, index')
+
+    enf b_chip' * v_input * v_output = b_chip * response_value
+
+
+ev mpverify([stack[16], op_helpers[6], selector[3], row, hasher[12], index], [b_chip]):
+    let v_input = $alpha[0] + 
+                  $alpha[1] * HASHER_MP_VERIFY + 
+                  $alpha[2] * op_helpers[0] + 
+                  $alpha[3] * stack[5] + 
+                  sum([$alpha[i + 8] * stack[3 - i] for i in 0..4])
+
+    let v_output = $alpha[0] + 
+                   $alpha[1] * HASHER_RETURN_HASH + 
+                   $alpha[2] * (op_helpers[0] + 8 * stack[4] - 1) + 
+                   sum([$alpha[i + 8] * stack[9 - i] for i in 0..4])
+
+    let response_value = get_hash_response_value(selector, row, hasher, hasher', index, index')
+
+    enf b_chip' * v_input * v_output = b_chip * response_value
+
+
+ev mrupdate([stack[16], op_helpers[6], selector[3], row, hasher[12], index], [b_chip]):
+    let v_input_old = $alpha[0] + 
+                      $alpha[1] * HASHER_MR_UPDATE_OLD + 
+                      $alpha[2] * op_helpers[0] + 
+                      $alpha[3] * stack[5] + 
+                      sum([$alpha[i + 8] * stack[3 - i] for i in 0..4])
+
+    let v_output_old = $alpha[0] + 
+                       $alpha[1] * HASHER_RETURN_HASH + 
+                       $alpha[2] * (op_helpers[0] + 8 * stack[4] - 1) + 
+                       sum([$alpha[i + 8] * stack[9 - i] for i in 0..4])
+
+    let v_input_new = $alpha[0] + 
+                      $alpha[1] * HASHER_MR_UPDATE_NEW + 
+                      $alpha[2] * (op_helpers[0] + 8 * stack[4]) + 
+                      $alpha[3] * stack[5] + 
+                      sum([$alpha[i + 8] * stack[13 - i] for i in 0..4])
+
+    let v_output_new = $alpha[0] + 
+                       $alpha[1] * HASHER_RETURN_HASH + 
+                       $alpha[2] * (op_helpers[0] + 2 * 8 * stack[4] - 1) + 
+                       sum([$alpha[i + 8] * stack[3 - i]' for i in 0..4])
+
+    let response_value = get_hash_response_value(selector, row, hasher, hasher', index, index')
+
+    enf b_chip' * v_input_old * v_output_old * v_input_new * v_output_new = b_chip * response_value
+
+
+# Enforces the constraint for computing block hashes.
+#
+# Max constraint degree: 8
+ev block_hash_computation([addr, op_bits[9], extra, selector[3], row, hasher[12], index], [b_chip]):
+    enf extra0(op_bits)
+    enf extra1(op_bits)
+
+    # Get flags required for the block hash computation constraint
+    let f_ctrli = get_f_ctrli(op_bits)
+    let f_span = get_f_span(op_bits)
+    let f_respan = get_f_respan(op_bits)
+    let f_end = get_f_end(op_bits)
+
+    # Label specifying that we are starting a new hash computation.
+    let m_bp = get_transition_label(HASHER_LINEAR_HASH)
+
+    # Label specifying that we are absorbing the next sequence of 8 elements into an ongoing hash 
+    # computation.
+    let m_abp = get_transition_label(HASHER_LINEAR_HASH)
+
+    # Label specifying that we are reading the result of a hash computation.
+    let m_hout = get_transition_label(HASHER_RETURN_HASH)
+
+    # `alpha` is the global random values array.
+    let rate_sum = sum([$alpha[i + 8] * hasher[i] for i in 0..8])
+    let digest_sum = sum([$alpha[i + 8] * hasher[i] for i in 0..4])
+
+    # Variable for initiating a hasher with address addr' and absorbing 8 elements from the hasher
+    # state (hasher[0], ..., hasher[7]) into it.
+    let h_init = $alpha[0] + $alpha[1] * m_bp + $alpha[2] * addr' + rate_sum
+
+    # Variable for the absorption.
+    let h_abp = $alpha[0] + $alpha[1] * m_abp + $alpha[2] * addr' + rate_sum
+
+    # Variable for the result.
+    let h_res = $alpha[0] + $alpha[1] * m_hout + $alpha[2] * (addr + 7) + digest_sum
+
+    # Opcode value of the opcode being executed on the virtual machine.
+    let opcode_value = sum([op_bits[i] * 2^i for i in 0..7])
+
+    # When a control block initializer operation (JOIN, SPLIT, LOOP, CALL, SYSCALL) is executed, a 
+    # new hasher is initialized and the contents of hasher[0], ..., hasher[7] are absorbed into the
+    # hasher. 
+    #
+    # Value degree: 7
+    let u_ctrli = f_ctrli * (h_init + $alpha[5] * opcode_value)
+
+    # When SPAN operation is executed, a new hasher is initialized and contents of 
+    # hasher[0], ..., hasher[7] are absorbed into the hasher.
+    #
+    # Value degree: 7
+    let u_span = f_span * h_init
+
+    # When RESPAN operation is executed, contents of hasher[0], ..., hasher[7] (which contain the 
+    # new operation batch) are absorbed into the hasher.
+    #
+    # Value degree: 5
+    let u_respan = f_respan * h_abp
+
+    # When END operation is executed, the hash result is copied into registers 
+    # hasher[0], ..., hasher[3].
+    #
+    # Value degree: 5
+    let u_end = f_end * h_res
+
+    let response_value = get_hash_response_value(selector, row, hasher, hasher', index, index')
+
+    # Enforce the block hash computation constraint. We need to add 1 and subtract the sum of the 
+    # relevant operation flags in the left side of equation to ensure that when none of the flags
+    # is set to 1, the above constraint reduces to b_chip' = b_chip.
+    # Constraint degree: 8
+    enf b_chip' * (u_ctrli + u_span + u_respan + u_end + 1 - (f_ctrli + f_span + f_respan + f_end)) = b_chip * response_value
+    
+
+### Chiplet Bus Air Constraints ###################################################################
+
+ev chiplet_bus([stack[16], op_helpers[6], ctx, addr, decoder_addr, clk, v[4], op_bits[9], extra, selector[3], row, hasher[12], index, a, b, z], [b_chip]):
+    enf block_hash_computation([decoder_addr, op_bits, extra, selector, row, hasher, index], [b_chip])
+
+    match enf:
+        bitwise([stack, a, b, z], [b_chip]) when !op_bits[6] & op_bits[5] & !op_bits[4] & !op_bits[3] & op_bits[2] & op_bits[1]
+        mloadw([stack, ctx, addr, clk, v], [b_chip]) when !op_bits[6] & op_bits[5] & !op_bits[4] & op_bits[3] & op_bits[2] & !op_bits[1] & !op_bits[0]
+        mload([stack, op_helpers, ctx, addr, clk, v], [b_chip]) when !op_bits[6] & !op_bits[5] & !op_bits[4] & !op_bits[3] & op_bits[2] & op_bits[1] & op_bits[0]
+        mstorew([stack, ctx, addr, clk, v], [b_chip]) when !op_bits[6] & op_bits[5] & !op_bits[4] & op_bits[3] & op_bits[2] & op_bits[1] & !op_bits[0]
+        mstore([stack, op_helpers, ctx, addr, clk, v], [b_chip]) when !op_bits[6] & op_bits[5] & !op_bits[4] & op_bits[3] & op_bits[2] & !op_bits[1] & op_bits[0]
+        mstream([stack, ctx, addr, clk, v], [b_chip]) when op_bits[7] & !op_bits[3] & !op_bits[2] & op_bits[1] & op_bits[0]
+        hperm([stack, op_helpers, selector, row, hasher, index], [b_chip]) when op_bits[7] & !op_bits[3] & !op_bits[2] & !op_bits[1] & !op_bits[0]
+        mpverify([stack, op_helpers, selector, row, hasher, index], [b_chip])  when op_bits[7] & !op_bits[3] & !op_bits[2] & !op_bits[1] & op_bits[0]
+        mrupdate([stack, op_helpers, selector, row, hasher, index], [b_chip]) when op_bits[8] & !op_bits[4] & !op_bits[3] & !op_bits[2]

@@ -238,109 +238,6 @@ ev b0_b1_is_zero([op_bits[8]]):
     enf op_bits[6] & op_bits[5] & op_bits[1] = 0
 
 
-ev u32and_bus_constraint([stack_top[16]], [b_chip]):
-    # and_req_val represents bitwise operation request value.
-    let and_req_val = $alpha[0] + 
-                      $alpha[1] * BITWISE_AND + 
-                      $alpha[2] * stack_top[0] + 
-                      $alpha[3] * stack_top[1] + 
-                      $alpha[4] * stack_top[0]'
-
-    # Enforce u32and bus constraint.
-    enf b_chip' * and_req_val = b_chip
-
-
-ev u32xor_bus_constraint([stack_top[16]], [b_chip]):
-    # xor_req_val represents bitwise operation request value.
-    let xor_req_val = $alpha[0] + 
-                      $alpha[1] * BITWISE_XOR + 
-                      $alpha[2] * stack_top[0] + 
-                      $alpha[3] * stack_top[1] + 
-                      $alpha[4] * stack_top[0]'
-
-    # Enforce u32and bus constraint.
-    enf b_chip' * xor_req_val = b_chip
-
-
-ev mloadw_bus_constraint([s[16], clk], [b_chip]):
-    let v = sum([$alpha[i + 5] * s[3 - i]' for i in 0..4])
-    let u_mem = $alpha[0] + $alpha[1] * MEMORY_READ + $alpha[3] * s[0] + $alpha[4] * clk + v
-    enf b_chip' * u_mem = b_chip
-
-
-ev mload_bus_constraint([s[16], op_helpers[6], clk], [b_chip]):
-    let v = $alpha[5] * s[0]' + sum([$alpha[i + 5] * op_helpers[3 - i]' for i in 1..4])
-    let u_mem = $alpha[0] + $alpha[1] * MEMORY_READ + $alpha[3] * s[0] + $alpha[4] * clk + v
-    enf b_chip' * u_mem = b_chip
-
-
-ev mstorew_bus_constraint([s[16], clk], [b_chip]):
-    let v = sum([$alpha[i + 5] * s[3 - i]']) for i in 0..4
-    let u_mem = $alpha[0] + $alpha[1] * MEMORY_WRITE + $alpha[3] * s[0] + $alpha[4] * clk + v
-    enf b_chip' * u_mem = b_chip
-
-
-ev mstore_bus_constraint([s[16], op_helpers[6], clk], [b_chip]):
-    let v = $alpha[5] * s[0]' + sum([$alpha[i + 5] * op_helpers[3 - i]' for i in 1..4])
-    let u_mem = $alpha[0] + $alpha[1] * MEMORY_WRITE + $alpha[3] * s[0] + $alpha[4] * clk + v
-    enf b_chip' * u_mem = b_chip
-
-
-ev hperm_bus_constraint([s[16], op_helpers[6]], [b_chip]):
-    let v_input = $alpha[0] + 
-                  $alpha[1] * HASHER_LINEAR_HASH + 
-                  $alpha[2] * op_helpers[0] + 
-                  sum([$alpha[i + 4] * s[11 - i] for i in 0..12])
-
-    let v_output = $alpha[0] + 
-                   $alpha[1] * HASHER_RETURN_STATE + 
-                   $alpha[2] * (op_helpers[0] + 7) + 
-                   sum([$alpha[i + 4] * s[11 - i]' for i in 0..12])
-
-    enf b_chip' * v_input * v_output = b_chip
-
-
-ev mpverify_bus_constraint([s[16], op_helpers[6]], [b_chip]):
-    let v_input = $alpha[0] + 
-                  $alpha[1] * HASHER_MP_VERIFY + 
-                  $alpha[2] * op_helpers[0] + 
-                  $alpha[3] * s[5] + 
-                  sum([$alpha[i + 8] * s[3 - i] for i in 0..4])
-
-    let v_output = $alpha[0] + 
-                   $alpha[1] * HASHER_RETURN_HASH + 
-                   $alpha[2] * (op_helpers[0] + 8 * s[4] - 1) + 
-                   sum([$alpha[i + 8] * s[9 - i] for i in 0..4])
-
-    enf b_chip' * v_input * v_output = b_chip
-
-
-ev mrupdate_bus_constraint([s[16], op_helpers[6]], [b_chip]):
-    let v_input_old = $alpha[0] + 
-                      $alpha[1] * HASHER_MR_UPDATE_OLD + 
-                      $alpha[2] * op_helpers[0] + 
-                      $alpha[3] * s[5] + 
-                      sum([$alpha[i + 8] * s[3 - i] for i in 0..4])
-
-    let v_output_old = $alpha[0] + 
-                       $alpha[1] * HASHER_RETURN_HASH + 
-                       $alpha[2] * (op_helpers[0] + 8 * s[4] - 1) + 
-                       sum([$alpha[i + 8] * s[9 - i] for i in 0..4])
-
-    let v_input_new = $alpha[0] + 
-                      $alpha[1] * HASHER_MR_UPDATE_NEW + 
-                      $alpha[2] * (op_helpers[0] + 8 * s[4]) + 
-                      $alpha[3] * s[5] + 
-                      sum([$alpha[i + 8] * s[13 - i] for i in 0..4])
-
-    let v_output_new = $alpha[0] + 
-                       $alpha[1] * op_rethash + 
-                       $alpha[2] * (op_helpers[0] + 2 * 8 * s[4] - 1) + 
-                       sum([$alpha[i + 8] * s[3 - i]' for i in 0..4])
-
-    enf b_chip' * v_input_old * v_output_old * v_input_new * v_output_new = b_chip
-
-
 ### Stack Air Constraints #########################################################################
 
 # Enforces the constraints on the stack.
@@ -348,8 +245,6 @@ ev mrupdate_bus_constraint([s[16], op_helpers[6]], [b_chip]):
 # stack_helpers consists of [bookkeeping[0], bookkeeping[1], h0]
 # op_bits consists of [op_bits[7], extra]
 ev stack_constraints([stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6], clk, fmp], [p1]):
-    enf overflow_table_constraints([stack_top, stack_helpers, op_bits, op_helpers, clk, fmp], [p1])
-
     let op_flags = compute_op_flags(op_bits)
 
     match enf:
@@ -429,38 +324,6 @@ ev stack_constraints([stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6]
         u32assert2([stack_top, op_bits, op_helpers])  when op_flags[69]
         u32add3([stack_top, op_bits, op_helpers])     when op_flags[70]
         u32madd([stack_top, op_bits, op_helpers])     when op_flags[71]
-
-
-ev overflow_table_constraints(
-    [stack_top[16], stack_helpers[3], op_bits[8], op_helpers[6], clk, fmp], 
-    [p1]
-):
-    # Flag to indicate whether the overflow table contains values (overflow flag).
-    let f_ov = (stack_helpers[0] - 16) * stack_helpers[2]
-    
-    # Enforce that overflow flag is set correctly.
-    enf (1 - f_ov) * (stack_helpers[0] - 16) = 0
-
-    # Enforce that stack depth column stack_helpers[0] (bookkeeping[0]) is updated correctly.
-    enf stack_helpers[0]' - stack_helpers[0] + f_shl(op_bits, op_helpers) * f_ov - f_shr(op_bits) = 0
-
-    # Value of the row to be added to the table
-    let v = $alpha[0] + $alpha[1] * clk + $alpha[2] * stack_top[15] + $alpha[3] * stack_helpers[1]
-
-    # Value of the row to be removed from the table
-    let u = $alpha[0] + $alpha[1] * stack_helpers[1] + $alpha[2] * stack_top[15]' + alpha[3] * stack_helpers[1]'
-
-    # Enforce that right and left shifts update the overflow table correctly.
-    enf p1' * (u * f_shl(op_bits, op_helpers) * f_ov + 1 - f_shl(op_bits, op_helpers) * f_ov) = 
-        p1 * (v * f_shr(op_bits) + 1 - f_shr)
-
-    # Enforce that the next value of stack_helpers[1] (bookkeeping[1]) is set to the current value of clk.
-    enf f_shr(op_bits) * (stack_helpers[1]' - clk) = 0
-
-    # Enforce that when the overflow table is empty, 0 is "shifted in" from the right (i.e. stack_top[15] is set to 0).
-    enf f_shl(op_bits, op_helpers) * (1 - f_ov) * stack_top[15]' = 0
-
-    # TODO: enforce boundary constraints
 
 
 # No stack shift operations
