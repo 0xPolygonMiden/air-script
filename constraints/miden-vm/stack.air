@@ -682,8 +682,11 @@ ev mpverify([s[16], op_bits[8], op_helpers[6]]):
 ev pipe([s[16], op_bits[8], op_helpers[6]]):
 
 
-# TODO: add constraints
+# Bus constraint is implemented in a separate file
 ev mstream([s[16], op_bits[8], op_helpers[6]]):
+    enf s[12]' = s[12] + 2
+    enf s[i]' = s[i] for i in 8..12
+    enf s[i]' = s[i] for i in 13..16
 
 # TODO: add constraints
 ev span([s[16], op_bits[8], op_helpers[6]])
