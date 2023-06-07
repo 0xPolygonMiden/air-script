@@ -205,59 +205,6 @@ ev hasher_state([s[3], h[12], i]):
         h[j + 8]' = h[j + 4] for j in 0..4 when b & f_absorb_node
 
 
-# Enforce constraints for the hash chiplet bus.
-#
-# Constraint degree: 7
-ev chiplet_bus([s[3], r, h[12], i], [p0]):
-    # Compute falgs required for the chiplet bus constraint.
-    let f_bp = get_f_bp(s)
-    let f_sout = get_f_sout(s)
-    let f_hout = get_f_hout(s)
-    let f_out = get_f_out(s)
-    let f_mp = get_f_mp(s)
-    let f_mv = get_f_mv(s)
-    let f_mu = get_f_mu(s)
-    let f_abp = get_f_abp(s)
-
-    let op_label = 2^3 * s[2] + 2^2 * s[1] + 2^1 * s[0] + 1
-    let transition_label = op_label + 2^4 * cycle_row_7  + 2^5 * cycle_row_0
-
-    # v_h is a common header.
-    let v_h = $alpha[0] + $alpha[1] * transition_label + $alpha[2] * r + $alpha[3] * i
-
-    # v_a, v_b and v_c are the first, second, and third words of the hasher state.
-    let v_a = sum([$alpha[j + 4] * h[j] for j in 0..4])
-    let v_b = sum([$alpha[j + 4] * h[j] for j in 4..8])
-    let v_b_next = sum([$alpha[j + 4] * h[j]' for j in 4..8])
-    let v_c = sum([$alpha[j + 4] * h[j] for j in 8..12])
-    let v_c_next = sum([$alpha[j + 4] * h[j]' for j in 8..12])
-
-    # v_d is the third word of the hasher state but computed using the same alphas values as used 
-    # for the second word.
-    let v_d = sum([$alpha[j] * h[j] for j in 8..12])
-    
-    # v_all represents the entire hasher state.
-    let v_all = v_h + v_a + v_b + v_c
-
-    # b is the value of the bit which is discarded during shift by one bit to the right.
-    let b = i - 2 * i'
-
-    # v_leaf represents the leaf of the path.
-    let v_leaf = v_h + (1 - b) * v_b + b * v_d
-
-    # v_abp represents delta between the last 8 elements of the hasher state during absorption a 
-    # new set of elements into the state while computing a linear hash.
-    let v_abp = v_h + v_b_next + v_c_next - (v_b + v_c)
-
-    # v_res represents returning the hash result, taken from the second word of the hasher state.
-    let v_res = v_h + v_b
-
-    # Enforce constraints for updating column p0.
-    # Constraint degree: 7
-    p0' = p0 * ((f_bp + f_sout) * v_all + (f_mp + f_mv + f_mu) * v_leaf + f_abp * v_abp + 
-                f_hout * v_res + 1 - (f_bp + f_mp + f_mv + f_mu + f_abp + f_out))
-
-
 # Enforce constraints for the hash chiplet sibling table, which is used to keep track of sibling 
 # nodes used during Merkle root update computations. For this computation, we need to enforce the 
 # following rules:
@@ -301,7 +248,7 @@ ev hash_sibling_table([s[3], r, h[12], i], [p1]):
 # Enforces the constraints on the hash chiplet, given the columns of the hash execution trace.
 #
 # Max constraint degree: 7
-ev hash_chiplet([s[3], r, h[12], i]):
+ev hash_chiplet([s[3], r, h[12], i], [p1]):
     ## Row address constraint ##
     # TODO: Apply row address constraints:
     # 1. Boundary constraint `enf r.first = 1`
@@ -318,5 +265,5 @@ ev hash_chiplet([s[3], r, h[12], i]):
     enf hasher_state([s, h, i])
 
     ## Multiset check constraints ##
-    enf chiplet_bus([s, r, h, i], [p0])
+    # Chiplet bus constraints are implemented in the separate file.
     enf hash_sibling_table([s, r, h, i], [p1])
