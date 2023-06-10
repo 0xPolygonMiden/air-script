@@ -1,4 +1,4 @@
-mod StacktAir
+mod StackAir
 
 ### Helper functions ##############################################################################
 
@@ -202,7 +202,7 @@ fn compute_op_flags(op_bits: vector[8]) -> vector[88]:
 
 ### Helper evaluators #############################################################################
 
-# Enforces that the provided columns must be binary.
+# Enforces that the provided columns are binary.
 ev is_binary([a]):
     enf a^2 = a
 
