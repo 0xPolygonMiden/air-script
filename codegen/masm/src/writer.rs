@@ -188,6 +188,11 @@ impl Writer {
     simple_ins!(ext2mul);
     simple_ins!(ext2add);
     simple_ins!(ext2sub);
+    simple_ins!(neg);
+
+    pub(crate) fn add(&mut self, arg: u64) {
+        self.ins(format!("add.{}", arg));
+    }
 
     pub fn dup(&mut self, arg: u64) {
         assert!(
@@ -241,16 +246,6 @@ impl Writer {
             "Value is larger than modulus, likely a bug"
         );
         self.ins(format!("push.{}", arg));
-    }
-
-    pub fn div(&mut self, divisor: Option<u64>) {
-        match divisor {
-            Some(divisor) => {
-                assert!(divisor != 0, "Division by zero is not supported, got div.0");
-                self.ins(format!("div.{}", divisor))
-            }
-            None => self.ins("div"),
-        }
     }
 
     pub fn neq(&mut self, arg: u64) {

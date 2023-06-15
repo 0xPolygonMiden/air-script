@@ -10,6 +10,7 @@ use ir::{
     NodeIndex, PeriodicColumn, PublicInput, TraceAccess, Value,
 };
 use std::collections::btree_map::{BTreeMap, Entry};
+use std::mem::{replace, take};
 
 use processor::math::{Felt, StarkField};
 use winter_prover::math::fft;
@@ -28,6 +29,11 @@ pub struct CodeGenerator<'ast> {
     ///
     /// Periodic columns are visited in order, and the counter is the same as the columns ID.
     periodic_column: u32,
+
+    /// A list of the periodic lengths in decreasing order.
+    ///
+    /// The index in this vector corresponds to the offset of the pre-computed z value.
+    periods: Vec<usize>,
 
     /// Counts how many composition coefficients have been used so far, used to compute the correct
     /// offset in memory.
@@ -56,15 +62,18 @@ pub struct CodeGenerator<'ast> {
     config: CodegenConfig,
 }
 
-/// Converts a column ID to an element position.
+/// Given a periodic column group position, returns a memory offset.
 ///
-/// The element position is then used to determine the memory location to load, and which elements
-/// of the word must be kept. Values of periodic columns are stored at distinct memory addresses
-/// such that each value occupies a single memory word with the two most significant word elements
-/// set to zeros (i.e., [q0, q1, 0, 0])
-fn periodic_column_to_target_el(column: u32) -> u32 {
-    // each period column has its own address, and the element is in the lower half
-    (column * 2) + 1
+/// Periodic columns are grouped based on their length, this is done so that only a single z value
+/// needs to be cached per group. The grouping is based on unique lengths, sorted from highest to
+/// lowest. Given a periodic group, this function will return a memory offset, which can be used to
+/// load the corresponding z value.
+fn periodic_group_to_memory_offset(group: u32) -> u32 {
+    // Each memory address contains a quadratic field extension element, this makes the code to
+    // store/load the data more efficient, since it is easier to push/pop the high values of a
+    // word. So below we have to multiply the group by 2, to account for the zero padding, and add
+    // 1, to account for the data being at the low and not high part of the word.
+    group * 2 + 1
 }
 
 /// Loads the `element` from a memory range starting at `base_addr`.
@@ -148,6 +157,7 @@ impl<'ast> CodeGenerator<'ast> {
         CodeGenerator {
             writer: Writer::new(),
             periodic_column: 0,
+            periods,
             composition_coefficient_count: 0,
             integrity_contraints: 0,
             boundary_contraints: 0,
@@ -166,113 +176,184 @@ impl<'ast> CodeGenerator<'ast> {
 
     /// Emits code for the procedure `cache_z_exp`.
     ///
-    /// The emitted procedure computes a `z**exp` for each periodic column, these values are later
-    /// on used to evaluate the polynomial of each periodic column.
+    /// The procedure computes and caches the necessary exponentiation of `z`. These values are
+    /// later on used to evaluate each periodic column polynomial and the constraint divisor.
     ///
-    /// The emitted code is optimized to performn the fewest number of exponentiations, this is
-    /// achieved by observing that periodic columns and trace length are both power-of-two in
-    /// length, since the exponent is defined as `exp = trace_len / periodic_column_len`, all
-    /// exponents are themselves powers-of-two.
+    /// This procedure exists because the VM doesn't have native instructions for exponentiation of
+    /// quadratic extension elements, and this is an expensive operation.
     ///
-    /// The algorithm computes the exponents from smallest to largest, using the previous result as
-    /// a cache value.
+    /// The generated code is optimized to perform the fewest number of exponentiations, this is
+    /// achieved by observing that periodic columns and trace length are both powers-of-two, since
+    /// the exponent is defined as `exp = trace_len / periodic_column_len`, all exponents are
+    /// themselves powers-of-two. This allows the results to be computed from smallest to largest,
+    /// re-using the intermediary values.
     fn gen_cache_z_exp(&mut self) -> Result<(), CodegenError> {
         // NOTE:
         // - the trace length is a power-of-two.
         //   Ref: https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/random_coin.masm#L82-L87
         // - the periodic columns are powers-of-two.
         //   Ref: https://github.com/0xPolygonMiden/air-script/blob/next/ir/src/symbol_table/mod.rs#L305-L309
-
-        let mut m: BTreeMap<u64, Vec<u32>> = BTreeMap::new();
-        for (p, c) in self.ir.periodic_columns().iter().enumerate() {
-            let idx = p.try_into().or(Err(CodegenError::InvalidIndex))?;
-            let len = c
-                .len()
-                .try_into()
-                .expect("length will be used as a memory address, it must fit in a u32");
-            m.entry(len).or_insert(vec![]).push(idx);
-        }
+        // - the trace length is always greater-than-or-equal the periodic column length.
+        //   Ref: https://github.com/facebook/winterfell/blob/main/air/src/air/mod.rs#L322-L326
 
         self.writer.proc("cache_z_exp");
 
-        self.writer.header("Load trace length");
-        self.writer.mem_load(self.config.trace_len_address);
-        self.writer.header("=> [trace_len, ...]");
+        self.load_z();
+        self.writer.header("=> [z_1, z_0, ...]");
 
-        self.writer.header("Push initial num_of_cycles");
-        self.writer.push(1);
-        self.writer.header("=> [num_of_cycles, trace_len, ...]");
+        // The loop below needs to mutably borrow the codegen, so take the field for the iteration
+        // (must reset value after the loop).
+        let periods = take(&mut self.periods);
 
-        self.writer.header("Load Z");
-        self.writer.padw();
-        self.writer.mem_loadw(self.config.z_address);
-        self.writer.drop();
-        self.writer.drop();
-        self.writer
-            .header("=> [z_1, z_0, num_of_cycles, trace_len, ...]");
+        // Emit code to precompute the exponentiation of z for the periodic columns.
+        let mut previous_period_size: Option<u64> = None;
+        for (idx, period) in periods.iter().enumerate() {
+            assert!(
+                period.is_power_of_two(),
+                "The length of a periodic column must be a power-of-two"
+            );
 
-        for (divisor, columns) in m.iter().rev() {
-            self.writer.header(format!(
-                "Compute exponentiations based on the number of cycles for a period of {}",
-                divisor
-            ));
-            self.writer.dup(3);
-            self.writer.div(Some(*divisor));
-            self.writer
-                .header("=> [num_of_cycles', z_1, z_0, num_of_cycles, trace_len, ...]");
+            match previous_period_size {
+                None => {
+                    self.writer.header(format!(
+                        "Find number exponentiations required to get for a period of length {}",
+                        period
+                    ));
 
-            self.writer
-                .header("Update next num_of_cycles and compute number of iterations");
-            self.writer.movup(3);
-            self.writer.dup(1);
-            self.writer.movdn(4);
-            self.writer.div(None);
-            self.writer
-                .header("=> [i, z_1, z_0, num_of_cycles', trace_len, ...]");
+                    // This procedure caches the result of `z.exp(trace_len / period_size)`. Note
+                    // that `trace_len = 2^x` and `period_len = 2^y`, so the result of the division
+                    // is the same as `2^(x - y)`, the code below computes `x-y` because both
+                    // values are in log2 form.
+                    //
+                    // The result is the number of times that `z` needs to be squared. The
+                    // instructions below result in a negative value, as `add.1` is optimized in
+                    // the VM (IOW, counting up is faster than counting down).
+                    self.load_log2_trace_len();
+                    self.writer.neg();
+                    self.writer.add(period.ilog2().into());
+                    self.writer.header(format!(
+                        "=> [count, z_1, z_0, ...] where count = -log2(trace_len) + {}",
+                        period.ilog2()
+                    ));
+                }
+                Some(prev) => {
+                    self.writer.header(format!(
+                        "Find number of exponentiations to bring from length {} to {}",
+                        prev, *period,
+                    ));
 
-            self.writer
-                .header("Exponentiate the existing `z**num_of_cycles` an additional `i` times");
+                    // The previous iteration computed `log2(trace_len) - log2(prev_period_size)`,
+                    // this iteration will compute `log2(trace_len) - log2(period_size)`. The goal
+                    // is to reuse the previous value as a cache, so only compute the difference of
+                    // the two values which is just `log2(prev_period_size) - log2(period_size)`.
+                    let prev = Felt::new(prev.ilog2().into());
+                    let new = Felt::new(period.ilog2().into());
+                    let diff = new - prev; // this is a negative value
+                    self.writer.push(diff.as_int());
+                    self.writer.header(format!(
+                        "=> [count, (z_1, z_0)^{}, ...] where count = {} - {}",
+                        prev.as_int(),
+                        new.as_int(),
+                        prev.as_int(),
+                    ));
+                }
+            }
+
+            self.writer.header("Exponentiate z");
+
+            // The trace length and the period may have the same size, so it is necessary to perform
+            // the test before entering the loop.
             self.writer.dup(0);
-            self.writer.neq(1);
+            self.writer.neq(0);
 
             self.writer.r#while();
             self.writer.movdn(2);
             self.writer.dup(1);
             self.writer.dup(1);
             self.writer.ext2mul();
-            self.writer
-                .header("=> [z_1^2, z_0^2, i, num_of_cycles', trace_len, ...]");
+            self.writer.header("=> [(z_1, z_0)^n, i, ...]");
 
             self.writer.movup(2);
-            self.writer.div(Some(2));
+            self.writer.add(1);
             self.writer.dup(0);
-            self.writer.neq(1);
-            self.writer
-                .header("=> [b, i+1, z_1^2, z_0^2, num_of_cycles', trace_len, ...]");
+            self.writer.neq(0);
+            self.writer.header("=> [b, i+1, (z_1, z_0)^n, ...]");
             self.writer.end();
 
-            self.writer.drop();
+            let idx: u32 = idx.try_into().expect("periodic column length is too large");
+            let addr = self.config.z_exp_address + idx;
             self.writer.push(0);
-            self.writer.push(0);
+            self.writer.mem_storew(addr);
+            self.writer.comment(format!("z^{}", *period));
 
-            for c in columns {
-                let addr = self.config.z_exp_address + c;
-                // each memory address contains the data for a single periodic column, this means
-                // the memory has to be zeroed and then we can overwrite the value.
-                self.writer.mem_storew(addr);
-                self.writer
-                    .comment(format!("Save the exponentiation of z for column {}", c));
-            }
-
-            self.writer
-                .header("=> [0, 0, z_1^2, z_0^2, num_of_cycles', trace_len, ...]");
+            self.writer.header(format!(
+                "=> [0, 0, (z_1, z_0)^n, ...] where n = trace_len-{}",
+                *period
+            ));
             self.writer.drop();
             self.writer.drop();
+
+            previous_period_size = Some((*period).try_into().expect("diff must fit in a u64"));
         }
-        self.writer
-            .header("=> [z_1^2, z_0^2, num_of_cycles', trace_len, ...]");
-        self.writer.comment("Clean stack");
+
+        // Re-set the periods now that the loop is over
+        let _ = replace(&mut self.periods, periods);
+
+        // Emit code to precompute the exponentiation of z for the divisor.
+        match previous_period_size {
+            None => {
+                self.writer.header("Exponentiate z trace_len times");
+                self.load_log2_trace_len();
+                self.writer.neg();
+                self.writer
+                    .header("=> [count, z_1, z_0, ...] where count = -log2(trace_len)");
+            }
+            Some(prev) => {
+                self.writer
+                    .header(format!("Exponentiate z {} times, until trace_len", prev));
+                let prev = Felt::new(prev.ilog2().into());
+                let neg_prev = -prev;
+                self.writer.push(neg_prev.as_int());
+                self.writer.header(format!(
+                    "=> [count, (z_1, z_0)^n, ...] where count=-{} , n=trace_len-{}",
+                    prev.as_int(),
+                    prev.as_int(),
+                ));
+            }
+        }
+
+        // The trace length and the period may have the same size, so it is necessary to perform
+        // the test before entering the loop.
+        self.writer.dup(0);
+        self.writer.neq(0);
+
+        self.writer.r#while();
+        self.writer.movdn(2);
+        self.writer.dup(1);
+        self.writer.dup(1);
+        self.writer.ext2mul();
+        self.writer.header("=> [(z_1, z_0)^n, i, ...]");
+
+        self.writer.movup(2);
+        self.writer.add(1);
+        self.writer.dup(0);
+        self.writer.neq(0);
+        self.writer.header("=> [b, i+1, (z_1, z_0)^n, ...]");
+        self.writer.end();
+
+        let idx: u32 = self
+            .periods
+            .len()
+            .try_into()
+            .expect("periodic column length is too large");
+        let addr = self.config.z_exp_address + idx;
+        self.writer.push(0);
+        self.writer.mem_storew(addr);
+        self.writer.comment("z^trace_len");
+
+        self.writer.header("=> [0, 0, (z_1, z_0)^trace_len, ...]");
         self.writer.dropw();
+        self.writer.comment("Clean stack");
 
         self.writer.end();
 
@@ -285,7 +366,6 @@ impl<'ast> CodeGenerator<'ast> {
     /// each periodic polynomial using Horner's method. The results are cached to memory.
     fn gen_evaluate_periodic_polys(&mut self) -> Result<(), CodegenError> {
         self.writer.proc("cache_periodic_polys");
-        self.writer.exec("cache_z_exp");
         walk_periodic_columns(self, self.ir)?;
         self.writer.end();
 
@@ -363,6 +443,19 @@ impl<'ast> CodeGenerator<'ast> {
 
         Ok(())
     }
+
+    /// Emits code to load the `log_2(trace_len)` onto the top of the stack.
+    fn load_log2_trace_len(&mut self) {
+        self.writer.mem_load(self.config.log2_trace_len_address);
+    }
+
+    /// Emits code to load `z` onto the top of the stack.
+    fn load_z(&mut self) {
+        self.writer.padw();
+        self.writer.mem_loadw(self.config.z_address);
+        self.writer.drop();
+        self.writer.drop();
+    }
 }
 
 #[derive(Debug)]
@@ -434,8 +527,8 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         walk_integrity_constraint_degrees(self, self.ir, MAIN_TRACE)?;
         walk_integrity_constraint_degrees(self, self.ir, AUX_TRACE)?;
 
+        self.gen_cache_z_exp()?;
         if !self.ir.periodic_columns().is_empty() {
-            self.gen_cache_z_exp()?;
             self.gen_evaluate_periodic_polys()?;
         }
         self.gen_compute_evaluate_integrity_constraints()?;
@@ -597,10 +690,17 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         // ---------------------------------------------------------------------------------------
 
         // assumes that cache_z_exp has been called before, which precomputes the value of z**exp
+        let group: u32 = self
+            .periods
+            .iter()
+            .position(|&p| p == column.len())
+            .expect("All periods are added in the constructor")
+            .try_into()
+            .expect("periods are u32");
         load_quadratic_element(
             &mut self.writer,
             self.config.z_exp_address,
-            periodic_column_to_target_el(self.periodic_column),
+            periodic_group_to_memory_offset(group),
         )?;
         self.writer.header("=> [z_exp_1, z_exp_0, ...]");
 
@@ -726,12 +826,18 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
 
                 load_quadratic_element(&mut self.writer, base_address, target_element)?;
             }
-            Value::PeriodicColumn(column, _) => {
-                let column: u32 = (*column).try_into().or(Err(CodegenError::InvalidIndex))?;
+            Value::PeriodicColumn(_, length) => {
+                let group: u32 = self
+                    .periods
+                    .iter()
+                    .position(|&p| p == *length)
+                    .expect("All periods are added in the constructor")
+                    .try_into()
+                    .expect("periods are u32");
                 load_quadratic_element(
                     &mut self.writer,
                     self.config.periodic_values_address,
-                    periodic_column_to_target_el(column),
+                    periodic_group_to_memory_offset(group),
                 )?;
             }
             Value::PublicInput(name, index) => {

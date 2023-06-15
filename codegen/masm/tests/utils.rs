@@ -126,6 +126,11 @@ where
         trace_len,
         constants::TRACE_LEN_ADDRESS
     ));
+    code.push_str(&format!(
+        "    push.{} push.{} mem_store # log2(trace_len)\n",
+        trace_len.ilog2(),
+        constants::LOG2_TRACE_LEN_ADDRESS,
+    ));
 
     // save the out-of-domain element
     let [z_0, z_1] = z.to_base_elements();
