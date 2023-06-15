@@ -1,28 +1,31 @@
+// WINTERFELL CONSTANTS ---------------------------------------------------------------------------
 pub const MAIN_TRACE: u8 = 0;
 pub const AUX_TRACE: u8 = 1;
 
-// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/verifier.masm#L21
-pub const COMPOSITION_COEF_ADDRESS: u32 = 4294966016;
+// MIDEN CONSTANTS -------------------------------------------------------------------------------
+// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/constants.masm#L33
+pub const COMPOSITION_COEF_ADDRESS: u32 = 4294900200;
 
-// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/verifier.masm#L15
-pub const PUBLIC_INPUTS_ADDRESS: u32 = 4294960000;
+// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/constants.masm#L14
+pub const PUBLIC_INPUTS_ADDRESS: u32 = 4294800000;
 
-// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/ood_frames.masm#L2
-pub const OOD_FRAME_ADDRESS: u32 = 4294965000;
+// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/constants.masm#L19
+pub const OOD_FRAME_ADDRESS: u32 = 4294900000;
 
-// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/ood_frames.masm#L2
-pub const OOD_AUX_FRAME_ADDRESS: u32 = OOD_FRAME_ADDRESS + 72;
+// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/ood_frames.masm#L11-L16
+pub const MAIN_TRACE_COLUMN_COUNT: u32 = 73;
+pub const OOD_AUX_FRAME_ADDRESS: u32 = OOD_FRAME_ADDRESS + MAIN_TRACE_COLUMN_COUNT;
 
-// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/verifier.masm#L20
-pub const AUX_RAND_ELEM_PTR: u32 = 4294966000;
+// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/constants.masm#LL30C25-L30C35
+pub const AUX_RAND_ELEM_PTR: u32 = 4294900150;
 
-// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/random_coin.masm#L12
-pub const TRACE_LEN_ADDRESS: u32 = 4294959999;
-pub const LOG_TRACE_LEN_ADDRESS: u32 = 4294959998;
+// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/constants.masm#L81
+pub const TRACE_LEN_ADDRESS: u32 = 4294903306;
+pub const LOG2_TRACE_LEN_ADDRESS: u32 = 4294903307;
 
-// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/random_coin.masm#L5
-pub const Z_ADDRESS: u32 = 4294967291;
+// https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/constants.masm#L79
+pub const Z_ADDRESS: u32 = 4294903304;
 
-// TODO: define these addresses
+// CODEGEN CONSTANTS ------------------------------------------------------------------------------
 pub const PERIODIC_VALUES_ADDRESS: u32 = 500000000;
 pub const Z_EXP_ADDRESS: u32 = 500000100;
