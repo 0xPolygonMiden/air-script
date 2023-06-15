@@ -1,6 +1,6 @@
 proc.cache_z_exp
     # Load trace length
-    mem_load.3294967296
+    mem_load.4294959999
     # => [trace_len, ...]
     # Push initial num_of_cycles
     push.1
@@ -22,8 +22,7 @@ proc.cache_z_exp
         movup.2 div.2 dup.0 neq.1
         # => [b, i+1, z_1^2, z_0^2, num_of_cycles', trace_len, ...]
     end # END while
-    drop push.0 push.0
-    mem_storew.500000100 # Save the exponentiation of z for column 0
+    drop push.0 push.0 mem_storew.500000100 # Save the exponentiation of z for column 0
     mem_storew.500000101 # Save the exponentiation of z for column 1
     # => [0, 0, z_1^2, z_0^2, num_of_cycles', trace_len, ...]
     drop drop
@@ -125,8 +124,8 @@ proc.cache_periodic_polys
     push.0 push.0 mem_storew.500000001 dropw
 end # END PROC cache_periodic_polys
 
-proc.compute_evaluate_transitions
-    # constraint 0 for main
+proc.compute_evaluate_integrity_constraints
+    # integrity constraint 0 for main
     padw mem_loadw.4294965000 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -144,11 +143,11 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965000 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966016 movdn.3 movdn.3 drop drop ext2mul
-    # constraint 1 for main
+    # integrity constraint 1 for main
     padw mem_loadw.500000001 drop drop padw mem_loadw.4294965000 drop drop padw mem_loadw.4294965000 movdn.3 movdn.3 drop drop ext2sub ext2mul push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966016 drop drop ext2mul
-    # constraint 2 for main
+    # integrity constraint 2 for main
     padw mem_loadw.4294965003 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -166,7 +165,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965003 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966017 movdn.3 movdn.3 drop drop ext2mul
-    # constraint 3 for main
+    # integrity constraint 3 for main
     padw mem_loadw.4294965004 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -184,7 +183,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965004 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966017 drop drop ext2mul
-    # constraint 4 for main
+    # integrity constraint 4 for main
     padw mem_loadw.4294965005 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -202,7 +201,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965005 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966018 movdn.3 movdn.3 drop drop ext2mul
-    # constraint 5 for main
+    # integrity constraint 5 for main
     padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -220,7 +219,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966018 drop drop ext2mul
-    # constraint 6 for main
+    # integrity constraint 6 for main
     padw mem_loadw.4294965007 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -238,7 +237,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965007 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966019 movdn.3 movdn.3 drop drop ext2mul
-    # constraint 7 for main
+    # integrity constraint 7 for main
     padw mem_loadw.4294965008 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -256,7 +255,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965008 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966019 drop drop ext2mul
-    # constraint 8 for main
+    # integrity constraint 8 for main
     padw mem_loadw.4294965009 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -274,7 +273,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965009 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966020 movdn.3 movdn.3 drop drop ext2mul
-    # constraint 9 for main
+    # integrity constraint 9 for main
     padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -292,7 +291,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop ext2sub push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966020 drop drop ext2mul
-    # constraint 10 for main
+    # integrity constraint 10 for main
     padw mem_loadw.500000000 drop drop padw mem_loadw.4294965001 movdn.3 movdn.3 drop drop push.2 push.0
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -350,7 +349,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop ext2mul ext2add ext2sub ext2mul push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966021 movdn.3 movdn.3 drop drop ext2mul
-    # constraint 11 for main
+    # integrity constraint 11 for main
     padw mem_loadw.500000000 drop drop padw mem_loadw.4294965002 movdn.3 movdn.3 drop drop push.2 push.0
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -408,7 +407,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop ext2mul ext2add ext2sub ext2mul push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966021 drop drop ext2mul
-    # constraint 12 for main
+    # integrity constraint 12 for main
     padw mem_loadw.500000001 drop drop padw mem_loadw.4294965001 drop drop padw mem_loadw.4294965001 movdn.3 movdn.3 drop drop push.16 push.0 ext2mul push.2 push.0
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -466,7 +465,7 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop ext2mul ext2add ext2sub ext2mul push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966022 movdn.3 movdn.3 drop drop ext2mul
-    # constraint 13 for main
+    # integrity constraint 13 for main
     padw mem_loadw.500000001 drop drop padw mem_loadw.4294965002 drop drop padw mem_loadw.4294965002 movdn.3 movdn.3 drop drop push.16 push.0 ext2mul push.2 push.0
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -524,15 +523,15 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop ext2mul ext2add ext2sub ext2mul push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966022 drop drop ext2mul
-    # constraint 14 for main
+    # integrity constraint 14 for main
     padw mem_loadw.500000000 drop drop padw mem_loadw.4294965011 movdn.3 movdn.3 drop drop ext2mul push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966023 movdn.3 movdn.3 drop drop ext2mul
-    # constraint 15 for main
+    # integrity constraint 15 for main
     padw mem_loadw.500000001 drop drop padw mem_loadw.4294965012 movdn.3 movdn.3 drop drop padw mem_loadw.4294965011 drop drop ext2sub ext2mul push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966023 drop drop ext2mul
-    # constraint 16 for main
+    # integrity constraint 16 for main
     push.1 push.0 padw mem_loadw.4294965000 movdn.3 movdn.3 drop drop ext2sub padw mem_loadw.4294965012 movdn.3 movdn.3 drop drop padw mem_loadw.4294965011 movdn.3 movdn.3 drop drop push.16 push.0 ext2mul push.2 push.0
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
@@ -644,15 +643,25 @@ proc.compute_evaluate_transitions
     padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop ext2add push.2 push.0 padw mem_loadw.4294965006 movdn.3 movdn.3 drop drop ext2mul padw mem_loadw.4294965010 movdn.3 movdn.3 drop drop ext2mul ext2sub ext2mul ext2add ext2sub ext2mul ext2add push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966024 movdn.3 movdn.3 drop drop ext2mul
-end # END PROC compute_evaluate_transitions
+end # END PROC compute_evaluate_integrity_constraints
 
-proc.evaluate_transitions
+proc.compute_evaluate_boundary_constraints
+    # boundary constraint 0 for main
+    padw mem_loadw.4294965013 movdn.3 movdn.3 drop drop push.0 push.0 ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966024 drop drop ext2mul
+end # END PROC compute_evaluate_boundary_constraints
+
+proc.evaluate_integrity_constraints
     exec.cache_periodic_polys
-    exec.compute_evaluate_transitions
+    exec.compute_evaluate_integrity_constraints
     # Accumulate the numerator of the constraint polynomial
     ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add ext2add
-end # END PROC evaluate_transitions
+end # END PROC evaluate_integrity_constraints
 
-proc.evaluate_boundary
-end # END PROC evaluate_boundary
+proc.evaluate_boundary_constraints
+    exec.compute_evaluate_boundary_constraints
+    # Accumulate the numerator of the constraint polynomial
+    ext2add
+end # END PROC evaluate_boundary_constraints
 

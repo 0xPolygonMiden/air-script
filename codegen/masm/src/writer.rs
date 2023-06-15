@@ -199,27 +199,15 @@ impl Writer {
         self.ins(format!("dup.{}", arg));
     }
 
-    pub fn mem_load(&mut self, address: u64) {
-        assert!(
-            address < 2u64.pow(32),
-            "mem_load address must be 32 bits or less"
-        );
+    pub fn mem_load(&mut self, address: u32) {
         self.ins(format!("mem_load.{}", address));
     }
 
-    pub fn mem_loadw(&mut self, address: u64) {
-        assert!(
-            address < 2u64.pow(32),
-            "mem_loadw address must be 32 bits or less"
-        );
+    pub fn mem_loadw(&mut self, address: u32) {
         self.ins(format!("mem_loadw.{}", address));
     }
 
-    pub fn mem_storew(&mut self, address: u64) {
-        assert!(
-            address < 2u64.pow(32),
-            "mem_storew address must be 32 bits or less"
-        );
+    pub fn mem_storew(&mut self, address: u32) {
         self.ins(format!("mem_storew.{}", address));
     }
 

@@ -26,11 +26,25 @@ pub struct CodeGenerator<'ast> {
     /// Counts how many periodic columns have been visited so far.
     ///
     /// Periodic columns are visited in order, and the counter is the same as the columns ID.
-    periodic_column: u64,
+    periodic_column: u32,
 
-    /// Counts how many transition constraint roots have been visited so far. Used for
-    /// documentation and to load the composition coefficients.
-    transition_contraint: usize,
+    /// Counts how many composition coefficients have been used so far, used to compute the correct
+    /// offset in memory.
+    composition_coefficient_count: u32,
+
+    /// Counts how many integrity constraint roots have been visited so far, used for
+    /// emitting documentation.
+    integrity_contraints: usize,
+
+    /// Counts how many boundary constraint roots have been visited so far, used for
+    /// emitting documentation.
+    boundary_contraints: usize,
+
+    /// Maps the public input to their start offset.
+    public_input_to_offset: BTreeMap<String, usize>,
+
+    /// Holds the count of public inputs seen so far, this is used to compute the offset.
+    public_input_count: usize,
 
     /// Map of the constants found while visitint the [AirIR].
     ///
@@ -50,7 +64,7 @@ pub struct CodeGenerator<'ast> {
 /// of the word must be kept. Values of periodic columns are stored at distinct memory addresses
 /// such that each value occupies a single memory word with the two most significant word elements
 /// set to zeros (i.e., [q0, q1, 0, 0])
-fn periodic_column_to_target_el(column: u64) -> u64 {
+fn periodic_column_to_target_el(column: u32) -> u32 {
     // each period column has its own address, and the element is in the lower half
     (column * 2) + 1
 }
@@ -61,10 +75,10 @@ fn periodic_column_to_target_el(column: u64) -> u64 {
 /// values are store in higher half of the word, while odd values are stored in the lower half.
 fn load_quadratic_element(
     writer: &mut Writer,
-    base_addr: u64,
-    element: u64,
+    base_addr: u32,
+    element: u32,
 ) -> Result<(), CodegenError> {
-    let target_word: u64 = element / 2;
+    let target_word: u32 = element / 2;
     let address = base_addr + target_word;
 
     // Load data from memory
@@ -102,9 +116,13 @@ impl<'ast> CodeGenerator<'ast> {
     pub fn new(ir: &'ast AirIR, config: CodegenConfig) -> CodeGenerator<'ast> {
         CodeGenerator {
             writer: Writer::new(),
-            constants: BTreeMap::new(),
-            transition_contraint: 0,
             periodic_column: 0,
+            composition_coefficient_count: 0,
+            integrity_contraints: 0,
+            boundary_contraints: 0,
+            public_input_to_offset: BTreeMap::new(),
+            public_input_count: 0,
+            constants: BTreeMap::new(),
             ir,
             config,
         }
@@ -135,10 +153,13 @@ impl<'ast> CodeGenerator<'ast> {
         // - the periodic columns are powers-of-two.
         //   Ref: https://github.com/0xPolygonMiden/air-script/blob/next/ir/src/symbol_table/mod.rs#L305-L309
 
-        let mut m: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
+        let mut m: BTreeMap<u64, Vec<u32>> = BTreeMap::new();
         for (p, c) in self.ir.periodic_columns().iter().enumerate() {
             let idx = p.try_into().or(Err(CodegenError::InvalidIndex))?;
-            let len = c.len().try_into().expect("length should fit in u64");
+            let len = c
+                .len()
+                .try_into()
+                .expect("length will be used as a memory address, it must fit in a u32");
             m.entry(len).or_insert(vec![]).push(idx);
         }
 
@@ -157,7 +178,6 @@ impl<'ast> CodeGenerator<'ast> {
         self.writer.mem_loadw(self.config.z_address);
         self.writer.drop();
         self.writer.drop();
-        self.writer.new_line();
         self.writer
             .header("=> [z_1, z_0, num_of_cycles, trace_len, ...]");
 
@@ -168,7 +188,6 @@ impl<'ast> CodeGenerator<'ast> {
             ));
             self.writer.dup(3);
             self.writer.div(Some(*divisor));
-            self.writer.new_line();
             self.writer
                 .header("=> [num_of_cycles', z_1, z_0, num_of_cycles, trace_len, ...]");
 
@@ -178,7 +197,6 @@ impl<'ast> CodeGenerator<'ast> {
             self.writer.dup(1);
             self.writer.movdn(4);
             self.writer.div(None);
-            self.writer.new_line();
             self.writer
                 .header("=> [i, z_1, z_0, num_of_cycles', trace_len, ...]");
 
@@ -206,7 +224,6 @@ impl<'ast> CodeGenerator<'ast> {
             self.writer.drop();
             self.writer.push(0);
             self.writer.push(0);
-            self.writer.new_line();
 
             for c in columns {
                 let addr = self.config.z_exp_address + c;
@@ -245,30 +262,42 @@ impl<'ast> CodeGenerator<'ast> {
         Ok(())
     }
 
-    /// Emits code for the procedure `compute_evaluate_transitions` and `compute_aux_evaluate_transitions`
+    /// Emits code for the procedure `compute_evaluate_integrity_constraints`.
     ///
-    /// This procedure evaluates each top-level transition constraint and leaves the result on the
+    /// This procedure evaluates each top-level integrity constraint and leaves the result on the
     /// stack. This is useful for testing the evaluation. Later on the value is aggregated.
-    fn gen_compute_evaluate_transitions(&mut self) -> Result<(), CodegenError> {
-        self.writer.proc("compute_evaluate_transitions");
+    fn gen_compute_evaluate_integrity_constraints(&mut self) -> Result<(), CodegenError> {
+        self.writer.proc("compute_evaluate_integrity_constraints");
         walk_integrity_constraints(self, self.ir, MAIN_TRACE)?;
+        self.integrity_contraints = 0; // reset counter for the aux trace
         walk_integrity_constraints(self, self.ir, AUX_TRACE)?;
         self.writer.end();
 
         Ok(())
     }
 
-    /// Emits code for the procedure `evaluate_transitions`.
+    /// Emits code for the procedure `compute_evaluate_boundary_constraints`.
+    fn gen_compute_evaluate_boundary_constraints(&mut self) -> Result<(), CodegenError> {
+        self.writer.proc("compute_evaluate_boundary_constraints");
+        walk_boundary_constraints(self, self.ir, MAIN_TRACE)?;
+        self.boundary_contraints = 0; // reset counter for the aux trace
+        walk_boundary_constraints(self, self.ir, AUX_TRACE)?;
+        self.writer.end();
+
+        Ok(())
+    }
+
+    /// Emits code for the procedure `evaluate_integrity_constraints`.
     ///
-    /// Evaluates the transition constraints for both the main and auxiliary traces.
-    fn gen_evaluate_transitions(&mut self) -> Result<(), CodegenError> {
-        self.writer.proc("evaluate_transitions");
+    /// Evaluates the integrity constraints for both the main and auxiliary traces.
+    fn gen_evaluate_integrity_constraints(&mut self) -> Result<(), CodegenError> {
+        self.writer.proc("evaluate_integrity_constraints");
 
         if !self.ir.periodic_columns().is_empty() {
             self.writer.exec("cache_periodic_polys");
         }
 
-        self.writer.exec("compute_evaluate_transitions");
+        self.writer.exec("compute_evaluate_integrity_constraints");
 
         self.writer
             .header("Accumulate the numerator of the constraint polynomial");
@@ -285,11 +314,23 @@ impl<'ast> CodeGenerator<'ast> {
         Ok(())
     }
 
-    /// Emits code for the procedure `evaluate_boundary`.
-    fn gen_evaluate_boundary(&mut self) -> Result<(), CodegenError> {
-        self.writer.proc("evaluate_boundary");
-        walk_boundary_constraints(self, self.ir, MAIN_TRACE)?;
-        walk_boundary_constraints(self, self.ir, AUX_TRACE)?;
+    /// Emits code for the procedure `evaluate_boundary_constraints`.
+    ///
+    /// Evaluates the boundary constraints for both the main and auxiliary traces.
+    fn gen_evaluate_boundary_constraints(&mut self) -> Result<(), CodegenError> {
+        self.writer.proc("evaluate_boundary_constraints");
+        self.writer.exec("compute_evaluate_boundary_constraints");
+
+        self.writer
+            .header("Accumulate the numerator of the constraint polynomial");
+
+        let total_len = self.ir.boundary_constraints(MAIN_TRACE).len()
+            + self.ir.boundary_constraints(AUX_TRACE).len();
+
+        for _ in 0..total_len {
+            self.writer.ext2add();
+        }
+
         self.writer.end();
 
         Ok(())
@@ -304,6 +345,8 @@ pub enum CodegenError {
     InvalidRowOffset,
     InvalidSize,
     InvalidIndex,
+    InvalidBoundaryConstraint,
+    InvalidIntegrityConstraint,
 }
 
 impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
@@ -316,10 +359,43 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
 
     fn visit_boundary_constraint(
         &mut self,
-        _constraint: &'ast ConstraintRoot,
-        _trace_segment: u8,
+        constraint: &'ast ConstraintRoot,
+        trace_segment: u8,
     ) -> Result<Self::Value, Self::Error> {
-        Ok(()) // TODO
+        if !constraint.domain().is_boundary() {
+            return Err(CodegenError::InvalidBoundaryConstraint);
+        }
+
+        let segment = if trace_segment == MAIN_TRACE {
+            "main"
+        } else {
+            "aux"
+        };
+
+        self.writer.header(format!(
+            "boundary constraint {} for {}",
+            self.boundary_contraints, segment
+        ));
+
+        // Note: AirScript's boundary constraints are only defined for the first or last row.
+        // Meaning they are implemented as an assertion for a single element. Visiting the
+        // [NodeIndex] will emit code to compute the difference of the expected value and the
+        // evaluation frame value.
+        self.visit_node_index(constraint.node_index())?;
+
+        self.writer
+            .header("Multiply by the composition coefficient");
+
+        load_quadratic_element(
+            &mut self.writer,
+            self.config.composition_coef_address,
+            self.composition_coefficient_count,
+        )?;
+        self.writer.ext2mul();
+        self.composition_coefficient_count += 1;
+
+        self.boundary_contraints += 1;
+        Ok(())
     }
 
     fn visit_air(&mut self) -> Result<Self::Value, Self::Error> {
@@ -332,9 +408,10 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
             self.gen_cache_z_exp()?;
             self.gen_evaluate_periodic_polys()?;
         }
-        self.gen_compute_evaluate_transitions()?;
-        self.gen_evaluate_transitions()?;
-        self.gen_evaluate_boundary()?;
+        self.gen_compute_evaluate_integrity_constraints()?;
+        self.gen_compute_evaluate_boundary_constraints()?;
+        self.gen_evaluate_integrity_constraints()?;
+        self.gen_evaluate_boundary_constraints()?;
 
         Ok(())
     }
@@ -365,6 +442,10 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         constraint: &'ast ConstraintRoot,
         trace_segment: u8,
     ) -> Result<Self::Value, Self::Error> {
+        if !constraint.domain().is_integrity() {
+            return Err(CodegenError::InvalidIntegrityConstraint);
+        }
+
         let segment = if trace_segment == MAIN_TRACE {
             "main"
         } else {
@@ -372,8 +453,8 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         };
 
         self.writer.header(format!(
-            "constraint {} for {}",
-            self.transition_contraint, segment
+            "integrity constraint {} for {}",
+            self.integrity_contraints, segment
         ));
 
         self.visit_node_index(constraint.node_index())?;
@@ -384,13 +465,12 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         load_quadratic_element(
             &mut self.writer,
             self.config.composition_coef_address,
-            self.transition_contraint
-                .try_into()
-                .or(Err(CodegenError::InvalidIndex))?,
+            self.composition_coefficient_count,
         )?;
         self.writer.ext2mul();
+        self.composition_coefficient_count += 1;
 
-        self.transition_contraint += 1;
+        self.integrity_contraints += 1;
         Ok(())
     }
 
@@ -548,8 +628,19 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
 
     fn visit_public_input(
         &mut self,
-        _constant: &'ast PublicInput,
+        constant: &'ast PublicInput,
     ) -> Result<Self::Value, Self::Error> {
+        debug_assert!(
+            !self.public_input_to_offset.contains_key(&constant.0),
+            "public input {} has already been visited",
+            constant.0,
+        );
+
+        let start_offset = self.public_input_count;
+        self.public_input_to_offset
+            .insert(constant.0.clone(), start_offset);
+
+        self.public_input_count += constant.1;
         Ok(())
     }
 
@@ -604,11 +695,11 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
                 // curr and next values of a single variable.
                 //
                 // Layout defined at: https://github.com/0xPolygonMiden/miden-vm/issues/875
-                let target_word: u64 = access
+                let target_word: u32 = access
                     .col_idx()
                     .try_into()
                     .map_err(|_| CodegenError::InvalidIndex)?;
-                let el_pos: u64 = access
+                let el_pos: u32 = access
                     .row_offset()
                     .try_into()
                     .or(Err(CodegenError::InvalidIndex))?;
@@ -623,14 +714,28 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
                 load_quadratic_element(&mut self.writer, base_address, target_element)?;
             }
             Value::PeriodicColumn(column, _) => {
-                let column: u64 = (*column).try_into().or(Err(CodegenError::InvalidIndex))?;
+                let column: u32 = (*column).try_into().or(Err(CodegenError::InvalidIndex))?;
                 load_quadratic_element(
                     &mut self.writer,
                     self.config.periodic_values_address,
                     periodic_column_to_target_el(column),
                 )?;
             }
-            Value::PublicInput(_, _) => todo!(),
+            Value::PublicInput(name, index) => {
+                let start_offset = self
+                    .public_input_to_offset
+                    .get(name)
+                    .unwrap_or_else(|| panic!("public input {} unknown", name));
+
+                self.writer.header(format!(
+                    "Load public input {} pos {} with final offset {}",
+                    name, index, start_offset,
+                ));
+                let index: u32 = (start_offset + *index)
+                    .try_into()
+                    .or(Err(CodegenError::InvalidIndex))?;
+                load_quadratic_element(&mut self.writer, self.config.public_inputs_address, index)?;
+            }
             Value::RandomValue(element) => {
                 // Compute the target address for the random value. Each memory address contains
                 // two values.

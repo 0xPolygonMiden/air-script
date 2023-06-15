@@ -61,7 +61,10 @@ fn test_simple_periodic() {
         ],
         trace_len,
         z,
-        &["cache_periodic_polys", "compute_evaluate_transitions"],
+        &[
+            "cache_periodic_polys",
+            "compute_evaluate_integrity_constraints",
+        ],
     );
     let program = Assembler::default().compile(code).unwrap();
 

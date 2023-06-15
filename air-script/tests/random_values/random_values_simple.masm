@@ -1,16 +1,30 @@
-proc.compute_evaluate_transitions
-    # constraint 0 for aux
-    padw mem_loadw.4294965072 drop drop padw mem_loadw.4294965007 drop drop padw mem_loadw.4294965000 movdn.3 movdn.3 drop drop ext2sub padw mem_loadw.4294965001 drop drop ext2add ext2sub
+proc.compute_evaluate_integrity_constraints
+    # integrity constraint 0 for aux
+    padw mem_loadw.4294965072 drop drop padw mem_loadw.4294966007 drop drop padw mem_loadw.4294966000 movdn.3 movdn.3 drop drop ext2sub padw mem_loadw.4294966001 drop drop ext2add ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294966016 movdn.3 movdn.3 drop drop ext2mul
-end # END PROC compute_evaluate_transitions
+end # END PROC compute_evaluate_integrity_constraints
 
-proc.evaluate_transitions
-    exec.compute_evaluate_transitions
+proc.compute_evaluate_boundary_constraints
+    # boundary constraint 0 for aux
+    padw mem_loadw.4294965072 movdn.3 movdn.3 drop drop padw mem_loadw.4294966002 drop drop padw mem_loadw.4294966001 drop drop ext2add padw mem_loadw.4294966007 drop drop ext2add ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966016 drop drop ext2mul
+    # boundary constraint 1 for aux
+    padw mem_loadw.4294965072 movdn.3 movdn.3 drop drop padw mem_loadw.4294966000 movdn.3 movdn.3 drop drop padw mem_loadw.4294966007 drop drop ext2add padw mem_loadw.4294966005 drop drop ext2add ext2sub
+    # Multiply by the composition coefficient
+    padw mem_loadw.4294966017 movdn.3 movdn.3 drop drop ext2mul
+end # END PROC compute_evaluate_boundary_constraints
+
+proc.evaluate_integrity_constraints
+    exec.compute_evaluate_integrity_constraints
     # Accumulate the numerator of the constraint polynomial
     ext2add
-end # END PROC evaluate_transitions
+end # END PROC evaluate_integrity_constraints
 
-proc.evaluate_boundary
-end # END PROC evaluate_boundary
+proc.evaluate_boundary_constraints
+    exec.compute_evaluate_boundary_constraints
+    # Accumulate the numerator of the constraint polynomial
+    ext2add ext2add
+end # END PROC evaluate_boundary_constraints
 

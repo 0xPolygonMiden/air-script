@@ -14,7 +14,7 @@ where
     T: Default + std::fmt::Display,
 {
     pub data: Vec<T>,
-    pub address: u64,
+    pub address: u32,
     pub descriptor: &'a str,
 }
 
@@ -91,16 +91,24 @@ where
     );
 
     // asserts there is no overlap between the memory ranges
-    let mut ranges: Vec<(u64, u64)> = memory
+    let mut ranges: Vec<(u32, u32)> = memory
         .iter()
-        .map(|data| (data.address, data.address + data.data.len() as u64))
+        .map(|data| {
+            let len: u32 = data.data.len().try_into().unwrap();
+            (data.address, data.address + len)
+        })
         .collect();
     ranges.sort();
 
     for check in ranges.windows(2) {
         let first = check[0];
         let second = check[1];
-        assert!(first.1 <= second.0, "memory ranges overlap");
+        assert!(
+            first.1 <= second.0,
+            "memory ranges overlap {:?} {:?}",
+            first,
+            second
+        );
     }
 
     let main_memory_pos = ranges
