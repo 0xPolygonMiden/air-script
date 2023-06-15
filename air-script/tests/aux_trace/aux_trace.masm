@@ -1,3 +1,22 @@
+proc.cache_z_exp
+    padw mem_loadw.4294903304 drop drop
+    # => [z_1, z_0, ...]
+    # Exponentiate z trace_len times
+    mem_load.4294903307 neg dup.0 neq.0
+    while.true
+        movdn.2 dup.1 dup.1 ext2mul
+        # => [z_1^2, z_0^2, i, ...]
+        movup.2 add.1 dup.0 neq.0
+        # => [b, i+1, z_1^2, z_0^2, ...]
+    end # END while
+    push.0 mem_storew.500000100 # z^exp for trace_len
+    # => [0, 0, z_1^2, z_0^2, ...]
+    drop drop
+    # => [z_1^2, z_0^2, num_of_cycles', -log2(trace_len), ...]
+    # Clean stack
+    dropw
+end # END PROC cache_z_exp
+
 proc.compute_evaluate_integrity_constraints
     # integrity constraint 0 for main
     padw mem_loadw.4294900000 drop drop padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop ext2mul padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2mul ext2add ext2sub

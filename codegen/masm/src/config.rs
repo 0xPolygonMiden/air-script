@@ -6,6 +6,11 @@ pub struct CodegenConfig {
     //      [trace_len_address] => [trace_len, 0, 0, 0]
     pub trace_len_address: u32,
 
+    // Memory location of the `log_2(trace_length)` using the following format:
+    //
+    //      [log2_trace_len_address] => [log_2(trace_len), 0, 0, 0]
+    pub log2_trace_len_address: u32,
+
     // Memory location of the out-of-domain value using the following format:
     //
     //      [z_address] => [z8_0, z8_1, z_0, z_1]
@@ -51,6 +56,7 @@ impl Default for CodegenConfig {
     fn default() -> Self {
         CodegenConfig {
             trace_len_address: constants::TRACE_LEN_ADDRESS,
+            log2_trace_len_address: constants::LOG2_TRACE_LEN_ADDRESS,
             z_address: constants::Z_ADDRESS,
             ood_frame_address: constants::OOD_FRAME_ADDRESS,
             ood_aux_frame_address: constants::OOD_AUX_FRAME_ADDRESS,

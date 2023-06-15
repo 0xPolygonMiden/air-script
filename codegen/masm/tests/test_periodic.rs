@@ -62,6 +62,7 @@ fn test_simple_periodic() {
         trace_len,
         z,
         &[
+            "cache_z_exp",
             "cache_periodic_polys",
             "compute_evaluate_integrity_constraints",
         ],
