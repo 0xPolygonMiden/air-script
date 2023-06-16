@@ -1,14 +1,19 @@
 use miden_processor::math::{Felt, StarkField};
 use std::borrow::{Borrow, Cow};
 
+#[derive(Debug, Clone, Copy)]
 enum ControlFlow {
     While,
+    If,
+    Else,
 }
 
 impl std::fmt::Display for ControlFlow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ControlFlow::While => write!(f, "while"),
+            ControlFlow::If => write!(f, "if"),
+            ControlFlow::Else => write!(f, "else"),
         }
     }
 }
@@ -186,7 +191,9 @@ impl Writer {
     simple_ins!(ext2mul);
     simple_ins!(ext2add);
     simple_ins!(ext2sub);
+    simple_ins!(u32checked_and);
     simple_ins!(neg);
+    simple_ins!(cdrop);
 
     pub(crate) fn add(&mut self, arg: u64) {
         self.ins(format!("add.{}", arg));
@@ -251,10 +258,40 @@ impl Writer {
     }
 
     pub fn r#while(&mut self) {
+        assert!(
+            self.procedure.is_some(),
+            "Can not open a while outside of a procedure"
+        );
         self.new_line();
         self.indent();
         self.code.push_str("while.true");
         self.new_line();
         self.stack.push(ControlFlow::While);
+    }
+
+    pub fn r#if(&mut self) {
+        assert!(
+            self.procedure.is_some(),
+            "Can not open a if outside of a procedure"
+        );
+        self.new_line();
+        self.indent();
+        self.code.push_str("if.true");
+        self.new_line();
+        self.stack.push(ControlFlow::If);
+    }
+
+    pub fn r#else(&mut self) {
+        match self.stack.pop() {
+            Some(ControlFlow::If) => {
+                self.maybe_new_line_and_indent();
+                self.code.push_str("else");
+                self.new_line();
+                self.stack.push(ControlFlow::Else);
+            }
+            flow => {
+                panic!("Can not open a else outside of a if, got {:?}", flow);
+            }
+        }
     }
 }

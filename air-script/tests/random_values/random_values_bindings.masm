@@ -16,6 +16,96 @@ proc.cache_z_exp
     dropw # Clean stack
 end # END PROC cache_z_exp
 
+proc.get_exemptions_points
+    mem_load.4294903306
+    # => [trace_len, ...]
+    dup.0 push.131064 u32checked_and neq.0 # Included(3)..Included(16)
+    if.true
+        dup.0 push.2040 u32checked_and neq.0 # Included(3)..Included(10)
+        if.true
+            dup.0 push.120 u32checked_and neq.0 # Included(3)..Included(6)
+            if.true
+                dup.0 push.24 u32checked_and neq.0 # Included(3)..Included(4)
+                if.true
+                    push.8 u32checked_and neq.0 # Test if trace length is a power of 2^3
+                    push.18442240469788262401 push.18446742969902956801 dup.2 cdrop push.18446742969902956801 push.18446462594437873665 movup.3 cdrop
+                else
+                    push.32 u32checked_and neq.0 # Test if trace length is a power of 2^5
+                    push.16140901060737761281 push.18158513693329981441 dup.2 cdrop push.18158513693329981441 push.18442240469788262401 movup.3 cdrop
+                end # END else
+            else
+                dup.0 push.384 u32checked_and neq.0 # Included(7)..Included(8)
+                if.true
+                    push.128 u32checked_and neq.0 # Test if trace length is a power of 2^7
+                    push.9171943329124577373 push.274873712576 dup.2 cdrop push.274873712576 push.16140901060737761281 movup.3 cdrop
+                else
+                    push.512 u32checked_and neq.0 # Test if trace length is a power of 2^9
+                    push.4088309022520035137 push.5464760906092500108 dup.2 cdrop push.5464760906092500108 push.9171943329124577373 movup.3 cdrop
+                end # END else
+            end # END else
+        else
+            dup.0 push.30720 u32checked_and neq.0 # Included(11)..Included(14)
+            if.true
+                dup.0 push.6144 u32checked_and neq.0 # Included(11)..Included(12)
+                if.true
+                    push.2048 u32checked_and neq.0 # Test if trace length is a power of 2^11
+                    push.386651765402340522 push.6141391951880571024 dup.2 cdrop push.6141391951880571024 push.4088309022520035137 movup.3 cdrop
+                else
+                    push.8192 u32checked_and neq.0 # Test if trace length is a power of 2^13
+                    push.2841727033376697931 push.11575992183625933494 dup.2 cdrop push.11575992183625933494 push.386651765402340522 movup.3 cdrop
+                end # END else
+            else
+                push.32768 u32checked_and neq.0 # Test if trace length is a power of 2^15
+                push.9071788333329385449 push.8892493137794983311 dup.2 cdrop push.8892493137794983311 push.2841727033376697931 movup.3 cdrop
+            end # END else
+        end # END else
+    else
+        dup.0 push.33423360 u32checked_and neq.0 # Included(17)..Included(24)
+        if.true
+            dup.0 push.1966080 u32checked_and neq.0 # Included(17)..Included(20)
+            if.true
+                dup.0 push.393216 u32checked_and neq.0 # Included(17)..Included(18)
+                if.true
+                    push.131072 u32checked_and neq.0 # Test if trace length is a power of 2^17
+                    push.14996013474702747840 push.15139302138664925958 dup.2 cdrop push.15139302138664925958 push.9071788333329385449 movup.3 cdrop
+                else
+                    push.524288 u32checked_and neq.0 # Test if trace length is a power of 2^19
+                    push.6451340039662992847 push.5708508531096855759 dup.2 cdrop push.5708508531096855759 push.14996013474702747840 movup.3 cdrop
+                end # END else
+            else
+                dup.0 push.6291456 u32checked_and neq.0 # Included(21)..Included(22)
+                if.true
+                    push.2097152 u32checked_and neq.0 # Test if trace length is a power of 2^21
+                    push.10420286214021487819 push.5102364342718059185 dup.2 cdrop push.5102364342718059185 push.6451340039662992847 movup.3 cdrop
+                else
+                    push.8388608 u32checked_and neq.0 # Test if trace length is a power of 2^23
+                    push.17538441494603169704 push.13945510089405579673 dup.2 cdrop push.13945510089405579673 push.10420286214021487819 movup.3 cdrop
+                end # END else
+            end # END else
+        else
+            dup.0 push.503316480 u32checked_and neq.0 # Included(25)..Included(28)
+            if.true
+                dup.0 push.100663296 u32checked_and neq.0 # Included(25)..Included(26)
+                if.true
+                    push.33554432 u32checked_and neq.0 # Test if trace length is a power of 2^25
+                    push.8974194941257008806 push.16784649996768716373 dup.2 cdrop push.16784649996768716373 push.17538441494603169704 movup.3 cdrop
+                else
+                    push.134217728 u32checked_and neq.0 # Test if trace length is a power of 2^27
+                    push.5506647088734794298 push.16194875529212099076 dup.2 cdrop push.16194875529212099076 push.8974194941257008806 movup.3 cdrop
+                end # END else
+            else
+                dup.0 push.1610612736 u32checked_and neq.0 # Included(29)..Included(30)
+                if.true
+                    push.536870912 u32checked_and neq.0 # Test if trace length is a power of 2^29
+                    push.16558868196663692994 push.7731871677141058814 dup.2 cdrop push.7731871677141058814 push.5506647088734794298 movup.3 cdrop
+                else
+                    push.9896756522253134970 push.16558868196663692994
+                end # END else
+            end # END else
+        end # END else
+    end # END else
+end # END PROC get_exemptions_points
+
 proc.compute_evaluate_integrity_constraints
     # integrity constraint 0 for aux
     padw mem_loadw.4294900073 drop drop padw mem_loadw.4294900157 drop drop padw mem_loadw.4294900150 movdn.3 movdn.3 drop drop ext2sub padw mem_loadw.4294900151 drop drop ext2add ext2sub
