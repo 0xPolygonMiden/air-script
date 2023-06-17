@@ -222,20 +222,34 @@ fn test_complex_boundary() {
     let program_outputs = process.execute(&program).expect("execution failed");
     let result_stack = program_outputs.stack();
 
-    // results are in stack-order
+    // Note: The order of the results is _not_ the same as the definition order in the AirScript.
+    // The order below is:
+    //
+    // 1. First row boundary constraints for the MAIN trace
+    // 2. Last row boundary constraints for the MAIN trace
+    // 3. First row boundary constraints for the AUX trace
+    // 4. Last row boundary constraints for the AUX trace
+    //
+    // Results are in stack-order.
     #[rustfmt::skip]
     let expected = to_stack_order(&[
+        // last row aux trace
         f - one,              // enf f.last = 1
+
+        // first row aux trace
         f - rand[0],          // enf f.first = $rand[0]
 
+        // last row main trace
+        b - public_inputs[3], // enf b.last = stack_outputs[1]
+        a - public_inputs[2], // enf a.last = stack_outputs[0]
+
+        // first row main trace
         e[1] - one,           // enf e[1].first = 1
         e[0],                 // enf e[0].first = 0
 
         d - one,              // enf d.first = 1
         c,                    // enf c.first = (B[0] - C[1][1]) * A
 
-        b - public_inputs[3], // enf b.last = stack_outputs[1]
-        a - public_inputs[2], // enf a.last = stack_outputs[0]
         b - public_inputs[1], // enf b.first = stack_inputs[1]
         a - public_inputs[0], // enf a.first = stack_inputs[0]
     ]);
