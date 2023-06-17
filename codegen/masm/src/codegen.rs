@@ -43,9 +43,6 @@ pub struct CodeGenerator<'ast> {
     /// Maps the public input to their start offset.
     public_input_to_offset: BTreeMap<String, usize>,
 
-    /// Holds the count of public inputs seen so far, this is used to compute the offset.
-    public_input_count: usize,
-
     /// Map of the constants found while visitint the [AirIR].
     ///
     /// These values are later used to emit immediate values.
@@ -114,15 +111,47 @@ fn quadratic_element_square(writer: &mut Writer, n: u32) {
 
 impl<'ast> CodeGenerator<'ast> {
     pub fn new(ir: &'ast AirIR, config: CodegenConfig) -> CodeGenerator<'ast> {
+        // remove duplicates and sort period lengths in descending order, since larger periods will
+        // have smaller number of cycles (which means a smaller number of exponentiations)
+        let mut periods: Vec<usize> = ir.periodic_columns().iter().map(|e| e.len()).collect();
+        periods.sort();
+        periods.dedup();
+        periods.reverse();
+
+        // Maps the public input name to its memory offset, were the memory offset is the
+        // accumulated number of inputs laid out in memory prior to our target. For example:
+        //
+        //  Input "a" starts at offset 0
+        // |      Input "b" starts at offset 4, after the 4 values of "a"
+        // v      v                   Input "c" starts at offset 20, after the values of "a" and "b"
+        // [ .... | ................ | ....]
+        //
+        // The offset is used by the codegen to load public input values.
+        let public_input_to_offset = ir
+            .public_inputs()
+            .iter()
+            .scan(0, |public_input_count, input| {
+                let start_offset = *public_input_count;
+                *public_input_count += input.1;
+                Some((input.0.clone(), start_offset))
+            })
+            .collect();
+
+        // create a map for constants lookups
+        let constants = ir
+            .constants()
+            .iter()
+            .map(|e| (e.name(), e.value()))
+            .collect();
+
         CodeGenerator {
             writer: Writer::new(),
             periodic_column: 0,
             composition_coefficient_count: 0,
             integrity_contraints: 0,
             boundary_contraints: 0,
-            public_input_to_offset: BTreeMap::new(),
-            public_input_count: 0,
-            constants: BTreeMap::new(),
+            public_input_to_offset,
+            constants,
             ir,
             config,
         }
@@ -418,15 +447,9 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
 
     fn visit_constant_binding(
         &mut self,
-        constant: &'ast ConstantBinding,
+        _constant: &'ast ConstantBinding,
     ) -> Result<Self::Value, Self::Error> {
-        match self.constants.entry(constant.name()) {
-            Entry::Occupied(_) => Err(CodegenError::DuplicatedConstant),
-            Entry::Vacant(entry) => {
-                entry.insert(constant.value());
-                Ok(())
-            }
-        }
+        Ok(())
     }
 
     fn visit_integrity_constraint_degree(
@@ -628,19 +651,8 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
 
     fn visit_public_input(
         &mut self,
-        constant: &'ast PublicInput,
+        _constant: &'ast PublicInput,
     ) -> Result<Self::Value, Self::Error> {
-        debug_assert!(
-            !self.public_input_to_offset.contains_key(&constant.0),
-            "public input {} has already been visited",
-            constant.0,
-        );
-
-        let start_offset = self.public_input_count;
-        self.public_input_to_offset
-            .insert(constant.0.clone(), start_offset);
-
-        self.public_input_count += constant.1;
         Ok(())
     }
 
