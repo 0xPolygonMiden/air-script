@@ -50,9 +50,6 @@ pub struct CodeGenerator<'ast> {
     /// Maps the public input to their start offset.
     public_input_to_offset: BTreeMap<String, usize>,
 
-    /// Holds the count of public inputs seen so far, this is used to compute the offset.
-    public_input_count: usize,
-
     /// Map of the constants found while visitint the [AirIR].
     ///
     /// These values are later used to emit immediate values.
@@ -208,6 +205,25 @@ impl<'ast> CodeGenerator<'ast> {
         periods.dedup();
         periods.reverse();
 
+        // map from public input name to start offset, used to compute the memory location of the
+        // public inputs
+        let public_input_to_offset = ir
+            .public_inputs()
+            .iter()
+            .scan(0, |public_input_count, input| {
+                let start_offset = *public_input_count;
+                *public_input_count += input.1;
+                Some((input.0.clone(), start_offset))
+            })
+            .collect();
+
+        // create a map for constants lookups
+        let constants = ir
+            .constants()
+            .iter()
+            .map(|e| (e.name(), e.value()))
+            .collect();
+
         CodeGenerator {
             writer: Writer::new(),
             periodic_column: 0,
@@ -215,9 +231,8 @@ impl<'ast> CodeGenerator<'ast> {
             composition_coefficient_count: 0,
             integrity_contraints: 0,
             boundary_contraints: 0,
-            public_input_to_offset: BTreeMap::new(),
-            public_input_count: 0,
-            constants: BTreeMap::new(),
+            public_input_to_offset,
+            constants,
             ir,
             config,
         }
@@ -722,15 +737,9 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
 
     fn visit_constant_binding(
         &mut self,
-        constant: &'ast ConstantBinding,
+        _constant: &'ast ConstantBinding,
     ) -> Result<Self::Value, Self::Error> {
-        match self.constants.entry(constant.name()) {
-            Entry::Occupied(_) => Err(CodegenError::DuplicatedConstant),
-            Entry::Vacant(entry) => {
-                entry.insert(constant.value());
-                Ok(())
-            }
-        }
+        Ok(())
     }
 
     fn visit_integrity_constraint_degree(
@@ -939,19 +948,8 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
 
     fn visit_public_input(
         &mut self,
-        constant: &'ast PublicInput,
+        _constant: &'ast PublicInput,
     ) -> Result<Self::Value, Self::Error> {
-        debug_assert!(
-            !self.public_input_to_offset.contains_key(&constant.0),
-            "public input {} has already been visited",
-            constant.0,
-        );
-
-        let start_offset = self.public_input_count;
-        self.public_input_to_offset
-            .insert(constant.0.clone(), start_offset);
-
-        self.public_input_count += constant.1;
         Ok(())
     }
 
