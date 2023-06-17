@@ -147,11 +147,11 @@ proc.compute_evaluate_boundary_constraints
     padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop push.1 push.0 push.0 push.0 ext2add push.1 push.0 ext2sub push.1 push.0 ext2add push.2 push.0 ext2sub push.2 push.0 ext2add push.0 push.0 ext2sub ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900204 movdn.3 movdn.3 drop drop ext2mul
-    # boundary constraint 0 for aux
+    # boundary constraint 4 for aux
     padw mem_loadw.4294900073 movdn.3 movdn.3 drop drop push.1 push.0 push.0 push.0 push.2 push.0 ext2mul ext2add ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900204 drop drop ext2mul
-    # boundary constraint 1 for aux
+    # boundary constraint 5 for aux
     padw mem_loadw.4294900073 movdn.3 movdn.3 drop drop push.1 push.0 push.1 push.0 push.1 push.0 ext2mul ext2sub ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900205 movdn.3 movdn.3 drop drop ext2mul
