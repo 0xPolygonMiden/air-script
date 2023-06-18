@@ -81,7 +81,7 @@ proc.get_exemptions_points
                     push.536870912 u32checked_and neq.0 # Test if trace length is a power of 2^29
                     push.16558868196663692994 push.7731871677141058814 dup.2 cdrop push.7731871677141058814 push.5506647088734794298 movup.3 cdrop
                 else
-                    push.9896756522253134970 push.16558868196663692994
+                    drop push.9896756522253134970 push.16558868196663692994
                 end # END else
             end # END else
         end # END else
@@ -207,6 +207,26 @@ proc.cache_periodic_polys
     push.0 push.0 mem_storew.500000001 dropw
 end # END PROC cache_periodic_polys
 
+proc.compute_integrity_constraint_divisor
+    padw mem_loadw.500000102 drop drop
+    # Comments below use zt = `z^trace_len`
+    # => [zt_1, zt_0, ...]
+    push.1 push.0 ext2sub
+    # => [zt_1-1, zt_0-1, ...]
+    padw mem_loadw.4294903304 drop drop
+    # => [z_1, z_0, zt_1-1, zt_0-1, ...]
+    exec.get_exemptions_points
+    # => [g^{trace_len-2}, g^{trace_len-1}, z_1, z_0, zt_1-1, zt_0-1, ...]
+    dup.3 dup.3 movup.3 push.0 ext2sub
+    # => [e_1, e_0, g^{trace_len-1}, z_1, z_0, zt_1-1, zt_0-1, ...]
+    movup.4 movup.4 movup.4 push.0 ext2sub
+    # => [e_3, e_2, e_1, e_0, zt_1-1, zt_0-1, ...]
+    ext2mul
+    # => [denominator_1, denominator_0, zt_1-1, zt_0-1, ...]
+    ext2div
+    # => [divisor_1, divisor_0, ...]
+end # END PROC compute_integrity_constraint_divisor
+
 proc.compute_evaluate_integrity_constraints
     # integrity constraint 0 for main
     padw mem_loadw.500000001 drop drop padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2add ext2mul push.0 push.0 ext2sub
@@ -228,8 +248,11 @@ end # END PROC compute_evaluate_boundary_constraints
 proc.evaluate_integrity_constraints
     exec.cache_periodic_polys
     exec.compute_evaluate_integrity_constraints
-    # Accumulate the numerator of the constraint polynomial
+    # Numerator of the transition constraint polynomial
     ext2add ext2add
+    # Divisor of the transition constraint polynomial
+    exec.compute_integrity_constraint_divisor
+    ext2div # divide the numerator by the divisor
 end # END PROC evaluate_integrity_constraints
 
 proc.evaluate_boundary_constraints
