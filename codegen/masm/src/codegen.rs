@@ -1,5 +1,5 @@
 use air_ir::{
-    AccessType, Air, ConstraintRoot, Identifier, IntegrityConstraintDegree, NodeIndex, Operation,
+    Air, ConstraintRoot, Identifier, IntegrityConstraintDegree, NodeIndex, Operation,
     PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
 };
 use std::collections::BTreeMap;
@@ -52,7 +52,8 @@ struct Backend<'ast> {
     periods: Vec<usize>,
 
     /// Counts how many composition coefficients have been used so far, used to compute the correct
-    /// offset in memory.
+    /// offset in memory. This counter is shared among integrity and boundary constraints for both
+    /// the main and auxiliary traces.
     composition_coefficient_count: u32,
 
     /// Counts how many integrity constraint roots have been visited so far, used for
@@ -374,6 +375,72 @@ impl<'ast> Backend<'ast> {
         Ok(())
     }
 
+    fn gen_compute_integrity_constraint_divisor(&mut self) -> Result<(), CodegenError> {
+        self.writer.proc("compute_integrity_constraint_divisor");
+
+        // `z^trace_len` is saved after all the period column points
+        let group: u32 = self.periods.len().try_into().expect("periods are u32");
+        load_quadratic_element(
+            &mut self.writer,
+            self.config.z_exp_address,
+            periodic_group_to_memory_offset(group),
+        )?;
+        self.writer.comment("load z^trace_len");
+
+        self.writer.header("Comments below use zt = `z^trace_len`");
+        self.writer.header("=> [zt_1, zt_0, ...]");
+
+        // Compute the numerator `z^trace_len - 1`
+        self.writer.push(1);
+        self.writer.push(0);
+        self.writer.ext2sub();
+        self.writer.header("=> [zt_1-1, zt_0-1, ...]");
+
+        // Compute the denominator of the divisor
+        // Load the point `z` to the stack
+        self.writer.padw();
+        self.writer.mem_loadw(self.config.z_address);
+        self.writer.drop();
+        self.writer.drop();
+        self.writer.comment("load z");
+
+        self.writer.header("=> [z_1, z_0, zt_1-1, zt_0-1, ...]");
+
+        self.writer.exec("get_exemptions_points");
+        self.writer
+            .header("=> [g^{trace_len-2}, g^{trace_len-1}, z_1, z_0, zt_1-1, zt_0-1, ...]");
+
+        // Compute `z - g^{trace_len-2}`
+        self.writer.dup(3);
+        self.writer.dup(3);
+        self.writer.movup(3);
+        self.writer.push(0);
+        self.writer.ext2sub();
+        self.writer
+            .header("=> [e_1, e_0, g^{trace_len-1}, z_1, z_0, zt_1-1, zt_0-1, ...]");
+
+        // Compute `z - g^{trace_len-1}`
+        self.writer.movup(4);
+        self.writer.movup(4);
+        self.writer.movup(4);
+        self.writer.push(0);
+        self.writer.ext2sub();
+        self.writer
+            .header("=> [e_3, e_2, e_1, e_0, zt_1-1, zt_0-1, ...]");
+
+        // Compute the denominator `(z - g^{trace_len-2}) * (z - g^{trace_len-1})`
+        self.writer.ext2mul();
+        self.writer
+            .header("=> [denominator_1, denominator_0, zt_1-1, zt_0-1, ...]");
+
+        // Compute the divisor `(z^trace_len - 1) / ((z - g^{trace_len-2}) * (z - g^{trace_len-1}))`
+        self.writer.ext2div();
+        self.writer.header("=> [divisor_1, divisor_0, ...]");
+        self.writer.end();
+
+        Ok(())
+    }
+
     /// Emits code for the procedure `compute_evaluate_integrity_constraints`.
     ///
     /// This procedure evaluates each top-level integrity constraint and leaves the result on the
@@ -434,7 +501,7 @@ impl<'ast> Backend<'ast> {
         self.writer.exec("compute_evaluate_integrity_constraints");
 
         self.writer
-            .header("Accumulate the numerator of the constraint polynomial");
+            .header("Numerator of the transition constraint polynomial");
 
         let total_len = self.ir.integrity_constraints(MAIN_TRACE).len()
             + self.ir.integrity_constraints(AUX_TRACE).len();
@@ -442,6 +509,14 @@ impl<'ast> Backend<'ast> {
         for _ in 0..total_len {
             self.writer.ext2add();
         }
+
+        self.writer
+            .header("Divisor of the transition constraint polynomial");
+
+        self.writer.exec("compute_integrity_constraint_divisor");
+
+        self.writer.ext2div();
+        self.writer.comment("divide the numerator by the divisor");
 
         self.writer.end();
 
@@ -510,8 +585,41 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
     type Value = ();
     type Error = CodegenError;
 
-    fn visit_access_type(&mut self, _access: &'ast AccessType) -> Result<Self::Value, Self::Error> {
-        todo!()
+    fn visit_integrity_constraint(
+        &mut self,
+        constraint: &'ast ConstraintRoot,
+        trace_segment: TraceSegmentId,
+    ) -> Result<Self::Value, Self::Error> {
+        if !constraint.domain().is_integrity() {
+            return Err(CodegenError::InvalidIntegrityConstraint);
+        }
+
+        let segment = if trace_segment == MAIN_TRACE {
+            "main"
+        } else {
+            "aux"
+        };
+
+        self.writer.header(format!(
+            "integrity constraint {} for {}",
+            self.integrity_contraints, segment
+        ));
+
+        self.visit_node_index(constraint.node_index())?;
+
+        self.writer
+            .header("Multiply by the composition coefficient");
+
+        load_quadratic_element(
+            &mut self.writer,
+            self.config.composition_coef_address,
+            self.composition_coefficient_count,
+        )?;
+        self.writer.ext2mul();
+        self.composition_coefficient_count += 1;
+
+        self.integrity_contraints += 1;
+        Ok(())
     }
 
     fn visit_boundary_constraint(
@@ -568,8 +676,18 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
         if !self.ir.periodic_columns.is_empty() {
             self.gen_evaluate_periodic_polys()?;
         }
+
+        self.gen_compute_integrity_constraint_divisor()?;
+
         self.gen_compute_evaluate_integrity_constraints()?;
         self.gen_compute_evaluate_boundary_constraints()?;
+
+        // NOTE: Order of the following two methods is important! The iteration order is used to
+        // determine the composition coefficient index. The correct order is:
+        // 1. Integrity constraints for the MAIN trace.
+        // 2. Integrity constraints for the AUX trace.
+        // 3. Boundary constraints for the MAIN trace.
+        // 4. Boundary constraints for the AUX trace.
         self.gen_evaluate_integrity_constraints()?;
         self.gen_evaluate_boundary_constraints()?;
 
@@ -582,43 +700,6 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
         _trace_segment: TraceSegmentId,
     ) -> Result<Self::Value, Self::Error> {
         Ok(()) // TODO
-    }
-
-    fn visit_integrity_constraint(
-        &mut self,
-        constraint: &'ast ConstraintRoot,
-        trace_segment: TraceSegmentId,
-    ) -> Result<Self::Value, Self::Error> {
-        if !constraint.domain().is_integrity() {
-            return Err(CodegenError::InvalidIntegrityConstraint);
-        }
-
-        let segment = if trace_segment == MAIN_TRACE {
-            "main"
-        } else {
-            "aux"
-        };
-
-        self.writer.header(format!(
-            "integrity constraint {} for {}",
-            self.integrity_contraints, segment
-        ));
-
-        self.visit_node_index(constraint.node_index())?;
-
-        self.writer
-            .header("Multiply by the composition coefficient");
-
-        load_quadratic_element(
-            &mut self.writer,
-            self.config.composition_coef_address,
-            self.composition_coefficient_count,
-        )?;
-        self.writer.ext2mul();
-        self.composition_coefficient_count += 1;
-
-        self.integrity_contraints += 1;
-        Ok(())
     }
 
     fn visit_node_index(
