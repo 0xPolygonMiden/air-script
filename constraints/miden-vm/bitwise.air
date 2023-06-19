@@ -95,32 +95,14 @@ ev output_aggregation([s, a, b, a_limb[4], b_limb[4], zp, z]):
         z = zp * 16 + a_and_b when !s
 
 
-# Enforces the constraint for the bitwise chiplet bus.
-#
-# Constraint degree: 4
-ev bitwise_chiplet_bus([a, b, z], [b_chip]):
-    # u_i represents reduction of a, b abd z into a single value for row i.
-    let u_i = $alpha[1] * a + $alpha[2] * b + $alpha[3] * z
-
-    # m represents inversion of k1 periodic column.
-    let m = !k1
-
-    # v_i represents value that includes u_i into the product when k1 = 0.
-    let v_i = m * u_i
-
-    # Enforce the constraints for the two sides of the bus communication.
-    # Constraint degree: 4
-    enf b_chip' * ($alpha[0] + u_i) = b_chip * (($alpha[0] + v_i) * m + 1 - m)
-
-
 ### Bitwise Chiplet Air Constraints ###############################################################
 
 # Enforces the constraints on the bitwise chiplet, given the columns of the bitwise execution 
 # trace.
 #
 # Max constraint degree: 4
-ev bitwise_chiplet(main: [s, a, b, a_limb[4], b_limb[4], zp, z], [b_chip]):
+ev bitwise_chiplet([s, a, b, a_limb[4], b_limb[4], zp, z]):
     enf bitwise_selector([s])
     enf input_decomposition([a, b, a_limb, b_limb])
     enf output_aggregation([s, a, b, a_limb, b_limb, zp, z])
-    enf bitwise_chiplet_bus([a, b, z], [b_chip])
+    # Bus constraint is implemented in a separate file

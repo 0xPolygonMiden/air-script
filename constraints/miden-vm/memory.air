@@ -104,31 +104,13 @@ ev enforce_values([s[2], v[4]]):
     enf is_unchanged([v_i]) for v_i in v when s[1]
 
 
-# Enforces that values of memory table rows are included into the chiplet bus.
-ev chiplet_bus([s[2], ctx, addr, clk, v[4]], [b_chip]): 
-    # Calculate the operation label for the memory access operation.
-    let op_mem = s[0] * 2^3 + 4
-
-    # v_mem represents a row in the memory table.
-    let v_mem = $alpha[0] + $alpha[1] * op_mem + $alpha[2] * ctx + $alpha[3] * addr +
-        $alpha[4] * clk + sum([$alpha[j + 5] * v[j] for j in 0..4])
-
-    # Enforce that values of memory table rows are included into the chiplet bus.
-    enf b_chip' = b_chip * v_mem
-
-
 ### Memory Chiplet Air Constraints ################################################################
 
 # Enforces the constraints on the memory chiplet, given the columns of the memory execution trace.
-ev memory_chiplet([s[2], ctx, addr, clk, v[4], d[2], t], [b_chip]):
+ev memory_chiplet([s[2], ctx, addr, clk, v[4], d[2], t]):
     enf flags_validity([ctx, addr, t])
-
     enf enforce_selectors([s, ctx, addr, t])
-
     enf enforce_delta([ctx, addr, clk, d, t])
-
     # TODO: perform range checks for values in columns d[0] and d[1]
-
     enf enforce_values([s, v])
-
-    enf chiplet_bus([s[2], ctx, addr, clk, v[4]], [b_chip])
+    # Bus constraint is implemented in a separate file
