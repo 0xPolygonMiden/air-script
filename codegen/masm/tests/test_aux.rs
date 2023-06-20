@@ -67,7 +67,7 @@ fn test_simple_aux() {
         ],
         trace_len,
         z,
-        &["compute_evaluate_integrity_constraints"],
+        &["compute_integrity_constraints"],
     );
     let program = Assembler::default().compile(code).unwrap();
 

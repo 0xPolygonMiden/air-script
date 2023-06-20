@@ -64,7 +64,7 @@ fn test_simple_periodic() {
         &[
             "cache_z_exp",
             "cache_periodic_polys",
-            "compute_evaluate_integrity_constraints",
+            "compute_integrity_constraints",
         ],
     );
     let program = Assembler::default().compile(code).unwrap();

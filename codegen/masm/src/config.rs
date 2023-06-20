@@ -50,6 +50,10 @@ pub struct CodegenConfig {
     /// Memory range used to store exponentiations of Z, each address contains one point to be used
     /// on the evaluation of each periodic polynimal.
     pub z_exp_address: u32,
+
+    /// Address to cache the point `g^{trace_len-2}`, which is used by the divisor of the boundary
+    /// constraints.
+    pub exemption_two_address: u32,
 }
 
 impl Default for CodegenConfig {
@@ -65,6 +69,7 @@ impl Default for CodegenConfig {
             aux_rand_address: constants::AUX_RAND_ELEM_PTR,
             periodic_values_address: constants::PERIODIC_VALUES_ADDRESS,
             z_exp_address: constants::Z_EXP_ADDRESS,
+            exemption_two_address: constants::EXEMPTION_TWO_ADDRESS,
         }
     }
 }

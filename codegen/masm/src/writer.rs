@@ -221,6 +221,10 @@ impl Writer {
         self.ins(format!("mem_loadw.{}", address));
     }
 
+    pub fn mem_store(&mut self, address: u32) {
+        self.ins(format!("mem_store.{}", address));
+    }
+
     pub fn mem_storew(&mut self, address: u32) {
         self.ins(format!("mem_storew.{}", address));
     }

@@ -117,7 +117,8 @@ proc.compute_integrity_constraint_divisor
     # => [z_1, z_0, zt_1-1, zt_0-1, ...]
     exec.get_exemptions_points
     # => [g^{trace_len-2}, g^{trace_len-1}, z_1, z_0, zt_1-1, zt_0-1, ...]
-    dup.3 dup.3 movup.3 push.0 ext2sub
+    # Save a copy of `g^{trace_len-2} to be used by the boundary divisor
+    dup.0 mem_store.500000101 dup.3 dup.3 movup.3 push.0 ext2sub
     # => [e_1, e_0, g^{trace_len-1}, z_1, z_0, zt_1-1, zt_0-1, ...]
     movup.4 movup.4 movup.4 push.0 ext2sub
     # => [e_3, e_2, e_1, e_0, zt_1-1, zt_0-1, ...]
@@ -127,7 +128,7 @@ proc.compute_integrity_constraint_divisor
     # => [divisor_1, divisor_0, ...]
 end # END PROC compute_integrity_constraint_divisor
 
-proc.compute_evaluate_integrity_constraints
+proc.compute_integrity_constraints
     # integrity constraint 0 for main
     padw mem_loadw.4294900002 drop drop padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop push.1 push.0 ext2add ext2sub
     # Multiply by the composition coefficient
@@ -136,17 +137,26 @@ proc.compute_evaluate_integrity_constraints
     padw mem_loadw.4294900001 drop drop padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop push.1 push.0 ext2sub ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900200 drop drop ext2mul
-end # END PROC compute_evaluate_integrity_constraints
+end # END PROC compute_integrity_constraints
 
-proc.compute_evaluate_boundary_constraints
+proc.compute_boundary_constraints_main_first
+end # END PROC compute_boundary_constraints_main_first
+
+proc.compute_boundary_constraints_main_last
+end # END PROC compute_boundary_constraints_main_last
+
+proc.compute_boundary_constraints_aux_first
     # boundary constraint 0 for aux
     padw mem_loadw.4294900077 movdn.3 movdn.3 drop drop push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900201 movdn.3 movdn.3 drop drop ext2mul
-end # END PROC compute_evaluate_boundary_constraints
+end # END PROC compute_boundary_constraints_aux_first
+
+proc.compute_boundary_constraints_aux_last
+end # END PROC compute_boundary_constraints_aux_last
 
 proc.evaluate_integrity_constraints
-    exec.compute_evaluate_integrity_constraints
+    exec.compute_integrity_constraints
     # Numerator of the transition constraint polynomial
     ext2add ext2add
     # Divisor of the transition constraint polynomial
@@ -155,8 +165,10 @@ proc.evaluate_integrity_constraints
 end # END PROC evaluate_integrity_constraints
 
 proc.evaluate_boundary_constraints
-    exec.compute_evaluate_boundary_constraints
-    # Accumulate the numerator of the constraint polynomial
-    ext2add
+    exec.compute_boundary_constraints_aux_first
+    # Compute the denominator for segment 1 FirstRow
+    padw mem_loadw.4294903304 drop drop push.1 push.0 ext2sub
+    ext2div # divide the numerator by the divisor
+    # Accumulate point of the constraint polynomial
 end # END PROC evaluate_boundary_constraints
 

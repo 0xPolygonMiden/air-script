@@ -3,6 +3,7 @@ mod config;
 pub mod constants;
 mod error;
 mod exemption_points;
+mod utils;
 pub mod visitor;
 mod writer;
 

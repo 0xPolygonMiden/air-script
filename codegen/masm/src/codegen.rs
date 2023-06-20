@@ -1,9 +1,9 @@
 use crate::constants::{AUX_TRACE, MAIN_TRACE};
 use crate::visitor::{
-    walk_boundary_constraints_in_natural_order, walk_constant_bindings,
-    walk_integrity_constraint_degrees, walk_integrity_constraints, walk_periodic_columns,
-    walk_public_inputs, AirVisitor,
+    walk_boundary_constraints, walk_constant_bindings, walk_integrity_constraint_degrees,
+    walk_integrity_constraints, walk_periodic_columns, walk_public_inputs, AirVisitor,
 };
+use ir::constraints::ConstraintDomain;
 use ir::{
     constraints::{ConstraintRoot, Operation},
     AccessType, AirIR, ConstantBinding, ConstantValueExpr, Identifier, IntegrityConstraintDegree,
@@ -50,6 +50,10 @@ pub struct CodeGenerator<'ast> {
     /// emitting documentation.
     boundary_contraints: usize,
 
+    /// Counts the size of a given boundary constraint category. The counter is used to emit the
+    /// correct number of multiplications for a given divisor.
+    boundary_constraint_count: BTreeMap<(u8, ConstraintDomain), usize>,
+
     /// Maps the public input to their start offset.
     public_input_to_offset: BTreeMap<String, usize>,
 
@@ -77,6 +81,16 @@ fn periodic_group_to_memory_offset(group: u32) -> u32 {
     // have to multiply the group by 2, to account for the zero padding, and add 1, to account for
     // the data being at the low and not high part of the word.
     group * 2 + 1
+}
+
+fn boundary_group_to_procedure_name(trace: u8, domain: ConstraintDomain) -> &'static str {
+    match (trace, domain) {
+        (MAIN_TRACE, ConstraintDomain::FirstRow) => "compute_boundary_constraints_main_first",
+        (MAIN_TRACE, ConstraintDomain::LastRow) => "compute_boundary_constraints_main_last",
+        (AUX_TRACE, ConstraintDomain::FirstRow) => "compute_boundary_constraints_aux_first",
+        (AUX_TRACE, ConstraintDomain::LastRow) => "compute_boundary_constraints_aux_last",
+        _ => panic!("Invalid boundary constraint"),
+    }
 }
 
 impl<'ast> CodeGenerator<'ast> {
@@ -107,6 +121,17 @@ impl<'ast> CodeGenerator<'ast> {
             .map(|e| (e.name(), e.value()))
             .collect();
 
+        // count the boundary constraints
+        let mut boundary_constraint_count = BTreeMap::new();
+        for segment in [MAIN_TRACE, AUX_TRACE] {
+            for boundary in ir.boundary_constraints(segment) {
+                boundary_constraint_count
+                    .entry((segment, boundary.domain()))
+                    .and_modify(|c| *c += 1)
+                    .or_insert(1);
+            }
+        }
+
         CodeGenerator {
             writer: Writer::new(),
             periodic_column: 0,
@@ -114,6 +139,7 @@ impl<'ast> CodeGenerator<'ast> {
             composition_coefficient_count: 0,
             integrity_contraints: 0,
             boundary_contraints: 0,
+            boundary_constraint_count,
             public_input_to_offset,
             constants,
             ir,
@@ -311,6 +337,11 @@ impl<'ast> CodeGenerator<'ast> {
         self.writer
             .header("=> [g^{trace_len-2}, g^{trace_len-1}, z_1, z_0, zt_1-1, zt_0-1, ...]");
 
+        self.writer
+            .header("Save a copy of `g^{trace_len-2} to be used by the boundary divisor");
+        self.writer.dup(0);
+        self.writer.mem_store(self.config.exemption_two_address);
+
         // Compute `z - g^{trace_len-2}`
         self.writer.dup(3);
         self.writer.dup(3);
@@ -342,12 +373,12 @@ impl<'ast> CodeGenerator<'ast> {
         Ok(())
     }
 
-    /// Emits code for the procedure `compute_evaluate_integrity_constraints`.
+    /// Emits code for the procedure `compute_integrity_constraints`.
     ///
     /// This procedure evaluates each top-level integrity constraint and leaves the result on the
     /// stack. This is useful for testing the evaluation. Later on the value is aggregated.
-    fn gen_compute_evaluate_integrity_constraints(&mut self) -> Result<(), CodegenError> {
-        self.writer.proc("compute_evaluate_integrity_constraints");
+    fn gen_compute_integrity_constraints(&mut self) -> Result<(), CodegenError> {
+        self.writer.proc("compute_integrity_constraints");
         walk_integrity_constraints(self, self.ir, MAIN_TRACE)?;
         self.integrity_contraints = 0; // reset counter for the aux trace
         walk_integrity_constraints(self, self.ir, AUX_TRACE)?;
@@ -356,10 +387,40 @@ impl<'ast> CodeGenerator<'ast> {
         Ok(())
     }
 
-    /// Emits code for the procedure `compute_evaluate_boundary_constraints`.
-    fn gen_compute_evaluate_boundary_constraints(&mut self) -> Result<(), CodegenError> {
-        self.writer.proc("compute_evaluate_boundary_constraints");
-        walk_boundary_constraints_in_natural_order(self, self.ir)?;
+    /// Emits procedure to compute boundary constraints values.
+    ///
+    /// This will emit four procedures:
+    ///
+    /// - compute_boundary_constraints_main_first
+    /// - compute_boundary_constraints_main_last
+    /// - compute_boundary_constraints_aux_first
+    /// - compute_boundary_constraints_aux_last
+    ///
+    /// Each procedure corresponds to a specific boundary constraint group. They are emitted
+    /// separetely because each value is divided by a different divisor, and it is best to
+    /// manipulate each point separetely.
+    fn gen_compute_boundary_constraints(&mut self) -> Result<(), CodegenError> {
+        // The boundary constraints have a natural order defined as (trace, domain, column_pos).
+        // The code below iterates using that order
+
+        let name = boundary_group_to_procedure_name(MAIN_TRACE, ConstraintDomain::FirstRow);
+        self.writer.proc(name);
+        walk_boundary_constraints(self, self.ir, MAIN_TRACE, ConstraintDomain::FirstRow)?;
+        self.writer.end();
+
+        let name = boundary_group_to_procedure_name(MAIN_TRACE, ConstraintDomain::LastRow);
+        self.writer.proc(name);
+        walk_boundary_constraints(self, self.ir, MAIN_TRACE, ConstraintDomain::LastRow)?;
+        self.writer.end();
+
+        let name = boundary_group_to_procedure_name(AUX_TRACE, ConstraintDomain::FirstRow);
+        self.writer.proc(name);
+        walk_boundary_constraints(self, self.ir, AUX_TRACE, ConstraintDomain::FirstRow)?;
+        self.writer.end();
+
+        let name = boundary_group_to_procedure_name(AUX_TRACE, ConstraintDomain::LastRow);
+        self.writer.proc(name);
+        walk_boundary_constraints(self, self.ir, AUX_TRACE, ConstraintDomain::LastRow)?;
         self.writer.end();
 
         Ok(())
@@ -395,7 +456,7 @@ impl<'ast> CodeGenerator<'ast> {
             self.writer.exec("cache_periodic_polys");
         }
 
-        self.writer.exec("compute_evaluate_integrity_constraints");
+        self.writer.exec("compute_integrity_constraints");
 
         self.writer
             .header("Numerator of the transition constraint polynomial");
@@ -425,21 +486,68 @@ impl<'ast> CodeGenerator<'ast> {
     /// Evaluates the boundary constraints for both the main and auxiliary traces.
     fn gen_evaluate_boundary_constraints(&mut self) -> Result<(), CodegenError> {
         self.writer.proc("evaluate_boundary_constraints");
-        self.writer.exec("compute_evaluate_boundary_constraints");
+
+        // Values are in stack order (reverse of the boundary constraints natural order)
+        self.boundary_constraint_point(AUX_TRACE, ConstraintDomain::LastRow);
+        self.boundary_constraint_point(AUX_TRACE, ConstraintDomain::FirstRow);
+        self.boundary_constraint_point(MAIN_TRACE, ConstraintDomain::LastRow);
+        self.boundary_constraint_point(MAIN_TRACE, ConstraintDomain::FirstRow);
 
         self.writer
-            .header("Accumulate the numerator of the constraint polynomial");
-
-        let total_len = self.ir.boundary_constraints(MAIN_TRACE).len()
-            + self.ir.boundary_constraints(AUX_TRACE).len();
-
-        for _ in 0..total_len {
+            .header("Accumulate point of the constraint polynomial");
+        let count = self.boundary_constraint_count.len() - 1;
+        for _ in 0..count {
             self.writer.ext2add();
         }
 
         self.writer.end();
 
         Ok(())
+    }
+
+    /// Emits code to finish computing the boundary constraint point.
+    ///
+    /// This will aggregate the numerator, load the divisor, and perform the division to get the
+    /// final point.
+    fn boundary_constraint_point(&mut self, segment: u8, domain: ConstraintDomain) {
+        if let Some(count) = self.boundary_constraint_count.get(&(segment, domain)) {
+            let name = boundary_group_to_procedure_name(segment, domain);
+            self.writer.exec(name);
+
+            if *count > 1 {
+                self.writer.header(format!(
+                    "Accumulate the numerator for segment {} {:?}",
+                    segment, domain
+                ));
+                for _ in 0..*count {
+                    self.writer.ext2add();
+                }
+            }
+
+            self.writer.header(format!(
+                "Compute the denominator for segment {} {:?}",
+                segment, domain
+            ));
+
+            match domain {
+                ConstraintDomain::FirstRow => {
+                    self.load_z();
+                    self.writer.push(1);
+                    self.writer.push(0);
+                    self.writer.ext2sub();
+                }
+                ConstraintDomain::LastRow => {
+                    self.load_z();
+                    self.writer.mem_load(self.config.exemption_two_address);
+                    self.writer.push(0);
+                    self.writer.ext2sub();
+                }
+                _ => panic!("unexpected constraint domain"),
+            };
+            self.writer.new_line();
+            self.writer.ext2div();
+            self.writer.comment("divide the numerator by the divisor");
+        }
     }
 
     /// Emits code to load the `log_2(trace_len)` onto the top of the stack.
@@ -486,8 +594,8 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         // 2. Integrity constraints for the AUX trace.
         // 3. Boundary constraints for the MAIN trace.
         // 4. Boundary constraints for the AUX trace.
-        self.gen_compute_evaluate_integrity_constraints()?;
-        self.gen_compute_evaluate_boundary_constraints()?;
+        self.gen_compute_integrity_constraints()?;
+        self.gen_compute_boundary_constraints()?;
 
         self.gen_evaluate_integrity_constraints()?;
         self.gen_evaluate_boundary_constraints()?;
