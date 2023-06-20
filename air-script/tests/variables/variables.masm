@@ -98,7 +98,7 @@ proc.cache_z_exp
     dup.0 neq.0
     while.true
         movdn.2 dup.1 dup.1 ext2mul
-        # => [z_1^2, z_0^2, i, ...]
+        # => [x_1^2, x_0^2, i, ...]
         movup.2 add.1 dup.0 neq.0
         # => [b, i+1, z_1^2, z_0^2, ...]
     end # END while
@@ -109,7 +109,7 @@ proc.cache_z_exp
     push.18446744069414584313 dup.0 neq.0
     while.true
         movdn.2 dup.1 dup.1 ext2mul
-        # => [z_1^2, z_0^2, i, ...]
+        # => [x_1^2, x_0^2, i, ...]
         movup.2 add.1 dup.0 neq.0
         # => [b, i+1, z_1^2, z_0^2, ...]
     end # END while

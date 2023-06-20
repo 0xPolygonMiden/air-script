@@ -1,11 +1,14 @@
 pub mod codegen;
 mod config;
 pub mod constants;
+mod error;
+mod exemption_points;
 pub mod visitor;
 mod writer;
 
-pub use codegen::{CodeGenerator, CodegenError};
+pub use codegen::CodeGenerator;
 pub use config::CodegenConfig;
+pub use error::CodegenError;
 use ir::AirIR;
 
 // CODEGEN

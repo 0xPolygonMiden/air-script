@@ -1,3 +1,4 @@
+use crate::error::CodegenError;
 use processor::math::{Felt, StarkField};
 use std::borrow::{Borrow, Cow};
 
@@ -296,5 +297,77 @@ impl Writer {
                 panic!("Can not open a else outside of a if, got {:?}", flow);
             }
         }
+    }
+
+    // UTILITIES
+    // -------------------------------------------------------------------------------------------
+
+    /// Loads the `element` from a memory range starting at `base_addr`.
+    ///
+    /// This function is used to load a qudratic element from memory, and discard the other value. Even
+    /// values are store in higher half of the word, while odd values are stored in the lower half.
+    pub fn load_quadratic_element(
+        &mut self,
+        base_addr: u32,
+        element: u32,
+    ) -> Result<(), CodegenError> {
+        let target_word: u32 = element / 2;
+        let address = base_addr + target_word;
+
+        // Load data from memory
+        self.padw();
+        self.mem_loadw(address);
+
+        // Discard the other value
+        match element % 2 {
+            0 => {
+                self.movdn(3);
+                self.movdn(3);
+                self.drop();
+                self.drop();
+            }
+            1 => {
+                self.drop();
+                self.drop();
+            }
+            _ => unreachable!(),
+        }
+
+        Ok(())
+    }
+
+    /// Assumes a quadratic element is at the top of the stack and square it `n` times.
+    pub fn quadratic_element_square(&mut self, n: u32) {
+        for _ in 0..n {
+            self.dup(1);
+            self.dup(1);
+            self.ext2mul();
+        }
+    }
+
+    /// Emit code to exponentiate a quadratic element to a power-of-two.
+    ///
+    /// Given a counter `p` and a quadratic element `x`, this function computes `x^(2^p)`.
+    ///
+    /// Input: [n, x_1, x_0, ...]
+    /// where n = -p
+    /// Ouptut: [0, x_1, x_0, ...]
+    pub fn exponentiate(&mut self) {
+        self.dup(0);
+        self.neq(0);
+
+        self.r#while();
+        self.movdn(2);
+        self.dup(1);
+        self.dup(1);
+        self.ext2mul();
+        self.header("=> [x_1^2, x_0^2, i, ...]");
+
+        self.movup(2);
+        self.add(1);
+        self.dup(0);
+        self.neq(0);
+        self.header("=> [b, i+1, z_1^2, z_0^2, ...]");
+        self.end();
     }
 }
