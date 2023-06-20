@@ -1,20 +1,18 @@
-use air_ir::{
-    Air, ConstraintRoot, Identifier, IntegrityConstraintDegree, NodeIndex, Operation,
-    PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
-};
-use std::collections::BTreeMap;
-use std::mem::{replace, take};
-
-use miden_processor::math::{Felt, StarkField};
-use winter_prover::math::fft;
-
 use crate::config::CodegenConfig;
 use crate::constants::{AUX_TRACE, MAIN_TRACE};
 use crate::visitor::{
-    walk_boundary_constraints_in_natural_order, walk_integrity_constraint_degrees,
-    walk_integrity_constraints, walk_periodic_columns, walk_public_inputs, AirVisitor,
+    walk_boundary_constraints, walk_integrity_constraint_degrees, walk_integrity_constraints,
+    walk_periodic_columns, walk_public_inputs, AirVisitor,
 };
 use crate::writer::Writer;
+use air_ir::{
+    Air, ConstraintDomain, ConstraintRoot, Identifier, IntegrityConstraintDegree, NodeIndex,
+    Operation, PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
+};
+use miden_processor::math::{Felt, StarkField};
+use std::collections::btree_map::BTreeMap;
+use std::mem::{replace, take};
+use winter_prover::math::fft;
 
 #[derive(Default)]
 pub struct CodeGenerator {
@@ -63,6 +61,10 @@ struct Backend<'ast> {
     /// Counts how many boundary constraint roots have been visited so far, used for
     /// emitting documentation.
     boundary_contraints: usize,
+
+    /// Counts the size of a given boundary constraint category. The counter is used to emit the
+    /// correct number of multiplications for a given divisor.
+    boundary_constraint_count: BTreeMap<(TraceSegmentId, ConstraintDomain), usize>,
 
     /// Maps the public input to their start offset.
     public_input_to_offset: BTreeMap<Identifier, usize>,
@@ -122,12 +124,25 @@ fn load_quadratic_element(
     Ok(())
 }
 
-/// Assumes a quadratic element is at the top of the stack and square it `n` times.
+/// Assumes a quadratic extension field element is at the top of the stack and square it `n` times.
 fn quadratic_element_square(writer: &mut Writer, n: u32) {
     for _ in 0..n {
         writer.dup(1);
         writer.dup(1);
         writer.ext2mul();
+    }
+}
+
+fn boundary_group_to_procedure_name(
+    trace: TraceSegmentId,
+    domain: ConstraintDomain,
+) -> &'static str {
+    match (trace, domain) {
+        (MAIN_TRACE, ConstraintDomain::FirstRow) => "compute_boundary_constraints_main_first",
+        (MAIN_TRACE, ConstraintDomain::LastRow) => "compute_boundary_constraints_main_last",
+        (AUX_TRACE, ConstraintDomain::FirstRow) => "compute_boundary_constraints_aux_first",
+        (AUX_TRACE, ConstraintDomain::LastRow) => "compute_boundary_constraints_aux_last",
+        _ => panic!("Invalid boundary constraint"),
     }
 }
 
@@ -158,6 +173,17 @@ impl<'ast> Backend<'ast> {
             })
             .collect();
 
+        // count the boundary constraints
+        let mut boundary_constraint_count = BTreeMap::new();
+        for segment in [MAIN_TRACE, AUX_TRACE] {
+            for boundary in ir.boundary_constraints(segment) {
+                boundary_constraint_count
+                    .entry((segment, boundary.domain()))
+                    .and_modify(|c| *c += 1)
+                    .or_insert(1);
+            }
+        }
+
         Self {
             writer: Writer::new(),
             periodic_column: 0,
@@ -165,6 +191,7 @@ impl<'ast> Backend<'ast> {
             composition_coefficient_count: 0,
             integrity_contraints: 0,
             boundary_contraints: 0,
+            boundary_constraint_count,
             public_input_to_offset,
             ir,
             config,
@@ -439,6 +466,11 @@ impl<'ast> Backend<'ast> {
         self.writer
             .header("=> [g^{trace_len-2}, g^{trace_len-1}, z_1, z_0, zt_1-1, zt_0-1, ...]");
 
+        self.writer.dup(0);
+        self.writer.mem_store(self.config.exemption_two_address);
+        self.writer
+            .comment("Save a copy of `g^{trace_len-2} to be used by the boundary divisor");
+
         // Compute `z - g^{trace_len-2}`
         self.writer.dup(3);
         self.writer.dup(3);
@@ -470,11 +502,11 @@ impl<'ast> Backend<'ast> {
         Ok(())
     }
 
-    /// Emits code for the procedure `compute_evaluate_integrity_constraints`.
+    /// Emits code for the procedure `compute_integrity_constraints`.
     ///
     /// This procedure evaluates each top-level integrity constraint and leaves the result on the
     /// stack. This is useful for testing the evaluation. Later on the value is aggregated.
-    fn gen_compute_evaluate_integrity_constraints(&mut self) -> Result<(), CodegenError> {
+    fn gen_compute_integrity_constraints(&mut self) -> Result<(), CodegenError> {
         let main_trace_count = self.ir.integrity_constraints(MAIN_TRACE).len();
         let aux_trace_count = self.ir.integrity_constraints(AUX_TRACE).len();
 
@@ -498,11 +530,11 @@ impl<'ast> Backend<'ast> {
             "where: (r_1, r_0) is the quadratic extension element resulting from the integrity constraint evaluation.",
         );
         self.writer.header(format!(
-            "       This procedure pushes {} quadratic elements to the stack",
+            "       This procedure pushes {} quadratic extension field elements to the stack",
             main_trace_count + aux_trace_count
         ));
 
-        self.writer.proc("compute_evaluate_integrity_constraints");
+        self.writer.proc("compute_integrity_constraints");
         walk_integrity_constraints(self, self.ir, MAIN_TRACE)?;
         self.integrity_contraints = 0; // reset counter for the aux trace
         walk_integrity_constraints(self, self.ir, AUX_TRACE)?;
@@ -511,38 +543,97 @@ impl<'ast> Backend<'ast> {
         Ok(())
     }
 
-    /// Emits code for the procedure `compute_evaluate_boundary_constraints`.
-    fn gen_compute_evaluate_boundary_constraints(&mut self) -> Result<(), CodegenError> {
-        let main_trace_count = self.ir.boundary_constraints(MAIN_TRACE).len();
-        let aux_trace_count = self.ir.boundary_constraints(AUX_TRACE).len();
+    /// Emits procedure to compute boundary constraints values.
+    ///
+    /// This will emit four procedures:
+    ///
+    /// - compute_boundary_constraints_main_first
+    /// - compute_boundary_constraints_main_last
+    /// - compute_boundary_constraints_aux_first
+    /// - compute_boundary_constraints_aux_last
+    ///
+    /// Each procedure corresponds to a specific boundary constraint group. They are emitted
+    /// separetely because each value is divided by a different divisor, and it is best to
+    /// manipulate each point separetely.
+    fn gen_compute_boundary_constraints(&mut self) -> Result<(), CodegenError> {
+        // The boundary constraints have a natural order defined as (trace, domain, column_pos).
+        // The code below iterates using that order
 
-        self.writer
-            .header("Procedure to evaluate numerators of all boundary constraints.");
-        self.writer.header("");
-        self.writer.header(format!(
-            "All the {} main and {} auxiliary constraints are computed.",
-            main_trace_count, aux_trace_count
-        ));
-        self.writer.header(
-            "The result constriants are evaluated in natural order, and their values are pushed to the stack.",
-        );
-        self.writer.header(
-            "The natural order is defined by `(trace, row, column)`, and the final evaluation is in stack-order.",
-        );
-        self.writer.header("");
-        self.writer.header("Input: [...]");
-        self.writer.header("Output: [(r_1, r_0)*, ...]");
-        self.writer.header(
-            "where: (r_1, r_0) is the quadratic extension element resulting from the boundary constraint evaluation.",
-        );
-        self.writer.header(format!(
-            "       This procedure pushes {} quadratic elements to the stack",
-            main_trace_count + aux_trace_count
-        ));
+        if self
+            .boundary_constraint_count
+            .contains_key(&(MAIN_TRACE, ConstraintDomain::FirstRow))
+        {
+            let name = boundary_group_to_procedure_name(MAIN_TRACE, ConstraintDomain::FirstRow);
+            self.writer.header(
+                "Procedure to evaluate the boundary constraint numerator for the first row of the main trace",
+            );
+            self.writer.header("");
+            self.writer.header("Input: [...]");
+            self.writer.header("Output: [(r_1, r_0)*, ...]");
+            self.writer.header(
+                "Where: (r_1, r_0) is one quadratic extension field element for each constraint",
+            );
+            self.writer.proc(name);
+            walk_boundary_constraints(self, self.ir, MAIN_TRACE, ConstraintDomain::FirstRow)?;
+            self.writer.end();
+        }
 
-        self.writer.proc("compute_evaluate_boundary_constraints");
-        walk_boundary_constraints_in_natural_order(self, self.ir)?;
-        self.writer.end();
+        if self
+            .boundary_constraint_count
+            .contains_key(&(MAIN_TRACE, ConstraintDomain::LastRow))
+        {
+            let name = boundary_group_to_procedure_name(MAIN_TRACE, ConstraintDomain::LastRow);
+            self.writer.header(
+                "Procedure to evaluate the boundary constraint numerator for the last row of the main trace",
+            );
+            self.writer.header("");
+            self.writer.header("Input: [...]");
+            self.writer.header("Output: [(r_1, r_0)*, ...]");
+            self.writer.header(
+                "Where: (r_1, r_0) is one quadratic extension field element for each constraint",
+            );
+            self.writer.proc(name);
+            walk_boundary_constraints(self, self.ir, MAIN_TRACE, ConstraintDomain::LastRow)?;
+            self.writer.end();
+        }
+
+        if self
+            .boundary_constraint_count
+            .contains_key(&(AUX_TRACE, ConstraintDomain::FirstRow))
+        {
+            let name = boundary_group_to_procedure_name(AUX_TRACE, ConstraintDomain::FirstRow);
+            self.writer.header(
+            "Procedure to evaluate the boundary constraint numerator for the first row of the auxiliary trace",
+        );
+            self.writer.header("");
+            self.writer.header("Input: [...]");
+            self.writer.header("Output: [(r_1, r_0)*, ...]");
+            self.writer.header(
+                "Where: (r_1, r_0) is one quadratic extension field element for each constraint",
+            );
+            self.writer.proc(name);
+            walk_boundary_constraints(self, self.ir, AUX_TRACE, ConstraintDomain::FirstRow)?;
+            self.writer.end();
+        }
+
+        if self
+            .boundary_constraint_count
+            .contains_key(&(AUX_TRACE, ConstraintDomain::LastRow))
+        {
+            let name = boundary_group_to_procedure_name(AUX_TRACE, ConstraintDomain::LastRow);
+            self.writer.header(
+            "Procedure to evaluate the boundary constraint numerator for the last row of the auxiliary trace",
+        );
+            self.writer.header("");
+            self.writer.header("Input: [...]");
+            self.writer.header("Output: [(r_1, r_0)*, ...]");
+            self.writer.header(
+                "Where: (r_1, r_0) is one quadratic extension field element for each constraint",
+            );
+            self.writer.proc(name);
+            walk_boundary_constraints(self, self.ir, AUX_TRACE, ConstraintDomain::LastRow)?;
+            self.writer.end();
+        }
 
         Ok(())
     }
@@ -595,7 +686,7 @@ impl<'ast> Backend<'ast> {
             self.writer.exec("cache_periodic_polys");
         }
 
-        self.writer.exec("compute_evaluate_integrity_constraints");
+        self.writer.exec("compute_integrity_constraints");
 
         self.writer
             .header("Numerator of the transition constraint polynomial");
@@ -633,21 +724,107 @@ impl<'ast> Backend<'ast> {
             .header("Where: (r_1, r_0) is the final result with the divisor applied");
 
         self.writer.proc("evaluate_boundary_constraints");
-        self.writer.exec("compute_evaluate_boundary_constraints");
 
-        self.writer
-            .header("Accumulate the numerator of the constraint polynomial");
+        let last = self.boundary_constraint_group(ConstraintDomain::LastRow);
+        let first = self.boundary_constraint_group(ConstraintDomain::FirstRow);
 
-        let total_len = self.ir.boundary_constraints(MAIN_TRACE).len()
-            + self.ir.boundary_constraints(AUX_TRACE).len();
-
-        for _ in 0..total_len {
+        if last != 0 && first != 0 {
+            self.writer.header("Add first and last row groups");
             self.writer.ext2add();
         }
 
         self.writer.end();
 
         Ok(())
+    }
+
+    /// Emits code to evaluate the boundary constraint for a given group determined by the domain.
+    fn boundary_constraint_group(&mut self, domain: ConstraintDomain) -> usize {
+        let aux_count = self
+            .boundary_constraint_count
+            .get(&(AUX_TRACE, domain))
+            .cloned();
+
+        let name = match domain {
+            ConstraintDomain::LastRow => "last",
+            ConstraintDomain::FirstRow => "first",
+            _ => panic!("unexpected domain"),
+        };
+
+        if let Some(count) = aux_count {
+            self.boundary_constraint_numerator(count, AUX_TRACE, domain);
+            self.writer
+                .header(format!("=> [(aux_{name}1, aux_{name}0), ...]"));
+        }
+
+        let main_count = self
+            .boundary_constraint_count
+            .get(&(MAIN_TRACE, domain))
+            .cloned();
+
+        if let Some(count) = main_count {
+            self.boundary_constraint_numerator(count, MAIN_TRACE, domain);
+
+            if aux_count.is_some() {
+                self.writer.header(format!(
+                    "=> [(main_{name}1, main_{name}0), (aux_{name}1, aux_{name}0), ...]"
+                ));
+                self.writer.ext2add();
+            }
+
+            self.writer.header(format!("=> [({name}1, {name}0), ...]"));
+        }
+
+        if aux_count.is_some() || main_count.is_some() {
+            self.writer
+                .header(format!("Compute the denominator for domain {:?}", domain));
+
+            match domain {
+                ConstraintDomain::FirstRow => {
+                    self.load_z();
+                    self.writer.push(1);
+                    self.writer.push(0);
+                    self.writer.ext2sub();
+                }
+                ConstraintDomain::LastRow => {
+                    self.load_z();
+                    self.writer.mem_load(self.config.exemption_two_address);
+                    self.writer.push(0);
+                    self.writer.ext2sub();
+                }
+                _ => panic!("unexpected constraint domain"),
+            };
+
+            self.writer
+                .header(format!("Compute numerator/denominator for {name} row"));
+            self.writer.ext2div();
+
+            aux_count.unwrap_or(0) + main_count.unwrap_or(0)
+        } else {
+            0
+        }
+    }
+
+    /// Emits code to evaluate the numerator portion of a boundary constraint point determined by
+    /// `segment` and `domain`.
+    fn boundary_constraint_numerator(
+        &mut self,
+        count: usize,
+        segment: TraceSegmentId,
+        domain: ConstraintDomain,
+    ) {
+        let name = boundary_group_to_procedure_name(segment, domain);
+        self.writer.exec(name);
+
+        if count > 1 {
+            self.writer.header(format!(
+                "Accumulate the numerator for segment {} {:?}",
+                segment, domain
+            ));
+            for _ in 0..count {
+                self.writer.ext2add();
+            }
+        }
     }
 
     /// Emits code to load the `log_2(trace_len)` onto the top of the stack.
@@ -784,8 +961,8 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
 
         self.gen_compute_integrity_constraint_divisor()?;
 
-        self.gen_compute_evaluate_integrity_constraints()?;
-        self.gen_compute_evaluate_boundary_constraints()?;
+        self.gen_compute_integrity_constraints()?;
+        self.gen_compute_boundary_constraints()?;
 
         // NOTE: Order of the following two methods is important! The iteration order is used to
         // determine the composition coefficient index. The correct order is:
