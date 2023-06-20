@@ -5,33 +5,33 @@ use winter_utils::collections::Vec;
 use winter_utils::{ByteWriter, Serializable};
 
 pub struct PublicInputs {
+    overflow_addrs: [Felt; 4],
     program_hash: [Felt; 4],
     stack_inputs: [Felt; 4],
     stack_outputs: [Felt; 20],
-    overflow_addrs: [Felt; 4],
 }
 
 impl PublicInputs {
-    pub fn new(program_hash: [Felt; 4], stack_inputs: [Felt; 4], stack_outputs: [Felt; 20], overflow_addrs: [Felt; 4]) -> Self {
-        Self { program_hash, stack_inputs, stack_outputs, overflow_addrs }
+    pub fn new(overflow_addrs: [Felt; 4], program_hash: [Felt; 4], stack_inputs: [Felt; 4], stack_outputs: [Felt; 20]) -> Self {
+        Self { overflow_addrs, program_hash, stack_inputs, stack_outputs }
     }
 }
 
 impl Serializable for PublicInputs {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write(self.overflow_addrs.as_slice());
         target.write(self.program_hash.as_slice());
         target.write(self.stack_inputs.as_slice());
         target.write(self.stack_outputs.as_slice());
-        target.write(self.overflow_addrs.as_slice());
     }
 }
 
 pub struct ConstantsAir {
     context: AirContext<Felt>,
+    overflow_addrs: [Felt; 4],
     program_hash: [Felt; 4],
     stack_inputs: [Felt; 4],
     stack_outputs: [Felt; 20],
-    overflow_addrs: [Felt; 4],
 }
 
 impl ConstantsAir {
@@ -63,7 +63,7 @@ impl Air for ConstantsAir {
             options,
         )
         .set_num_transition_exemptions(2);
-        Self { context, program_hash: public_inputs.program_hash, stack_inputs: public_inputs.stack_inputs, stack_outputs: public_inputs.stack_outputs, overflow_addrs: public_inputs.overflow_addrs }
+        Self { context, overflow_addrs: public_inputs.overflow_addrs, program_hash: public_inputs.program_hash, stack_inputs: public_inputs.stack_inputs, stack_outputs: public_inputs.stack_outputs }
     }
 
     fn get_periodic_column_values(&self) -> Vec<Vec<Felt>> {
