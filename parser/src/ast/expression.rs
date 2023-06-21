@@ -767,13 +767,13 @@ impl SymbolAccess {
                 Type::Felt => unreachable!(),
                 Type::Vector(len) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Vector(_) => Ok(Self {
-                    access_type: AccessType::Index(idx),
+                    access_type: AccessType::Index(base_range.start + idx),
                     ty: Some(Type::Felt),
                     ..self.clone()
                 }),
                 Type::Matrix(rows, _) if idx >= rows => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Matrix(_, cols) => Ok(Self {
-                    access_type: AccessType::Index(idx),
+                    access_type: AccessType::Index(base_range.start + idx),
                     ty: Some(Type::Vector(cols)),
                     ..self.clone()
                 }),
