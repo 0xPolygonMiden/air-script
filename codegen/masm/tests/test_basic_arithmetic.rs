@@ -1,13 +1,12 @@
-use air_codegen_masm::{code_gen, constants};
-use assembly::Assembler;
-use ir::AirIR;
-use processor::{
+use air_codegen_masm::constants;
+use miden_assembly::Assembler;
+use miden_processor::{
     math::{Felt, FieldElement},
     AdviceInputs, Kernel, MemAdviceProvider, Process, QuadExtension, StackInputs,
 };
 
 mod utils;
-use utils::{parse, test_code, to_stack_order, Data};
+use utils::{codegen, test_code, to_stack_order, Data};
 
 static ARITH_AIR: &str = "
 def SimpleArithmetic
@@ -33,9 +32,7 @@ integrity_constraints:
 
 #[test]
 fn test_simple_arithmetic() {
-    let ast = parse(ARITH_AIR);
-    let ir = AirIR::new(ast).expect("build AirIR failed");
-    let code = code_gen(&ir).expect("codegen failed");
+    let code = codegen(ARITH_AIR);
 
     let trace_len = 2u64.pow(4);
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
@@ -59,7 +56,7 @@ fn test_simple_arithmetic() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 6]),
+                data: to_stack_order(&[one; 6]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },
@@ -122,9 +119,7 @@ integrity_constraints:
 
 #[test]
 fn test_exp() {
-    let ast = parse(EXP_AIR);
-    let ir = AirIR::new(ast).expect("build AirIR failed");
-    let code = code_gen(&ir).expect("codegen failed");
+    let code = codegen(EXP_AIR);
 
     let trace_len = 2u64.pow(4);
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
@@ -148,7 +143,7 @@ fn test_exp() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 5]),
+                data: to_stack_order(&[one; 5]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },
@@ -206,9 +201,7 @@ integrity_constraints:
 
 #[test]
 fn test_long_trace() {
-    let ast = parse(LONG_TRACE);
-    let ir = AirIR::new(ast).expect("build AirIR failed");
-    let code = code_gen(&ir).expect("codegen failed");
+    let code = codegen(LONG_TRACE);
 
     let trace_len = 2u64.pow(4);
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
@@ -238,7 +231,7 @@ fn test_long_trace() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 1]),
+                data: to_stack_order(&[one; 1]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },
@@ -287,9 +280,7 @@ integrity_constraints:
 
 #[test]
 fn test_vector() {
-    let ast = parse(VECTOR);
-    let ir = AirIR::new(ast).expect("build AirIR failed");
-    let code = code_gen(&ir).expect("codegen failed");
+    let code = codegen(VECTOR);
 
     let trace_len = 2u64.pow(4);
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
@@ -317,7 +308,7 @@ fn test_vector() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 1]),
+                data: to_stack_order(&[one; 1]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },
@@ -367,9 +358,7 @@ integrity_constraints:
 
 #[test]
 fn test_multiple_rows() {
-    let ast = parse(MULTIPLE_ROWS_AIR);
-    let ir = AirIR::new(ast).expect("build AirIR failed");
-    let code = code_gen(&ir).expect("codegen failed");
+    let code = codegen(MULTIPLE_ROWS_AIR);
 
     let trace_len = 2u64.pow(4);
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
@@ -394,7 +383,7 @@ fn test_multiple_rows() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 2]),
+                data: to_stack_order(&[one; 2]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },

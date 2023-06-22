@@ -1,5 +1,6 @@
 use crate::constants;
 
+#[derive(Copy, Clone)]
 pub struct CodegenConfig {
     // Memory location of the trace length using the following format:
     //
@@ -54,7 +55,7 @@ pub struct CodegenConfig {
 
 impl Default for CodegenConfig {
     fn default() -> Self {
-        CodegenConfig {
+        Self {
             trace_len_address: constants::TRACE_LEN_ADDRESS,
             log2_trace_len_address: constants::LOG2_TRACE_LEN_ADDRESS,
             z_address: constants::Z_ADDRESS,

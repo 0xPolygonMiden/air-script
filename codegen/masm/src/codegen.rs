@@ -1,24 +1,40 @@
-use crate::constants::{AUX_TRACE, MAIN_TRACE};
-use crate::visitor::{
-    walk_boundary_constraints_in_natural_order, walk_constant_bindings,
-    walk_integrity_constraint_degrees, walk_integrity_constraints, walk_periodic_columns,
-    walk_public_inputs, AirVisitor,
+use air_ir::{
+    AccessType, Air, ConstraintRoot, Identifier, IntegrityConstraintDegree, NodeIndex, Operation,
+    PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
 };
-use ir::{
-    constraints::{ConstraintRoot, Operation},
-    AccessType, AirIR, ConstantBinding, ConstantValueExpr, Identifier, IntegrityConstraintDegree,
-    NodeIndex, PeriodicColumn, PublicInput, TraceAccess, Value,
-};
-use std::collections::btree_map::{BTreeMap, Entry};
+use std::collections::BTreeMap;
 use std::mem::{replace, take};
 
-use processor::math::{Felt, StarkField};
+use miden_processor::math::{Felt, StarkField};
 use winter_prover::math::fft;
 
 use crate::config::CodegenConfig;
+use crate::constants::{AUX_TRACE, MAIN_TRACE};
+use crate::visitor::{
+    walk_boundary_constraints_in_natural_order, walk_integrity_constraint_degrees,
+    walk_integrity_constraints, walk_periodic_columns, walk_public_inputs, AirVisitor,
+};
 use crate::writer::Writer;
 
-pub struct CodeGenerator<'ast> {
+#[derive(Default)]
+pub struct CodeGenerator {
+    config: CodegenConfig,
+}
+impl CodeGenerator {
+    pub fn new(config: CodegenConfig) -> Self {
+        Self { config }
+    }
+}
+impl air_ir::CodeGenerator for CodeGenerator {
+    type Output = String;
+
+    fn generate(&self, ir: &Air) -> anyhow::Result<Self::Output> {
+        let generator = Backend::new(ir, self.config);
+        generator.generate()
+    }
+}
+
+struct Backend<'ast> {
     /// Miden Assembly writer.
     ///
     /// Track indentation level, and performs basic validations for generated instructions and
@@ -48,15 +64,10 @@ pub struct CodeGenerator<'ast> {
     boundary_contraints: usize,
 
     /// Maps the public input to their start offset.
-    public_input_to_offset: BTreeMap<String, usize>,
+    public_input_to_offset: BTreeMap<Identifier, usize>,
 
-    /// Map of the constants found while visitint the [AirIR].
-    ///
-    /// These values are later used to emit immediate values.
-    constants: BTreeMap<&'ast Identifier, &'ast ConstantValueExpr>,
-
-    /// The [AirIR] to visit.
-    ir: &'ast AirIR,
+    /// The [Air] to visit.
+    ir: &'ast Air,
 
     /// Configuration for the codegen.
     config: CodegenConfig,
@@ -119,11 +130,11 @@ fn quadratic_element_square(writer: &mut Writer, n: u32) {
     }
 }
 
-impl<'ast> CodeGenerator<'ast> {
-    pub fn new(ir: &'ast AirIR, config: CodegenConfig) -> CodeGenerator<'ast> {
+impl<'ast> Backend<'ast> {
+    fn new(ir: &'ast Air, config: CodegenConfig) -> Self {
         // remove duplicates and sort period lengths in descending order, since larger periods will
         // have smaller number of cycles (which means a smaller number of exponentiations)
-        let mut periods: Vec<usize> = ir.periodic_columns().iter().map(|e| e.len()).collect();
+        let mut periods: Vec<usize> = ir.periodic_columns().map(|e| e.period()).collect();
         periods.sort();
         periods.dedup();
         periods.reverse();
@@ -139,22 +150,14 @@ impl<'ast> CodeGenerator<'ast> {
         // The offset is used by the codegen to load public input values.
         let public_input_to_offset = ir
             .public_inputs()
-            .iter()
             .scan(0, |public_input_count, input| {
                 let start_offset = *public_input_count;
-                *public_input_count += input.1;
-                Some((input.0.clone(), start_offset))
+                *public_input_count += input.size;
+                Some((input.name, start_offset))
             })
             .collect();
 
-        // create a map for constants lookups
-        let constants = ir
-            .constants()
-            .iter()
-            .map(|e| (e.name(), e.value()))
-            .collect();
-
-        CodeGenerator {
+        Self {
             writer: Writer::new(),
             periodic_column: 0,
             periods,
@@ -162,14 +165,13 @@ impl<'ast> CodeGenerator<'ast> {
             integrity_contraints: 0,
             boundary_contraints: 0,
             public_input_to_offset,
-            constants,
             ir,
             config,
         }
     }
 
     /// Emits the Miden Assembly code  after visiting the [AirIR].
-    pub fn generate(mut self) -> Result<String, CodegenError> {
+    fn generate(mut self) -> anyhow::Result<String> {
         self.visit_air()?;
         Ok(self.writer.into_code())
     }
@@ -401,7 +403,7 @@ impl<'ast> CodeGenerator<'ast> {
     fn gen_evaluate_integrity_constraints(&mut self) -> Result<(), CodegenError> {
         self.writer.proc("evaluate_integrity_constraints");
 
-        if !self.ir.periodic_columns().is_empty() {
+        if !self.ir.periodic_columns.is_empty() {
             self.writer.exec("cache_periodic_polys");
         }
 
@@ -458,19 +460,23 @@ impl<'ast> CodeGenerator<'ast> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum CodegenError {
-    DuplicatedConstant,
+    #[error("invalid access type")]
     InvalidAccessType,
-    UnknownConstant,
+    #[error("invalid row offset")]
     InvalidRowOffset,
+    #[error("invalid size")]
     InvalidSize,
+    #[error("invalid index")]
     InvalidIndex,
+    #[error("invalid boundary constraint")]
     InvalidBoundaryConstraint,
+    #[error("invalid integrity constraint")]
     InvalidIntegrityConstraint,
 }
 
-impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
+impl<'ast> AirVisitor<'ast> for Backend<'ast> {
     type Value = ();
     type Error = CodegenError;
 
@@ -481,7 +487,7 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
     fn visit_boundary_constraint(
         &mut self,
         constraint: &'ast ConstraintRoot,
-        trace_segment: u8,
+        trace_segment: TraceSegmentId,
     ) -> Result<Self::Value, Self::Error> {
         if !constraint.domain().is_boundary() {
             return Err(CodegenError::InvalidBoundaryConstraint);
@@ -522,13 +528,12 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
     }
 
     fn visit_air(&mut self) -> Result<Self::Value, Self::Error> {
-        walk_constant_bindings(self, self.ir)?;
         walk_public_inputs(self, self.ir)?;
         walk_integrity_constraint_degrees(self, self.ir, MAIN_TRACE)?;
         walk_integrity_constraint_degrees(self, self.ir, AUX_TRACE)?;
 
         self.gen_cache_z_exp()?;
-        if !self.ir.periodic_columns().is_empty() {
+        if !self.ir.periodic_columns.is_empty() {
             self.gen_evaluate_periodic_polys()?;
         }
         self.gen_compute_evaluate_integrity_constraints()?;
@@ -539,17 +544,10 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         Ok(())
     }
 
-    fn visit_constant_binding(
-        &mut self,
-        _constant: &'ast ConstantBinding,
-    ) -> Result<Self::Value, Self::Error> {
-        Ok(())
-    }
-
     fn visit_integrity_constraint_degree(
         &mut self,
         _constraint: IntegrityConstraintDegree,
-        _trace_segment: u8,
+        _trace_segment: TraceSegmentId,
     ) -> Result<Self::Value, Self::Error> {
         Ok(()) // TODO
     }
@@ -557,7 +555,7 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
     fn visit_integrity_constraint(
         &mut self,
         constraint: &'ast ConstraintRoot,
-        trace_segment: u8,
+        trace_segment: TraceSegmentId,
     ) -> Result<Self::Value, Self::Error> {
         if !constraint.domain().is_integrity() {
             return Err(CodegenError::InvalidIntegrityConstraint);
@@ -679,8 +677,8 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         column: &'ast PeriodicColumn,
     ) -> Result<Self::Value, Self::Error> {
         // convert the periodic column to a polynomial
-        let inv_twiddles = fft::get_inv_twiddles::<Felt>(column.len());
-        let mut poly: Vec<Felt> = column.iter().map(|e| Felt::new(*e)).collect();
+        let inv_twiddles = fft::get_inv_twiddles::<Felt>(column.period());
+        let mut poly: Vec<Felt> = column.values.iter().map(|e| Felt::new(*e)).collect();
         fft::interpolate_poly(&mut poly, &inv_twiddles);
 
         self.writer
@@ -693,7 +691,7 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         let group: u32 = self
             .periods
             .iter()
-            .position(|&p| p == column.len())
+            .position(|&p| p == column.period())
             .expect("All periods are added in the constructor")
             .try_into()
             .expect("periods are u32");
@@ -766,42 +764,14 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
 
     fn visit_value(&mut self, value: &'ast Value) -> Result<Self::Value, Self::Error> {
         match value {
-            Value::BoundConstant(symbol) => match self.constants.entry(symbol.ident()) {
-                Entry::Occupied(entry) => match (entry.get(), symbol.access_type()) {
-                    (ConstantValueExpr::Scalar(scalar), AccessType::Default) => {
-                        self.writer.push(*scalar);
-                        self.writer.push(0);
-                    }
-                    (ConstantValueExpr::Vector(vec), AccessType::Vector(pos)) => {
-                        let scalar = vec.get(*pos).ok_or(CodegenError::InvalidAccessType)?;
-                        self.writer.push(*scalar);
-                        self.writer.push(0);
-                    }
-                    (ConstantValueExpr::Matrix(mat), AccessType::Matrix(x, y)) => {
-                        let scalar = mat
-                            .get(*x)
-                            .and_then(|v| v.get(*y))
-                            .ok_or(CodegenError::InvalidAccessType)?;
-                        self.writer.push(*scalar);
-                        self.writer.push(0);
-                    }
-                    _ => return Err(CodegenError::InvalidAccessType),
-                },
-                Entry::Vacant(_) => return Err(CodegenError::UnknownConstant),
-            },
-            Value::InlineConstant(value) => {
+            Value::Constant(value) => {
                 self.writer.push(*value);
                 self.writer.push(0);
             }
-            Value::TraceElement(access) => {
+            Value::TraceAccess(access) => {
                 // eventually larger offsets will be supported
-                if access.row_offset() > 1 {
+                if access.row_offset > 1 {
                     return Err(CodegenError::InvalidRowOffset);
-                }
-
-                // should always be one
-                if access.size() != 1 {
-                    return Err(CodegenError::InvalidSize);
                 }
 
                 // Compute the target address for this variable. Each memory address contains the
@@ -809,16 +779,16 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
                 //
                 // Layout defined at: https://github.com/0xPolygonMiden/miden-vm/issues/875
                 let target_word: u32 = access
-                    .col_idx()
+                    .column
                     .try_into()
                     .map_err(|_| CodegenError::InvalidIndex)?;
                 let el_pos: u32 = access
-                    .row_offset()
+                    .row_offset
                     .try_into()
                     .or(Err(CodegenError::InvalidIndex))?;
                 let target_element = target_word * 2 + el_pos;
 
-                let base_address = if access.trace_segment() == MAIN_TRACE {
+                let base_address = if access.segment == MAIN_TRACE {
                     self.config.ood_frame_address
                 } else {
                     self.config.ood_aux_frame_address
@@ -826,11 +796,11 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
 
                 load_quadratic_element(&mut self.writer, base_address, target_element)?;
             }
-            Value::PeriodicColumn(_, length) => {
+            Value::PeriodicColumn(access) => {
                 let group: u32 = self
                     .periods
                     .iter()
-                    .position(|&p| p == *length)
+                    .position(|&p| p == access.cycle)
                     .expect("All periods are added in the constructor")
                     .try_into()
                     .expect("periods are u32");
@@ -840,17 +810,17 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
                     periodic_group_to_memory_offset(group),
                 )?;
             }
-            Value::PublicInput(name, index) => {
+            Value::PublicInput(access) => {
                 let start_offset = self
                     .public_input_to_offset
-                    .get(name)
-                    .unwrap_or_else(|| panic!("public input {} unknown", name));
+                    .get(&access.name)
+                    .unwrap_or_else(|| panic!("public input {} unknown", access.name));
 
                 self.writer.header(format!(
                     "Load public input {} pos {} with final offset {}",
-                    name, index, start_offset,
+                    access.name, access.index, start_offset,
                 ));
-                let index: u32 = (start_offset + *index)
+                let index: u32 = (start_offset + access.index)
                     .try_into()
                     .or(Err(CodegenError::InvalidIndex))?;
                 load_quadratic_element(&mut self.writer, self.config.public_inputs_address, index)?;

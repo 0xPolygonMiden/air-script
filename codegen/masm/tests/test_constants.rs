@@ -1,13 +1,12 @@
-use air_codegen_masm::{code_gen, constants};
-use assembly::Assembler;
-use ir::AirIR;
-use processor::{
+use air_codegen_masm::constants;
+use miden_assembly::Assembler;
+use miden_processor::{
     math::{Felt, FieldElement},
     AdviceInputs, Kernel, MemAdviceProvider, Process, QuadExtension, StackInputs,
 };
 
 mod utils;
-use utils::{parse, test_code, to_stack_order, Data};
+use utils::{codegen, test_code, to_stack_order, Data};
 
 static CONSTANTS_AIR: &str = "
 def ConstantsAir
@@ -38,9 +37,7 @@ const C_0_0: QuadExtension<Felt> = QuadExtension::new(Felt::new(7), Felt::ZERO);
 
 #[test]
 fn test_constants() {
-    let ast = parse(CONSTANTS_AIR);
-    let ir = AirIR::new(ast).expect("build AirIR failed");
-    let code = code_gen(&ir).expect("codegen failed");
+    let code = codegen(CONSTANTS_AIR);
 
     let trace_len = 2u64.pow(4);
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
