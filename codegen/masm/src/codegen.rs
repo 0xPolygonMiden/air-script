@@ -1,7 +1,8 @@
 use crate::constants::{AUX_TRACE, MAIN_TRACE};
 use crate::visitor::{
-    walk_boundary_constraints, walk_constant_bindings, walk_integrity_constraint_degrees,
-    walk_integrity_constraints, walk_periodic_columns, walk_public_inputs, AirVisitor,
+    walk_boundary_constraints_in_natural_order, walk_constant_bindings,
+    walk_integrity_constraint_degrees, walk_integrity_constraints, walk_periodic_columns,
+    walk_public_inputs, AirVisitor,
 };
 use ir::{
     constraints::{ConstraintRoot, Operation},
@@ -308,9 +309,7 @@ impl<'ast> CodeGenerator<'ast> {
     /// Emits code for the procedure `compute_evaluate_boundary_constraints`.
     fn gen_compute_evaluate_boundary_constraints(&mut self) -> Result<(), CodegenError> {
         self.writer.proc("compute_evaluate_boundary_constraints");
-        walk_boundary_constraints(self, self.ir, MAIN_TRACE)?;
-        self.boundary_contraints = 0; // reset counter for the aux trace
-        walk_boundary_constraints(self, self.ir, AUX_TRACE)?;
+        walk_boundary_constraints_in_natural_order(self, self.ir)?;
         self.writer.end();
 
         Ok(())
@@ -415,6 +414,8 @@ impl<'ast> AirVisitor<'ast> for CodeGenerator<'ast> {
         self.writer
             .header("Multiply by the composition coefficient");
 
+        // Note: The correctness of the load below relies on the integrity constraint being
+        // iterated first _and_ the boundary constraints being iterated in natural order.
         load_quadratic_element(
             &mut self.writer,
             self.config.composition_coef_address,
