@@ -14,5 +14,6 @@ rust-version = "1.65"
 [dependencies]
 air-parser = { path = "../parser", version = "0.2.0" }
 air-pass = { path = "../pass", version = "0.1.0" }
+anyhow = "1.0"
 miden-diagnostics = { git = "https://github.com/0xpolygonmiden/miden-diagnostics" }
 thiserror = "1.0"
