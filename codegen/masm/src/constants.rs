@@ -1,6 +1,6 @@
 // WINTERFELL CONSTANTS ---------------------------------------------------------------------------
-pub const MAIN_TRACE: u8 = 0;
-pub const AUX_TRACE: u8 = 1;
+pub const MAIN_TRACE: air_ir::TraceSegmentId = 0;
+pub const AUX_TRACE: air_ir::TraceSegmentId = 1;
 
 // MIDEN CONSTANTS -------------------------------------------------------------------------------
 // https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/constants.masm#L33

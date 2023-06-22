@@ -1,8 +1,7 @@
 use crate::constants::{AUX_TRACE, MAIN_TRACE};
-use ir::{
-    constraints::{ConstraintDomain, ConstraintRoot, Operation},
-    AccessType, AirIR, ConstantBinding, IntegrityConstraintDegree, NodeIndex, PeriodicColumn,
-    PublicInput, TraceAccess, Value,
+use air_ir::{
+    AccessType, Air, ConstraintDomain, ConstraintRoot, IntegrityConstraintDegree, NodeIndex,
+    Operation, PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
 };
 
 pub trait AirVisitor<'ast> {
@@ -14,26 +13,21 @@ pub trait AirVisitor<'ast> {
     fn visit_boundary_constraint(
         &mut self,
         constraint: &'ast ConstraintRoot,
-        trace_segment: u8,
+        trace_segment: TraceSegmentId,
     ) -> Result<Self::Value, Self::Error>;
 
     fn visit_air(&mut self) -> Result<Self::Value, Self::Error>;
 
-    fn visit_constant_binding(
-        &mut self,
-        constant: &'ast ConstantBinding,
-    ) -> Result<Self::Value, Self::Error>;
-
     fn visit_integrity_constraint_degree(
         &mut self,
         constraint: IntegrityConstraintDegree,
-        trace_segment: u8,
+        trace_segment: TraceSegmentId,
     ) -> Result<Self::Value, Self::Error>;
 
     fn visit_integrity_constraint(
         &mut self,
         constraint: &'ast ConstraintRoot,
-        trace_segment: u8,
+        trace_segment: TraceSegmentId,
     ) -> Result<Self::Value, Self::Error>;
 
     fn visit_node_index(&mut self, node_index: &'ast NodeIndex)
@@ -59,20 +53,9 @@ pub trait AirVisitor<'ast> {
     fn visit_value(&mut self, value: &'ast Value) -> Result<Self::Value, Self::Error>;
 }
 
-pub fn walk_constant_bindings<'ast, V: AirVisitor<'ast>>(
-    visitor: &mut V,
-    ir: &'ast AirIR,
-) -> Result<(), V::Error> {
-    for constant in ir.constants() {
-        visitor.visit_constant_binding(constant)?;
-    }
-
-    Ok(())
-}
-
 pub fn walk_public_inputs<'ast, V: AirVisitor<'ast>>(
     visitor: &mut V,
-    ir: &'ast AirIR,
+    ir: &'ast Air,
 ) -> Result<(), V::Error> {
     for input in ir.public_inputs() {
         visitor.visit_public_input(input)?;
@@ -83,8 +66,8 @@ pub fn walk_public_inputs<'ast, V: AirVisitor<'ast>>(
 
 pub fn walk_integrity_constraint_degrees<'ast, V: AirVisitor<'ast>>(
     visitor: &mut V,
-    ir: &'ast AirIR,
-    trace_segment: u8,
+    ir: &'ast Air,
+    trace_segment: TraceSegmentId,
 ) -> Result<(), V::Error> {
     for constraint in ir.integrity_constraint_degrees(trace_segment) {
         visitor.visit_integrity_constraint_degree(constraint, trace_segment)?;
@@ -95,7 +78,7 @@ pub fn walk_integrity_constraint_degrees<'ast, V: AirVisitor<'ast>>(
 
 pub fn walk_periodic_columns<'ast, V: AirVisitor<'ast>>(
     visitor: &mut V,
-    ir: &'ast AirIR,
+    ir: &'ast Air,
 ) -> Result<(), V::Error> {
     for column in ir.periodic_columns() {
         visitor.visit_periodic_column(column)?;
@@ -119,7 +102,7 @@ pub fn walk_periodic_columns<'ast, V: AirVisitor<'ast>>(
 /// - It sorts the constraints so groups with the same divisor are iterated together.
 pub fn walk_boundary_constraints_in_natural_order<'ast, V: AirVisitor<'ast>>(
     visitor: &mut V,
-    ir: &'ast AirIR,
+    ir: &'ast Air,
 ) -> Result<(), V::Error> {
     fn domain(boundary: &&ConstraintRoot) -> u8 {
         match boundary.domain() {
@@ -146,8 +129,8 @@ pub fn walk_boundary_constraints_in_natural_order<'ast, V: AirVisitor<'ast>>(
 
 pub fn walk_integrity_constraints<'ast, V: AirVisitor<'ast>>(
     visitor: &mut V,
-    ir: &'ast AirIR,
-    trace_segment: u8,
+    ir: &'ast Air,
+    trace_segment: TraceSegmentId,
 ) -> Result<(), V::Error> {
     for integrity in ir.integrity_constraints(trace_segment) {
         visitor.visit_integrity_constraint(integrity, trace_segment)?;

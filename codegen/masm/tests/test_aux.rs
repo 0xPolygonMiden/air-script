@@ -1,13 +1,12 @@
-use air_codegen_masm::{code_gen, constants};
-use assembly::Assembler;
-use ir::AirIR;
-use processor::{
+use air_codegen_masm::constants;
+use miden_assembly::Assembler;
+use miden_processor::{
     math::{Felt, FieldElement},
     AdviceInputs, Kernel, MemAdviceProvider, Process, QuadExtension, StackInputs,
 };
 
 mod utils;
-use utils::{parse, test_code, to_stack_order, Data};
+use utils::{codegen, test_code, to_stack_order, Data};
 
 static SIMPLE_AUX_AIR: &str = "
 def SimpleAux
@@ -34,9 +33,7 @@ integrity_constraints:
 
 #[test]
 fn test_simple_aux() {
-    let ast = parse(SIMPLE_AUX_AIR);
-    let ir = AirIR::new(ast).expect("build AirIR failed");
-    let code = code_gen(&ir).expect("codegen failed");
+    let code = codegen(SIMPLE_AUX_AIR);
 
     let trace_len = 2u64.pow(4);
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);

@@ -1,4 +1,4 @@
-use processor::math::{Felt, StarkField};
+use miden_processor::math::{Felt, StarkField};
 use std::borrow::{Borrow, Cow};
 
 enum ControlFlow {
@@ -13,7 +13,9 @@ impl std::fmt::Display for ControlFlow {
     }
 }
 
+#[derive(Default)]
 enum LineState {
+    #[default]
     Start,
     Idented,
     Instructions,
@@ -24,6 +26,7 @@ enum LineState {
 ///
 /// This struct helps to detect errors by tracking state of the code generation, and also helps to
 /// produce more readable code with automatic alignining.
+#[derive(Default)]
 pub struct Writer {
     code: String,
     procedure: Option<Cow<'static, str>>,
@@ -42,13 +45,8 @@ macro_rules! simple_ins {
 impl Writer {
     const INDENT: usize = 4;
 
-    pub fn new() -> Writer {
-        Writer {
-            code: String::new(),
-            procedure: None,
-            stack: vec![],
-            state: LineState::Start,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Consume the [Writer] and returns the generated code.

@@ -1,13 +1,12 @@
-use air_codegen_masm::{code_gen, constants};
-use assembly::Assembler;
-use ir::AirIR;
-use processor::{
+use air_codegen_masm::constants;
+use miden_assembly::Assembler;
+use miden_processor::{
     math::{Felt, FieldElement},
     AdviceInputs, Kernel, MemAdviceProvider, Process, QuadExtension, StackInputs,
 };
 
 mod utils;
-use utils::{parse, test_code, to_stack_order, Data};
+use utils::{codegen, test_code, to_stack_order, Data};
 
 static SIMPLE_BOUNDARY_AIR: &str = "
 def SimpleBoundary
@@ -32,9 +31,7 @@ integrity_constraints:
 
 #[test]
 fn test_simple_boundary() {
-    let ast = parse(SIMPLE_BOUNDARY_AIR);
-    let ir = AirIR::new(ast).expect("build AirIR failed");
-    let code = code_gen(&ir).expect("codegen failed");
+    let code = codegen(SIMPLE_BOUNDARY_AIR);
 
     let trace_len = 32u64;
     let one = QuadExtension::ONE;
@@ -137,9 +134,7 @@ integrity_constraints:
 
 #[test]
 fn test_complex_boundary() {
-    let ast = parse(COMPLEX_BOUNDARY_AIR);
-    let ir = AirIR::new(ast).expect("build AirIR failed");
-    let code = code_gen(&ir).expect("codegen failed");
+    let code = codegen(COMPLEX_BOUNDARY_AIR);
 
     let trace_len = 32u64;
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
