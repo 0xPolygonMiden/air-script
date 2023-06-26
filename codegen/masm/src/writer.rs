@@ -1,6 +1,7 @@
 use miden_processor::math::{Felt, StarkField};
 use std::borrow::{Borrow, Cow};
 
+#[derive(Debug, Clone, Copy)]
 enum ControlFlow {
     While,
 }
@@ -187,6 +188,9 @@ impl Writer {
     simple_ins!(ext2add);
     simple_ins!(ext2sub);
     simple_ins!(neg);
+    simple_ins!(swap);
+    simple_ins!(div);
+    simple_ins!(mul);
 
     pub(crate) fn add(&mut self, arg: u64) {
         self.ins(format!("add.{}", arg));
@@ -251,6 +255,10 @@ impl Writer {
     }
 
     pub fn r#while(&mut self) {
+        assert!(
+            self.procedure.is_some(),
+            "Can not open a while outside of a procedure"
+        );
         self.new_line();
         self.indent();
         self.code.push_str("while.true");

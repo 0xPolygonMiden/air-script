@@ -142,6 +142,13 @@ where
         constants::LOG2_TRACE_LEN_ADDRESS,
     ));
 
+    let g = Felt::get_root_of_unity(trace_len.ilog2());
+    code.push_str(&format!(
+        "    push.{} push.{} mem_store # trace domain generator `g`\n",
+        g,
+        constants::TRACE_DOMAIN_GENERATOR_ADDRESS,
+    ));
+
     // save the out-of-domain element
     let [z_0, z_1] = z.to_base_elements();
     code.push_str(&format!(
