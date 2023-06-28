@@ -26,6 +26,8 @@ pub const LOG2_TRACE_LEN_ADDRESS: u32 = 4294903307;
 // https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/constants.masm#L79
 pub const Z_ADDRESS: u32 = 4294903304;
 
+pub const TRACE_DOMAIN_GENERATOR_ADDRESS: u32 = 4294799999;
+
 // CODEGEN CONSTANTS ------------------------------------------------------------------------------
 pub const PERIODIC_VALUES_ADDRESS: u32 = 500000000;
 pub const Z_EXP_ADDRESS: u32 = 500000100;

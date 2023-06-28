@@ -51,6 +51,11 @@ pub struct CodegenConfig {
     /// Memory range used to store exponentiations of Z, each address contains one point to be used
     /// on the evaluation of each periodic polynimal.
     pub z_exp_address: u32,
+
+    /// Memory position of the trace domain generator.
+    ///
+    /// Note: `g_trace = g_lde^{blowup}`
+    pub trace_domain_generator_address: u32,
 }
 
 impl Default for CodegenConfig {
@@ -66,6 +71,7 @@ impl Default for CodegenConfig {
             aux_rand_address: constants::AUX_RAND_ELEM_PTR,
             periodic_values_address: constants::PERIODIC_VALUES_ADDRESS,
             z_exp_address: constants::Z_EXP_ADDRESS,
+            trace_domain_generator_address: constants::TRACE_DOMAIN_GENERATOR_ADDRESS,
         }
     }
 }

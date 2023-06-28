@@ -397,6 +397,30 @@ impl<'ast> Backend<'ast> {
         Ok(())
     }
 
+    /// Emits code for the procedure `get_exemptions_points`.
+    ///
+    /// Generate code to push the exemption points to the top of the stack.
+    /// Stack: [g^{trace_len-2}, g^{trace_len-1}, ...]
+    fn gen_get_exemptions_points(&mut self) -> Result<(), CodegenError> {
+        self.writer.proc("get_exemptions_points");
+        self.load_trace_domain_generator();
+        self.writer.header("=> [g, ...]");
+
+        self.writer.push(1);
+        self.writer.swap();
+        self.writer.div();
+        self.writer.header("=> [g^{-1}, ...]");
+
+        self.writer.dup(0);
+        self.writer.dup(0);
+        self.writer.mul();
+        self.writer.header("=> [g^{-2}, g^{-1}, ...]");
+
+        self.writer.end(); // end proc
+
+        Ok(())
+    }
+
     /// Emits code for the procedure `evaluate_integrity_constraints`.
     ///
     /// Evaluates the integrity constraints for both the main and auxiliary traces.
@@ -457,6 +481,12 @@ impl<'ast> Backend<'ast> {
         self.writer.mem_loadw(self.config.z_address);
         self.writer.drop();
         self.writer.drop();
+    }
+
+    /// Emits code to load `g`, the trace domain generator.
+    fn load_trace_domain_generator(&mut self) {
+        self.writer
+            .mem_load(self.config.trace_domain_generator_address);
     }
 }
 
@@ -533,6 +563,8 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
         walk_integrity_constraint_degrees(self, self.ir, AUX_TRACE)?;
 
         self.gen_cache_z_exp()?;
+        self.gen_get_exemptions_points()?;
+
         if !self.ir.periodic_columns.is_empty() {
             self.gen_evaluate_periodic_polys()?;
         }

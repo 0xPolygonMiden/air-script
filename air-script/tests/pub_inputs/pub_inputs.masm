@@ -16,6 +16,15 @@ proc.cache_z_exp
     dropw # Clean stack
 end # END PROC cache_z_exp
 
+proc.get_exemptions_points
+    mem_load.4294799999
+    # => [g, ...]
+    push.1 swap div
+    # => [g^{-1}, ...]
+    dup.0 dup.0 mul
+    # => [g^{-2}, g^{-1}, ...]
+end # END PROC get_exemptions_points
+
 proc.compute_evaluate_integrity_constraints
     # integrity constraint 0 for main
     padw mem_loadw.4294900000 drop drop padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2add ext2sub
