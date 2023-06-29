@@ -58,7 +58,7 @@ end # END PROC compute_evaluate_integrity_constraints
 
 proc.compute_evaluate_boundary_constraints
     # boundary constraint 0 for aux
-    padw mem_loadw.4294900077 movdn.3 movdn.3 drop drop push.0 push.0 ext2sub
+    padw mem_loadw.4294900076 movdn.3 movdn.3 drop drop push.0 push.0 ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900201 movdn.3 movdn.3 drop drop ext2mul
 end # END PROC compute_evaluate_boundary_constraints

@@ -139,7 +139,7 @@ proc.compute_evaluate_integrity_constraints
     # Multiply by the composition coefficient
     padw mem_loadw.4294900201 drop drop ext2mul
     # integrity constraint 0 for aux
-    padw mem_loadw.4294900073 drop drop padw mem_loadw.4294900073 movdn.3 movdn.3 drop drop padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop padw mem_loadw.4294900150 movdn.3 movdn.3 drop drop ext2add ext2mul ext2sub
+    padw mem_loadw.4294900072 drop drop padw mem_loadw.4294900072 movdn.3 movdn.3 drop drop padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop padw mem_loadw.4294900150 movdn.3 movdn.3 drop drop ext2add ext2mul ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900202 movdn.3 movdn.3 drop drop ext2mul
 end # END PROC compute_evaluate_integrity_constraints

@@ -13,7 +13,7 @@ pub const PUBLIC_INPUTS_ADDRESS: u32 = 4294800000;
 pub const OOD_FRAME_ADDRESS: u32 = 4294900000;
 
 // https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/ood_frames.masm#L11-L16
-pub const MAIN_TRACE_COLUMN_COUNT: u32 = 73;
+pub const MAIN_TRACE_COLUMN_COUNT: u32 = 72;
 pub const OOD_AUX_FRAME_ADDRESS: u32 = OOD_FRAME_ADDRESS + MAIN_TRACE_COLUMN_COUNT;
 
 // https://github.com/0xPolygonMiden/miden-vm/blob/next/stdlib/asm/crypto/stark/constants.masm#LL30C25-L30C35
