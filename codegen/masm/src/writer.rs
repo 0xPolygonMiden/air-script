@@ -104,8 +104,13 @@ impl Writer {
                 self.indent();
             }
         }
-        self.code.push_str("# ");
-        self.code.push_str(comment.borrow());
+        let comment = comment.borrow();
+        if !comment.is_empty() {
+            self.code.push_str("# ");
+            self.code.push_str(comment);
+        } else {
+            self.code.push('#');
+        }
         self.state = LineState::Comment;
     }
 
