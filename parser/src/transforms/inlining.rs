@@ -267,9 +267,9 @@ impl<'a> Inlining<'a> {
             Statement::Enforce(expr) => self.expand_constraint(expr),
             // Constraint comprehensions are inlined by unrolling the comprehension into a sequence of constraints
             Statement::EnforceAll(expr) => {
-                self.in_comprehension_constraint = true;
+                let in_cc = core::mem::replace(&mut self.in_comprehension_constraint, true);
                 let result = self.expand_comprehension(expr);
-                self.in_comprehension_constraint = false;
+                self.in_comprehension_constraint = in_cc;
                 result
             }
             // Conditional constraints are expanded like regular constraints, except the selector is applied
@@ -674,7 +674,10 @@ impl<'a> Inlining<'a> {
                 let ty = match stmt {
                     Statement::Expr(value) => value.ty(),
                     Statement::Let(nested) => nested.ty(),
-                    _ => unreachable!(),
+                    stmt => unreachable!(
+                        "unexpected statement type in comprehension body: {}",
+                        stmt.display(0)
+                    ),
                 };
                 Expr::SymbolAccess(SymbolAccess {
                     span,
@@ -807,7 +810,6 @@ impl<'a> Inlining<'a> {
 
         // Rewrite all references to the iterable bindings in the comprehension body
         let mut visitor = RewriteIterableBindingsVisitor {
-            inliner: self,
             values: &bound_values,
         };
         if let ControlFlow::Break(err) = visitor.visit_mut_scalar_expr(&mut body) {
@@ -946,6 +948,10 @@ impl<'a> Inlining<'a> {
 
         // Match call arguments to function parameters, populating the set of rewrites
         // which should be performed on the inlined function body.
+        //
+        // NOTE: We create a new nested scope for the parameters in order to avoid conflicting
+        // with the root declarations
+        eval_bindings.enter();
         self.populate_rewrites(
             &mut eval_bindings,
             call.args.as_slice(),
@@ -1254,7 +1260,6 @@ impl<'a> Inlining<'a> {
 /// This visitor is used to rewrite uses of iterable bindings within a comprehension body,
 /// including expansion of constant accesses.
 struct RewriteIterableBindingsVisitor<'a> {
-    inliner: &'a Inlining<'a>,
     /// This map contains the set of symbols to be rewritten, and the abstract values which
     /// should replace them in the comprehension body.
     values: &'a HashMap<Identifier, Expr>,
@@ -1357,9 +1362,8 @@ impl<'a> VisitMut<SemanticAnalysisError> for RewriteIterableBindingsVisitor<'a> 
         match expr {
             // Nothing to do with constants
             ScalarExpr::Const(_) => ControlFlow::Continue(()),
-            // If we observe an access, try to rewrite it as an iterable binding first, otherwise
-            // check to see if this is a trace access which should be rewritten. If neither are true,
-            // it can be left alone.
+            // If we observe an access, try to rewrite it as an iterable binding, if it is
+            // not a candidate for rewrite, leave it alone.
             //
             // NOTE: We handle BoundedSymbolAccess here even though comprehension constraints are not
             // permitted in boundary_constraints currently. That is handled elsewhere, we just need to
@@ -1372,9 +1376,6 @@ impl<'a> VisitMut<SemanticAnalysisError> for RewriteIterableBindingsVisitor<'a> 
                 if let Some(replacement) = self.rewrite_scalar_access(access.clone())? {
                     *expr = replacement;
                     return ControlFlow::Continue(());
-                }
-                if let Some(rewrite) = self.inliner.get_trace_access_rewrite(access) {
-                    *access = rewrite;
                 }
                 ControlFlow::Continue(())
             }
