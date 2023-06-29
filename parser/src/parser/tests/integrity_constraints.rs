@@ -588,6 +588,68 @@ fn ic_comprehension_with_evaluator_and_selectors() {
     ParseTest::new().expect_module_ast(source, expected);
 }
 
+#[test]
+fn ic_match_constraint() {
+    let source = "
+    def test
+
+    ev is_binary([x]):
+        enf x^2 = x
+
+    trace_columns:
+        main: [s[2], a, b, c[4], d[4]]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
+    integrity_constraints:
+        enf match:
+            case s[0] & s[1]: is_binary([c[0]])
+            case s[0]: c[1] = c[2]";
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected.trace_columns.push(trace_segment!(
+        0,
+        "$main",
+        [(s, 2), (a, 1), (b, 1), (c, 4), (d, 4)]
+    ));
+    expected.evaluators.insert(
+        ident!(is_binary),
+        EvaluatorFunction::new(
+            SourceSpan::UNKNOWN,
+            ident!(is_binary),
+            vec![trace_segment!(0, "%0", [(x, 1)])],
+            vec![enforce!(eq!(exp!(access!(x), int!(2)), access!(x)))],
+        ),
+    );
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![
+            enforce_all!(
+                lc!((("%1", range!(0..1))) => call!(is_binary(vector!(access!(c[0])))), when and!(access!(s[0]), access!(s[1])))
+            ),
+            enforce_all!(
+                lc!((("%2", range!(0..1))) => eq!(access!(c[1]), access!(c[2])), when access!(s[0]))
+            ),
+        ],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
+}
+
 // INVALID INTEGRITY CONSTRAINT COMPREHENSION
 // ================================================================================================
 
