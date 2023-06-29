@@ -185,6 +185,7 @@ impl Writer {
     simple_ins!(dropw);
     simple_ins!(padw);
     simple_ins!(ext2mul);
+    simple_ins!(ext2div);
     simple_ins!(ext2add);
     simple_ins!(ext2sub);
     simple_ins!(neg);

@@ -1,14 +1,12 @@
 use crate::constants::{AUX_TRACE, MAIN_TRACE};
 use air_ir::{
-    AccessType, Air, ConstraintDomain, ConstraintRoot, IntegrityConstraintDegree, NodeIndex,
-    Operation, PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
+    Air, ConstraintDomain, ConstraintRoot, IntegrityConstraintDegree, NodeIndex, Operation,
+    PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
 };
 
 pub trait AirVisitor<'ast> {
     type Value;
     type Error;
-
-    fn visit_access_type(&mut self, access: &'ast AccessType) -> Result<Self::Value, Self::Error>;
 
     fn visit_boundary_constraint(
         &mut self,
