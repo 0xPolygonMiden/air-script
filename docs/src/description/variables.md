@@ -22,8 +22,8 @@ random_values:
     rand: [16]
 
 boundary_constraints:
-    let x = stack_inputs[0] + stack_inputs[1]   
-    let y = [$rand[0], $rand[1]]  
+    let x = stack_inputs[0] + stack_inputs[1]
+    let y = [$rand[0], $rand[1]]
     enf e.first = x + y[0] + y[1]
 
 integrity_constraints:
@@ -53,7 +53,7 @@ Currently, it is not possible to:
     ```
 2. Create variables with list comprehension for which the source array is a inlined vector, a matrix row, or a range in matrix row.
 
-    Example: 
+    Example:
 
     ```
     ...

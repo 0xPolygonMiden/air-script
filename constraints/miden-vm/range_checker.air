@@ -48,7 +48,7 @@ ev range_checker([t, s0, s1, v], [p0]):
     let selectors = [t, s0, s1]
     enf is_binary([s]) for s in selectors
 
-    # Constrain the row transitions in the 8-bit section of the table so that as we move from one 
+    # Constrain the row transitions in the 8-bit section of the table so that as we move from one
     # row to the next the value either stays the same or increases by 1.
     enf (v' - v) * (v' - v - 1) = 0 when !t'
 

@@ -17,7 +17,7 @@ ev chiplet_selectors([s[3]]):
     enf is_binary([s[1]]) when s[0]
     enf is_binary([s[2]]) when s[0] & s[1]
 
-    # Enforce that the chiplets are stacked correctly by restricting selector values so they can 
+    # Enforce that the chiplets are stacked correctly by restricting selector values so they can
     # only change from 0 to 1.
     enf s[0]' = s[0] when s[0]
     enf s[1]' = s[1] when s[0] & s[1]
@@ -26,11 +26,11 @@ ev chiplet_selectors([s[3]]):
 
 ### Chiplets Constraints ##########################################################################
 
-# Enforce the constraints on the hash, bitwise or memory chiplet, given the columns of the chiplet 
+# Enforce the constraints on the hash, bitwise or memory chiplet, given the columns of the chiplet
 # module trace.
 ev chiplets([s[3], chiplet_columns[15]]):
     enf chiplet_selectors([s])
-    match enf: 
+    match enf:
         hash_chiplet([s[1], s[2], chiplet_columns]) when !s[0]
         bitwise_chiplet([s[2], chiplet_columns]) when s[0] & !s[1]
         memory_chiplet([chiplet_columns]) when s[0] & s[1] & !s[2]'

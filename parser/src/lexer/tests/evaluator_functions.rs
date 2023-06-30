@@ -9,7 +9,7 @@ fn ev_fn_with_main_cols() {
     ev ev_fn([state[12]]):
         let s1 = [x^7 for x in state]
         let s2 = [x^7 for x in s1]
-  
+
         enf s1[0] = s2[0]";
 
     let tokens = [
@@ -70,7 +70,7 @@ fn ev_fn_with_main_and_aux_cols() {
         let ms = [x^7 for x in main_state]
         let ms_sum = sum([x^7 for x in main_state])
         let as = [x^7 for x in aux_state]
-        
+
         enf main_state[0] = ms[0] + ms_sum
         enf aux_state[0] = as[0] * $rand[0]";
 

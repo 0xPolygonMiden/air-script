@@ -28,7 +28,7 @@ ev is_unchanged([column]):
 
 # Enforces that the provided columns must be zero.
 ev is_zero([column]):
-    enf column = 0 
+    enf column = 0
 
 
 # Enforces that created flags have valid values during the program execution.
@@ -45,7 +45,7 @@ ev flags_validity([ctx, addr, t]):
     # Enforce that when context changes, n0 = 1 (or when n0 = 0, context remains the same).
     enf ctx' = ctx when !n0
 
-    # Enforce that n1 must be binary. An additional condition ensures that the check of n1 
+    # Enforce that n1 must be binary. An additional condition ensures that the check of n1
     # occurs only if the context does not change (n0 = 0).
     enf n1^2 = n1 when !n0
 
@@ -65,7 +65,7 @@ ev enforce_selectors([s[2], ctx, addr, t]):
     # if context remains the same, n1 = 1 when address changes and 0 otherwise.
     let n1 = get_n1(addr, addr', t')
 
-    # Enforce that s[1]' = 1 when the operation is a read and `ctx` and `addr` columns are both 
+    # Enforce that s[1]' = 1 when the operation is a read and `ctx` and `addr` columns are both
     # unchanged.
     enf s[1]' = 1 when !n0 & !n1 & s[0]'
 
@@ -74,7 +74,7 @@ ev enforce_selectors([s[2], ctx, addr, t]):
     enf s[1]' = 0 when n0 | n1 | !s[0]'
 
 
-# Enforces that the delta between two consecutive contexts, addresses, or clock cycles is updated 
+# Enforces that the delta between two consecutive contexts, addresses, or clock cycles is updated
 # and decomposed into the `d1` and `d0` columns correctly.
 ev enforce_delta([ctx, addr, clk, d[2], t]):
     # n0 = 1 when context changes and 0 otherwise.
@@ -85,7 +85,7 @@ ev enforce_delta([ctx, addr, clk, d[2], t]):
 
     let d_next_agg = 2^16 * d[1]' + d[0]'
 
-    # Enforce that values of context (`ctx`), address (`addr`), and clock cycle (`clk`) grow 
+    # Enforce that values of context (`ctx`), address (`addr`), and clock cycle (`clk`) grow
     # monotonically
     match enf:
         d_next_agg = ctx' - ctx when n0
@@ -93,7 +93,7 @@ ev enforce_delta([ctx, addr, clk, d[2], t]):
         d_next_agg = clk' - clk - 1 when !n0 & !n1
 
 
-# Enforces that memory is initialized to zero when it is read before being written and that when 
+# Enforces that memory is initialized to zero when it is read before being written and that when
 # existing memory values are read they remain unchanged.
 ev enforce_values([s[2], v[4]]):
     # Enforce that values at a given memory address are always initialized to 0.

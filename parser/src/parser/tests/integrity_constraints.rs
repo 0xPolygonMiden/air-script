@@ -674,7 +674,7 @@ fn err_empty_integrity_constraints() {
         main: [clk]
 
     integrity_constraints:
-        
+
     boundary_constraints:
         enf clk.first = 1";
     ParseTest::new().expect_unrecognized_token(source);

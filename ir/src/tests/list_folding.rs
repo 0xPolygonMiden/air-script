@@ -73,7 +73,7 @@ fn list_folding_on_lc() {
         enf c[2].first = 0
     integrity_constraints:
         let x = sum([c * d for (c, d) in (c, d)])
-        let y = prod([c + d for (c, d) in (c, d)])    
+        let y = prod([c + d for (c, d) in (c, d)])
         enf clk = y - x";
 
     assert!(compile(source).is_ok());
@@ -88,10 +88,10 @@ fn list_folding_in_lc() {
         aux: [a, b, c[4], d[4]]
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf c[2].first = 0
-    
+
     integrity_constraints:
         let x = sum([c * d for (c, d) in (c, d)])
         let y = [m + x for m in fmp]

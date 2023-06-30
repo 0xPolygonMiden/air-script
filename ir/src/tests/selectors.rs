@@ -6,13 +6,13 @@ fn single_selector() {
     def test
     trace_columns:
         main: [s[2], clk]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf clk' = clk when s[0]";
 
@@ -25,13 +25,13 @@ fn chained_selectors() {
     def test
     trace_columns:
         main: [s[3], clk]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf clk' = clk when (s[0] & !s[1]) | !s[2]'";
 
@@ -45,13 +45,13 @@ fn multiconstraint_selectors() {
     def test
     trace_columns:
         main: [s[3], clk]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf clk' = 0 when s[0] & !s[1]
         match enf:
@@ -67,16 +67,16 @@ fn selectors_in_evaluators() {
     def test
     ev evaluator_with_selector([selector, clk]):
         enf clk' - clk = 0 when selector
-    
+
     trace_columns:
         main: [s[3], clk]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf evaluator_with_selector([s[0], clk])";
 
@@ -89,16 +89,16 @@ fn multiple_selectors_in_evaluators() {
     def test
     ev evaluator_with_selector([s0, s1, clk]):
         enf clk' - clk = 0 when s0 & !s1
-    
+
     trace_columns:
         main: [s[3], clk]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf evaluator_with_selector([s[0], s[1], clk])";
 
@@ -111,16 +111,16 @@ fn selector_with_evaluator_call() {
     def test
     ev unchanged([clk]):
         enf clk' = clk
-    
+
     trace_columns:
         main: [s[3], clk]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf unchanged([clk]) when s[0] & !s[1]";
 
@@ -143,7 +143,7 @@ fn selectors_inside_match() {
 
     trace_columns:
         main: [s[3], clk]
-        
+
     public_inputs:
         stack_inputs: [16]
 

@@ -76,10 +76,10 @@ fn err_non_const_exp_outside_lc() {
         aux: [a, b, c[4], d[4]]
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf c[2].first = 0
-    
+
     integrity_constraints:
         enf clk = 2^ctx";
 

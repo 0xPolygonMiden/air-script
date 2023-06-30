@@ -5,9 +5,9 @@ trace_columns:
 
 public_inputs:
     inputs: [2]
-  
+
 integrity_constraints:
     enf clk' = clk + 1
-  
+
 boundary_constraints:
     enf clk.first = 0

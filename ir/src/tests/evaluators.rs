@@ -6,16 +6,16 @@ fn simple_evaluator() {
     def test
     ev advance_clock([clk]):
         enf clk' = clk + 1
-    
+
     trace_columns:
         main: [clk]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf advance_clock([clk])";
 
@@ -29,16 +29,16 @@ fn evaluator_with_variables() {
     ev advance_clock([clk]):
         let z = clk + 1
         enf clk' = z
-    
+
     trace_columns:
         main: [clk]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf advance_clock([clk])";
 
@@ -53,17 +53,17 @@ fn evaluator_with_main_and_aux_cols() {
         let z = a + b
         enf clk' = clk + 1
         enf a' = a + z
-    
+
     trace_columns:
         main: [clk]
         aux: [a, b]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf enforce_constraints([clk], [a, b])";
 
@@ -76,17 +76,17 @@ fn ev_call_with_aux_only() {
     def test
     ev enforce_a([], [a, b]):
         enf a' = a + 1
-    
+
     trace_columns:
         main: [clk]
         aux: [a, b]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf enforce_a([], [a, b])";
 
@@ -99,19 +99,19 @@ fn ev_call_inside_evaluator_with_main() {
     def test
     ev enforce_clk([clk]):
         enf clk' = clk + 1
-    
+
     ev enforce_all_constraints([clk]):
         enf enforce_clk([clk])
-    
+
     trace_columns:
         main: [clk]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf enforce_all_constraints([clk])";
 
@@ -124,24 +124,24 @@ fn ev_call_inside_evaluator_with_aux() {
     def test
     ev enforce_clk([clk]):
         enf clk' = clk + 1
-    
+
     ev enforce_a([], [a, b]):
         enf a' = a + 1
-    
+
     ev enforce_all_constraints([clk], [a, b]):
         enf enforce_clk([clk])
         enf enforce_a([], [a, b])
-    
+
     trace_columns:
         main: [clk]
         aux: [a, b]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf clk.first = 0
-    
+
     integrity_constraints:
         enf enforce_all_constraints([clk], [a, b])";
 
@@ -154,16 +154,16 @@ fn ev_fn_call_with_column_group() {
     def test
     ev clk_selectors([selectors[3], clk]):
         enf (clk' - clk) * selectors[0] * selectors[1] * selectors[2] = 0
-    
+
     trace_columns:
         main: [s[3], clk]
-        
+
     public_inputs:
         stack_inputs: [16]
-        
+
     boundary_constraints:
         enf clk.first = 0
-        
+
     integrity_constraints:
         enf clk_selectors([s, clk])";
 
@@ -176,17 +176,17 @@ fn err_ev_fn_call_wrong_segment_columns() {
     def test
     ev is_binary([x]):
         enf x^2 = x
-    
+
     trace_columns:
         main: [b]
         aux: [c]
-    
+
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf b.first = 0
-    
+
     integrity_constraints:
         enf is_binary([c])";
 

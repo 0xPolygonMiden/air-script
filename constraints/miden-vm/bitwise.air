@@ -43,22 +43,22 @@ ev input_decomposition([a, b, a_limb[4], b_limb[4]]):
     # Enforce that the input is decomposed into valid bits.
     # Constraints degree: 2
     enf is_binary([a]) for a in a_limb
-    enf is_binary([b]) for b in b_limb 
+    enf is_binary([b]) for b in b_limb
 
-    # Enforce that the value in the first row of column `a` of the current 8-row cycle should be 
+    # Enforce that the value in the first row of column `a` of the current 8-row cycle should be
     # the aggregation of the decomposed bit columns `a_limb`.
     let a_aggr = aggregate(a_limb)
     # Constraint degree: 2
     enf a = a_aggr when k0
 
-    # Enforce that the value in the first row of column `b` of the current 8-row cycle should be 
+    # Enforce that the value in the first row of column `b` of the current 8-row cycle should be
     # the aggregation of the decomposed bit columns `b_limb`.
     let b_aggr = aggregate(b_limb)
     # Constraint degree: 2
     enf b = b_aggr when k0
 
     # Enforce that for all rows in an 8-row cycle, except for the last one, the values in a and b
-    # columns are increased by the values contained in the individual bit columns a_limb and 
+    # columns are increased by the values contained in the individual bit columns a_limb and
     # b_limb.
     # Constraints degree: 2
     enf a' = a * 16 + a_aggr when k1
@@ -81,9 +81,9 @@ ev output_aggregation([s, a, b, a_limb[4], b_limb[4], zp, z]):
 
     # Enforce that for all rows the value in the z column is computed by multiplying the previous
     # output value (from the zp column in the current row) by 16 and then adding it to the bitwise
-    # operation applied to the row's set of bits of a_limb and b_limb. The entire constraint must 
-    # also be multiplied by the operation selector flag to ensure it is only applied for the 
-    # appropriate operation. The constraint for AND is enforced when s = 0 and the constraint for 
+    # operation applied to the row's set of bits of a_limb and b_limb. The entire constraint must
+    # also be multiplied by the operation selector flag to ensure it is only applied for the
+    # appropriate operation. The constraint for AND is enforced when s = 0 and the constraint for
     # XOR is enforced when s = 1. Because the selectors for the AND and XOR operations are mutually
     # exclusive, the constraints for different operations can be aggregated into the same result
     # indices.
@@ -97,7 +97,7 @@ ev output_aggregation([s, a, b, a_limb[4], b_limb[4], zp, z]):
 
 ### Bitwise Chiplet Air Constraints ###############################################################
 
-# Enforces the constraints on the bitwise chiplet, given the columns of the bitwise execution 
+# Enforces the constraints on the bitwise chiplet, given the columns of the bitwise execution
 # trace.
 #
 # Max constraint degree: 4

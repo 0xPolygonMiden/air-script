@@ -29,7 +29,7 @@ fn lc_with_const_exp() {
         stack_inputs: [16]
     boundary_constraints:
         enf c[2].first = 0
-    
+
     integrity_constraints:
         let y = [col^7 for col in c]
         let z = [col'^7 - col for col in c]
@@ -47,10 +47,10 @@ fn lc_with_non_const_exp() {
         aux: [a, b, c[4], d[4]]
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf c[2].first = 0
-    
+
     integrity_constraints:
         let enumerate = [2^c * c for (i, c) in (0..4, c)]
         enf clk = enumerate[3]";
@@ -102,7 +102,7 @@ fn lc_with_multiple_lists() {
         main: [a, b[3], c[4], d[4]]
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf c[2].first = 0
     integrity_constraints:
@@ -123,7 +123,7 @@ fn err_index_out_of_range_lc_ident() {
         stack_inputs: [16]
     boundary_constraints:
         enf c[2].first = 0
-    
+
     integrity_constraints:
         let x = [fmp for fmp in fmp]
         enf clk = x[2]";
@@ -143,10 +143,10 @@ fn err_index_out_of_range_lc_slice() {
         aux: [a, b, c[4], d[4]]
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf c[2].first = 0
-    
+
     integrity_constraints:
         let x = [z for z in c[1..3]]
         enf clk = x[3]";
@@ -166,10 +166,10 @@ fn err_non_const_exp_ident_iterable() {
         aux: [a, b, c[4], d[4]]
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf c[2].first = 0
-    
+
     integrity_constraints:
         let invalid_exp_lc = [2^d * c for (d, c) in (d, c)]
         enf clk = invalid_exp_lc[1]";
@@ -186,10 +186,10 @@ fn err_non_const_exp_slice_iterable() {
         aux: [a, b, c[4], d[4]]
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf c[2].first = 0
-    
+
     integrity_constraints:
         let invalid_exp_lc = [2^d * c for (d, c) in (d[0..4], c)]
         enf clk = invalid_exp_lc[1]";
@@ -206,10 +206,10 @@ fn err_duplicate_member() {
         aux: [a, b, c[4], d[4]]
     public_inputs:
         stack_inputs: [16]
-    
+
     boundary_constraints:
         enf c[2].first = 0
-    
+
     integrity_constraints:
         let duplicate_member_lc = [c * d for (c, c) in (c, d)]
         enf clk = duplicate_member_lc[1]";
