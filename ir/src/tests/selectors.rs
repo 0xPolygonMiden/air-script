@@ -39,7 +39,6 @@ fn chained_selectors() {
 }
 
 #[test]
-#[ignore]
 fn multiconstraint_selectors() {
     let source = "
     def test
@@ -54,9 +53,9 @@ fn multiconstraint_selectors() {
     
     integrity_constraints:
         enf clk' = 0 when s[0] & !s[1]
-        match enf:
-            clk' = clk when s[0] & s[1]
-            clk' = 1 when !s[0] & !s[1]";
+        enf match:
+            case s[0] & s[1]: clk' = clk
+            case !s[0] & !s[1]: clk' = 1";
 
     assert!(compile(source).is_ok());
 }
@@ -128,7 +127,6 @@ fn selector_with_evaluator_call() {
 }
 
 #[test]
-#[ignore]
 fn selectors_inside_match() {
     let source = "
     def test
@@ -152,9 +150,9 @@ fn selectors_inside_match() {
 
     integrity_constraints:
         enf next_is_zero([clk]) when s[0] & !s[1]
-        match enf:
-            is_unchanged([clk, s[0]]) when s[1] & s[2]
-            next_is_one([clk]) when !s[1] & !s[2]";
+        enf match:
+            case s[1] & s[2]: is_unchanged([clk, s[0]])
+            case !s[1] & !s[2]: next_is_one([clk])";
 
     assert!(compile(source).is_ok());
 }

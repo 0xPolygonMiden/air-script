@@ -137,6 +137,8 @@ pub enum Token {
     // --------------------------------------------------------------------------------------------
     /// Keyword to signify that a constraint needs to be enforced
     Enf,
+    Match,
+    Case,
     When,
 
     // PUNCTUATION
@@ -182,6 +184,8 @@ impl Token {
             "for" => Self::For,
             "in" => Self::In,
             "enf" => Self::Enf,
+            "match" => Self::Match,
+            "case" => Self::Case,
             "when" => Self::When,
             other => Self::Ident(Symbol::intern(other)),
         }
@@ -250,6 +254,8 @@ impl fmt::Display for Token {
             Self::For => write!(f, "for"),
             Self::In => write!(f, "in"),
             Self::Enf => write!(f, "enf"),
+            Self::Match => write!(f, "match"),
+            Self::Case => write!(f, "case"),
             Self::When => write!(f, "when"),
             Self::Quote => write!(f, "'"),
             Self::Colon => write!(f, ":"),

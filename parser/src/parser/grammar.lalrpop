@@ -279,19 +279,14 @@ IntegrityConstraints: Span<Vec<Statement>> = {
 // STATEMENTS
 // ================================================================================================
 
-Statement: Statement = {
-    <Let> => Statement::Let(<>),
-    ConstraintStatement,
-}
-
 StatementBlock: Vec<Statement> = {
     <Let> => vec![Statement::Let(<>)],
-    <stmts:ConstraintStatement+> <last:Let> => {
+    <stmts:ConstraintStatements> <last:Let> => {
         let mut stmts = stmts;
         stmts.push(Statement::Let(last));
         stmts
     },
-    <ConstraintStatement+>,
+    <ConstraintStatements>,
 }
 
 Let: Let = {
@@ -299,8 +294,25 @@ Let: Let = {
         => Let::new(span!(l, r), name, value, body)
 }
 
-ConstraintStatement: Statement = {
-    "enf" <ConstraintExpr> => <>,
+ConstraintStatements: Vec<Statement> = {
+    <stmts:ConstraintStatement+> => {
+        stmts.into_iter().flatten().collect::<Vec<_>>()
+    }
+}
+
+ConstraintStatement: Vec<Statement> = {
+    "enf" "match" ":" <MatchArm+> => <>,
+    "enf" <ConstraintExpr> => vec![<>],
+}
+
+MatchArm: Statement = {
+    <l:@L> "case" <selector:ScalarExpr> ":" <constraint:ScalarConstraintExpr> <r:@R> => {
+        let generated_name = format!("%{}", *next_var);
+        *next_var += 1;
+        let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
+        let context = vec![(generated_binding, Expr::Range(Span::new(SourceSpan::UNKNOWN, 0..1)))];
+        Statement::EnforceAll(ListComprehension::new(span!(l, r), constraint, context, Some(selector)))
+    }
 }
 
 // This grammar rules handles two types of constraints: simple and comprehension constraints.
@@ -580,6 +592,8 @@ extern {
         "integrity_constraints" => Token::IntegrityConstraints,
         "ev" => Token::Ev,
         "enf" => Token::Enf,
+        "match" => Token::Match,
+        "case" => Token::Case,
         "when" => Token::When,
         "'" => Token::Quote,
         "=" => Token::Equal,

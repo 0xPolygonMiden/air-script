@@ -11,6 +11,6 @@ boundary_constraints:
 
 integrity_constraints:
     enf clk' = 0 when s[0] & !s[1]
-    match enf:
-        clk' = clk when s[0] & s[1] & s[2]
-        clk' = 1 when !s[1] & !s[2]
+    enf match:
+        case s[0] & s[1] & s[2]: clk' = clk
+        case !s[1] & !s[2]: clk' = 1
