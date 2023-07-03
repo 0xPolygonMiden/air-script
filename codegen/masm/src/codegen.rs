@@ -199,6 +199,14 @@ impl<'ast> Backend<'ast> {
         // - the trace length is always greater-than-or-equal the periodic column length.
         //   Ref: https://github.com/facebook/winterfell/blob/main/air/src/air/mod.rs#L322-L326
 
+        self.writer
+            .header("Procedure to efficiently compute the required exponentiations of the out-of-domain point `z` and cache them for later use.");
+        self.writer.header("");
+        self.writer.header("This computes the power of `z` needed to evaluate the periodic polynomials and the constraint divisors");
+        self.writer.header("");
+        self.writer.header("Input: [...]");
+        self.writer.header("Output: [...]");
+
         self.writer.proc("cache_z_exp");
 
         self.load_z();
@@ -368,6 +376,15 @@ impl<'ast> Backend<'ast> {
     /// This procedure first computes the `z**exp` for each periodic column, and then evaluates
     /// each periodic polynomial using Horner's method. The results are cached to memory.
     fn gen_evaluate_periodic_polys(&mut self) -> Result<(), CodegenError> {
+        self.writer
+            .header("Procedure to evaluate the periodic polynomials.");
+        self.writer.header("");
+        self.writer
+            .header("Procedure `cache_z_exp` must have been called prior to this.");
+        self.writer.header("");
+        self.writer.header("Input: [...]");
+        self.writer.header("Output: [...]");
+
         self.writer.proc("cache_periodic_polys");
         walk_periodic_columns(self, self.ir)?;
         self.writer.end();
@@ -376,6 +393,18 @@ impl<'ast> Backend<'ast> {
     }
 
     fn gen_compute_integrity_constraint_divisor(&mut self) -> Result<(), CodegenError> {
+        self.writer
+            .header("Procedure to compute the integrity constraint divisor.");
+        self.writer.header("");
+        self.writer.header(
+            "The divisor is defined as `(z^trace_len - 1) / ((z - g^{trace_len-2}) * (z - g^{trace_len-1}))`",
+        );
+        self.writer
+            .header("Procedure `cache_z_exp` must have been called prior to this.");
+        self.writer.header("");
+        self.writer.header("Input: [...]");
+        self.writer.header("Output: [divisor_1, divisor_0, ...]");
+
         self.writer.proc("compute_integrity_constraint_divisor");
 
         // `z^trace_len` is saved after all the period column points
@@ -446,6 +475,33 @@ impl<'ast> Backend<'ast> {
     /// This procedure evaluates each top-level integrity constraint and leaves the result on the
     /// stack. This is useful for testing the evaluation. Later on the value is aggregated.
     fn gen_compute_evaluate_integrity_constraints(&mut self) -> Result<(), CodegenError> {
+        let main_trace_count = self.ir.integrity_constraints(MAIN_TRACE).len();
+        let aux_trace_count = self.ir.integrity_constraints(AUX_TRACE).len();
+
+        self.writer
+            .header("Procedure to evaluate numerators of all integrity constraints.");
+        self.writer.header("");
+        self.writer.header(format!(
+            "All the {} main and {} auxiliary constraints are evaluated.",
+            main_trace_count, aux_trace_count
+        ));
+        self.writer.header(
+            "The result of each evaluation is kept on the stack, with the top of the stack",
+        );
+        self.writer.header(
+            "containing the evaluations for the auxiliary trace (if any) followed by the main trace.",
+        );
+        self.writer.header("");
+        self.writer.header("Input: [...]");
+        self.writer.header("Output: [(r_1, r_0)*, ...]");
+        self.writer.header(
+            "where: (r_1, r_0) is the quadratic extension element resulting from the integrity constraint evaluation.",
+        );
+        self.writer.header(format!(
+            "       This procedure pushes {} quadratic elements to the stack",
+            main_trace_count + aux_trace_count
+        ));
+
         self.writer.proc("compute_evaluate_integrity_constraints");
         walk_integrity_constraints(self, self.ir, MAIN_TRACE)?;
         self.integrity_contraints = 0; // reset counter for the aux trace
@@ -457,6 +513,33 @@ impl<'ast> Backend<'ast> {
 
     /// Emits code for the procedure `compute_evaluate_boundary_constraints`.
     fn gen_compute_evaluate_boundary_constraints(&mut self) -> Result<(), CodegenError> {
+        let main_trace_count = self.ir.boundary_constraints(MAIN_TRACE).len();
+        let aux_trace_count = self.ir.boundary_constraints(AUX_TRACE).len();
+
+        self.writer
+            .header("Procedure to evaluate numerators of all boundary constraints.");
+        self.writer.header("");
+        self.writer.header(format!(
+            "All the {} main and {} auxiliary constraints are computed.",
+            main_trace_count, aux_trace_count
+        ));
+        self.writer.header(
+            "The result constriants are evaluated in natural order, and their values are pushed to the stack.",
+        );
+        self.writer.header(
+            "The natural order is defined by `(trace, row, column)`, and the final evaluation is in stack-order.",
+        );
+        self.writer.header("");
+        self.writer.header("Input: [...]");
+        self.writer.header("Output: [(r_1, r_0)*, ...]");
+        self.writer.header(
+            "where: (r_1, r_0) is the quadratic extension element resulting from the boundary constraint evaluation.",
+        );
+        self.writer.header(format!(
+            "       This procedure pushes {} quadratic elements to the stack",
+            main_trace_count + aux_trace_count
+        ));
+
         self.writer.proc("compute_evaluate_boundary_constraints");
         walk_boundary_constraints_in_natural_order(self, self.ir)?;
         self.writer.end();
@@ -469,6 +552,12 @@ impl<'ast> Backend<'ast> {
     /// Generate code to push the exemption points to the top of the stack.
     /// Stack: [g^{trace_len-2}, g^{trace_len-1}, ...]
     fn gen_get_exemptions_points(&mut self) -> Result<(), CodegenError> {
+        self.writer
+            .header("Procedure to compute the exemption points.");
+        self.writer.header("");
+        self.writer.header("Input: [...]");
+        self.writer.header("Output: [g^{-2}, g^{-1}, ...]");
+
         self.writer.proc("get_exemptions_points");
         self.load_trace_domain_generator();
         self.writer.header("=> [g, ...]");
@@ -492,6 +581,14 @@ impl<'ast> Backend<'ast> {
     ///
     /// Evaluates the integrity constraints for both the main and auxiliary traces.
     fn gen_evaluate_integrity_constraints(&mut self) -> Result<(), CodegenError> {
+        self.writer
+            .header("Procedure to evaluate all integrity constraints.");
+        self.writer.header("");
+        self.writer.header("Input: [...]");
+        self.writer.header("Output: [(r_1, r_0), ...]");
+        self.writer
+            .header("Where: (r_1, r_0) is the final result with the divisor applied");
+
         self.writer.proc("evaluate_integrity_constraints");
 
         if !self.ir.periodic_columns.is_empty() {
@@ -527,6 +624,14 @@ impl<'ast> Backend<'ast> {
     ///
     /// Evaluates the boundary constraints for both the main and auxiliary traces.
     fn gen_evaluate_boundary_constraints(&mut self) -> Result<(), CodegenError> {
+        self.writer
+            .header("Procedure to evaluate all boundary constraints.");
+        self.writer.header("");
+        self.writer.header("Input: [...]");
+        self.writer.header("Output: [(r_1, r_0), ...]");
+        self.writer
+            .header("Where: (r_1, r_0) is the final result with the divisor applied");
+
         self.writer.proc("evaluate_boundary_constraints");
         self.writer.exec("compute_evaluate_boundary_constraints");
 
