@@ -63,7 +63,13 @@ fn test_simple_boundary() {
         ],
         trace_len,
         z,
-        &["compute_evaluate_boundary_constraints"],
+        &[
+            "compute_boundary_constraints_main_first",
+            "compute_boundary_constraints_main_last",
+            // there are no auxiliary boundary constraints on this AIR defnition
+            // "compute_boundary_constraints_aux_first",
+            // "compute_boundary_constraints_aux_last",
+        ],
     );
     let program = Assembler::default().compile(code).unwrap();
 
@@ -205,7 +211,12 @@ fn test_complex_boundary() {
         ],
         trace_len,
         z,
-        &["compute_evaluate_boundary_constraints"],
+        &[
+            "compute_boundary_constraints_main_first",
+            "compute_boundary_constraints_main_last",
+            "compute_boundary_constraints_aux_first",
+            "compute_boundary_constraints_aux_last",
+        ],
     );
     let program = Assembler::default().compile(code).unwrap();
 

@@ -1,4 +1,4 @@
-use crate::constants::{AUX_TRACE, MAIN_TRACE};
+use crate::utils::contraint_root_domain;
 use air_ir::{
     Air, ConstraintDomain, ConstraintRoot, IntegrityConstraintDegree, NodeIndex, Operation,
     PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
@@ -85,41 +85,22 @@ pub fn walk_periodic_columns<'ast, V: AirVisitor<'ast>>(
     Ok(())
 }
 
-/// Walks the IR's boundary constraints.
-///
-/// The boundary constraints have an implicit natural order. Defined by:
-///
-/// - Trace segment: The main trace is sorted before the auxiliary trace.
-/// - Row: Constraints on the first row are sorted before the last row.
-/// - Column: Constraints on lower columns are sorted before higher columns.
-///
-/// The order above has two functions:
-///
-/// - It sorts the constraints so that the order of iteration matches the order in which the
-/// composition coefficients are defined.
-/// - It sorts the constraints so groups with the same divisor are iterated together.
-pub fn walk_boundary_constraints_in_natural_order<'ast, V: AirVisitor<'ast>>(
+pub fn walk_boundary_constraints<'ast, V: AirVisitor<'ast>>(
     visitor: &mut V,
     ir: &'ast Air,
+    segment: TraceSegmentId,
+    constraint_domain: ConstraintDomain,
 ) -> Result<(), V::Error> {
-    fn domain(boundary: &&ConstraintRoot) -> u8 {
-        match boundary.domain() {
-            ConstraintDomain::FirstRow => 0,
-            ConstraintDomain::LastRow => 1,
-            ConstraintDomain::EveryRow => panic!("EveryRow is not supported"),
-            ConstraintDomain::EveryFrame(_) => panic!("EveryFrame is not supported"),
-        }
-    }
-    for segment in [MAIN_TRACE, AUX_TRACE] {
-        let mut constraints: Vec<&'ast ConstraintRoot> =
-            ir.boundary_constraints(segment).iter().collect();
+    let mut constraints: Vec<&'ast ConstraintRoot> =
+        ir.boundary_constraints(segment).iter().collect();
 
-        // TODO: Sort by the column index. Issue #315
-        constraints.sort_by_key(domain);
+    constraints.sort_by_key(contraint_root_domain);
 
-        for boundary in constraints {
-            visitor.visit_boundary_constraint(boundary, segment)?;
-        }
+    for boundary in constraints
+        .iter()
+        .filter(|c| c.domain() == constraint_domain)
+    {
+        visitor.visit_boundary_constraint(boundary, segment)?;
     }
 
     Ok(())

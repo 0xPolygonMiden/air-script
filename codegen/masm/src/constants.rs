@@ -31,3 +31,4 @@ pub const TRACE_DOMAIN_GENERATOR_ADDRESS: u32 = 4294799999;
 // CODEGEN CONSTANTS ------------------------------------------------------------------------------
 pub const PERIODIC_VALUES_ADDRESS: u32 = 500000000;
 pub const Z_EXP_ADDRESS: u32 = 500000100;
+pub const EXEMPTION_TWO_ADDRESS: u32 = 500000101;

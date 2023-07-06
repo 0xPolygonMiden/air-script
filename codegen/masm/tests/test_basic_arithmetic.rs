@@ -63,7 +63,7 @@ fn test_simple_arithmetic() {
         ],
         trace_len,
         z,
-        &["compute_evaluate_integrity_constraints"],
+        &["compute_integrity_constraints"],
     );
     let program = Assembler::default().compile(code).unwrap();
 
@@ -150,7 +150,7 @@ fn test_exp() {
         ],
         trace_len,
         z,
-        &["compute_evaluate_integrity_constraints"],
+        &["compute_integrity_constraints"],
     );
     let program = Assembler::default().compile(code).unwrap();
 
@@ -238,7 +238,7 @@ fn test_long_trace() {
         ],
         trace_len,
         z,
-        &["compute_evaluate_integrity_constraints"],
+        &["compute_integrity_constraints"],
     );
     let program = Assembler::default().compile(code).unwrap();
 
@@ -315,7 +315,7 @@ fn test_vector() {
         ],
         trace_len,
         z,
-        &["compute_evaluate_integrity_constraints"],
+        &["compute_integrity_constraints"],
     );
     let program = Assembler::default().compile(code).unwrap();
 
@@ -390,7 +390,7 @@ fn test_multiple_rows() {
         ],
         trace_len,
         z,
-        &["compute_evaluate_integrity_constraints"],
+        &["compute_integrity_constraints"],
     );
     let program = Assembler::default().compile(code).unwrap();
 
