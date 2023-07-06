@@ -387,13 +387,7 @@ impl<'ast> Backend<'ast> {
         self.writer.header("=> [zt_1-1, zt_0-1, ...]");
 
         // Compute the denominator of the divisor
-        // Load the point `z` to the stack
-        self.writer.padw();
-        self.writer.mem_loadw(self.config.z_address);
-        self.writer.drop();
-        self.writer.drop();
-        self.writer.comment("load z");
-
+        self.load_z();
         self.writer.header("=> [z_1, z_0, zt_1-1, zt_0-1, ...]");
 
         self.writer.exec("get_exemptions_points");
@@ -795,6 +789,7 @@ impl<'ast> Backend<'ast> {
         self.writer.mem_loadw(self.config.z_address);
         self.writer.drop();
         self.writer.drop();
+        self.writer.comment("load z");
     }
 
     /// Emits code to load `g`, the trace domain generator.

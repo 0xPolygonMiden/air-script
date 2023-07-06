@@ -5,7 +5,7 @@
 # Input: [...]
 # Output: [...]
 proc.cache_z_exp
-    padw mem_loadw.4294903304 drop drop
+    padw mem_loadw.4294903304 drop drop # load z
     # => [z_1, z_0, ...]
     # Exponentiate z trace_len times
     mem_load.4294903307 neg
@@ -115,7 +115,8 @@ proc.evaluate_boundary_constraints
     exec.compute_boundary_constraints_main_first
     # => [(first1, first0), ...]
     # Compute the denominator for domain FirstRow
-    padw mem_loadw.4294903304 drop drop push.1 push.0 ext2sub
+    padw mem_loadw.4294903304 drop drop # load z
+    push.1 push.0 ext2sub
     # Compute numerator/denominator for first row
     ext2div
 end # END PROC evaluate_boundary_constraints
