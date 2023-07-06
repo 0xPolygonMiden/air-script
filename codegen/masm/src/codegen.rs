@@ -827,6 +827,29 @@ impl<'ast> Backend<'ast> {
         }
     }
 
+    /// Emits code for the procedure `evaluate_constraints`.
+    ///
+    /// This will compute and cache values, the transition and boundary constraints for both the main and auxiliary traces.
+    fn gen_evaluate_constraints(&mut self) {
+        self.writer
+            .header("Procedure to evaluate the integrity and boundary constraints.");
+        self.writer.header("");
+        self.writer.header("Input: [...]");
+        self.writer.header("Output: [(r_1, r_0), ...]");
+
+        self.writer.export("evaluate_constraints");
+
+        // The order of execution below is important. These are the dependencies:
+        // - `z^trace_len` is computed and cached to be used by integrity contraints
+        // - `g^{trace_len-2}` is computed and cached to be used by boundary constraints
+        self.writer.exec("cache_z_exp");
+        self.writer.exec("evaluate_integrity_constraints");
+        self.writer.exec("evaluate_boundary_constraints");
+        self.writer.ext2add();
+
+        self.writer.end();
+    }
+
     /// Emits code to load the `log_2(trace_len)` onto the top of the stack.
     fn load_log2_trace_len(&mut self) {
         self.writer.mem_load(self.config.log2_trace_len_address);
@@ -972,6 +995,8 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
         // 4. Boundary constraints for the AUX trace.
         self.gen_evaluate_integrity_constraints()?;
         self.gen_evaluate_boundary_constraints()?;
+
+        self.gen_evaluate_constraints();
 
         Ok(())
     }

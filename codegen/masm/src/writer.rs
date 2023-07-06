@@ -131,6 +131,20 @@ impl Writer {
         self.new_line();
     }
 
+    /// Starts the codegen for an exported procedure.
+    pub fn export(&mut self, name: impl Into<Cow<'static, str>>) {
+        assert!(
+            self.procedure.is_none(),
+            "Can not nest procedures, currently writing {:?}",
+            self.procedure
+        );
+
+        let name = name.into();
+        self.code.push_str(&format!("export.{}", name));
+        self.procedure = Some(name);
+        self.new_line();
+    }
+
     pub fn exec(&mut self, name: impl Into<Cow<'static, str>>) {
         self.maybe_new_line_and_indent();
         self.code.push_str(&format!("exec.{}", name.into()));

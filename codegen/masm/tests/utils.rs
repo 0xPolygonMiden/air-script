@@ -36,7 +36,9 @@ pub fn codegen(source: &str) -> String {
         .expect("lowering failed");
 
     let codegen = air_codegen_masm::CodeGenerator::default();
-    codegen.generate(&air).expect("codegen failed")
+    let code = codegen.generate(&air).expect("codegen failed");
+
+    code.replace("export", "proc")
 }
 
 pub fn to_stack_order(values: &[QuadExtension<Felt>]) -> Vec<u64> {

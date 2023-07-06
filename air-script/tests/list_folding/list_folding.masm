@@ -132,3 +132,14 @@ proc.evaluate_boundary_constraints
     ext2div
 end # END PROC evaluate_boundary_constraints
 
+# Procedure to evaluate the integrity and boundary constraints.
+#
+# Input: [...]
+# Output: [(r_1, r_0), ...]
+export.evaluate_constraints
+    exec.cache_z_exp
+    exec.evaluate_integrity_constraints
+    exec.evaluate_boundary_constraints
+    ext2add
+end # END PROC evaluate_constraints
+
