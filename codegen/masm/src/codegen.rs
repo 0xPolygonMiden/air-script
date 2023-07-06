@@ -6,13 +6,12 @@ use crate::utils::{
     quadratic_element_square,
 };
 use crate::visitor::{
-    walk_boundary_constraints, walk_integrity_constraint_degrees, walk_integrity_constraints,
-    walk_periodic_columns, walk_public_inputs, AirVisitor,
+    walk_boundary_constraints, walk_integrity_constraints, walk_periodic_columns, AirVisitor,
 };
 use crate::writer::Writer;
 use air_ir::{
-    Air, ConstraintDomain, ConstraintRoot, Identifier, IntegrityConstraintDegree, NodeIndex,
-    Operation, PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
+    Air, ConstraintDomain, ConstraintRoot, Identifier, NodeIndex, Operation, PeriodicColumn,
+    TraceSegmentId, Value,
 };
 use miden_processor::math::{Felt, StarkField};
 use std::collections::btree_map::BTreeMap;
@@ -890,10 +889,6 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
     }
 
     fn visit_air(&mut self) -> Result<Self::Value, Self::Error> {
-        walk_public_inputs(self, self.ir)?;
-        walk_integrity_constraint_degrees(self, self.ir, MAIN_TRACE)?;
-        walk_integrity_constraint_degrees(self, self.ir, AUX_TRACE)?;
-
         self.gen_cache_z_exp()?;
         self.gen_get_exemptions_points()?;
 
@@ -918,14 +913,6 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
         self.gen_evaluate_constraints();
 
         Ok(())
-    }
-
-    fn visit_integrity_constraint_degree(
-        &mut self,
-        _constraint: IntegrityConstraintDegree,
-        _trace_segment: TraceSegmentId,
-    ) -> Result<Self::Value, Self::Error> {
-        Ok(()) // TODO
     }
 
     fn visit_node_index(
@@ -1085,20 +1072,6 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
 
         self.periodic_column += 1;
         Ok(())
-    }
-
-    fn visit_public_input(
-        &mut self,
-        _constant: &'ast PublicInput,
-    ) -> Result<Self::Value, Self::Error> {
-        Ok(())
-    }
-
-    fn visit_trace_access(
-        &mut self,
-        _trace_access: &'ast TraceAccess,
-    ) -> Result<Self::Value, Self::Error> {
-        Ok(()) // TODO
     }
 
     fn visit_value(&mut self, value: &'ast Value) -> Result<Self::Value, Self::Error> {
