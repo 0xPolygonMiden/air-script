@@ -13,9 +13,9 @@ proc.cache_z_exp
     dup.0 neq.0
     while.true
         movdn.2 dup.1 dup.1 ext2mul
-        # => [(z_1, z_0)^n, i, ...]
+        # => [(e_1, e_0)^n, i, ...]
         movup.2 add.1 dup.0 neq.0
-        # => [b, i+1, (z_1, z_0)^n, ...]
+        # => [b, i+1, (e_1, e_0)^n, ...]
     end # END while
     push.0 mem_storew.500000100 # z^trace_len
     # => [0, 0, (z_1, z_0)^trace_len, ...]

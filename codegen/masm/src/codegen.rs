@@ -232,25 +232,7 @@ impl<'ast> Backend<'ast> {
             }
 
             self.writer.header("Exponentiate z");
-
-            // The trace length and the period may have the same size, so it is necessary to perform
-            // the test before entering the loop.
-            self.writer.dup(0);
-            self.writer.neq(0);
-
-            self.writer.r#while();
-            self.writer.movdn(2);
-            self.writer.dup(1);
-            self.writer.dup(1);
-            self.writer.ext2mul();
-            self.writer.header("=> [(z_1, z_0)^n, i, ...]");
-
-            self.writer.movup(2);
-            self.writer.add(1);
-            self.writer.dup(0);
-            self.writer.neq(0);
-            self.writer.header("=> [b, i+1, (z_1, z_0)^n, ...]");
-            self.writer.end();
+            self.writer.ext2_exponentiate();
 
             let idx: u32 = idx.try_into().expect("periodic column length is too large");
             let addr = self.config.z_exp_address + idx;
@@ -294,24 +276,7 @@ impl<'ast> Backend<'ast> {
             }
         }
 
-        // The trace length and the period may have the same size, so it is necessary to perform
-        // the test before entering the loop.
-        self.writer.dup(0);
-        self.writer.neq(0);
-
-        self.writer.r#while();
-        self.writer.movdn(2);
-        self.writer.dup(1);
-        self.writer.dup(1);
-        self.writer.ext2mul();
-        self.writer.header("=> [(z_1, z_0)^n, i, ...]");
-
-        self.writer.movup(2);
-        self.writer.add(1);
-        self.writer.dup(0);
-        self.writer.neq(0);
-        self.writer.header("=> [b, i+1, (z_1, z_0)^n, ...]");
-        self.writer.end();
+        self.writer.ext2_exponentiate();
 
         let idx: u32 = self
             .periods
