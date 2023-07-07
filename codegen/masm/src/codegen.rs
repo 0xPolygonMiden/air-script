@@ -1,13 +1,17 @@
 use crate::config::CodegenConfig;
 use crate::constants::{AUX_TRACE, MAIN_TRACE};
+use crate::error::CodegenError;
+use crate::utils::{
+    boundary_group_to_procedure_name, load_quadratic_element, periodic_group_to_memory_offset,
+    quadratic_element_square,
+};
 use crate::visitor::{
-    walk_boundary_constraints, walk_integrity_constraint_degrees, walk_integrity_constraints,
-    walk_periodic_columns, walk_public_inputs, AirVisitor,
+    walk_boundary_constraints, walk_integrity_constraints, walk_periodic_columns, AirVisitor,
 };
 use crate::writer::Writer;
 use air_ir::{
-    Air, ConstraintDomain, ConstraintRoot, Identifier, IntegrityConstraintDegree, NodeIndex,
-    Operation, PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
+    Air, ConstraintDomain, ConstraintRoot, Identifier, NodeIndex, Operation, PeriodicColumn,
+    TraceSegmentId, Value,
 };
 use miden_processor::math::{Felt, StarkField};
 use std::collections::btree_map::BTreeMap;
@@ -74,76 +78,6 @@ struct Backend<'ast> {
 
     /// Configuration for the codegen.
     config: CodegenConfig,
-}
-
-/// Given a periodic column group position, returns a memory offset.
-///
-/// Periodic columns are grouped based on their length, this is done so that only a single z value
-/// needs to be cached per group. The grouping is based on unique lengths, sorted from highest to
-/// lowest. Given a periodic group, this function will return a memory offset, which can be used to
-/// load the corresponding z value.
-fn periodic_group_to_memory_offset(group: u32) -> u32 {
-    // Each memory address contains a quadratic field extension element, this makes the code to
-    // store/load the data more efficient, since it is easier to push/pop the high values of a
-    // word. So below we have to multiply the group by 2, to account for the zero padding, and add
-    // 1, to account for the data being at the low and not high part of the word.
-    group * 2 + 1
-}
-
-/// Loads the `element` from a memory range starting at `base_addr`.
-///
-/// This function is used to load a qudratic element from memory, and discard the other value. Even
-/// values are store in higher half of the word, while odd values are stored in the lower half.
-fn load_quadratic_element(
-    writer: &mut Writer,
-    base_addr: u32,
-    element: u32,
-) -> Result<(), CodegenError> {
-    let target_word: u32 = element / 2;
-    let address = base_addr + target_word;
-
-    // Load data from memory
-    writer.padw();
-    writer.mem_loadw(address);
-
-    // Discard the other value
-    match element % 2 {
-        0 => {
-            writer.movdn(3);
-            writer.movdn(3);
-            writer.drop();
-            writer.drop();
-        }
-        1 => {
-            writer.drop();
-            writer.drop();
-        }
-        _ => unreachable!(),
-    }
-
-    Ok(())
-}
-
-/// Assumes a quadratic extension field element is at the top of the stack and square it `n` times.
-fn quadratic_element_square(writer: &mut Writer, n: u32) {
-    for _ in 0..n {
-        writer.dup(1);
-        writer.dup(1);
-        writer.ext2mul();
-    }
-}
-
-fn boundary_group_to_procedure_name(
-    trace: TraceSegmentId,
-    domain: ConstraintDomain,
-) -> &'static str {
-    match (trace, domain) {
-        (MAIN_TRACE, ConstraintDomain::FirstRow) => "compute_boundary_constraints_main_first",
-        (MAIN_TRACE, ConstraintDomain::LastRow) => "compute_boundary_constraints_main_last",
-        (AUX_TRACE, ConstraintDomain::FirstRow) => "compute_boundary_constraints_aux_first",
-        (AUX_TRACE, ConstraintDomain::LastRow) => "compute_boundary_constraints_aux_last",
-        _ => panic!("Invalid boundary constraint"),
-    }
 }
 
 impl<'ast> Backend<'ast> {
@@ -298,25 +232,7 @@ impl<'ast> Backend<'ast> {
             }
 
             self.writer.header("Exponentiate z");
-
-            // The trace length and the period may have the same size, so it is necessary to perform
-            // the test before entering the loop.
-            self.writer.dup(0);
-            self.writer.neq(0);
-
-            self.writer.r#while();
-            self.writer.movdn(2);
-            self.writer.dup(1);
-            self.writer.dup(1);
-            self.writer.ext2mul();
-            self.writer.header("=> [(z_1, z_0)^n, i, ...]");
-
-            self.writer.movup(2);
-            self.writer.add(1);
-            self.writer.dup(0);
-            self.writer.neq(0);
-            self.writer.header("=> [b, i+1, (z_1, z_0)^n, ...]");
-            self.writer.end();
+            self.writer.ext2_exponentiate();
 
             let idx: u32 = idx.try_into().expect("periodic column length is too large");
             let addr = self.config.z_exp_address + idx;
@@ -360,24 +276,7 @@ impl<'ast> Backend<'ast> {
             }
         }
 
-        // The trace length and the period may have the same size, so it is necessary to perform
-        // the test before entering the loop.
-        self.writer.dup(0);
-        self.writer.neq(0);
-
-        self.writer.r#while();
-        self.writer.movdn(2);
-        self.writer.dup(1);
-        self.writer.dup(1);
-        self.writer.ext2mul();
-        self.writer.header("=> [(z_1, z_0)^n, i, ...]");
-
-        self.writer.movup(2);
-        self.writer.add(1);
-        self.writer.dup(0);
-        self.writer.neq(0);
-        self.writer.header("=> [b, i+1, (z_1, z_0)^n, ...]");
-        self.writer.end();
+        self.writer.ext2_exponentiate();
 
         let idx: u32 = self
             .periods
@@ -453,13 +352,7 @@ impl<'ast> Backend<'ast> {
         self.writer.header("=> [zt_1-1, zt_0-1, ...]");
 
         // Compute the denominator of the divisor
-        // Load the point `z` to the stack
-        self.writer.padw();
-        self.writer.mem_loadw(self.config.z_address);
-        self.writer.drop();
-        self.writer.drop();
-        self.writer.comment("load z");
-
+        self.load_z();
         self.writer.header("=> [z_1, z_0, zt_1-1, zt_0-1, ...]");
 
         self.writer.exec("get_exemptions_points");
@@ -861,6 +754,7 @@ impl<'ast> Backend<'ast> {
         self.writer.mem_loadw(self.config.z_address);
         self.writer.drop();
         self.writer.drop();
+        self.writer.comment("load z");
     }
 
     /// Emits code to load `g`, the trace domain generator.
@@ -868,22 +762,6 @@ impl<'ast> Backend<'ast> {
         self.writer
             .mem_load(self.config.trace_domain_generator_address);
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum CodegenError {
-    #[error("invalid access type")]
-    InvalidAccessType,
-    #[error("invalid row offset")]
-    InvalidRowOffset,
-    #[error("invalid size")]
-    InvalidSize,
-    #[error("invalid index")]
-    InvalidIndex,
-    #[error("invalid boundary constraint")]
-    InvalidBoundaryConstraint,
-    #[error("invalid integrity constraint")]
-    InvalidIntegrityConstraint,
 }
 
 impl<'ast> AirVisitor<'ast> for Backend<'ast> {
@@ -971,10 +849,6 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
     }
 
     fn visit_air(&mut self) -> Result<Self::Value, Self::Error> {
-        walk_public_inputs(self, self.ir)?;
-        walk_integrity_constraint_degrees(self, self.ir, MAIN_TRACE)?;
-        walk_integrity_constraint_degrees(self, self.ir, AUX_TRACE)?;
-
         self.gen_cache_z_exp()?;
         self.gen_get_exemptions_points()?;
 
@@ -999,14 +873,6 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
         self.gen_evaluate_constraints();
 
         Ok(())
-    }
-
-    fn visit_integrity_constraint_degree(
-        &mut self,
-        _constraint: IntegrityConstraintDegree,
-        _trace_segment: TraceSegmentId,
-    ) -> Result<Self::Value, Self::Error> {
-        Ok(()) // TODO
     }
 
     fn visit_node_index(
@@ -1166,20 +1032,6 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
 
         self.periodic_column += 1;
         Ok(())
-    }
-
-    fn visit_public_input(
-        &mut self,
-        _constant: &'ast PublicInput,
-    ) -> Result<Self::Value, Self::Error> {
-        Ok(())
-    }
-
-    fn visit_trace_access(
-        &mut self,
-        _trace_access: &'ast TraceAccess,
-    ) -> Result<Self::Value, Self::Error> {
-        Ok(()) // TODO
     }
 
     fn visit_value(&mut self, value: &'ast Value) -> Result<Self::Value, Self::Error> {

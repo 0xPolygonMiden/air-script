@@ -5,7 +5,7 @@
 # Input: [...]
 # Output: [...]
 proc.cache_z_exp
-    padw mem_loadw.4294903304 drop drop
+    padw mem_loadw.4294903304 drop drop # load z
     # => [z_1, z_0, ...]
     # Find number exponentiations required to get for a period of length 8
     mem_load.4294903307 neg add.3
@@ -14,9 +14,9 @@ proc.cache_z_exp
     dup.0 neq.0
     while.true
         movdn.2 dup.1 dup.1 ext2mul
-        # => [(z_1, z_0)^n, i, ...]
+        # => [(e_1, e_0)^n, i, ...]
         movup.2 add.1 dup.0 neq.0
-        # => [b, i+1, (z_1, z_0)^n, ...]
+        # => [b, i+1, (e_1, e_0)^n, ...]
     end # END while
     push.0 mem_storew.500000100 # z^8
     # => [0, 0, (z_1, z_0)^n, ...] where n = trace_len-8
@@ -28,9 +28,9 @@ proc.cache_z_exp
     dup.0 neq.0
     while.true
         movdn.2 dup.1 dup.1 ext2mul
-        # => [(z_1, z_0)^n, i, ...]
+        # => [(e_1, e_0)^n, i, ...]
         movup.2 add.1 dup.0 neq.0
-        # => [b, i+1, (z_1, z_0)^n, ...]
+        # => [b, i+1, (e_1, e_0)^n, ...]
     end # END while
     push.0 mem_storew.500000101 # z^4
     # => [0, 0, (z_1, z_0)^n, ...] where n = trace_len-4
@@ -41,9 +41,9 @@ proc.cache_z_exp
     dup.0 neq.0
     while.true
         movdn.2 dup.1 dup.1 ext2mul
-        # => [(z_1, z_0)^n, i, ...]
+        # => [(e_1, e_0)^n, i, ...]
         movup.2 add.1 dup.0 neq.0
-        # => [b, i+1, (z_1, z_0)^n, ...]
+        # => [b, i+1, (e_1, e_0)^n, ...]
     end # END while
     push.0 mem_storew.500000102 # z^trace_len
     # => [0, 0, (z_1, z_0)^trace_len, ...]
@@ -226,7 +226,8 @@ proc.evaluate_boundary_constraints
     exec.compute_boundary_constraints_main_first
     # => [(first1, first0), ...]
     # Compute the denominator for domain FirstRow
-    padw mem_loadw.4294903304 drop drop push.1 push.0 ext2sub
+    padw mem_loadw.4294903304 drop drop # load z
+    push.1 push.0 ext2sub
     # Compute numerator/denominator for first row
     ext2div
 end # END PROC evaluate_boundary_constraints

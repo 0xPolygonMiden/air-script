@@ -289,4 +289,26 @@ impl Writer {
         self.new_line();
         self.stack.push(ControlFlow::While);
     }
+
+    // Emits code to exponentiate a quadratic extension field element `n` times.
+    //
+    // The stack state must be `[-n, (e_1, e_0), ...]`, the result stack will be `[0, (e_1, e_0)^n, ...]`
+    pub fn ext2_exponentiate(&mut self) {
+        self.dup(0);
+        self.neq(0);
+
+        self.r#while();
+        self.movdn(2);
+        self.dup(1);
+        self.dup(1);
+        self.ext2mul();
+        self.header("=> [(e_1, e_0)^n, i, ...]");
+
+        self.movup(2);
+        self.add(1);
+        self.dup(0);
+        self.neq(0);
+        self.header("=> [b, i+1, (e_1, e_0)^n, ...]");
+        self.end();
+    }
 }

@@ -1,7 +1,7 @@
 use crate::utils::contraint_root_domain;
 use air_ir::{
-    Air, ConstraintDomain, ConstraintRoot, IntegrityConstraintDegree, NodeIndex, Operation,
-    PeriodicColumn, PublicInput, TraceAccess, TraceSegmentId, Value,
+    Air, ConstraintDomain, ConstraintRoot, NodeIndex, Operation, PeriodicColumn, TraceSegmentId,
+    Value,
 };
 
 pub trait AirVisitor<'ast> {
@@ -15,12 +15,6 @@ pub trait AirVisitor<'ast> {
     ) -> Result<Self::Value, Self::Error>;
 
     fn visit_air(&mut self) -> Result<Self::Value, Self::Error>;
-
-    fn visit_integrity_constraint_degree(
-        &mut self,
-        constraint: IntegrityConstraintDegree,
-        trace_segment: TraceSegmentId,
-    ) -> Result<Self::Value, Self::Error>;
 
     fn visit_integrity_constraint(
         &mut self,
@@ -38,40 +32,7 @@ pub trait AirVisitor<'ast> {
         columns: &'ast PeriodicColumn,
     ) -> Result<Self::Value, Self::Error>;
 
-    fn visit_public_input(
-        &mut self,
-        constant: &'ast PublicInput,
-    ) -> Result<Self::Value, Self::Error>;
-
-    fn visit_trace_access(
-        &mut self,
-        trace_access: &'ast TraceAccess,
-    ) -> Result<Self::Value, Self::Error>;
-
     fn visit_value(&mut self, value: &'ast Value) -> Result<Self::Value, Self::Error>;
-}
-
-pub fn walk_public_inputs<'ast, V: AirVisitor<'ast>>(
-    visitor: &mut V,
-    ir: &'ast Air,
-) -> Result<(), V::Error> {
-    for input in ir.public_inputs() {
-        visitor.visit_public_input(input)?;
-    }
-
-    Ok(())
-}
-
-pub fn walk_integrity_constraint_degrees<'ast, V: AirVisitor<'ast>>(
-    visitor: &mut V,
-    ir: &'ast Air,
-    trace_segment: TraceSegmentId,
-) -> Result<(), V::Error> {
-    for constraint in ir.integrity_constraint_degrees(trace_segment) {
-        visitor.visit_integrity_constraint_degree(constraint, trace_segment)?;
-    }
-
-    Ok(())
 }
 
 pub fn walk_periodic_columns<'ast, V: AirVisitor<'ast>>(
