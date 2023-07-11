@@ -1,7 +1,7 @@
 # Language Description
 
 - [Syntax overview](./syntax.md)
-- [File structure](./structure.md)
+- [File structure](./organization.md)
 - [Type declarations](./declarations.md)
 - [Variables](./variables.md)
 - [Convenience syntax](./convenience-syntax.md)
