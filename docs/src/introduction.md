@@ -6,9 +6,6 @@ Polygon Miden's AirScript is designed to make it simple to describe AIR constrai
 
 Currently, AirScript is on version 0.3, which includes about 95% of features needed to describe Miden VM constraints, and supports generation of constraint evaluation code for the following backends:
 
-* Rust code targeting the [Winterfell prover](https://github.com/facebook/winterfell).
-* Miden assembly code targeting recursive verifier in [Miden VM](https://github.com/0xPolygonMiden/miden-vm).
-
 AirScript includes the following features:
 
 - **Trace Columns**: Users can declare trace columns for main and auxiliary traces as individual columns or groups of columns (e.g. `main: [a, b, c[3], d]` where `a`, `b`, and `d` are single columns and `c` refers to a group of 3 columns)
@@ -52,10 +49,7 @@ Then, run the `airc` target with the `transpile` option. For example:
 ```
 ./target/release/airc transpile examples/example.air
 ```
-This will output constraint evaluation code targeted for the Winterfell prover. To output constraint evaluation code in Miden assembly, you can use `--target masm` flag like so:
-```
-./target/release/airc transpile examples/example.air --target masm
-```
+This will output constraint evaluation code targeted for the Winterfell prover.
 
 You can use the `help` option to see other available options.
 

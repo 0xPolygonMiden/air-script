@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 (2023-07-12)
+
+- Added support for library modules.
+- Added support for evaluator functions.
+- Added support for constraint comprehension.
+- Added support for conditional constraints.
+- Refactored parser to make it more robust and provide better error reporting.
+- Fixed grammar ambiguities.
+- Added initial implementation of Miden assembly backend.
+
 ## 0.2.0 (2023-02-23)
 
 - Added support for named constants (scalars, vectors, and matrices).

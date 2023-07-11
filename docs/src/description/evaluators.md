@@ -107,4 +107,4 @@ integrity_constraints:
 ```
 
 ### Using in conditional constraints
-Evaluators can also be used in [conditional constraints](./convenience-syntax.md#conditional-evaluators). The combination of evaluator and selector syntax is especially powerful as it enables describing complex constraints in a simple and modular way.
+Evaluators can also be used in [conditional constraints](./convenience.md#conditional-evaluators). The combination of evaluator and selector syntax is especially powerful as it enables describing complex constraints in a simple and modular way.
