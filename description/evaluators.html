@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Variables - AirScript by Polygon Miden</title>
+        <title>Evaluators - AirScript by Polygon Miden</title>
 
 
         <!-- Custom HTML head -->
@@ -83,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/organization.html"><strong aria-hidden="true">2.2.</strong> Code organization</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/variables.html" class="active"><strong aria-hidden="true">2.5.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/evaluators.html"><strong aria-hidden="true">2.6.</strong> Evaluators</a></li><li class="chapter-item expanded "><a href="../description/convenience-syntax.html"><strong aria-hidden="true">2.7.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.8.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.9.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html"><strong aria-hidden="true">2.10.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/organization.html"><strong aria-hidden="true">2.2.</strong> Code organization</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/variables.html"><strong aria-hidden="true">2.5.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/evaluators.html" class="active"><strong aria-hidden="true">2.6.</strong> Evaluators</a></li><li class="chapter-item expanded "><a href="../description/convenience-syntax.html"><strong aria-hidden="true">2.7.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.8.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.9.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html"><strong aria-hidden="true">2.10.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -170,89 +170,109 @@
                 <div id="content" class="content">
                     <main>
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
-<h1 id="local-variables-and-built-in-variables"><a class="header" href="#local-variables-and-built-in-variables">Local Variables and Built-in Variables</a></h1>
-<p>This section describes the syntax for declaring local variables and built-in variables.</p>
-<h2 id="variables"><a class="header" href="#variables">Variables</a></h2>
-<p>In AirScript, variables can be declared in <code>boundary_constraints</code> and <code>integrity_constraints</code> sections and can contain any expression that would be valid within that source section. Variables can be of type scalar, vector or matrix. In the example below, <code>x</code> is a variable of type <code>scalar</code>, <code>y</code> is a variable of type <code>vector</code> and <code>z</code> is a variable of type <code>matrix</code>.</p>
-<pre><code>def VariablesExample
-
-const A = 1
-const B = 2
-
-trace_columns:
-    main: [a, b, c, d]
-    aux: [e, f]
-
-public_inputs:
-    stack_inputs: [16]
-
-random_values:
-    rand: [16]
-
-boundary_constraints:
-    let x = stack_inputs[0] + stack_inputs[1]   
-    let y = [$rand[0], $rand[1]]  
-    enf e.first = x + y[0] + y[1]
+<h1 id="evaluators"><a class="header" href="#evaluators">Evaluators</a></h1>
+<p>Evaluators are sets of constraints logically grouped together. The primary purpose of evaluators is to increase modularity and readability of AirScript code.</p>
+<h2 id="defining-evaluators"><a class="header" href="#defining-evaluators">Defining evaluators</a></h2>
+<p>An evaluator consists of a declaration which specifies evaluator metadata and a body which contains descriptions of integrity constraints.</p>
+<p>Evaluator declaration starts with the <code>ev</code> keyword, followed by the name of the evaluator, parameter declarations, and a semicolon. For example:</p>
+<pre><code>ev foo([a, b, c], [p]):
+</code></pre>
+<p>Evaluator name must:</p>
+<ul>
+<li>Be a string consisting of alpha-numeric characters and underscores.</li>
+<li>Start with a letter.</li>
+<li>Be unique among the evaluators declared in and imported by a module.</li>
+</ul>
+<p>Evaluator parameters define an evaluator's view into the execution trace. Specifically, they define the set of columns in the main and the auxiliary trace segments the evaluator can access. For example, the evaluator declared above can access 3 columns of the main trace segment (which can be referenced as <code>a</code>, <code>b</code>, and <code>c</code>), and 1 column in the auxiliary trace segment (which can be referenced as <code>p</code>).</p>
+<p>If an evaluator needs to access only the main trace segment, we can omit the parameters for the auxiliary trace segment. For example:</p>
+<pre><code>ev bar([a, b, c]):
+</code></pre>
+<p>If, however, an evaluator needs to access only the auxiliary trace segments, we must define the main trace segment parameters as an empty set like so:</p>
+<pre><code>ev baz([], [p]):
+</code></pre>
+<p>An evaluator body must contain at least one integrity constraint. For example:</p>
+<pre><code>ev foo([a, b]):
+    enf a' = a + b
+</code></pre>
+<p>In general, an evaluator body may contain any set of expressions allowed in the <a href="./constraints.html#integrity-constraints-integrity_constraints">integrity constraints</a> section subject to the following caveats:</p>
+<ul>
+<li>Evaluators can access only the trace columns defined via its parameters.</li>
+<li>Evaluators can access only constants and periodic columns defined in the same module.</li>
+<li>Evaluators can access random values defined in the root module.</li>
+</ul>
+<p>Evaluators can be declared anywhere in a module, but usually are declared towards the end of the module.</p>
+<h2 id="using-evaluators"><a class="header" href="#using-evaluators">Using evaluators</a></h2>
+<p>An evaluator defined in a module or <a href="./organization.html#importing-evaluators">imported</a> from a different module can be invoked via the <code>enf</code> keyword. For example (public inputs and boundary constraints omitted for brevity):</p>
+<pre><code>trace_columns:
+    main: [a, b]
 
 integrity_constraints:
-    let z = [
-        [a + b, c + d],
-        [A * a, B * b]
-    ]
-    enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1]
+    enf foo([a, b])
+
+ev foo([x, y]):
+    enf x' = x + y
 </code></pre>
-<h3 id="syntax-restriction-for-local-variables"><a class="header" href="#syntax-restriction-for-local-variables">Syntax restriction for local variables</a></h3>
-<p>Currently, it is not possible to:</p>
-<ol>
-<li>
-<p>Create matrices containing both arrays and references to arrays.</p>
-<p>Example:</p>
-<pre><code>...
-boundary_constraints:
-    let a = [[1,2], [3,4]]  # &lt;-- this is allowed
-    let b = [1, 2]
-    let c = [a[1], b]  # &lt;-- this is allowed
-    let d = [b, [3, 4]]  # &lt;-- this is not allowed, because `d` consists of array `[3, 4]` and reference to array `b`
-    enf ...
-...
-</code></pre>
-</li>
-<li>
-<p>Create variables with list comprehension for which the source array is a inlined vector, a matrix row, or a range in matrix row.</p>
-<p>Example: </p>
-<pre><code>...
+<p>In the above example, evaluator <code>foo</code> is invoked using trace columns <code>a</code> and <code>b</code>, but notice that within the evaluator we refer to these columns by different names (specifically, <code>x</code> and <code>y</code> respectively). The above example is equivalent to:</p>
+<pre><code>trace_columns:
+    main: [a, b]
+
 integrity_constraints:
-    let a = [[1, 2], [3, 4]]
-    let b = [5, 6]
-    let c = 7
-    let d = [e for e in [8, 9, 10]]  # &lt;-- source array is an inlined vector
-    let f = [g for g in a[1]]  # &lt;-- source is a matrix row
-    let h = [i for i in a[0][0..2]]  # &lt;-- source is a range in matrix row
-    enf ...
-...
+    enf a' = a + b
 </code></pre>
-</li>
-</ol>
-<h2 id="built-in-variables"><a class="header" href="#built-in-variables">Built-in variables</a></h2>
-<p>Built-in variables are identified by the starting character <code>$</code>. There are two built-in variables:</p>
-<h3 id="main"><a class="header" href="#main">$main</a></h3>
-<p><code>$main</code> is used to access columns in the <a href="./appendix.html#main-vs-auxiliary-execution-trace-segments-main-and-aux">main execution trace</a>.</p>
-<p>These columns may be accessed by using the indexing operator on <code>$main</code>. For example, <code>$main[i]</code> provides the <code>(i+1)th</code> column in the main execution trace.</p>
-<p>Columns using the <code>$main</code> built-in may only be accessed within source sections for integrity constraints, i.e. the <a href="./constraints.html#integrity-constraints-integrity_constraints"><code>integrity_constraints</code> section</a>.</p>
-<h3 id="aux"><a class="header" href="#aux">$aux</a></h3>
-<p><code>$aux</code> is used to access columns in the <a href="./appendix.html#main-vs-auxiliary-execution-trace-segments-main-and-aux">auxiliary execution trace</a>.</p>
-<p>These columns may be accessed by using the indexing operator on <code>$aux</code>. For example, <code>$aux[i]</code> provides the <code>(i+1)th</code> column in the auxiliary execution trace.</p>
-<p>Columns using the <code>$aux</code> built-in may only be accessed within source sections for integrity constraints, i.e. the <a href="./constraints.html#integrity-constraints-integrity_constraints"><code>integrity_constraints</code> section</a>.</p>
+<p>That is, we can think of evaluators as being <em>inlined</em> at their call sites.</p>
+<p>Evaluators can be invoked multiple times. For example:</p>
+<pre><code>trace_columns:
+    main: [a, b, c]
+
+integrity_constraints:
+    enf foo([a, b])
+    enf foo([c, a])
+
+ev foo([x, y]):
+    enf x' = x + y
+</code></pre>
+<p>This is equivalent to:</p>
+<pre><code>trace_columns:
+    main: [a, b, c]
+
+integrity_constraints:
+    enf a' = a + b
+    enf c' = c + a
+</code></pre>
+<p>Evaluators can also invoke other evaluators. For example:</p>
+<pre><code>trace_columns:
+    main: [a, b]
+
+integrity_constraints:
+    enf foo([a, b])
+
+ev foo([x, y]):
+    enf x' = x + y
+    enf bar([y, x])
+
+ev bar([x, y]):
+    enf x' = x * y
+</code></pre>
+<p>The above is equivalent to:</p>
+<pre><code>trace_columns:
+    main: [a, b]
+
+integrity_constraints:
+    enf a' = a + b
+    enf b' = b * a
+</code></pre>
+<h3 id="using-in-conditional-constraints"><a class="header" href="#using-in-conditional-constraints">Using in conditional constraints</a></h3>
+<p>Evaluators can also be used in <a href="./convenience-syntax.html#conditional-evaluators">conditional constraints</a>. The combination of evaluator and selector syntax is especially powerful as it enables describing complex constraints in a simple and modular way.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../description/constraints.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../description/variables.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next" href="../description/evaluators.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../description/convenience-syntax.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -262,11 +282,11 @@ integrity_constraints:
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../description/constraints.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../description/variables.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next" href="../description/evaluators.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="../description/convenience-syntax.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

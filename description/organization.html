@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>File structure - AirScript by Polygon Miden</title>
+        <title>Code organization - AirScript by Polygon Miden</title>
 
 
         <!-- Custom HTML head -->
@@ -83,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/structure.html" class="active"><strong aria-hidden="true">2.2.</strong> File structure</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/variables.html"><strong aria-hidden="true">2.4.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/convenience-syntax.html"><strong aria-hidden="true">2.5.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.6.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.7.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.8.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html"><strong aria-hidden="true">2.9.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/organization.html" class="active"><strong aria-hidden="true">2.2.</strong> Code organization</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/variables.html"><strong aria-hidden="true">2.5.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/evaluators.html"><strong aria-hidden="true">2.6.</strong> Evaluators</a></li><li class="chapter-item expanded "><a href="../description/convenience-syntax.html"><strong aria-hidden="true">2.7.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.8.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.9.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html"><strong aria-hidden="true">2.10.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -170,49 +170,74 @@
                 <div id="content" class="content">
                     <main>
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
-<h1 id="file-structure"><a class="header" href="#file-structure">File Structure</a></h1>
-<p>An AIR Script file consists of a name definition and several source sections which contain declarations and constraints. The declarations describe the shape of the execution trace to which constraints are applied and the public inputs, and periodic columns that are used for computing those constraints. The constraints describe boundary and integrity constraints which must hold for an execution trace and set of public inputs in order for them to be valid (i.e. in order for a valid proof to be generated or verification to pass).</p>
-<h2 id="air-name-definition"><a class="header" href="#air-name-definition">AIR name definition</a></h2>
-<p>An AirScript file starts with a definition of the name of the AIR module, such as:</p>
+<h1 id="code-organization"><a class="header" href="#code-organization">Code organization</a></h1>
+<p>AirScript project can consist of one or more modules, each module located in a separate file with a <code>.air</code> extension. For projects consisting of multiple modules, one module must be declared as the root module, and all other modules must be declared as library modules.</p>
+<p>Currently, all modules must be located in a single directory, but in the future this limitation will be removed.</p>
+<p>All modules must start with a module name declaration followed by a set of source sections. These sections describe both the metadata and constraint evaluation logic for the AIR. Depending on the module type, some source sections may be required, be optional, or may not be allowed. The table below summarizes this information.</p>
+<div class="table-wrapper"><table><thead><tr><th>Section</th><th style="text-align: center">Root module</th><th style="text-align: center">Library module</th></tr></thead><tbody>
+<tr><td><a href="./declarations.html#constants-const">constants</a></td><td style="text-align: center">optional</td><td style="text-align: center">optional</td></tr>
+<tr><td><a href="./declarations.html#execution-trace-trace_columns">trace columns</a></td><td style="text-align: center">required</td><td style="text-align: center">not allowed</td></tr>
+<tr><td><a href="./declarations.html#public-inputs-public_inputs">public inputs</a></td><td style="text-align: center">required</td><td style="text-align: center">not allowed</td></tr>
+<tr><td><a href="./declarations.html#periodic-columns-periodic_columns">periodic columns</a></td><td style="text-align: center">optional</td><td style="text-align: center">optional</td></tr>
+<tr><td><a href="./declarations.html#random-values-random_values">random values</a></td><td style="text-align: center">optional</td><td style="text-align: center">not allowed</td></tr>
+<tr><td><a href="./constraints.html#boundary-constraints-boundary_constraints">boundary constraints</a></td><td style="text-align: center">required</td><td style="text-align: center">not allowed</td></tr>
+<tr><td><a href="./constraints.html#integrity-constraints-integrity_constraints">integrity constraints</a></td><td style="text-align: center">required</td><td style="text-align: center">not allowed</td></tr>
+<tr><td><a href="./evaluators.html">evaluators</a></td><td style="text-align: center">optional</td><td style="text-align: center">optional</td></tr>
+</tbody></table>
+</div>
+<p>Note that constants and evaluators are not really distinct sections but rather a set of declarations which can be done in-between any other sections.</p>
+<h3 id="root-module"><a class="header" href="#root-module">Root module</a></h3>
+<p>A root module defines an entrypoint into an AirScript project. It must start with a name declaration which consists of a <code>def</code> keyword followed by the name of the AIR project. For example:</p>
 <pre><code>def ExampleAir
 </code></pre>
-<p>It must:</p>
+<p>where the name of the module must:</p>
 <ul>
-<li>Begin with the <code>def</code> keyword, with no indentation.</li>
-<li>Continue with a string that does not begin with a number.</li>
+<li>Be a string consisting of alpha-numeric characters and underscores.</li>
+<li>Start with a letter.</li>
 <li>End with a newline.</li>
 </ul>
-<h2 id="constant-declarations"><a class="header" href="#constant-declarations">Constant declarations</a></h2>
-<p>Constants can be declared using the <code>const</code> keyword, followed by an identifier with uppercase letters only, an <code>=</code> sign and a value. For example:</p>
-<pre><code>const FOO = 42
+<p>Besides the name declaration, a root module must:</p>
+<ul>
+<li>Describe the shape of the execution trace (done via the <em>trace columns</em> section).
+<ul>
+<li>If the trace consists of more than one segment (e.g., main and auxiliary segments), describe random values available to the prover after each segment commitment (done via the <em>random values</em> section).</li>
+</ul>
+</li>
+<li>Describe the shape of the public inputs (done via the <em>public inputs</em> section).</li>
+<li>Describe the boundary constraints placed against the execution trace (done via the <em>boundary constraints</em> section).</li>
+<li>Describe the integrity constraints placed against the execution trace (done via the <em>integrity constraints</em> section).</li>
+</ul>
+<p>To aid with boundary and integrity constraint descriptions, a root module may also contain definitions of constants, evaluators, and periodic columns.</p>
+<h3 id="library-modules"><a class="header" href="#library-modules">Library modules</a></h3>
+<p>Library modules can be used to split integrity constraint descriptions across multiple files. A library module must start with a name declaration which consists of a <code>mod</code> keyword followed by the name of the module. For example:</p>
+<pre><code>mod example_module
 </code></pre>
-<p>Constants are conventionally declared at the top of the module just after Air name definition section. Constants may be used in any <code>boundary_constraints</code> or <code>integrity_constraints</code> sections.</p>
-<h2 id="source-sections"><a class="header" href="#source-sections">Source sections</a></h2>
-<p>All source sections must:</p>
+<p>where the name of the module must:</p>
 <ul>
-<li>Begin with a valid source section keyword, followed by <code>:</code> and a newline.</li>
-<li>Have all contents in an indented block.</li>
+<li>Be the same as the name of the file in which the library module is defined (e.g., the above module must be located in <code>example_module.air</code> file).</li>
+<li>Be a string consisting of alpha-numeric characters and underscores.</li>
+<li>Start with a letter.</li>
+<li>End with a newline.</li>
 </ul>
-<p>This is an example of a well-formed source section:</p>
-<pre><code># source section keyword
-trace_columns:
-    # indented content block
-    main: [a, b, c, d]
-    aux: [x, y, z]
+<p>Besides the name declaration, library modules my contain definitions of constants, evaluators, and periodic columns. Constants and evaluators defined in a library module may be imported by a root or other library modules.</p>
+<p>Library modules inherit random value declarations of the root module. That is, evaluators defined in a library module can reference random values declared in the root module.</p>
+<h2 id="importing-evaluators"><a class="header" href="#importing-evaluators">Importing evaluators</a></h2>
+<p>A module can import constants and evaluators from library modules via a <code>use</code> statement. For example:</p>
+<pre><code>use my_module::my_evaluator
+use my_module::my_constant
 </code></pre>
-<p>Valid keywords for type declaration sections are the following:</p>
+<p>where:</p>
 <ul>
-<li><code>trace_columns</code></li>
-<li><code>public_inputs</code></li>
-<li><code>periodic_columns</code></li>
-<li><code>random_values</code></li>
+<li><code>my_module</code> is a library module located in the same directory as the importing module.</li>
+<li><code>my_evaluator</code> and <code>my_constant</code> is an evaluator and a constant defined in <code>my_module</code>.</li>
 </ul>
-<p>Valid keywords for constraint description sections are the following:</p>
-<ul>
-<li><code>boundary_constraints</code></li>
-<li><code>integrity_constraints</code></li>
-</ul>
-<p>By convention, type declaration sections precede constraint description sections, although this is not a requirement of the language.</p>
+<p>Once an evaluator or a constant is imported, it can be used in the same way as evaluators and constants defined in the importing module.</p>
+<p>To import multiple evaluators and constants, multiple <code>use</code> statements must be used:</p>
+<pre><code>use my_module::foo
+use my_module::bar
+use my_other_module::baz
+</code></pre>
+<p><code>use</code> statements can appear anywhere in the module file.</p>
 
                     </main>
 
