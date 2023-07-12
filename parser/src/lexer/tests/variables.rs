@@ -1,4 +1,4 @@
-use super::{expect_valid_tokenization, Token};
+use super::{expect_valid_tokenization, Symbol, Token};
 
 // VARIABLES VALID TOKENIZATION
 // ================================================================================================
@@ -10,15 +10,15 @@ fn boundary_constraint_with_scalar_variables() {
     enf clk.first = first_value";
     let tokens = vec![
         Token::Let,
-        Token::Ident("first_value".to_string()),
+        Token::Ident(Symbol::intern("first_value")),
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::First,
         Token::Equal,
-        Token::Ident("first_value".to_string()),
+        Token::Ident(Symbol::intern("first_value")),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -31,31 +31,31 @@ fn boundary_constraint_with_vector_variables() {
     enf clk.last = boundary_values[1]";
     let tokens = vec![
         Token::Let,
-        Token::Ident("boundary_values".to_string()),
+        Token::Ident(Symbol::intern("boundary_values")),
         Token::Equal,
-        Token::Lsqb,
-        Token::Num("0".to_string()),
+        Token::LBracket,
+        Token::Num(0),
         Token::Comma,
-        Token::Num("1".to_string()),
-        Token::Rsqb,
+        Token::Num(1),
+        Token::RBracket,
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::First,
         Token::Equal,
-        Token::Ident("boundary_values".to_string()),
-        Token::Lsqb,
-        Token::Num("0".to_string()),
-        Token::Rsqb,
+        Token::Ident(Symbol::intern("boundary_values")),
+        Token::LBracket,
+        Token::Num(0),
+        Token::RBracket,
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::Last,
         Token::Equal,
-        Token::Ident("boundary_values".to_string()),
-        Token::Lsqb,
-        Token::Num("1".to_string()),
-        Token::Rsqb,
+        Token::Ident(Symbol::intern("boundary_values")),
+        Token::LBracket,
+        Token::Num(1),
+        Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -67,16 +67,16 @@ fn integrity_constraint_with_scalar_variables() {
     enf clk' = clk - a";
     let tokens = vec![
         Token::Let,
-        Token::Ident("a".to_string()),
+        Token::Ident(Symbol::intern("a")),
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
         Token::Enf,
-        Token::Ident("clk".to_string()),
-        Token::Next,
+        Token::Ident(Symbol::intern("clk")),
+        Token::Quote,
         Token::Equal,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Minus,
-        Token::Ident("a".to_string()),
+        Token::Ident(Symbol::intern("a")),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -88,28 +88,64 @@ fn integrity_constraint_with_vector_variables() {
     enf clk' = clk - a[0] + a[1]";
     let tokens = vec![
         Token::Let,
-        Token::Ident("a".to_string()),
+        Token::Ident(Symbol::intern("a")),
         Token::Equal,
-        Token::Lsqb,
-        Token::Num("0".to_string()),
+        Token::LBracket,
+        Token::Num(0),
         Token::Comma,
-        Token::Num("1".to_string()),
-        Token::Rsqb,
+        Token::Num(1),
+        Token::RBracket,
         Token::Enf,
-        Token::Ident("clk".to_string()),
-        Token::Next,
+        Token::Ident(Symbol::intern("clk")),
+        Token::Quote,
         Token::Equal,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Minus,
-        Token::Ident("a".to_string()),
-        Token::Lsqb,
-        Token::Num("0".to_string()),
-        Token::Rsqb,
+        Token::Ident(Symbol::intern("a")),
+        Token::LBracket,
+        Token::Num(0),
+        Token::RBracket,
         Token::Plus,
-        Token::Ident("a".to_string()),
-        Token::Lsqb,
-        Token::Num("1".to_string()),
-        Token::Rsqb,
+        Token::Ident(Symbol::intern("a")),
+        Token::LBracket,
+        Token::Num(1),
+        Token::RBracket,
+    ];
+    expect_valid_tokenization(source, tokens);
+}
+
+#[test]
+fn variables_with_or_operators() {
+    let source = "
+    integrity_constraints:
+        let flag = s[0] | !s[1]'
+        enf clk' = clk + 1 when flag";
+    let tokens = vec![
+        Token::IntegrityConstraints,
+        Token::Colon,
+        Token::Let,
+        Token::Ident(Symbol::intern("flag")),
+        Token::Equal,
+        Token::Ident(Symbol::intern("s")),
+        Token::LBracket,
+        Token::Num(0),
+        Token::RBracket,
+        Token::Bar,
+        Token::Bang,
+        Token::Ident(Symbol::intern("s")),
+        Token::LBracket,
+        Token::Num(1),
+        Token::RBracket,
+        Token::Quote,
+        Token::Enf,
+        Token::Ident(Symbol::intern("clk")),
+        Token::Quote,
+        Token::Equal,
+        Token::Ident(Symbol::intern("clk")),
+        Token::Plus,
+        Token::Num(1),
+        Token::When,
+        Token::Ident(Symbol::intern("flag")),
     ];
     expect_valid_tokenization(source, tokens);
 }

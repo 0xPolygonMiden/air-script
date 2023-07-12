@@ -2,6 +2,9 @@
 members = [
   "air-script",
   "parser",
+  "pass",
   "ir",
-  "codegen/winterfell"
+  "codegen/masm",
+  "codegen/winterfell",
 ]
+resolver = "2"

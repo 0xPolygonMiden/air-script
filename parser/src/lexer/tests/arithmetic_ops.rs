@@ -1,5 +1,5 @@
 use super::expect_valid_tokenization;
-use crate::lexer::Token;
+use crate::{lexer::Token, Symbol};
 
 // EXPRESSIONS VALID TOKENIZATION
 // ================================================================================================
@@ -9,14 +9,14 @@ fn chained_add_ops() {
     let source = "enf clk' + clk + 1 = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
-        Token::Next,
+        Token::Ident(Symbol::intern("clk")),
+        Token::Quote,
         Token::Plus,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Plus,
-        Token::Num("1".to_string()),
+        Token::Num(1),
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -26,14 +26,14 @@ fn chained_sub_ops() {
     let source = "enf clk' - clk - 1 = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
-        Token::Next,
+        Token::Ident(Symbol::intern("clk")),
+        Token::Quote,
         Token::Minus,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Minus,
-        Token::Num("1".to_string()),
+        Token::Num(1),
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -43,14 +43,14 @@ fn chained_mul_ops() {
     let source = "enf clk' * clk * 1 = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
-        Token::Next,
-        Token::Mul,
-        Token::Ident("clk".to_string()),
-        Token::Mul,
-        Token::Num("1".to_string()),
+        Token::Ident(Symbol::intern("clk")),
+        Token::Quote,
+        Token::Star,
+        Token::Ident(Symbol::intern("clk")),
+        Token::Star,
+        Token::Num(1),
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -60,16 +60,16 @@ fn exp_op() {
     let source = "enf clk'^2 - clk - 1 = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
-        Token::Next,
-        Token::Exp,
-        Token::Num("2".to_string()),
+        Token::Ident(Symbol::intern("clk")),
+        Token::Quote,
+        Token::Caret,
+        Token::Num(2),
         Token::Minus,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Minus,
-        Token::Num("1".to_string()),
+        Token::Num(1),
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -79,16 +79,16 @@ fn ops_with_parens() {
     let source = "enf clk' - (clk + 1) = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
-        Token::Next,
+        Token::Ident(Symbol::intern("clk")),
+        Token::Quote,
         Token::Minus,
-        Token::Lparen,
-        Token::Ident("clk".to_string()),
+        Token::LParen,
+        Token::Ident(Symbol::intern("clk")),
         Token::Plus,
-        Token::Num("1".to_string()),
-        Token::Rparen,
+        Token::Num(1),
+        Token::RParen,
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -99,17 +99,17 @@ fn ops_without_matching_closing_parens() {
     let source = "enf (clk' - (clk + 1) = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Lparen,
-        Token::Ident("clk".to_string()),
-        Token::Next,
+        Token::LParen,
+        Token::Ident(Symbol::intern("clk")),
+        Token::Quote,
         Token::Minus,
-        Token::Lparen,
-        Token::Ident("clk".to_string()),
+        Token::LParen,
+        Token::Ident(Symbol::intern("clk")),
         Token::Plus,
-        Token::Num("1".to_string()),
-        Token::Rparen,
+        Token::Num(1),
+        Token::RParen,
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }

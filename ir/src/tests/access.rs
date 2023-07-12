@@ -1,8 +1,10 @@
-use super::{parse, AirIR};
+use super::expect_diagnostic;
 
 #[test]
-fn err_bc_invalid_vector_access() {
+fn invalid_vector_access_in_boundary_constraint() {
     let source = "
+    def test
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -15,15 +17,17 @@ fn err_bc_invalid_vector_access() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
 }
 
 #[test]
-fn err_bc_invalid_matrix_access() {
+fn invalid_matrix_row_access_in_boundary_constraint() {
     let source = "
+    def test
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -36,12 +40,17 @@ fn err_bc_invalid_matrix_access() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
+}
 
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
-
+#[test]
+fn invalid_matrix_column_access_in_boundary_constraint() {
     let source = "
+    def test
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -54,15 +63,17 @@ fn err_bc_invalid_matrix_access() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
 }
 
 #[test]
-fn err_ic_invalid_vector_access() {
+fn invalid_vector_access_in_integrity_constraint() {
     let source = "
+    def test
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -75,15 +86,17 @@ fn err_ic_invalid_vector_access() {
     integrity_constraints:
         enf clk' = clk + A + B[3] - C[1][2]";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
 }
 
 #[test]
-fn err_ic_invalid_matrix_access() {
+fn invalid_matrix_row_access_in_integrity_constraint() {
     let source = "
+    def test
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -96,12 +109,17 @@ fn err_ic_invalid_matrix_access() {
     integrity_constraints:
         enf clk' = clk + A + B[1] - C[3][2]";
 
-    let parsed = parse(source).expect("Parsing failed");
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
+}
 
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
-
+#[test]
+fn invalid_matrix_column_access_in_integrity_constraint() {
     let source = "
+    def test
+
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -114,8 +132,8 @@ fn err_ic_invalid_matrix_access() {
     integrity_constraints:
         enf clk' = clk + A + B[1] - C[1][3]";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
 }

@@ -1,4 +1,4 @@
-use super::{expect_valid_tokenization, Token};
+use super::{expect_valid_tokenization, Symbol, Token};
 
 // BOUNDARY STATEMENTS VALID TOKENIZATION
 // ================================================================================================
@@ -8,11 +8,11 @@ fn first_boundary_constant() {
     let source = "enf clk.first = 0";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::First,
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -22,11 +22,11 @@ fn last_boundary_constant() {
     let source = "enf clk.last = 15";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::Last,
         Token::Equal,
-        Token::Num("15".to_string()),
+        Token::Num(15),
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -36,14 +36,14 @@ fn boundary_with_pub_input() {
     let source = "enf clk.first = stack_inputs[0]";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::First,
         Token::Equal,
-        Token::Ident("stack_inputs".to_string()),
-        Token::Lsqb,
-        Token::Num("0".to_string()),
-        Token::Rsqb,
+        Token::Ident(Symbol::intern("stack_inputs")),
+        Token::LBracket,
+        Token::Num(0),
+        Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -53,18 +53,18 @@ fn boundary_expression() {
     let source = "enf clk.first = 5 + stack_inputs[3] + 6";
     let tokens = vec![
         Token::Enf,
-        Token::Ident("clk".to_string()),
+        Token::Ident(Symbol::intern("clk")),
         Token::Dot,
         Token::First,
         Token::Equal,
-        Token::Num("5".to_string()),
+        Token::Num(5),
         Token::Plus,
-        Token::Ident("stack_inputs".to_string()),
-        Token::Lsqb,
-        Token::Num("3".to_string()),
-        Token::Rsqb,
+        Token::Ident(Symbol::intern("stack_inputs")),
+        Token::LBracket,
+        Token::Num(3),
+        Token::RBracket,
         Token::Plus,
-        Token::Num("6".to_string()),
+        Token::Num(6),
     ];
     expect_valid_tokenization(source, tokens);
 }

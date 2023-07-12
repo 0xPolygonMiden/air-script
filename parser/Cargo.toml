@@ -1,20 +1,28 @@
 [package]
 name = "air-parser"
-version = "0.2.0"
-description="Parser for the AirScript language"
+version = "0.3.0"
+description = "Parser for the AirScript language"
 authors = ["miden contributors"]
-readme="README.md"
+readme = "README.md"
 license = "MIT"
 repository = "https://github.com/0xPolygonMiden/air-script"
 categories = ["compilers", "cryptography", "parser-implementations"]
 keywords = ["air", "stark", "zero-knowledge", "zkp"]
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.67"
+
 [build-dependencies]
-lalrpop = "0.19.7"
+lalrpop = { version = "0.20", default-features = false }
 
 [dependencies]
-air-script-core = { package = "air-script-core", path="../air-script-core", version="0.2.0" }
-lalrpop-util = { version = "0.19.7" }
-logos = "0.12.0"
+air-pass = { package = "air-pass", path = "../pass", version = "0.1" }
+miden-diagnostics = "0.1"
+miden-parsing = "0.1"
+lalrpop-util="0.20"
+lazy_static = "1.4"
+petgraph = "0.6"
 regex = "1"
+thiserror = "1.0"
+
+[dev-dependencies]
+pretty_assertions = "1.0"

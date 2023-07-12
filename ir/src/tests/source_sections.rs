@@ -1,9 +1,10 @@
-use super::{parse, AirIR};
+use super::expect_diagnostic;
 
 #[test]
-fn err_trace_cols_empty_or_omitted() {
+fn err_trace_cols_empty() {
     // if trace columns is empty, an error should be returned at parser level.
     let source = "
+    def test
     trace_columns:
     public_inputs:
         stack_inputs: [16]
@@ -12,10 +13,14 @@ fn err_trace_cols_empty_or_omitted() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    assert!(parse(source).is_err());
+    expect_diagnostic(source, "missing 'main' declaration in this section");
+}
 
+#[test]
+fn err_trace_cols_omitted() {
     // returns an error if trace columns declaration is missing
     let source = "
+    def test
     public_inputs:
         stack_inputs: [16]
     boundary_constraints:
@@ -23,19 +28,14 @@ fn err_trace_cols_empty_or_omitted() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(&parsed);
-
-    // this fails before the check for missing trace columns declaration since the clk column
-    // used in constraints is not declared.
-    assert!(result.is_err());
+    expect_diagnostic(source, "missing trace_columns section");
 }
 
 #[test]
-fn err_pub_inputs_empty_or_omitted() {
+fn err_pub_inputs_empty() {
     // if public inputs are empty, an error should be returned at parser level.
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -44,10 +44,14 @@ fn err_pub_inputs_empty_or_omitted() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    assert!(parse(source).is_err());
+    expect_diagnostic(source, "expected one of: 'identifier'");
+}
 
+#[test]
+fn err_pub_inputs_omitted() {
     // if public inputs are omitted, an error should be returned at IR level.
     let source = "
+    def test
     trace_columns:
         main: [clk]
     boundary_constraints:
@@ -55,15 +59,14 @@ fn err_pub_inputs_empty_or_omitted() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "root module must contain a public_inputs section");
 }
 
 #[test]
-fn err_bc_empty_or_omitted() {
+fn err_bc_empty() {
     // if boundary constraints are empty, an error should be returned at parser level.
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -72,10 +75,14 @@ fn err_bc_empty_or_omitted() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    assert!(parse(source).is_err());
+    expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
+}
 
+#[test]
+fn err_bc_omitted() {
     // if boundary constraints are omitted, an error should be returned at IR level.
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -83,15 +90,17 @@ fn err_bc_empty_or_omitted() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "root module must contain both boundary_constraints and integrity_constraints sections",
+    );
 }
 
 #[test]
-fn err_ic_empty_or_omitted() {
+fn err_ic_empty() {
     // if integrity constraints are empty, an error should be returned at parser level.
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -100,10 +109,14 @@ fn err_ic_empty_or_omitted() {
         enf clk.first = 0
     integrity_constraints:";
 
-    assert!(parse(source).is_err());
+    expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
+}
 
+#[test]
+fn err_ic_omitted() {
     // if integrity constraints are omitted, an error should be returned at IR level.
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -111,7 +124,8 @@ fn err_ic_empty_or_omitted() {
     boundary_constraints:
         enf clk.first = 0";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "root module must contain both boundary_constraints and integrity_constraints sections",
+    );
 }

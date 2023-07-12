@@ -16,16 +16,28 @@ The compiler has three stages, which can be imported and used independently or t
 Example usage:
 
 ```Rust
-use air_script::{parse, AirIR, CodeGenerator};
+use air_script::{Air, parse, passes, Pass, transforms, WinterfellCodeGenerator};
+use miden_diagnostics::{
+    term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
+};
 
-// parse the source string to a Result containing the AST or an Error
-let ast = parse(source.as_str()).expect("Parsing failed");
+// Used for diagnostics reporting
+let codemap = Arc::new(CodeMap::new());
+let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
+let diagnostics = DiagnosticsHandler::new(Default::default(), codemap.clone(), emitter);
 
-// process the AST to get a Result containing the AirIR or an Error
-let ir = AirIR::new(&ast).expect("AIR is invalid");
+// Parse into AST
+let ast = parse(&diagnostics, codemap, source.as_str()).expect("parsing failed");
+// Lower to IR
+let air = {
+   let mut pipeline = transforms::ConstantPropagation::new(&diagnostics)
+      .chain(transforms::Inlining::new(&diagnostics))
+      .chain(passes::AstToAir::new(&diagnostics));
+   pipeline.run(ast).expect("lowering failed")
+};
 
-// generate Rust code targeting the Winterfell prover
-let rust_code = CodeGenerator::new(&ir);
+// Generate Rust code targeting the Winterfell prover
+let code = WinterfellCodeGenerator::new(&ir).generate().expect("codegen failed");
 ```
 
 An example of an AIR defined in AirScript can be found in the `examples/` directory.
@@ -42,10 +54,10 @@ To use the CLI, first run:
 cargo build --release
 ```
 
-Then, run the `airc` target with the `transpile` option and specify your input file with `-i`. For example:
+Then, run the `airc` target with the `transpile`. For example:
 
 ```
-./target/release/airc transpile -i examples/example.air
+./target/release/airc transpile examples/example.air
 ```
 
 When no output destination is specified, the output file will use the path and name of the input file, replacing the `.air` extension with `.rs`. For the above example, `examples/example.rs` will contain the generated output.

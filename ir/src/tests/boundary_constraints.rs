@@ -1,8 +1,9 @@
-use super::{parse, AirIR};
+use super::{compile, expect_diagnostic};
 
 #[test]
 fn boundary_constraints() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -13,14 +14,13 @@ fn boundary_constraints() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn err_bc_duplicate_first() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -31,15 +31,13 @@ fn err_bc_duplicate_first() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-
-    assert!(result.is_err());
+    expect_diagnostic(source, "overlapping boundary constraints");
 }
 
 #[test]
 fn err_bc_duplicate_last() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -50,8 +48,5 @@ fn err_bc_duplicate_last() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-
-    assert!(result.is_err());
+    expect_diagnostic(source, "overlapping boundary constraints");
 }

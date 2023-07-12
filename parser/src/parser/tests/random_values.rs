@@ -1,7 +1,8 @@
-use super::{
-    build_parse_test, Error, Expression::*, Identifier, IntegrityConstraint, IntegrityStmt::*,
-    ParseError, RandBinding, RandomValues, Source, SourceSection, SourceSection::*,
-};
+use miden_diagnostics::{SourceSpan, Span};
+
+use crate::ast::*;
+
+use super::ParseTest;
 
 // RANDOM VALUES
 // ================================================================================================
@@ -9,82 +10,229 @@ use super::{
 #[test]
 fn random_values_fixed_list() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+        aux: [a]
+
     random_values:
-        rand: [15]";
-    let expected = Source(vec![RandomValues(RandomValues::new(
-        Identifier("rand".to_string()),
-        15,
-        vec![],
-    ))]);
-    build_parse_test!(source).expect_ast(expected);
+        rand: [15]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
+    integrity_constraints:
+        enf clk = 0";
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected
+        .trace_columns
+        .push(trace_segment!(1, "$aux", [(a, 1)]));
+    expected.random_values = Some(random_values!("$rand", 15));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(access!(clk), int!(0)))],
+    ));
+
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn random_values_ident_vector() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+        aux: [aux0]
+
     random_values:
-        rand: [a, b[12], c]";
-    let expected = Source(vec![RandomValues(RandomValues::new(
-        Identifier("rand".to_string()),
-        14,
-        vec![
-            RandBinding::new(Identifier("a".to_string()), 1),
-            RandBinding::new(Identifier("b".to_string()), 12),
-            RandBinding::new(Identifier("c".to_string()), 1),
-        ],
-    ))]);
-    build_parse_test!(source).expect_ast(expected);
+        rand: [a, b[12], c]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
+    integrity_constraints:
+        enf clk = 0";
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected
+        .trace_columns
+        .push(trace_segment!(1, "$aux", [(aux0, 1)]));
+    expected.random_values = Some(random_values!("$rand", [(a, 1), (b, 12), (c, 1)]));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(access!(clk), int!(0)))],
+    ));
+
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn random_values_custom_name() {
     let source = "
-    random_values:
-        alphas: [14]";
-    let expected = Source(vec![RandomValues(RandomValues::new(
-        Identifier("alphas".to_string()),
-        14,
-        vec![],
-    ))]);
-    build_parse_test!(source).expect_ast(expected);
-}
+    def test
 
-#[test]
-fn random_values_empty_list_error() {
-    let source = "
+    trace_columns:
+        main: [clk]
+        aux: [aux0]
+
     random_values:
-        rand: []";
-    let error = Error::ParseError(ParseError::InvalidRandomValues(
-        "Random Values section cannot be empty".to_string(),
+        alphas: [14]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
+    integrity_constraints:
+        enf clk = 0";
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected
+        .trace_columns
+        .push(trace_segment!(1, "$aux", [(aux0, 1)]));
+    expected.random_values = Some(random_values!("$alphas", 14));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
     ));
-    build_parse_test!(source).expect_error(error)
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(access!(clk), int!(0)))],
+    ));
+
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
-fn random_values_multiple_declaration_error() {
+fn err_random_values_empty_list() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+
+    random_values:
+        rand: []
+
+    integrity_constraints:
+        enf clk = 0";
+
+    ParseTest::new().expect_module_diagnostic(source, "random values cannot be empty");
+}
+
+#[test]
+fn err_random_values_multiple_declaration() {
+    let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+
     random_values:
         rand: [12]
-        alphas: [a, b[2]]";
-    let error = Error::ParseError(ParseError::InvalidRandomValues(
-        "No more than one set of random values can be declared".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error)
+        alphas: [a, b[2]]
+
+    integrity_constraints:
+        enf clk = 0";
+
+    ParseTest::new()
+        .expect_module_diagnostic(source, "only one declaration may appear in random_values");
 }
 
 #[test]
 fn random_values_index_access() {
     let source = "
+    def test
+
+    trace_columns:
+        main: [clk]
+        aux: [aux0]
+
+    random_values:
+        rand: [12]
+
+    public_inputs:
+        inputs: [2]
+
+    boundary_constraints:
+        enf clk.first = 0
+
     integrity_constraints:
-        enf a + $alphas[1] = 0";
-    let expected = Source(vec![SourceSection::IntegrityConstraints(vec![Constraint(
-        IntegrityConstraint::new(
-            Add(
-                Box::new(Elem(Identifier("a".to_string()))),
-                Box::new(Rand(Identifier("alphas".to_string()), 1)),
-            ),
-            Const(0),
-        ),
-    )])]);
-    build_parse_test!(source).expect_ast(expected);
+        enf clk + $rand[1] = 0";
+
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .trace_columns
+        .push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected
+        .trace_columns
+        .push(trace_segment!(1, "$aux", [(aux0, 1)]));
+    expected.random_values = Some(random_values!("$rand", 12));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 2),
+    );
+    expected.boundary_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            bounded_access!(clk, Boundary::First),
+            int!(0)
+        ))],
+    ));
+    expected.integrity_constraints = Some(Span::new(
+        SourceSpan::UNKNOWN,
+        vec![enforce!(eq!(
+            add!(access!(clk), access!("$rand"[1])),
+            int!(0)
+        ))],
+    ));
+    ParseTest::new().expect_module_ast(source, expected);
 }

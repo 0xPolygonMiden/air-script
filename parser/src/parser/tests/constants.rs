@@ -1,8 +1,8 @@
-use super::{build_parse_test, Identifier, Source, SourceSection};
-use crate::{
-    ast::{Constant, ConstantType},
-    error::{Error, ParseError},
-};
+use miden_diagnostics::SourceSpan;
+
+use crate::ast::*;
+
+use super::ParseTest;
 
 // CONSTANTS
 // ================================================================================================
@@ -10,137 +10,174 @@ use crate::{
 #[test]
 fn constants_scalars() {
     let source = "
+    mod test
+
     const A = 1
     const B = 2";
-    let expected = Source(vec![
-        SourceSection::Constant(Constant::new(
-            Identifier("A".to_string()),
-            ConstantType::Scalar(1),
-        )),
-        SourceSection::Constant(Constant::new(
-            Identifier("B".to_string()),
-            ConstantType::Scalar(2),
-        )),
-    ]);
-    build_parse_test!(source).expect_ast(expected);
+
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    expected.constants.insert(
+        ident!(A),
+        Constant::new(SourceSpan::UNKNOWN, ident!(A), ConstantExpr::Scalar(1)),
+    );
+    expected.constants.insert(
+        ident!(B),
+        Constant::new(SourceSpan::UNKNOWN, ident!(B), ConstantExpr::Scalar(2)),
+    );
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn constants_vectors() {
     let source = "
+    mod test
+
     const A = [1, 2, 3, 4]
     const B = [5, 6, 7, 8]";
-    let expected = Source(vec![
-        SourceSection::Constant(Constant::new(
-            Identifier("A".to_string()),
-            ConstantType::Vector(vec![1, 2, 3, 4]),
-        )),
-        SourceSection::Constant(Constant::new(
-            Identifier("B".to_string()),
-            ConstantType::Vector(vec![5, 6, 7, 8]),
-        )),
-    ]);
-    build_parse_test!(source).expect_ast(expected);
+
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    expected.constants.insert(
+        ident!(A),
+        Constant::new(
+            SourceSpan::UNKNOWN,
+            ident!(A),
+            ConstantExpr::Vector(vec![1, 2, 3, 4]),
+        ),
+    );
+    expected.constants.insert(
+        ident!(B),
+        Constant::new(
+            SourceSpan::UNKNOWN,
+            ident!(B),
+            ConstantExpr::Vector(vec![5, 6, 7, 8]),
+        ),
+    );
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn constants_matrices() {
     let source = "
-    const ABC = [[1, 2], [3, 4]]
-    const XYZ = [[5, 6], [7, 8]]";
-    let expected = Source(vec![
-        SourceSection::Constant(Constant::new(
-            Identifier("ABC".to_string()),
-            ConstantType::Matrix(vec![vec![1, 2], vec![3, 4]]),
-        )),
-        SourceSection::Constant(Constant::new(
-            Identifier("XYZ".to_string()),
-            ConstantType::Matrix(vec![vec![5, 6], vec![7, 8]]),
-        )),
-    ]);
-    build_parse_test!(source).expect_ast(expected);
+    mod test
+
+    const A = [[1, 2], [3, 4]]
+    const B = [[5, 6], [7, 8]]";
+
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    expected.constants.insert(
+        ident!(A),
+        Constant::new(
+            SourceSpan::UNKNOWN,
+            ident!(A),
+            ConstantExpr::Matrix(vec![vec![1, 2], vec![3, 4]]),
+        ),
+    );
+    expected.constants.insert(
+        ident!(B),
+        Constant::new(
+            SourceSpan::UNKNOWN,
+            ident!(B),
+            ConstantExpr::Matrix(vec![vec![5, 6], vec![7, 8]]),
+        ),
+    );
+    ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
-fn const_matrix_unequal_number_of_cols() {
+fn err_const_matrix_unequal_number_of_cols() {
     // This is invalid since the number of columns for the two rows are unequal. However this
     // validation happens at the IR level.
     let source = "
+    mod test
+
     const A = [[1, 2], [3, 4, 5]]";
-    let expected = Source(vec![SourceSection::Constant(Constant::new(
-        Identifier("A".to_string()),
-        ConstantType::Matrix(vec![vec![1, 2], vec![3, 4, 5]]),
-    ))]);
-    build_parse_test!(source).expect_ast(expected);
+
+    ParseTest::new()
+        .expect_module_diagnostic(source, "invalid matrix literal: mismatched dimensions");
 }
 
 #[test]
-fn error_empty_constant_section() {
+fn err_incomplete_constant_declaration_missing_name() {
     let source = "
+    mod test
+
     const
     ";
-    assert!(build_parse_test!(source).parse().is_err());
+    assert!(ParseTest::new().parse_module(source).is_err());
 }
 
 #[test]
-fn error_empty_constant_declaration() {
+fn err_incomplete_constant_declaration_missing_value() {
     let source = "
+    mod test
+
     const A
     ";
-    assert!(build_parse_test!(source).parse().is_err());
+    assert!(ParseTest::new().parse_module(source).is_err());
 }
 
 #[test]
 fn err_lowercase_constant_name() {
     let source = "
+    mod test
+
     const Ab = [[1, 2], [3, 4]]
     const C = [[5, 6], [7, 8]]";
-    let error = Error::ParseError(ParseError::InvalidConst(
-        "The constant name should be uppercase: Ab".to_string(),
-    ));
-    build_parse_test!(source).expect_error(error);
+    ParseTest::new().expect_module_diagnostic(source, "constant identifiers must be uppercase");
 }
 
 #[test]
 fn err_consts_with_non_int_values() {
     let source = "
-        const A = a
-        const B = 2";
-    build_parse_test!(source).expect_unrecognized_token();
+    def test
+
+    const A = a
+    const B = 2";
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
 fn err_const_vectors_with_non_int_values() {
     let source = "
-        const A = [1, a]
-        const B = [2, 4]";
-    build_parse_test!(source).expect_unrecognized_token();
+    def test
+
+    const A = [1, a]
+    const B = [2, 4]";
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
 fn err_vector_with_trailing_comma() {
     let source = "
+    def test
+
     const A = [1, ]";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
 fn err_matrix_with_trailing_comma() {
     let source = "
+    def test
+
     const A = [[1, 2], ]";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
 fn err_matrix_mixed_element_types() {
     let source = "
+    def test
+
     const A = [1, [1, 2]]";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }
 
 #[test]
 fn err_invalid_matrix_element() {
     let source = "
+    def test
+
     const A = [[1, 2], [3, [4, 5]]]";
-    build_parse_test!(source).expect_unrecognized_token();
+    ParseTest::new().expect_unrecognized_token(source);
 }

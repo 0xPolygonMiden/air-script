@@ -1,4 +1,4 @@
-use super::{expect_valid_tokenization, Token};
+use super::{expect_valid_tokenization, Symbol, Token};
 
 #[test]
 fn pub_inputs_kw() {
@@ -17,16 +17,16 @@ public_inputs:
     let tokens = vec![
         Token::PublicInputs,
         Token::Colon,
-        Token::Ident("program_hash".to_string()),
+        Token::Ident(Symbol::intern("program_hash")),
         Token::Colon,
-        Token::Lsqb,
-        Token::Num("4".to_string()),
-        Token::Rsqb,
-        Token::Ident("stack_inputs".to_string()),
+        Token::LBracket,
+        Token::Num(4),
+        Token::RBracket,
+        Token::Ident(Symbol::intern("stack_inputs")),
         Token::Colon,
-        Token::Lsqb,
-        Token::Num("12".to_string()),
-        Token::Rsqb,
+        Token::LBracket,
+        Token::Num(12),
+        Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
 }

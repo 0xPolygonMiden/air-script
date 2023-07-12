@@ -1,8 +1,9 @@
-use super::{parse, AirIR};
+use super::{compile, expect_diagnostic};
 
 #[test]
-fn bc_with_constants() {
+fn boundary_constraint_with_constants() {
     let source = "
+    def test
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -16,14 +17,13 @@ fn bc_with_constants() {
     integrity_constraints:
         enf clk' = clk - 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
-fn ic_with_constants() {
+fn integrity_constraint_with_constants() {
     let source = "
+    def test
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -36,15 +36,13 @@ fn ic_with_constants() {
     integrity_constraints:
         enf clk' = clk + A + B[1] - C[1][2]";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(&parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
-fn err_invalid_matrix_const() {
+fn invalid_matrix_constant() {
     let source = "
+    def test
     const A = [[2, 3], [1, 0, 2]]
     trace_columns:
         main: [clk]
@@ -56,7 +54,5 @@ fn err_invalid_matrix_const() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "invalid matrix literal: mismatched dimensions");
 }

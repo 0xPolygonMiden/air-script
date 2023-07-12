@@ -1,8 +1,9 @@
-use super::{parse, AirIR};
+use super::{compile, expect_diagnostic};
 
 #[test]
 fn trace_columns_index_access() {
     let source = "
+    def test
     trace_columns:
         main: [a, b]
         aux: [c, d]
@@ -14,14 +15,13 @@ fn trace_columns_index_access() {
         enf $main[0]' - $main[1] = 0
         enf $aux[0]^3 - $aux[1]' = 0";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn trace_cols_groups() {
     let source = "
+    def test
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -35,15 +35,13 @@ fn trace_cols_groups() {
     integrity_constraints:
         enf a[0]' = a[1] - 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(&parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
 fn err_bc_column_undeclared() {
     let source = "
+    def test
     trace_columns:
         main: [ctx]
     public_inputs:
@@ -54,15 +52,13 @@ fn err_bc_column_undeclared() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "this variable is not defined");
 }
 
 #[test]
 fn err_ic_column_undeclared() {
     let source = "
+    def test
     trace_columns:
         main: [ctx]
     public_inputs:
@@ -72,16 +68,14 @@ fn err_ic_column_undeclared() {
     integrity_constraints:
         enf clk' = clk + 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(source, "this variable is not defined");
 }
 
 #[test]
 fn err_bc_trace_cols_access_out_of_bounds() {
     // out of bounds in boundary constraints
     let source = "
+    def test
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -94,16 +88,17 @@ fn err_bc_trace_cols_access_out_of_bounds() {
     integrity_constraints:
         enf a[0]' = a[0] - 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
 }
 
 #[test]
 fn err_ic_trace_cols_access_out_of_bounds() {
     // out of bounds in integrity constraints
     let source = "
+    def test
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
@@ -117,8 +112,24 @@ fn err_ic_trace_cols_access_out_of_bounds() {
     integrity_constraints:
         enf a[4]' = a[4] - 1";
 
-    let parsed = parse(source).expect("Parsing failed");
+    expect_diagnostic(
+        source,
+        "attempted to access an index which is out of bounds",
+    );
+}
 
-    let result = AirIR::new(&parsed);
-    assert!(result.is_err());
+#[test]
+fn err_ic_trace_cols_group_used_as_scalar() {
+    let source = "
+    def test
+    trace_columns:
+        main: [clk, a[4]]
+    public_inputs:
+        stack_inputs: [16]
+    boundary_constraints:
+        enf a[1].first = 0
+    integrity_constraints:
+        enf a[0]' = a + clk";
+
+    expect_diagnostic(source, "type mismatch");
 }

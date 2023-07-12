@@ -1,4 +1,4 @@
-use super::{expect_valid_tokenization, Token};
+use super::{expect_valid_tokenization, Symbol, Token};
 
 #[test]
 fn random_values_empty_list() {
@@ -9,10 +9,10 @@ random_values:
     let tokens = vec![
         Token::RandomValues,
         Token::Colon,
-        Token::Ident("rand".to_string()),
+        Token::Ident(Symbol::intern("rand")),
         Token::Colon,
-        Token::Lsqb,
-        Token::Rsqb,
+        Token::LBracket,
+        Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -26,11 +26,11 @@ random_values:
     let tokens = vec![
         Token::RandomValues,
         Token::Colon,
-        Token::Ident("rand".to_string()),
+        Token::Ident(Symbol::intern("rand")),
         Token::Colon,
-        Token::Lsqb,
-        Token::Num("15".to_string()),
-        Token::Rsqb,
+        Token::LBracket,
+        Token::Num(15),
+        Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -44,18 +44,18 @@ random_values:
     let tokens = vec![
         Token::RandomValues,
         Token::Colon,
-        Token::Ident("rand".to_string()),
+        Token::Ident(Symbol::intern("rand")),
         Token::Colon,
-        Token::Lsqb,
-        Token::Ident("a".to_string()),
+        Token::LBracket,
+        Token::Ident(Symbol::intern("a")),
         Token::Comma,
-        Token::Ident("b".to_string()),
-        Token::Lsqb,
-        Token::Num("12".to_string()),
-        Token::Rsqb,
+        Token::Ident(Symbol::intern("b")),
+        Token::LBracket,
+        Token::Num(12),
+        Token::RBracket,
         Token::Comma,
-        Token::Ident("c".to_string()),
-        Token::Rsqb,
+        Token::Ident(Symbol::intern("c")),
+        Token::RBracket,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -70,15 +70,14 @@ fn random_values_index_access() {
         Token::IntegrityConstraints,
         Token::Colon,
         Token::Enf,
-        Token::Ident("a".to_string()),
+        Token::Ident(Symbol::intern("a")),
         Token::Plus,
-        Token::Rand,
-        Token::Ident("alphas".to_string()),
-        Token::Lsqb,
-        Token::Num("1".to_string()),
-        Token::Rsqb,
+        Token::DeclIdentRef(Symbol::intern("$alphas")),
+        Token::LBracket,
+        Token::Num(1),
+        Token::RBracket,
         Token::Equal,
-        Token::Num("0".to_string()),
+        Token::Num(0),
     ];
     expect_valid_tokenization(source, tokens);
 }

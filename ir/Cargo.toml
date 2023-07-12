@@ -1,16 +1,19 @@
 [package]
 name = "air-ir"
-version = "0.2.0"
-description="Intermediate representation for the AirScript language"
+version = "0.3.0"
+description = "Intermediate representation for the AirScript language"
 authors = ["miden contributors"]
-readme="README.md"
+readme = "README.md"
 license = "MIT"
 repository = "https://github.com/0xPolygonMiden/air-script"
 categories = ["compilers", "cryptography"]
 keywords = ["air", "stark", "zero-knowledge", "zkp"]
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.67"
 
 [dependencies]
-air-script-core = { package = "air-script-core", path="../air-script-core", version="0.2.0" }
-parser = { package = "air-parser", path = "../parser", version = "0.2.0" }
+air-parser = { package = "air-parser", path = "../parser", version = "0.3" }
+air-pass = { package = "air-pass", path = "../pass", version = "0.1" }
+anyhow = "1.0"
+miden-diagnostics = "0.1"
+thiserror = "1.0"

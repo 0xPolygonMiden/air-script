@@ -1,17 +1,17 @@
 [package]
 name = "air-codegen-winter"
-version = "0.2.0"
-description="Winterfell code generator for the AirScript language"
+version = "0.3.0"
+description = "Winterfell code generator for the AirScript language"
 authors = ["miden contributors"]
-readme="README.md"
+readme = "README.md"
 license = "MIT"
 repository = "https://github.com/0xPolygonMiden/air-script"
 categories = ["compilers", "cryptography"]
 keywords = ["air", "stark", "winterfell", "zero-knowledge", "zkp"]
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.67"
 
 [dependencies]
-air-script-core = { package = "air-script-core", path="../../air-script-core", version="0.2.0" }
-ir = { package = "air-ir", path="../../ir", version="0.2.0" }
-codegen = "0.2.0"
+air-ir = { package = "air-ir", path = "../../ir", version = "0.3" }
+anyhow = "1.0"
+codegen = "0.2"

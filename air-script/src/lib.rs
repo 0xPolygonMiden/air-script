@@ -1,11 +1,7 @@
-// EXPORTS
-// ================================================================================================
-
-/// AirScript parse method to generate an AST from AirScript source files
-pub use parser::parse;
-
-/// AirScript intermediate representation
-pub use ir::AirIR;
-
-/// Code generation targeting Rust for the Winterfell prover
-pub use codegen_winter::CodeGenerator;
+pub use air_codegen_masm::{
+    CodeGenerator as MasmCodeGenerator, CodegenConfig as MasmCodegenConfig,
+};
+pub use air_codegen_winter::CodeGenerator as WinterfellCodeGenerator;
+pub use air_ir::{passes, Air, CompileError};
+pub use air_parser::{parse, parse_file, transforms};
+pub use air_pass::Pass;

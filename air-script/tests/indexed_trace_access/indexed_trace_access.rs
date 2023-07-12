@@ -20,18 +20,18 @@ impl Serializable for PublicInputs {
     }
 }
 
-pub struct IndexedTraceAccessAir {
+pub struct TraceAccessAir {
     context: AirContext<Felt>,
     stack_inputs: [Felt; 16],
 }
 
-impl IndexedTraceAccessAir {
+impl TraceAccessAir {
     pub fn last_step(&self) -> usize {
         self.trace_length() - self.context().num_transition_exemptions()
     }
 }
 
-impl Air for IndexedTraceAccessAir {
+impl Air for TraceAccessAir {
     type BaseField = Felt;
     type PublicInputs = PublicInputs;
 
@@ -63,7 +63,7 @@ impl Air for IndexedTraceAccessAir {
 
     fn get_assertions(&self) -> Vec<Assertion<Felt>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(0, 0, Felt::new(0)));
+        result.push(Assertion::single(0, 0, Felt::ZERO));
         result
     }
 
@@ -75,7 +75,7 @@ impl Air for IndexedTraceAccessAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = main_next[0] - (main_current[1] + E::from(1_u64));
+        result[0] = main_next[0] - (main_current[1] + E::ONE);
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
@@ -86,6 +86,6 @@ impl Air for IndexedTraceAccessAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
-        result[0] = aux_next[0] - (aux_current[1] + E::from(1_u64));
+        result[0] = aux_next[0] - (aux_current[1] + E::ONE);
     }
 }

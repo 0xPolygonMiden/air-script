@@ -1,8 +1,9 @@
-use super::{parse, AirIR};
+use super::compile;
 
 #[test]
 fn bc_with_public_inputs() {
     let source = "
+    def test
     trace_columns:
         main: [clk]
     public_inputs:
@@ -12,7 +13,5 @@ fn bc_with_public_inputs() {
     integrity_constraints:
         enf clk' = clk - 1";
 
-    let parsed = parse(source).expect("Parsing failed");
-    let result = AirIR::new(&parsed);
-    assert!(result.is_ok());
+    assert!(compile(source).is_ok());
 }

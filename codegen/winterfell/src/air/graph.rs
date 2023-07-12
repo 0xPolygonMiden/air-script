@@ -1,18 +1,21 @@
-use ir::IndexedTraceAccess;
+use air_ir::{
+    Air, IntegrityConstraintDegree, NodeIndex, Operation, TraceAccess, TraceSegmentId, Value,
+};
 
-use super::{AirIR, ConstantValue, ElemType, IntegrityConstraintDegree, NodeIndex, Operation};
+use super::ElemType;
 
 // RUST STRING GENERATION FOR THE CONSTRAINT GRAPH
 // ================================================================================================
 
 /// Code generation trait for generating Rust code strings from IR types related to constraints and
 /// the [AlgebraicGraph].
+/// TODO: replace panics with errors
 pub trait Codegen {
-    fn to_string(&self, ir: &AirIR, elem_type: ElemType, trace_segment: u8) -> String;
+    fn to_string(&self, ir: &Air, elem_type: ElemType, trace_segment: TraceSegmentId) -> String;
 }
 
 impl Codegen for IntegrityConstraintDegree {
-    fn to_string(&self, _ir: &AirIR, _elem_type: ElemType, _trace_segment: u8) -> String {
+    fn to_string(&self, _ir: &Air, _elem_type: ElemType, _trace_segment: TraceSegmentId) -> String {
         if self.cycles().is_empty() {
             format!("TransitionConstraintDegree::new({})", self.base())
         } else {
@@ -31,23 +34,19 @@ impl Codegen for IntegrityConstraintDegree {
     }
 }
 
-impl Codegen for IndexedTraceAccess {
-    fn to_string(&self, _ir: &AirIR, _elem_type: ElemType, trace_segment: u8) -> String {
-        let frame = if let 0 = self.trace_segment() {
-            "main"
-        } else {
-            "aux"
-        };
-        let row_offset = match self.row_offset() {
+impl Codegen for TraceAccess {
+    fn to_string(&self, _ir: &Air, _elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
+        let frame = if self.segment == 0 { "main" } else { "aux" };
+        let row_offset = match self.row_offset {
             0 => {
-                format!("current[{}]", self.col_idx())
+                format!("current[{}]", self.column)
             }
             1 => {
-                format!("next[{}]", self.col_idx())
+                format!("next[{}]", self.column)
             }
             _ => panic!("Winterfell doesn't support row offsets greater than 1."),
         };
-        if self.trace_segment() == 0 && self.trace_segment() != trace_segment {
+        if self.segment == 0 && self.segment != trace_segment {
             format!("E::from({frame}_{row_offset})")
         } else {
             format!("{frame}_{row_offset}")
@@ -56,58 +55,20 @@ impl Codegen for IndexedTraceAccess {
 }
 
 impl Codegen for NodeIndex {
-    fn to_string(&self, ir: &AirIR, elem_type: ElemType, trace_segment: u8) -> String {
+    fn to_string(&self, ir: &Air, elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
         let op = ir.constraint_graph().node(self).op();
         op.to_string(ir, elem_type, trace_segment)
     }
 }
 
 impl Codegen for Operation {
-    fn to_string(&self, ir: &AirIR, elem_type: ElemType, trace_segment: u8) -> String {
+    fn to_string(&self, ir: &Air, elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
         match self {
-            Operation::Constant(ConstantValue::Inline(value)) => match elem_type {
-                ElemType::Base => format!("Felt::new({value})"),
-                ElemType::Ext => format!("E::from({value}_u64)"),
-            },
-            Operation::Constant(ConstantValue::Scalar(ident)) => match elem_type {
-                ElemType::Base => ident.to_string(),
-                ElemType::Ext => format!("E::from({ident})"),
-            },
-            Operation::Constant(ConstantValue::Vector(vector_access)) => match elem_type {
-                ElemType::Base => format!("{}[{}]", vector_access.name(), vector_access.idx()),
-                ElemType::Ext => {
-                    format!("E::from({}[{}])", vector_access.name(), vector_access.idx())
-                }
-            },
-            Operation::Constant(ConstantValue::Matrix(matrix_access)) => match elem_type {
-                ElemType::Base => format!(
-                    "{}[{}][{}]",
-                    matrix_access.name(),
-                    matrix_access.row_idx(),
-                    matrix_access.col_idx()
-                ),
-                ElemType::Ext => format!(
-                    "E::from({}[{}][{}])",
-                    matrix_access.name(),
-                    matrix_access.row_idx(),
-                    matrix_access.col_idx()
-                ),
-            },
-            Operation::TraceElement(trace_access) => {
-                trace_access.to_string(ir, elem_type, trace_segment)
-            }
-            Operation::PeriodicColumn(col_idx, _) => {
-                format!("periodic_values[{col_idx}]")
-            }
-            Operation::PublicInput(ident, idx) => {
-                format!("self.{ident}[{idx}]")
-            }
-            Operation::RandomValue(idx) => {
-                format!("aux_rand_elements.get_segment_elements(0)[{idx}]")
-            }
+            Operation::Value(value) => value.to_string(ir, elem_type, trace_segment),
             Operation::Add(_, _) => binary_op_to_string(ir, self, elem_type, trace_segment),
             Operation::Sub(_, _) => binary_op_to_string(ir, self, elem_type, trace_segment),
             Operation::Mul(_, _) => binary_op_to_string(ir, self, elem_type, trace_segment),
+            // TODO: move this logic to a helper function
             Operation::Exp(l_idx, r_idx) => {
                 let lhs = l_idx.to_string(ir, elem_type, trace_segment);
                 let lhs = if is_leaf(l_idx, ir) {
@@ -115,17 +76,64 @@ impl Codegen for Operation {
                 } else {
                     format!("({lhs})")
                 };
-                match elem_type {
-                    ElemType::Base => format!("{lhs}.exp(Felt::new({r_idx}))"),
-                    ElemType::Ext => format!("{lhs}.exp(E::PositiveInteger::from({r_idx}_u64))"),
+                match r_idx {
+                    0 => match elem_type {
+                        // x^0 = 1
+                        ElemType::Base => "Felt::ONE".to_string(),
+                        ElemType::Ext => "E::ONE".to_string(),
+                    },
+                    1 => lhs, // x^1 = x
+                    _ => match elem_type {
+                        ElemType::Base => format!("{lhs}.exp(Felt::new({r_idx}))"),
+                        ElemType::Ext => {
+                            format!("{lhs}.exp(E::PositiveInteger::from({r_idx}_u64))")
+                        }
+                    },
                 }
             }
         }
     }
 }
 
+impl Codegen for Value {
+    fn to_string(&self, ir: &Air, elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
+        match self {
+            // TODO: move constant handling to a helper function
+            Value::Constant(0) => match elem_type {
+                ElemType::Base => "Felt::ZERO".to_string(),
+                ElemType::Ext => "E::ZERO".to_string(),
+            },
+            Value::Constant(1) => match elem_type {
+                ElemType::Base => "Felt::ONE".to_string(),
+                ElemType::Ext => "E::ONE".to_string(),
+            },
+            Value::Constant(value) => match elem_type {
+                ElemType::Base => format!("Felt::new({value})"),
+                ElemType::Ext => format!("E::from({value}_u64)"),
+            },
+            Value::TraceAccess(trace_access) => {
+                trace_access.to_string(ir, elem_type, trace_segment)
+            }
+            Value::PeriodicColumn(pc) => {
+                let index = ir
+                    .periodic_columns
+                    .iter()
+                    .position(|(qid, _)| qid == &pc.name)
+                    .unwrap();
+                format!("periodic_values[{index}]")
+            }
+            Value::PublicInput(air_ir::PublicInputAccess { name, index }) => {
+                format!("self.{name}[{index}]")
+            }
+            Value::RandomValue(idx) => {
+                format!("aux_rand_elements.get_segment_elements(0)[{idx}]")
+            }
+        }
+    }
+}
+
 /// Returns true if the operation at the specified node index is a leaf node in the constraint graph.
-fn is_leaf(idx: &NodeIndex, ir: &AirIR) -> bool {
+fn is_leaf(idx: &NodeIndex, ir: &Air) -> bool {
     !matches!(
         ir.constraint_graph().node(idx).op(),
         Operation::Add(_, _) | Operation::Sub(_, _) | Operation::Mul(_, _) | Operation::Exp(_, _)
@@ -134,10 +142,10 @@ fn is_leaf(idx: &NodeIndex, ir: &AirIR) -> bool {
 
 /// Returns a string representation of a binary operation.
 fn binary_op_to_string(
-    ir: &AirIR,
+    ir: &Air,
     op: &Operation,
     elem_type: ElemType,
-    trace_segment: u8,
+    trace_segment: TraceSegmentId,
 ) -> String {
     match op {
         Operation::Add(l_idx, r_idx) => {
