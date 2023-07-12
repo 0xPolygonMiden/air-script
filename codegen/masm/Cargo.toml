@@ -1,18 +1,27 @@
 [package]
 name = "air-codegen-masm"
 version = "0.1.0"
+description = "Miden Assembly code generator for the AirScript language"
+authors = ["miden contributors"]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/0xPolygonMiden/air-script"
+categories = ["compilers", "cryptography"]
+keywords = ["air", "stark", "winterfell", "zero-knowledge", "zkp"]
 edition = "2021"
+rust-version = "1.67"
 
 [dependencies]
-air-ir = { path = "../../ir", version = "0.2.0" }
+air-ir = { package = "air-ir", path = "../../ir", version = "0.3" }
 anyhow = "1.0"
-winter-prover = { version = "0.6", default-features = false }
-miden-processor = { git = "https://github.com/0xPolygonMiden/miden-vm", features = ["internals"], default-features = false }
+miden-core = { package = "miden-core", version = "0.6", default-features = false }
 thiserror = "1.0"
+winter-math = { package = "winter-math", version = "0.6", default-features = false }
 
 [dev-dependencies]
-air-parser = { path = "../../parser", version = "0.2.0" }
+air-parser = { path = "../../parser" }
 air-pass = { path = "../../pass" }
-miden = "0.3.0"
-miden-diagnostics = { git = "https://github.com/0xpolygonmiden/miden-diagnostics" }
-miden-assembly = { git = "https://github.com/0xPolygonMiden/miden-vm", default-features = false }
+miden-assembly = { package = "miden-assembly", version = "0.6", default-features = false }
+miden-processor = { package = "miden-processor", version = "0.6", features = ["internals"], default-features = false }
+miden-diagnostics = "0.1"
+winter-air = { package = "winter-air", version = "0.6", default-features = false }

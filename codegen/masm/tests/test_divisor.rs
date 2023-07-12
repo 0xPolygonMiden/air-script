@@ -4,7 +4,7 @@ use miden_processor::{
     math::{Felt, FieldElement},
     AdviceInputs, Kernel, MemAdviceProvider, Process, QuadExtension, StackInputs,
 };
-use winter_prover::{Assertion, ConstraintDivisor};
+use winter_air::{Assertion, ConstraintDivisor};
 
 mod utils;
 use utils::{codegen, test_code, to_stack_order, Data};

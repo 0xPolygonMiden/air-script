@@ -638,7 +638,9 @@ impl<'a> Inlining<'a> {
         let mut statements = vec![];
 
         // Get the number of iterations in this comprehension
-        let Type::Vector(num_iterations) = expr.ty.unwrap() else { panic!("invalid comprehension type"); };
+        let Type::Vector(num_iterations) = expr.ty.unwrap() else {
+            panic!("invalid comprehension type");
+        };
 
         // Step the iterables for each iteration, giving each it's own lexical scope
         for i in 0..num_iterations {
@@ -1068,7 +1070,9 @@ impl<'a> Inlining<'a> {
                             // The input expression must have been a symbol access, as matrices of columns
                             // aren't a thing, and there is no other expression type which can produce trace
                             // bindings.
-                            let Expr::SymbolAccess(ref access) = input else { panic!("unexpected element in trace column vector: {:#?}", input) };
+                            let Expr::SymbolAccess(ref access) = input else {
+                                panic!("unexpected element in trace column vector: {:#?}", input)
+                            };
                             // Unless we have leftover input, initialize `binding_ty` with the binding type of this input
                             let bt = binding_ty
                                 .take()

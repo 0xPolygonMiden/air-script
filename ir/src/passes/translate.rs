@@ -293,9 +293,13 @@ impl<'a> AirBuilder<'a> {
         // The left-hand side of a boundary constraint equality expression is always a bounded symbol access
         // against a trace column. It is fine to panic here if that is ever violated.
         let ast::ScalarExpr::BoundedSymbolAccess(ref access) = lhs else {
-            self.diagnostics.diagnostic(Severity::Bug)
+            self.diagnostics
+                .diagnostic(Severity::Bug)
                 .with_message("invalid boundary constraint")
-                .with_primary_label(lhs_span, "expected bounded trace column access here, e.g. 'main[0].first'")
+                .with_primary_label(
+                    lhs_span,
+                    "expected bounded trace column access here, e.g. 'main[0].first'",
+                )
                 .emit();
             return Err(CompileError::Failed);
         };
@@ -415,7 +419,9 @@ impl<'a> AirBuilder<'a> {
     fn insert_binary_expr(&mut self, expr: &ast::BinaryExpr) -> NodeIndex {
         if expr.op == ast::BinaryOp::Exp {
             let lhs = self.insert_scalar_expr(expr.lhs.as_ref());
-            let ast::ScalarExpr::Const(rhs) = expr.rhs.as_ref() else { unreachable!(); };
+            let ast::ScalarExpr::Const(rhs) = expr.rhs.as_ref() else {
+                unreachable!();
+            };
             return self.insert_op(Operation::Exp(lhs, rhs.item as usize));
         }
 

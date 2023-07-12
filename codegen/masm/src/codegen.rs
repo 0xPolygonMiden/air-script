@@ -13,10 +13,10 @@ use air_ir::{
     Air, ConstraintDomain, ConstraintRoot, Identifier, NodeIndex, Operation, PeriodicColumn,
     TraceSegmentId, Value,
 };
-use miden_processor::math::{Felt, StarkField};
+use miden_core::{Felt, StarkField};
 use std::collections::btree_map::BTreeMap;
 use std::mem::{replace, take};
-use winter_prover::math::fft;
+use winter_math::fft;
 
 #[derive(Default)]
 pub struct CodeGenerator {

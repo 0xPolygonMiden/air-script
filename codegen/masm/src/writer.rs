@@ -1,4 +1,4 @@
-use miden_processor::math::{Felt, StarkField};
+use miden_core::{Felt, StarkField};
 use std::borrow::{Borrow, Cow};
 
 #[derive(Debug, Clone, Copy)]
