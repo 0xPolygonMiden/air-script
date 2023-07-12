@@ -83,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html" class="active"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/organization.html"><strong aria-hidden="true">2.2.</strong> Code organization</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.5.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/evaluators.html"><strong aria-hidden="true">2.6.</strong> Evaluators</a></li><li class="chapter-item expanded "><a href="description/convenience-syntax.html"><strong aria-hidden="true">2.7.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.8.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.9.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.10.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html" class="active"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/organization.html"><strong aria-hidden="true">2.2.</strong> Code organization</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.5.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/evaluators.html"><strong aria-hidden="true">2.6.</strong> Evaluators</a></li><li class="chapter-item expanded "><a href="description/convenience.html"><strong aria-hidden="true">2.7.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.8.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.9.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.10.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="backends.html"><strong aria-hidden="true">3.</strong> Backends</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -174,10 +174,6 @@
 <p>Polygon Miden's AirScript is designed to make it simple to describe AIR constraints and generate efficient and accurate constraint evaluation code in the required target language. The code for AirScript can be found <a href="https://github.com/0xPolygonMiden/air-script/">here</a>.</p>
 <h2 id="current-version"><a class="header" href="#current-version">Current Version</a></h2>
 <p>Currently, AirScript is on version 0.3, which includes about 95% of features needed to describe Miden VM constraints, and supports generation of constraint evaluation code for the following backends:</p>
-<ul>
-<li>Rust code targeting the <a href="https://github.com/facebook/winterfell">Winterfell prover</a>.</li>
-<li>Miden assembly code targeting recursive verifier in <a href="https://github.com/0xPolygonMiden/miden-vm">Miden VM</a>.</li>
-</ul>
 <p>AirScript includes the following features:</p>
 <ul>
 <li>
@@ -224,9 +220,7 @@
 <p>Then, run the <code>airc</code> target with the <code>transpile</code> option. For example:</p>
 <pre><code>./target/release/airc transpile examples/example.air
 </code></pre>
-<p>This will output constraint evaluation code targeted for the Winterfell prover. To output constraint evaluation code in Miden assembly, you can use <code>--target masm</code> flag like so:</p>
-<pre><code>./target/release/airc transpile examples/example.air --target masm
-</code></pre>
+<p>This will output constraint evaluation code targeted for the Winterfell prover.</p>
 <p>You can use the <code>help</code> option to see other available options.</p>
 <pre><code>./target/release/airc transpile --help
 </code></pre>

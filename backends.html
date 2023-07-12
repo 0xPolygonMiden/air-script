@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Language Implementation - AirScript by Polygon Miden</title>
+        <title>Backends - AirScript by Polygon Miden</title>
 
 
         <!-- Custom HTML head -->
@@ -83,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/organization.html"><strong aria-hidden="true">2.2.</strong> Code organization</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.5.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/evaluators.html"><strong aria-hidden="true">2.6.</strong> Evaluators</a></li><li class="chapter-item expanded "><a href="description/convenience-syntax.html"><strong aria-hidden="true">2.7.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.8.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.9.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.10.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="implementation.html" class="active"><strong aria-hidden="true">3.</strong> Language Implementation</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="description/organization.html"><strong aria-hidden="true">2.2.</strong> Code organization</a></li><li class="chapter-item expanded "><a href="description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="description/variables.html"><strong aria-hidden="true">2.5.</strong> Variables</a></li><li class="chapter-item expanded "><a href="description/evaluators.html"><strong aria-hidden="true">2.6.</strong> Evaluators</a></li><li class="chapter-item expanded "><a href="description/convenience.html"><strong aria-hidden="true">2.7.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="description/example.html"><strong aria-hidden="true">2.8.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="description/keywords.html"><strong aria-hidden="true">2.9.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="description/appendix.html"><strong aria-hidden="true">2.10.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="backends.html" class="active"><strong aria-hidden="true">3.</strong> Backends</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -170,66 +170,20 @@
                 <div id="content" class="content">
                     <main>
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
-<h1 id="language-implementation"><a class="header" href="#language-implementation">Language Implementation</a></h1>
-<p>This is a high-level overview of the implementation.</p>
-<h2 id="parser"><a class="header" href="#parser">Parser</a></h2>
-<p>The parser is split into 3 modules:</p>
+<h1 id="backends"><a class="header" href="#backends">Backends</a></h1>
+<p>AirScript currently comes bundled with two backends:</p>
 <ul>
-<li>a scanner built using the <a href="https://crates.io/crates/logos">Logos</a> lexer-generator tool</li>
-<li>an LR(1) parser generated by the <a href="https://crates.io/crates/lalrpop">LALRPOP</a> parser-generator framework</li>
-<li>an AST for representing the parsed AIR description</li>
+<li><a href="https://github.com/0xPolygonMiden/air-script/tree/main/codegen/winterfell">Winterfell backend</a> which outputs <code>Air</code> trait implementation for the <a href="https://github.com/facebook/winterfell">Winterfell prover</a> (Rust).</li>
+<li><a href="https://github.com/0xPolygonMiden/air-script/tree/main/codegen/masm">Miden assembly backend</a> which outputs constraint evaluation code for the <a href="https://github.com/0xPolygonMiden/miden-vm">Miden VM</a> recursive verifier.</li>
 </ul>
-<h2 id="ir"><a class="header" href="#ir">IR</a></h2>
-<p>The IR is where semantic checking is done and where optimizations will be done in the future.</p>
-<p>A directed acyclic graph called <code>AlgebraicGraph</code> is responsible for efficiently representing all boundary and integrity constraints, identifying their domain (i.e. the rows they should be applied to), identifying their trace segment (main or auxiliary), and computing their degrees.</p>
-<h3 id="building-the-graph"><a class="header" href="#building-the-graph">Building the graph</a></h3>
-<p>While building the graph, the IR associates the following information with each constraint:</p>
-<ul>
-<li>For integrity constraints, identifies the trace segment and the type of the integrity constraint (transition or validity) based on the constraint expression.
-<ul>
-<li>Constraints referencing the auxiliary trace columns or using random values are identified as constraints against the auxiliary trace (trace segment 1). All other constraints are identified as constraints against the main trace (trace segment 0).</li>
-<li>Constraints referencing the &quot;next&quot; indicator are identified as transition constraints. All other constraints are identified as validity constraints.</li>
-</ul>
-</li>
-<li>For boundary constraints, identifies the trace segment and constraint domain (first or last row) based on the trace column and the boundary to which the constraint is applied.</li>
-</ul>
-<h3 id="error-checking"><a class="header" href="#error-checking">Error checking</a></h3>
-<p>Currently, error checking in the IR covers the following cases</p>
-<h4 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h4>
-<ul>
-<li>Prevent duplicate identifier declarations.</li>
-<li>Prevent usage of undeclared identifiers.</li>
-</ul>
-<h4 id="periodic-columns"><a class="header" href="#periodic-columns">Periodic columns</a></h4>
-<ul>
-<li>Ensure the cycle length of periodic columns is valid (greater than the minimum and a power of two).</li>
-</ul>
-<h4 id="boundary-constraints"><a class="header" href="#boundary-constraints">Boundary constraints</a></h4>
-<ul>
-<li>Prevent multiple constraints against the same column at the same boundary.</li>
-<li>Ensure boundary constraint expressions contain valid identifier references by:
-<ul>
-<li>Preventing periodic columns from being used by boundary constraints.</li>
-<li>Ensuring valid indices for vector accesses (e.g. for public inputs, random values, vector constants or vector variables) or matrix accesses (e.g. for matrix constants or matrix variables).</li>
-<li>Ensuring valid identifier types for vector and matrix accesses.</li>
-</ul>
-</li>
-</ul>
-<h4 id="integrity-constraints"><a class="header" href="#integrity-constraints">Integrity constraints</a></h4>
-<ul>
-<li>Ensure integrity constraints contain valid identifier references by:
-<ul>
-<li>Preventing public inputs from being used.</li>
-<li>Preventing &quot;next&quot; indicators from being applied to anything other than trace columns.</li>
-<li>Ensuring valid indices for vector accesses (e.g. for public inputs, random values, vector constants or vector variables) or matrix accesses (e.g. for matrix constants or matrix variables).</li>
-<li>Ensuring valid identifier types for vector and matrix accesses.</li>
-</ul>
-</li>
-</ul>
-<h2 id="winterfell-codegen"><a class="header" href="#winterfell-codegen">Winterfell Codegen</a></h2>
-<p>The <code>codegen/winterfell</code> crate provides a code generator for a Rust implementation of the <a href="https://github.com/novifinancial/winterfell">Winterfell prover's</a> <code>Air</code> trait from an instance of an AirScript <code>IR</code>.</p>
-<h2 id="airscript-core"><a class="header" href="#airscript-core">AirScript Core</a></h2>
-<p>The <code>air-script-core</code> crate contains commonly used constants and structs used by the other crates.</p>
+<p>These backends can be used programmatically as crates. They can also be used via AirScript CLI by specifying <code>--target</code> flag.</p>
+<p>For example, the following will output Winterfell <code>Air</code> trait implementation for AIR constraints described in <code>example.air</code> file:</p>
+<pre><code>./target/release/airc transpile examples/example.air --target winterfell
+</code></pre>
+<p>While the following will output constraint evaluation code for the same constraints in Miden assembly.</p>
+<pre><code>./target/release/airc transpile examples/example.air --target masm
+</code></pre>
+<p>In both cases we assumed that the CLI has been compiled as described <a href="./introduction.html#cli">here</a>.</p>
 
                     </main>
 
