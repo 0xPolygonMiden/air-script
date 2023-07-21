@@ -1,4 +1,4 @@
-use miden_diagnostics::{SourceSpan, Span};
+use miden_diagnostics::SourceSpan;
 
 use crate::ast::*;
 

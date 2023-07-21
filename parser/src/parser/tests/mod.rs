@@ -360,6 +360,13 @@ macro_rules! int {
             $value,
         ))
     };
+
+    ($value:expr) => {
+        ScalarExpr::Const(miden_diagnostics::Span::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            $value,
+        ))
+    };
 }
 
 macro_rules! call {
@@ -497,7 +504,7 @@ macro_rules! lc {
 
 macro_rules! range {
     ($range:expr) => {
-        Expr::Range(Span::new(SourceSpan::UNKNOWN, $range))
+        Expr::Range(miden_diagnostics::Span::new(SourceSpan::UNKNOWN, $range))
     };
 }
 
