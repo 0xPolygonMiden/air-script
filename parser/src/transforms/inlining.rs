@@ -448,7 +448,11 @@ impl<'a> Inlining<'a> {
                 Ok(vec![Statement::Expr(folded)])
             }
             Expr::ListComprehension(lc) => {
+                // Expand the comprehension, but ensure we don't treat it like a comprehension constraint
+                let in_cc = core::mem::replace(&mut self.in_comprehension_constraint, false);
                 let mut expanded = self.expand_comprehension(lc)?;
+                self.in_comprehension_constraint = in_cc;
+                // Apply the fold to the expanded comprehension in the bottom of the let tree
                 with_let_result(self, &mut expanded, |inliner, value| {
                     match value {
                         // The result value of expanding a comprehension _must_ be a vector
