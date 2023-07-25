@@ -1,6 +1,6 @@
 [package]
 name = "air-codegen-masm"
-version = "0.1.0"
+version = "0.4.0"
 description = "Miden Assembly code generator for the AirScript language"
 authors = ["miden contributors"]
 readme = "README.md"
@@ -12,7 +12,7 @@ edition = "2021"
 rust-version = "1.67"
 
 [dependencies]
-air-ir = { package = "air-ir", path = "../../ir", version = "0.3" }
+air-ir = { package = "air-ir", path = "../../ir", version = "0.4" }
 anyhow = "1.0"
 miden-core = { package = "miden-core", version = "0.6", default-features = false }
 thiserror = "1.0"
