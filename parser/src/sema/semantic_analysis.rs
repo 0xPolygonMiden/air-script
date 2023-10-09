@@ -253,6 +253,23 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
             );
         }
 
+        for (function_name, function) in module.functions.iter() {
+            let namespaced_name = NamespacedIdentifier::Function(*function_name);
+            if let Some((prev, _)) = self.imported.get_key_value(&namespaced_name) {
+                self.declaration_import_conflict(namespaced_name.span(), prev.span())?;
+            }
+            assert_eq!(
+                self.locals.insert(
+                    namespaced_name,
+                    BindingType::Function(FunctionType::Function(
+                        function.param_types(),
+                        function.return_type
+                    ))
+                ),
+                None
+            );
+        }
+
         // Next, we add any periodic columns to the set of local bindings.
         //
         // These _can_ conflict with globally defined names, but are guaranteed not to conflict
@@ -285,6 +302,10 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         // rewrite its name to be fully-qualified,
         for evaluator in module.evaluators.values_mut() {
             self.visit_mut_evaluator_function(evaluator)?;
+        }
+
+        for function in module.functions.values_mut() {
+            self.visit_mut_function(function)?;
         }
 
         if let Some(boundary_constraints) = module.boundary_constraints.as_mut() {
@@ -359,6 +380,48 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         self.locals.exit();
         // Disallow constraints
         self.constraint_mode = ConstraintMode::None;
+
+        ControlFlow::Continue(())
+    }
+
+    fn visit_mut_function(
+        &mut self,
+        function: &mut Function,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        // constraints are not allowed in pure functions
+        self.constraint_mode = ConstraintMode::None;
+
+        // Start a new lexical scope
+        self.locals.enter();
+
+        // Track referenced imports in a new context, as we want to update the dependency graph
+        // for this function using only those imports referenced from this function body
+        let referenced = mem::take(&mut self.referenced);
+
+        // Add the set of parameters to the current scope, check for conflicts
+        for (param, param_type) in function.params.iter_mut() {
+            let namespaced_name = NamespacedIdentifier::Binding(*param);
+            self.locals
+                .insert(namespaced_name, BindingType::Local(*param_type));
+        }
+
+        // Visit all of the statements in the body
+        self.visit_mut_statement_block(&mut function.body)?;
+
+        // Update the dependency graph for this function
+        let current_item = QualifiedIdentifier::new(
+            self.current_module.unwrap(),
+            NamespacedIdentifier::Function(function.name),
+        );
+        for (referenced_item, ref_type) in self.referenced.iter() {
+            let referenced_item = self.deps.add_node(*referenced_item);
+            self.deps.add_edge(current_item, referenced_item, *ref_type);
+        }
+
+        // Restore the original references metadata
+        self.referenced = referenced;
+        // Restore the original lexical scope
+        self.locals.exit();
 
         ControlFlow::Continue(())
     }
@@ -598,6 +661,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
                         }
                         // TODO: When we have non-evaluator functions, we must fetch the type in its signature here,
                         // and store it as the type of the Call expression
+                        expr.ty = fty.result();
                     }
                 } else {
                     self.has_type_errors = true;

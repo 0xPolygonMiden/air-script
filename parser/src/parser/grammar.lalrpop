@@ -75,6 +75,7 @@ Declaration: Declaration = {
     PeriodicColumns => Declaration::PeriodicColumns(<>),
     RandomValues => Declaration::RandomValues(<>),
     EvaluatorFunction => Declaration::EvaluatorFunction(<>),
+    Function => Declaration::Function(<>),
     <l:@L> <trace:Trace> <r:@R> => Declaration::Trace(Span::new(span!(l, r), trace)),
     <PublicInputs> => Declaration::PublicInputs(<>),
     <BoundaryConstraints> => Declaration::BoundaryConstraints(<>),
@@ -256,6 +257,43 @@ EvaluatorSegmentBindings: (SourceSpan, Vec<Span<(Identifier, usize)>>) = {
     <l:@L> "[" "]" <r:@R> => (span!(l, r), vec![]),
 }
 
+// FUNCTIONS
+// ================================================================================================
+
+Function: Function = {
+    <l:@L> "fn" <name: FunctionIdentifier> "(" <params: FunctionBindings> ")" "->"
+        <return_type: FunctionBindingType>":" <body: FunctionBody> <r:@R>
+        => Function::new(span!(l, r), name, params, return_type, body)
+}
+
+FunctionBindings: Vec<(Identifier, Type)> = {
+    <l:@L> <params: Comma<FunctionBinding>> <r:@R> => params,
+}
+
+FunctionBinding: (Identifier, Type) = {
+    <name: Identifier> ":" <ty: FunctionBindingType> => (name, ty),
+}
+
+FunctionBindingType: Type = {
+    <l:@L> "felt" <r:@R> => Type::Felt,
+    <l:@L> "felt" <size: Size> <r:@R> => Type::Vector(size as usize),
+    <l:@L> "felt" "[" <row_size: Num_u64> "," <col_size: Num_u64> "]" <r:@R> => Type::Matrix(row_size as usize, col_size as usize),
+}
+
+FunctionBody: Vec<Statement> = {
+    // TODO: validate
+    <l:@L> <stmts: StatementBlock> <r:@R> =>? {
+        if stmts.len() > 1 {
+            diagnostics.diagnostic(Severity::Error)
+            .with_message("invalid function definition")
+            .with_primary_label(span!(l, r), "function should have 0 or more let statements followed by a return statement.")
+            .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(stmts)
+    },
+}
+
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
@@ -287,6 +325,7 @@ StatementBlock: Vec<Statement> = {
         stmts
     },
     <ConstraintStatements>,
+    <ReturnStatement> => vec![Statement::Expr(<>)],
 }
 
 Let: Let = {
@@ -303,6 +342,10 @@ ConstraintStatements: Vec<Statement> = {
 ConstraintStatement: Vec<Statement> = {
     "enf" "match" ":" <MatchArm+> => <>,
     "enf" <ConstraintExpr> => vec![<>],
+}
+
+ReturnStatement: Expr = {
+    <l:@L> "return" <expr: Expr> <r:@R> => expr,
 }
 
 MatchArm: Statement = {
@@ -516,6 +559,11 @@ Iterable: Expr = {
     <ident: Identifier> => Expr::SymbolAccess(SymbolAccess::new(ident.span(), ident, AccessType::Default, 0)),
     <l:@L> <range: Range> <r:@R> => Expr::Range(Span::new(span!(l, r), range)),
     <l:@L> <ident: Identifier> "[" <range: Range> "]" <r:@R> => Expr::SymbolAccess(SymbolAccess::new(span!(l, r), ident, AccessType::Slice(range), 0)),
+    <l:@L> <function_call: FunctionCall> <r:@R> => if let ScalarExpr::Call(call) = function_call {
+        Expr::Call(call)
+    } else {
+        unreachable!()
+    }
 }
 
 Range: Range = {
@@ -532,6 +580,15 @@ Vector<T>: Vec<T> = {
 Matrix<T>: Vec<Vec<T>> = {
     Vector<Vector<T>>,
 }
+
+Tuple<T>: Vec<T> = {
+    "(" <v1:T> "," <v2:T> <v:("," <T>)*> ")" => {
+        let mut v = v;
+        v.insert(0, v2);
+        v.insert(0, v1);
+        v
+    }
+};
 
 Size: u64 = {
     "[" <Num_u64> "]" => <>
@@ -591,10 +648,13 @@ extern {
         "last" => Token::Last,
         "integrity_constraints" => Token::IntegrityConstraints,
         "ev" => Token::Ev,
+        "fn" => Token::Fn,
         "enf" => Token::Enf,
+        "return" => Token::Return,
         "match" => Token::Match,
         "case" => Token::Case,
         "when" => Token::When,
+        "felt" => Token::Felt,
         "'" => Token::Quote,
         "=" => Token::Equal,
         "+" => Token::Plus,
@@ -613,5 +673,6 @@ extern {
         ")" => Token::RParen,
         "." => Token::Dot,
         ".." => Token::DotDot,
+        "->" => Token::Arrow,
     }
 }

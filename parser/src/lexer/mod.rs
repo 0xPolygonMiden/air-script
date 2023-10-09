@@ -113,6 +113,8 @@ pub enum Token {
     RandomValues,
     /// Keyword to declare the evaluator function section in the AIR constraints module.
     Ev,
+    /// Keyword to declare the function section in the AIR constraints module.
+    Fn,
 
     // BOUNDARY CONSTRAINT KEYWORDS
     // --------------------------------------------------------------------------------------------
@@ -137,9 +139,11 @@ pub enum Token {
     // --------------------------------------------------------------------------------------------
     /// Keyword to signify that a constraint needs to be enforced
     Enf,
+    Return,
     Match,
     Case,
     When,
+    Felt,
 
     // PUNCTUATION
     // --------------------------------------------------------------------------------------------
@@ -161,6 +165,7 @@ pub enum Token {
     Ampersand,
     Bar,
     Bang,
+    Arrow,
 }
 impl Token {
     pub fn from_keyword_or_ident(s: &str) -> Self {
@@ -177,6 +182,8 @@ impl Token {
             "periodic_columns" => Self::PeriodicColumns,
             "random_values" => Self::RandomValues,
             "ev" => Self::Ev,
+            "fn" => Self::Fn,
+            "felt" => Self::Felt,
             "boundary_constraints" => Self::BoundaryConstraints,
             "integrity_constraints" => Self::IntegrityConstraints,
             "first" => Self::First,
@@ -184,6 +191,7 @@ impl Token {
             "for" => Self::For,
             "in" => Self::In,
             "enf" => Self::Enf,
+            "return" => Self::Return,
             "match" => Self::Match,
             "case" => Self::Case,
             "when" => Self::When,
@@ -247,6 +255,8 @@ impl fmt::Display for Token {
             Self::PeriodicColumns => write!(f, "periodic_columns"),
             Self::RandomValues => write!(f, "random_values"),
             Self::Ev => write!(f, "ev"),
+            Self::Fn => write!(f, "fn"),
+            Self::Felt => write!(f, "felt"),
             Self::BoundaryConstraints => write!(f, "boundary_constraints"),
             Self::First => write!(f, "first"),
             Self::Last => write!(f, "last"),
@@ -254,6 +264,7 @@ impl fmt::Display for Token {
             Self::For => write!(f, "for"),
             Self::In => write!(f, "in"),
             Self::Enf => write!(f, "enf"),
+            Self::Return => write!(f, "return"),
             Self::Match => write!(f, "match"),
             Self::Case => write!(f, "case"),
             Self::When => write!(f, "when"),
@@ -275,6 +286,7 @@ impl fmt::Display for Token {
             Self::Ampersand => write!(f, "&"),
             Self::Bar => write!(f, "|"),
             Self::Bang => write!(f, "!"),
+            Self::Arrow => write!(f, "->"),
         }
     }
 }
@@ -486,7 +498,10 @@ where
             ']' => pop!(self, Token::RBracket),
             '=' => pop!(self, Token::Equal),
             '+' => pop!(self, Token::Plus),
-            '-' => pop!(self, Token::Minus),
+            '-' => match self.peek() {
+                '>' => pop2!(self, Token::Arrow),
+                _ => pop!(self, Token::Minus),
+            },
             '*' => pop!(self, Token::Star),
             '^' => pop!(self, Token::Caret),
             '&' => pop!(self, Token::Ampersand),

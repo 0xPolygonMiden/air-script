@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     ops::ControlFlow,
+    vec,
 };
 
 use air_pass::Pass;
@@ -19,12 +20,12 @@ use super::constant_propagation;
 /// * Monomorphizing and inlining evaluators/functions at their call sites
 /// * Unrolling constraint comprehensions into a sequence of scalar constraints
 /// * Unrolling list comprehensions into a tree of `let` statements which end in
-/// a vector expression (the implicit result of the tree). Each iteration of the
-/// unrolled comprehension is reified as a value and bound to a variable so that
-/// other transformations may refer to it directly.
+///   a vector expression (the implicit result of the tree). Each iteration of the
+///   unrolled comprehension is reified as a value and bound to a variable so that
+///   other transformations may refer to it directly.
 /// * Rewriting aliases of top-level declarations to refer to those declarations directly
 /// * Removing let-bound variables which are unused, which is also used to clean up
-/// after the aliasing rewrite mentioned above.
+///   after the aliasing rewrite mentioned above.
 ///
 /// The trickiest transformation comes with inlining the body of evaluators at their
 /// call sites, as evaluator parameter lists can arbitrarily destructure/regroup columns
@@ -75,6 +76,8 @@ pub struct Inlining<'a> {
     imported: HashMap<QualifiedIdentifier, BindingType>,
     /// All evaluator functions in the program
     evaluators: HashMap<QualifiedIdentifier, EvaluatorFunction>,
+    /// All pure functions in the program
+    functions: HashMap<QualifiedIdentifier, Function>,
     /// A set of identifiers for which accesses should be rewritten.
     ///
     /// When an identifier is in this set, it means it is a local alias for a trace column,
@@ -82,7 +85,8 @@ pub struct Inlining<'a> {
     /// identifier in `bindings`.
     rewrites: HashSet<Identifier>,
     in_comprehension_constraint: bool,
-    next_ident: usize,
+    next_ident_lc: usize,
+    next_ident_call: usize,
 }
 impl<'p> Pass for Inlining<'p> {
     type Input<'a> = Program;
@@ -93,6 +97,12 @@ impl<'p> Pass for Inlining<'p> {
         self.root = program.name;
         self.evaluators = program
             .evaluators
+            .iter()
+            .map(|(k, v)| (*k, v.clone()))
+            .collect();
+
+        self.functions = program
+            .functions
             .iter()
             .map(|(k, v)| (*k, v.clone()))
             .collect();
@@ -187,9 +197,11 @@ impl<'a> Inlining<'a> {
             let_bound: Default::default(),
             imported: Default::default(),
             evaluators: Default::default(),
+            functions: Default::default(),
             rewrites: Default::default(),
             in_comprehension_constraint: false,
-            next_ident: 0,
+            next_ident_lc: 0,
+            next_ident_call: 0,
         }
     }
 
@@ -197,10 +209,16 @@ impl<'a> Inlining<'a> {
     ///
     /// This is only used when expanding list comprehensions, so we use a special prefix for
     /// these generated identifiers to make it clear what they were expanded from.
-    fn next_ident(&mut self, span: SourceSpan) -> Identifier {
-        let id = self.next_ident;
-        self.next_ident += 1;
+    fn get_next_ident_lc(&mut self, span: SourceSpan) -> Identifier {
+        let id = self.next_ident_lc;
+        self.next_ident_lc += 1;
         Identifier::new(span, crate::Symbol::intern(format!("%lc{}", id)))
+    }
+
+    fn get_next_ident_call(&mut self, span: SourceSpan) -> Identifier {
+        let id = self.next_ident_call;
+        self.next_ident_call += 1;
+        Identifier::new(span, crate::Symbol::intern(format!("%call{}", id)))
     }
 
     /// Inline/expand all of the statements in the `boundary_constraints` section
@@ -293,10 +311,14 @@ impl<'a> Inlining<'a> {
             }
             // Expression statements are introduced during inlining, and are always already expanded,
             // but they are recursively visited to apply rewrites
-            Statement::Expr(mut expr) => {
-                self.rewrite_expr(&mut expr)?;
-                Ok(vec![Statement::Expr(expr)])
-            }
+            Statement::Expr(mut expr) => match expr {
+                Expr::Call(call) => self.expand_call(call),
+                Expr::Binary(mut expr) => self.expand_binary_expr(&mut expr),
+                _ => {
+                    self.rewrite_expr(&mut expr)?;
+                    Ok(vec![Statement::Expr(expr)])
+                }
+            },
         }
     }
 
@@ -337,6 +359,9 @@ impl<'a> Inlining<'a> {
             //
             // The rules for expansion are the same.
             Expr::ListComprehension(lc) => self.expand_comprehension(lc)?,
+
+            Expr::Binary(mut expr) => self.expand_binary_expr(&mut expr)?,
+
             // Other expressions we visit just to expand rewrites
             mut value => {
                 self.rewrite_expr(&mut value)?;
@@ -431,7 +456,304 @@ impl<'a> Inlining<'a> {
                 other => unimplemented!("unhandled builtin: {}", other),
             }
         } else {
-            todo!("pure functions are not implemented yet")
+            let expanded_function = self.expand_function_callsite(call)?;
+            Ok(expanded_function)
+        }
+    }
+
+    fn expand_binary_expr(
+        &mut self,
+        expr: &mut BinaryExpr,
+    ) -> Result<Vec<Statement>, SemanticAnalysisError> {
+        let span = expr.span();
+        match (expr.lhs.as_mut(), expr.rhs.as_mut()) {
+            (ScalarExpr::Binary(lhs_binary_expr), ScalarExpr::Binary(rhs_binary_expr)) => {
+                let op = expr.op;
+
+                // Expand the LHS call
+                let mut lhs_statements = self.expand_binary_expr(&mut lhs_binary_expr.clone())?;
+                let mut lhs_value: Option<Expr> = None;
+                let lhs_value_ref = &mut lhs_value;
+                let name = self.get_next_ident_call(span);
+                // Expand the RHS call
+                let rhs_statements = self.expand_binary_expr(&mut rhs_binary_expr.clone())?;
+                with_let_result(self, &mut lhs_statements, |_, value| {
+                    *lhs_value_ref = Some(value.clone());
+                    Ok(Some(Statement::Let(Let::new(
+                        span,
+                        name,
+                        value.clone(),
+                        rhs_statements,
+                    ))))
+                })?;
+
+                with_let_result(self, &mut lhs_statements, move |_, value| {
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr::new(
+                        span,
+                        op,
+                        lhs_value
+                            .expect("LHS value should be available")
+                            .try_into()?,
+                        value.try_into()?,
+                    )))))
+                })?;
+                Ok(lhs_statements)
+            }
+            (ScalarExpr::Binary(binary_expr), ScalarExpr::Call(call)) => {
+                let op = expr.op;
+
+                // Expand the LHS call
+                let mut lhs_statements = self.expand_binary_expr(&mut binary_expr.clone())?;
+                let mut lhs_value: Option<Expr> = None;
+                let lhs_value_ref = &mut lhs_value;
+                let name = self.get_next_ident_call(span);
+                // Expand the RHS call
+                let rhs_statements = self.expand_call(call.clone())?;
+                with_let_result(self, &mut lhs_statements, |_, value| {
+                    *lhs_value_ref = Some(value.clone());
+                    Ok(Some(Statement::Let(Let::new(
+                        span,
+                        name,
+                        value.clone(),
+                        rhs_statements,
+                    ))))
+                })?;
+
+                with_let_result(self, &mut lhs_statements, move |_, value| {
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr::new(
+                        span,
+                        op,
+                        lhs_value
+                            .expect("LHS value should be available")
+                            .try_into()?,
+                        value.try_into()?,
+                    )))))
+                })?;
+                Ok(lhs_statements)
+            }
+            (ScalarExpr::Call(call), ScalarExpr::Binary(binary_expr)) => {
+                let op = expr.op;
+
+                // Expand the LHS call
+                let mut lhs_statements = self.expand_call(call.clone())?;
+                let mut lhs_value: Option<Expr> = None;
+                let lhs_value_ref = &mut lhs_value;
+                let name = self.get_next_ident_call(span);
+                // Expand the RHS call
+                let rhs_statements = self.expand_binary_expr(&mut binary_expr.clone())?;
+                with_let_result(self, &mut lhs_statements, |_, value| {
+                    *lhs_value_ref = Some(value.clone());
+                    Ok(Some(Statement::Let(Let::new(
+                        span,
+                        name,
+                        value.clone(),
+                        rhs_statements,
+                    ))))
+                })?;
+
+                with_let_result(self, &mut lhs_statements, move |_, value| {
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr::new(
+                        span,
+                        op,
+                        lhs_value
+                            .expect("LHS value should be available")
+                            .try_into()?,
+                        value.try_into()?,
+                    )))))
+                })?;
+                Ok(lhs_statements)
+            }
+            (ScalarExpr::Binary(binary_expr), rhs_expr) => {
+                let op = expr.op;
+                let mut statements = self.expand_binary_expr(binary_expr)?;
+                // Since the let-bound expression may have expanded to a nested `let` tree,
+                // ultimately terminating a value expression of some kind, it is necessary to
+                // push down the current let to the bottom of that tree, replacing the value
+                // of the current let with whatever expression is at the bottom of the tree
+                // wrapped in a `Statement::Expr`. We then visit the tree top-down normally,
+                // knowing that all of the let-bound expressions are simple values.
+                //
+                // In short, we perform two visits of the tree - once to nest the current let
+                // at the bottom of the tree, and a second time to perform expansion/inlining/rewrites
+                // on the tree.
+                self.rewrite_scalar_expr(rhs_expr)?;
+                with_let_result(self, &mut statements, move |_, value| {
+                    // Steal the result value, and replace it with a dummy
+                    //
+                    // The dummy expression will be replaced with the let we're constructing
+                    // when this function returns
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr::new(
+                        span,
+                        op,
+                        value.try_into()?,
+                        rhs_expr.clone(),
+                    )))))
+                })?;
+
+                Ok(statements)
+            }
+            (lhs_expr, ScalarExpr::Binary(binary_expr)) => {
+                let op = expr.op;
+                let mut statements = self.expand_binary_expr(binary_expr)?;
+                // Since the let-bound expression may have expanded to a nested `let` tree,
+                // ultimately terminating a value expression of some kind, it is necessary to
+                // push down the current let to the bottom of that tree, replacing the value
+                // of the current let with whatever expression is at the bottom of the tree
+                // wrapped in a `Statement::Expr`. We then visit the tree top-down normally,
+                // knowing that all of the let-bound expressions are simple values.
+                //
+                // In short, we perform two visits of the tree - once to nest the current let
+                // at the bottom of the tree, and a second time to perform expansion/inlining/rewrites
+                // on the tree.
+                self.rewrite_scalar_expr(lhs_expr)?;
+                with_let_result(self, &mut statements, move |_, value| {
+                    // Steal the result value, and replace it with a dummy
+                    //
+                    // The dummy expression will be replaced with the let we're constructing
+                    // when this function returns
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr::new(
+                        span,
+                        op,
+                        lhs_expr.clone(),
+                        value.try_into()?,
+                    )))))
+                })?;
+
+                Ok(statements)
+            }
+            (ScalarExpr::Call(lhs_call), ScalarExpr::Call(rhs_call)) => {
+                let op = expr.op;
+
+                // Expand the LHS call
+                let mut lhs_statements = self.expand_call(lhs_call.clone())?;
+                // Store the final LHS value after replacing it with a dummy value
+                let mut lhs_value: Option<Expr> = None;
+                let lhs_value_ref = &mut lhs_value;
+                let name = self.get_next_ident_call(span);
+                // Expand the RHS call
+                let rhs_statements = self.expand_call(rhs_call.clone())?;
+                with_let_result(self, &mut lhs_statements, |_, value| {
+                    *lhs_value_ref = Some(value.clone());
+                    Ok(Some(Statement::Let(Let::new(
+                        span,
+                        name,
+                        value.clone(),
+                        rhs_statements,
+                    ))))
+                })?;
+
+                with_let_result(self, &mut lhs_statements, move |_, value| {
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr::new(
+                        span,
+                        op,
+                        lhs_value
+                            .expect("LHS value should be available")
+                            .try_into()?,
+                        value.try_into()?,
+                    )))))
+                })?;
+                Ok(lhs_statements)
+            }
+            (ScalarExpr::Call(call), rhs_expr) => {
+                let op = expr.op;
+                let mut statements = self.expand_call(call.clone())?;
+                // Since the let-bound expression may have expanded to a nested `let` tree,
+                // ultimately terminating a value expression of some kind, it is necessary to
+                // push down the current let to the bottom of that tree, replacing the value
+                // of the current let with whatever expression is at the bottom of the tree
+                // wrapped in a `Statement::Expr`. We then visit the tree top-down normally,
+                // knowing that all of the let-bound expressions are simple values.
+                //
+                // In short, we perform two visits of the tree - once to nest the current let
+                // at the bottom of the tree, and a second time to perform expansion/inlining/rewrites
+                // on the tree.
+                self.rewrite_scalar_expr(rhs_expr)?;
+                with_let_result(self, &mut statements, move |_, value| {
+                    // Steal the result value, and replace it with a dummy
+                    //
+                    // The dummy expression will be replaced with the let we're constructing
+                    // when this function returns
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr::new(
+                        span,
+                        op,
+                        value.try_into()?,
+                        rhs_expr.clone(),
+                    )))))
+                })?;
+
+                Ok(statements)
+            }
+            (lhs_expr, ScalarExpr::Call(call)) => {
+                let op = expr.op;
+                let mut statements = self.expand_call(call.clone())?;
+                // Since the let-bound expression may have expanded to a nested `let` tree,
+                // ultimately terminating a value expression of some kind, it is necessary to
+                // push down the current let to the bottom of that tree, replacing the value
+                // of the current let with whatever expression is at the bottom of the tree
+                // wrapped in a `Statement::Expr`. We then visit the tree top-down normally,
+                // knowing that all of the let-bound expressions are simple values.
+                //
+                // In short, we perform two visits of the tree - once to nest the current let
+                // at the bottom of the tree, and a second time to perform expansion/inlining/rewrites
+                // on the tree.
+                self.rewrite_scalar_expr(lhs_expr)?;
+                with_let_result(self, &mut statements, move |_, value| {
+                    // Steal the result value, and replace it with a dummy
+                    //
+                    // The dummy expression will be replaced with the let we're constructing
+                    // when this function returns
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr::new(
+                        span,
+                        op,
+                        lhs_expr.clone(),
+                        value.try_into()?,
+                    )))))
+                })?;
+
+                Ok(statements)
+            }
+            (lhs_expr, rhs_expr) => {
+                self.rewrite_scalar_expr(lhs_expr)?;
+                self.rewrite_scalar_expr(rhs_expr)?;
+                Ok(vec![Statement::Expr(Expr::Binary(BinaryExpr {
+                    span,
+                    op: expr.op,
+                    lhs: Box::new(lhs_expr.clone()),
+                    rhs: Box::new(rhs_expr.clone()),
+                }))])
+            }
         }
     }
 
@@ -527,14 +849,273 @@ impl<'a> Inlining<'a> {
                 mut rhs,
                 span,
             }) => {
-                self.rewrite_scalar_expr(lhs.as_mut())?;
-                self.rewrite_scalar_expr(rhs.as_mut())?;
-                Ok(vec![Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
-                    op: BinaryOp::Eq,
-                    lhs,
-                    rhs,
-                    span,
-                }))])
+                match (lhs.as_ref(), rhs.as_ref()) {
+                    (ScalarExpr::Binary(lhs_binary_expr), ScalarExpr::Binary(rhs_binary_expr)) => {
+                        // Expand the LHS call
+                        let mut lhs_statements =
+                            self.expand_binary_expr(&mut lhs_binary_expr.clone())?;
+                        let mut lhs_value: Option<Expr> = None;
+                        let lhs_value_ref = &mut lhs_value;
+                        let name = self.get_next_ident_call(span);
+                        // Expand the RHS call
+                        let rhs_statements =
+                            self.expand_binary_expr(&mut rhs_binary_expr.clone())?;
+                        with_let_result(self, &mut lhs_statements, |_, value| {
+                            *lhs_value_ref = Some(value.clone());
+                            Ok(Some(Statement::Let(Let::new(
+                                span,
+                                name,
+                                value.clone(),
+                                rhs_statements,
+                            ))))
+                        })?;
+
+                        with_let_result(self, &mut lhs_statements, move |_, value| {
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                                op: BinaryOp::Eq,
+                                lhs: Box::new(
+                                    lhs_value
+                                        .expect("LHS value should be available")
+                                        .try_into()?,
+                                ),
+                                rhs: Box::new(value.try_into()?),
+                                span,
+                            }))))
+                        })?;
+                        Ok(lhs_statements)
+                    }
+                    (ScalarExpr::Binary(binary_expr), ScalarExpr::Call(call)) => {
+                        // Expand the LHS call
+                        let mut lhs_statements =
+                            self.expand_binary_expr(&mut binary_expr.clone())?;
+                        let mut lhs_value: Option<Expr> = None;
+                        let lhs_value_ref = &mut lhs_value;
+                        let name = self.get_next_ident_call(span);
+                        // Expand the RHS call
+                        let rhs_statements = self.expand_call(call.clone())?;
+                        with_let_result(self, &mut lhs_statements, |_, value| {
+                            *lhs_value_ref = Some(value.clone());
+                            Ok(Some(Statement::Let(Let::new(
+                                span,
+                                name,
+                                value.clone(),
+                                rhs_statements,
+                            ))))
+                        })?;
+
+                        with_let_result(self, &mut lhs_statements, move |_, value| {
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                                op: BinaryOp::Eq,
+                                lhs: Box::new(
+                                    lhs_value
+                                        .expect("LHS value should be available")
+                                        .try_into()?,
+                                ),
+                                rhs: Box::new(value.try_into()?),
+                                span,
+                            }))))
+                        })?;
+                        Ok(lhs_statements)
+                    }
+                    (ScalarExpr::Call(call), ScalarExpr::Binary(binary_expr)) => {
+                        // Expand the LHS call
+                        let mut lhs_statements = self.expand_call(call.clone())?;
+                        let mut lhs_value: Option<Expr> = None;
+                        let lhs_value_ref = &mut lhs_value;
+                        let name = self.get_next_ident_call(span);
+                        // Expand the RHS call
+                        let rhs_statements = self.expand_binary_expr(&mut binary_expr.clone())?;
+                        with_let_result(self, &mut lhs_statements, |_, value| {
+                            *lhs_value_ref = Some(value.clone());
+                            Ok(Some(Statement::Let(Let::new(
+                                span,
+                                name,
+                                value.clone(),
+                                rhs_statements,
+                            ))))
+                        })?;
+
+                        with_let_result(self, &mut lhs_statements, move |_, value| {
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                                op: BinaryOp::Eq,
+                                lhs: Box::new(
+                                    lhs_value
+                                        .expect("LHS value should be available")
+                                        .try_into()?,
+                                ),
+                                rhs: Box::new(value.try_into()?),
+                                span,
+                            }))))
+                        })?;
+                        Ok(lhs_statements)
+                    }
+                    (ScalarExpr::Binary(binary_expr), _) => {
+                        let mut statements = self.expand_binary_expr(&mut binary_expr.clone())?;
+                        self.rewrite_scalar_expr(rhs.as_mut())?;
+                        with_let_result(self, &mut statements, move |_, value| {
+                            // Steal the result value, and replace it with a dummy
+                            //
+                            // The dummy expression will be replaced with the let we're constructing
+                            // when this function returns
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                                op: BinaryOp::Eq,
+                                lhs: Box::new(value.try_into()?),
+                                rhs,
+                                span,
+                            }))))
+                        })?;
+
+                        Ok(statements)
+                    }
+                    (_, ScalarExpr::Binary(binary_expr)) => {
+                        let mut statements = self.expand_binary_expr(&mut binary_expr.clone())?;
+                        self.rewrite_scalar_expr(lhs.as_mut())?;
+                        with_let_result(self, &mut statements, move |_, value| {
+                            // Steal the result value, and replace it with a dummy
+                            //
+                            // The dummy expression will be replaced with the let we're constructing
+                            // when this function returns
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                                op: BinaryOp::Eq,
+                                lhs,
+                                rhs: Box::new(value.try_into()?),
+                                span,
+                            }))))
+                        })?;
+
+                        Ok(statements)
+                    }
+                    (ScalarExpr::Call(lhs_call), ScalarExpr::Call(rhs_call)) => {
+                        // Expand the LHS call
+                        let mut lhs_statements = self.expand_call(lhs_call.clone())?;
+                        let mut lhs_value: Option<Expr> = None;
+                        let lhs_value_ref = &mut lhs_value;
+                        let name = self.get_next_ident_call(span);
+                        // Expand the RHS call
+                        let rhs_statements = self.expand_call(rhs_call.clone())?;
+                        with_let_result(self, &mut lhs_statements, |_, value| {
+                            *lhs_value_ref = Some(value.clone());
+                            Ok(Some(Statement::Let(Let::new(
+                                span,
+                                name,
+                                value.clone(),
+                                rhs_statements,
+                            ))))
+                        })?;
+
+                        with_let_result(self, &mut lhs_statements, move |_, value| {
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                                op: BinaryOp::Eq,
+                                lhs: Box::new(
+                                    lhs_value
+                                        .expect("LHS value should be available")
+                                        .try_into()?,
+                                ),
+                                rhs: Box::new(value.try_into()?),
+                                span,
+                            }))))
+                        })?;
+                        Ok(lhs_statements)
+                    }
+                    (ScalarExpr::Call(call), _) => {
+                        let mut statements = self.expand_call(call.clone())?;
+                        // Since the let-bound expression may have expanded to a nested `let` tree,
+                        // ultimately terminating a value expression of some kind, it is necessary to
+                        // push down the current let to the bottom of that tree, replacing the value
+                        // of the current let with whatever expression is at the bottom of the tree
+                        // wrapped in a `Statement::Expr`. We then visit the tree top-down normally,
+                        // knowing that all of the let-bound expressions are simple values.
+                        //
+                        // In short, we perform two visits of the tree - once to nest the current let
+                        // at the bottom of the tree, and a second time to perform expansion/inlining/rewrites
+                        // on the tree.
+                        self.rewrite_scalar_expr(rhs.as_mut())?;
+                        with_let_result(self, &mut statements, move |_, value| {
+                            // Steal the result value, and replace it with a dummy
+                            //
+                            // The dummy expression will be replaced with the let we're constructing
+                            // when this function returns
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                                op: BinaryOp::Eq,
+                                lhs: Box::new(value.try_into()?),
+                                rhs,
+                                span,
+                            }))))
+                        })?;
+
+                        Ok(statements)
+                    }
+                    (_, ScalarExpr::Call(call)) => {
+                        let mut statements = self.expand_call(call.clone())?;
+                        // Since the let-bound expression may have expanded to a nested `let` tree,
+                        // ultimately terminating a value expression of some kind, it is necessary to
+                        // push down the current let to the bottom of that tree, replacing the value
+                        // of the current let with whatever expression is at the bottom of the tree
+                        // wrapped in a `Statement::Expr`. We then visit the tree top-down normally,
+                        // knowing that all of the let-bound expressions are simple values.
+                        //
+                        // In short, we perform two visits of the tree - once to nest the current let
+                        // at the bottom of the tree, and a second time to perform expansion/inlining/rewrites
+                        // on the tree.
+                        self.rewrite_scalar_expr(lhs.as_mut())?;
+                        with_let_result(self, &mut statements, move |_, value| {
+                            // Steal the result value, and replace it with a dummy
+                            //
+                            // The dummy expression will be replaced with the let we're constructing
+                            // when this function returns
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                                op: BinaryOp::Eq,
+                                lhs,
+                                rhs: Box::new(value.try_into()?),
+                                span,
+                            }))))
+                        })?;
+
+                        Ok(statements)
+                    }
+                    (_, _) => {
+                        self.rewrite_scalar_expr(lhs.as_mut())?;
+                        self.rewrite_scalar_expr(rhs.as_mut())?;
+                        Ok(vec![Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                            op: BinaryOp::Eq,
+                            lhs,
+                            rhs,
+                            span,
+                        }))])
+                    }
+                }
             }
             invalid => unreachable!("unexpected constraint node: {:#?}", invalid),
         }
@@ -669,7 +1250,7 @@ impl<'a> Inlining<'a> {
         // Generate a new variable name for each element in the comprehension
         let mut symbols = statements
             .iter()
-            .map(|_| self.next_ident(span))
+            .map(|_| self.get_next_ident_lc(span))
             .collect::<Vec<_>>();
         // Generate the list of elements for the vector which is to be the result of the let-tree
         let vars = statements
@@ -800,13 +1381,11 @@ impl<'a> Inlining<'a> {
                     self.bindings.insert(binding, binding_ty);
                     Expr::SymbolAccess(current_access)
                 }
-                // TODO: Currently, calls cannot be used as iterables, because we don't have pure functions
-                // which can produce aggregates. However, when those are added, we may want to add support
-                // for that here. This branch is set up to raise an appropriate panic if we forget to do so.
-                Expr::Call(_) => unimplemented!("calls to functions as iterables"),
-                // Binary expressions are scalar, so cannot be used as iterables, and we don't (currently)
-                // support nested comprehensions, so it is never possible to observe these expression types here
-                Expr::Binary(_) | Expr::ListComprehension(_) => unreachable!(),
+                // Binary expressions are scalar, so cannot be used as iterables, and we don't
+                // (currently) support nested comprehensions, so it is never possible to observe
+                // these expression types here. Calls should have been inlined earlier in the
+                // pipeline.
+                Expr::Call(_) | Expr::Binary(_) | Expr::ListComprehension(_) => unreachable!(),
             };
             bound_values.insert(binding, abstract_value);
         }
@@ -958,7 +1537,7 @@ impl<'a> Inlining<'a> {
         // NOTE: We create a new nested scope for the parameters in order to avoid conflicting
         // with the root declarations
         eval_bindings.enter();
-        self.populate_rewrites(
+        self.populate_rewrites_evaluator(
             &mut eval_bindings,
             call.args.as_slice(),
             evaluator.params.as_slice(),
@@ -976,10 +1555,123 @@ impl<'a> Inlining<'a> {
         Ok(evaluator.body)
     }
 
+    /// This function handles inlining pure function calls.
+    fn expand_function_callsite(
+        &mut self,
+        call: Call,
+    ) -> Result<Vec<Statement>, SemanticAnalysisError> {
+        self.bindings.enter();
+        // The callee is guaranteed to be resolved and exist at this point
+        let callee = call
+            .callee
+            .resolved()
+            .expect("callee should have been resolved by now");
+
+        // We clone the function here as we will be modifying the body during the
+        // inlining process, and we must not modify the original
+        let mut function = self.functions.get(&callee).unwrap().clone();
+
+        // This will be the initial set of bindings visible within the function body
+        //
+        // This is distinct from `self.bindings` at this point, because the function doesn't
+        // inherit the caller's scope, it has an entirely new one.
+        let mut function_bindings = LexicalScope::default();
+
+        // Add all referenced (and thus imported) items from the function module
+        //
+        // NOTE: This will include constants, periodic columns, and other functions
+        for (qid, binding_ty) in self.imported.iter() {
+            if qid.module == callee.module {
+                function_bindings.insert(*qid.as_ref(), binding_ty.clone());
+            }
+        }
+
+        // Add random values, trace columns, and other root declarations to the set of
+        // bindings visible in the function body, _if_ the function is defined in the
+        // root module.
+        let is_function_in_root = callee.module == self.root;
+        if is_function_in_root {
+            if let Some(rv) = self.random_values.as_ref() {
+                function_bindings.insert(
+                    rv.name,
+                    BindingType::RandomValue(RandBinding::new(
+                        rv.name.span(),
+                        rv.name,
+                        rv.size,
+                        0,
+                        Type::Vector(rv.size),
+                    )),
+                );
+                for binding in rv.bindings.iter().copied() {
+                    function_bindings.insert(binding.name, BindingType::RandomValue(binding));
+                }
+            }
+
+            for segment in self.trace.iter() {
+                function_bindings.insert(
+                    segment.name,
+                    BindingType::TraceColumn(TraceBinding {
+                        span: segment.name.span(),
+                        segment: segment.id,
+                        name: Some(segment.name),
+                        offset: 0,
+                        size: segment.size,
+                        ty: Type::Vector(segment.size),
+                    }),
+                );
+                for binding in segment.bindings.iter().copied() {
+                    function_bindings.insert(
+                        binding.name.unwrap(),
+                        BindingType::TraceColumn(TraceBinding {
+                            span: segment.name.span(),
+                            segment: segment.id,
+                            name: binding.name,
+                            offset: binding.offset,
+                            size: binding.size,
+                            ty: binding.ty,
+                        }),
+                    );
+                }
+            }
+
+            for input in self.public_inputs.values() {
+                function_bindings.insert(
+                    input.name,
+                    BindingType::PublicInput(Type::Vector(input.size)),
+                );
+            }
+        }
+
+        // Match call arguments to function parameters, populating the set of rewrites
+        // which should be performed on the inlined function body.
+        //
+        // NOTE: We create a new nested scope for the parameters in order to avoid conflicting
+        // with the root declarations
+        function_bindings.enter();
+        self.populate_rewrites_function(
+            &mut function_bindings,
+            call.args.as_slice(),
+            function.params.as_slice(),
+        );
+
+        // While we're inlining the body, use the set of function bindings we built above
+        let prev_bindings = core::mem::replace(&mut self.bindings, function_bindings);
+
+        // Expand the function body into a block of statements
+        self.expand_statement_block(&mut function.body)?;
+
+        // Restore the caller's bindings before we leave
+        self.bindings = prev_bindings;
+
+        // self.bindings.exit();
+
+        Ok(function.body)
+    }
+
     /// Populate the set of access rewrites, as well as the initial set of bindings to use when inlining an evaluator function.
     ///
     /// This is done by resolving the arguments provided by the call to the evaluator, with the parameter list of the evaluator itself.
-    fn populate_rewrites(
+    fn populate_rewrites_evaluator(
         &mut self,
         eval_bindings: &mut LexicalScope<Identifier, BindingType>,
         args: &[Expr],
@@ -1160,6 +1852,31 @@ impl<'a> Inlining<'a> {
                 // This should not be possible at this point, but would be an invalid evaluator call,
                 // only trace columns are permitted
                 expr => unreachable!("{:#?}", expr),
+            }
+        }
+    }
+
+    fn populate_rewrites_function(
+        &mut self,
+        function_bindings: &mut LexicalScope<Identifier, BindingType>,
+        args: &[Expr],
+        params: &[(Identifier, Type)],
+    ) {
+        // Reset the rewrites set
+        self.rewrites.clear();
+
+        for (arg, param) in args.iter().zip(params.iter()) {
+            match arg {
+                Expr::SymbolAccess(access) => {
+                    let mut binding_ty = Some(self.access_binding_type(access).unwrap());
+                    let binding_name = param.0;
+                    // We can safely assume that there is a binding type available here,
+                    // otherwise the semantic analysis pass missed something
+                    let bt = binding_ty.take().unwrap();
+                    self.rewrites.insert(binding_name);
+                    function_bindings.insert(binding_name, bt);
+                }
+                _ => todo!(),
             }
         }
     }
