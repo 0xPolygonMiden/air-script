@@ -38,18 +38,18 @@ fn test_simple_boundary() {
 
     let trace_len = 32u64;
     let one = QuadExtension::ONE;
-    let z = one.clone();
+    let z = one;
     let a = QuadExtension::new(Felt::new(514229), Felt::ZERO);
     let b = QuadExtension::new(Felt::new(317811), Felt::ZERO);
     let len = QuadExtension::new(Felt::new(27), Felt::ZERO);
     let a_prime = QuadExtension::new(Felt::new(514229 + 317811), Felt::ZERO);
-    let b_prime = a.clone();
+    let b_prime = a;
 
     let code = test_code(
         code,
         vec![
             Data {
-                data: to_stack_order(&[a, a_prime, b, b_prime, len.clone(), len.clone()]),
+                data: to_stack_order(&[a, a_prime, b, b_prime, len, len]),
                 address: constants::OOD_FRAME_ADDRESS,
                 descriptor: "main_trace",
             },
@@ -151,7 +151,7 @@ fn test_complex_boundary() {
 
     let trace_len = 32u64;
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
-    let z = one.clone();
+    let z = one;
 
     let public_inputs = [
         // stack_inputs

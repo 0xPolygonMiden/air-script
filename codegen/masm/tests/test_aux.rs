@@ -40,7 +40,7 @@ fn test_simple_aux() {
 
     let trace_len = 2u64.pow(4);
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
-    let z = one.clone();
+    let z = one;
     let a = QuadExtension::new(Felt::new(3), Felt::ZERO);
     let b = QuadExtension::new(Felt::new(7), Felt::ZERO);
     let a_prime = a;
@@ -60,7 +60,7 @@ fn test_simple_aux() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 6]),
+                data: to_stack_order(&[one; 6]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },

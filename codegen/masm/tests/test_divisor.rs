@@ -50,7 +50,7 @@ fn test_integrity_divisor() {
                     descriptor: "main_trace",
                 },
                 Data {
-                    data: to_stack_order(&vec![one; 2]),
+                    data: to_stack_order(&[one; 2]),
                     address: constants::COMPOSITION_COEF_ADDRESS,
                     descriptor: "composition_coefficients",
                 },
@@ -149,7 +149,7 @@ fn test_boundary_divisor() {
                     descriptor: "aux_trace",
                 },
                 Data {
-                    data: to_stack_order(&vec![one; 5]),
+                    data: to_stack_order(&[one; 5]),
                     address: constants::COMPOSITION_COEF_ADDRESS,
                     descriptor: "composition_coefficients",
                 },
@@ -268,7 +268,7 @@ fn test_mixed_boundary_divisor() {
                     descriptor: "aux_trace",
                 },
                 Data {
-                    data: to_stack_order(&vec![one; 5]),
+                    data: to_stack_order(&[one; 5]),
                     address: constants::COMPOSITION_COEF_ADDRESS,
                     descriptor: "composition_coefficients",
                 },
