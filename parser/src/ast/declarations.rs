@@ -41,6 +41,10 @@ pub enum Declaration {
     ///
     /// Evaluator functions can be defined in any module of the program
     EvaluatorFunction(EvaluatorFunction),
+    /// A pure function definition
+    ///
+    /// Pure functions can be defined in any module of the program
+    Function(Function),
     /// A `periodic_columns` section declaration
     ///
     /// This may appear any number of times in the program, and may be declared in any module.
@@ -521,5 +525,49 @@ impl Eq for EvaluatorFunction {}
 impl PartialEq for EvaluatorFunction {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.params == other.params && self.body == other.body
+    }
+}
+
+/// Functions take a group of expressions as parameters and returns a group of expressions. These
+/// values can be a Felt, a Vector or a Matrix. Functions do not take trace bindings as parameters.
+#[derive(Debug, Clone, Spanned)]
+pub struct Function {
+    #[span]
+    pub span: SourceSpan,
+    pub name: Identifier,
+    pub params: Vec<(Identifier, Type)>,
+    pub return_type: Type,
+    pub body: Vec<Statement>,
+}
+impl Function {
+    /// Creates a new function.
+    pub const fn new(
+        span: SourceSpan,
+        name: Identifier,
+        params: Vec<(Identifier, Type)>,
+        return_type: Type,
+        body: Vec<Statement>,
+    ) -> Self {
+        Self {
+            span,
+            name,
+            params,
+            return_type,
+            body,
+        }
+    }
+
+    pub fn param_types(&self) -> Vec<Type> {
+        self.params.iter().map(|(_, ty)| *ty).collect::<Vec<_>>()
+    }
+}
+
+impl Eq for Function {}
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.params == other.params
+            && self.return_type == other.return_type
+            && self.body == other.body
     }
 }

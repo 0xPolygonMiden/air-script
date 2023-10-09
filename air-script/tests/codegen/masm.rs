@@ -85,6 +85,31 @@ fn evaluators() {
 }
 
 #[test]
+fn functions() {
+    let generated_masm = Test::new("tests/functions/functions_simple.air".to_string())
+        .transpile(Target::Masm)
+        .unwrap();
+
+    let expected = expect_file!["../functions/functions_simple.masm"];
+    expected.assert_eq(&generated_masm);
+
+    // make sure that the constraints generated using inlined functions are the same as the ones
+    // generated using regular functions
+    let generated_masm = Test::new("tests/functions/inlined_functions_simple.air".to_string())
+        .transpile(Target::Masm)
+        .unwrap();
+    let expected = expect_file!["../functions/functions_simple.masm"];
+    expected.assert_eq(&generated_masm);
+
+    // let generated_masm = Test::new("tests/functions/functions_complex.air".to_string())
+    //     .transpile(Target::Masm)
+    //     .unwrap();
+
+    // let expected = expect_file!["../functions/functions_complex.masm"];
+    // expected.assert_eq(&generated_masm);
+}
+
+#[test]
 fn variables() {
     let generated_masm = Test::new("tests/variables/variables.air".to_string())
         .transpile(Target::Masm)

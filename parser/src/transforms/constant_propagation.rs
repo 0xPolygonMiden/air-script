@@ -69,6 +69,11 @@ impl<'a> ConstantPropagation<'a> {
             self.visit_mut_evaluator_function(evaluator)?;
         }
 
+        // Visit all of the functions
+        for function in program.functions.values_mut() {
+            self.visit_mut_function(function)?;
+        }
+
         // Visit all of the constraints
         self.visit_mut_boundary_constraints(&mut program.boundary_constraints)?;
         self.visit_mut_integrity_constraints(&mut program.integrity_constraints)

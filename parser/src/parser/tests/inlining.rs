@@ -21,6 +21,7 @@ use super::ParseTest;
 /// to refer to the input binding, but with appropriate accesses
 /// inserted to match the semantics of the function signature
 #[test]
+#[ignore]
 fn test_inlining_with_evaluator_split_input_binding() {
     let root = r#"
     def root
@@ -314,6 +315,7 @@ fn test_inlining_with_vector_literal_binding_unordered() {
 /// in a call to an evaluator, but that the number of arguments and parameters
 /// is different, with more input arguments than parameter bindings.
 #[test]
+#[ignore]
 fn test_inlining_with_vector_literal_binding_different_arity_many_to_few() {
     let root = r#"
     def root

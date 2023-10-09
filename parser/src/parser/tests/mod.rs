@@ -448,6 +448,12 @@ macro_rules! let_ {
     };
 }
 
+macro_rules! return_ {
+    ($value:expr) => {
+        Statement::Expr($value)
+    };
+}
+
 macro_rules! enforce {
     ($expr:expr) => {
         Statement::Enforce($expr)
@@ -606,6 +612,7 @@ mod calls;
 mod constant_propagation;
 mod constants;
 mod evaluators;
+mod functions;
 mod identifiers;
 mod inlining;
 mod integrity_constraints;

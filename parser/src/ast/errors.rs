@@ -49,3 +49,29 @@ impl ToDiagnostic for InvalidExprError {
         }
     }
 }
+
+/// Represents an invalid type for use in a `BindingType` context
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidTypeError {
+    #[error("expected iterable to be a vector")]
+    NonVectorIterable(SourceSpan),
+}
+impl Eq for InvalidTypeError {}
+impl PartialEq for InvalidTypeError {
+    fn eq(&self, other: &Self) -> bool {
+        core::mem::discriminant(self) == core::mem::discriminant(other)
+    }
+}
+impl ToDiagnostic for InvalidTypeError {
+    fn to_diagnostic(self) -> Diagnostic {
+        let message = format!("{}", &self);
+        match self {
+            Self::NonVectorIterable(span) => Diagnostic::error()
+                .with_message("invalid type")
+                .with_labels(vec![
+                    Label::primary(span.source_id(), span).with_message(message)
+                ])
+                .with_notes(vec!["Only vectors can be used as iterables".to_string()]),
+        }
+    }
+}

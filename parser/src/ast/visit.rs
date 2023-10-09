@@ -122,6 +122,9 @@ pub trait VisitMut<T> {
     ) -> ControlFlow<T> {
         visit_mut_evaluator_function(self, expr)
     }
+    fn visit_mut_function(&mut self, expr: &mut ast::Function) -> ControlFlow<T> {
+        visit_mut_function(self, expr)
+    }
     fn visit_mut_periodic_column(&mut self, expr: &mut ast::PeriodicColumn) -> ControlFlow<T> {
         visit_mut_periodic_column(self, expr)
     }
@@ -223,6 +226,12 @@ pub trait VisitMut<T> {
     fn visit_mut_identifier(&mut self, expr: &mut ast::Identifier) -> ControlFlow<T> {
         visit_mut_identifier(self, expr)
     }
+    fn visit_mut_typed_identifier(
+        &mut self,
+        expr: &mut (ast::Identifier, ast::Type),
+    ) -> ControlFlow<T> {
+        visit_mut_typed_identifier(self, expr)
+    }
 }
 
 impl<'a, V, T> VisitMut<T> for &'a mut V
@@ -243,6 +252,9 @@ where
         expr: &mut ast::EvaluatorFunction,
     ) -> ControlFlow<T> {
         (**self).visit_mut_evaluator_function(expr)
+    }
+    fn visit_mut_function(&mut self, expr: &mut ast::Function) -> ControlFlow<T> {
+        (**self).visit_mut_function(expr)
     }
     fn visit_mut_periodic_column(&mut self, expr: &mut ast::PeriodicColumn) -> ControlFlow<T> {
         (**self).visit_mut_periodic_column(expr)
@@ -344,6 +356,12 @@ where
     fn visit_mut_identifier(&mut self, expr: &mut ast::Identifier) -> ControlFlow<T> {
         (**self).visit_mut_identifier(expr)
     }
+    fn visit_mut_typed_identifier(
+        &mut self,
+        expr: &mut (ast::Identifier, ast::Type),
+    ) -> ControlFlow<T> {
+        (**self).visit_mut_typed_identifier(expr)
+    }
 }
 
 pub fn visit_mut_module<V, T>(visitor: &mut V, module: &mut ast::Module) -> ControlFlow<T>
@@ -358,6 +376,9 @@ where
     }
     for evaluator in module.evaluators.values_mut() {
         visitor.visit_mut_evaluator_function(evaluator)?;
+    }
+    for function in module.functions.values_mut() {
+        visitor.visit_mut_function(function)?;
     }
     for column in module.periodic_columns.values_mut() {
         visitor.visit_mut_periodic_column(column)?;
@@ -435,6 +456,17 @@ where
     visitor.visit_mut_identifier(&mut expr.name)?;
     for segment in expr.params.iter_mut() {
         visitor.visit_mut_evaluator_trace_segment(segment)?;
+    }
+    visitor.visit_mut_statement_block(&mut expr.body)
+}
+
+pub fn visit_mut_function<V, T>(visitor: &mut V, expr: &mut ast::Function) -> ControlFlow<T>
+where
+    V: ?Sized + VisitMut<T>,
+{
+    visitor.visit_mut_identifier(&mut expr.name)?;
+    for param in expr.params.iter_mut() {
+        visitor.visit_mut_typed_identifier(param)?;
     }
     visitor.visit_mut_statement_block(&mut expr.body)
 }
@@ -656,6 +688,16 @@ where
 }
 
 pub fn visit_mut_identifier<V, T>(_visitor: &mut V, _expr: &mut ast::Identifier) -> ControlFlow<T>
+where
+    V: ?Sized + VisitMut<T>,
+{
+    ControlFlow::Continue(())
+}
+
+pub fn visit_mut_typed_identifier<V, T>(
+    _visitor: &mut V,
+    _expr: &mut (ast::Identifier, ast::Type),
+) -> ControlFlow<T>
 where
     V: ?Sized + VisitMut<T>,
 {

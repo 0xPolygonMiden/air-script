@@ -71,6 +71,8 @@ pub struct Program {
     pub constants: BTreeMap<QualifiedIdentifier, Constant>,
     /// The set of used evaluator functions referenced in this program.
     pub evaluators: BTreeMap<QualifiedIdentifier, EvaluatorFunction>,
+    /// The set of used pure functions referenced in this program.
+    pub functions: BTreeMap<QualifiedIdentifier, Function>,
     /// The set of used periodic columns referenced in this program.
     pub periodic_columns: BTreeMap<QualifiedIdentifier, PeriodicColumn>,
     /// The set of public inputs defined in the root module
@@ -115,6 +117,7 @@ impl Program {
             name,
             constants: Default::default(),
             evaluators: Default::default(),
+            functions: Default::default(),
             periodic_columns: Default::default(),
             public_inputs: Default::default(),
             random_values: None,
@@ -265,7 +268,12 @@ impl Program {
                             .entry(referenced)
                             .or_insert_with(|| referenced_module.evaluators[&id].clone());
                     }
-                    DependencyType::Function => unimplemented!(),
+                    DependencyType::Function => {
+                        program
+                            .functions
+                            .entry(referenced)
+                            .or_insert_with(|| referenced_module.functions[&id].clone());
+                    }
                     DependencyType::PeriodicColumn => {
                         program
                             .periodic_columns
@@ -288,6 +296,7 @@ impl PartialEq for Program {
         self.name == other.name
             && self.constants == other.constants
             && self.evaluators == other.evaluators
+            && self.functions == other.functions
             && self.periodic_columns == other.periodic_columns
             && self.public_inputs == other.public_inputs
             && self.random_values == other.random_values
@@ -375,6 +384,29 @@ impl fmt::Display for Program {
                 writeln!(f, "{}", statement.display(1))?;
             }
             f.write_str("\n")?;
+        }
+
+        for (qid, function) in self.functions.iter() {
+            f.write_str("fn ")?;
+            if qid.module == self.name {
+                writeln!(
+                    f,
+                    "{}{}",
+                    &qid.item,
+                    DisplayTypedTuple(function.params.as_slice())
+                )?;
+            } else {
+                writeln!(
+                    f,
+                    "{}{}",
+                    qid,
+                    DisplayTypedTuple(function.params.as_slice())
+                )?;
+            }
+
+            for statement in function.body.iter() {
+                writeln!(f, "{}", statement.display(1))?;
+            }
         }
 
         Ok(())

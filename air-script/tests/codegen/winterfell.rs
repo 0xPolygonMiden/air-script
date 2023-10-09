@@ -85,6 +85,32 @@ fn evaluators() {
 }
 
 #[test]
+fn functions() {
+    let generated_air = Test::new("tests/functions/functions_simple.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../functions/functions_simple.rs"];
+    expected.assert_eq(&generated_air);
+
+    // make sure that the constraints generated using inlined functions are the same as the ones
+    // generated using regular functions
+    let generated_air = Test::new("tests/functions/inlined_functions_simple.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../functions/functions_simple.rs"];
+    expected.assert_eq(&generated_air);
+
+    // let generated_air = Test::new("tests/functions/functions_complex.air".to_string())
+    //     .transpile(Target::Winterfell)
+    //     .unwrap();
+
+    // let expected = expect_file!["../functions/functions_complex.rs"];
+    // expected.assert_eq(&generated_air);
+}
+
+#[test]
 fn variables() {
     let generated_air = Test::new("tests/variables/variables.air".to_string())
         .transpile(Target::Winterfell)

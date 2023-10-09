@@ -72,9 +72,9 @@ impl Type {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Felt => f.write_str("field element"),
-            Self::Vector(n) => write!(f, "vector of length {}", n),
-            Self::Matrix(rows, cols) => write!(f, "matrix of {} rows and {} columns", rows, cols),
+            Self::Felt => f.write_str("felt"),
+            Self::Vector(n) => write!(f, "felt[{}]", n),
+            Self::Matrix(rows, cols) => write!(f, "felt[{}, {}]", rows, cols),
         }
     }
 }
@@ -86,7 +86,6 @@ pub enum FunctionType {
     /// a complex type signature due to the nature of trace bindings
     Evaluator(Vec<TraceSegment>),
     /// A standard function with one or more inputs, and a result
-    #[allow(dead_code)]
     Function(Vec<Type>, Type),
 }
 impl FunctionType {

@@ -10,7 +10,7 @@ impl<T: fmt::Display> fmt::Display for DisplayBracketed<T> {
     }
 }
 
-/// Displays a slice of items surrounded by brackets, e.g. `[foo]`
+/// Displays a slice of items surrounded by brackets, e.g. `[foo, bar]`
 pub struct DisplayList<'a, T>(pub &'a [T]);
 impl<'a, T: fmt::Display> fmt::Display for DisplayList<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -26,11 +26,24 @@ impl<T: fmt::Display> fmt::Display for DisplayParenthesized<T> {
     }
 }
 
-/// Displays a slice of items surrounded by parentheses, e.g. `(foo)`
+/// Displays a slice of items surrounded by parentheses, e.g. `(foo, bar)`
 pub struct DisplayTuple<'a, T>(pub &'a [T]);
 impl<'a, T: fmt::Display> fmt::Display for DisplayTuple<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({})", DisplayCsv::new(self.0.iter()))
+    }
+}
+
+/// Displays a slice of items with their types surrounded by parentheses,
+/// e.g. `(foo: felt, bar: felt[12])`
+pub struct DisplayTypedTuple<'a, V, T>(pub &'a [(V, T)]);
+impl<'a, V: fmt::Display, T: fmt::Display> fmt::Display for DisplayTypedTuple<'a, V, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "({})",
+            DisplayCsv::new(self.0.iter().map(|(v, t)| format!("{}: {}", v, t)))
+        )
     }
 }
 
@@ -96,7 +109,7 @@ impl<'a> fmt::Display for DisplayStatement<'a> {
             Statement::EnforceAll(ref expr) => {
                 write!(f, "enf {}", expr)
             }
-            Statement::Expr(ref expr) => write!(f, "{}", expr),
+            Statement::Expr(ref expr) => write!(f, "return {}", expr),
         }
     }
 }
