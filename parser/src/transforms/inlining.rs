@@ -1,10 +1,11 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     ops::ControlFlow,
+    vec,
 };
 
 use air_pass::Pass;
-use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Span, Spanned};
+use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
 use crate::{
     ast::{visit::VisitMut, *},
@@ -19,12 +20,12 @@ use super::constant_propagation;
 /// * Monomorphizing and inlining evaluators/functions at their call sites
 /// * Unrolling constraint comprehensions into a sequence of scalar constraints
 /// * Unrolling list comprehensions into a tree of `let` statements which end in
-/// a vector expression (the implicit result of the tree). Each iteration of the
-/// unrolled comprehension is reified as a value and bound to a variable so that
-/// other transformations may refer to it directly.
+///   a vector expression (the implicit result of the tree). Each iteration of the
+///   unrolled comprehension is reified as a value and bound to a variable so that
+///   other transformations may refer to it directly.
 /// * Rewriting aliases of top-level declarations to refer to those declarations directly
 /// * Removing let-bound variables which are unused, which is also used to clean up
-/// after the aliasing rewrite mentioned above.
+///   after the aliasing rewrite mentioned above.
 ///
 /// The trickiest transformation comes with inlining the body of evaluators at their
 /// call sites, as evaluator parameter lists can arbitrarily destructure/regroup columns
@@ -75,13 +76,23 @@ pub struct Inlining<'a> {
     imported: HashMap<QualifiedIdentifier, BindingType>,
     /// All evaluator functions in the program
     evaluators: HashMap<QualifiedIdentifier, EvaluatorFunction>,
+    /// All pure functions in the program
+    functions: HashMap<QualifiedIdentifier, Function>,
     /// A set of identifiers for which accesses should be rewritten.
     ///
     /// When an identifier is in this set, it means it is a local alias for a trace column,
     /// and should be rewritten based on the current `BindingType` associated with the alias
     /// identifier in `bindings`.
     rewrites: HashSet<Identifier>,
+    /// The call stack during expansion of a function call.
+    ///
+    /// Each time we begin to expand a call, we check if it is already present on the call
+    /// stack, and if so, raise a diagnostic due to infinite recursion. If not, the callee
+    /// is pushed on the stack while we expand its body. When we finish expanding the body
+    /// of the callee, we pop it off this stack, and proceed as usual.
+    call_stack: Vec<QualifiedIdentifier>,
     in_comprehension_constraint: bool,
+    next_ident_lc: usize,
     next_ident: usize,
 }
 impl<'p> Pass for Inlining<'p> {
@@ -93,6 +104,12 @@ impl<'p> Pass for Inlining<'p> {
         self.root = program.name;
         self.evaluators = program
             .evaluators
+            .iter()
+            .map(|(k, v)| (*k, v.clone()))
+            .collect();
+
+        self.functions = program
+            .functions
             .iter()
             .map(|(k, v)| (*k, v.clone()))
             .collect();
@@ -187,8 +204,11 @@ impl<'a> Inlining<'a> {
             let_bound: Default::default(),
             imported: Default::default(),
             evaluators: Default::default(),
+            functions: Default::default(),
             rewrites: Default::default(),
             in_comprehension_constraint: false,
+            call_stack: vec![],
+            next_ident_lc: 0,
             next_ident: 0,
         }
     }
@@ -197,10 +217,16 @@ impl<'a> Inlining<'a> {
     ///
     /// This is only used when expanding list comprehensions, so we use a special prefix for
     /// these generated identifiers to make it clear what they were expanded from.
-    fn next_ident(&mut self, span: SourceSpan) -> Identifier {
+    fn get_next_ident_lc(&mut self, span: SourceSpan) -> Identifier {
+        let id = self.next_ident_lc;
+        self.next_ident_lc += 1;
+        Identifier::new(span, crate::Symbol::intern(format!("%lc{}", id)))
+    }
+
+    fn get_next_ident(&mut self, span: SourceSpan) -> Identifier {
         let id = self.next_ident;
         self.next_ident += 1;
-        Identifier::new(span, crate::Symbol::intern(format!("%lc{}", id)))
+        Identifier::new(span, crate::Symbol::intern(format!("%{}", id)))
     }
 
     /// Inline/expand all of the statements in the `boundary_constraints` section
@@ -320,8 +346,46 @@ impl<'a> Inlining<'a> {
     /// by replacing it with the result of expanding its body
     fn expand_let(&mut self, expr: Let) -> Result<Vec<Statement>, SemanticAnalysisError> {
         let span = expr.span();
-        let name = expr.name;
+        let mut name = expr.name;
         let body = expr.body;
+
+        // When expanding a `let` that was inlined at a function callsite, we must ensure that any
+        // let-bound variables introduced do not shadow bindings for the remaining statements in
+        // the body of the block at which the function is inlined. For example, consider the following:
+        //
+        //     fn foo(a: felt) -> felt {
+        //         let b = a * a
+        //         b
+        //     }
+        //
+        //     integrity_constraints {
+        //         let b = col[0]
+        //         enf foo(b) = 1
+        //         enf b = 0
+        //     }
+        //
+        // If the call to `foo` is naively inlined, we will end up with:
+        //
+        //     integrity_constraints {
+        //         let b = col[0]
+        //         let b = b * b
+        //         enf b = 1
+        //         enf b = 0
+        //     }
+        //
+        // As you can see, this has the effect of breaking the last constraint, by changing the
+        // definition bound to `b` at that point in the program.
+        //
+        // To solve this, we check if we are currently expanding a `let` being inlined as part of
+        // a function call, and if so, we generate new variable names that will replace the originals.
+        if !self.call_stack.is_empty() {
+            name = self.get_next_ident(span);
+            let binding_ty = self
+                .expr_binding_type(&expr.value)
+                .expect("unexpected undefined variable");
+            self.rewrites.insert(name);
+            self.bindings.insert(name, binding_ty);
+        }
 
         // Visit the let-bound expression first, since it determines how the rest of the process goes
         let mut statements = match expr.value {
@@ -337,6 +401,9 @@ impl<'a> Inlining<'a> {
             //
             // The rules for expansion are the same.
             Expr::ListComprehension(lc) => self.expand_comprehension(lc)?,
+            // The operands of a binary expression can contain function calls, so we must ensure
+            // that we expand the operands as needed, and then proceed with expanding the let.
+            Expr::Binary(expr) => self.expand_binary_expr(expr)?,
             // Other expressions we visit just to expand rewrites
             mut value => {
                 self.rewrite_expr(&mut value)?;
@@ -431,7 +498,116 @@ impl<'a> Inlining<'a> {
                 other => unimplemented!("unhandled builtin: {}", other),
             }
         } else {
-            todo!("pure functions are not implemented yet")
+            self.expand_function_callsite(call)
+        }
+    }
+
+    fn maybe_expand_scalar_expr(
+        &mut self,
+        mut expr: Box<ScalarExpr>,
+    ) -> Result<Result<Vec<Statement>, Box<ScalarExpr>>, SemanticAnalysisError> {
+        match *expr {
+            ScalarExpr::Binary(expr) if expr.has_block_like_expansion() => {
+                self.expand_binary_expr(expr).map(Ok)
+            }
+            ScalarExpr::Call(lhs) => self.expand_call(lhs).map(Ok),
+            _ => {
+                self.rewrite_scalar_expr(&mut expr)?;
+                Ok(Err(expr))
+            }
+        }
+    }
+
+    fn expand_binary_expr(
+        &mut self,
+        expr: BinaryExpr,
+    ) -> Result<Vec<Statement>, SemanticAnalysisError> {
+        let span = expr.span();
+        let op = expr.op;
+        let lhs = self.maybe_expand_scalar_expr(expr.lhs)?;
+        let rhs = self.maybe_expand_scalar_expr(expr.rhs)?;
+
+        match (lhs, rhs) {
+            (Err(lhs), Err(rhs)) => Ok(vec![Statement::Expr(Expr::Binary(BinaryExpr {
+                span,
+                op,
+                lhs,
+                rhs,
+            }))]),
+            (Err(lhs), Ok(mut rhs)) => {
+                with_let_result(self, &mut rhs, |_, value| {
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr {
+                        span,
+                        op,
+                        lhs,
+                        rhs: Box::new(value.try_into()?),
+                    }))))
+                })?;
+
+                Ok(rhs)
+            }
+            (Ok(mut lhs), Err(rhs)) => {
+                with_let_result(self, &mut lhs, |_, value| {
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr {
+                        span,
+                        op,
+                        lhs: Box::new(value.try_into()?),
+                        rhs,
+                    }))))
+                })?;
+
+                Ok(lhs)
+            }
+            (Ok(mut lhs), Ok(mut rhs)) => {
+                let name = self.get_next_ident(span);
+                let ty = match lhs
+                    .last()
+                    .expect("unexpected empty expansion for scalar expression")
+                {
+                    Statement::Expr(ref expr) => expr.ty(),
+                    Statement::Let(ref expr) => expr.ty(),
+                    _ => unreachable!(),
+                };
+
+                with_let_result(self, &mut rhs, |_, value| {
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+
+                    Ok(Some(Statement::Expr(Expr::Binary(BinaryExpr::new(
+                        span,
+                        op,
+                        ScalarExpr::SymbolAccess(SymbolAccess {
+                            span,
+                            name: ResolvableIdentifier::Local(name),
+                            access_type: AccessType::Default,
+                            offset: 0,
+                            ty,
+                        }),
+                        value.try_into()?,
+                    )))))
+                })?;
+
+                with_let_result(self, &mut lhs, move |_, value| {
+                    let value = core::mem::replace(
+                        value,
+                        Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                    );
+                    Ok(Some(Statement::Let(Let::new(span, name, value, rhs))))
+                })?;
+                Ok(lhs)
+            }
         }
     }
 
@@ -523,18 +699,90 @@ impl<'a> Inlining<'a> {
         match constraint {
             ScalarExpr::Binary(BinaryExpr {
                 op: BinaryOp::Eq,
-                mut lhs,
-                mut rhs,
+                lhs,
+                rhs,
                 span,
             }) => {
-                self.rewrite_scalar_expr(lhs.as_mut())?;
-                self.rewrite_scalar_expr(rhs.as_mut())?;
-                Ok(vec![Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
-                    op: BinaryOp::Eq,
-                    lhs,
-                    rhs,
-                    span,
-                }))])
+                let lhs = self.maybe_expand_scalar_expr(lhs)?;
+                let rhs = self.maybe_expand_scalar_expr(rhs)?;
+
+                match (lhs, rhs) {
+                    (Err(lhs), Err(rhs)) => {
+                        Ok(vec![Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                            span,
+                            op: BinaryOp::Eq,
+                            lhs,
+                            rhs,
+                        }))])
+                    }
+                    (Err(lhs), Ok(mut rhs)) => {
+                        with_let_result(self, &mut rhs, |_, value| {
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                                span,
+                                op: BinaryOp::Eq,
+                                lhs,
+                                rhs: Box::new(value.try_into()?),
+                            }))))
+                        })?;
+
+                        Ok(rhs)
+                    }
+                    (Ok(mut lhs), Err(rhs)) => {
+                        with_let_result(self, &mut lhs, |_, value| {
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(BinaryExpr {
+                                span,
+                                op: BinaryOp::Eq,
+                                lhs: Box::new(value.try_into()?),
+                                rhs,
+                            }))))
+                        })?;
+
+                        Ok(lhs)
+                    }
+                    (Ok(mut lhs), Ok(mut rhs)) => {
+                        let name = self.get_next_ident(span);
+
+                        with_let_result(self, &mut rhs, |_, value| {
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+
+                            Ok(Some(Statement::Enforce(ScalarExpr::Binary(
+                                BinaryExpr::new(
+                                    span,
+                                    BinaryOp::Eq,
+                                    ScalarExpr::SymbolAccess(SymbolAccess::new(
+                                        span,
+                                        name,
+                                        AccessType::Default,
+                                        0,
+                                    )),
+                                    value.try_into()?,
+                                ),
+                            ))))
+                        })?;
+
+                        with_let_result(self, &mut lhs, move |_, value| {
+                            let value = core::mem::replace(
+                                value,
+                                Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                            );
+                            Ok(Some(Statement::Let(Let::new(span, name, value, rhs))))
+                        })?;
+                        Ok(lhs)
+                    }
+                }
             }
             invalid => unreachable!("unexpected constraint node: {:#?}", invalid),
         }
@@ -636,10 +884,51 @@ impl<'a> Inlining<'a> {
     /// * A flat list of constraint statements
     fn expand_comprehension(
         &mut self,
-        expr: ListComprehension,
+        mut expr: ListComprehension,
     ) -> Result<Vec<Statement>, SemanticAnalysisError> {
-        // This is the vector containing the expansion result
-        let mut statements = vec![];
+        // Lift any function calls in iterable position out of the comprehension,
+        // binding the result of those calls via `let`. Rewrite the iterable as
+        // a symbol access to the newly-bound variable.
+        //
+        // NOTE: The actual expansion of the lifted iterables occurs after we expand
+        // the comprehension, so that we can place the expanded comprehension in the
+        // body of the final let
+        let mut lifted_bindings = vec![];
+        let mut lifted = vec![];
+        for param in expr.iterables.iter_mut() {
+            if !matches!(param, Expr::Call(_)) {
+                continue;
+            }
+
+            let span = param.span();
+            let name = self.get_next_ident(span);
+            let ty = match param {
+                Expr::Call(Call { callee, .. }) => {
+                    let callee = callee
+                        .resolved()
+                        .expect("callee should have been resolved by now");
+                    self.functions[&callee].return_type
+                }
+                _ => unsafe { core::hint::unreachable_unchecked() },
+            };
+            let param = core::mem::replace(
+                param,
+                Expr::SymbolAccess(SymbolAccess {
+                    span,
+                    name: ResolvableIdentifier::Local(name),
+                    access_type: AccessType::Default,
+                    offset: 0,
+                    ty: Some(ty),
+                }),
+            );
+            match param {
+                Expr::Call(call) => {
+                    lifted_bindings.push((name, BindingType::Local(ty)));
+                    lifted.push((name, call));
+                }
+                _ => unsafe { core::hint::unreachable_unchecked() },
+            }
+        }
 
         // Get the number of iterations in this comprehension
         let Type::Vector(num_iterations) = expr.ty.unwrap() else {
@@ -647,83 +936,161 @@ impl<'a> Inlining<'a> {
         };
 
         // Step the iterables for each iteration, giving each it's own lexical scope
+        let mut statement_groups = vec![];
         for i in 0..num_iterations {
             self.bindings.enter();
-            let mut expansion = self.expand_comprehension_iteration(&expr, i)?;
-            statements.append(&mut expansion);
+            // Ensure any lifted iterables are in scope for the expansion of this iteration
+            for (name, binding_ty) in lifted_bindings.iter() {
+                self.bindings.insert(*name, binding_ty.clone());
+            }
+            let expansion = self.expand_comprehension_iteration(&expr, i)?;
+            // An expansion can be empty if a constraint selector with a constant selector expression
+            // evaluates to false (allowing us to elide the constraint for that iteration entirely).
+            if !expansion.is_empty() {
+                statement_groups.push(expansion);
+            }
             self.bindings.exit();
         }
 
-        // If we're in a constraint comprehension, we're already fully expanded
-        if self.in_comprehension_constraint {
-            return Ok(statements);
-        }
-
-        // Otherwise, this is a list comprehension, which means the current expansion
-        // is a flat list of statements, one for each element of the unrolled comprehension.
+        // At this point, we have one or more statement groups, representing the expansions
+        // of each iteration of the comprehension. Additionally, we may have a set of lifted
+        // iterables which we need to bind (and expand) "around" the expansion of the comprehension
+        // itself.
         //
-        // We need to convert this into a nested tree of `let` statements that bind each
-        // element of the comprehension to a variable, and at the bottom construct a vector
-        // of all the elements to return as the result of the tree.
+        // In short, we must take this list of statement groups, and flatten/treeify it. Once
+        // a let binding is introduced into scope, all subsequent statements must occur in the body
+        // of that let, forming a tree. Consecutive statements which introduce no new bindings do
+        // not require any nesting, resulting in the groups containing those statements being flattened.
+        //
+        // Lastly, whether this is a list or constraint comprehension determines if we will also be
+        // constructing a vector from the values produced by each iteration, and returning it as the
+        // result of the comprehension itself.
         let span = expr.span();
-        // Generate a new variable name for each element in the comprehension
-        let mut symbols = statements
-            .iter()
-            .map(|_| self.next_ident(span))
-            .collect::<Vec<_>>();
-        // Generate the list of elements for the vector which is to be the result of the let-tree
-        let vars = statements
-            .iter()
-            .zip(symbols.iter().copied())
-            .map(|(stmt, name)| {
-                // The type of these statements must be known by now
-                let ty = match stmt {
-                    Statement::Expr(value) => value.ty(),
-                    Statement::Let(nested) => nested.ty(),
-                    stmt => unreachable!(
-                        "unexpected statement type in comprehension body: {}",
-                        stmt.display(0)
-                    ),
-                };
-                Expr::SymbolAccess(SymbolAccess {
-                    span,
-                    name: ResolvableIdentifier::Local(name),
-                    access_type: AccessType::Default,
-                    offset: 0,
-                    ty,
-                })
-            })
-            .collect();
-        // Construct the let tree by visiting the statements bottom-up
-        let acc = Statement::Expr(Expr::Vector(Span::new(span, vars)));
-        let result = statements.drain(..).zip(symbols.drain(..)).try_rfold(
-            acc,
-            |acc, (mut stmt, name)| {
-                match stmt {
-                    // If the current statement is an expression, it represents the value of this
-                    // element of the comprehension, and we must generate a let to bind it, using
-                    // the accumulator expression as the body
-                    Statement::Expr(value) => {
-                        Ok(Statement::Let(Let::new(span, name, value, vec![acc])))
+        if self.in_comprehension_constraint {
+            let mut result = vec![];
+
+            // If for some reason, we've been able to eliminate all constraints for this comprehension,
+            // then return an empty block, since we need not emit any code at all if unused.
+            if statement_groups.is_empty() {
+                return Ok(result);
+            }
+
+            // Each group is presumed to already be flattened/treeified
+            for mut group in statement_groups {
+                // The first group is simply flattened
+                if result.is_empty() {
+                    result.append(&mut group);
+                    continue;
+                }
+                // Ensure that all statements preceded by a let-bound variable, are nested in the
+                // body of that let.
+                match group.pop().unwrap() {
+                    Statement::Let(mut let_expr) => {
+                        with_let_innermost_block(self, &mut let_expr.body, |_, block| {
+                            block.append(&mut result);
+
+                            Ok(())
+                        })?;
+                        result.append(&mut group);
+                        result.push(Statement::Let(let_expr));
                     }
-                    // If the current statement is a `let`-tree, we need to generate a new `let` at
-                    // the bottom of the tree, which binds the result expression as the value of the
-                    // generated `let`, and uses the accumualtor expression as the body
-                    Statement::Let(ref mut wrapper) => {
+                    stmt => {
+                        result.append(&mut group);
+                        result.push(stmt);
+                    }
+                }
+            }
+            Ok(result)
+        } else {
+            // For list comprehensions, we must emit a let tree that binds each iteration,
+            // and ensure that the expansion of the iteration itself is properly nested so
+            // that the lexical scope of all bound variables is correct. This is more complex
+            // than the constraint comprehension case, as we must emit a single expression
+            // representing the entire expansion of the comprehension as an aggregate, whereas
+            // constraints produce no results.
+
+            // Generate a new variable name for each element in the comprehension
+            let symbols = statement_groups
+                .iter()
+                .map(|_| self.get_next_ident_lc(span))
+                .collect::<Vec<_>>();
+            // Generate the list of elements for the vector which is to be the result of the let-tree
+            let vars = statement_groups
+                .iter()
+                .zip(symbols.iter().copied())
+                .map(|(group, name)| {
+                    // The type of these statements must be known by now
+                    let ty = match group.last().unwrap() {
+                        Statement::Expr(value) => value.ty(),
+                        Statement::Let(nested) => nested.ty(),
+                        stmt => unreachable!(
+                            "unexpected statement type in comprehension body: {}",
+                            stmt.display(0)
+                        ),
+                    };
+                    Expr::SymbolAccess(SymbolAccess {
+                        span,
+                        name: ResolvableIdentifier::Local(name),
+                        access_type: AccessType::Default,
+                        offset: 0,
+                        ty,
+                    })
+                })
+                .collect();
+            // Construct the let tree by visiting the statements bottom-up
+            let acc = vec![Statement::Expr(Expr::Vector(Span::new(span, vars)))];
+            let expanded = statement_groups.into_iter().zip(symbols).try_rfold(
+                acc,
+                |acc, (mut group, name)| {
+                    match group.pop().unwrap() {
+                        // If the current statement is an expression, it represents the value of this
+                        // iteration of the comprehension, and we must generate a let to bind it, using
+                        // the accumulator expression as the body
+                        Statement::Expr(expr) => {
+                            group.push(Statement::Let(Let::new(span, name, expr, acc)));
+                        }
+                        // If the current statement is a `let`-tree, we need to generate a new `let` at
+                        // the bottom of the tree, which binds the result expression as the value of the
+                        // generated `let`, and uses the accumulator as the body
+                        Statement::Let(mut wrapper) => {
+                            with_let_result(self, &mut wrapper.body, move |_, value| {
+                                let value = core::mem::replace(
+                                    value,
+                                    Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
+                                );
+                                Ok(Some(Statement::Let(Let::new(span, name, value, acc))))
+                            })?;
+                            group.push(Statement::Let(wrapper));
+                        }
+                        _ => unreachable!(),
+                    }
+                    Ok::<_, SemanticAnalysisError>(group)
+                },
+            )?;
+            // Lastly, construct the let tree for the lifted iterables, placing the expanded
+            // comprehension at the bottom of that tree.
+            lifted.into_iter().try_rfold(expanded, |acc, (name, call)| {
+                let span = call.span();
+                let mut preamble = self.expand_call(call)?;
+                match preamble.pop().unwrap() {
+                    Statement::Expr(expr) => {
+                        preamble.push(Statement::Let(Let::new(span, name, expr, acc)));
+                    }
+                    Statement::Let(mut wrapper) => {
                         with_let_result(self, &mut wrapper.body, move |_, value| {
                             let value = core::mem::replace(
                                 value,
                                 Expr::Const(Span::new(span, ConstantExpr::Scalar(0))),
                             );
-                            Ok(Some(Statement::Let(Let::new(span, name, value, vec![acc]))))
-                        })
-                        .map(|_| stmt)
+                            Ok(Some(Statement::Let(Let::new(span, name, value, acc))))
+                        })?;
+                        preamble.push(Statement::Let(wrapper));
                     }
                     _ => unreachable!(),
                 }
-            },
-        )?;
-        Ok(vec![result])
+                Ok(preamble)
+            })
+        }
     }
 
     fn expand_comprehension_iteration(
@@ -800,13 +1167,10 @@ impl<'a> Inlining<'a> {
                     self.bindings.insert(binding, binding_ty);
                     Expr::SymbolAccess(current_access)
                 }
-                // TODO: Currently, calls cannot be used as iterables, because we don't have pure functions
-                // which can produce aggregates. However, when those are added, we may want to add support
-                // for that here. This branch is set up to raise an appropriate panic if we forget to do so.
-                Expr::Call(_) => unimplemented!("calls to functions as iterables"),
-                // Binary expressions are scalar, so cannot be used as iterables, and we don't (currently)
-                // support nested comprehensions, so it is never possible to observe these expression types here
-                Expr::Binary(_) | Expr::ListComprehension(_) => unreachable!(),
+                // Binary expressions are scalar, so cannot be used as iterables, and we don't
+                // (currently) support nested comprehensions, so it is never possible to observe
+                // these expression types here. Calls should have been lifted prior to expansion.
+                Expr::Call(_) | Expr::Binary(_) | Expr::ListComprehension(_) => unreachable!(),
             };
             bound_values.insert(binding, abstract_value);
         }
@@ -958,7 +1322,7 @@ impl<'a> Inlining<'a> {
         // NOTE: We create a new nested scope for the parameters in order to avoid conflicting
         // with the root declarations
         eval_bindings.enter();
-        self.populate_rewrites(
+        self.populate_evaluator_rewrites(
             &mut eval_bindings,
             call.args.as_slice(),
             evaluator.params.as_slice(),
@@ -976,10 +1340,142 @@ impl<'a> Inlining<'a> {
         Ok(evaluator.body)
     }
 
+    /// This function handles inlining pure function calls.
+    fn expand_function_callsite(
+        &mut self,
+        call: Call,
+    ) -> Result<Vec<Statement>, SemanticAnalysisError> {
+        self.bindings.enter();
+        // The callee is guaranteed to be resolved and exist at this point
+        let callee = call
+            .callee
+            .resolved()
+            .expect("callee should have been resolved by now");
+
+        if self.call_stack.contains(&callee) {
+            let ifd = self
+                .diagnostics
+                .diagnostic(Severity::Error)
+                .with_message("invalid recursive function call")
+                .with_primary_label(call.span, "recursion occurs due to this function call");
+            self.call_stack
+                .iter()
+                .rev()
+                .fold(ifd, |ifd, caller| {
+                    ifd.with_secondary_label(caller.span(), "which was called from")
+                })
+                .emit();
+            return Err(SemanticAnalysisError::Invalid);
+        } else {
+            self.call_stack.push(callee);
+        }
+
+        // We clone the function here as we will be modifying the body during the
+        // inlining process, and we must not modify the original
+        let mut function = self.functions.get(&callee).unwrap().clone();
+
+        // This will be the initial set of bindings visible within the function body
+        //
+        // This is distinct from `self.bindings` at this point, because the function doesn't
+        // inherit the caller's scope, it has an entirely new one.
+        let mut function_bindings = LexicalScope::default();
+
+        // Add all referenced (and thus imported) items from the function module
+        //
+        // NOTE: This will include constants, periodic columns, and other functions
+        for (qid, binding_ty) in self.imported.iter() {
+            if qid.module == callee.module {
+                function_bindings.insert(*qid.as_ref(), binding_ty.clone());
+            }
+        }
+
+        // Add random values, trace columns, and other root declarations to the set of
+        // bindings visible in the function body, _if_ the function is defined in the
+        // root module.
+        let is_function_in_root = callee.module == self.root;
+        if is_function_in_root {
+            if let Some(rv) = self.random_values.as_ref() {
+                function_bindings.insert(
+                    rv.name,
+                    BindingType::RandomValue(RandBinding::new(
+                        rv.name.span(),
+                        rv.name,
+                        rv.size,
+                        0,
+                        Type::Vector(rv.size),
+                    )),
+                );
+                for binding in rv.bindings.iter().copied() {
+                    function_bindings.insert(binding.name, BindingType::RandomValue(binding));
+                }
+            }
+
+            for segment in self.trace.iter() {
+                function_bindings.insert(
+                    segment.name,
+                    BindingType::TraceColumn(TraceBinding {
+                        span: segment.name.span(),
+                        segment: segment.id,
+                        name: Some(segment.name),
+                        offset: 0,
+                        size: segment.size,
+                        ty: Type::Vector(segment.size),
+                    }),
+                );
+                for binding in segment.bindings.iter().copied() {
+                    function_bindings.insert(
+                        binding.name.unwrap(),
+                        BindingType::TraceColumn(TraceBinding {
+                            span: segment.name.span(),
+                            segment: segment.id,
+                            name: binding.name,
+                            offset: binding.offset,
+                            size: binding.size,
+                            ty: binding.ty,
+                        }),
+                    );
+                }
+            }
+
+            for input in self.public_inputs.values() {
+                function_bindings.insert(
+                    input.name,
+                    BindingType::PublicInput(Type::Vector(input.size)),
+                );
+            }
+        }
+
+        // Match call arguments to function parameters, populating the set of rewrites
+        // which should be performed on the inlined function body.
+        //
+        // NOTE: We create a new nested scope for the parameters in order to avoid conflicting
+        // with the root declarations
+        function_bindings.enter();
+        self.populate_function_rewrites(
+            &mut function_bindings,
+            call.args.as_slice(),
+            function.params.as_slice(),
+        );
+
+        // While we're inlining the body, use the set of function bindings we built above
+        let prev_bindings = core::mem::replace(&mut self.bindings, function_bindings);
+
+        // Expand the function body into a block of statements
+        self.expand_statement_block(&mut function.body)?;
+
+        // Restore the caller's bindings before we leave
+        self.bindings = prev_bindings;
+
+        // We're done expanding this call, so remove it from the call stack
+        self.call_stack.pop();
+
+        Ok(function.body)
+    }
+
     /// Populate the set of access rewrites, as well as the initial set of bindings to use when inlining an evaluator function.
     ///
     /// This is done by resolving the arguments provided by the call to the evaluator, with the parameter list of the evaluator itself.
-    fn populate_rewrites(
+    fn populate_evaluator_rewrites(
         &mut self,
         eval_bindings: &mut LexicalScope<Identifier, BindingType>,
         args: &[Expr],
@@ -1161,6 +1657,25 @@ impl<'a> Inlining<'a> {
                 // only trace columns are permitted
                 expr => unreachable!("{:#?}", expr),
             }
+        }
+    }
+
+    fn populate_function_rewrites(
+        &mut self,
+        function_bindings: &mut LexicalScope<Identifier, BindingType>,
+        args: &[Expr],
+        params: &[(Identifier, Type)],
+    ) {
+        // Reset the rewrites set
+        self.rewrites.clear();
+
+        for (arg, (param_name, param_ty)) in args.iter().zip(params.iter()) {
+            // We can safely assume that there is a binding type available here,
+            // otherwise the semantic analysis pass missed something
+            let binding_ty = self.expr_binding_type(arg).unwrap();
+            debug_assert_eq!(binding_ty.ty(), Some(*param_ty), "unexpected type mismatch");
+            self.rewrites.insert(*param_name);
+            function_bindings.insert(*param_name, binding_ty);
         }
     }
 
@@ -1528,6 +2043,63 @@ where
             }
             // No other statements types are possible here
             _ => unreachable!(),
+        }
+    }
+
+    // Restore the original lexical scope
+    inliner.bindings = prev;
+
+    Ok(())
+}
+
+fn with_let_innermost_block<F>(
+    inliner: &mut Inlining,
+    entry: &mut Vec<Statement>,
+    callback: F,
+) -> Result<(), SemanticAnalysisError>
+where
+    F: FnOnce(&mut Inlining, &mut Vec<Statement>) -> Result<(), SemanticAnalysisError>,
+{
+    // Preserve the original lexical scope to be restored on exit
+    let prev = inliner.bindings.clone();
+
+    // SAFETY: We must use a raw pointer here because the Rust compiler is not able to
+    // see that we only ever use the mutable reference once, and that the reference
+    // is never aliased.
+    //
+    // Both of these guarantees are in fact upheld here however, as each iteration of the loop
+    // is either the last iteration (when we use the mutable reference to mutate the end of the
+    // bottom-most block), or a traversal to the last child of the current let expression.
+    // We never alias the mutable reference, and in fact immediately convert back to a mutable
+    // reference inside the loop to ensure that within the loop body we have some degree of
+    // compiler-assisted checking of that invariant.
+    let mut current_block = Some(entry as *mut Vec<Statement>);
+    while let Some(parent_block) = current_block.take() {
+        // SAFETY: We convert the pointer back to a mutable reference here before
+        // we do anything else to ensure the usual aliasing rules are enforced.
+        //
+        // It is further guaranteed that this reference is never improperly aliased
+        // across iterations, as each iteration is visiting a child of the previous
+        // iteration's node, i.e. what we're doing here is equivalent to holding a
+        // mutable reference and using it to mutate a field in a deeply nested struct.
+        let parent_block = unsafe { &mut *parent_block };
+        // A block is guaranteed to always have at least one statement here
+        if let Some(Statement::Let(ref mut let_expr)) = parent_block.last_mut() {
+            // Register this binding
+            let binding_ty = inliner.expr_binding_type(&let_expr.value).unwrap();
+            inliner.bindings.insert(let_expr.name, binding_ty);
+            // Set up the next iteration
+            current_block = Some(&mut let_expr.body as *mut Vec<Statement>);
+            continue;
+        }
+        // When we hit a block whose last statement is an expression, which
+        // must also be the bottom-most block of this tree.
+        match callback(inliner, parent_block) {
+            Ok(_) => break,
+            Err(err) => {
+                inliner.bindings = prev;
+                return Err(err);
+            }
         }
     }
 

@@ -1155,6 +1155,121 @@ fn test_inlining_constraints_with_folded_comprehensions_in_evaluator() {
     assert_eq!(program, expected);
 }
 
+#[test]
+fn test_inlining_with_function_call_as_binary_operand() {
+    let root = r#"
+    def root
+
+    trace_columns {
+        main: [clk, a, b[4], c]
+    }
+
+    public_inputs {
+        inputs: [0]
+    }
+
+    integrity_constraints {
+        let complex_fold = fold_sum(b) * fold_vec(b)
+        enf complex_fold = 1
+    }
+
+    boundary_constraints {
+        enf clk.first = 0
+    }
+
+    fn fold_sum(a: felt[4]) -> felt {
+        return a[0] + a[1] + a[2] + a[3]
+    }
+
+    fn fold_vec(a: felt[4]) -> felt {
+        let m = a[0] * a[1]
+        let n = m * a[2]
+        let o = n * a[3]
+        return o
+    }
+    "#;
+
+    let test = ParseTest::new();
+    let program = match test.parse_program(root) {
+        Err(err) => {
+            test.diagnostics.emit(err);
+            panic!("expected parsing to succeed, see diagnostics for details");
+        }
+        Ok(ast) => ast,
+    };
+
+    let mut pipeline =
+        ConstantPropagation::new(&test.diagnostics).chain(Inlining::new(&test.diagnostics));
+    let program = pipeline.run(program).unwrap();
+
+    let mut expected = Program::new(ident!(root));
+    expected.trace_columns.push(trace_segment!(
+        0,
+        "$main",
+        [(clk, 1), (a, 1), (b, 4), (c, 1)]
+    ));
+    expected.public_inputs.insert(
+        ident!(inputs),
+        PublicInput::new(SourceSpan::UNKNOWN, ident!(inputs), 0),
+    );
+    expected.functions.insert(
+        function_ident!(root, fold_sum),
+        Function::new(
+            SourceSpan::UNKNOWN,
+            ident!(fold_sum),
+            vec![(ident!(a), Type::Vector(4))],
+            Type::Felt,
+            vec![return_!(expr!(add!(
+                add!(
+                    add!(access!(a[0], Type::Felt), access!(a[1], Type::Felt)),
+                    access!(a[2], Type::Felt)
+                ),
+                access!(a[3], Type::Felt)
+            )))],
+        ),
+    );
+    expected.functions.insert(
+        function_ident!(root, fold_vec),
+        Function::new(
+            SourceSpan::UNKNOWN,
+            ident!(fold_vec),
+            vec![(ident!(a), Type::Vector(4))],
+            Type::Felt,
+            vec![
+                let_!("m" = expr!(mul!(access!(a[0], Type::Felt), access!(a[1], Type::Felt)))
+                => let_!("n" = expr!(mul!(access!(m, Type::Felt), access!(a[2], Type::Felt)))
+                => let_!("o" = expr!(mul!(access!(n, Type::Felt), access!(a[3], Type::Felt)))
+                => return_!(expr!(access!(o, Type::Felt)))
+                ))),
+            ],
+        ),
+    );
+    // The sole boundary constraint is already minimal
+    expected.boundary_constraints.push(enforce!(eq!(
+        bounded_access!(clk, Boundary::First, Type::Felt),
+        int!(0)
+    )));
+    // With constant propagation and inlining done
+    //
+    // let %0 = b[0] + b[1] + b[2] + b[3]
+    // let m = b[0] * b[1]
+    // let n = m * b[2]
+    // let o = n * b[3]
+    // let %1 = o
+    // let complex_fold = %0 * %1
+    // enf complex_fold = 1
+    expected.integrity_constraints.push(
+        let_!("%0" = expr!(add!(add!(add!(access!(b[0], Type::Felt), access!(b[1], Type::Felt)), access!(b[2], Type::Felt)), access!(b[3], Type::Felt)))
+            => let_!(m = expr!(mul!(access!(b[0], Type::Felt), access!(b[1], Type::Felt)))
+            => let_!(n = expr!(mul!(access!(m, Type::Felt), access!(b[2], Type::Felt)))
+            => let_!(o = expr!(mul!(access!(n, Type::Felt), access!(b[3], Type::Felt)))
+            => let_!(complex_fold = expr!(mul!(access!("%0", Type::Felt), access!(o, Type::Felt)))
+            => enforce!(eq!(access!(complex_fold, Type::Felt), int!(1))))))))
+    );
+
+    assert_eq!(program, expected);
+}
+
 /// This test originally reproduced the bug in air-script#340, but as of this commit
 /// that bug is fixed. This test remains not to prevent regressions necessarily, but
 /// to add a more realistic test case to our test suite, and potentially catch bugs
@@ -1265,51 +1380,45 @@ fn test_repro_issue340() {
             .integrity_constraints
             .push(enforce!(eq!(exp!(access.clone(), int!(2)), access.clone())));
     }
-    let word_sum = (1..32)
-        .into_iter()
-        .fold(access!("%lc0", Type::Felt), |acc, i| {
-            let access = ScalarExpr::SymbolAccess(SymbolAccess {
-                span: miden_diagnostics::SourceSpan::UNKNOWN,
-                name: ResolvableIdentifier::Local(Identifier::new(
-                    miden_diagnostics::SourceSpan::UNKNOWN,
-                    crate::Symbol::intern(format!("%lc{}", i)),
-                )),
-                access_type: AccessType::Default,
-                offset: 0,
-                ty: Some(Type::Felt),
-            });
-            add!(acc, access)
+    let word_sum = (1..32).fold(access!("%lc0", Type::Felt), |acc, i| {
+        let access = ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ResolvableIdentifier::Local(Identifier::new(
+                miden_diagnostics::SourceSpan::UNKNOWN,
+                crate::Symbol::intern(format!("%lc{}", i)),
+            )),
+            access_type: AccessType::Default,
+            offset: 0,
+            ty: Some(Type::Felt),
         });
-    let high_bit_sum = (33..53)
-        .into_iter()
-        .fold(access!("%lc32", Type::Felt), |acc, i| {
-            let access = ScalarExpr::SymbolAccess(SymbolAccess {
-                span: miden_diagnostics::SourceSpan::UNKNOWN,
-                name: ResolvableIdentifier::Local(Identifier::new(
-                    miden_diagnostics::SourceSpan::UNKNOWN,
-                    crate::Symbol::intern(format!("%lc{}", i)),
-                )),
-                access_type: AccessType::Default,
-                offset: 0,
-                ty: Some(Type::Felt),
-            });
-            add!(acc, access)
+        add!(acc, access)
+    });
+    let high_bit_sum = (33..53).fold(access!("%lc32", Type::Felt), |acc, i| {
+        let access = ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ResolvableIdentifier::Local(Identifier::new(
+                miden_diagnostics::SourceSpan::UNKNOWN,
+                crate::Symbol::intern(format!("%lc{}", i)),
+            )),
+            access_type: AccessType::Default,
+            offset: 0,
+            ty: Some(Type::Felt),
         });
-    let low_bit_sum = (54..64)
-        .into_iter()
-        .fold(access!("%lc53", Type::Felt), |acc, i| {
-            let access = ScalarExpr::SymbolAccess(SymbolAccess {
-                span: miden_diagnostics::SourceSpan::UNKNOWN,
-                name: ResolvableIdentifier::Local(Identifier::new(
-                    miden_diagnostics::SourceSpan::UNKNOWN,
-                    crate::Symbol::intern(format!("%lc{}", i)),
-                )),
-                access_type: AccessType::Default,
-                offset: 0,
-                ty: Some(Type::Felt),
-            });
-            add!(acc, access)
+        add!(acc, access)
+    });
+    let low_bit_sum = (54..64).fold(access!("%lc53", Type::Felt), |acc, i| {
+        let access = ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ResolvableIdentifier::Local(Identifier::new(
+                miden_diagnostics::SourceSpan::UNKNOWN,
+                crate::Symbol::intern(format!("%lc{}", i)),
+            )),
+            access_type: AccessType::Default,
+            offset: 0,
+            ty: Some(Type::Felt),
         });
+        add!(acc, access)
+    });
     let low_bit_sum_body = let_!(low_bit_sum = expr!(low_bit_sum) =>
         enforce!(eq!(access!(immediate, Type::Felt), add!(access!(low_bit_sum, Type::Felt), access!(high_bit_sum, Type::Felt))), when access!(s, Type::Felt)),
         enforce!(eq!(access!(instruction_bits[31], Type::Felt), int!(1)), when access!(s, Type::Felt)));

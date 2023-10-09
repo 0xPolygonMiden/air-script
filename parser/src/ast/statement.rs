@@ -127,12 +127,29 @@ impl Let {
         }
     }
 
+    /// Return the type of the overall `let` expression.
+    ///
+    /// A `let` with an empty body, or with a body that terminates with a non-expression statement
+    /// has no type (or rather, one could consider the type it returns to be of "void" or "unit" type).
+    ///
+    /// For `let` statements with a non-empty body that terminates with an expression, the `let` can
+    /// be used in expression position, producing the value of the terminating expression in its body,
+    /// and having the same type as that value.
     pub fn ty(&self) -> Option<Type> {
-        self.body.last().and_then(|stmt| match stmt {
-            Statement::Let(ref nested) => nested.ty(),
-            Statement::Expr(ref expr) => expr.ty(),
-            _ => None,
-        })
+        let mut last = self.body.last();
+        while let Some(stmt) = last.take() {
+            match stmt {
+                Statement::Let(ref let_expr) => {
+                    last = let_expr.body.last();
+                }
+                Statement::Expr(ref expr) => return expr.ty(),
+                Statement::Enforce(_) | Statement::EnforceIf(_, _) | Statement::EnforceAll(_) => {
+                    break
+                }
+            }
+        }
+
+        None
     }
 }
 impl Eq for Let {}

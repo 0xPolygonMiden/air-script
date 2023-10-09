@@ -445,6 +445,15 @@ impl ScalarExpr {
         matches!(self, Self::Const(_))
     }
 
+    /// Returns true if this scalar expression could expand to a block, e.g. due to a function call being inlined.
+    pub fn has_block_like_expansion(&self) -> bool {
+        match self {
+            Self::Binary(ref expr) => expr.has_block_like_expansion(),
+            Self::Call(_) => true,
+            _ => false,
+        }
+    }
+
     /// Returns the resolved type of this expression, if known.
     ///
     /// Returns `Ok(Some)` if the type could be resolved without conflict.
@@ -526,6 +535,12 @@ impl BinaryExpr {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
         }
+    }
+
+    /// Returns true if this binary expression could expand to a block, e.g. due to a function call being inlined.
+    #[inline]
+    pub fn has_block_like_expansion(&self) -> bool {
+        self.lhs.has_block_like_expansion() || self.rhs.has_block_like_expansion()
     }
 }
 impl Eq for BinaryExpr {}

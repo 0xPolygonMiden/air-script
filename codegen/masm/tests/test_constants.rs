@@ -66,7 +66,7 @@ fn test_constants() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 3]),
+                data: to_stack_order(&[one; 3]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },

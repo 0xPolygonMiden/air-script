@@ -23,6 +23,8 @@ impl<'p> Pass for AstToAir<'p> {
     type Error = CompileError;
 
     fn run<'a>(&mut self, program: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
+        dbg!(&program);
+
         let mut air = Air::new(program.name);
 
         let random_values = program.random_values;
@@ -47,8 +49,8 @@ impl<'p> Pass for AstToAir<'p> {
             builder.build_boundary_constraint(bc)?;
         }
 
-        for bc in integrity_constraints.iter() {
-            builder.build_integrity_constraint(bc)?;
+        for ic in integrity_constraints.iter() {
+            builder.build_integrity_constraint(ic)?;
         }
 
         Ok(air)
@@ -98,8 +100,8 @@ impl<'a> AirBuilder<'a> {
         }
     }
 
-    fn build_integrity_constraint(&mut self, bc: &ast::Statement) -> Result<(), CompileError> {
-        match bc {
+    fn build_integrity_constraint(&mut self, ic: &ast::Statement) -> Result<(), CompileError> {
+        match ic {
             ast::Statement::Enforce(ast::ScalarExpr::Binary(ast::BinaryExpr {
                 op: ast::BinaryOp::Eq,
                 ref lhs,

@@ -55,7 +55,7 @@ fn test_simple_periodic() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 1]),
+                data: to_stack_order(&[one; 1]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },
@@ -150,7 +150,7 @@ fn test_multiple_periodic() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 3]),
+                data: to_stack_order(&[one; 3]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },
