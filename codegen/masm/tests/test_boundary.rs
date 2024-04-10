@@ -11,23 +11,26 @@ use utils::{codegen, test_code, to_stack_order, Data};
 static SIMPLE_BOUNDARY_AIR: &str = "
 def SimpleBoundary
 
-trace_columns:
+trace_columns {
     main: [a, b, len]
+}
 
-public_inputs:
+public_inputs {
     target: [1]
+}
 
-boundary_constraints:
+boundary_constraints {
     enf a.first = 1
     enf b.first = 1
 
     enf len.first = 0
     enf len.last = target[0]
+}
 
-integrity_constraints:
+integrity_constraints {
     enf a' = a + b
     enf b' = a
-";
+}";
 
 #[test]
 fn test_simple_boundary() {
@@ -108,18 +111,21 @@ const A = 1
 const B = [0, 1]
 const C = [[1, 2], [2, 0]]
 
-trace_columns:
+trace_columns {
     main: [a, b, c, d, e[2]]
     aux: [f]
+}
 
-public_inputs:
+public_inputs {
     stack_inputs: [2]
     stack_outputs: [2]
+}
 
-random_values:
+random_values {
     rand: [2]
+}
 
-boundary_constraints:
+boundary_constraints {
     enf a.first = stack_inputs[0]
     enf b.first = stack_inputs[1]
     enf a.last = stack_outputs[0]
@@ -133,10 +139,11 @@ boundary_constraints:
 
     enf f.first = $rand[0]
     enf f.last = 1
+}
 
-integrity_constraints:
+integrity_constraints {
     enf a + b = 0
-";
+}";
 
 #[test]
 fn test_complex_boundary() {

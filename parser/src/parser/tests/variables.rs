@@ -11,9 +11,10 @@ fn variables_with_and_operators() {
     let source = "
     mod test
 
-    ev test([clk]):
+    ev test([clk]) {
         let flag = n1 & !n2
-        enf clk' = clk + 1 when flag";
+        enf clk' = clk + 1 when flag
+    }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
     // The constraint is converted into a comprehension constraint by the parser, which
@@ -38,9 +39,10 @@ fn variables_with_or_operators() {
     let source = "
     mod test
 
-    ev test([clk]):
+    ev test([clk]) {
         let flag = n1 | !n2'
-        enf clk' = clk + 1 when flag";
+        enf clk' = clk + 1 when flag
+    }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
     let body = vec![
@@ -80,7 +82,7 @@ fn err_vector_variable_with_trailing_comma() {
     let source = "
     def test
 
-    integrity_constraints:
+    integrity_constraints {
         let a = [1, ]";
 
     ParseTest::new().expect_unrecognized_token(source);
@@ -91,7 +93,7 @@ fn err_matrix_variable_with_trailing_comma() {
     let source = "
     def test
 
-    integrity_constraints:
+    integrity_constraints {
         let a = [[1, 2], ]";
     ParseTest::new().expect_unrecognized_token(source);
 }
@@ -101,7 +103,7 @@ fn err_matrix_variable_mixed_element_types() {
     let source = "
     def test
 
-    integrity_constraints:
+    integrity_constraints {
         let a = [[1, 2], 1]";
     ParseTest::new().expect_unrecognized_token(source);
 }
@@ -111,7 +113,7 @@ fn err_invalid_matrix_element() {
     let source = "
     def test
 
-    integrity_constraints:
+    integrity_constraints {
         let a = [[1, 2], [3, [4, 5]]]";
     ParseTest::new().expect_unrecognized_token(source);
 }
@@ -121,7 +123,7 @@ fn err_matrix_variable_from_vector_and_reference() {
     let source = "
     def test
 
-    integrity_constraints:
+    integrity_constraints {
         let a = [[1, 2], [3, 4]]
         let b = [5, 6]
         let c = [b, [7, 8]]
