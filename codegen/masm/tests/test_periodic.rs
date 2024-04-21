@@ -11,21 +11,25 @@ use utils::{codegen, test_code, to_stack_order, Data};
 static SIMPLE_AUX_AIR: &str = "
 def SimpleAux
 
-trace_columns:
+trace_columns {
     main: [a]
+}
 
-periodic_columns:
+periodic_columns {
     k: [1, 1]
+}
 
-public_inputs:
+public_inputs {
     stack_inputs: [16]
+}
 
-boundary_constraints:
+boundary_constraints {
     enf a.first = 0
+}
 
-integrity_constraints:
+integrity_constraints {
     enf a * k = 0
-";
+}";
 
 #[test]
 fn test_simple_periodic() {
@@ -94,25 +98,29 @@ fn test_simple_periodic() {
 static MULTIPLE_AUX_AIR: &str = "
 def MultipleAux
 
-trace_columns:
+trace_columns {
     main: [a, b, c]
+}
 
-periodic_columns:
+periodic_columns {
     m: [1, 0]
     n: [1, 1, 1, 0]
     o: [1, 0, 0, 0]
+}
 
-public_inputs:
+public_inputs {
     stack_inputs: [16]
+}
 
-boundary_constraints:
+boundary_constraints {
     enf a.first = 0
+}
 
-integrity_constraints:
+integrity_constraints {
     enf a * m = 0
     enf b * n = 0
     enf c * o = 0
-";
+}";
 
 #[test]
 fn test_multiple_periodic() {

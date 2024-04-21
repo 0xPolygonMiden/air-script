@@ -292,15 +292,17 @@ impl PartialEq for PublicInput {
 /// size `15`:
 ///
 /// ```airscript
-/// random_values:
+/// random_values {
 ///     rand: [15]
+/// }
 /// ```
 ///
 /// A `random_values` declaration like the following however:
 ///
 /// ```airscript
-/// random_values:
+/// random_values {
 ///     rand: [a, b[12]]
+/// }
 /// ```
 ///
 /// It is equivalent to creating it with `RandomValues::new`, with two separate bindings,

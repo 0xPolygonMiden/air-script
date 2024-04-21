@@ -1,16 +1,19 @@
 def AuxiliaryAir
 
-trace_columns:
+trace_columns {
     main: [a, b, c]
     aux: [p0, p1]
+}
 
-public_inputs:
+public_inputs {
     stack_inputs: [16]
+}
 
-random_values:
+random_values {
     rand: [2]
+}
 
-boundary_constraints:
+boundary_constraints {
     enf a.first = 1
     enf b.first = 1
 
@@ -20,8 +23,9 @@ boundary_constraints:
     # auxiliary boundary constraint with a random value
     enf p1.first = $rand[0]
     enf p1.last = 1
-  
-integrity_constraints:
+}
+
+integrity_constraints {
     enf a' = b + a * b * c
     enf b' = c + a'
     enf c = a + b
@@ -29,3 +33,4 @@ integrity_constraints:
     # integrity constraints against the auxiliary trace with random values
     enf p0' = p0 * (a + $rand[0] + b + $rand[1])
     enf p1 = p1' * (c + $rand[0])
+}

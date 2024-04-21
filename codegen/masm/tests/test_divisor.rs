@@ -12,18 +12,21 @@ use utils::{codegen, test_code, to_stack_order, Data};
 static SIMPLE_INTEGRITY_AIR: &str = "
 def SimpleIntegrityAux
 
-trace_columns:
+trace_columns {
     main: [a]
+}
 
-public_inputs:
+public_inputs {
     stack_inputs: [1]
+}
 
-boundary_constraints:
+boundary_constraints {
     enf a.first = 0
+}
 
-integrity_constraints:
+integrity_constraints {
     enf a = 0
-";
+}";
 
 #[test]
 fn test_integrity_divisor() {
@@ -93,22 +96,25 @@ fn test_integrity_divisor() {
 static SIMPLE_BOUNDARY_AIR: &str = "
 def SimpleBoundaryAux
 
-trace_columns:
+trace_columns {
     main: [a]
     aux: [b]
+}
 
-public_inputs:
+public_inputs {
     stack_inputs: [1]
+}
 
-boundary_constraints:
+boundary_constraints {
     enf a.first = 0
     enf a.last = 0
     enf b.first = 0
     enf b.last = 0
+}
 
-integrity_constraints:
+integrity_constraints {
     enf a = 0
-";
+}";
 
 #[test]
 fn test_boundary_divisor() {
@@ -211,20 +217,23 @@ fn test_boundary_divisor() {
 static MIXED_BOUNDARY_AIR: &str = "
 def MixedBoundaryAux
 
-trace_columns:
+trace_columns {
     main: [a]
     aux: [b]
+}
 
-public_inputs:
+public_inputs {
     stack_inputs: [1]
+}
 
-boundary_constraints:
+boundary_constraints {
     enf a.first = 3
     enf b.last = 5
+}
 
-integrity_constraints:
+integrity_constraints {
     enf a = 0
-";
+}";
 
 #[test]
 fn test_mixed_boundary_divisor() {

@@ -58,8 +58,9 @@ fn modules_integration_test() {
     // defines an evaluator `other_constraint`, that evaluator is never called
     // so it is treated as dead code and stripped from the program
 
-    // ev bar_constraint([clk]):
+    // ev bar_constraint([clk]) {
     //    enf clk' = clk + k0 when k0
+    // }
     expected.evaluators.insert(
         function_ident!(bar, bar_constraint),
         EvaluatorFunction::new(
@@ -72,8 +73,9 @@ fn modules_integration_test() {
             ), when access!(bar, k0, Type::Felt)))],
         ),
     );
-    // ev foo_constraint([clk]):
+    // ev foo_constraint([clk]) {
     //    enf clk' = clk + 1 when k0
+    // }
     expected.evaluators.insert(
         function_ident!(foo, foo_constraint),
         EvaluatorFunction::new(

@@ -97,11 +97,12 @@ pub struct Let {
     /// For example, given the following:
     ///
     /// ```airscript
-    /// integrity_constraints:
+    /// integrity_constraints {
     ///     let x = 2
     ///     let y = x^2
     ///     enf clk = x
     ///     enf clk' = clk + y
+    /// }
     /// ```
     ///
     /// When parsed, the syntax tree for the `integrity_constraints` block

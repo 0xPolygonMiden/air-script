@@ -68,16 +68,19 @@ The following accessor may only be applied to public inputs declared in `public_
 Here is an example of usage of first and last boundaries and a public input within a boundary constraint:
 
 ```
-trace_columns:
+trace_columns {
     main: [a]
+}
 
-public_inputs:
+public_inputs {
     stack_inputs: [4]
     stack_outputs: [4]
+}
 
-boundary_constraints:
+boundary_constraints {
     enf a.first = stack_inputs[0]
     enf a.last = stack_outputs[0]
+}
 ```
 
 ### [Integrity constraints](./constraints.md#integrity_constraints)
@@ -89,10 +92,12 @@ The following accessor may only be applied to trace columns when they are refere
 Here is an example of usage of the Next Row operator within an integrity constraint:
 
 ```
-trace_columns:
+trace_columns {
   main: [a]
   aux: [p]
+}
 
-integrity_constraints:
+integrity_constraints {
   enf p' = p * a
+}
 ```
