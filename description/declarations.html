@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="en" class="sidebar-visible no-js light">
+<html lang="en" class="light" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -10,7 +10,7 @@
         
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="theme-color" content="#ffffff" />
+        <meta name="theme-color" content="#ffffff">
 
         <link rel="icon" href="../favicon.svg">
         <link rel="shortcut icon" href="../favicon.png">
@@ -31,7 +31,7 @@
         <!-- Custom theme stylesheets -->
 
     </head>
-    <body>
+    <body class="sidebar-visible no-js">
     <div id="body-container">
         <!-- Provide site root to javascript -->
         <script>
@@ -61,31 +61,38 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             var html = document.querySelector('html');
-            html.classList.remove('no-js')
             html.classList.remove('light')
             html.classList.add(theme);
-            html.classList.add('js');
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
         </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var html = document.querySelector('html');
+            var body = document.querySelector('body');
             var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
             } else {
                 sidebar = 'hidden';
             }
-            html.classList.remove('sidebar-visible');
-            html.classList.add("sidebar-" + sidebar);
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
                 <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/organization.html"><strong aria-hidden="true">2.2.</strong> Code organization</a></li><li class="chapter-item expanded "><a href="../description/declarations.html" class="active"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/variables.html"><strong aria-hidden="true">2.5.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/evaluators.html"><strong aria-hidden="true">2.6.</strong> Evaluators</a></li><li class="chapter-item expanded "><a href="../description/convenience.html"><strong aria-hidden="true">2.7.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.8.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.9.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html"><strong aria-hidden="true">2.10.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../backends.html"><strong aria-hidden="true">3.</strong> Backends</a></li></ol>
             </div>
-            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
         </nav>
 
         <!-- Track and set sidebar scroll position -->
@@ -116,9 +123,9 @@
                                 <div id="menu-bar-hover-placeholder"></div>
                 <div id="menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
-                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
                             <i class="fa fa-bars"></i>
-                        </button>
+                        </label>
                         <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
                             <i class="fa fa-paint-brush"></i>
                         </button>
@@ -169,7 +176,7 @@
 
                 <div id="content" class="content">
                     <main>
-                        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
+                        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/katex.min.css">
 <h1 id="type-declaration-sections"><a class="header" href="#type-declaration-sections">Type declaration sections</a></h1>
 <h2 id="constants-const"><a class="header" href="#constants-const">Constants (<code>const</code>)</a></h2>
 <p>Constants can be optionally declared with the const keyword at the top of an AirScript module just below the declaration of the module name. They can be scalars, vectors or matrices. Constant names must contain only uppercase letters.</p>
@@ -184,9 +191,10 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
 <p>The <code>main</code> and <code>aux</code> declarations define the shape of the main and auxiliary execution traces respectively and define identifiers which can be used to refer to each of the columns or a group of columns in that trace. The columns can also be referred using the built-in variables <code>$main</code> and <code>$aux</code> and the index of the column in the respective trace.</p>
 <p><strong>A <code>trace_columns</code> section with a <code>main</code> declaration is required for an AIR defined in AirScript to be valid.</strong> The <code>aux</code> declaration is optional, but if it is defined then it must follow the <code>main</code> declaration.</p>
 <p>The following is a valid <code>trace_columns</code> source section:</p>
-<pre><code>trace_columns:
+<pre><code>trace_columns {
     main: [a, b, c[3], d]
     aux: [e, f]
+}
 </code></pre>
 <p>In the above example, the main execution trace for the AIR has 6 columns with 4 column bindings, where the identifiers <code>a</code>, <code>b</code>, and <code>d</code> are each bound to a single column and <code>c</code> refers to a group of 3 columns. Single columns can be referenced using their identifiers (e.g. <code>a</code>, <code>b</code> and <code>d</code>) and columns in a group (e.g. <code>c</code>) can be referenced using the identifier <code>c</code> and the index of the column within the group <code>c</code> (<code>c[0]</code>, <code>c[1]</code> and <code>c[2]</code>). Similarly, the auxiliary execution trace has 2 columns which can be referenced by <code>e</code> and <code>f</code>.</p>
 <h2 id="public-inputs-public_inputs"><a class="header" href="#public-inputs-public_inputs">Public inputs (<code>public_inputs</code>)</a></h2>
@@ -196,10 +204,11 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
 <pre><code>identifier: [n]
 </code></pre>
 <p>The following is an example of a valid <code>public_inputs</code> source section:</p>
-<pre><code>public_inputs:
+<pre><code>public_inputs {
     program_hash: [4]
     stack_inputs: [16]
     stack_outputs: [16]
+}
 </code></pre>
 <p>In the above example, the public input <code>program_hash</code> is an array of length <code>4</code>. <code>stack_inputs</code> and <code>stack_outputs</code> are both arrays of length <code>16</code>.</p>
 <p>Public inputs can be referenced by <a href="./constraints.html#boundary_constraints">boundary constraints</a> by using the identifier and an index. For example, the 3rd element of the <code>program_hash</code> declared above would be referenced as <code>program_hash[2]</code>.</p>
@@ -212,24 +221,27 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
 </code></pre>
 <p>The length of each of the array must be a power of two which is greater than or equal to <code>2</code>.</p>
 <p>The following is an example of a valid <code>periodic_columns</code> source section:</p>
-<pre><code>periodic_columns:
+<pre><code>periodic_columns {
     k0: [0, 0, 0, 1]
     k1: [1, 1, 1, 1, 1, 1, 1, 0]
+}
 </code></pre>
 <p>In the above example, <code>k0</code> declares a periodic column with a cycle of length <code>4</code>, and <code>k1</code> declares a periodic column with a cycle of length <code>8</code>.</p>
 <p>Periodic columns can be referenced by <a href="./constraints.html#integrity_constraints">integrity constraints</a> by using the column's identifier.</p>
-<p>When constraints are evaluated, these periodic values always refer to the value of the column in the current row. For example, when evaluating an integrity constraint such as <code>enf k0 * a = 0</code>, <code>k0</code> would be evaluated as <code>0</code> in rows <code>0</code>, <code>1</code>, <code>2</code> of the trace and as <code>1</code> in row <code>3</code>, and then the cycle would repeat. Attempting to refer to the &quot;next&quot; row of a periodic column, such as by <code>k0'</code>, is invalid and will cause a <code>ParseError</code>.</p>
+<p>When constraints are evaluated, these periodic values always refer to the value of the column in the current row. For example, when evaluating an integrity constraint such as <code>enf k0 * a = 0</code>, <code>k0</code> would be evaluated as <code>0</code> in rows <code>0</code>, <code>1</code>, <code>2</code> of the trace and as <code>1</code> in row <code>3</code>, and then the cycle would repeat. Attempting to refer to the "next" row of a periodic column, such as by <code>k0'</code>, is invalid and will cause a <code>ParseError</code>.</p>
 <h2 id="random-values-random_values"><a class="header" href="#random-values-random_values">Random values (<code>random_values</code>)</a></h2>
 <p>A <code>random_values</code> section contains declarations for random values provided by the verifier. Random values can be accessed by the named identifier for the whole array or by named bindings to single or grouped random values within the array.</p>
 <p><strong>Random values are optional.</strong> However if the section is declared then it cannot be empty and it can only contain a single declaration.</p>
 <p>The following is an example of a valid <code>random_values</code> source section:</p>
-<pre><code>random_values:
+<pre><code>random_values {
     rand: [4]
+}
 </code></pre>
 <p>In the above example, <code>rand</code> is a random value array of length <code>4</code>. Random values can be accessed using <code>$</code> followed by the name of the array and the index of the value. For example, <code>$rand[2]</code> would refer to the third random value in the array.</p>
 <p>The following is an example of a valid <code>random_values</code> section with named bindings to particular random values and groups of random values:</p>
-<pre><code>random_values:
+<pre><code>random_values {
     rand: [a, b, c[2]]
+}
 </code></pre>
 <p>In the above example, <code>rand</code> is a random value array of length <code>4</code> and <code>a</code> and <code>b</code> are individual random value bindings and <code>c</code> is a binding referring to a group of 2 random values. In this case, random values can be accessed similarly (e.g. <code>$rand[2]</code>) or using named bindings (e.g. <code>a</code> or <code>c[0]</code>). Here, <code>$rand[2]</code> and <code>c[0]</code> refer to the same random value.</p>
 
@@ -241,7 +253,7 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next" href="../description/constraints.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../description/constraints.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -255,7 +267,7 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next" href="../description/constraints.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../description/constraints.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

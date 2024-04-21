@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="en" class="sidebar-visible no-js light">
+<html lang="en" class="light" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -10,7 +10,7 @@
         
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="theme-color" content="#ffffff" />
+        <meta name="theme-color" content="#ffffff">
 
         <link rel="icon" href="../favicon.svg">
         <link rel="shortcut icon" href="../favicon.png">
@@ -31,7 +31,7 @@
         <!-- Custom theme stylesheets -->
 
     </head>
-    <body>
+    <body class="sidebar-visible no-js">
     <div id="body-container">
         <!-- Provide site root to javascript -->
         <script>
@@ -61,31 +61,38 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             var html = document.querySelector('html');
-            html.classList.remove('no-js')
             html.classList.remove('light')
             html.classList.add(theme);
-            html.classList.add('js');
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
         </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var html = document.querySelector('html');
+            var body = document.querySelector('body');
             var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
             } else {
                 sidebar = 'hidden';
             }
-            html.classList.remove('sidebar-visible');
-            html.classList.add("sidebar-" + sidebar);
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
                 <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../description/main.html"><strong aria-hidden="true">2.</strong> Language Description</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../description/syntax.html"><strong aria-hidden="true">2.1.</strong> Syntax overview</a></li><li class="chapter-item expanded "><a href="../description/organization.html"><strong aria-hidden="true">2.2.</strong> Code organization</a></li><li class="chapter-item expanded "><a href="../description/declarations.html"><strong aria-hidden="true">2.3.</strong> Type declarations</a></li><li class="chapter-item expanded "><a href="../description/constraints.html"><strong aria-hidden="true">2.4.</strong> Constraint descriptions</a></li><li class="chapter-item expanded "><a href="../description/variables.html"><strong aria-hidden="true">2.5.</strong> Variables</a></li><li class="chapter-item expanded "><a href="../description/evaluators.html" class="active"><strong aria-hidden="true">2.6.</strong> Evaluators</a></li><li class="chapter-item expanded "><a href="../description/convenience.html"><strong aria-hidden="true">2.7.</strong> Convenience syntax</a></li><li class="chapter-item expanded "><a href="../description/example.html"><strong aria-hidden="true">2.8.</strong> AirScript Example</a></li><li class="chapter-item expanded "><a href="../description/keywords.html"><strong aria-hidden="true">2.9.</strong> Keywords</a></li><li class="chapter-item expanded "><a href="../description/appendix.html"><strong aria-hidden="true">2.10.</strong> Appendix</a></li></ol></li><li class="chapter-item expanded "><a href="../backends.html"><strong aria-hidden="true">3.</strong> Backends</a></li></ol>
             </div>
-            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
         </nav>
 
         <!-- Track and set sidebar scroll position -->
@@ -116,9 +123,9 @@
                                 <div id="menu-bar-hover-placeholder"></div>
                 <div id="menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
-                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
                             <i class="fa fa-bars"></i>
-                        </button>
+                        </label>
                         <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
                             <i class="fa fa-paint-brush"></i>
                         </button>
@@ -169,13 +176,13 @@
 
                 <div id="content" class="content">
                     <main>
-                        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
+                        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/katex.min.css">
 <h1 id="evaluators"><a class="header" href="#evaluators">Evaluators</a></h1>
 <p>Evaluators are sets of constraints logically grouped together. The primary purpose of evaluators is to increase modularity and readability of AirScript code.</p>
 <h2 id="defining-evaluators"><a class="header" href="#defining-evaluators">Defining evaluators</a></h2>
 <p>An evaluator consists of a declaration which specifies evaluator metadata and a body which contains descriptions of integrity constraints.</p>
-<p>Evaluator declaration starts with the <code>ev</code> keyword, followed by the name of the evaluator, parameter declarations, and a semicolon. For example:</p>
-<pre><code>ev foo([a, b, c], [p]):
+<p>Evaluator declaration starts with the <code>ev</code> keyword, followed by the name of the evaluator, parameter declarations, and a code block surrounded by braces. For example:</p>
+<pre><code>ev foo([a, b, c], [p]) {}
 </code></pre>
 <p>Evaluator name must:</p>
 <ul>
@@ -185,14 +192,15 @@
 </ul>
 <p>Evaluator parameters define an evaluator's view into the execution trace. Specifically, they define the set of columns in the main and the auxiliary trace segments the evaluator can access. For example, the evaluator declared above can access 3 columns of the main trace segment (which can be referenced as <code>a</code>, <code>b</code>, and <code>c</code>), and 1 column in the auxiliary trace segment (which can be referenced as <code>p</code>).</p>
 <p>If an evaluator needs to access only the main trace segment, we can omit the parameters for the auxiliary trace segment. For example:</p>
-<pre><code>ev bar([a, b, c]):
+<pre><code>ev bar([a, b, c]) {}
 </code></pre>
 <p>If, however, an evaluator needs to access only the auxiliary trace segments, we must define the main trace segment parameters as an empty set like so:</p>
-<pre><code>ev baz([], [p]):
+<pre><code>ev baz([], [p]) {}
 </code></pre>
 <p>An evaluator body must contain at least one integrity constraint. For example:</p>
-<pre><code>ev foo([a, b]):
+<pre><code>ev foo([a, b]) {
     enf a' = a + b
+}
 </code></pre>
 <p>In general, an evaluator body may contain any set of expressions allowed in the <a href="./constraints.html#integrity-constraints-integrity_constraints">integrity constraints</a> section subject to the following caveats:</p>
 <ul>
@@ -203,63 +211,79 @@
 <p>Evaluators can be declared anywhere in a module, but usually are declared towards the end of the module.</p>
 <h2 id="using-evaluators"><a class="header" href="#using-evaluators">Using evaluators</a></h2>
 <p>An evaluator defined in a module or <a href="./organization.html#importing-evaluators">imported</a> from a different module can be invoked via the <code>enf</code> keyword. For example (public inputs and boundary constraints omitted for brevity):</p>
-<pre><code>trace_columns:
+<pre><code>trace_columns {
     main: [a, b]
+}
 
-integrity_constraints:
+integrity_constraints {
     enf foo([a, b])
+}
 
-ev foo([x, y]):
+ev foo([x, y]) {
     enf x' = x + y
+}
 </code></pre>
 <p>In the above example, evaluator <code>foo</code> is invoked using trace columns <code>a</code> and <code>b</code>, but notice that within the evaluator we refer to these columns by different names (specifically, <code>x</code> and <code>y</code> respectively). The above example is equivalent to:</p>
-<pre><code>trace_columns:
+<pre><code>trace_columns {
     main: [a, b]
+}
 
-integrity_constraints:
+integrity_constraints {
     enf a' = a + b
+}
 </code></pre>
 <p>That is, we can think of evaluators as being <em>inlined</em> at their call sites.</p>
 <p>Evaluators can be invoked multiple times. For example:</p>
-<pre><code>trace_columns:
+<pre><code>trace_columns {
     main: [a, b, c]
+}
 
-integrity_constraints:
+integrity_constraints {
     enf foo([a, b])
     enf foo([c, a])
+}
 
-ev foo([x, y]):
+ev foo([x, y]) {
     enf x' = x + y
+}
 </code></pre>
 <p>This is equivalent to:</p>
-<pre><code>trace_columns:
+<pre><code>trace_columns {
     main: [a, b, c]
+}
 
-integrity_constraints:
+integrity_constraints {
     enf a' = a + b
     enf c' = c + a
+}
 </code></pre>
 <p>Evaluators can also invoke other evaluators. For example:</p>
-<pre><code>trace_columns:
+<pre><code>trace_columns {
     main: [a, b]
+}
 
-integrity_constraints:
+integrity_constraints {
     enf foo([a, b])
+}
 
-ev foo([x, y]):
+ev foo([x, y]) {
     enf x' = x + y
     enf bar([y, x])
+}
 
-ev bar([x, y]):
+ev bar([x, y]) {
     enf x' = x * y
+}
 </code></pre>
 <p>The above is equivalent to:</p>
-<pre><code>trace_columns:
+<pre><code>trace_columns {
     main: [a, b]
+}
 
-integrity_constraints:
+integrity_constraints {
     enf a' = a + b
     enf b' = b * a
+}
 </code></pre>
 <h3 id="using-in-conditional-constraints"><a class="header" href="#using-in-conditional-constraints">Using in conditional constraints</a></h3>
 <p>Evaluators can also be used in <a href="./convenience.html#conditional-evaluators">conditional constraints</a>. The combination of evaluator and selector syntax is especially powerful as it enables describing complex constraints in a simple and modular way.</p>
@@ -272,7 +296,7 @@ integrity_constraints:
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next" href="../description/convenience.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../description/convenience.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -286,7 +310,7 @@ integrity_constraints:
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next" href="../description/convenience.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../description/convenience.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
