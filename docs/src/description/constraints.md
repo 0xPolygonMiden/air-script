@@ -199,6 +199,10 @@ periodic_columns {
     k: [1, 1, 1, 0]
 }
 
+random_values {
+    rand: [16]
+}
+
 boundary_constraints {
     <omitted for brevity>
 }
@@ -234,6 +238,10 @@ trace_columns {
 
 public_inputs {
     <omitted for brevity>
+}
+
+random_values {
+    rand: [16]
 }
 
 periodic_columns {
