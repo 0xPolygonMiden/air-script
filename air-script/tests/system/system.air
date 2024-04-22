@@ -1,13 +1,17 @@
 def SystemAir
 
-trace_columns:
+trace_columns {
     main: [clk, fmp, ctx]
+}
 
-public_inputs:
+public_inputs {
     stack_inputs: [16]
+}
 
-integrity_constraints:
+integrity_constraints {
     enf clk' = clk + 1
-  
-boundary_constraints:
+}
+
+boundary_constraints {
     enf clk.first = 0
+}

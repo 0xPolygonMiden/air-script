@@ -94,7 +94,7 @@ Import: Span<Import> = {
 // ================================================================================================
 
 Trace: Vec<TraceSegment> = {
-    <l:@L> "trace_columns" ":" <main: MainTraceBindings?> <aux: AuxTraceBindings?> <r:@R> =>?
+    <l:@L> "trace_columns" "{" <main: MainTraceBindings?> <aux: AuxTraceBindings?> "}" <r:@R> =>?
         match (main, aux) {
             (Some(main), Some(aux)) => Ok(vec![main, aux]),
             (Some(main), None) => Ok(vec![main]),
@@ -157,7 +157,7 @@ ConstExpr: ConstantExpr = {
 
 // At least one public input is required.
 PublicInputs: Span<Vec<PublicInput>> = {
-    <l:@L> "public_inputs" ":" <inputs:PublicInput+> <r:@R> => Span::new(span!(l, r), inputs)
+    <l:@L> "public_inputs" "{" <inputs:PublicInput+> "}" <r:@R> => Span::new(span!(l, r), inputs)
 }
 
 PublicInput: PublicInput = {
@@ -170,7 +170,7 @@ PublicInput: PublicInput = {
 
 // Periodic columns are not required, and there is no limit to the number that can be provided.
 PeriodicColumns: Span<Vec<PeriodicColumn>> = {
-    <l:@L> "periodic_columns" ":" <columns:PeriodicColumn*> <r:@R>
+    <l:@L> "periodic_columns" "{" <columns:PeriodicColumn*> "}" <r:@R>
         => Span::new(span!(l, r), columns)
 }
 
@@ -183,7 +183,7 @@ PeriodicColumn: PeriodicColumn = {
 // ================================================================================================
 
 RandomValues: RandomValues = {
-    "random_values" ":" <random_values: RandValuesDef> <l:@L> <extra: RandValuesDef*> <r:@R> =>? {
+    "random_values" "{" <random_values: RandValuesDef> <l:@L> <extra: RandValuesDef*> "}" <r:@R> =>? {
         if !extra.is_empty() {
             diagnostics.diagnostic(Severity::Warning)
                 .with_message("only one declaration may appear in random_values")
@@ -221,7 +221,7 @@ RandBinding: Span<(Identifier, usize)> = {
 // ================================================================================================
 
 EvaluatorFunction: EvaluatorFunction = {
-    <l:@L> "ev" <name: FunctionIdentifier> "(" <params: EvaluatorBindings> ")" ":" <body: StatementBlock> <r:@R>
+    <l:@L> "ev" <name: FunctionIdentifier> "(" <params: EvaluatorBindings> ")" "{" <body: StatementBlock> "}" <r:@R>
         => EvaluatorFunction::new(span!(l, r), name, params, body)
 }
 
@@ -260,7 +260,7 @@ EvaluatorSegmentBindings: (SourceSpan, Vec<Span<(Identifier, usize)>>) = {
 // ================================================================================================
 
 BoundaryConstraints: Span<Vec<Statement>> = {
-    <l:@L> "boundary_constraints" ":" <body: StatementBlock> <r:@R> => Span::new(span!(l, r), body),
+    <l:@L> "boundary_constraints" "{" <body: StatementBlock> "}" <r:@R> => Span::new(span!(l, r), body),
 }
 
 Boundary: Boundary = {
@@ -272,7 +272,7 @@ Boundary: Boundary = {
 // ================================================================================================
 
 IntegrityConstraints: Span<Vec<Statement>> = {
-    <l:@L> "integrity_constraints" ":" <body: StatementBlock> <r:@R>
+    <l:@L> "integrity_constraints" "{" <body: StatementBlock> "}" <r:@R>
         => Span::new(span!(l, r), body)
 }
 
@@ -301,7 +301,7 @@ ConstraintStatements: Vec<Statement> = {
 }
 
 ConstraintStatement: Vec<Statement> = {
-    "enf" "match" ":" <MatchArm+> => <>,
+    "enf" "match" "{" <MatchArm+> "}" => <>,
     "enf" <ConstraintExpr> => vec![<>],
 }
 
@@ -611,6 +611,8 @@ extern {
         "]" => Token::RBracket,
         "(" => Token::LParen,
         ")" => Token::RParen,
+        "{" => Token::LBrace,
+        "}" => Token::RBrace,
         "." => Token::Dot,
         ".." => Token::DotDot,
     }

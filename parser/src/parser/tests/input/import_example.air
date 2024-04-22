@@ -6,15 +6,19 @@ use foo::*
 # Import just `bar_constraint` from bar
 use bar::bar_constraint
 
-trace_columns:
+trace_columns {
     main: [clk, fmp, ctx]
+}
 
-public_inputs:
+public_inputs {
     inputs: [2]
+}
 
-integrity_constraints:
+integrity_constraints {
     enf foo_constraint([clk])
     enf bar_constraint([clk])
+}
 
-boundary_constraints:
+boundary_constraints {
     enf clk.first = 0
+}

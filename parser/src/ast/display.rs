@@ -67,7 +67,7 @@ pub struct DisplayStatement<'a> {
     pub indent: usize,
 }
 impl DisplayStatement<'_> {
-    const INDENT: &str = "    ";
+    const INDENT: &'static str = "    ";
 
     fn write_indent(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for _ in 0..self.indent {

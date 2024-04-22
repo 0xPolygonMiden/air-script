@@ -300,26 +300,29 @@ impl fmt::Display for Program {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "def {}\n", self.name)?;
 
-        writeln!(f, "trace_columns:")?;
+        writeln!(f, "trace_columns {{")?;
         for segment in self.trace_columns.iter() {
             writeln!(f, "    {}", segment)?;
         }
+        f.write_str("}}")?;
         f.write_str("\n")?;
 
-        writeln!(f, "public_inputs:")?;
+        writeln!(f, "public_inputs {{")?;
         for public_input in self.public_inputs.values() {
             writeln!(f, "    {}: [{}]", public_input.name, public_input.size)?;
         }
+        f.write_str("}}")?;
         f.write_str("\n")?;
 
         if let Some(rv) = self.random_values.as_ref() {
-            writeln!(f, "random_values:")?;
+            writeln!(f, "random_values {{")?;
             writeln!(f, "    {}", rv)?;
+            f.write_str("}}")?;
             f.write_str("\n")?;
         }
 
         if !self.periodic_columns.is_empty() {
-            writeln!(f, "periodic_columns:")?;
+            writeln!(f, "periodic_columns {{")?;
             for (qid, column) in self.periodic_columns.iter() {
                 if qid.module == self.name {
                     writeln!(
@@ -332,6 +335,7 @@ impl fmt::Display for Program {
                     writeln!(f, "    {}: {}", qid, DisplayList(column.values.as_slice()))?;
                 }
             }
+            f.write_str("}}")?;
             f.write_str("\n")?;
         }
 
@@ -346,16 +350,18 @@ impl fmt::Display for Program {
             f.write_str("\n")?;
         }
 
-        writeln!(f, "boundary_constraints:")?;
+        writeln!(f, "boundary_constraints {{")?;
         for statement in self.boundary_constraints.iter() {
             writeln!(f, "{}", statement.display(1))?;
         }
+        f.write_str("}}")?;
         f.write_str("\n")?;
 
-        writeln!(f, "integrity_constraints:")?;
+        writeln!(f, "integrity_constraints {{")?;
         for statement in self.integrity_constraints.iter() {
             writeln!(f, "{}", statement.display(1))?;
         }
+        f.write_str("}}")?;
         f.write_str("\n")?;
 
         for (qid, evaluator) in self.evaluators.iter() {
@@ -370,10 +376,11 @@ impl fmt::Display for Program {
             } else {
                 writeln!(f, "{}{}", qid, DisplayTuple(evaluator.params.as_slice()))?;
             }
-
+            f.write_str(" {{")?;
             for statement in evaluator.body.iter() {
                 writeln!(f, "{}", statement.display(1))?;
             }
+            f.write_str("}}")?;
             f.write_str("\n")?;
         }
 

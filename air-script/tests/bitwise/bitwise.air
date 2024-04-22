@@ -1,20 +1,24 @@
 def BitwiseAir
 
-public_inputs:
+public_inputs {
     stack_inputs: [16]
+}
 
-trace_columns:
+trace_columns {
     main: [s, a, b, a0, a1, a2, a3, b0, b1, b2, b3, zp, z, dummy]
+}
 
-periodic_columns:
+periodic_columns {
     k0: [1, 0, 0, 0, 0, 0, 0, 0]
     k1: [1, 1, 1, 1, 1, 1, 1, 0]
+}
 
-boundary_constraints:
+boundary_constraints {
     # This is a dummy trace column to satisfy requirement of at least one boundary constraint.
     enf dummy.first = 0
+}
 
-integrity_constraints:
+integrity_constraints {
     # Enforce that selector must be binary
     enf s^2 - s = 0
 
@@ -59,3 +63,4 @@ integrity_constraints:
     # exclusive, the constraints for different operations can be aggregated into the same result
     # indices.
     enf (1 - s) * (z - (zp * 16 + 2^0 * a0 * b0 + 2^1 * a1 * b1 + 2^2 * a2 * b2 + 2^3 * a3 * b3)) + s * (z - (zp * 16 + 2^0 * (a0 + b0 - 2 * a0 * b0) + 2^1 * (a1 + b1 - 2 * a1 * b1) + 2^2 * (a2 + b2 - 2 * a2 * b2) + 2^3 * (a3 + b3 - 2 * a3 * b3))) = 0
+}

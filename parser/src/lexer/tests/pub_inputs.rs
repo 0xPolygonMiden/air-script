@@ -10,13 +10,14 @@ fn pub_inputs_kw() {
 #[test]
 fn pub_inputs_sized_arrays() {
     let source = "
-public_inputs:
+public_inputs {
     program_hash: [4]
-    stack_inputs: [12]";
+    stack_inputs: [12]
+}";
 
     let tokens = vec![
         Token::PublicInputs,
-        Token::Colon,
+        Token::LBrace,
         Token::Ident(Symbol::intern("program_hash")),
         Token::Colon,
         Token::LBracket,
@@ -27,6 +28,7 @@ public_inputs:
         Token::LBracket,
         Token::Num(12),
         Token::RBracket,
+        Token::RBrace,
     ];
     expect_valid_tokenization(source, tokens);
 }

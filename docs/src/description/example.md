@@ -5,18 +5,21 @@ This is an example AIR definition in AirScript that includes all existing AirScr
 ```
 def ExampleAir
 
-trace_columns:
+trace_columns {
     main: [s, a, b, c]
     aux: [p]
+}
 
-public_inputs:
+public_inputs {
     stack_inputs: [16]
     stack_outputs: [16]
+}
 
-periodic_columns:
+periodic_columns {
     k0: [1, 1, 1, 1, 1, 1, 1, 0]
+}
 
-boundary_constraints:
+boundary_constraints {
     # define boundary constraints against the main trace at the first row of the trace.
     enf a.first = stack_inputs[0]
     enf b.first = stack_inputs[1]
@@ -29,8 +32,9 @@ boundary_constraints:
 
     # set the first row of the auxiliary column p to 1
     enf p.first = 1
+}
 
-integrity_constraints:
+integrity_constraints {
     # the selector must be binary.
     enf s^2 = s
 
@@ -45,4 +49,5 @@ integrity_constraints:
 
     # the auxiliary column contains the product of values of c offset by a random value.
     enf p' = p * (c + $rand[0])
+}
 ```

@@ -626,25 +626,29 @@ mod variables;
 fn full_air_file() {
     // def SystemAir
     let mut expected = Program::new(ident!(SystemAir));
-    // public_inputs:
+    // public_inputs {
     //     inputs: [2]
+    // }
     expected.public_inputs.insert(
         ident!(inputs),
         PublicInput::new(miden_diagnostics::SourceSpan::UNKNOWN, ident!(inputs), 2),
     );
-    // trace_columns:
+    // trace_columns {
     //     main: [clk, fmp, ctx]
+    // }
     expected
         .trace_columns
         .push(trace_segment!(0, "$main", [(clk, 1), (fmp, 1), (ctx, 1)]));
-    // integrity_constraints:
+    // integrity_constraints {
     //     enf clk' = clk + 1
+    // }
     expected.integrity_constraints.push(enforce!(eq!(
         access!(clk, 1, Type::Felt),
         add!(access!(clk, Type::Felt), int!(1))
     )));
-    // boundary_constraints:
+    // boundary_constraints {
     //     enf clk.first = 0
+    // }
     expected.boundary_constraints.push(enforce!(eq!(
         bounded_access!(clk, Boundary::First, Type::Felt),
         int!(0)
