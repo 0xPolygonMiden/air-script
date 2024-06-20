@@ -82,6 +82,24 @@ impl Statement {
         }
     }
 }
+impl From<Expr> for Statement {
+    fn from(expr: Expr) -> Self {
+        match expr {
+            Expr::Let(let_expr) => Self::Let(*let_expr),
+            expr => Self::Expr(expr),
+        }
+    }
+}
+impl TryFrom<ScalarExpr> for Statement {
+    type Error = ();
+
+    fn try_from(expr: ScalarExpr) -> Result<Self, Self::Error> {
+        match expr {
+            ScalarExpr::Let(let_expr) => Ok(Self::Let(*let_expr)),
+            expr => Expr::try_from(expr).map_err(|_| ()).map(Self::Expr),
+        }
+    }
+}
 
 /// A `let` statement binds `name` to the value of `expr` in `body`.
 #[derive(Clone, Spanned)]

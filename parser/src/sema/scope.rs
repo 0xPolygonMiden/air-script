@@ -3,6 +3,7 @@ use std::{
     collections::HashMap,
     hash::Hash,
     ops::{Index, IndexMut},
+    rc::Rc,
 };
 
 /// A simple type alias for a boxed `HashMap` to aid in readability of the code below
@@ -21,7 +22,6 @@ pub type Env<K, V> = Box<HashMap<K, V>>;
 /// When searching for keys, the search begins in the current scope, and searches upwards
 /// in the scope tree until either the root is reached and the search terminates, or the
 /// key is found in some intervening scope.
-#[derive(Clone)]
 pub enum LexicalScope<K, V> {
     /// An empty scope, this is the default state in which all [LexicalScope] start
     Empty,
@@ -29,7 +29,20 @@ pub enum LexicalScope<K, V> {
     Root(Env<K, V>),
     /// Represents a (possibly empty) nested scope, as a tuple of the parent scope and
     /// the environment of the current scope.
-    Nested(Box<LexicalScope<K, V>>, Env<K, V>),
+    Nested(Rc<LexicalScope<K, V>>, Env<K, V>),
+}
+impl<K, V> Clone for LexicalScope<K, V>
+where
+    K: Clone,
+    V: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Empty => Self::Empty,
+            Self::Root(scope) => Self::Root(scope.clone()),
+            Self::Nested(parent, scope) => Self::Nested(Rc::clone(parent), scope.clone()),
+        }
+    }
 }
 impl<K, V> Default for LexicalScope<K, V> {
     fn default() -> Self {
@@ -45,23 +58,26 @@ impl<K, V> LexicalScope<K, V> {
             Self::Nested(parent, env) => env.is_empty() && parent.is_empty(),
         }
     }
+}
 
+impl<K, V> LexicalScope<K, V>
+where
+    K: Clone,
+    V: Clone,
+{
+    /// Returns true if this scope is empty
     /// Enters a new, nested lexical scope
     pub fn enter(&mut self) {
-        let moved = Box::new(core::mem::take(self));
+        let moved = Rc::new(core::mem::take(self));
         *self = Self::Nested(moved, Env::default());
     }
 
     /// Exits the current lexical scope
     pub fn exit(&mut self) {
-        match self {
-            Self::Empty => (),
-            Self::Root(_env) => {
-                *self = Self::Empty;
-            }
-            Self::Nested(ref mut parent, _) => {
-                let moved = core::mem::take(parent.as_mut());
-                *self = moved;
+        match core::mem::replace(self, Self::Empty) {
+            Self::Empty | Self::Root(_) => (),
+            Self::Nested(parent, _) => {
+                *self = Rc::unwrap_or_clone(parent);
             }
         }
     }
@@ -108,9 +124,9 @@ where
         match self {
             Self::Empty => None,
             Self::Root(ref mut env) => env.get_mut(key),
-            Self::Nested(ref mut parent, ref mut env) => {
-                env.get_mut(key).or_else(|| parent.get_mut(key))
-            }
+            Self::Nested(ref mut parent, ref mut env) => env
+                .get_mut(key)
+                .or_else(|| Rc::get_mut(parent).and_then(|p| p.get_mut(key))),
         }
     }
 

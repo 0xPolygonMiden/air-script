@@ -1562,6 +1562,14 @@ impl<'a> SemanticAnalysis<'a> {
                     }
                 }
             }
+            Expr::Let(ref expr) => {
+                self.diagnostics
+                    .diagnostic(Severity::Bug)
+                    .with_message("invalid expression")
+                    .with_primary_label(expr.span(), "let expressions are not valid here")
+                    .emit();
+                Err(InvalidAccessError::InvalidBinding)
+            }
         }
     }
 

@@ -79,7 +79,7 @@ proc.compute_integrity_constraints
     # Multiply by the composition coefficient
     padw mem_loadw.4294900200 movdn.3 movdn.3 drop drop ext2mul
     # integrity constraint 0 for aux
-    padw mem_loadw.4294900072 drop drop padw mem_loadw.4294900072 movdn.3 movdn.3 drop drop padw mem_loadw.4294900150 movdn.3 movdn.3 drop drop padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop ext2add
+    padw mem_loadw.4294900072 drop drop padw mem_loadw.4294900072 movdn.3 movdn.3 drop drop padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
     # => [b1, b0, r1, r0, ...]
@@ -93,7 +93,7 @@ proc.compute_integrity_constraints
     # clean stack
     drop drop
     # => [r1, r0, ...] (2 cycles)
-    padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2mul ext2mul padw mem_loadw.4294900150 movdn.3 movdn.3 drop drop padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop ext2add
+    padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2mul ext2mul padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop
     # push the accumulator to the stack
     push.1 movdn.2 push.0 movdn.2
     # => [b1, b0, r1, r0, ...]
@@ -107,7 +107,7 @@ proc.compute_integrity_constraints
     # clean stack
     drop drop
     # => [r1, r0, ...] (2 cycles)
-    push.1 push.0 padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop ext2sub padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2mul ext2mul ext2add padw mem_loadw.4294900150 movdn.3 movdn.3 drop drop padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop ext2add padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop push.1 push.0 padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2sub ext2mul ext2mul ext2add push.1 push.0 padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop ext2sub push.1 push.0 padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2sub ext2mul ext2add padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop ext2mul padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop ext2sub push.1 push.0 ext2add ext2mul ext2sub
+    push.1 push.0 padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop ext2sub padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2mul ext2mul ext2add padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop push.1 push.0 padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2sub ext2mul ext2mul ext2add push.1 push.0 padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop ext2sub push.1 push.0 padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2sub ext2mul ext2add padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop ext2mul padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop ext2sub push.1 push.0 ext2add ext2mul ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900200 drop drop ext2mul
 end # END PROC compute_integrity_constraints
