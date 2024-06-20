@@ -1120,22 +1120,32 @@ fn test_inlining_constraints_with_folded_comprehensions_in_evaluator() {
         int!(0)
     )));
     // When constant propagation and inlining is done, integrity_constraints should look like:
-    //     let lc%0 = b[2]^7
-    //     let lc%1 = b[3]^7
-    //     let y = lc%0 + lc%1
-    //     let lc%2 = b[2]^7
-    //     let lc%3 = b[3]^7
-    //     let z = lc%2 + lc%3
+    //     let y =
+    //         let %lc0 = b[2]^7
+    //         let %lc1 = b[3]^7
+    //         %lc0 + %lc1
+    //     in
+    //     let z =
+    //         let %lc2 = b[2]^7
+    //         let %lc3 = b[3]^7
+    //         %lc2 * %lc3
+    //     in
     //     enf b[1] = y + z
     expected
         .integrity_constraints
-        .push(let_!("%lc0" = expr!(exp!(access!(b[2], Type::Felt), int!(7)))
+        .push(let_!(y = expr!(
+            let_!("%lc0" = expr!(exp!(access!(b[2], Type::Felt), int!(7)))
             => let_!("%lc1" = expr!(exp!(access!(b[3], Type::Felt), int!(7)))
-            => let_!(y = expr!(add!(access!("%lc0", Type::Felt), access!("%lc1", Type::Felt)))
-            => let_!("%lc2" = expr!(exp!(access!(b[2], Type::Felt), int!(7)))
-            => let_!("%lc3" = expr!(exp!(access!(b[3], Type::Felt), int!(7)))
-            => let_!(z = expr!(mul!(access!("%lc2", Type::Felt), access!("%lc3", Type::Felt)))
-            => enforce!(eq!(access!(b[1], Type::Felt), add!(access!(y, Type::Felt), access!(z, Type::Felt)))))))))));
+            => statement!(add!(access!("%lc0", Type::Felt), access!("%lc1", Type::Felt)))))
+        ) =>
+            let_!(z = expr!(
+                let_!("%lc2" = expr!(exp!(access!(b[2], Type::Felt), int!(7)))
+                => let_!("%lc3" = expr!(exp!(access!(b[3], Type::Felt), int!(7)))
+                => statement!(mul!(access!("%lc2", Type::Felt), access!("%lc3", Type::Felt)))))
+            ) =>
+              enforce!(eq!(access!(b[1], Type::Felt), add!(access!(y, Type::Felt), access!(z, Type::Felt))))
+            )
+        ));
     // The evaluator definition is never modified by constant propagation or inlining
     let body = vec![
         let_!(y = expr!(call!(sum(expr!(lc!(((col, expr!(access!(ys, Type::Vector(2))))) => exp!(access!(col, Type::Felt), int!(7)))))))
@@ -1251,20 +1261,19 @@ fn test_inlining_with_function_call_as_binary_operand() {
     )));
     // With constant propagation and inlining done
     //
-    // let %0 = b[0] + b[1] + b[2] + b[3]
-    // let m = b[0] * b[1]
-    // let n = m * b[2]
-    // let o = n * b[3]
-    // let %1 = o
-    // let complex_fold = %0 * %1
+    // let complex_fold =
+    //   (b[0] + b[1] + b[2] + b[3]) *
+    //   (let m = b[0] * b[1]
+    //   let n = m * b[2]
+    //   let o = n * b[3] in o)
     // enf complex_fold = 1
     expected.integrity_constraints.push(
-        let_!("%0" = expr!(add!(add!(add!(access!(b[0], Type::Felt), access!(b[1], Type::Felt)), access!(b[2], Type::Felt)), access!(b[3], Type::Felt)))
-            => let_!(m = expr!(mul!(access!(b[0], Type::Felt), access!(b[1], Type::Felt)))
+        let_!(complex_fold = expr!(mul!(
+            add!(add!(add!(access!(b[0], Type::Felt), access!(b[1], Type::Felt)), access!(b[2], Type::Felt)), access!(b[3], Type::Felt)),
+            scalar!(let_!(m = expr!(mul!(access!(b[0], Type::Felt), access!(b[1], Type::Felt)))
             => let_!(n = expr!(mul!(access!(m, Type::Felt), access!(b[2], Type::Felt)))
-            => let_!(o = expr!(mul!(access!(n, Type::Felt), access!(b[3], Type::Felt)))
-            => let_!(complex_fold = expr!(mul!(access!("%0", Type::Felt), access!(o, Type::Felt)))
-            => enforce!(eq!(access!(complex_fold, Type::Felt), int!(1))))))))
+            => let_!(o = expr!(mul!(access!(n, Type::Felt), access!(b[3], Type::Felt))) => return_!(expr!(access!(o, Type::Felt)))))))
+        )) => enforce!(eq!(access!(complex_fold, Type::Felt), int!(1))))
     );
 
     assert_eq!(program, expected);
@@ -1419,84 +1428,88 @@ fn test_repro_issue340() {
         });
         add!(acc, access)
     });
-    let low_bit_sum_body = let_!(low_bit_sum = expr!(low_bit_sum) =>
-        enforce!(eq!(access!(immediate, Type::Felt), add!(access!(low_bit_sum, Type::Felt), access!(high_bit_sum, Type::Felt))), when access!(s, Type::Felt)),
-        enforce!(eq!(access!(instruction_bits[31], Type::Felt), int!(1)), when access!(s, Type::Felt)));
-    let high_bit_sum_body = let_!(high_bit_sum = expr!(high_bit_sum)
-                => let_!("%lc53" = expr!(mul!(access!(instruction_bits[20], Type::Felt), int!(1)))
-                => let_!("%lc54" = expr!(mul!(access!(instruction_bits[21], Type::Felt), int!(2)))
-                => let_!("%lc55" = expr!(mul!(access!(instruction_bits[22], Type::Felt), int!(4)))
-                => let_!("%lc56" = expr!(mul!(access!(instruction_bits[23], Type::Felt), int!(8)))
-                => let_!("%lc57" = expr!(mul!(access!(instruction_bits[24], Type::Felt), int!(16)))
-                => let_!("%lc58" = expr!(mul!(access!(instruction_bits[25], Type::Felt), int!(32)))
-                => let_!("%lc59" = expr!(mul!(access!(instruction_bits[26], Type::Felt), int!(64)))
-                => let_!("%lc60" = expr!(mul!(access!(instruction_bits[27], Type::Felt), int!(128)))
-                => let_!("%lc61" = expr!(mul!(access!(instruction_bits[28], Type::Felt), int!(256)))
-                => let_!("%lc62" = expr!(mul!(access!(instruction_bits[29], Type::Felt), int!(512)))
-                => let_!("%lc63" = expr!(mul!(access!(instruction_bits[30], Type::Felt), int!(1024)))
-                => low_bit_sum_body))))))))))));
-    let word_sum_body = let_!(word_sum = expr!(word_sum)
-          => enforce!(eq!(access!(instruction_word, Type::Felt), access!(word_sum, Type::Felt))),
-             let_!("%lc32" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(2048)))
-             => let_!("%lc33" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(4096)))
-             => let_!("%lc34" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(8192)))
-             => let_!("%lc35" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(16384)))
-             => let_!("%lc36" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(32768)))
-             => let_!("%lc37" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(65536)))
-             => let_!("%lc38" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(131072)))
-             => let_!("%lc39" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(262144)))
-             => let_!("%lc40" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(524288)))
-             => let_!("%lc41" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(1048576)))
-             => let_!("%lc42" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(2097152)))
-             => let_!("%lc43" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(4194304)))
-             => let_!("%lc44" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(8388608)))
-             => let_!("%lc45" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(16777216)))
-             => let_!("%lc46" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(33554432)))
-             => let_!("%lc47" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(67108864)))
-             => let_!("%lc48" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(134217728)))
-             => let_!("%lc49" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(268435456)))
-             => let_!("%lc50" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(536870912)))
-             => let_!("%lc51" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(1073741824)))
-             => let_!("%lc52" = expr!(mul!(access!(instruction_bits[31], Type::Felt), int!(2147483648)))
-             => high_bit_sum_body))))))))))))))))))))),
-           enforce!(eq!(access!(immediate, Type::Felt), int!(0)), when not!(access!(s, Type::Felt)))
+    let instruction_bits = ident!(instruction_bits);
+    let low_bit_sum_value_expr = (53..64).rfold(
+        Statement::Expr(Expr::try_from(low_bit_sum).unwrap()),
+        |acc, i| {
+            let literal = 2u64.pow((i as u32) - 53);
+            let access = ScalarExpr::SymbolAccess(SymbolAccess {
+                span: Default::default(),
+                name: ResolvableIdentifier::Local(instruction_bits),
+                access_type: AccessType::Index(i - 33),
+                offset: 0,
+                ty: Some(Type::Felt),
+            });
+            Statement::Let(Let {
+                span: SourceSpan::default(),
+                name: Identifier::new(
+                    SourceSpan::default(),
+                    crate::Symbol::intern(format!("%lc{}", i)),
+                ),
+                value: expr!(mul!(access, scalar!(literal))),
+                body: vec![acc],
+            })
+        },
+    );
+    let low_bit_sum_value_expr = Expr::try_from(low_bit_sum_value_expr).unwrap();
+    let high_bit_sum_value_expr = (11..32).rfold(
+        Statement::Expr(Expr::try_from(high_bit_sum).unwrap()),
+        |acc, i| {
+            let literal = 2u64.pow(i);
+            let access = ScalarExpr::SymbolAccess(SymbolAccess {
+                span: Default::default(),
+                name: ResolvableIdentifier::Local(instruction_bits),
+                access_type: AccessType::Index(31),
+                offset: 0,
+                ty: Some(Type::Felt),
+            });
+            Statement::Let(Let {
+                span: SourceSpan::default(),
+                name: Identifier::new(
+                    SourceSpan::default(),
+                    crate::Symbol::intern(format!("%lc{}", i + 21)),
+                ),
+                value: expr!(mul!(access, scalar!(literal))),
+                body: vec![acc],
+            })
+        },
+    );
+    let high_bit_sum_value_expr = Expr::try_from(high_bit_sum_value_expr).unwrap();
+    let word_sum_value_expr = (0..32).rfold(
+        Statement::Expr(Expr::try_from(word_sum).unwrap()),
+        |acc, i| {
+            let literal = 2u64.pow(i as u32);
+            let access = ScalarExpr::SymbolAccess(SymbolAccess {
+                span: Default::default(),
+                name: ResolvableIdentifier::Local(instruction_bits),
+                access_type: AccessType::Index(i),
+                offset: 0,
+                ty: Some(Type::Felt),
+            });
+            Statement::Let(Let {
+                span: SourceSpan::default(),
+                name: Identifier::new(
+                    SourceSpan::default(),
+                    crate::Symbol::intern(format!("%lc{}", i)),
+                ),
+                value: expr!(mul!(scalar!(literal), access)),
+                body: vec![acc],
+            })
+        },
+    );
+    let word_sum_value_expr = Expr::try_from(word_sum_value_expr).unwrap();
+    let word_sum_body = let_!(word_sum = word_sum_value_expr
+    => enforce!(eq!(access!(instruction_word, Type::Felt), access!(word_sum, Type::Felt))),
+       let_!(high_bit_sum = high_bit_sum_value_expr
+       => let_!(low_bit_sum = low_bit_sum_value_expr
+       =>  enforce!(eq!(access!(immediate, Type::Felt), add!(access!(low_bit_sum, Type::Felt), access!(high_bit_sum, Type::Felt))), when access!(s, Type::Felt)),
+           enforce!(eq!(access!(instruction_bits[31], Type::Felt), int!(1)), when access!(s, Type::Felt))
+       )),
+       enforce!(eq!(access!(immediate, Type::Felt), int!(0)), when not!(access!(s, Type::Felt)))
     );
 
-    expected.integrity_constraints.push(
-        let_!("%lc0" = expr!(mul!(int!(1), access!(instruction_bits[0], Type::Felt)))
-        => let_!("%lc1" = expr!(mul!(int!(2), access!(instruction_bits[1], Type::Felt)))
-        => let_!("%lc2" = expr!(mul!(int!(4), access!(instruction_bits[2], Type::Felt)))
-        => let_!("%lc3" = expr!(mul!(int!(8), access!(instruction_bits[3], Type::Felt)))
-        => let_!("%lc4" = expr!(mul!(int!(16), access!(instruction_bits[4], Type::Felt)))
-        => let_!("%lc5" = expr!(mul!(int!(32), access!(instruction_bits[5], Type::Felt)))
-        => let_!("%lc6" = expr!(mul!(int!(64), access!(instruction_bits[6], Type::Felt)))
-        => let_!("%lc7" = expr!(mul!(int!(128), access!(instruction_bits[7], Type::Felt)))
-        => let_!("%lc8" = expr!(mul!(int!(256), access!(instruction_bits[8], Type::Felt)))
-        => let_!("%lc9" = expr!(mul!(int!(512), access!(instruction_bits[9], Type::Felt)))
-        => let_!("%lc10" = expr!(mul!(int!(1024), access!(instruction_bits[10], Type::Felt)))
-        => let_!("%lc11" = expr!(mul!(int!(2048), access!(instruction_bits[11], Type::Felt)))
-        => let_!("%lc12" = expr!(mul!(int!(4096), access!(instruction_bits[12], Type::Felt)))
-        => let_!("%lc13" = expr!(mul!(int!(8192), access!(instruction_bits[13], Type::Felt)))
-        => let_!("%lc14" = expr!(mul!(int!(16384), access!(instruction_bits[14], Type::Felt)))
-        => let_!("%lc15" = expr!(mul!(int!(32768), access!(instruction_bits[15], Type::Felt)))
-        => let_!("%lc16" = expr!(mul!(int!(65536), access!(instruction_bits[16], Type::Felt)))
-        => let_!("%lc17" = expr!(mul!(int!(131072), access!(instruction_bits[17], Type::Felt)))
-        => let_!("%lc18" = expr!(mul!(int!(262144), access!(instruction_bits[18], Type::Felt)))
-        => let_!("%lc19" = expr!(mul!(int!(524288), access!(instruction_bits[19], Type::Felt)))
-        => let_!("%lc20" = expr!(mul!(int!(1048576), access!(instruction_bits[20], Type::Felt)))
-        => let_!("%lc21" = expr!(mul!(int!(2097152), access!(instruction_bits[21], Type::Felt)))
-        => let_!("%lc22" = expr!(mul!(int!(4194304), access!(instruction_bits[22], Type::Felt)))
-        => let_!("%lc23" = expr!(mul!(int!(8388608), access!(instruction_bits[23], Type::Felt)))
-        => let_!("%lc24" = expr!(mul!(int!(16777216), access!(instruction_bits[24], Type::Felt)))
-        => let_!("%lc25" = expr!(mul!(int!(33554432), access!(instruction_bits[25], Type::Felt)))
-        => let_!("%lc26" = expr!(mul!(int!(67108864), access!(instruction_bits[26], Type::Felt)))
-        => let_!("%lc27" = expr!(mul!(int!(134217728), access!(instruction_bits[27], Type::Felt)))
-        => let_!("%lc28" = expr!(mul!(int!(268435456), access!(instruction_bits[28], Type::Felt)))
-        => let_!("%lc29" = expr!(mul!(int!(536870912), access!(instruction_bits[29], Type::Felt)))
-        => let_!("%lc30" = expr!(mul!(int!(1073741824), access!(instruction_bits[30], Type::Felt)))
-        => let_!("%lc31" = expr!(mul!(int!(2147483648), access!(instruction_bits[31], Type::Felt)))
-        => word_sum_body)))))))))))))))))))))))))))))))),
-    );
+    expected.integrity_constraints.push(word_sum_body);
+
     // The evaluator definition is never modified by constant propagation or inlining
     let body = vec![
         let_!(sign_bit = expr!(access!(instruction_bits[31], Type::Felt))

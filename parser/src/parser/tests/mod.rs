@@ -275,6 +275,18 @@ macro_rules! expr {
     };
 }
 
+macro_rules! scalar {
+    ($expr:expr) => {
+        ScalarExpr::try_from($expr).unwrap()
+    };
+}
+
+macro_rules! statement {
+    ($expr:expr) => {
+        Statement::try_from($expr).unwrap()
+    };
+}
+
 macro_rules! slice {
     ($name:ident, $range:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {

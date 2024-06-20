@@ -94,11 +94,12 @@ impl<'a> fmt::Display for DisplayStatement<'a> {
         self.write_indent(f)?;
         match self.statement {
             Statement::Let(ref expr) => {
-                writeln!(f, "let {} = {}", expr.name, expr.value)?;
-                for statement in expr.body.iter() {
-                    writeln!(f, "{}", statement.display(self.indent))?;
-                }
-                Ok(())
+                let display = DisplayLet {
+                    let_expr: expr,
+                    indent: self.indent,
+                    in_expr_position: false,
+                };
+                write!(f, "{display}")
             }
             Statement::Enforce(ref expr) => {
                 write!(f, "enf {}", expr)
@@ -111,5 +112,61 @@ impl<'a> fmt::Display for DisplayStatement<'a> {
             }
             Statement::Expr(ref expr) => write!(f, "return {}", expr),
         }
+    }
+}
+
+pub struct DisplayLet<'a> {
+    pub let_expr: &'a super::Let,
+    pub indent: usize,
+    pub in_expr_position: bool,
+}
+impl DisplayLet<'_> {
+    const INDENT: &'static str = "    ";
+
+    fn write_indent(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for _ in 0..self.indent {
+            f.write_str(Self::INDENT)?;
+        }
+        Ok(())
+    }
+}
+impl<'a> fmt::Display for DisplayLet<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use core::fmt::Write;
+
+        self.write_indent(f)?;
+        match &self.let_expr.value {
+            super::Expr::Let(value) => {
+                writeln!(f, "let {} = {{", self.let_expr.name)?;
+                let display = DisplayLet {
+                    let_expr: value,
+                    indent: self.indent + 1,
+                    in_expr_position: true,
+                };
+                writeln!(f, "{display}")?;
+                self.write_indent(f)?;
+                if self.in_expr_position {
+                    f.write_str("} in {\n")?;
+                } else {
+                    f.write_str("}\n")?;
+                }
+            }
+            value => {
+                write!(f, "let {} = {}", self.let_expr.name, value)?;
+                if self.in_expr_position {
+                    f.write_str(" in {\n")?;
+                } else {
+                    f.write_char('\n')?;
+                }
+            }
+        }
+        for stmt in self.let_expr.body.iter() {
+            writeln!(f, "{}", stmt.display(self.indent + 1))?;
+        }
+        if self.in_expr_position {
+            self.write_indent(f)?;
+            f.write_char('}')?;
+        }
+        Ok(())
     }
 }

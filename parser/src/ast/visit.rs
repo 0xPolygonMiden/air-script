@@ -601,6 +601,7 @@ where
         ast::Expr::Binary(ref mut expr) => visitor.visit_mut_binary_expr(expr),
         ast::Expr::Call(ref mut expr) => visitor.visit_mut_call(expr),
         ast::Expr::ListComprehension(ref mut expr) => visitor.visit_mut_list_comprehension(expr),
+        ast::Expr::Let(ref mut expr) => visitor.visit_mut_let(expr),
     }
 }
 
@@ -616,6 +617,7 @@ where
         }
         ast::ScalarExpr::Binary(ref mut expr) => visitor.visit_mut_binary_expr(expr),
         ast::ScalarExpr::Call(ref mut expr) => visitor.visit_mut_call(expr),
+        ast::ScalarExpr::Let(ref mut expr) => visitor.visit_mut_let(expr),
     }
 }
 

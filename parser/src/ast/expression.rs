@@ -296,6 +296,11 @@ pub enum Expr {
     Call(Call),
     /// A generator expression which produces a vector or matrix of values
     ListComprehension(ListComprehension),
+    /// A `let` expression, used to bind temporaries in expression position during compilation.
+    ///
+    /// NOTE: The AirScript syntax only permits `let` in statement position, so this variant
+    /// is only present in the AST as the result of an explicit transformation.
+    Let(Box<Let>),
 }
 impl Expr {
     /// Returns true if this expression is constant
@@ -325,6 +330,7 @@ impl Expr {
             Self::Binary(_) => Some(Type::Felt),
             Self::Call(ref call) => call.ty,
             Self::ListComprehension(ref lc) => lc.ty,
+            Self::Let(ref let_expr) => let_expr.ty(),
         }
     }
 }
@@ -341,6 +347,7 @@ impl fmt::Debug for Expr {
             Self::ListComprehension(ref expr) => {
                 f.debug_tuple("ListComprehension").field(expr).finish()
             }
+            Self::Let(ref let_expr) => write!(f, "{let_expr:#?}"),
         }
     }
 }
@@ -360,10 +367,18 @@ impl fmt::Display for Expr {
                 }
                 f.write_str("]")
             }
-            Self::ListComprehension(ref expr) => write!(f, "{}", DisplayBracketed(expr)),
             Self::SymbolAccess(ref expr) => write!(f, "{}", expr),
             Self::Binary(ref expr) => write!(f, "{}", expr),
             Self::Call(ref expr) => write!(f, "{}", expr),
+            Self::ListComprehension(ref expr) => write!(f, "{}", DisplayBracketed(expr)),
+            Self::Let(ref let_expr) => {
+                let display = DisplayLet {
+                    let_expr,
+                    indent: 0,
+                    in_expr_position: true,
+                };
+                write!(f, "{display}")
+            }
         }
     }
 }
@@ -391,22 +406,45 @@ impl From<ListComprehension> for Expr {
         Self::ListComprehension(expr)
     }
 }
+impl TryFrom<Let> for Expr {
+    type Error = InvalidExprError;
+
+    fn try_from(expr: Let) -> Result<Self, Self::Error> {
+        if expr.ty().is_some() {
+            Ok(Self::Let(Box::new(expr)))
+        } else {
+            Err(InvalidExprError::InvalidLetExpr(expr.span()))
+        }
+    }
+}
 impl TryFrom<ScalarExpr> for Expr {
     type Error = InvalidExprError;
 
     #[inline]
     fn try_from(expr: ScalarExpr) -> Result<Self, Self::Error> {
         match expr {
-            ScalarExpr::Const(spanned) => Ok(Expr::Const(Span::new(
+            ScalarExpr::Const(spanned) => Ok(Self::Const(Span::new(
                 spanned.span(),
                 ConstantExpr::Scalar(spanned.item),
             ))),
-            ScalarExpr::SymbolAccess(access) => Ok(Expr::SymbolAccess(access)),
-            ScalarExpr::Binary(expr) => Ok(Expr::Binary(expr)),
-            ScalarExpr::Call(expr) => Ok(Expr::Call(expr)),
+            ScalarExpr::SymbolAccess(access) => Ok(Self::SymbolAccess(access)),
+            ScalarExpr::Binary(expr) => Ok(Self::Binary(expr)),
+            ScalarExpr::Call(expr) => Ok(Self::Call(expr)),
             ScalarExpr::BoundedSymbolAccess(_) => {
                 Err(InvalidExprError::BoundedSymbolAccess(expr.span()))
             }
+            ScalarExpr::Let(expr) => Ok(Self::Let(expr)),
+        }
+    }
+}
+impl TryFrom<Statement> for Expr {
+    type Error = InvalidExprError;
+
+    fn try_from(stmt: Statement) -> Result<Self, Self::Error> {
+        match stmt {
+            Statement::Let(let_expr) => Ok(Self::Let(Box::new(let_expr))),
+            Statement::Expr(expr) => Ok(expr),
+            _ => Err(InvalidExprError::NotAnExpr(stmt.span())),
         }
     }
 }
@@ -430,7 +468,7 @@ pub enum ScalarExpr {
     Binary(BinaryExpr),
     /// A call to a pure function or evaluator
     ///
-    /// NOTE: This is only a valid expression when one of the following hold:
+    /// NOTE: This is only a valid scalar expression when one of the following hold:
     ///
     /// 1. The call is the top-level expression of a constraint, and is to an evaluator function
     /// 2. The call is not the top-level expression of a constraint, and is to a pure function
@@ -438,6 +476,12 @@ pub enum ScalarExpr {
     ///
     /// If neither of the above are true, the call is invalid in a `ScalarExpr` context
     Call(Call),
+    /// An expression that binds a local variable to a temporary value during evaluation.
+    ///
+    /// NOTE: This is only a valid scalar expression during the inlining phase, when we expand
+    /// binary expressions or function calls to a block of statements, and only when the result
+    /// of evaluating the `let` produces a valid scalar expression.
+    Let(Box<Let>),
 }
 impl ScalarExpr {
     /// Returns true if this is a constant value
@@ -449,7 +493,7 @@ impl ScalarExpr {
     pub fn has_block_like_expansion(&self) -> bool {
         match self {
             Self::Binary(ref expr) => expr.has_block_like_expansion(),
-            Self::Call(_) => true,
+            Self::Call(_) | Self::Let(_) => true,
             _ => false,
         }
     }
@@ -471,6 +515,7 @@ impl ScalarExpr {
                 _ => Err(expr.span()),
             },
             Self::Call(ref expr) => Ok(expr.ty),
+            Self::Let(ref expr) => Ok(expr.ty()),
         }
     }
 }
@@ -489,8 +534,31 @@ impl TryFrom<Expr> for ScalarExpr {
             Expr::SymbolAccess(sym) => Ok(Self::SymbolAccess(sym)),
             Expr::Binary(bin) => Ok(Self::Binary(bin)),
             Expr::Call(call) => Ok(Self::Call(call)),
+            Expr::Let(let_expr) => {
+                if let_expr.ty().is_none() {
+                    Err(InvalidExprError::InvalidScalarExpr(let_expr.span()))
+                } else {
+                    Ok(Self::Let(let_expr))
+                }
+            }
             invalid => Err(InvalidExprError::InvalidScalarExpr(invalid.span())),
         }
+    }
+}
+impl TryFrom<Statement> for ScalarExpr {
+    type Error = InvalidExprError;
+
+    fn try_from(stmt: Statement) -> Result<Self, Self::Error> {
+        match stmt {
+            Statement::Let(let_expr) => Self::try_from(Expr::Let(Box::new(let_expr))),
+            Statement::Expr(expr) => Self::try_from(expr),
+            stmt => Err(InvalidExprError::InvalidScalarExpr(stmt.span())),
+        }
+    }
+}
+impl From<u64> for ScalarExpr {
+    fn from(value: u64) -> Self {
+        Self::Const(Span::new(SourceSpan::UNKNOWN, value))
     }
 }
 impl fmt::Debug for ScalarExpr {
@@ -503,6 +571,7 @@ impl fmt::Debug for ScalarExpr {
             }
             Self::Binary(ref expr) => f.debug_tuple("Binary").field(expr).finish(),
             Self::Call(ref expr) => f.debug_tuple("Call").field(expr).finish(),
+            Self::Let(ref expr) => write!(f, "{:#?}", expr),
         }
     }
 }
@@ -514,6 +583,14 @@ impl fmt::Display for ScalarExpr {
             Self::BoundedSymbolAccess(ref expr) => write!(f, "{}.{}", &expr.column, &expr.boundary),
             Self::Binary(ref expr) => write!(f, "{}", expr),
             Self::Call(ref call) => write!(f, "{}", call),
+            Self::Let(ref let_expr) => {
+                let display = DisplayLet {
+                    let_expr,
+                    indent: 0,
+                    in_expr_position: true,
+                };
+                write!(f, "{display}")
+            }
         }
     }
 }

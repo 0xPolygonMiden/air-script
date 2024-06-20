@@ -11,6 +11,10 @@ pub enum InvalidExprError {
     BoundedSymbolAccess(SourceSpan),
     #[error("expected scalar expression")]
     InvalidScalarExpr(SourceSpan),
+    #[error("invalid let in expression position: body produces no value, or the type of that value is unknown")]
+    InvalidLetExpr(SourceSpan),
+    #[error("syntax does not represent a valid expression")]
+    NotAnExpr(SourceSpan),
 }
 impl Eq for InvalidExprError {}
 impl PartialEq for InvalidExprError {
@@ -22,11 +26,6 @@ impl ToDiagnostic for InvalidExprError {
     fn to_diagnostic(self) -> Diagnostic {
         let message = format!("{}", &self);
         match self {
-            Self::InvalidExponent(span) => Diagnostic::error()
-                .with_message("invalid expression")
-                .with_labels(vec![
-                    Label::primary(span.source_id(), span).with_message(message)
-                ]),
             Self::NonConstantExponent(span) => Diagnostic::error()
                 .with_message("invalid expression")
                 .with_labels(vec![
@@ -36,12 +35,11 @@ impl ToDiagnostic for InvalidExprError {
                     "Only constant powers are supported with the exponentiation operator currently"
                         .to_string(),
                 ]),
-            Self::BoundedSymbolAccess(span) => Diagnostic::error()
-                .with_message("invalid expression")
-                .with_labels(vec![
-                    Label::primary(span.source_id(), span).with_message(message)
-                ]),
-            Self::InvalidScalarExpr(span) => Diagnostic::error()
+            Self::InvalidExponent(span)
+            | Self::BoundedSymbolAccess(span)
+            | Self::InvalidScalarExpr(span)
+            | Self::InvalidLetExpr(span)
+            | Self::NotAnExpr(span) => Diagnostic::error()
                 .with_message("invalid expression")
                 .with_labels(vec![
                     Label::primary(span.source_id(), span).with_message(message)
