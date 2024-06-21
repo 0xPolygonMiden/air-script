@@ -115,11 +115,11 @@ impl<'p> Pass for Inlining<'p> {
             .collect();
 
         // We'll be referencing the trace configuration during inlining, so keep a copy of it
-        self.trace = program.trace_columns.clone();
+        self.trace.clone_from(&program.trace_columns);
         // Same with the random values
-        self.random_values = program.random_values.clone();
+        self.random_values.clone_from(&program.random_values);
         // And the public inputs
-        self.public_inputs = program.public_inputs.clone();
+        self.public_inputs.clone_from(&program.public_inputs);
 
         // Add all of the local bindings visible in the root module, except for
         // constants and periodic columns, which by this point have been rewritten
