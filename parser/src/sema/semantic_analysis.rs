@@ -1386,7 +1386,7 @@ impl<'a> SemanticAnalysis<'a> {
                                         // and we will have already validated the reference
                                         let (import_id, module_id) = self.imported.get_key_value(&id).unwrap();
                                         let module = self.library.get(module_id).unwrap();
-                                        if module.evaluators.get(&id.id()).is_none() {
+                                        if !module.evaluators.contains_key(&id.id()) {
                                             self.invalid_constraint(id.span(), "calls in constraints must be to evaluator functions")
                                                 .with_secondary_label(import_id.span(), "the function imported here is not an evaluator")
                                                 .emit();
