@@ -131,7 +131,6 @@ impl AlgebraicGraph {
 
                 Ok((trace_segment, domain))
             }
-            Operation::Exp(lhs, _) => self.node_details(lhs, default_domain),
         }
     }
 
@@ -182,10 +181,6 @@ impl AlgebraicGraph {
                 let lhs_base = self.accumulate_degree(cycles, lhs);
                 let rhs_base = self.accumulate_degree(cycles, rhs);
                 lhs_base + rhs_base
-            }
-            Operation::Exp(lhs, rhs) => {
-                let lhs_base = self.accumulate_degree(cycles, lhs);
-                lhs_base * rhs
             }
         }
     }
