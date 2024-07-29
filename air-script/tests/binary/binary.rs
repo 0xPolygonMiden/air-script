@@ -75,8 +75,8 @@ impl Air for BinaryAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = main_current[0].exp(E::PositiveInteger::from(2_u64)) - main_current[0] - E::ZERO;
-        result[1] = main_current[1].exp(E::PositiveInteger::from(2_u64)) - main_current[1] - E::ZERO;
+        result[0] = main_current[0] * main_current[0] - main_current[0] - E::ZERO;
+        result[1] = main_current[1] * main_current[1] - main_current[1] - E::ZERO;
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
