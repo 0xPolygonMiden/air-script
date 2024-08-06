@@ -11,9 +11,9 @@ use utils::{codegen, test_code, to_stack_order, Data};
 static CONSTANTS_AIR: &str = "
 def ConstantsAir
 
-const A = 2
-const B = [3, 5]
-const C = [[7, 11], [13, 17]]
+const A = 2;
+const B = [3, 5];
+const C = [[7, 11], [13, 17]];
 
 trace_columns {
     main: [a, b, c]

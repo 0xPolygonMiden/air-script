@@ -4,7 +4,7 @@ use super::compile;
 fn list_folding_on_const() {
     let source = "
     def test
-    const A = [1, 2, 3]
+    const A = [1, 2, 3];
     trace_columns {
         main: [clk, fmp[2], ctx]
         aux: [a, b, c[4], d[4]]
@@ -75,7 +75,7 @@ fn list_folding_on_vector() {
 fn list_folding_on_lc() {
     let source = "
     def test
-    const A = [1, 2, 3]
+    const A = [1, 2, 3];
     trace_columns {
         main: [clk, fmp[2], ctx]
         aux: [a, b, c[4], d[4]]

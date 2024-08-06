@@ -107,9 +107,9 @@ fn test_simple_boundary() {
 static COMPLEX_BOUNDARY_AIR: &str = "
 def ComplexBoundary
 
-const A = 1
-const B = [0, 1]
-const C = [[1, 2], [2, 0]]
+const A = 1;
+const B = [0, 1];
+const C = [[1, 2], [2, 0]];
 
 trace_columns {
     main: [a, b, c, d, e[2]]

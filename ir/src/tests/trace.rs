@@ -26,9 +26,9 @@ fn trace_columns_index_access() {
 fn trace_cols_groups() {
     let source = "
     def test
-    const A = 123
-    const B = [1, 2, 3]
-    const C = [[1, 2, 3], [4, 5, 6]]
+    const A = 123;
+    const B = [1, 2, 3];
+    const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
         main: [clk, a[4]]
     }
@@ -92,9 +92,9 @@ fn err_bc_trace_cols_access_out_of_bounds() {
     // out of bounds in boundary constraints
     let source = "
     def test
-    const A = 123
-    const B = [1, 2, 3]
-    const C = [[1, 2, 3], [4, 5, 6]]
+    const A = 123;
+    const B = [1, 2, 3];
+    const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
         main: [clk, a[4]]
     }
@@ -119,9 +119,9 @@ fn err_ic_trace_cols_access_out_of_bounds() {
     // out of bounds in integrity constraints
     let source = "
     def test
-    const A = 123
-    const B = [1, 2, 3]
-    const C = [[1, 2, 3], [4, 5, 6]]
+    const A = 123;
+    const B = [1, 2, 3];
+    const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
         main: [clk, a[4]]
     }

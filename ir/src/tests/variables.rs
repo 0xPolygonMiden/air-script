@@ -215,7 +215,7 @@ fn invalid_matrix_literal_with_trailing_vector_binding() {
 fn invalid_variable_access_before_declaration() {
     let source = "
     def test
-    const A = [[2, 3], [1, 0]]
+    const A = [[2, 3], [1, 0]];
     trace_columns {
         main: [clk]
     }
@@ -238,7 +238,7 @@ fn invalid_variable_access_before_declaration() {
 fn invalid_trailing_let() {
     let source = "
     def test
-    const A = [[2, 3], [1, 0]]
+    const A = [[2, 3], [1, 0]];
     trace_columns {
         main: [clk]
     }
@@ -261,7 +261,7 @@ fn invalid_trailing_let() {
 fn invalid_reference_to_variable_defined_in_other_section() {
     let source = "
     def test
-    const A = [[2, 3], [1, 0]]
+    const A = [[2, 3], [1, 0]];
     trace_columns {
         main: [clk]
     }
@@ -284,7 +284,7 @@ fn invalid_reference_to_variable_defined_in_other_section() {
 fn invalid_vector_variable_access_out_of_bounds() {
     let source = "
     def test
-    const A = [[2, 3], [1, 0]]
+    const A = [[2, 3], [1, 0]];
     trace_columns {
         main: [clk]
     }
@@ -360,9 +360,9 @@ fn invalid_matrix_row_variable_access_out_of_bounds() {
 fn invalid_index_into_scalar_variable() {
     let source = "
     def test
-    const A = 123
-    const B = [1, 2, 3]
-    const C = [[1, 2, 3], [4, 5, 6]]
+    const A = 123;
+    const B = [1, 2, 3];
+    const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
         main: [clk]
         aux: [p]
@@ -388,9 +388,9 @@ fn invalid_index_into_scalar_variable() {
 fn trace_binding_access_in_integrity_constraint() {
     let source = "
     def test
-    const A = 123
-    const B = [1, 2, 3]
-    const C = [[1, 2, 3], [4, 5, 6]]
+    const A = 123;
+    const B = [1, 2, 3];
+    const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
         main: [clk, x[4]]
         aux: [p]
