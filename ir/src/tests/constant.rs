@@ -4,9 +4,9 @@ use super::{compile, expect_diagnostic};
 fn boundary_constraint_with_constants() {
     let source = "
     def test
-    const A = 123
-    const B = [1, 2, 3]
-    const C = [[1, 2, 3], [4, 5, 6]]
+    const A = 123;
+    const B = [1, 2, 3];
+    const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
         main: [clk]
     }
@@ -28,10 +28,17 @@ fn boundary_constraint_with_constants() {
 fn integrity_constraint_with_constants() {
     let source = "
     def test
+<<<<<<< HEAD
     const A = 123
     const B = [1, 2, 3]
     const C = [[1, 2, 3], [4, 5, 6]]
     trace_columns {
+=======
+    const A = 123;
+    const B = [1, 2, 3];
+    const C = [[1, 2, 3], [4, 5, 6]];
+    trace_columns:
+>>>>>>> 5b5e31b (Modify grammar in order to declare constants with a semicolon (at the end))
         main: [clk]
     }
     public_inputs {
@@ -51,8 +58,13 @@ fn integrity_constraint_with_constants() {
 fn invalid_matrix_constant() {
     let source = "
     def test
+<<<<<<< HEAD
     const A = [[2, 3], [1, 0, 2]]
     trace_columns {
+=======
+    const A = [[2, 3], [1, 0, 2]];
+    trace_columns:
+>>>>>>> 5b5e31b (Modify grammar in order to declare constants with a semicolon (at the end))
         main: [clk]
     }
     public_inputs {

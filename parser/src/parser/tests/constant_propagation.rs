@@ -22,8 +22,8 @@ fn test_constant_propagation() {
         inputs: [0]
     }
 
-    const A = [2, 4, 6, 8]
-    const B = [[1, 1], [2, 2]]
+    const A = [2, 4, 6, 8];
+    const B = [[1, 1], [2, 2]];
 
     integrity_constraints {
         enf test_constraint(b)
@@ -40,7 +40,7 @@ fn test_constant_propagation() {
     let lib = r#"
     mod lib
 
-    const EXP = 2
+    const EXP = 2;
 
     ev test_constraint([b0, b1]) {
         let x = EXP

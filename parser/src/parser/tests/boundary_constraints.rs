@@ -189,9 +189,9 @@ fn boundary_constraint_with_const() {
         "
     {BASE_MODULE}
 
-    const A = 1
-    const B = [0, 1]
-    const C = [[0, 1], [1, 0]]
+    const A = 1;
+    const B = [0, 1];
+    const C = [[0, 1], [1, 0]];
 
     boundary_constraints {{
         enf clk.first = A + B[1] - C[0][1]

@@ -143,7 +143,7 @@ TraceBinding: Span<(Identifier, usize)> = {
 // ================================================================================================
 
 Constant: Constant = {
-    <l:@L> "const" <name: Identifier> "=" <value: ConstExpr> <r:@R>
+    <l:@L> "const" <name: Identifier> "=" <value: ConstExpr> ";" <r:@R>
         => Constant::new(span!(l, r), name, value),
 }
 
@@ -674,5 +674,6 @@ extern {
         "." => Token::Dot,
         ".." => Token::DotDot,
         "->" => Token::Arrow,
+        ";" => Token::SemiColon,
     }
 }

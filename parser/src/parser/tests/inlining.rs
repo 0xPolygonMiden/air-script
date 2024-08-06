@@ -35,8 +35,8 @@ fn test_inlining_with_evaluator_split_input_binding() {
         inputs: [0]
     }
 
-    const A = [2, 4, 6, 8]
-    const B = [[1, 1], [2, 2]]
+    const A = [2, 4, 6, 8];
+    const B = [[1, 1], [2, 2]];
 
     integrity_constraints {
         enf test_constraint(b)
@@ -54,7 +54,7 @@ fn test_inlining_with_evaluator_split_input_binding() {
     let lib = r#"
     mod lib
 
-    const EXP = 2
+    const EXP = 2;
 
     ev test_constraint([b0, b1]) {
         let x = EXP
@@ -735,7 +735,7 @@ fn test_inlining_constraint_comprehensions_no_selector() {
     let root = r#"
     def root
 
-    const YS = [2, 4, 6, 8]
+    const YS = [2, 4, 6, 8];
 
     trace_columns {
         main: [clk, a, b[2], c]
@@ -813,7 +813,7 @@ fn test_inlining_constraint_comprehensions_with_selector() {
     let root = r#"
     def root
 
-    const YS = [2, 4, 6, 8]
+    const YS = [2, 4, 6, 8];
 
     trace_columns {
         main: [clk, a, b[2], c]
@@ -893,7 +893,7 @@ fn test_inlining_constraint_comprehensions_with_constant_selector() {
     let root = r#"
     def root
 
-    const YS = [0, 4, 0, 8]
+    const YS = [0, 4, 0, 8];
 
     trace_columns {
         main: [clk, a, b[4], c]
@@ -970,7 +970,7 @@ fn test_inlining_constraint_comprehensions_in_evaluator() {
     let root = r#"
     def root
 
-    const YS = [0, 4, 0, 8]
+    const YS = [0, 4, 0, 8];
 
     trace_columns {
         main: [clk, a, b[4], c]

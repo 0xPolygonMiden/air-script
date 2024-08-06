@@ -236,9 +236,9 @@ fn integrity_constraint_with_constants() {
         main: [clk]
     }
 
-    const A = 0
-    const B = [0, 1]
-    const C = [[0, 1], [1, 0]]
+    const A = 0;
+    const B = [0, 1];
+    const C = [[0, 1], [1, 0]];
 
     public_inputs {
         inputs: [2]
