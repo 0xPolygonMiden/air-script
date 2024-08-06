@@ -12,7 +12,7 @@ fn variables_with_and_operators() {
     mod test
 
     ev test([clk]) {
-        let flag = n1 & !n2
+        let flag = n1 & !n2;
         enf clk' = clk + 1 when flag
     }";
 
@@ -40,7 +40,7 @@ fn variables_with_or_operators() {
     mod test
 
     ev test([clk]) {
-        let flag = n1 | !n2'
+        let flag = n1 | !n2';
         enf clk' = clk + 1 when flag
     }";
 
@@ -70,9 +70,9 @@ fn err_let_bound_variable_at_top_level() {
     let source = "
     def test
 
-    const A = 1
+    const A = 1;
 
-    let a = 0";
+    let a = 0;";
 
     ParseTest::new().expect_unrecognized_token(source);
 }
@@ -83,7 +83,7 @@ fn err_vector_variable_with_trailing_comma() {
     def test
 
     integrity_constraints {
-        let a = [1, ]";
+        let a = [1, ];";
 
     ParseTest::new().expect_unrecognized_token(source);
 }
@@ -94,7 +94,7 @@ fn err_matrix_variable_with_trailing_comma() {
     def test
 
     integrity_constraints {
-        let a = [[1, 2], ]";
+        let a = [[1, 2], ];";
     ParseTest::new().expect_unrecognized_token(source);
 }
 
@@ -104,7 +104,7 @@ fn err_matrix_variable_mixed_element_types() {
     def test
 
     integrity_constraints {
-        let a = [[1, 2], 1]";
+        let a = [[1, 2], 1];";
     ParseTest::new().expect_unrecognized_token(source);
 }
 
@@ -114,7 +114,7 @@ fn err_invalid_matrix_element() {
     def test
 
     integrity_constraints {
-        let a = [[1, 2], [3, [4, 5]]]";
+        let a = [[1, 2], [3, [4, 5]]];";
     ParseTest::new().expect_unrecognized_token(source);
 }
 
@@ -124,9 +124,9 @@ fn err_matrix_variable_from_vector_and_reference() {
     def test
 
     integrity_constraints {
-        let a = [[1, 2], [3, 4]]
-        let b = [5, 6]
-        let c = [b, [7, 8]]
-        let d = [[7, 8], a[0]]";
+        let a = [[1, 2], [3, 4]];
+        let b = [5, 6];
+        let c = [b, [7, 8]];
+        let d = [[7, 8], a[0]];";
     ParseTest::new().expect_unrecognized_token(source);
 }

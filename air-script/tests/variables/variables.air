@@ -26,13 +26,13 @@ boundary_constraints {
 }
 
 integrity_constraints {
-    let m = 0
+    let m = 0;
 
     # the selector must be binary.
     enf s^2 = s
 
-    let n = [2 * 3, s]
-    let o = [[s', 3], [4 - 2, 8 + 8]]
+    let n = [2 * 3, s];
+    let o = [[s', 3], [4 - 2, 8 + 8]];
 
     # selector should stay the same for all rows of an 8-row cycle.
     enf k0 * (s' - s) = m

@@ -40,13 +40,13 @@ fn test_inlining_with_evaluator_split_input_binding() {
 
     integrity_constraints {
         enf test_constraint(b)
-        let x = 2^EXP
-        let y = A[0..2]
+        let x = 2^EXP;
+        let y = A[0..2];
         enf a + y[1] = c + (x + 1)
     }
 
     boundary_constraints {
-        let x = B[0]
+        let x = B[0];
         enf a.first = x[0]
     }
 
@@ -57,8 +57,8 @@ fn test_inlining_with_evaluator_split_input_binding() {
     const EXP = 2;
 
     ev test_constraint([b0, b1]) {
-        let x = EXP
-        let y = 2^x
+        let x = EXP;
+        let y = 2^x;
         enf b0 + x = b1 + y
     }"#;
 
@@ -989,10 +989,10 @@ fn test_inlining_constraint_comprehensions_in_evaluator() {
     }
 
     ev test_constraint([i, j[2]]) {
-        let ys = [x^2 for x in YS]
-        let k = j[0]
-        let l = j[1]
-        let xs = [i, k, l]
+        let ys = [x^2 for x in YS];
+        let k = j[0];
+        let l = j[1];
+        let xs = [i, k, l];
         enf x' = y for (x, y) in (xs, ys[1..4]) when y
     }"#;
 
@@ -1086,8 +1086,8 @@ fn test_inlining_constraints_with_folded_comprehensions_in_evaluator() {
     }
 
     ev test_constraint([x, ys[2]]) {
-        let y = sum([col^7 for col in ys])
-        let z = prod([col^7 for col in ys])
+        let y = sum([col^7 for col in ys]);
+        let z = prod([col^7 for col in ys]);
         enf x = y + z
     }"#;
 
@@ -1318,7 +1318,7 @@ fn test_repro_issue340() {
         enf b^2 = b for b in instruction_bits
 
         # Ensure they add up to the instruction word:
-        let word_sum = sum([2^i * a for (i, a) in (0..32, instruction_bits)])
+        let word_sum = sum([2^i * a for (i, a) in (0..32, instruction_bits)]);
         enf instruction_word = word_sum
 
         enf match {
@@ -1329,10 +1329,10 @@ fn test_repro_issue340() {
 
     # The highest bit is a sign bit, so we sign extend then reconstruct from the other bits
     ev imm_reconstruction([instruction_bits[32], immediate]) {
-        let sign_bit = instruction_bits[31]
-        let high_bit_sum = sum([sign_bit*2^i for i in (11..32)])
-        let immediate_bits = instruction_bits[20..31]
-        let low_bit_sum = sum([immediate_bit * 2^i for (i, immediate_bit) in (0..11, instruction_bits[20..31])])
+        let sign_bit = instruction_bits[31];
+        let high_bit_sum = sum([sign_bit*2^i for i in (11..32)]);
+        let immediate_bits = instruction_bits[20..31];
+        let low_bit_sum = sum([immediate_bit * 2^i for (i, immediate_bit) in (0..11, instruction_bits[20..31])]);
         enf immediate = low_bit_sum + high_bit_sum
         enf sign_bit = 1
     }"#;

@@ -15,7 +15,7 @@ fn list_comprehension() {
         enf c[2].first = 0
     }
     integrity_constraints {
-        let x = [fmp for fmp in fmp]
+        let x = [fmp for fmp in fmp];
         enf clk = x[1]
     }";
 
@@ -37,8 +37,8 @@ fn lc_with_const_exp() {
         enf c[2].first = 0
     }
     integrity_constraints {
-        let y = [col^7 for col in c]
-        let z = [col'^7 - col for col in c]
+        let y = [col^7 for col in c];
+        let z = [col'^7 - col for col in c];
         enf clk = y[1] + z[1]
     }";
 
@@ -60,7 +60,7 @@ fn lc_with_non_const_exp() {
         enf c[2].first = 0
     }
     integrity_constraints {
-        let enumerate = [2^c * c for (i, c) in (0..4, c)]
+        let enumerate = [2^c * c for (i, c) in (0..4, c)];
         enf clk = enumerate[3]
     }";
 
@@ -82,7 +82,7 @@ fn lc_with_two_lists() {
         enf c[2].first = 0
     }
     integrity_constraints {
-        let diff = [x - y for (x, y) in (c, d)]
+        let diff = [x - y for (x, y) in (c, d)];
         enf clk = diff[0]
     }";
 
@@ -104,7 +104,7 @@ fn lc_with_two_slices() {
         enf c[2].first = 0
     }
     integrity_constraints {
-        let diff = [x - y for (x, y) in (c[0..2], d[1..3])]
+        let diff = [x - y for (x, y) in (c[0..2], d[1..3])];
         enf clk = diff[1]
     }";
 
@@ -125,7 +125,7 @@ fn lc_with_multiple_lists() {
         enf c[2].first = 0
     }
     integrity_constraints {
-        let x = [w + x - y - z for (w, x, y, z) in (0..3, b, c[0..3], d[0..3])]
+        let x = [w + x - y - z for (w, x, y, z) in (0..3, b, c[0..3], d[0..3])];
         enf a = x[0] + x[1] + x[2]
     }";
 
@@ -148,7 +148,7 @@ fn err_index_out_of_range_lc_ident() {
     }
     
     integrity_constraints {
-        let x = [fmp for fmp in fmp]
+        let x = [fmp for fmp in fmp];
         enf clk = x[2]
     }";
 
@@ -175,7 +175,7 @@ fn err_index_out_of_range_lc_slice() {
     }
     
     integrity_constraints {
-        let x = [z for z in c[1..3]]
+        let x = [z for z in c[1..3]];
         enf clk = x[3]
     }";
 
@@ -202,7 +202,7 @@ fn err_non_const_exp_ident_iterable() {
     }
     
     integrity_constraints {
-        let invalid_exp_lc = [2^d * c for (d, c) in (d, c)]
+        let invalid_exp_lc = [2^d * c for (d, c) in (d, c)];
         enf clk = invalid_exp_lc[1]
     }";
 
@@ -226,7 +226,7 @@ fn err_non_const_exp_slice_iterable() {
     }
 
     integrity_constraints {
-        let invalid_exp_lc = [2^d * c for (d, c) in (d[0..4], c)]
+        let invalid_exp_lc = [2^d * c for (d, c) in (d[0..4], c)];
         enf clk = invalid_exp_lc[1]
     }";
 
@@ -250,7 +250,7 @@ fn err_duplicate_member() {
     }
 
     integrity_constraints {
-        let duplicate_member_lc = [c * d for (c, c) in (c, d)]
+        let duplicate_member_lc = [c * d for (c, c) in (c, d)];
         enf clk = duplicate_member_lc[1]
     }";
 

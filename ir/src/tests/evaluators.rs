@@ -32,7 +32,7 @@ fn evaluator_with_variables() {
     let source = "
     def test
     ev advance_clock([clk]) {
-        let z = clk + 1
+        let z = clk + 1;
         enf clk' = z
     }
     
@@ -60,7 +60,7 @@ fn evaluator_with_main_and_aux_cols() {
     let source = "
     def test
     ev enforce_constraints([clk], [a, b]) {
-        let z = a + b
+        let z = a + b;
         enf clk' = clk + 1
         enf a' = a + z
     }

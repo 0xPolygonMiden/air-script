@@ -60,7 +60,7 @@ fn ev_fn_main_and_aux_cols() {
     mod test
 
     ev ev_func([clk], [a, b]) {
-        let z = a + b
+        let z = a + b;
         enf clk' = clk + 1
         enf a' = a + z
     }";

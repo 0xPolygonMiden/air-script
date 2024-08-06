@@ -221,9 +221,9 @@ fn boundary_constraint_with_variables() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        let a = 2^2
-        let b = [a, 2 * a]
-        let c = [[a - 1, a^2], [b[0], b[1]]]
+        let a = 2^2;
+        let b = [a, 2 * a];
+        let c = [[a - 1, a^2], [b[0], b[1]]];
         enf clk.first = 5 + a[3] + 6
     }}"
     );
@@ -369,7 +369,7 @@ fn err_invalid_variable() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        let a = 2^2 + [1]
+        let a = 2^2 + [1];
     }}"
     );
     ParseTest::new().expect_unrecognized_token(&source);
@@ -382,9 +382,9 @@ fn err_missing_boundary_constraint() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        let a = 2^2
-        let b = [a, 2 * a]
-        let c = [[a - 1, a^2], [b[0], b[1]]]
+        let a = 2^2;
+        let b = [a, 2 * a];
+        let c = [[a - 1, a^2], [b[0], b[1]]];
     }}"
     );
     ParseTest::new().expect_module_diagnostic(&source, "expected one of: '\"enf\"', '\"let\"'");

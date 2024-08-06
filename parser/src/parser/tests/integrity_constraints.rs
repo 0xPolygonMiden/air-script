@@ -300,9 +300,9 @@ fn integrity_constraint_with_variables() {
     }
 
     integrity_constraints {
-        let a = 2^2
-        let b = [a, 2 * a]
-        let c = [[a - 1, a^2], [b[0], b[1]]]
+        let a = 2^2;
+        let b = [a, 2 * a];
+        let c = [[a - 1, a^2], [b[0], b[1]]];
         enf clk + a = b[1] + c[1][1]
     }";
 
@@ -762,9 +762,9 @@ fn err_missing_integrity_constraint() {
     }
 
     integrity_constraints {
-        let a = 2^2
-        let b = [a, 2 * a]
-        let c = [[a - 1, a^2], [b[0], b[1]]]
+        let a = 2^2;
+        let b = [a, 2 * a];
+        let c = [[a - 1, a^2], [b[0], b[1]]];
     }";
     ParseTest::new().expect_module_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
 }

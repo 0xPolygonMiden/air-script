@@ -10,8 +10,8 @@ fn call_fold_identifier() {
     mod test
 
     ev test([a, c[2]]) {
-        let x = sum(c)
-        let y = prod(c)
+        let x = sum(c);
+        let y = prod(c);
         enf a = x + y
     }";
 
@@ -38,8 +38,8 @@ fn call_fold_vector_literal() {
     mod test
 
     ev test([a, b, c[4]]) {
-        let x = sum([a, b, c[0]])
-        let y = prod([a, b, c[0]])
+        let x = sum([a, b, c[0]]);
+        let y = prod([a, b, c[0]]);
         enf a = x + y
     }";
 
@@ -68,8 +68,8 @@ fn call_fold_list_comprehension() {
     mod test
 
     ev test([a, b, c[4]]) {
-        let x = sum([col^7 for col in c])
-        let y = prod([col^7 for col in c])
+        let x = sum([col^7 for col in c]);
+        let y = prod([col^7 for col in c]);
         enf a = x + y
     }";
 

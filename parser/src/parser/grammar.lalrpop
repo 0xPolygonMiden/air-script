@@ -327,7 +327,7 @@ StatementBlock: Vec<Statement> = {
 }
 
 Let: Let = {
-    <l:@L> "let" <name: Identifier> "=" <value: Expr> <r:@R> <body: StatementBlock>
+    <l:@L> "let" <name: Identifier> "=" <value: Expr> ";" <r:@R> <body: StatementBlock>
         => Let::new(span!(l, r), name, value, body)
 }
 
