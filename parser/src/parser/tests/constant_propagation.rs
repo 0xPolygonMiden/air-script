@@ -12,7 +12,7 @@ fn test_constant_propagation() {
     let root = r#"
     def root
 
-    use lib::*
+    use lib::*;
 
     trace_columns {
         main: [clk, a, b[2], c]

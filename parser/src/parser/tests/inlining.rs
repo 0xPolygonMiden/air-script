@@ -25,7 +25,7 @@ fn test_inlining_with_evaluator_split_input_binding() {
     let root = r#"
     def root
 
-    use lib::*
+    use lib::*;
 
     trace_columns {
         main: [clk, a, b[2], c]
@@ -150,7 +150,7 @@ fn test_inlining_with_vector_literal_binding_regrouped() {
     let root = r#"
     def root
 
-    use lib::*
+    use lib::*;
 
     trace_columns {
         main: [clk, a, b[2], c]
@@ -240,7 +240,7 @@ fn test_inlining_with_vector_literal_binding_unordered() {
     let root = r#"
     def root
 
-    use lib::*
+    use lib::*;
 
     trace_columns {
         main: [clk, a, b[2], c]
@@ -329,7 +329,7 @@ fn test_inlining_with_vector_literal_binding_different_arity_many_to_few() {
     let root = r#"
     def root
 
-    use lib::*
+    use lib::*;
 
     trace_columns {
         main: [clk, a, b[2], c]
@@ -418,7 +418,7 @@ fn test_inlining_with_vector_literal_binding_different_arity_few_to_many() {
     let root = r#"
     def root
 
-    use lib::*
+    use lib::*;
 
     trace_columns {
         main: [clk, a, b[2], c]
@@ -506,7 +506,7 @@ fn test_inlining_across_modules_with_nested_evaluators_variant1() {
     let root = r#"
     def root
 
-    use lib1::test_constraint
+    use lib1::test_constraint;
 
     trace_columns {
         main: [clk, a, b[2], c]
@@ -527,7 +527,7 @@ fn test_inlining_across_modules_with_nested_evaluators_variant1() {
     let lib1 = r#"
     mod lib1
 
-    use lib2::*
+    use lib2::*;
 
     ev test_constraint([tuple[3], z]) {
         enf helper_constraint([z, tuple[1..3]])
@@ -618,7 +618,7 @@ fn test_inlining_across_modules_with_nested_evaluators_variant2() {
     let root = r#"
     def root
 
-    use lib1::test_constraint
+    use lib1::test_constraint;
 
     trace_columns {
         main: [clk, a, b[2], c]
@@ -639,7 +639,7 @@ fn test_inlining_across_modules_with_nested_evaluators_variant2() {
     let lib1 = r#"
     mod lib1
 
-    use lib2::*
+    use lib2::*;
 
     ev test_constraint([tuple[3], z]) {
         enf helper_constraint([z, tuple[1], tuple[2..3]])
