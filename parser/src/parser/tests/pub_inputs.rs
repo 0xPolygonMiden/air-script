@@ -22,11 +22,11 @@ fn public_inputs() {
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));

@@ -25,10 +25,10 @@ fn err_trace_cols_omitted() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(source, "missing trace_columns section");
@@ -62,10 +62,10 @@ fn err_pub_inputs_omitted() {
         main: [clk]
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(source, "root module must contain a public_inputs section");
@@ -102,7 +102,7 @@ fn err_bc_omitted() {
         stack_inputs: [16]
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(
@@ -123,7 +123,7 @@ fn err_ic_empty() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {}";
 
@@ -142,7 +142,7 @@ fn err_ic_omitted() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }";
 
     expect_diagnostic(

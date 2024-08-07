@@ -10,10 +10,10 @@ public_inputs {
 }
 
 integrity_constraints {
-    enf fmp[1]' = fmp[1] + 1
-    enf fmp[0]' = fmp[0] - 1
+    enf fmp[1]' = fmp[1] + 1;
+    enf fmp[0]' = fmp[0] - 1;
 }
 
 boundary_constraints {
-    enf c[2].first = 0
+    enf c[2].first = 0;
 }

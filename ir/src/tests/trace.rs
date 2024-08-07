@@ -12,11 +12,11 @@ fn trace_columns_index_access() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf a.first = 1
+        enf a.first = 1;
     }
     integrity_constraints {
-        enf $main[0]' - $main[1] = 0
-        enf $aux[0]^3 - $aux[1]' = 0
+        enf $main[0]' - $main[1] = 0;
+        enf $aux[0]^3 - $aux[1]' = 0;
     }";
 
     assert!(compile(source).is_ok());
@@ -36,11 +36,11 @@ fn trace_cols_groups() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf a[1].first = A
-        enf clk.last = B[0] + C[0][1]
+        enf a[1].first = A;
+        enf clk.last = B[0] + C[0][1];
     }
     integrity_constraints {
-        enf a[0]' = a[1] - 1
+        enf a[0]' = a[1] - 1;
     }";
 
     assert!(compile(source).is_ok());
@@ -57,11 +57,11 @@ fn err_bc_column_undeclared() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = 0
-        enf clk.last = 1
+        enf clk.first = 0;
+        enf clk.last = 1;
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(source, "this variable is not defined");
@@ -78,10 +78,10 @@ fn err_ic_column_undeclared() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf ctx.first = 0
+        enf ctx.first = 0;
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(source, "this variable is not defined");
@@ -102,10 +102,10 @@ fn err_bc_trace_cols_access_out_of_bounds() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf a[4].first = A
+        enf a[4].first = A;
     }
     integrity_constraints {
-        enf a[0]' = a[0] - 1
+        enf a[0]' = a[0] - 1;
     }";
 
     expect_diagnostic(
@@ -129,11 +129,11 @@ fn err_ic_trace_cols_access_out_of_bounds() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf a[1].first = A
-        enf clk.last = B[0] + C[0][1]
+        enf a[1].first = A;
+        enf clk.last = B[0] + C[0][1];
     }
     integrity_constraints {
-        enf a[4]' = a[4] - 1
+        enf a[4]' = a[4] - 1;
     }";
 
     expect_diagnostic(
@@ -153,10 +153,10 @@ fn err_ic_trace_cols_group_used_as_scalar() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf a[1].first = 0
+        enf a[1].first = 0;
     }
     integrity_constraints {
-        enf a[0]' = a + clk
+        enf a[0]' = a + clk;
     }";
 
     expect_diagnostic(source, "type mismatch");

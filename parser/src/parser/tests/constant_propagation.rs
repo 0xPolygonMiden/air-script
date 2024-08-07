@@ -26,15 +26,15 @@ fn test_constant_propagation() {
     const B = [[1, 1], [2, 2]];
 
     integrity_constraints {
-        enf test_constraint(b)
+        enf test_constraint(b);
         let x = 2^EXP;
         let y = A[0..2];
-        enf a + y[1] = c + (x + 1)
+        enf a + y[1] = c + (x + 1);
     }
 
     boundary_constraints {
         let x = B[0];
-        enf a.first = x[0]
+        enf a.first = x[0];
     }
     "#;
     let lib = r#"
@@ -45,7 +45,7 @@ fn test_constant_propagation() {
     ev test_constraint([b0, b1]) {
         let x = EXP;
         let y = 2^x;
-        enf b0 + x = b1 + y
+        enf b0 + x = b1 + y;
     }"#;
 
     let test = ParseTest::new();

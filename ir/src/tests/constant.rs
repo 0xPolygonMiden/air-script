@@ -14,11 +14,11 @@ fn boundary_constraint_with_constants() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = A
-        enf clk.last = B[0] + C[0][1]
+        enf clk.first = A;
+        enf clk.last = B[0] + C[0][1];
     }
     integrity_constraints {
-        enf clk' = clk - 1
+        enf clk' = clk - 1;
     }";
 
     assert!(compile(source).is_ok());
@@ -38,10 +38,10 @@ fn integrity_constraint_with_constants() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {
-        enf clk' = clk + A + B[1] - C[1][2]
+        enf clk' = clk + A + B[1] - C[1][2];
     }";
 
     assert!(compile(source).is_ok());
@@ -59,11 +59,11 @@ fn invalid_matrix_constant() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = 0
-        enf clk.last = 1
+        enf clk.first = 0;
+        enf clk.last = 1;
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(source, "invalid matrix literal: mismatched dimensions");

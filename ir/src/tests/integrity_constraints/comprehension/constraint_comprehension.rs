@@ -12,10 +12,10 @@ fn constraint_comprehension() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf c[2].first = 0
+        enf c[2].first = 0;
     }
     integrity_constraints {
-        enf c = d for (c, d) in (c, d)
+        enf c = d for (c, d) in (c, d);
     }";
 
     assert!(compile(source).is_ok());
@@ -33,10 +33,10 @@ fn ic_comprehension_with_selectors() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf c[2].first = 0
+        enf c[2].first = 0;
     }
     integrity_constraints {
-        enf c = d for (c, d) in (c, d) when !fmp[0]
+        enf c = d for (c, d) in (c, d) when !fmp[0];
     }";
 
     assert!(compile(source).is_ok());

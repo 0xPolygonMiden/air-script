@@ -26,11 +26,11 @@ fn random_values_fixed_list() {
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -79,11 +79,11 @@ fn random_values_ident_vector() {
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -132,11 +132,11 @@ fn random_values_custom_name() {
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -227,11 +227,11 @@ fn random_values_index_access() {
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk + $rand[1] = 0
+        enf clk + $rand[1] = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));

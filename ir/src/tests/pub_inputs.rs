@@ -11,10 +11,10 @@ fn bc_with_public_inputs() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = stack_inputs[0]^3
+        enf clk.first = stack_inputs[0]^3;
     }
     integrity_constraints {
-        enf clk' = clk - 1
+        enf clk' = clk - 1;
     }";
 
     assert!(compile(source).is_ok());

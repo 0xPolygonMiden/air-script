@@ -10,10 +10,10 @@ public_inputs {
 }
 
 integrity_constraints {
-    enf $main[0]' = $main[1] + 1
-    enf $aux[0]' = $aux[1] + 1
+    enf $main[0]' = $main[1] + 1;
+    enf $aux[0]' = $aux[1] + 1;
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }

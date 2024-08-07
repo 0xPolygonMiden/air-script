@@ -21,11 +21,11 @@ fn single_selector() {
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk' = clk when n1
+        enf clk' = clk when n1;
     }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -65,11 +65,11 @@ fn chained_selectors() {
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk' = clk when (n1 & !n2) | !n3
+        enf clk' = clk when (n1 & !n2) | !n3;
     }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected.trace_columns.push(trace_segment!(

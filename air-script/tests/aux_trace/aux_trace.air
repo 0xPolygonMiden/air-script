@@ -14,23 +14,23 @@ random_values {
 }
 
 boundary_constraints {
-    enf a.first = 1
-    enf b.first = 1
+    enf a.first = 1;
+    enf b.first = 1;
 
-    enf p0.first = 1
-    enf p0.last = 1
+    enf p0.first = 1;
+    enf p0.last = 1;
 
     # auxiliary boundary constraint with a random value
-    enf p1.first = $rand[0]
-    enf p1.last = 1
+    enf p1.first = $rand[0];
+    enf p1.last = 1;
 }
 
 integrity_constraints {
-    enf a' = b + a * b * c
-    enf b' = c + a'
-    enf c = a + b
+    enf a' = b + a * b * c;
+    enf b' = c + a';
+    enf c = a + b;
 
     # integrity constraints against the auxiliary trace with random values
-    enf p0' = p0 * (a + $rand[0] + b + $rand[1])
-    enf p1 = p1' * (c + $rand[0])
+    enf p0' = p0 * (a + $rand[0] + b + $rand[1]);
+    enf p1 = p1' * (c + $rand[0]);
 }

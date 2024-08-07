@@ -24,15 +24,15 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = A
-    enf b.first = A + B[0] * C[0][1]
-    enf c.last = A - B[1] * C[0][0]
+    enf a.first = A;
+    enf b.first = A + B[0] * C[0][1];
+    enf c.last = A - B[1] * C[0][0];
 }
 
 integrity_constraints {
-    enf a' = a + A
-    enf b' = B[0] * b
-    enf c' = (C[0][0] + B[0]) * c
+    enf a' = a + A;
+    enf b' = B[0] * b;
+    enf c' = (C[0][0] + B[0]) * c;
 }";
 const A: QuadExtension<Felt> = QuadExtension::new(Felt::new(2), Felt::ZERO);
 const B_0: QuadExtension<Felt> = QuadExtension::new(Felt::new(3), Felt::ZERO);

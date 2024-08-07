@@ -14,10 +14,10 @@ random_values {
 }
 
 boundary_constraints {
-    enf c.first = $alphas[5] + y[2] + z
-    enf c.last = x + $alphas[15] + y[10]
+    enf c.first = $alphas[5] + y[2] + z;
+    enf c.last = x + $alphas[15] + y[10];
 }
 
 integrity_constraints {
-    enf c' = z - $alphas[0] + y[2]
+    enf c' = z - $alphas[0] + y[2];
 }

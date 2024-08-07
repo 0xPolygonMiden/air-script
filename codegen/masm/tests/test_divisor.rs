@@ -21,11 +21,11 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }
 
 integrity_constraints {
-    enf a = 0
+    enf a = 0;
 }";
 
 #[test]
@@ -106,14 +106,14 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 0
-    enf a.last = 0
-    enf b.first = 0
-    enf b.last = 0
+    enf a.first = 0;
+    enf a.last = 0;
+    enf b.first = 0;
+    enf b.last = 0;
 }
 
 integrity_constraints {
-    enf a = 0
+    enf a = 0;
 }";
 
 #[test]
@@ -227,12 +227,12 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 3
-    enf b.last = 5
+    enf a.first = 3;
+    enf b.last = 5;
 }
 
 integrity_constraints {
-    enf a = 0
+    enf a = 0;
 }";
 
 #[test]

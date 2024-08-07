@@ -13,12 +13,12 @@ fn list_folding_on_const() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf c[2].first = 0
+        enf c[2].first = 0;
     }
     integrity_constraints {
         let x = sum(A);
         let y = prod(A);
-        enf clk = y - x
+        enf clk = y - x;
     }";
 
     assert!(compile(source).is_ok());
@@ -36,13 +36,13 @@ fn list_folding_on_variable() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf c[2].first = 0
+        enf c[2].first = 0;
     }
     integrity_constraints {
         let x = [a + c[0], 1, c[2] * d[2]];
         let y = sum(x);
         let z = prod(x);
-        enf clk = z - y
+        enf clk = z - y;
     }";
 
     assert!(compile(source).is_ok());
@@ -60,12 +60,12 @@ fn list_folding_on_vector() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf c[2].first = 0
+        enf c[2].first = 0;
     }
     integrity_constraints {
         let x = sum([c[0], c[2], 2 * a]);
         let y = prod([c[0], c[2], 2 * a]);
-        enf clk = y - x
+        enf clk = y - x;
     }";
 
     assert!(compile(source).is_ok());
@@ -84,12 +84,12 @@ fn list_folding_on_lc() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf c[2].first = 0
+        enf c[2].first = 0;
     }
     integrity_constraints {
         let x = sum([c * d for (c, d) in (c, d)]);
         let y = prod([c + d for (c, d) in (c, d)]);
-        enf clk = y - x
+        enf clk = y - x;
     }";
 
     assert!(compile(source).is_ok());
@@ -107,12 +107,12 @@ fn list_folding_in_lc() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf c[2].first = 0
+        enf c[2].first = 0;
     }
     integrity_constraints {
         let x = sum([c * d for (c, d) in (c, d)]);
         let y = [m + x for m in fmp];
-        enf clk = y[0]
+        enf clk = y[0];
     }";
 
     assert!(compile(source).is_ok());

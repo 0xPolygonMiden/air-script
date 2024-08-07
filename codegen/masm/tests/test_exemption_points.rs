@@ -20,11 +20,11 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }
 
 integrity_constraints {
-    enf a + a = 0
+    enf a + a = 0;
 }";
 
 #[test]

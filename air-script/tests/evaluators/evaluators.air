@@ -1,17 +1,17 @@
 def EvaluatorsAir
 
 ev are_unchanged([x, y, z]) {
-    enf x' = x
-    enf y' = y
-    enf z' = z
+    enf x' = x;
+    enf y' = y;
+    enf z' = z;
 }
 
 ev is_binary([x]) {
-    enf x^2 = x
+    enf x^2 = x;
 }
 
 ev are_all_binary([c[3]]) {
-    enf is_binary([c]) for c in c
+    enf is_binary([c]) for c in c;
 }
 
 trace_columns {
@@ -23,11 +23,11 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf b.first = 0
+    enf b.first = 0;
 }
 
 integrity_constraints {
-    enf are_unchanged([b, c[1], d[2]])
-    enf is_binary([b])
-    enf are_all_binary([c])
+    enf are_unchanged([b, c[1], d[2]]);
+    enf is_binary([b]);
+    enf are_all_binary([c]);
 }

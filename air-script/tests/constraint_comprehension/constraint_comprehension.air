@@ -10,9 +10,9 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf c[2].first = 0
+    enf c[2].first = 0;
 }
 
 integrity_constraints {
-    enf c = d for (c, d) in (c, d)
+    enf c = d for (c, d) in (c, d);
 }

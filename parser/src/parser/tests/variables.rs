@@ -13,7 +13,7 @@ fn variables_with_and_operators() {
 
     ev test([clk]) {
         let flag = n1 & !n2;
-        enf clk' = clk + 1 when flag
+        enf clk' = clk + 1 when flag;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -41,7 +41,7 @@ fn variables_with_or_operators() {
 
     ev test([clk]) {
         let flag = n1 | !n2';
-        enf clk' = clk + 1 when flag
+        enf clk' = clk + 1 when flag;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));

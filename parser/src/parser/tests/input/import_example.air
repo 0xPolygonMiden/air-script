@@ -15,10 +15,10 @@ public_inputs {
 }
 
 integrity_constraints {
-    enf foo_constraint([clk])
-    enf bar_constraint([clk])
+    enf foo_constraint([clk]);
+    enf bar_constraint([clk]);
 }
 
 boundary_constraints {
-    enf clk.first = 0
+    enf clk.first = 0;
 }

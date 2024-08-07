@@ -6,9 +6,9 @@ periodic_columns {
 }
 
 ev foo_constraint([clk]) {
-    enf clk' = clk + 1 when k0
+    enf clk' = clk + 1 when k0;
 }
 
 ev other_constraint([clk]) {
-    enf clk' = 0 when !k0
+    enf clk' = 0 when !k0;
 }

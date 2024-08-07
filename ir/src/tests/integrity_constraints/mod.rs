@@ -13,10 +13,10 @@ fn integrity_constraints() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     assert!(compile(source).is_ok());
@@ -33,10 +33,10 @@ fn ic_using_parens() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {
-        enf clk' = (clk + 1)
+        enf clk' = (clk + 1);
     }";
 
     assert!(compile(source).is_ok());
@@ -53,10 +53,10 @@ fn ic_op_mul() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {
-        enf clk' * clk = 1
+        enf clk' * clk = 1;
     }";
 
     assert!(compile(source).is_ok());
@@ -73,10 +73,10 @@ fn ic_op_exp() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {
-        enf clk'^2 - clk = 1
+        enf clk'^2 - clk = 1;
     }";
 
     assert!(compile(source).is_ok());
@@ -95,10 +95,10 @@ fn err_non_const_exp_outside_lc() {
         stack_inputs: [16]
     }
     boundary_constraints {
-        enf c[2].first = 0
+        enf c[2].first = 0;
     }
     integrity_constraints {
-        enf clk = 2^ctx
+        enf clk = 2^ctx;
     }";
 
     expect_diagnostic(source, "expected exponent to be a constant");

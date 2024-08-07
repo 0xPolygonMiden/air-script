@@ -338,8 +338,8 @@ ConstraintStatements: Vec<Statement> = {
 }
 
 ConstraintStatement: Vec<Statement> = {
-    "enf" "match" "{" <MatchArm+> "}" => <>,
-    "enf" <ConstraintExpr> => vec![<>],
+    "enf" "match" "{" <MatchArm+> "}" ";" => <>,
+    "enf" <ConstraintExpr> ";" => vec![<>],
 }
 
 ReturnStatement: Expr = {

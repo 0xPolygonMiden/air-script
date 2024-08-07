@@ -20,17 +20,17 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }
 
 integrity_constraints {
-    enf a + a = 0
-    enf a - a = 0
-    enf a * a = 0
+    enf a + a = 0;
+    enf a - a = 0;
+    enf a * a = 0;
 
-    enf b + a = 0
-    enf b - a = 0
-    enf b * a = 0
+    enf b + a = 0;
+    enf b - a = 0;
+    enf b * a = 0;
 }";
 
 #[test]
@@ -112,15 +112,15 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }
 
 integrity_constraints {
-    enf b^1 = 0
-    enf b^2 = 0
-    enf b^3 = 0
-    enf b^4 = 0
-    enf b^5 = 0
+    enf b^1 = 0;
+    enf b^2 = 0;
+    enf b^3 = 0;
+    enf b^4 = 0;
+    enf b^5 = 0;
 }";
 
 #[test]
@@ -201,11 +201,11 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }
 
 integrity_constraints {
-    enf a * b * c + d - e = 0
+    enf a * b * c + d - e = 0;
 }";
 
 #[test]
@@ -283,11 +283,11 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf clk.first = 0
+    enf clk.first = 0;
 }
 
 integrity_constraints {
-    enf clk - fmp[0] + fmp[1] = 0
+    enf clk - fmp[0] + fmp[1] = 0;
 }";
 
 #[test]
@@ -363,12 +363,12 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }
 
 integrity_constraints {
-    enf a' = a * 2
-    enf b' = a + b
+    enf a' = a * 2;
+    enf b' = a + b;
 }";
 
 #[test]

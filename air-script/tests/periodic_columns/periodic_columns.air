@@ -14,10 +14,10 @@ periodic_columns {
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }
 
 integrity_constraints {
-    enf k0 * (b + c) = 0
-    enf k1 * (a' - a) = 0
+    enf k0 * (b + c) = 0;
+    enf k1 * (a' - a) = 0;
 }

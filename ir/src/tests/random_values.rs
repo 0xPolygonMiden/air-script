@@ -15,11 +15,11 @@ fn random_values_indexed_access() {
         rand: [16]
     }
     boundary_constraints {
-        enf c.first = $rand[10] * 2
-        enf c.last = 1
+        enf c.first = $rand[10] * 2;
+        enf c.last = 1;
     }
     integrity_constraints {
-        enf c' = $rand[3] + 1
+        enf c' = $rand[3] + 1;
     }";
 
     assert!(compile(source).is_ok());
@@ -40,11 +40,11 @@ fn random_values_custom_name() {
         alphas: [16]
     }
     boundary_constraints {
-        enf c.first = $alphas[10] * 2
-        enf c.last = 1
+        enf c.first = $alphas[10] * 2;
+        enf c.last = 1;
     }
     integrity_constraints {
-        enf c' = $alphas[3] + 1
+        enf c' = $alphas[3] + 1;
     }";
 
     assert!(compile(source).is_ok());
@@ -65,11 +65,11 @@ fn random_values_named_access() {
         rand: [m, n[4]]
     }
     boundary_constraints {
-        enf c.first = (n[1] - $rand[0]) * 2
-        enf c.last = m
+        enf c.first = (n[1] - $rand[0]) * 2;
+        enf c.last = m;
     }
     integrity_constraints {
-        enf c' = m + n[2] + $rand[1]
+        enf c' = m + n[2] + $rand[1];
     }";
 
     assert!(compile(source).is_ok());
@@ -90,11 +90,11 @@ fn err_random_values_out_of_bounds_no_bindings() {
         rand: [4]
     }
     boundary_constraints {
-        enf a.first = $rand[10] * 2
-        enf a.last = 1
+        enf a.first = $rand[10] * 2;
+        enf a.last = 1;
     }
     integrity_constraints {
-        enf a' = $rand[4] + 1
+        enf a' = $rand[4] + 1;
     }";
 
     expect_diagnostic(
@@ -118,11 +118,11 @@ fn err_random_values_out_of_bounds_binding_ref() {
         rand: [m, n[4]]
     }
     boundary_constraints {
-        enf a.first = n[5] * 2
-        enf a.last = 1
+        enf a.first = n[5] * 2;
+        enf a.last = 1;
     }
     integrity_constraints {
-        enf a' = m + 1
+        enf a' = m + 1;
     }";
 
     expect_diagnostic(
@@ -146,11 +146,11 @@ fn err_random_values_out_of_bounds_global_ref() {
         rand: [m, n[4]]
     }
     boundary_constraints {
-        enf a.first = $rand[10] * 2
-        enf a.last = 1
+        enf a.first = $rand[10] * 2;
+        enf a.last = 1;
     }
     integrity_constraints {
-        enf a' = m + 1
+        enf a' = m + 1;
     }";
 
     expect_diagnostic(
@@ -173,11 +173,11 @@ fn err_random_values_without_aux_cols() {
         rand: [16]
     }
     boundary_constraints {
-        enf a.first = 2
-        enf a.last = 1
+        enf a.first = 2;
+        enf a.last = 1;
     }
     integrity_constraints {
-        enf a' = a + 1
+        enf a' = a + 1;
     }";
 
     expect_diagnostic(
@@ -201,11 +201,11 @@ fn err_random_values_in_bc_against_main_cols() {
         rand: [16]
     }
     boundary_constraints {
-        enf a.first = $rand[10] * 2
-        enf b[2].last = 1
+        enf a.first = $rand[10] * 2;
+        enf b[2].last = 1;
     }
     integrity_constraints {
-        enf c' = $rand[3] + 1
+        enf c' = $rand[3] + 1;
     }";
 
     expect_diagnostic(source, "Boundary constraints require both sides of the constraint to apply to the same trace segment");

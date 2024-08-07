@@ -12,7 +12,7 @@ fn call_fold_identifier() {
     ev test([a, c[2]]) {
         let x = sum(c);
         let y = prod(c);
-        enf a = x + y
+        enf a = x + y;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -40,7 +40,7 @@ fn call_fold_vector_literal() {
     ev test([a, b, c[4]]) {
         let x = sum([a, b, c[0]]);
         let y = prod([a, b, c[0]]);
-        enf a = x + y
+        enf a = x + y;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -70,7 +70,7 @@ fn call_fold_list_comprehension() {
     ev test([a, b, c[4]]) {
         let x = sum([col^7 for col in c]);
         let y = prod([col^7 for col in c]);
-        enf a = x + y
+        enf a = x + y;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));

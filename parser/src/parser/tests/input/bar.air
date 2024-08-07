@@ -9,5 +9,5 @@ periodic_columns {
 }
 
 ev bar_constraint([clk]) {
-    enf clk' = clk + k0 when k0
+    enf clk' = clk + k0 when k0;
 }

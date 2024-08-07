@@ -20,16 +20,16 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 1
-    enf b.first = 1
+    enf a.first = 1;
+    enf b.first = 1;
 
-    enf len.first = 0
-    enf len.last = target[0]
+    enf len.first = 0;
+    enf len.last = target[0];
 }
 
 integrity_constraints {
-    enf a' = a + b
-    enf b' = a
+    enf a' = a + b;
+    enf b' = a;
 }";
 
 #[test]
@@ -126,23 +126,23 @@ random_values {
 }
 
 boundary_constraints {
-    enf a.first = stack_inputs[0]
-    enf b.first = stack_inputs[1]
-    enf a.last = stack_outputs[0]
-    enf b.last = stack_outputs[1]
+    enf a.first = stack_inputs[0];
+    enf b.first = stack_inputs[1];
+    enf a.last = stack_outputs[0];
+    enf b.last = stack_outputs[1];
 
-    enf c.first = (B[0] - C[1][1]) * A
-    enf d.first = 1
+    enf c.first = (B[0] - C[1][1]) * A;
+    enf d.first = 1;
 
-    enf e[0].first = 0
-    enf e[1].first = 1
+    enf e[0].first = 0;
+    enf e[1].first = 1;
 
-    enf f.first = $rand[0]
-    enf f.last = 1
+    enf f.first = $rand[0];
+    enf f.last = 1;
 }
 
 integrity_constraints {
-    enf a + b = 0
+    enf a + b = 0;
 }";
 
 #[test]

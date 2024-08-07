@@ -24,11 +24,11 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }
 
 integrity_constraints {
-    enf a * k = 0
+    enf a * k = 0;
 }";
 
 #[test]
@@ -113,13 +113,13 @@ public_inputs {
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }
 
 integrity_constraints {
-    enf a * m = 0
-    enf b * n = 0
-    enf c * o = 0
+    enf a * m = 0;
+    enf b * n = 0;
+    enf c * o = 0;
 }";
 
 #[test]

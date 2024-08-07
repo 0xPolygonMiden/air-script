@@ -39,15 +39,15 @@ fn test_inlining_with_evaluator_split_input_binding() {
     const B = [[1, 1], [2, 2]];
 
     integrity_constraints {
-        enf test_constraint(b)
+        enf test_constraint(b);
         let x = 2^EXP;
         let y = A[0..2];
-        enf a + y[1] = c + (x + 1)
+        enf a + y[1] = c + (x + 1);
     }
 
     boundary_constraints {
         let x = B[0];
-        enf a.first = x[0]
+        enf a.first = x[0];
     }
 
     "#;
@@ -59,7 +59,7 @@ fn test_inlining_with_evaluator_split_input_binding() {
     ev test_constraint([b0, b1]) {
         let x = EXP;
         let y = 2^x;
-        enf b0 + x = b1 + y
+        enf b0 + x = b1 + y;
     }"#;
 
     let test = ParseTest::new();
@@ -161,11 +161,11 @@ fn test_inlining_with_vector_literal_binding_regrouped() {
     }
 
     integrity_constraints {
-        enf test_constraint([clk, b])
+        enf test_constraint([clk, b]);
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     "#;
@@ -173,7 +173,7 @@ fn test_inlining_with_vector_literal_binding_regrouped() {
     mod lib
 
     ev test_constraint([pair[2], b1]) {
-        enf pair[0] + pair[1] = b1
+        enf pair[0] + pair[1] = b1;
     }"#;
 
     let test = ParseTest::new();
@@ -251,18 +251,18 @@ fn test_inlining_with_vector_literal_binding_unordered() {
     }
 
     integrity_constraints {
-        enf test_constraint([b, clk])
+        enf test_constraint([b, clk]);
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     "#;
     let lib = r#"
     mod lib
 
     ev test_constraint([b0, pair[2]]) {
-        enf pair[1] + b0 = pair[0]
+        enf pair[1] + b0 = pair[0];
     }"#;
 
     let test = ParseTest::new();
@@ -340,18 +340,18 @@ fn test_inlining_with_vector_literal_binding_different_arity_many_to_few() {
     }
 
     integrity_constraints {
-        enf test_constraint([clk, b, a])
+        enf test_constraint([clk, b, a]);
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     "#;
     let lib = r#"
     mod lib
 
     ev test_constraint([pair[3], foo]) {
-        enf pair[0] + pair[1] = foo + pair[2]
+        enf pair[0] + pair[1] = foo + pair[2];
     }"#;
 
     let test = ParseTest::new();
@@ -429,18 +429,18 @@ fn test_inlining_with_vector_literal_binding_different_arity_few_to_many() {
     }
 
     integrity_constraints {
-        enf test_constraint([b, a])
+        enf test_constraint([b, a]);
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     "#;
     let lib = r#"
     mod lib
 
     ev test_constraint([x, y, z]) {
-        enf x + y = z
+        enf x + y = z;
     }"#;
 
     let test = ParseTest::new();
@@ -517,11 +517,11 @@ fn test_inlining_across_modules_with_nested_evaluators_variant1() {
     }
 
     integrity_constraints {
-        enf test_constraint([clk, b, a])
+        enf test_constraint([clk, b, a]);
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     "#;
     let lib1 = r#"
@@ -530,13 +530,13 @@ fn test_inlining_across_modules_with_nested_evaluators_variant1() {
     use lib2::*;
 
     ev test_constraint([tuple[3], z]) {
-        enf helper_constraint([z, tuple[1..3]])
+        enf helper_constraint([z, tuple[1..3]]);
     }"#;
     let lib2 = r#"
     mod lib2
 
     ev helper_constraint([x[2], y]) {
-        enf x[0] + x[1] = y
+        enf x[0] + x[1] = y;
     }"#;
 
     let test = ParseTest::new();
@@ -629,11 +629,11 @@ fn test_inlining_across_modules_with_nested_evaluators_variant2() {
     }
 
     integrity_constraints {
-        enf test_constraint([clk, b[0..2], a])
+        enf test_constraint([clk, b[0..2], a]);
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     "#;
     let lib1 = r#"
@@ -642,13 +642,13 @@ fn test_inlining_across_modules_with_nested_evaluators_variant2() {
     use lib2::*;
 
     ev test_constraint([tuple[3], z]) {
-        enf helper_constraint([z, tuple[1], tuple[2..3]])
+        enf helper_constraint([z, tuple[1], tuple[2..3]]);
     }"#;
     let lib2 = r#"
     mod lib2
 
     ev helper_constraint([x[2], y]) {
-        enf x[0] + x[1] = y
+        enf x[0] + x[1] = y;
     }"#;
 
     let test = ParseTest::new();
@@ -751,11 +751,11 @@ fn test_inlining_constraint_comprehensions_no_selector() {
         #    enf b[0]' = 2
         #    enf b[1]' = 4
         #
-        enf x' = y for (x, y) in (b, YS[0..2])
+        enf x' = y for (x, y) in (b, YS[0..2]);
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     "#;
 
@@ -829,11 +829,11 @@ fn test_inlining_constraint_comprehensions_with_selector() {
         #    enf b[0]' = 2 when c
         #    enf b[1]' = 4 when c
         #
-        enf x' = y for (x, y) in (b, YS[0..2]) when c
+        enf x' = y for (x, y) in (b, YS[0..2]) when c;
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     "#;
 
@@ -909,11 +909,11 @@ fn test_inlining_constraint_comprehensions_with_constant_selector() {
         #    enf b[1]' = 4
         #    enf b[3]' = 8
         #
-        enf x' = y for (x, y) in (b, YS) when y
+        enf x' = y for (x, y) in (b, YS) when y;
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     "#;
 
@@ -981,11 +981,11 @@ fn test_inlining_constraint_comprehensions_in_evaluator() {
     }
 
     integrity_constraints {
-        enf test_constraint(b[1..4])
+        enf test_constraint(b[1..4]);
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     ev test_constraint([i, j[2]]) {
@@ -993,7 +993,7 @@ fn test_inlining_constraint_comprehensions_in_evaluator() {
         let k = j[0];
         let l = j[1];
         let xs = [i, k, l];
-        enf x' = y for (x, y) in (xs, ys[1..4]) when y
+        enf x' = y for (x, y) in (xs, ys[1..4]) when y;
     }"#;
 
     let test = ParseTest::new();
@@ -1078,17 +1078,17 @@ fn test_inlining_constraints_with_folded_comprehensions_in_evaluator() {
     }
 
     integrity_constraints {
-        enf test_constraint(b[1..4])
+        enf test_constraint(b[1..4]);
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     ev test_constraint([x, ys[2]]) {
         let y = sum([col^7 for col in ys]);
         let z = prod([col^7 for col in ys]);
-        enf x = y + z
+        enf x = y + z;
     }"#;
 
     let test = ParseTest::new();
@@ -1309,22 +1309,22 @@ fn test_repro_issue340() {
 
     boundary_constraints {
         # define boundary constraints against the main trace at the first row of the trace.
-        enf instruction_word.first = 0
-        enf instruction_word.last = 2
+        enf instruction_word.first = 0;
+        enf instruction_word.last = 2;
     }
 
     integrity_constraints {
         # The instruction bit decomposition must be bits
-        enf b^2 = b for b in instruction_bits
+        enf b^2 = b for b in instruction_bits;
 
         # Ensure they add up to the instruction word:
         let word_sum = sum([2^i * a for (i, a) in (0..32, instruction_bits)]);
-        enf instruction_word = word_sum
+        enf instruction_word = word_sum;
 
         enf match {
             case s: imm_reconstruction([instruction_bits, immediate])
             case !s: immediate = 0
-        }
+        };
     }
 
     # The highest bit is a sign bit, so we sign extend then reconstruct from the other bits
@@ -1333,8 +1333,8 @@ fn test_repro_issue340() {
         let high_bit_sum = sum([sign_bit*2^i for i in (11..32)]);
         let immediate_bits = instruction_bits[20..31];
         let low_bit_sum = sum([immediate_bit * 2^i for (i, immediate_bit) in (0..11, instruction_bits[20..31])]);
-        enf immediate = low_bit_sum + high_bit_sum
-        enf sign_bit = 1
+        enf immediate = low_bit_sum + high_bit_sum;
+        enf sign_bit = 1;
     }"#;
 
     let test = ParseTest::new();
