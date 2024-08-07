@@ -15,11 +15,11 @@ fn test_constant_propagation() {
     use lib::*;
 
     trace_columns {
-        main: [clk, a, b[2], c]
+        main: [clk, a, b[2], c];
     }
 
     public_inputs {
-        inputs: [0]
+        inputs: [0];
     }
 
     const A = [2, 4, 6, 8];

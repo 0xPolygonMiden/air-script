@@ -5,14 +5,14 @@ fn random_values_indexed_access() {
     let source = "
     def test
     trace_columns {
-        main: [a, b[12]]
-        aux: [c, d]
+        main: [a, b[12]];
+        aux: [c, d];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     random_values {
-        rand: [16]
+        rand: [16];
     }
     boundary_constraints {
         enf c.first = $rand[10] * 2;
@@ -30,14 +30,14 @@ fn random_values_custom_name() {
     let source = "
     def test
     trace_columns {
-        main: [a, b[12]]
-        aux: [c, d]
+        main: [a, b[12]];
+        aux: [c, d];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     random_values {
-        alphas: [16]
+        alphas: [16];
     }
     boundary_constraints {
         enf c.first = $alphas[10] * 2;
@@ -55,14 +55,14 @@ fn random_values_named_access() {
     let source = "
     def test
     trace_columns {
-        main: [a, b[12]]
-        aux: [c, d]
+        main: [a, b[12]];
+        aux: [c, d];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     random_values {
-        rand: [m, n[4]]
+        rand: [m, n[4]];
     }
     boundary_constraints {
         enf c.first = (n[1] - $rand[0]) * 2;
@@ -80,14 +80,14 @@ fn err_random_values_out_of_bounds_no_bindings() {
     let source = "
     def test
     trace_columns {
-        main: [a, b[12]]
-        aux: [c, d]
+        main: [a, b[12]];
+        aux: [c, d];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     random_values {
-        rand: [4]
+        rand: [4];
     }
     boundary_constraints {
         enf a.first = $rand[10] * 2;
@@ -108,14 +108,14 @@ fn err_random_values_out_of_bounds_binding_ref() {
     let source = "
     def test
     trace_columns {
-        main: [a, b[12]]
-        aux: [c, d]
+        main: [a, b[12]];
+        aux: [c, d];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     random_values {
-        rand: [m, n[4]]
+        rand: [m, n[4]];
     }
     boundary_constraints {
         enf a.first = n[5] * 2;
@@ -136,14 +136,14 @@ fn err_random_values_out_of_bounds_global_ref() {
     let source = "
     def test
     trace_columns {
-        main: [a, b[12]]
-        aux: [c, d]
+        main: [a, b[12]];
+        aux: [c, d];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     random_values {
-        rand: [m, n[4]]
+        rand: [m, n[4]];
     }
     boundary_constraints {
         enf a.first = $rand[10] * 2;
@@ -164,13 +164,13 @@ fn err_random_values_without_aux_cols() {
     let source = "
     def test
     trace_columns {
-        main: [a, b[12]]
+        main: [a, b[12]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     random_values {
-        rand: [16]
+        rand: [16];
     }
     boundary_constraints {
         enf a.first = 2;
@@ -191,14 +191,14 @@ fn err_random_values_in_bc_against_main_cols() {
     let source = "
     def test
     trace_columns {
-        main: [a, b[12]]
-        aux: [c, d]
+        main: [a, b[12]];
+        aux: [c, d];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     random_values {
-        rand: [16]
+        rand: [16];
     }
     boundary_constraints {
         enf a.first = $rand[10] * 2;

@@ -13,11 +13,11 @@ fn trace_columns() {
     def test
 
     trace_columns {
-        main: [clk, fmp, ctx]
+        main: [clk, fmp, ctx];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {
@@ -55,12 +55,12 @@ fn trace_columns_main_and_aux() {
     def test
 
     trace_columns {
-        main: [clk, fmp, ctx]
-        aux: [rc_bus, ch_bus]
+        main: [clk, fmp, ctx];
+        aux: [rc_bus, ch_bus];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {
@@ -101,12 +101,12 @@ fn trace_columns_groups() {
     def test
 
     trace_columns {
-        main: [clk, fmp, ctx, a[3]]
-        aux: [rc_bus, b[4], ch_bus]
+        main: [clk, fmp, ctx, a[3]];
+        aux: [rc_bus, b[4], ch_bus];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {
@@ -168,16 +168,16 @@ fn err_main_trace_cols_missing() {
     def test
 
     trace_columns {
-        aux: [clk]
+        aux: [clk];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }"#;
 
     ParseTest::new()

@@ -13,11 +13,11 @@ fn bc_one_iterable_identifier_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     integrity_constraints {
@@ -60,11 +60,11 @@ fn bc_identifier_and_range_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     integrity_constraints {
@@ -105,11 +105,11 @@ fn bc_iterable_slice_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     integrity_constraints {
@@ -150,11 +150,11 @@ fn bc_two_iterable_identifier_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4], d[4]]
+        main: [a, b, c[4], d[4]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     integrity_constraints {
@@ -195,11 +195,11 @@ fn bc_multiple_iterables_lc() {
     def test
 
     trace_columns {
-        main: [a, b[3], c[4], d[4]]
+        main: [a, b[3], c[4], d[4]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     integrity_constraints {
@@ -241,11 +241,11 @@ fn ic_one_iterable_identifier_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {
@@ -291,11 +291,11 @@ fn ic_iterable_identifier_range_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {
@@ -336,11 +336,11 @@ fn ic_iterable_slice_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {
@@ -381,11 +381,11 @@ fn ic_two_iterable_identifier_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4], d[4]]
+        main: [a, b, c[4], d[4]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {
@@ -426,11 +426,11 @@ fn ic_multiple_iterables_lc() {
     def test
 
     trace_columns {
-        main: [a, b[3], c[4], d[4]]
+        main: [a, b[3], c[4], d[4]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {
@@ -475,12 +475,12 @@ fn err_bc_lc_one_member_two_iterables() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]];
     }
 
     boundary_constraints {
         let x = [c for c in (c, d)];
-        enf a.first = x
+        enf a.first = x;
     }";
 
     ParseTest::new()
@@ -493,12 +493,12 @@ fn err_bc_lc_two_members_one_iterables() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]];
     }
 
     boundary_constraints {
         let x = [c + d for (c, d) in c];
-        enf a.first = x
+        enf a.first = x;
     }";
 
     ParseTest::new()
@@ -511,12 +511,12 @@ fn err_ic_lc_one_member_two_iterables() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]];
     }
 
     integrity_constraints {
         let x = [c for c in (c, d)];
-        enf a = x
+        enf a = x;
     }";
 
     ParseTest::new()
@@ -529,12 +529,12 @@ fn err_ic_lc_two_members_one_iterable() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]];
     }
 
     integrity_constraints {
         let x = [c + d for (c, d) in c];
-        enf a = x
+        enf a = x;
     }";
 
     ParseTest::new()

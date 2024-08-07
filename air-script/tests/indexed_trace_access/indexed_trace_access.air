@@ -1,12 +1,12 @@
 def TraceAccessAir
 
 trace_columns {
-    main: [a, b]
-    aux: [c, d]
+    main: [a, b];
+    aux: [c, d];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 integrity_constraints {

@@ -1,16 +1,16 @@
 def RandomValuesAir
 
 trace_columns {
-    main: [a, b]
-    aux: [c, d]
+    main: [a, b];
+    aux: [c, d];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 random_values {
-    rand: [16]
+    rand: [16];
 }
 
 boundary_constraints {

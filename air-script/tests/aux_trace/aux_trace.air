@@ -1,16 +1,16 @@
 def AuxiliaryAir
 
 trace_columns {
-    main: [a, b, c]
-    aux: [p0, p1]
+    main: [a, b, c];
+    aux: [p0, p1];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 random_values {
-    rand: [2]
+    rand: [2];
 }
 
 boundary_constraints {

@@ -89,11 +89,11 @@ fn ev_fn_call_simple() {
     def test
 
     trace_columns {
-        main: [clk]
+        main: [clk];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {
@@ -130,11 +130,11 @@ fn ev_fn_call() {
     def test
 
     trace_columns {
-        main: [a[2], b[4], c[6]]
+        main: [a[2], b[4], c[6]];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {
@@ -202,11 +202,11 @@ fn ev_fn_call_with_more_than_two_args() {
     def test
 
     trace_columns {
-        main: [a, b, c]
+        main: [a, b, c];
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2];
     }
 
     boundary_constraints {

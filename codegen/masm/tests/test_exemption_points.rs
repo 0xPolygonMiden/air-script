@@ -12,11 +12,11 @@ static SIMPLE_AIR: &str = "
 def Simple
 
 trace_columns {
-    main: [a]
+    main: [a];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 boundary_constraints {

@@ -1,14 +1,14 @@
 def PubInputsAir
 
 trace_columns {
-    main: [a, b, c, d]
+    main: [a, b, c, d];
 }
 
 public_inputs {
-    program_hash: [4]
-    stack_inputs: [4]
-    stack_outputs: [20]
-    overflow_addrs: [4]
+    program_hash: [4];
+    stack_inputs: [4];
+    stack_outputs: [20];
+    overflow_addrs: [4];
 }
 
 boundary_constraints {

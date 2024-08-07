@@ -2,7 +2,7 @@
 mod foo
 
 periodic_columns {
-    k0: [1, 1, 0, 0]
+    k0: [1, 1, 0, 0];
 }
 
 ev foo_constraint([clk]) {

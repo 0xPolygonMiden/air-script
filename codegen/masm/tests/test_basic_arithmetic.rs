@@ -12,11 +12,11 @@ static ARITH_AIR: &str = "
 def SimpleArithmetic
 
 trace_columns {
-    main: [a, b]
+    main: [a, b];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 boundary_constraints {
@@ -104,11 +104,11 @@ static EXP_AIR: &str = "
 def Exp
 
 trace_columns {
-    main: [a, b]
+    main: [a, b];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 boundary_constraints {
@@ -193,11 +193,11 @@ static LONG_TRACE: &str = "
 def LongTrace
 
 trace_columns {
-    main: [a, b, c, d, e, f, g, h, i]
+    main: [a, b, c, d, e, f, g, h, i];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 boundary_constraints {
@@ -275,11 +275,11 @@ static VECTOR: &str = "
 def Vector
 
 trace_columns {
-    main: [clk, fmp[2]]
+    main: [clk, fmp[2]];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 boundary_constraints {
@@ -355,11 +355,11 @@ static MULTIPLE_ROWS_AIR: &str = "
 def MultipleRows
 
 trace_columns {
-    main: [a, b]
+    main: [a, b];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 boundary_constraints {

@@ -13,12 +13,12 @@ fn public_inputs() {
     def test
 
     trace_columns {
-        main: [clk]
+        main: [clk];
     }
 
     public_inputs {
-        program_hash: [4]
-        stack_inputs: [16]
+        program_hash: [4];
+        stack_inputs: [16];
     }
 
     boundary_constraints {

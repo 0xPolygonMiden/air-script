@@ -5,10 +5,10 @@ fn boundary_constraints() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -26,10 +26,10 @@ fn err_bc_duplicate_first() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -47,10 +47,10 @@ fn err_bc_duplicate_last() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf clk.last = 0;

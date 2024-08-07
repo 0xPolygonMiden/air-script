@@ -16,11 +16,11 @@ const B = [3, 5];
 const C = [[7, 11], [13, 17]];
 
 trace_columns {
-    main: [a, b, c]
+    main: [a, b, c];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 boundary_constraints {

@@ -12,12 +12,12 @@ static SIMPLE_AUX_AIR: &str = "
 def SimpleAux
 
 trace_columns {
-    main: [a]
-    aux: [b]
+    main: [a];
+    aux: [b];
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 boundary_constraints {

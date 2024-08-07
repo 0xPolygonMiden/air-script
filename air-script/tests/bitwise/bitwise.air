@@ -1,16 +1,16 @@
 def BitwiseAir
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16];
 }
 
 trace_columns {
-    main: [s, a, b, a0, a1, a2, a3, b0, b1, b2, b3, zp, z, dummy]
+    main: [s, a, b, a0, a1, a2, a3, b0, b1, b2, b3, zp, z, dummy];
 }
 
 periodic_columns {
-    k0: [1, 0, 0, 0, 0, 0, 0, 0]
-    k1: [1, 1, 1, 1, 1, 1, 1, 0]
+    k0: [1, 0, 0, 0, 0, 0, 0, 0];
+    k1: [1, 1, 1, 1, 1, 1, 1, 0];
 }
 
 boundary_constraints {

@@ -7,10 +7,10 @@ fn integrity_constraints() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -27,10 +27,10 @@ fn ic_using_parens() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -47,10 +47,10 @@ fn ic_op_mul() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -67,10 +67,10 @@ fn ic_op_exp() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -88,11 +88,11 @@ fn err_non_const_exp_outside_lc() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf c[2].first = 0;

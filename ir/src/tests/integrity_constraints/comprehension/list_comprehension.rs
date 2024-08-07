@@ -5,11 +5,11 @@ fn list_comprehension() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf c[2].first = 0;
@@ -27,11 +27,11 @@ fn lc_with_const_exp() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf c[2].first = 0;
@@ -50,11 +50,11 @@ fn lc_with_non_const_exp() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf c[2].first = 0;
@@ -72,11 +72,11 @@ fn lc_with_two_lists() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf c[2].first = 0;
@@ -94,11 +94,11 @@ fn lc_with_two_slices() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf c[2].first = 0;
@@ -116,10 +116,10 @@ fn lc_with_multiple_lists() {
     let source = "
     def test
     trace_columns {
-        main: [a, b[3], c[4], d[4]]
+        main: [a, b[3], c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf c[2].first = 0;
@@ -137,11 +137,11 @@ fn err_index_out_of_range_lc_ident() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     boundary_constraints {
         enf c[2].first = 0;
@@ -163,11 +163,11 @@ fn err_index_out_of_range_lc_slice() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     
     boundary_constraints {
@@ -190,11 +190,11 @@ fn err_non_const_exp_ident_iterable() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
     
     boundary_constraints {
@@ -214,11 +214,11 @@ fn err_non_const_exp_slice_iterable() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
 
     boundary_constraints {
@@ -238,11 +238,11 @@ fn err_duplicate_member() {
     let source = "
     def test
     trace_columns {
-        main: [clk, fmp[2], ctx]
-        aux: [a, b, c[4], d[4]]
+        main: [clk, fmp[2], ctx];
+        aux: [a, b, c[4], d[4]];
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16];
     }
 
     boundary_constraints {
