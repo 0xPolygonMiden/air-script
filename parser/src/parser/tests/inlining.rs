@@ -1171,31 +1171,31 @@ fn test_inlining_with_function_call_as_binary_operand() {
     def root
 
     trace_columns {
-        main: [clk, a, b[4], c]
+        main: [clk, a, b[4], c],
     }
 
     public_inputs {
-        inputs: [0]
+        inputs: [0],
     }
 
     integrity_constraints {
-        let complex_fold = fold_sum(b) * fold_vec(b)
-        enf complex_fold = 1
+        let complex_fold = fold_sum(b) * fold_vec(b);
+        enf complex_fold = 1;
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     fn fold_sum(a: felt[4]) -> felt {
-        return a[0] + a[1] + a[2] + a[3]
+        return a[0] + a[1] + a[2] + a[3];
     }
 
     fn fold_vec(a: felt[4]) -> felt {
-        let m = a[0] * a[1]
-        let n = m * a[2]
-        let o = n * a[3]
-        return o
+        let m = a[0] * a[1];
+        let n = m * a[2];
+        let o = n * a[3];
+        return o;
     }
     "#;
 

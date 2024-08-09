@@ -343,7 +343,7 @@ ConstraintStatement: Vec<Statement> = {
 }
 
 ReturnStatement: Expr = {
-    <l:@L> "return" <expr: Expr> <r:@R> => expr,
+    <l:@L> "return" <expr: Expr> ";" <r:@R> => expr,
 }
 
 MatchArm: Statement = {
