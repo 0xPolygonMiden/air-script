@@ -364,21 +364,21 @@ impl<'a> Inlining<'a> {
     /// Let expressions are expanded using the following rules:
     ///
     /// * The let-bound expression is expanded first. If it expands to a statement block and
-    /// not an expression, the block is inlined in place of the let being expanded, and the
-    /// rest of the expansion takes place at the end of the block; replacing the last statement
-    /// in the block. If the last statement in the block was an expression, it is treated as
-    /// the let-bound value. If the last statement in the block was another `let` however, then
-    /// we recursively walk down the let tree until we reach the bottom, which must always be
-    /// an expression statement.
+    ///   not an expression, the block is inlined in place of the let being expanded, and the
+    ///   rest of the expansion takes place at the end of the block; replacing the last statement
+    ///   in the block. If the last statement in the block was an expression, it is treated as
+    ///   the let-bound value. If the last statement in the block was another `let` however, then
+    ///   we recursively walk down the let tree until we reach the bottom, which must always be
+    ///   an expression statement.
     ///
     /// * The body is expanded in-place after the previous step has been completed.
     ///
     /// * If a let-bound variable is an alias for a declaration, we replace all uses
-    /// of the variable with direct references to the declaration, making the let-bound variable
-    /// dead
+    ///   of the variable with direct references to the declaration, making the let-bound
+    ///   variable dead
     ///
     /// * If a let-bound variable is dead (i.e. has no references), then the let is elided,
-    /// by replacing it with the result of expanding its body
+    ///   by replacing it with the result of expanding its body
     fn expand_let(&mut self, expr: Let) -> Result<Vec<Statement>, SemanticAnalysisError> {
         let span = expr.span();
         let name = expr.name;
@@ -744,9 +744,9 @@ impl<'a> Inlining<'a> {
     /// the expansion is, respectively:
     ///
     /// * A tree of let statements (using generated variables), where each let binds the value of a
-    /// single iteration of the comprehension. The body of the final let, and thus the effective value
-    /// of the entire tree, is a vector containing all of the bindings in the evaluation order of the
-    /// comprehension.
+    ///   single iteration of the comprehension. The body of the final let, and thus the effective
+    ///   value of the entire tree, is a vector containing all of the bindings in the evaluation
+    ///   order of the comprehension.
     /// * A flat list of constraint statements
     fn expand_comprehension(
         &mut self,

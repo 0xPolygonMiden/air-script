@@ -472,7 +472,7 @@ pub enum ScalarExpr {
     ///
     /// 1. The call is the top-level expression of a constraint, and is to an evaluator function
     /// 2. The call is not the top-level expression of a constraint, and is to a pure function
-    /// that produces a scalar value type.
+    ///    that produces a scalar value type.
     ///
     /// If neither of the above are true, the call is invalid in a `ScalarExpr` context
     Call(Call),
@@ -1138,8 +1138,8 @@ pub struct Call {
     ///
     /// * Calls to evaluators produce no value, and thus have no type
     /// * When parsed, the callee has not yet been resolved, so we don't know the
-    /// type of the function being called. During semantic analysis, the callee is
-    /// resolved and this field is set to the result type of that function.
+    ///   type of the function being called. During semantic analysis, the callee is
+    ///   resolved and this field is set to the result type of that function.
     pub ty: Option<Type>,
 }
 impl Call {
