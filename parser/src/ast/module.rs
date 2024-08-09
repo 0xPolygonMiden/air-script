@@ -35,8 +35,8 @@ pub enum ModuleType {
 ///
 /// * Fields which are only allowed in root modules are empty/unset in library modules
 /// * Fields which must be present in root modules are guaranteed to be present in a root module
-/// * It is guaranteed that at least one boundary constraint and one integrity constraint are present
-/// in a root module
+/// * It is guaranteed that at least one boundary constraint and one integrity constraint are
+///   present in a root module
 /// * No duplicate module-level declarations were present
 /// * All globally-visible declarations are unique
 ///
