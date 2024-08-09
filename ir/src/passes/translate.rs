@@ -447,8 +447,8 @@ impl<'a> AirBuilder<'a> {
             ast::ScalarExpr::Call(_) | ast::ScalarExpr::BoundedSymbolAccess(_) => unreachable!(),
         }
     }
-	
-	// Use square and multiply algorithm to expand the exp into a series of multiplications
+
+    // Use square and multiply algorithm to expand the exp into a series of multiplications
     fn expand_exp(&mut self, lhs: NodeIndex, rhs: u64) -> NodeIndex {
         match rhs {
             0 => self.insert_constant(1),
@@ -464,14 +464,14 @@ impl<'a> AirBuilder<'a> {
             }
         }
     }
-	
+
     fn insert_binary_expr(&mut self, expr: &ast::BinaryExpr) -> Result<NodeIndex, CompileError> {
         if expr.op == ast::BinaryOp::Exp {
             let lhs = self.insert_scalar_expr(expr.lhs.as_ref())?;
             let ast::ScalarExpr::Const(rhs) = expr.rhs.as_ref() else {
                 unreachable!();
             };
-            return Ok(self.expand_exp(lhs, rhs.item as u64));
+            return Ok(self.expand_exp(lhs, rhs.item));
         }
 
         let lhs = self.insert_scalar_expr(expr.lhs.as_ref())?;
