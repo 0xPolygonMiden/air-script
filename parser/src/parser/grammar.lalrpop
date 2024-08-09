@@ -280,7 +280,6 @@ FunctionBindingType: Type = {
 }
 
 FunctionBody: Vec<Statement> = {
-    // TODO: validate
     <l:@L> <stmts: StatementBlock> <r:@R> =>? {
         if stmts.len() > 1 {
             diagnostics.diagnostic(Severity::Error)
