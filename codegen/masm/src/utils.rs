@@ -62,15 +62,6 @@ pub fn load_quadratic_element(
     Ok(())
 }
 
-/// Assumes a quadratic extension field element is at the top of the stack and square it `n` times.
-pub fn quadratic_element_square(writer: &mut Writer, n: u32) {
-    for _ in 0..n {
-        writer.dup(1);
-        writer.dup(1);
-        writer.ext2mul();
-    }
-}
-
 pub fn boundary_group_to_procedure_name(
     trace: TraceSegmentId,
     domain: ConstraintDomain,

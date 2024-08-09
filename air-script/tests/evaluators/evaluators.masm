@@ -87,75 +87,19 @@ proc.compute_integrity_constraints
     # Multiply by the composition coefficient
     padw mem_loadw.4294900201 movdn.3 movdn.3 drop drop ext2mul
     # integrity constraint 3 for main
-    padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop
-    # push the accumulator to the stack
-    push.1 movdn.2 push.0 movdn.2
-    # => [b1, b0, r1, r0, ...]
-    # square 1 times
-    dup.1 dup.1 ext2mul
-    # multiply
-    dup.1 dup.1 movdn.5 movdn.5
-    # => [b1, b0, r1, r0, b1, b0, ...] (4 cycles)
-    ext2mul movdn.3 movdn.3
-    # => [b1, b0, r1', r0', ...] (5 cycles)
-    # clean stack
-    drop drop
-    # => [r1, r0, ...] (2 cycles)
-    padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop ext2sub
+    padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop ext2mul padw mem_loadw.4294900000 movdn.3 movdn.3 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900201 drop drop ext2mul
     # integrity constraint 4 for main
-    padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop
-    # push the accumulator to the stack
-    push.1 movdn.2 push.0 movdn.2
-    # => [b1, b0, r1, r0, ...]
-    # square 1 times
-    dup.1 dup.1 ext2mul
-    # multiply
-    dup.1 dup.1 movdn.5 movdn.5
-    # => [b1, b0, r1, r0, b1, b0, ...] (4 cycles)
-    ext2mul movdn.3 movdn.3
-    # => [b1, b0, r1', r0', ...] (5 cycles)
-    # clean stack
-    drop drop
-    # => [r1, r0, ...] (2 cycles)
-    padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop ext2sub
+    padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop ext2mul padw mem_loadw.4294900001 movdn.3 movdn.3 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900202 movdn.3 movdn.3 drop drop ext2mul
     # integrity constraint 5 for main
-    padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop
-    # push the accumulator to the stack
-    push.1 movdn.2 push.0 movdn.2
-    # => [b1, b0, r1, r0, ...]
-    # square 1 times
-    dup.1 dup.1 ext2mul
-    # multiply
-    dup.1 dup.1 movdn.5 movdn.5
-    # => [b1, b0, r1, r0, b1, b0, ...] (4 cycles)
-    ext2mul movdn.3 movdn.3
-    # => [b1, b0, r1', r0', ...] (5 cycles)
-    # clean stack
-    drop drop
-    # => [r1, r0, ...] (2 cycles)
-    padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2sub
+    padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2mul padw mem_loadw.4294900002 movdn.3 movdn.3 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900202 drop drop ext2mul
     # integrity constraint 6 for main
-    padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop
-    # push the accumulator to the stack
-    push.1 movdn.2 push.0 movdn.2
-    # => [b1, b0, r1, r0, ...]
-    # square 1 times
-    dup.1 dup.1 ext2mul
-    # multiply
-    dup.1 dup.1 movdn.5 movdn.5
-    # => [b1, b0, r1, r0, b1, b0, ...] (4 cycles)
-    ext2mul movdn.3 movdn.3
-    # => [b1, b0, r1', r0', ...] (5 cycles)
-    # clean stack
-    drop drop
-    # => [r1, r0, ...] (2 cycles)
-    padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop ext2sub
+    padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop ext2mul padw mem_loadw.4294900003 movdn.3 movdn.3 drop drop ext2sub
     # Multiply by the composition coefficient
     padw mem_loadw.4294900203 movdn.3 movdn.3 drop drop ext2mul
 end # END PROC compute_integrity_constraints

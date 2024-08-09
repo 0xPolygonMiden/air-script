@@ -79,7 +79,7 @@ impl Air for VariablesAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = main_current[0].exp(E::PositiveInteger::from(2_u64)) - main_current[0];
+        result[0] = main_current[0] * main_current[0] - main_current[0];
         result[1] = periodic_values[0] * (main_next[0] - main_current[0]) - E::ZERO;
         result[2] = (E::ONE - main_current[0]) * (main_current[3] - main_current[1] - main_current[2]) - (E::from(6_u64) - main_current[0]);
         result[3] = main_current[0] * (main_current[3] - main_current[1] * main_current[2]) - (main_next[0] - E::from(3_u64) - E::from(2_u64));

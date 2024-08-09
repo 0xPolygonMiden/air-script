@@ -78,10 +78,10 @@ impl Air for EvaluatorsAir {
         result[0] = main_next[0] - main_current[0];
         result[1] = main_next[2] - main_current[2];
         result[2] = main_next[6] - main_current[6];
-        result[3] = main_current[0].exp(E::PositiveInteger::from(2_u64)) - main_current[0];
-        result[4] = main_current[1].exp(E::PositiveInteger::from(2_u64)) - main_current[1];
-        result[5] = main_current[2].exp(E::PositiveInteger::from(2_u64)) - main_current[2];
-        result[6] = main_current[3].exp(E::PositiveInteger::from(2_u64)) - main_current[3];
+        result[3] = main_current[0] * main_current[0] - main_current[0];
+        result[4] = main_current[1] * main_current[1] - main_current[1];
+        result[5] = main_current[2] * main_current[2] - main_current[2];
+        result[6] = main_current[3] * main_current[3] - main_current[3];
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxTraceRandElements<E>, result: &mut [E])
