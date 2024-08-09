@@ -5,11 +5,11 @@ fn trace_columns_index_access() {
     let source = "
     def test
     trace_columns {
-        main: [a, b];
-        aux: [c, d];
+        main: [a, b],
+        aux: [c, d],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf a.first = 1;
@@ -30,10 +30,10 @@ fn trace_cols_groups() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk, a[4]];
+        main: [clk, a[4]],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf a[1].first = A;
@@ -51,10 +51,10 @@ fn err_bc_column_undeclared() {
     let source = "
     def test
     trace_columns {
-        main: [ctx];
+        main: [ctx],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -72,10 +72,10 @@ fn err_ic_column_undeclared() {
     let source = "
     def test
     trace_columns {
-        main: [ctx];
+        main: [ctx],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf ctx.first = 0;
@@ -96,10 +96,10 @@ fn err_bc_trace_cols_access_out_of_bounds() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk, a[4]];
+        main: [clk, a[4]],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf a[4].first = A;
@@ -123,10 +123,10 @@ fn err_ic_trace_cols_access_out_of_bounds() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk, a[4]];
+        main: [clk, a[4]],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf a[1].first = A;
@@ -147,10 +147,10 @@ fn err_ic_trace_cols_group_used_as_scalar() {
     let source = "
     def test
     trace_columns {
-        main: [clk, a[4]];
+        main: [clk, a[4]],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf a[1].first = 0;

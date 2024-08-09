@@ -3,21 +3,21 @@
 def VariablesAir
 
 trace_columns {
-    main: [s, a, b, c];
-    aux: [p];
+    main: [s, a, b, c],
+    aux: [p],
 }
 
 public_inputs {
-    stack_inputs: [16];
-    stack_outputs: [16];
+    stack_inputs: [16],
+    stack_outputs: [16],
 }
 
 periodic_columns {
-    k0: [1, 1, 1, 1, 1, 1, 1, 0];
+    k0: [1, 1, 1, 1, 1, 1, 1, 0],
 }
 
 random_values {
-    rand: [1];
+    rand: [1],
 }
 
 boundary_constraints {

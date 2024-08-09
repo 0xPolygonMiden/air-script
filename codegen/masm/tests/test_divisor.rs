@@ -13,11 +13,11 @@ static SIMPLE_INTEGRITY_AIR: &str = "
 def SimpleIntegrityAux
 
 trace_columns {
-    main: [a];
+    main: [a],
 }
 
 public_inputs {
-    stack_inputs: [1];
+    stack_inputs: [1],
 }
 
 boundary_constraints {
@@ -97,12 +97,12 @@ static SIMPLE_BOUNDARY_AIR: &str = "
 def SimpleBoundaryAux
 
 trace_columns {
-    main: [a];
-    aux: [b];
+    main: [a],
+    aux: [b],
 }
 
 public_inputs {
-    stack_inputs: [1];
+    stack_inputs: [1],
 }
 
 boundary_constraints {
@@ -218,12 +218,12 @@ static MIXED_BOUNDARY_AIR: &str = "
 def MixedBoundaryAux
 
 trace_columns {
-    main: [a];
-    aux: [b];
+    main: [a],
+    aux: [b],
 }
 
 public_inputs {
-    stack_inputs: [1];
+    stack_inputs: [1],
 }
 
 boundary_constraints {

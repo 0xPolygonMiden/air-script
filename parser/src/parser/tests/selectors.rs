@@ -13,11 +13,11 @@ fn single_selector() {
     def test
 
     trace_columns {
-        main: [clk, n1];
+        main: [clk, n1],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -57,11 +57,11 @@ fn chained_selectors() {
     def test
 
     trace_columns {
-        main: [clk, n1, n2, n3];
+        main: [clk, n1, n2, n3],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {

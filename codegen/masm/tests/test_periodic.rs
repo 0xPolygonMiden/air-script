@@ -12,15 +12,15 @@ static SIMPLE_AUX_AIR: &str = "
 def SimpleAux
 
 trace_columns {
-    main: [a];
+    main: [a],
 }
 
 periodic_columns {
-    k: [1, 1];
+    k: [1, 1],
 }
 
 public_inputs {
-    stack_inputs: [16];
+    stack_inputs: [16],
 }
 
 boundary_constraints {
@@ -99,17 +99,17 @@ static MULTIPLE_AUX_AIR: &str = "
 def MultipleAux
 
 trace_columns {
-    main: [a, b, c];
+    main: [a, b, c],
 }
 
 periodic_columns {
-    m: [1, 0];
-    n: [1, 1, 1, 0];
-    o: [1, 0, 0, 0];
+    m: [1, 0],
+    n: [1, 1, 1, 0],
+    o: [1, 0, 0, 0],
 }
 
 public_inputs {
-    stack_inputs: [16];
+    stack_inputs: [16],
 }
 
 boundary_constraints {

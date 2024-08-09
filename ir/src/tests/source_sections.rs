@@ -22,7 +22,7 @@ fn err_trace_cols_omitted() {
     let source = "
     def test
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -40,7 +40,7 @@ fn err_pub_inputs_empty() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {}
     boundary_constraints {
@@ -59,7 +59,7 @@ fn err_pub_inputs_omitted() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -77,10 +77,10 @@ fn err_bc_empty() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {}
     integrity_constraints {
@@ -96,10 +96,10 @@ fn err_bc_omitted() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     integrity_constraints {
         enf clk' = clk + 1;
@@ -117,10 +117,10 @@ fn err_ic_empty() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -136,10 +136,10 @@ fn err_ic_omitted() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;

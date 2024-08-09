@@ -10,8 +10,8 @@ fn periodic_columns() {
     mod test
 
     periodic_columns {
-        k0: [1, 0, 0, 0];
-        k1: [0, 0, 0, 0, 0, 0, 0, 1];
+        k0: [1, 0, 0, 0],
+        k1: [0, 0, 0, 0, 0, 0, 0, 1],
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -47,7 +47,7 @@ fn err_periodic_columns_length() {
     mod test
 
     periodic_columns {
-        k0: [1, 0, 0];
+        k0: [1, 0, 0],
     }";
 
     ParseTest::new().expect_module_diagnostic(

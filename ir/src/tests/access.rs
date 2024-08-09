@@ -9,10 +9,10 @@ fn invalid_vector_access_in_boundary_constraint() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = A + B[3] - C[1][2];
@@ -36,10 +36,10 @@ fn invalid_matrix_row_access_in_boundary_constraint() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = A + B[1] - C[3][2];
@@ -63,10 +63,10 @@ fn invalid_matrix_column_access_in_boundary_constraint() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = A + B[1] - C[1][3];
@@ -90,10 +90,10 @@ fn invalid_vector_access_in_integrity_constraint() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -117,10 +117,10 @@ fn invalid_matrix_row_access_in_integrity_constraint() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -144,10 +144,10 @@ fn invalid_matrix_column_access_in_integrity_constraint() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;

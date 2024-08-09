@@ -1,11 +1,11 @@
 def BinaryAir
 
 trace_columns {
-    main: [a, b];
+    main: [a, b],
 }
 
 public_inputs {
-    stack_inputs: [16];
+    stack_inputs: [16],
 }
 
 boundary_constraints {

@@ -5,11 +5,11 @@ fn single_selector() {
     let source = "
     def test
     trace_columns {
-        main: [s[2], clk];
+        main: [s[2], clk],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -26,11 +26,11 @@ fn chained_selectors() {
     let source = "
     def test
     trace_columns {
-        main: [s[3], clk];
+        main: [s[3], clk],
     }
     
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -47,11 +47,11 @@ fn multiconstraint_selectors() {
     let source = "
     def test
     trace_columns {
-        main: [s[3], clk];
+        main: [s[3], clk],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -78,11 +78,11 @@ fn selectors_in_evaluators() {
     }
     
     trace_columns {
-        main: [s[3], clk];
+        main: [s[3], clk],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -105,11 +105,11 @@ fn multiple_selectors_in_evaluators() {
     }
     
     trace_columns {
-        main: [s[3], clk];
+        main: [s[3], clk],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -132,11 +132,11 @@ fn selector_with_evaluator_call() {
     }
     
     trace_columns {
-        main: [s[3], clk];
+        main: [s[3], clk],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -167,11 +167,11 @@ fn selectors_inside_match() {
     }
 
     trace_columns {
-        main: [s[3], clk];
+        main: [s[3], clk],
     }
  
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {

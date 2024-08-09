@@ -13,11 +13,11 @@ fn integrity_constraints() {
     def test
 
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -80,11 +80,11 @@ fn multiple_integrity_constraints() {
     def test
 
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -127,15 +127,15 @@ fn integrity_constraint_with_periodic_col() {
     def test
 
     trace_columns {
-        main: [b];
+        main: [b],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     periodic_columns {
-        k0: [1, 0];
+        k0: [1, 0],
     }
 
     boundary_constraints {
@@ -178,16 +178,16 @@ fn integrity_constraint_with_random_value() {
     def test
 
     trace_columns {
-        main: [a];
-        aux: [aux0[2]];
+        main: [a],
+        aux: [aux0[2]],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     random_values {
-        rand: [2];
+        rand: [2],
     }
 
     boundary_constraints {
@@ -233,7 +233,7 @@ fn integrity_constraint_with_constants() {
     def test
 
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
 
     const A = 0;
@@ -241,7 +241,7 @@ fn integrity_constraint_with_constants() {
     const C = [[0, 1], [1, 0]];
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -288,11 +288,11 @@ fn integrity_constraint_with_variables() {
     def test
 
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -337,12 +337,12 @@ fn integrity_constraint_with_indexed_trace_access() {
     def test
 
     trace_columns {
-        main: [a, b];
-        aux: [c, d];
+        main: [a, b],
+        aux: [c, d],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -397,11 +397,11 @@ fn ic_comprehension_one_iterable_identifier() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]];
+        main: [a, b, c[4]],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -442,11 +442,11 @@ fn ic_comprehension_one_iterable_range() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]];
+        main: [a, b, c[4]],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -487,11 +487,11 @@ fn ic_comprehension_with_selectors() {
     def test
 
     trace_columns {
-        main: [s[2], a, b, c[4]];
+        main: [s[2], a, b, c[4]],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -536,11 +536,11 @@ fn ic_comprehension_with_evaluator_call() {
     }
 
     trace_columns {
-        main: [a, b, c[4], d[4]];
+        main: [a, b, c[4], d[4]],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -594,11 +594,11 @@ fn ic_comprehension_with_evaluator_and_selectors() {
     }
 
     trace_columns {
-        main: [s[2], a, b, c[4], d[4]];
+        main: [s[2], a, b, c[4], d[4]],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -654,11 +654,11 @@ fn ic_match_constraint() {
     }
 
     trace_columns {
-        main: [s[2], a, b, c[4], d[4]];
+        main: [s[2], a, b, c[4], d[4]],
     }
 
     public_inputs {
-        inputs: [2];
+        inputs: [2],
     }
 
     boundary_constraints {
@@ -721,7 +721,7 @@ fn err_ic_comprehension_one_member_two_iterables() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]];
+        main: [a, b, c[4]],
     }
 
     integrity_constraints {
@@ -738,7 +738,7 @@ fn err_ic_comprehension_two_members_one_iterable() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]];
+        main: [a, b, c[4]],
     }
 
     integrity_constraints {
@@ -758,7 +758,7 @@ fn err_missing_integrity_constraint() {
     def test
 
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
 
     integrity_constraints {
@@ -775,7 +775,7 @@ fn ic_invalid() {
     def test
 
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
 
     integrity_constraints {
@@ -790,7 +790,7 @@ fn error_invalid_next_usage() {
     def test
 
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
 
     integrity_constraints {
@@ -805,7 +805,7 @@ fn err_empty_integrity_constraints() {
     def test
 
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
 
     integrity_constraints {}

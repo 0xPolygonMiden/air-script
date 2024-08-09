@@ -9,11 +9,11 @@ fn simple_evaluator() {
     }
     
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -37,11 +37,11 @@ fn evaluator_with_variables() {
     }
     
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -66,12 +66,12 @@ fn evaluator_with_main_and_aux_cols() {
     }
     
     trace_columns {
-        main: [clk];
-        aux: [a, b];
+        main: [clk],
+        aux: [a, b],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -94,12 +94,12 @@ fn ev_call_with_aux_only() {
     }
     
     trace_columns {
-        main: [clk];
-        aux: [a, b];
+        main: [clk],
+        aux: [a, b],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -126,11 +126,11 @@ fn ev_call_inside_evaluator_with_main() {
     }
     
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -162,12 +162,12 @@ fn ev_call_inside_evaluator_with_aux() {
     }
     
     trace_columns {
-        main: [clk];
-        aux: [a, b];
+        main: [clk],
+        aux: [a, b],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -190,11 +190,11 @@ fn ev_fn_call_with_column_group() {
     }
     
     trace_columns {
-        main: [s[3], clk];
+        main: [s[3], clk],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {
@@ -217,12 +217,12 @@ fn err_ev_fn_call_wrong_segment_columns() {
     }
     
     trace_columns {
-        main: [b];
-        aux: [c];
+        main: [b],
+        aux: [c],
     }
 
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
 
     boundary_constraints {

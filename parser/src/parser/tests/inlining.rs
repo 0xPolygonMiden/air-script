@@ -28,11 +28,11 @@ fn test_inlining_with_evaluator_split_input_binding() {
     use lib::*;
 
     trace_columns {
-        main: [clk, a, b[2], c];
+        main: [clk, a, b[2], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     const A = [2, 4, 6, 8];
@@ -153,11 +153,11 @@ fn test_inlining_with_vector_literal_binding_regrouped() {
     use lib::*;
 
     trace_columns {
-        main: [clk, a, b[2], c];
+        main: [clk, a, b[2], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -243,11 +243,11 @@ fn test_inlining_with_vector_literal_binding_unordered() {
     use lib::*;
 
     trace_columns {
-        main: [clk, a, b[2], c];
+        main: [clk, a, b[2], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -332,11 +332,11 @@ fn test_inlining_with_vector_literal_binding_different_arity_many_to_few() {
     use lib::*;
 
     trace_columns {
-        main: [clk, a, b[2], c];
+        main: [clk, a, b[2], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -421,11 +421,11 @@ fn test_inlining_with_vector_literal_binding_different_arity_few_to_many() {
     use lib::*;
 
     trace_columns {
-        main: [clk, a, b[2], c];
+        main: [clk, a, b[2], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -509,11 +509,11 @@ fn test_inlining_across_modules_with_nested_evaluators_variant1() {
     use lib1::test_constraint;
 
     trace_columns {
-        main: [clk, a, b[2], c];
+        main: [clk, a, b[2], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -621,11 +621,11 @@ fn test_inlining_across_modules_with_nested_evaluators_variant2() {
     use lib1::test_constraint;
 
     trace_columns {
-        main: [clk, a, b[2], c];
+        main: [clk, a, b[2], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -738,11 +738,11 @@ fn test_inlining_constraint_comprehensions_no_selector() {
     const YS = [2, 4, 6, 8];
 
     trace_columns {
-        main: [clk, a, b[2], c];
+        main: [clk, a, b[2], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -816,11 +816,11 @@ fn test_inlining_constraint_comprehensions_with_selector() {
     const YS = [2, 4, 6, 8];
 
     trace_columns {
-        main: [clk, a, b[2], c];
+        main: [clk, a, b[2], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -896,11 +896,11 @@ fn test_inlining_constraint_comprehensions_with_constant_selector() {
     const YS = [0, 4, 0, 8];
 
     trace_columns {
-        main: [clk, a, b[4], c];
+        main: [clk, a, b[4], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -973,11 +973,11 @@ fn test_inlining_constraint_comprehensions_in_evaluator() {
     const YS = [0, 4, 0, 8];
 
     trace_columns {
-        main: [clk, a, b[4], c];
+        main: [clk, a, b[4], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -1070,11 +1070,11 @@ fn test_inlining_constraints_with_folded_comprehensions_in_evaluator() {
     def root
 
     trace_columns {
-        main: [clk, a, b[4], c];
+        main: [clk, a, b[4], c],
     }
 
     public_inputs {
-        inputs: [0];
+        inputs: [0],
     }
 
     integrity_constraints {
@@ -1295,16 +1295,16 @@ fn test_repro_issue340() {
     def root
 
     trace_columns {
-        main: [instruction_word, instruction_bits[32], immediate, s];
+        main: [instruction_word, instruction_bits[32], immediate, s],
     }
 
     public_inputs {
-        stack_inputs: [16];
-        stack_outputs: [16];
+        stack_inputs: [16],
+        stack_outputs: [16],
     }
 
     periodic_columns {
-        k0: [1, 1, 1, 1, 1, 1, 1, 0];
+        k0: [1, 1, 1, 1, 1, 1, 1, 0],
     }
 
     boundary_constraints {

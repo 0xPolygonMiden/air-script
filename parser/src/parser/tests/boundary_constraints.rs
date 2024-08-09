@@ -11,11 +11,11 @@ const BASE_MODULE: &str = r#"
 def test
 
 trace_columns {
-    main: [clk];
+    main: [clk],
 }
 
 public_inputs {
-    inputs: [2];
+    inputs: [2],
 }
 
 integrity_constraints {

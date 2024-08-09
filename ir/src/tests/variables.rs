@@ -5,10 +5,10 @@ fn let_scalar_constant_in_boundary_constraint() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         let a = 1 + 8;
@@ -26,10 +26,10 @@ fn let_vector_constant_in_boundary_constraint() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         let b = [1, 5];
@@ -47,10 +47,10 @@ fn multi_constraint_nested_let_with_expressions_in_boundary_constraint() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         let a = 1 + 8;
@@ -72,10 +72,10 @@ fn let_scalar_constant_in_boundary_constraint_both_domains() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         let a = 1 + 8;
@@ -94,10 +94,10 @@ fn invalid_column_offset_in_boundary_constraint() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         let a = clk';
@@ -116,10 +116,10 @@ fn nested_let_with_expressions_in_integrity_constraint() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -140,10 +140,10 @@ fn nested_let_with_vector_access_in_integrity_constraint() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 7;
@@ -168,10 +168,10 @@ fn invalid_matrix_literal_with_leading_vector_binding() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 7;
@@ -193,10 +193,10 @@ fn invalid_matrix_literal_with_trailing_vector_binding() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 7;
@@ -217,10 +217,10 @@ fn invalid_variable_access_before_declaration() {
     def test
     const A = [[2, 3], [1, 0]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = a;
@@ -240,10 +240,10 @@ fn invalid_trailing_let() {
     def test
     const A = [[2, 3], [1, 0]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -263,10 +263,10 @@ fn invalid_reference_to_variable_defined_in_other_section() {
     def test
     const A = [[2, 3], [1, 0]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         let a = 1;
@@ -286,10 +286,10 @@ fn invalid_vector_variable_access_out_of_bounds() {
     def test
     const A = [[2, 3], [1, 0]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         let a = [1, 2];
@@ -311,10 +311,10 @@ fn invalid_matrix_column_variable_access_out_of_bounds() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         let a = [[1, 2, 3], [4, 5, 6]];
@@ -336,10 +336,10 @@ fn invalid_matrix_row_variable_access_out_of_bounds() {
     let source = "
     def test
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         let a = [[1, 2, 3], [4, 5, 6]];
@@ -364,14 +364,14 @@ fn invalid_index_into_scalar_variable() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk];
-        aux: [p];
+        main: [clk],
+        aux: [p],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     random_values {
-        alphas: [1];
+        alphas: [1],
     }
     boundary_constraints {
         enf clk.first = 1;
@@ -392,14 +392,14 @@ fn trace_binding_access_in_integrity_constraint() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk, x[4]];
-        aux: [p];
+        main: [clk, x[4]],
+        aux: [p],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     random_values {
-        alphas: [1];
+        alphas: [1],
     }
     boundary_constraints {
         enf clk.first = 1;

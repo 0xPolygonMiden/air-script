@@ -8,10 +8,10 @@ fn boundary_constraint_with_constants() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = A;
@@ -32,10 +32,10 @@ fn integrity_constraint_with_constants() {
     const B = [1, 2, 3];
     const C = [[1, 2, 3], [4, 5, 6]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;
@@ -53,10 +53,10 @@ fn invalid_matrix_constant() {
     def test
     const A = [[2, 3], [1, 0, 2]];
     trace_columns {
-        main: [clk];
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16];
+        stack_inputs: [16],
     }
     boundary_constraints {
         enf clk.first = 0;

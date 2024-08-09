@@ -1,16 +1,16 @@
 def PeriodicColumnsAir
 
 trace_columns {
-    main: [a, b, c];
+    main: [a, b, c],
 }
 
 public_inputs {
-    stack_inputs: [16];
+    stack_inputs: [16],
 }
 
 periodic_columns {
-    k0: [1, 0, 0, 0];
-    k1: [1, 1, 1, 1, 1, 1, 1, 0];
+    k0: [1, 0, 0, 0],
+    k1: [1, 1, 1, 1, 1, 1, 1, 0],
 }
 
 boundary_constraints {

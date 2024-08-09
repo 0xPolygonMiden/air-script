@@ -12,11 +12,11 @@ static SIMPLE_BOUNDARY_AIR: &str = "
 def SimpleBoundary
 
 trace_columns {
-    main: [a, b, len];
+    main: [a, b, len],
 }
 
 public_inputs {
-    target: [1];
+    target: [1],
 }
 
 boundary_constraints {
@@ -112,17 +112,17 @@ const B = [0, 1];
 const C = [[1, 2], [2, 0]];
 
 trace_columns {
-    main: [a, b, c, d, e[2]];
-    aux: [f];
+    main: [a, b, c, d, e[2]],
+    aux: [f],
 }
 
 public_inputs {
-    stack_inputs: [2];
-    stack_outputs: [2];
+    stack_inputs: [2],
+    stack_outputs: [2],
 }
 
 random_values {
-    rand: [2];
+    rand: [2],
 }
 
 boundary_constraints {
