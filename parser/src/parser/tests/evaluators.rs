@@ -13,7 +13,7 @@ fn ev_fn_main_cols() {
     mod test
 
     ev advance_clock([clk]) {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -35,7 +35,7 @@ fn ev_fn_aux_cols() {
     mod test
 
     ev foo([], [p]) {
-        enf p' = p + 1
+        enf p' = p + 1;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -60,9 +60,9 @@ fn ev_fn_main_and_aux_cols() {
     mod test
 
     ev ev_func([clk], [a, b]) {
-        let z = a + b
-        enf clk' = clk + 1
-        enf a' = a + z
+        let z = a + b;
+        enf clk' = clk + 1;
+        enf a' = a + z;
     }";
 
     let body = vec![let_!(z = expr!(add!(access!(a), access!(b))) =>
@@ -89,19 +89,19 @@ fn ev_fn_call_simple() {
     def test
 
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
-        enf advance_clock([clk])
+        enf advance_clock([clk]);
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -130,19 +130,19 @@ fn ev_fn_call() {
     def test
 
     trace_columns {
-        main: [a[2], b[4], c[6]]
+        main: [a[2], b[4], c[6]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
-        enf advance_clock([a, b[1..3], c[2..4]])
+        enf advance_clock([a, b[1..3], c[2..4]]);
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -175,7 +175,7 @@ fn ev_fn_call_inside_ev_fn() {
     mod test
 
     ev ev_func([clk], [a, b]) {
-        enf advance_clock([clk])
+        enf advance_clock([clk]);
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -202,19 +202,19 @@ fn ev_fn_call_with_more_than_two_args() {
     def test
 
     trace_columns {
-        main: [a, b, c]
+        main: [a, b, c],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
-        enf advance_clock([a], [b], [c])
+        enf advance_clock([a], [b], [c]);
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -261,7 +261,7 @@ fn ev_fn_call_with_no_args() {
     def test
 
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
 
     integrity_constraints {

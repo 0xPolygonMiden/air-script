@@ -13,19 +13,19 @@ fn trace_columns() {
     def test
 
     trace_columns {
-        main: [clk, fmp, ctx]
+        main: [clk, fmp, ctx],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -55,20 +55,20 @@ fn trace_columns_main_and_aux() {
     def test
 
     trace_columns {
-        main: [clk, fmp, ctx]
-        aux: [rc_bus, ch_bus]
+        main: [clk, fmp, ctx],
+        aux: [rc_bus, ch_bus],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -101,21 +101,21 @@ fn trace_columns_groups() {
     def test
 
     trace_columns {
-        main: [clk, fmp, ctx, a[3]]
-        aux: [rc_bus, b[4], ch_bus]
+        main: [clk, fmp, ctx, a[3]],
+        aux: [rc_bus, b[4], ch_bus],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf a[1]' = 1
-        enf clk' = clk - 1
+        enf a[1]' = 1;
+        enf clk' = clk - 1;
     }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected.trace_columns.push(trace_segment!(
@@ -168,16 +168,16 @@ fn err_main_trace_cols_missing() {
     def test
 
     trace_columns {
-        aux: [clk]
+        aux: [clk],
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }"#;
 
     ParseTest::new()

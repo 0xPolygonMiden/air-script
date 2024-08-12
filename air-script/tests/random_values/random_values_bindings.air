@@ -1,23 +1,23 @@
 def RandomValuesAir
 
 trace_columns {
-    main: [a, b]
-    aux: [c, d]
+    main: [a, b],
+    aux: [c, d],
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16],
 }
 
 random_values {
-    alphas: [x, y[14], z]
+    alphas: [x, y[14], z],
 }
 
 boundary_constraints {
-    enf c.first = $alphas[5] + y[2] + z
-    enf c.last = x + $alphas[15] + y[10]
+    enf c.first = $alphas[5] + y[2] + z;
+    enf c.last = x + $alphas[15] + y[10];
 }
 
 integrity_constraints {
-    enf c' = z - $alphas[0] + y[2]
+    enf c' = z - $alphas[0] + y[2];
 }

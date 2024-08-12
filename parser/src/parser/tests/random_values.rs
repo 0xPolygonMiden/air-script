@@ -13,24 +13,24 @@ fn random_values_fixed_list() {
     def test
 
     trace_columns {
-        main: [clk]
-        aux: [a]
+        main: [clk],
+        aux: [a],
     }
 
     random_values {
-        rand: [15]
+        rand: [15],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -66,24 +66,24 @@ fn random_values_ident_vector() {
     def test
 
     trace_columns {
-        main: [clk]
-        aux: [aux0]
+        main: [clk],
+        aux: [aux0],
     }
 
     random_values {
-        rand: [a, b[12], c]
+        rand: [a, b[12], c],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -119,24 +119,24 @@ fn random_values_custom_name() {
     def test
 
     trace_columns {
-        main: [clk]
-        aux: [aux0]
+        main: [clk],
+        aux: [aux0],
     }
 
     random_values {
-        alphas: [14]
+        alphas: [14],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -172,15 +172,15 @@ fn err_random_values_empty_list() {
     def test
 
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
 
     random_values {
-        rand: []
+        rand: [],
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }";
 
     ParseTest::new().expect_module_diagnostic(source, "random values cannot be empty");
@@ -192,16 +192,16 @@ fn err_random_values_multiple_declaration() {
     def test
 
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
 
     random_values {
-        rand: [12]
-        alphas: [a, b[2]]
+        rand: [12],
+        alphas: [a, b[2]],
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }";
 
     ParseTest::new()
@@ -214,24 +214,24 @@ fn random_values_index_access() {
     def test
 
     trace_columns {
-        main: [clk]
-        aux: [aux0]
+        main: [clk],
+        aux: [aux0],
     }
 
     random_values {
-        rand: [12]
+        rand: [12],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk + $rand[1] = 0
+        enf clk + $rand[1] = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));

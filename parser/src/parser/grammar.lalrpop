@@ -83,8 +83,8 @@ Declaration: Declaration = {
 }
 
 Import: Span<Import> = {
-    <l:@L> "use" <module:Identifier> "::" "*" <r:@R> => Span::new(span!(l, r), Import::All { module: Identifier::new(span!(l, r), module.name()) }),
-    <l:@L> "use" <module:Identifier> "::" <item:Identifier> <r:@R> => {
+    <l:@L> "use" <module:Identifier> "::" "*" ";" <r:@R> => Span::new(span!(l, r), Import::All { module: Identifier::new(span!(l, r), module.name()) }),
+    <l:@L> "use" <module:Identifier> "::" <item:Identifier> ";" <r:@R> => {
         let mut items: HashSet<Identifier> = HashSet::default();
         items.insert(item);
         Span::new(span!(l, r), Import::Partial { module, items })
@@ -125,12 +125,12 @@ AuxSegmentId: Identifier = {
 }
 
 MainTraceBindings: TraceSegment = {
-    <l:@L> <name:MainSegmentId> ":" <bindings: Vector<TraceBinding>> <r:@R> =>
+    <l:@L> <name:MainSegmentId> ":" <bindings: Vector<TraceBinding>> "," <r:@R> =>
         TraceSegment::new(span!(l, r), 0, name, bindings),
 }
 
 AuxTraceBindings: TraceSegment = {
-    <l:@L> <name:AuxSegmentId> ":" <bindings: Vector<TraceBinding>> <r:@R> =>
+    <l:@L> <name:AuxSegmentId> ":" <bindings: Vector<TraceBinding>> "," <r:@R> =>
         TraceSegment::new(span!(l, r), 1, name, bindings),
 }
 
@@ -143,7 +143,7 @@ TraceBinding: Span<(Identifier, usize)> = {
 // ================================================================================================
 
 Constant: Constant = {
-    <l:@L> "const" <name: Identifier> "=" <value: ConstExpr> <r:@R>
+    <l:@L> "const" <name: Identifier> "=" <value: ConstExpr> ";" <r:@R>
         => Constant::new(span!(l, r), name, value),
 }
 
@@ -162,7 +162,7 @@ PublicInputs: Span<Vec<PublicInput>> = {
 }
 
 PublicInput: PublicInput = {
-    <l:@L> <name: Identifier> ":" <size: Size> <r:@R>
+    <l:@L> <name: Identifier> ":" <size: Size> "," <r:@R>
         => PublicInput::new(span!(l, r), name, size),
 }
 
@@ -176,7 +176,7 @@ PeriodicColumns: Span<Vec<PeriodicColumn>> = {
 }
 
 PeriodicColumn: PeriodicColumn = {
-    <l:@L> <name: Identifier> ":" <values: Vector<Num_u64>> <r:@R>
+    <l:@L> <name: Identifier> ":" <values: Vector<Num_u64>> "," <r:@R>
         => PeriodicColumn::new(span!(l, r), name, values),
 }
 
@@ -196,18 +196,18 @@ RandomValues: RandomValues = {
 }
 
 RandValuesDef: RandomValues = {
-    <l:@L> <name: Identifier> ":" <size: Size> <r:@R> => {
+    <l:@L> <name: Identifier> ":" <size: Size> "," <r:@R> => {
         let name = Identifier::new(name.span(), Symbol::intern(format!("${}", &name)));
         RandomValues::with_size(span!(l, r), name, size as usize)
     },
-    <l:@L> <ignored: Identifier> ":" "[" "]" <r:@R> =>? {
+    <l:@L> <ignored: Identifier> ":" "[" "]" "," <r:@R> =>? {
         diagnostics.diagnostic(Severity::Error)
             .with_message("random values cannot be empty")
             .with_primary_label(span!(l, r), "invalid declaration occurs here")
             .emit();
         Err(ParseError::Failed.into())
     },
-    <l:@L> <name: Identifier> ":" <bindings: Vector<RandBinding>> <r:@R> => {
+    <l:@L> <name: Identifier> ":" <bindings: Vector<RandBinding>> "," <r:@R> => {
         let name = Identifier::new(name.span(), Symbol::intern(format!("${}", &name)));
         RandomValues::new(span!(l, r), name, bindings)
     },
@@ -327,7 +327,7 @@ StatementBlock: Vec<Statement> = {
 }
 
 Let: Let = {
-    <l:@L> "let" <name: Identifier> "=" <value: Expr> <r:@R> <body: StatementBlock>
+    <l:@L> "let" <name: Identifier> "=" <value: Expr> ";" <r:@R> <body: StatementBlock>
         => Let::new(span!(l, r), name, value, body)
 }
 
@@ -338,12 +338,12 @@ ConstraintStatements: Vec<Statement> = {
 }
 
 ConstraintStatement: Vec<Statement> = {
-    "enf" "match" "{" <MatchArm+> "}" => <>,
-    "enf" <ConstraintExpr> => vec![<>],
+    "enf" "match" "{" <MatchArm+> "}" ";" => <>,
+    "enf" <ConstraintExpr> ";" => vec![<>],
 }
 
 ReturnStatement: Expr = {
-    <l:@L> "return" <expr: Expr> <r:@R> => expr,
+    <l:@L> "return" <expr: Expr> ";" <r:@R> => expr,
 }
 
 MatchArm: Statement = {
@@ -674,5 +674,6 @@ extern {
         "." => Token::Dot,
         ".." => Token::DotDot,
         "->" => Token::Arrow,
+        ";" => Token::SemiColon,
     }
 }

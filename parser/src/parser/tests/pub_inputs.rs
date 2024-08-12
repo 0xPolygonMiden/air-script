@@ -13,20 +13,20 @@ fn public_inputs() {
     def test
 
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
 
     public_inputs {
-        program_hash: [4]
-        stack_inputs: [16]
+        program_hash: [4],
+        stack_inputs: [16],
     }
 
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
 
     integrity_constraints {
-        enf clk = 0
+        enf clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));

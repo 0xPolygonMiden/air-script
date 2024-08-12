@@ -9,7 +9,7 @@ fn use_declaration() {
     let source = "
     mod test
 
-    use foo::*
+    use foo::*;
     ";
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
     expected.imports.insert(ident!(foo), import_all!(foo));
@@ -21,7 +21,7 @@ fn import_declaration() {
     let source = "
     mod test
 
-    use foo::bar
+    use foo::bar;
     ";
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
     expected.imports.insert(ident!(foo), import!(foo, bar));

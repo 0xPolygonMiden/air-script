@@ -12,26 +12,26 @@ static SIMPLE_AUX_AIR: &str = "
 def SimpleAux
 
 trace_columns {
-    main: [a]
-    aux: [b]
+    main: [a],
+    aux: [b],
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16],
 }
 
 boundary_constraints {
-    enf a.first = 0
+    enf a.first = 0;
 }
 
 integrity_constraints {
-    enf a + a = 0
-    enf a - a = 0
-    enf a * a = 0
+    enf a + a = 0;
+    enf a - a = 0;
+    enf a * a = 0;
 
-    enf b + a = 0
-    enf b - a = 0
-    enf b * a = 0
+    enf b + a = 0;
+    enf b - a = 0;
+    enf b * a = 0;
 }";
 
 #[test]

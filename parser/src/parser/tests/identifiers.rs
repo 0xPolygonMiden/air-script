@@ -12,7 +12,7 @@ fn error_invalid_int() {
     def test
 
     trace_columns {{
-        main: [clk]
+        main: [clk],
     }}
 
     integrity_constraints {{

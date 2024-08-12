@@ -11,15 +11,15 @@ const BASE_MODULE: &str = r#"
 def test
 
 trace_columns {
-    main: [clk]
+    main: [clk],
 }
 
 public_inputs {
-    inputs: [2]
+    inputs: [2],
 }
 
 integrity_constraints {
-    enf clk = 0
+    enf clk = 0;
 
 }"#;
 
@@ -65,7 +65,7 @@ fn boundary_constraint_at_first() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf clk.first = 0
+        enf clk.first = 0;
     }}"
     );
 
@@ -87,7 +87,7 @@ fn boundary_constraint_at_last() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf clk.last = 15
+        enf clk.last = 15;
     }}"
     );
 
@@ -123,8 +123,8 @@ fn multiple_boundary_constraints() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf clk.first = 0
-        enf clk.last = 1
+        enf clk.first = 0;
+        enf clk.last = 1;
     }}"
     );
 
@@ -146,7 +146,7 @@ fn boundary_constraint_with_pub_input() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf clk.first = inputs[0]
+        enf clk.first = inputs[0];
     }}"
     );
 
@@ -168,7 +168,7 @@ fn boundary_constraint_with_expr() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf clk.first = 5 + inputs[1] + 6
+        enf clk.first = 5 + inputs[1] + 6;
     }}"
     );
 
@@ -189,12 +189,12 @@ fn boundary_constraint_with_const() {
         "
     {BASE_MODULE}
 
-    const A = 1
-    const B = [0, 1]
-    const C = [[0, 1], [1, 0]]
+    const A = 1;
+    const B = [0, 1];
+    const C = [[0, 1], [1, 0]];
 
     boundary_constraints {{
-        enf clk.first = A + B[1] - C[0][1]
+        enf clk.first = A + B[1] - C[0][1];
     }}"
     );
 
@@ -221,10 +221,10 @@ fn boundary_constraint_with_variables() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        let a = 2^2
-        let b = [a, 2 * a]
-        let c = [[a - 1, a^2], [b[0], b[1]]]
-        enf clk.first = 5 + a[3] + 6
+        let a = 2^2;
+        let b = [a, 2 * a];
+        let c = [[a - 1, a^2], [b[0], b[1]]];
+        enf clk.first = 5 + a[3] + 6;
     }}"
     );
 
@@ -249,7 +249,7 @@ fn bc_comprehension_one_iterable_identifier() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf x.first = 0 for x in inputs
+        enf x.first = 0 for x in inputs;
     }}"
     );
 
@@ -270,7 +270,7 @@ fn bc_comprehension_one_iterable_range() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf x.first = 0 for x in (0..4)
+        enf x.first = 0 for x in (0..4);
     }}"
     );
 
@@ -291,7 +291,7 @@ fn bc_comprehension_one_iterable_slice() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf x.first = 0 for x in inputs[0..1]
+        enf x.first = 0 for x in inputs[0..1];
     }}"
     );
 
@@ -312,7 +312,7 @@ fn bc_comprehension_two_iterable_identifiers() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf x.first = y for (x, y) in (inputs, inputs)
+        enf x.first = y for (x, y) in (inputs, inputs);
     }}"
     );
 
@@ -336,7 +336,7 @@ fn err_bc_comprehension_one_member_two_iterables() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf clk.first = c for c in (inputs, inputs)
+        enf clk.first = c for c in (inputs, inputs);
     }}"
     );
 
@@ -351,7 +351,7 @@ fn err_bc_comprehension_two_members_one_iterables() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        enf clk.first = c + d for (c, d) in inputs
+        enf clk.first = c + d for (c, d) in inputs;
     }}"
     );
 
@@ -369,7 +369,7 @@ fn err_invalid_variable() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        let a = 2^2 + [1]
+        let a = 2^2 + [1];
     }}"
     );
     ParseTest::new().expect_unrecognized_token(&source);
@@ -382,9 +382,9 @@ fn err_missing_boundary_constraint() {
     {BASE_MODULE}
 
     boundary_constraints {{
-        let a = 2^2
-        let b = [a, 2 * a]
-        let c = [[a - 1, a^2], [b[0], b[1]]]
+        let a = 2^2;
+        let b = [a, 2 * a];
+        let c = [[a - 1, a^2], [b[0], b[1]]];
     }}"
     );
     ParseTest::new().expect_module_diagnostic(&source, "expected one of: '\"enf\"', '\"let\"'");

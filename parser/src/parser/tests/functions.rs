@@ -13,7 +13,7 @@ fn fn_def_with_scalars() {
     mod test
 
     fn fn_with_scalars(a: felt, b: felt) -> felt {
-        return a + b
+        return a + b;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -36,7 +36,7 @@ fn fn_def_with_vectors() {
     mod test
 
     fn fn_with_vectors(a: felt[12], b: felt[12]) -> felt[12] {
-        return [x + y for (x, y) in (a, b)]
+        return [x + y for (x, y) in (a, b)];
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -62,23 +62,23 @@ fn fn_use_scalars_and_vectors() {
         def root
 
         public_inputs {
-            stack_inputs: [16]
+            stack_inputs: [16],
         }
 
         trace_columns {
-            main: [a, b[12]]
+            main: [a, b[12]],
         }
 
         fn fn_with_scalars_and_vectors(a: felt, b: felt[12]) -> felt {
-            return sum([a + x for x in b])
+            return sum([a + x for x in b]);
         }
 
         boundary_constraints {
-            enf a.first = 0
+            enf a.first = 0;
         }
 
         integrity_constraints {
-            enf a' = fn_with_scalars_and_vectors(a, b)
+            enf a' = fn_with_scalars_and_vectors(a, b);
         }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
@@ -128,27 +128,27 @@ fn fn_call_in_fn() {
     def root
 
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
 
     trace_columns {
-        main: [a, b[12]]
+        main: [a, b[12]],
     }
 
     fn fold_vec(a: felt[12]) -> felt {
-        return sum([x for x in a])
+        return sum([x for x in a]);
     }
 
     fn fold_scalar_and_vec(a: felt, b: felt[12]) -> felt {
-        return a + fold_vec(b)
+        return a + fold_vec(b);
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
-        enf a' = fold_scalar_and_vec(a, b)
+        enf a' = fold_scalar_and_vec(a, b);
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
@@ -211,31 +211,31 @@ fn fn_call_in_ev() {
     def root
 
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
 
     trace_columns {
-        main: [a, b[12]]
+        main: [a, b[12]],
     }
 
     fn fold_vec(a: felt[12]) -> felt {
-        return sum([x for x in a])
+        return sum([x for x in a]);
     }
 
     fn fold_scalar_and_vec(a: felt, b: felt[12]) -> felt {
-        return a + fold_vec(b)
+        return a + fold_vec(b);
     }
 
     ev evaluator([a, b[12]]) {
-        enf a' = fold_scalar_and_vec(a, b)
+        enf a' = fold_scalar_and_vec(a, b);
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
-        enf evaluator(a, b)
+        enf evaluator(a, b);
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
@@ -311,24 +311,24 @@ fn fn_as_lc_iterables() {
     def root
 
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
 
     trace_columns {
-        main: [a[12], b[12]]
+        main: [a[12], b[12]],
     }
 
     fn operation(a: felt, b: felt) -> felt {
-        let x = a^b + 1
-        return b^x
+        let x = a^b + 1;
+        return b^x;
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
-        enf a' = sum([operation(x, y) for (x, y) in (a, b)])
+        enf a' = sum([operation(x, y) for (x, y) in (a, b)]);
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
@@ -384,24 +384,24 @@ fn fn_call_in_binary_ops() {
     def root
 
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
 
     trace_columns {
-        main: [a[12], b[12]]
+        main: [a[12], b[12]],
     }
 
     fn operation(a: felt[12], b: felt[12]) -> felt {
-        return sum([x + y for (x, y) in (a, b)])
+        return sum([x + y for (x, y) in (a, b)]);
     }
 
     boundary_constraints {
-        enf a[0].first = 0
+        enf a[0].first = 0;
     }
 
     integrity_constraints {
-        enf a[0]' = a[0] * operation(a, b)
-        enf b[0]' = b[0] * operation(a, b)
+        enf a[0]' = a[0] * operation(a, b);
+        enf b[0]' = b[0] * operation(a, b);
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
@@ -468,25 +468,25 @@ fn fn_call_in_vector_def() {
     def root
 
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
 
     trace_columns {
-        main: [a[12], b[12]]
+        main: [a[12], b[12]],
     }
 
     fn operation(a: felt[12], b: felt[12]) -> felt[12] {
-        return [x + y for (x, y) in (a, b)]
+        return [x + y for (x, y) in (a, b)];
     }
 
     boundary_constraints {
-        enf a[0].first = 0
+        enf a[0].first = 0;
     }
 
     integrity_constraints {
-        let d = [a[0] * operation(a, b), b[0] * operation(a, b)]
-        enf a[0]' = d[0]
-        enf b[0]' = d[1]
+        let d = [a[0] * operation(a, b), b[0] * operation(a, b)];
+        enf a[0]' = d[0];
+        enf b[0]' = d[1];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));

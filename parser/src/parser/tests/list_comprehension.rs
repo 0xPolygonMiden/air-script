@@ -13,22 +13,22 @@ fn bc_one_iterable_identifier_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     integrity_constraints {
-        enf a = 0
+        enf a = 0;
     }
 
     boundary_constraints {
         # raise value in the current row to power 7
-        let x = [col^7 for col in c]
+        let x = [col^7 for col in c];
 
-        enf a.first = x[0] + x[1] + x[2] + x[3]
+        enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -60,20 +60,20 @@ fn bc_identifier_and_range_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     integrity_constraints {
-        enf a = 0
+        enf a = 0;
     }
 
     boundary_constraints {
-        let x = [2^i * c for (i, c) in (0..3, c)]
-        enf a.first = x[0] + x[1] + x[2] + x[3]
+        let x = [2^i * c for (i, c) in (0..3, c)];
+        enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -105,20 +105,20 @@ fn bc_iterable_slice_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     integrity_constraints {
-        enf a = 0
+        enf a = 0;
     }
 
     boundary_constraints {
-        let x = [c for c in c[0..3]]
-        enf a.first = x[0] + x[1] + x[2] + x[3]
+        let x = [c for c in c[0..3]];
+        enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -150,20 +150,20 @@ fn bc_two_iterable_identifier_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4], d[4]]
+        main: [a, b, c[4], d[4]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     integrity_constraints {
-        enf a = 0
+        enf a = 0;
     }
 
     boundary_constraints {
-        let diff = [x - y for (x, y) in (c, d)]
-        enf a.first = x[0] + x[1] + x[2] + x[3]
+        let diff = [x - y for (x, y) in (c, d)];
+        enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -195,20 +195,20 @@ fn bc_multiple_iterables_lc() {
     def test
 
     trace_columns {
-        main: [a, b[3], c[4], d[4]]
+        main: [a, b[3], c[4], d[4]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     integrity_constraints {
-        enf a = 0
+        enf a = 0;
     }
 
     boundary_constraints {
-        let diff = [w + x - y - z for (w, x, y, z) in (0..3, b, c[0..3], d[0..3])]
-        enf a.first = x[0] + x[1] + x[2] + x[3]
+        let diff = [w + x - y - z for (w, x, y, z) in (0..3, b, c[0..3], d[0..3])];
+        enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -241,24 +241,24 @@ fn ic_one_iterable_identifier_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
         # raise value in the current row to power 7
-        let x = [col^7 for col in c]
+        let x = [col^7 for col in c];
 
         # raise value in the next row to power 7
-        let y = [col'^7 for col in c]
-        enf a = x[0] + x[1] + x[2] + x[3]
+        let y = [col'^7 for col in c];
+        enf a = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -291,20 +291,20 @@ fn ic_iterable_identifier_range_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
-        let x = [2^i * c for (i, c) in (0..3, c)]
-        enf a = x[0] + x[1] + x[2] + x[3]
+        let x = [2^i * c for (i, c) in (0..3, c)];
+        enf a = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -336,20 +336,20 @@ fn ic_iterable_slice_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
-        let x = [c for c in c[0..3]]
-        enf a = x[0] + x[1] + x[2] + x[3]
+        let x = [c for c in c[0..3]];
+        enf a = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -381,20 +381,20 @@ fn ic_two_iterable_identifier_lc() {
     def test
 
     trace_columns {
-        main: [a, b, c[4], d[4]]
+        main: [a, b, c[4], d[4]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
-        let diff = [x - y for (x, y) in (c, d)]
-        enf a = x[0] + x[1] + x[2] + x[3]
+        let diff = [x - y for (x, y) in (c, d)];
+        enf a = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -426,20 +426,20 @@ fn ic_multiple_iterables_lc() {
     def test
 
     trace_columns {
-        main: [a, b[3], c[4], d[4]]
+        main: [a, b[3], c[4], d[4]],
     }
 
     public_inputs {
-        inputs: [2]
+        inputs: [2],
     }
 
     boundary_constraints {
-        enf a.first = 0
+        enf a.first = 0;
     }
 
     integrity_constraints {
-        let diff = [w + x - y - z for (w, x, y, z) in (0..3, b, c[0..3], d[0..3])]
-        enf a = x[0] + x[1] + x[2] + x[3]
+        let diff = [w + x - y - z for (w, x, y, z) in (0..3, b, c[0..3], d[0..3])];
+        enf a = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
@@ -475,12 +475,12 @@ fn err_bc_lc_one_member_two_iterables() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]],
     }
 
     boundary_constraints {
-        let x = [c for c in (c, d)]
-        enf a.first = x
+        let x = [c for c in (c, d)];
+        enf a.first = x;
     }";
 
     ParseTest::new()
@@ -493,12 +493,12 @@ fn err_bc_lc_two_members_one_iterables() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]],
     }
 
     boundary_constraints {
-        let x = [c + d for (c, d) in c]
-        enf a.first = x
+        let x = [c + d for (c, d) in c];
+        enf a.first = x;
     }";
 
     ParseTest::new()
@@ -511,12 +511,12 @@ fn err_ic_lc_one_member_two_iterables() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]],
     }
 
     integrity_constraints {
-        let x = [c for c in (c, d)]
-        enf a = x
+        let x = [c for c in (c, d)];
+        enf a = x;
     }";
 
     ParseTest::new()
@@ -529,12 +529,12 @@ fn err_ic_lc_two_members_one_iterable() {
     def test
 
     trace_columns {
-        main: [a, b, c[4]]
+        main: [a, b, c[4]],
     }
 
     integrity_constraints {
-        let x = [c + d for (c, d) in c]
-        enf a = x
+        let x = [c + d for (c, d) in c];
+        enf a = x;
     }";
 
     ParseTest::new()

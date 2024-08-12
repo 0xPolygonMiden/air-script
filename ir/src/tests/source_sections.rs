@@ -22,13 +22,13 @@ fn err_trace_cols_omitted() {
     let source = "
     def test
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(source, "missing trace_columns section");
@@ -40,14 +40,14 @@ fn err_pub_inputs_empty() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
     public_inputs {}
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(source, "expected one of: 'identifier'");
@@ -59,13 +59,13 @@ fn err_pub_inputs_omitted() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(source, "root module must contain a public_inputs section");
@@ -77,14 +77,14 @@ fn err_bc_empty() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
     boundary_constraints {}
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
@@ -96,13 +96,13 @@ fn err_bc_omitted() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
     integrity_constraints {
-        enf clk' = clk + 1
+        enf clk' = clk + 1;
     }";
 
     expect_diagnostic(
@@ -117,13 +117,13 @@ fn err_ic_empty() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }
     integrity_constraints {}";
 
@@ -136,13 +136,13 @@ fn err_ic_omitted() {
     let source = "
     def test
     trace_columns {
-        main: [clk]
+        main: [clk],
     }
     public_inputs {
-        stack_inputs: [16]
+        stack_inputs: [16],
     }
     boundary_constraints {
-        enf clk.first = 0
+        enf clk.first = 0;
     }";
 
     expect_diagnostic(
