@@ -12,40 +12,40 @@ fn test_constant_propagation() {
     let root = r#"
     def root
 
-    use lib::*
+    use lib::*;
 
     trace_columns {
-        main: [clk, a, b[2], c]
+        main: [clk, a, b[2], c],
     }
 
     public_inputs {
-        inputs: [0]
+        inputs: [0],
     }
 
-    const A = [2, 4, 6, 8]
-    const B = [[1, 1], [2, 2]]
+    const A = [2, 4, 6, 8];
+    const B = [[1, 1], [2, 2]];
 
     integrity_constraints {
-        enf test_constraint(b)
-        let x = 2^EXP
-        let y = A[0..2]
-        enf a + y[1] = c + (x + 1)
+        enf test_constraint(b);
+        let x = 2^EXP;
+        let y = A[0..2];
+        enf a + y[1] = c + (x + 1);
     }
 
     boundary_constraints {
-        let x = B[0]
-        enf a.first = x[0]
+        let x = B[0];
+        enf a.first = x[0];
     }
     "#;
     let lib = r#"
     mod lib
 
-    const EXP = 2
+    const EXP = 2;
 
     ev test_constraint([b0, b1]) {
-        let x = EXP
-        let y = 2^x
-        enf b0 + x = b1 + y
+        let x = EXP;
+        let y = 2^x;
+        enf b0 + x = b1 + y;
     }"#;
 
     let test = ParseTest::new();

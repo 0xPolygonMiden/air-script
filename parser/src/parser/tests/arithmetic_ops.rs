@@ -14,7 +14,7 @@ fn single_addition() {
     mod test
 
     ev test([clk]) {
-        enf clk' + clk = 0
+        enf clk' + clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -37,7 +37,7 @@ fn multi_addition() {
     mod test
 
     ev test([clk]) {
-        enf clk' + clk + 2 = 0
+        enf clk' + clk + 2 = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -63,7 +63,7 @@ fn single_subtraction() {
     mod test
 
     ev test([clk]) {
-        enf clk' - clk = 0
+        enf clk' - clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -86,7 +86,7 @@ fn multi_subtraction() {
     mod test
 
     ev test([clk]) {
-        enf clk' - clk - 1 = 0
+        enf clk' - clk - 1 = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -112,7 +112,7 @@ fn single_multiplication() {
     mod test
 
     ev test([clk]) {
-        enf clk' * clk = 0
+        enf clk' * clk = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -135,7 +135,7 @@ fn multi_multiplication() {
     mod test
 
     ev test([clk]) {
-        enf clk' * clk * 2 = 0
+        enf clk' * clk * 2 = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -161,7 +161,7 @@ fn unit_with_parens() {
     mod test
 
     ev test([clk]) {
-        enf (2) + 1 = 3
+        enf (2) + 1 = 3;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -184,7 +184,7 @@ fn ops_with_parens() {
     mod test
 
     ev test([clk]) {
-        enf (clk' + clk) * 2 = 4
+        enf (clk' + clk) * 2 = 4;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -210,7 +210,7 @@ fn const_exponentiation() {
     mod test
 
     ev test([clk]) {
-        enf clk'^2 = 1
+        enf clk'^2 = 1;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -233,7 +233,7 @@ fn non_const_exponentiation() {
     mod test
 
     ev test([clk]) {
-        enf clk'^(clk + 2) = 1
+        enf clk'^(clk + 2) = 1;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -283,7 +283,7 @@ fn multi_arithmetic_ops_same_precedence() {
     mod test
 
     ev test([clk]) {
-        enf clk' - clk - 2 + 1 = 0
+        enf clk' - clk - 2 + 1 = 0;
     }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
@@ -309,7 +309,7 @@ fn multi_arithmetic_ops_different_precedence() {
     mod test
 
     ev test([clk]) {
-        enf clk'^2 - clk * 2 - 1 = 0
+        enf clk'^2 - clk * 2 - 1 = 0;
     }";
 
     // The precedence order of operations here is:
@@ -344,7 +344,7 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
     mod test
 
     ev test([clk]) {
-        enf clk' - clk^2 * (2 - 1) = 0
+        enf clk' - clk^2 * (2 - 1) = 0;
     }";
 
     // The precedence order of operations here is:
