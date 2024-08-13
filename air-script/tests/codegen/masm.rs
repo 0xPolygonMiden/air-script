@@ -75,6 +75,16 @@ fn constants() {
 }
 
 #[test]
+fn constant_in_range() {
+    let generated_masm = Test::new("tests/constant_in_range/constant_in_range.air".to_string())
+        .transpile(Target::Masm)
+        .unwrap();
+
+    let expected = expect_file!["../constant_in_range/constant_in_range.masm"];
+    expected.assert_eq(&generated_masm);
+}
+
+#[test]
 fn evaluators() {
     let generated_masm = Test::new("tests/evaluators/evaluators.air".to_string())
         .transpile(Target::Masm)

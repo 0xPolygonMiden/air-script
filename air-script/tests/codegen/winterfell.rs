@@ -75,6 +75,16 @@ fn constants() {
 }
 
 #[test]
+fn constant_in_range() {
+    let generated_air = Test::new("tests/constant_in_range/constant_in_range.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../constant_in_range/constant_in_range.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
 fn evaluators() {
     let generated_air = Test::new("tests/evaluators/evaluators.air".to_string())
         .transpile(Target::Winterfell)
