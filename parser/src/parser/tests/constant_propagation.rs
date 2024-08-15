@@ -24,6 +24,7 @@ fn test_constant_propagation() {
 
     const A = [2, 4, 6, 8];
     const B = [[1, 1], [2, 2]];
+    const TWO = 2;
 
     integrity_constraints {
         enf test_constraint(b);

@@ -275,7 +275,7 @@ pub enum Expr {
     /// A constant expression
     Const(Span<ConstantExpr>),
     /// An expression which evaluates to a vector of integers in the given range
-    Range(Span<Range>),
+    Range(RangeExpr),
     /// A vector of expressions
     ///
     /// A vector may be used to represent matrices in some situations, but such matrices
@@ -307,14 +307,18 @@ impl Expr {
     ///
     /// NOTE: This only returns true for the `Const` and `Range` variants
     pub fn is_constant(&self) -> bool {
-        matches!(self, Self::Const(_) | Self::Range(_))
+        match self {
+            Self::Const(_) => true,
+            Self::Range(range) => range.is_constant(),
+            _ => false,
+        }
     }
 
     /// Returns the resolved type of this expression, if known
     pub fn ty(&self) -> Option<Type> {
         match self {
             Self::Const(constant) => Some(constant.ty()),
-            Self::Range(range) => Some(Type::Vector(range.item.end - range.item.start)),
+            Self::Range(range) => range.ty(),
             Self::Vector(vector) => match vector.first().and_then(|e| e.ty()) {
                 Some(Type::Felt) => Some(Type::Vector(vector.len())),
                 Some(Type::Vector(n)) => Some(Type::Matrix(vector.len(), n)),
@@ -338,7 +342,7 @@ impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Const(ref expr) => f.debug_tuple("Const").field(&expr.item).finish(),
-            Self::Range(ref expr) => f.debug_tuple("Range").field(&expr.item).finish(),
+            Self::Range(ref expr) => f.debug_tuple("Range").field(&expr).finish(),
             Self::Vector(ref expr) => f.debug_tuple("Vector").field(&expr.item).finish(),
             Self::Matrix(ref expr) => f.debug_tuple("Matrix").field(&expr.item).finish(),
             Self::SymbolAccess(ref expr) => f.debug_tuple("SymbolAccess").field(expr).finish(),
@@ -355,7 +359,7 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Const(ref expr) => write!(f, "{}", &expr),
-            Self::Range(ref range) => write!(f, "{}..{}", range.start, range.end),
+            Self::Range(ref range) => write!(f, "{}", range),
             Self::Vector(ref expr) => write!(f, "{}", DisplayList(expr.as_slice())),
             Self::Matrix(ref expr) => {
                 f.write_str("[")?;
@@ -595,6 +599,148 @@ impl fmt::Display for ScalarExpr {
     }
 }
 
+#[derive(Clone, Spanned, Debug)]
+pub struct ConstSymbolAccess {
+    #[span]
+    pub span: SourceSpan,
+    pub name: ResolvableIdentifier,
+    pub ty: Option<Type>,
+}
+impl ConstSymbolAccess {
+    pub fn new(span: SourceSpan, name: Identifier) -> Self {
+        Self {
+            span,
+            name: ResolvableIdentifier::Unresolved(NamespacedIdentifier::Binding(name)),
+            ty: None,
+        }
+    }
+}
+impl Eq for ConstSymbolAccess {}
+impl PartialEq for ConstSymbolAccess {
+    fn eq(&self, other: &Self) -> bool {
+        self.name.eq(&other.name) && self.ty.eq(&other.ty)
+    }
+}
+impl fmt::Display for ConstSymbolAccess {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.name)
+    }
+}
+
+#[derive(Debug, Clone, Spanned)]
+pub struct RangeExpr {
+    #[span]
+    pub span: SourceSpan,
+    pub start: RangeBound,
+    pub end: RangeBound,
+}
+impl RangeExpr {
+    pub fn is_constant(&self) -> bool {
+        self.start.is_constant() && self.end.is_constant()
+    }
+
+    pub fn to_slice_range(&self) -> Range {
+        match (&self.start, &self.end) {
+            (RangeBound::Const(lhs), RangeBound::Const(rhs)) => lhs.item..rhs.item,
+            _ => panic!("attempted to convert non-constant range expression to constant"),
+        }
+    }
+
+    pub fn ty(&self) -> Option<Type> {
+        match (&self.start, &self.end) {
+            (RangeBound::Const(start), RangeBound::Const(end)) => {
+                Some(Type::Vector(end.item.abs_diff(start.item)))
+            }
+            _ => None,
+        }
+    }
+}
+impl From<Range> for RangeExpr {
+    fn from(range: Range) -> Self {
+        Self {
+            span: SourceSpan::default(),
+            start: RangeBound::Const(Span::new(SourceSpan::UNKNOWN, range.start)),
+            end: RangeBound::Const(Span::new(SourceSpan::UNKNOWN, range.end)),
+        }
+    }
+}
+impl Eq for RangeExpr {}
+impl PartialEq for RangeExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.start.eq(&other.start) && self.end.eq(&other.end)
+    }
+}
+impl fmt::Display for RangeExpr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}..{}", &self.start, &self.end)
+    }
+}
+
+#[derive(Clone, Spanned, PartialEq, Eq, Debug)]
+pub enum RangeBound {
+    SymbolAccess(ConstSymbolAccess),
+    Const(Span<usize>),
+}
+impl RangeBound {
+    pub fn is_constant(&self) -> bool {
+        matches!(self, Self::Const(_))
+    }
+}
+impl From<ConstSymbolAccess> for RangeBound {
+    fn from(sym: ConstSymbolAccess) -> Self {
+        Self::SymbolAccess(sym)
+    }
+}
+impl From<Identifier> for RangeBound {
+    fn from(name: Identifier) -> Self {
+        Self::SymbolAccess(ConstSymbolAccess {
+            span: name.span(),
+            name: ResolvableIdentifier::Unresolved(NamespacedIdentifier::Binding(name)),
+            ty: None,
+        })
+    }
+}
+impl From<usize> for RangeBound {
+    fn from(constant: usize) -> Self {
+        Self::Const(Span::new(SourceSpan::UNKNOWN, constant))
+    }
+}
+impl From<Span<usize>> for RangeBound {
+    fn from(constant: Span<usize>) -> Self {
+        Self::Const(constant)
+    }
+}
+impl fmt::Display for RangeBound {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::SymbolAccess(sym) => write!(f, "{sym}"),
+            Self::Const(constant) => write!(f, "{constant}"),
+        }
+    }
+}
+impl core::ops::Add for RangeBound {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Const(lhs), Self::Const(rhs)) => {
+                Self::Const(Span::new(lhs.span(), lhs.item + rhs.item))
+            }
+            _ => panic!("unexpected non-constant range bound operand"),
+        }
+    }
+}
+impl core::ops::Sub for RangeBound {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Const(lhs), Self::Const(rhs)) => {
+                Self::Const(Span::new(lhs.span(), lhs.item - rhs.item))
+            }
+            _ => panic!("unexpected non-constant range bound operand"),
+        }
+    }
+}
+
 /// Represents an expression requiring evaluation of a binary operator
 #[derive(Clone, Spanned)]
 pub struct BinaryExpr {
@@ -689,7 +835,7 @@ pub enum AccessType {
     /// Access refers to the entire bound value
     Default,
     /// Access binds a sub-slice of a vector
-    Slice(Range),
+    Slice(RangeExpr),
     /// Access binds the value at a specific index of an aggregate value (i.e. vector or matrix)
     ///
     /// The result type may be either a scalar or a vector, depending on the type of the aggregate
@@ -783,7 +929,9 @@ impl SymbolAccess {
     pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
         match &self.access_type {
             AccessType::Default => self.access_default(access_type),
-            AccessType::Slice(base_range) => self.access_slice(base_range.clone(), access_type),
+            AccessType::Slice(base_range) => {
+                self.access_slice(base_range.to_slice_range(), access_type)
+            }
             AccessType::Index(base_idx) => self.access_index(*base_idx, access_type),
             AccessType::Matrix(_, _) => match access_type {
                 AccessType::Default => Ok(self.clone()),
@@ -812,10 +960,11 @@ impl SymbolAccess {
                 }),
             },
             AccessType::Slice(range) => {
-                let rlen = range.end - range.start;
+                let slice_range = range.to_slice_range();
+                let rlen = slice_range.end - slice_range.start;
                 match ty {
                     Type::Felt => Err(InvalidAccessError::IndexIntoScalar),
-                    Type::Vector(len) if range.end > len => {
+                    Type::Vector(len) if slice_range.end > len => {
                         Err(InvalidAccessError::IndexOutOfBounds)
                     }
                     Type::Vector(_) => Ok(Self {
@@ -823,7 +972,7 @@ impl SymbolAccess {
                         ty: Some(Type::Vector(rlen)),
                         ..self.clone()
                     }),
-                    Type::Matrix(rows, _) if range.end > rows => {
+                    Type::Matrix(rows, _) if slice_range.end > rows => {
                         Err(InvalidAccessError::IndexOutOfBounds)
                     }
                     Type::Matrix(_, cols) => Ok(Self {
@@ -871,14 +1020,19 @@ impl SymbolAccess {
                 }),
             },
             AccessType::Slice(range) => {
+                let slice_range = range.to_slice_range();
                 let blen = base_range.end - base_range.start;
-                let rlen = range.end - range.start;
-                let start = base_range.start + range.start;
-                let end = range.start + range.end;
-                let shifted = start..end;
+                let rlen = slice_range.len();
+                let start = base_range.start + slice_range.start;
+                let end = slice_range.start + slice_range.end;
+                let shifted = RangeExpr {
+                    span: range.span,
+                    start: RangeBound::Const(Span::new(range.start.span(), start)),
+                    end: RangeBound::Const(Span::new(range.end.span(), end)),
+                };
                 match ty {
                     Type::Felt => unreachable!(),
-                    Type::Vector(_) if range.end > blen => {
+                    Type::Vector(_) if slice_range.end > blen => {
                         Err(InvalidAccessError::IndexOutOfBounds)
                     }
                     Type::Vector(_) => Ok(Self {
@@ -886,7 +1040,7 @@ impl SymbolAccess {
                         ty: Some(Type::Vector(rlen)),
                         ..self.clone()
                     }),
-                    Type::Matrix(rows, _) if range.end > rows => {
+                    Type::Matrix(rows, _) if slice_range.end > rows => {
                         Err(InvalidAccessError::IndexOutOfBounds)
                     }
                     Type::Matrix(_, cols) => Ok(Self {

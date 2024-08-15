@@ -292,7 +292,7 @@ macro_rules! slice {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Unresolved(NamespacedIdentifier::Binding(ident!($name))),
-            access_type: AccessType::Slice($range),
+            access_type: AccessType::Slice($range.into()),
             offset: 0,
             ty: None,
         })
@@ -302,7 +302,7 @@ macro_rules! slice {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
-            access_type: AccessType::Slice($range),
+            access_type: AccessType::Slice($range.into()),
             offset: 0,
             ty: Some($ty),
         })
@@ -522,7 +522,17 @@ macro_rules! lc {
 
 macro_rules! range {
     ($range:expr) => {
-        Expr::Range(miden_diagnostics::Span::new(SourceSpan::UNKNOWN, $range))
+        Expr::Range($range.into())
+    };
+    ($start:literal, $end:literal) => {
+        Expr::Range(($start..$end).into())
+    };
+    ($start:expr, $end:expr) => {
+        Expr::Range(RangeExpr {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            start: $start.into(),
+            end: $end.into(),
+        })
     };
 }
 
