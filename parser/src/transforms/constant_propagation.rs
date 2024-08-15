@@ -127,11 +127,11 @@ impl<'a> ConstantPropagation<'a> {
                     self.local.insert(expr.name, value.clone());
                 }
                 Expr::Range(ref range) => {
-                    let vector = range.item.clone().map(|i| i as u64).collect();
-                    self.local.insert(
-                        expr.name,
-                        Span::new(range.span(), ConstantExpr::Vector(vector)),
-                    );
+                    let span = range.span();
+                    let range = range.to_slice_range();
+                    let vector = range.map(|i| i as u64).collect();
+                    self.local
+                        .insert(expr.name, Span::new(span, ConstantExpr::Vector(vector)));
                 }
                 _ => unreachable!(),
             }
@@ -316,7 +316,8 @@ impl<'a> VisitMut<SemanticAnalysisError> for ConstantPropagation<'a> {
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Vector(value)));
                             }
                             AccessType::Slice(range) => {
-                                let vector = value[range.start..range.end].to_vec();
+                                let range = range.to_slice_range();
+                                let vector = value[range].to_vec();
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Vector(vector)));
                             }
                             AccessType::Index(idx) => {
@@ -333,7 +334,8 @@ impl<'a> VisitMut<SemanticAnalysisError> for ConstantPropagation<'a> {
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Matrix(value)));
                             }
                             AccessType::Slice(range) => {
-                                let matrix = value[range.start..range.end].to_vec();
+                                let range = range.to_slice_range();
+                                let matrix = value[range].to_vec();
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Matrix(matrix)));
                             }
                             AccessType::Index(idx) => {
@@ -506,7 +508,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for ConstantPropagation<'a> {
                         ..
                     }) => rows.len(),
                     Expr::Const(_) => panic!("expected iterable constant, got scalar"),
-                    Expr::Range(range) => range.end - range.start,
+                    Expr::Range(range) => range.to_slice_range().len(),
                     _ => unreachable!(),
                 };
 
@@ -532,6 +534,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for ConstantPropagation<'a> {
                                 self.local.insert(binding, Span::new(span, value));
                             }
                             Expr::Range(range) => {
+                                let range = range.to_slice_range();
                                 assert!(range.end > range.start + step);
                                 let value = ConstantExpr::Scalar((range.start + step) as u64);
                                 self.local.insert(binding, Span::new(span, value));

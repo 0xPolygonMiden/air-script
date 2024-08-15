@@ -950,6 +950,7 @@ impl<'a> Inlining<'a> {
                 // Ranges are constant, so same rules as above apply here
                 Expr::Range(range) => {
                     let span = range.span();
+                    let range = range.to_slice_range();
                     let binding_ty = BindingType::Constant(Type::Felt);
                     self.bindings.insert(binding, binding_ty);
                     Expr::Const(Span::new(
@@ -1538,7 +1539,7 @@ impl<'a> Inlining<'a> {
                     } else {
                         let start = tb.offset - original_binding.offset;
                         (
-                            AccessType::Slice(start..(start + tb.size)),
+                            AccessType::Slice(RangeExpr::from(start..(start + tb.size))),
                             Type::Vector(tb.size),
                         )
                     };
@@ -1580,7 +1581,9 @@ fn eval_expr_binding_type(
 ) -> Result<BindingType, InvalidAccessError> {
     match expr {
         Expr::Const(constant) => Ok(BindingType::Local(constant.ty())),
-        Expr::Range(range) => Ok(BindingType::Local(Type::Vector(range.end - range.start))),
+        Expr::Range(range) => Ok(BindingType::Local(Type::Vector(
+            range.to_slice_range().len(),
+        ))),
         Expr::Vector(ref elems) => match elems[0].ty() {
             None | Some(Type::Felt) => {
                 let mut binding_tys = Vec::with_capacity(elems.len());
@@ -1692,7 +1695,7 @@ impl<'a> RewriteIterableBindingsVisitor<'a> {
             }
             Some(Expr::Range(range)) => {
                 let span = range.span();
-                let range = range.item.clone();
+                let range = range.to_slice_range();
                 match access.access_type {
                     AccessType::Index(idx) => Some(ScalarExpr::Const(Span::new(
                         span,

@@ -196,11 +196,13 @@ impl BindingType {
                     Err(InvalidAccessError::IndexOutOfBounds)
                 }
                 AccessType::Index(idx) => Ok(elems[idx].clone()),
-                AccessType::Slice(range) if range.end > elems.len() => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                }
                 AccessType::Slice(range) => {
-                    Ok(Self::Vector(elems[range.start..range.end].to_vec()))
+                    let slice_range = range.to_slice_range();
+                    if slice_range.end > elems.len() {
+                        Err(InvalidAccessError::IndexOutOfBounds)
+                    } else {
+                        Ok(Self::Vector(elems[slice_range].to_vec()))
+                    }
                 }
                 AccessType::Matrix(row, _) if row >= elems.len() => {
                     Err(InvalidAccessError::IndexOutOfBounds)

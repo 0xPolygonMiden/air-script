@@ -255,18 +255,20 @@ impl TraceBinding {
         match access_type {
             AccessType::Default => Ok(*self),
             AccessType::Slice(_) if self.is_scalar() => Err(InvalidAccessError::SliceOfScalar),
-            AccessType::Slice(range) if range.end > self.size => {
-                Err(InvalidAccessError::IndexOutOfBounds)
-            }
             AccessType::Slice(range) => {
-                let offset = self.offset + range.start;
-                let size = range.end - range.start;
-                Ok(Self {
-                    offset,
-                    size,
-                    ty: Type::Vector(size),
-                    ..*self
-                })
+                let slice_range = range.to_slice_range();
+                if slice_range.end > self.size {
+                    Err(InvalidAccessError::IndexOutOfBounds)
+                } else {
+                    let offset = self.offset + slice_range.start;
+                    let size = slice_range.len();
+                    Ok(Self {
+                        offset,
+                        size,
+                        ty: Type::Vector(size),
+                        ..*self
+                    })
+                }
             }
             AccessType::Index(_) if self.is_scalar() => Err(InvalidAccessError::IndexIntoScalar),
             AccessType::Index(idx) if idx >= self.size => Err(InvalidAccessError::IndexOutOfBounds),

@@ -436,21 +436,31 @@ impl RandBinding {
 
     /// Derive a new [RandBinding] derived from the current one given an [AccessType]
     pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
+        use super::{RangeBound, RangeExpr};
         match access_type {
             AccessType::Default => Ok(*self),
             AccessType::Slice(_) if self.is_scalar() => Err(InvalidAccessError::SliceOfScalar),
-            AccessType::Slice(range) if range.end > self.size => {
-                Err(InvalidAccessError::IndexOutOfBounds)
-            }
-            AccessType::Slice(range) => {
-                let offset = self.offset + range.start;
-                let size = range.end - range.start;
+            AccessType::Slice(RangeExpr {
+                start: RangeBound::Const(start),
+                end: RangeBound::Const(end),
+                ..
+            }) if start > end => Err(InvalidAccessError::IndexOutOfBounds),
+            AccessType::Slice(RangeExpr {
+                start: RangeBound::Const(start),
+                end: RangeBound::Const(end),
+                ..
+            }) => {
+                let offset = self.offset + start.item;
+                let size = end.item - start.item;
                 Ok(Self {
                     offset,
                     size,
                     ty: Type::Vector(size),
                     ..*self
                 })
+            }
+            AccessType::Slice(_) => {
+                unreachable!("expected non-constant range bounds to have been erased by this point")
             }
             AccessType::Index(_) if self.is_scalar() => Err(InvalidAccessError::IndexIntoScalar),
             AccessType::Index(idx) if idx >= self.size => Err(InvalidAccessError::IndexOutOfBounds),
