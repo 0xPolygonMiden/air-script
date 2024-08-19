@@ -61,8 +61,8 @@ fn multiconstraint_selectors() {
     integrity_constraints {
         enf clk' = 0 when s[0] & !s[1];
         enf match {
-            case s[0] & s[1]: clk' = clk
-            case !s[0] & !s[1]: clk' = 1
+            case s[0] & s[1]: clk' = clk,
+            case !s[0] & !s[1]: clk' = 1,
         };
     }";
 
@@ -181,8 +181,8 @@ fn selectors_inside_match() {
     integrity_constraints {
         enf next_is_zero([clk]) when s[0] & !s[1];
         enf match {
-            case s[1] & s[2]: is_unchanged([clk, s[0]])
-            case !s[1] & !s[2]: next_is_one([clk])
+            case s[1] & s[2]: is_unchanged([clk, s[0]]),
+            case !s[1] & !s[2]: next_is_one([clk]),
         };
     }";
 
