@@ -42,25 +42,25 @@ Evaluators can be declared anywhere in a module, but usually are declared toward
 An evaluator defined in a module or [imported](./organization.md#importing-evaluators) from a different module can be invoked via the `enf` keyword. For example (public inputs and boundary constraints omitted for brevity):
 ```
 trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf foo([a, b])
+    enf foo([a, b]);
 }
 
 ev foo([x, y]) {
-    enf x' = x + y
+    enf x' = x + y;
 }
 ```
 In the above example, evaluator `foo` is invoked using trace columns `a` and `b`, but notice that within the evaluator we refer to these columns by different names (specifically, `x` and `y` respectively). The above example is equivalent to:
 ```
 trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf a' = a + b
+    enf a' = a + b;
 }
 ```
 That is, we can think of evaluators as being *inlined* at their call sites.
@@ -68,58 +68,58 @@ That is, we can think of evaluators as being *inlined* at their call sites.
 Evaluators can be invoked multiple times. For example:
 ```
 trace_columns {
-    main: [a, b, c]
+    main: [a, b, c],
 }
 
 integrity_constraints {
-    enf foo([a, b])
-    enf foo([c, a])
+    enf foo([a, b]);
+    enf foo([c, a]);
 }
 
 ev foo([x, y]) {
-    enf x' = x + y
+    enf x' = x + y;
 }
 ```
 This is equivalent to:
 ```
 trace_columns {
-    main: [a, b, c]
+    main: [a, b, c],
 }
 
 integrity_constraints {
-    enf a' = a + b
-    enf c' = c + a
+    enf a' = a + b;
+    enf c' = c + a;
 }
 ```
 Evaluators can also invoke other evaluators. For example:
 ```
 trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf foo([a, b])
+    enf foo([a, b]);
 }
 
 ev foo([x, y]) {
-    enf x' = x + y
-    enf bar([y, x])
+    enf x' = x + y;
+    enf bar([y, x]);
 }
 
 ev bar([x, y]) {
-    enf x' = x * y
+    enf x' = x * y;
 }
 ```
 The above is equivalent to:
 
 ```
 trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf a' = a + b
-    enf b' = b * a
+    enf a' = a + b;
+    enf b' = b * a;
 }
 ```
 
