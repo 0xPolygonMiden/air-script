@@ -22,6 +22,12 @@ let x = [2^i * a for (i, a) in (0..5, b)]
 Ranges can also be used as iterables, which makes it easy to refer to an element and its index at the same time. This will create a new vector with length 5 and each element will be the corresponding element in `b` multiplied by 2 raised to the power of the element's index. This will throw an error if `b` is not of length 5.
 
 ```
+const MAX = 5
+let x = [2^i * a for (i, a) in (0..MAX, b)]
+```
+Ranges are defined with each bound being either an integer literal, or a [named constant](./declarations.md#constants-const) of type scalar.
+
+```
 let x = [m + n + o for (m, n, o) in (a, 0..5, c[0..5])]
 ```
 Slices can also be used as iterables. This will create a new vector with length 5 and each element will be the sum of the corresponding elements in `a`, the range 0 to 5, and the first 5 elements of `c`. This will throw an error if `a` is not of length 5 or if `c` is of length less than 5.
