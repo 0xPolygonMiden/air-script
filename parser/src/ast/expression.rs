@@ -599,6 +599,7 @@ impl fmt::Display for ScalarExpr {
     }
 }
 
+/// Represents a symbol access to a named constant.
 #[derive(Clone, Spanned, Debug)]
 pub struct ConstSymbolAccess {
     #[span]
@@ -652,6 +653,8 @@ impl RangeExpr {
         self.start.is_constant() && self.end.is_constant()
     }
 
+    /// Converts this range expression to a `Range` type, assuming it is constant.
+    /// Panics if the range is not constant.
     pub fn to_slice_range(&self) -> Range {
         self.try_into()
             .expect("attempted to convert non-constant range expression to constant")
@@ -697,18 +700,9 @@ impl RangeBound {
         matches!(self, Self::Const(_))
     }
 }
-impl From<ConstSymbolAccess> for RangeBound {
-    fn from(sym: ConstSymbolAccess) -> Self {
-        Self::SymbolAccess(sym)
-    }
-}
 impl From<Identifier> for RangeBound {
     fn from(name: Identifier) -> Self {
-        Self::SymbolAccess(ConstSymbolAccess {
-            span: name.span(),
-            name: ResolvableIdentifier::Unresolved(NamespacedIdentifier::Binding(name)),
-            ty: None,
-        })
+        Self::SymbolAccess(ConstSymbolAccess::new(name.span(), name))
     }
 }
 impl From<usize> for RangeBound {
@@ -716,38 +710,11 @@ impl From<usize> for RangeBound {
         Self::Const(Span::new(SourceSpan::UNKNOWN, constant))
     }
 }
-impl From<Span<usize>> for RangeBound {
-    fn from(constant: Span<usize>) -> Self {
-        Self::Const(constant)
-    }
-}
 impl fmt::Display for RangeBound {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::SymbolAccess(sym) => write!(f, "{sym}"),
             Self::Const(constant) => write!(f, "{constant}"),
-        }
-    }
-}
-impl core::ops::Add for RangeBound {
-    type Output = Self;
-    fn add(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (Self::Const(lhs), Self::Const(rhs)) => {
-                Self::Const(Span::new(lhs.span(), lhs.item + rhs.item))
-            }
-            _ => panic!("unexpected non-constant range bound operand"),
-        }
-    }
-}
-impl core::ops::Sub for RangeBound {
-    type Output = Self;
-    fn sub(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (Self::Const(lhs), Self::Const(rhs)) => {
-                Self::Const(Span::new(lhs.span(), lhs.item - rhs.item))
-            }
-            _ => panic!("unexpected non-constant range bound operand"),
         }
     }
 }

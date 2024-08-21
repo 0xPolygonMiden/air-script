@@ -140,6 +140,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
     fn visit_mut_module(&mut self, module: &mut Module) -> ControlFlow<SemanticAnalysisError> {
         self.current_module = Some(module.name);
 
+        // Collect the values of all named constants that can be referenced in range declarations
         self.constants.extend(
             module
                 .constants

@@ -524,9 +524,6 @@ macro_rules! range {
     ($range:expr) => {
         Expr::Range($range.into())
     };
-    ($start:literal, $end:literal) => {
-        Expr::Range(($start..$end).into())
-    };
     ($start:expr, $end:expr) => {
         Expr::Range(RangeExpr {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
