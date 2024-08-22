@@ -634,16 +634,27 @@ pub struct RangeExpr {
     pub start: RangeBound,
     pub end: RangeBound,
 }
+
+impl TryFrom<&RangeExpr> for Range {
+    type Error = InvalidExprError;
+
+    #[inline]
+    fn try_from(expr: &RangeExpr) -> Result<Self, InvalidExprError> {
+        match (&expr.start, &expr.end) {
+            (RangeBound::Const(lhs), RangeBound::Const(rhs)) => Ok(lhs.item..rhs.item),
+            _ => Err(InvalidExprError::NonConstantRangeExpr(expr.span)),
+        }
+    }
+}
+
 impl RangeExpr {
     pub fn is_constant(&self) -> bool {
         self.start.is_constant() && self.end.is_constant()
     }
 
     pub fn to_slice_range(&self) -> Range {
-        match (&self.start, &self.end) {
-            (RangeBound::Const(lhs), RangeBound::Const(rhs)) => lhs.item..rhs.item,
-            _ => panic!("attempted to convert non-constant range expression to constant"),
-        }
+        self.try_into()
+            .expect("attempted to convert non-constant range expression to constant")
     }
 
     pub fn ty(&self) -> Option<Type> {
