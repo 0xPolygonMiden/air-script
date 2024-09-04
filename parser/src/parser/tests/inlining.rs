@@ -1322,8 +1322,8 @@ fn test_repro_issue340() {
         enf instruction_word = word_sum;
 
         enf match {
-            case s: imm_reconstruction([instruction_bits, immediate])
-            case !s: immediate = 0
+            case s: imm_reconstruction([instruction_bits, immediate]),
+            case !s: immediate = 0,
         };
     }
 

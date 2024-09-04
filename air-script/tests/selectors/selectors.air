@@ -15,7 +15,7 @@ boundary_constraints {
 integrity_constraints {
     enf clk' = 0 when s[0] & !s[1];
     enf match {
-        case s[0] & s[1] & s[2]: clk' = clk
-        case !s[1] & !s[2]: clk' = 1
+        case s[0] & s[1] & s[2]: clk' = clk,
+        case !s[1] & !s[2]: clk' = 1,
     };
 }

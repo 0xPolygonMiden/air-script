@@ -667,8 +667,8 @@ fn ic_match_constraint() {
 
     integrity_constraints {
         enf match {
-            case s[0] & s[1]: is_binary([c[0]])
-            case s[0]: c[1] = c[2]
+            case s[0] & s[1]: is_binary([c[0]]),
+            case s[0]: c[1] = c[2],
         };
     }";
 

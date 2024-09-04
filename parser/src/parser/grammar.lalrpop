@@ -347,7 +347,7 @@ ReturnStatement: Expr = {
 }
 
 MatchArm: Statement = {
-    <l:@L> "case" <selector:ScalarExpr> ":" <constraint:ScalarConstraintExpr> <r:@R> => {
+    <l:@L> "case" <selector:ScalarExpr> ":" <constraint:ScalarConstraintExpr> "," <r:@R> => {
         let generated_name = format!("%{}", *next_var);
         *next_var += 1;
         let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
