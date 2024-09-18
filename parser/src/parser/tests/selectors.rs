@@ -12,18 +12,21 @@ fn single_selector() {
     let source = r#"
     def test
 
-    trace_columns:
-        main: [clk, n1]
+    trace_columns {
+        main: [clk, n1],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf clk' = clk when n1
-    "#;
+    integrity_constraints {
+        enf clk' = clk when n1;
+    }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
         .trace_columns
@@ -53,18 +56,21 @@ fn chained_selectors() {
     let source = r#"
     def test
 
-    trace_columns:
-        main: [clk, n1, n2, n3]
+    trace_columns {
+        main: [clk, n1, n2, n3],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf clk' = clk when (n1 & !n2) | !n3
-    "#;
+    integrity_constraints {
+        enf clk' = clk when (n1 & !n2) | !n3;
+    }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected.trace_columns.push(trace_segment!(
         0,

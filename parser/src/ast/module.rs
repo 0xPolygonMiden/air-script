@@ -35,8 +35,8 @@ pub enum ModuleType {
 ///
 /// * Fields which are only allowed in root modules are empty/unset in library modules
 /// * Fields which must be present in root modules are guaranteed to be present in a root module
-/// * It is guaranteed that at least one boundary constraint and one integrity constraint are present
-/// in a root module
+/// * It is guaranteed that at least one boundary constraint and one integrity constraint are
+///   present in a root module
 /// * No duplicate module-level declarations were present
 /// * All globally-visible declarations are unique
 ///
@@ -54,6 +54,7 @@ pub struct Module {
     pub imports: BTreeMap<ModuleId, Import>,
     pub constants: BTreeMap<Identifier, Constant>,
     pub evaluators: BTreeMap<Identifier, EvaluatorFunction>,
+    pub functions: BTreeMap<Identifier, Function>,
     pub periodic_columns: BTreeMap<Identifier, PeriodicColumn>,
     pub public_inputs: BTreeMap<Identifier, PublicInput>,
     pub random_values: Option<RandomValues>,
@@ -79,6 +80,7 @@ impl Module {
             imports: Default::default(),
             constants: Default::default(),
             evaluators: Default::default(),
+            functions: Default::default(),
             periodic_columns: Default::default(),
             public_inputs: Default::default(),
             random_values: None,
@@ -120,6 +122,9 @@ impl Module {
                 }
                 Declaration::EvaluatorFunction(evaluator) => {
                     module.declare_evaluator(diagnostics, &mut names, evaluator)?;
+                }
+                Declaration::Function(function) => {
+                    module.declare_function(diagnostics, &mut names, function)?;
                 }
                 Declaration::PeriodicColumns(mut columns) => {
                     for column in columns.drain(..) {
@@ -395,6 +400,22 @@ impl Module {
         Ok(())
     }
 
+    fn declare_function(
+        &mut self,
+        diagnostics: &DiagnosticsHandler,
+        names: &mut HashSet<NamespacedIdentifier>,
+        function: Function,
+    ) -> Result<(), SemanticAnalysisError> {
+        if let Some(prev) = names.replace(NamespacedIdentifier::Function(function.name)) {
+            conflicting_declaration(diagnostics, "function", prev.span(), function.name.span());
+            return Err(SemanticAnalysisError::NameConflict(function.name.span()));
+        }
+
+        self.functions.insert(function.name, function);
+
+        Ok(())
+    }
+
     fn declare_periodic_column(
         &mut self,
         diagnostics: &DiagnosticsHandler,
@@ -621,6 +642,7 @@ impl PartialEq for Module {
             && self.imports == other.imports
             && self.constants == other.constants
             && self.evaluators == other.evaluators
+            && self.functions == other.functions
             && self.periodic_columns == other.periodic_columns
             && self.public_inputs == other.public_inputs
             && self.random_values == other.random_values

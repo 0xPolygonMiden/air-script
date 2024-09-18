@@ -122,6 +122,9 @@ pub trait VisitMut<T> {
     ) -> ControlFlow<T> {
         visit_mut_evaluator_function(self, expr)
     }
+    fn visit_mut_function(&mut self, expr: &mut ast::Function) -> ControlFlow<T> {
+        visit_mut_function(self, expr)
+    }
     fn visit_mut_periodic_column(&mut self, expr: &mut ast::PeriodicColumn) -> ControlFlow<T> {
         visit_mut_periodic_column(self, expr)
     }
@@ -205,6 +208,18 @@ pub trait VisitMut<T> {
     fn visit_mut_call(&mut self, expr: &mut ast::Call) -> ControlFlow<T> {
         visit_mut_call(self, expr)
     }
+    fn visit_mut_range_bound(&mut self, expr: &mut ast::RangeBound) -> ControlFlow<T> {
+        visit_mut_range_bound(self, expr)
+    }
+    fn visit_mut_access_type(&mut self, expr: &mut ast::AccessType) -> ControlFlow<T> {
+        visit_mut_access_type(self, expr)
+    }
+    fn visit_mut_const_symbol_access(
+        &mut self,
+        expr: &mut ast::ConstSymbolAccess,
+    ) -> ControlFlow<T> {
+        visit_mut_const_symbol_access(self, expr)
+    }
     fn visit_mut_bounded_symbol_access(
         &mut self,
         expr: &mut ast::BoundedSymbolAccess,
@@ -222,6 +237,12 @@ pub trait VisitMut<T> {
     }
     fn visit_mut_identifier(&mut self, expr: &mut ast::Identifier) -> ControlFlow<T> {
         visit_mut_identifier(self, expr)
+    }
+    fn visit_mut_typed_identifier(
+        &mut self,
+        expr: &mut (ast::Identifier, ast::Type),
+    ) -> ControlFlow<T> {
+        visit_mut_typed_identifier(self, expr)
     }
 }
 
@@ -243,6 +264,9 @@ where
         expr: &mut ast::EvaluatorFunction,
     ) -> ControlFlow<T> {
         (**self).visit_mut_evaluator_function(expr)
+    }
+    fn visit_mut_function(&mut self, expr: &mut ast::Function) -> ControlFlow<T> {
+        (**self).visit_mut_function(expr)
     }
     fn visit_mut_periodic_column(&mut self, expr: &mut ast::PeriodicColumn) -> ControlFlow<T> {
         (**self).visit_mut_periodic_column(expr)
@@ -326,6 +350,18 @@ where
     fn visit_mut_call(&mut self, expr: &mut ast::Call) -> ControlFlow<T> {
         (**self).visit_mut_call(expr)
     }
+    fn visit_mut_range_bound(&mut self, expr: &mut ast::RangeBound) -> ControlFlow<T> {
+        (**self).visit_mut_range_bound(expr)
+    }
+    fn visit_mut_access_type(&mut self, expr: &mut ast::AccessType) -> ControlFlow<T> {
+        (**self).visit_mut_access_type(expr)
+    }
+    fn visit_mut_const_symbol_access(
+        &mut self,
+        expr: &mut ast::ConstSymbolAccess,
+    ) -> ControlFlow<T> {
+        (**self).visit_mut_const_symbol_access(expr)
+    }
     fn visit_mut_bounded_symbol_access(
         &mut self,
         expr: &mut ast::BoundedSymbolAccess,
@@ -344,6 +380,12 @@ where
     fn visit_mut_identifier(&mut self, expr: &mut ast::Identifier) -> ControlFlow<T> {
         (**self).visit_mut_identifier(expr)
     }
+    fn visit_mut_typed_identifier(
+        &mut self,
+        expr: &mut (ast::Identifier, ast::Type),
+    ) -> ControlFlow<T> {
+        (**self).visit_mut_typed_identifier(expr)
+    }
 }
 
 pub fn visit_mut_module<V, T>(visitor: &mut V, module: &mut ast::Module) -> ControlFlow<T>
@@ -358,6 +400,9 @@ where
     }
     for evaluator in module.evaluators.values_mut() {
         visitor.visit_mut_evaluator_function(evaluator)?;
+    }
+    for function in module.functions.values_mut() {
+        visitor.visit_mut_function(function)?;
     }
     for column in module.periodic_columns.values_mut() {
         visitor.visit_mut_periodic_column(column)?;
@@ -435,6 +480,17 @@ where
     visitor.visit_mut_identifier(&mut expr.name)?;
     for segment in expr.params.iter_mut() {
         visitor.visit_mut_evaluator_trace_segment(segment)?;
+    }
+    visitor.visit_mut_statement_block(&mut expr.body)
+}
+
+pub fn visit_mut_function<V, T>(visitor: &mut V, expr: &mut ast::Function) -> ControlFlow<T>
+where
+    V: ?Sized + VisitMut<T>,
+{
+    visitor.visit_mut_identifier(&mut expr.name)?;
+    for param in expr.params.iter_mut() {
+        visitor.visit_mut_typed_identifier(param)?;
     }
     visitor.visit_mut_statement_block(&mut expr.body)
 }
@@ -550,7 +606,12 @@ where
     V: ?Sized + VisitMut<T>,
 {
     match expr {
-        ast::Expr::Const(_) | ast::Expr::Range(_) => ControlFlow::Continue(()),
+        ast::Expr::Const(_) => ControlFlow::Continue(()),
+        ast::Expr::Range(ref mut range) => {
+            visitor.visit_mut_range_bound(&mut range.start)?;
+            visitor.visit_mut_range_bound(&mut range.end)?;
+            ControlFlow::Continue(())
+        }
         ast::Expr::Vector(ref mut exprs) => {
             for expr in exprs.iter_mut() {
                 visitor.visit_mut_expr(expr)?;
@@ -569,6 +630,7 @@ where
         ast::Expr::Binary(ref mut expr) => visitor.visit_mut_binary_expr(expr),
         ast::Expr::Call(ref mut expr) => visitor.visit_mut_call(expr),
         ast::Expr::ListComprehension(ref mut expr) => visitor.visit_mut_list_comprehension(expr),
+        ast::Expr::Let(ref mut expr) => visitor.visit_mut_let(expr),
     }
 }
 
@@ -584,6 +646,7 @@ where
         }
         ast::ScalarExpr::Binary(ref mut expr) => visitor.visit_mut_binary_expr(expr),
         ast::ScalarExpr::Call(ref mut expr) => visitor.visit_mut_call(expr),
+        ast::ScalarExpr::Let(ref mut expr) => visitor.visit_mut_let(expr),
     }
 }
 
@@ -625,6 +688,43 @@ where
     ControlFlow::Continue(())
 }
 
+pub fn visit_mut_range_bound<V, T>(visitor: &mut V, expr: &mut ast::RangeBound) -> ControlFlow<T>
+where
+    V: ?Sized + VisitMut<T>,
+{
+    match expr {
+        ast::RangeBound::Const(_) => ControlFlow::Continue(()),
+        ast::RangeBound::SymbolAccess(ref mut access) => {
+            visitor.visit_mut_const_symbol_access(access)
+        }
+    }
+}
+
+pub fn visit_mut_access_type<V, T>(visitor: &mut V, expr: &mut ast::AccessType) -> ControlFlow<T>
+where
+    V: ?Sized + VisitMut<T>,
+{
+    match expr {
+        ast::AccessType::Default | ast::AccessType::Index(_) | ast::AccessType::Matrix(_, _) => {
+            ControlFlow::Continue(())
+        }
+        ast::AccessType::Slice(ref mut range) => {
+            visitor.visit_mut_range_bound(&mut range.start)?;
+            visitor.visit_mut_range_bound(&mut range.end)
+        }
+    }
+}
+
+pub fn visit_mut_const_symbol_access<V, T>(
+    visitor: &mut V,
+    expr: &mut ast::ConstSymbolAccess,
+) -> ControlFlow<T>
+where
+    V: ?Sized + VisitMut<T>,
+{
+    visitor.visit_mut_resolvable_identifier(&mut expr.name)
+}
+
 pub fn visit_mut_bounded_symbol_access<V, T>(
     visitor: &mut V,
     expr: &mut ast::BoundedSymbolAccess,
@@ -656,6 +756,16 @@ where
 }
 
 pub fn visit_mut_identifier<V, T>(_visitor: &mut V, _expr: &mut ast::Identifier) -> ControlFlow<T>
+where
+    V: ?Sized + VisitMut<T>,
+{
+    ControlFlow::Continue(())
+}
+
+pub fn visit_mut_typed_identifier<V, T>(
+    _visitor: &mut V,
+    _expr: &mut (ast::Identifier, ast::Type),
+) -> ControlFlow<T>
 where
     V: ?Sized + VisitMut<T>,
 {

@@ -275,12 +275,24 @@ macro_rules! expr {
     };
 }
 
+macro_rules! scalar {
+    ($expr:expr) => {
+        ScalarExpr::try_from($expr).unwrap()
+    };
+}
+
+macro_rules! statement {
+    ($expr:expr) => {
+        Statement::try_from($expr).unwrap()
+    };
+}
+
 macro_rules! slice {
     ($name:ident, $range:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Unresolved(NamespacedIdentifier::Binding(ident!($name))),
-            access_type: AccessType::Slice($range),
+            access_type: AccessType::Slice($range.into()),
             offset: 0,
             ty: None,
         })
@@ -290,7 +302,7 @@ macro_rules! slice {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
-            access_type: AccessType::Slice($range),
+            access_type: AccessType::Slice($range.into()),
             offset: 0,
             ty: Some($ty),
         })
@@ -355,6 +367,13 @@ macro_rules! bounded_access {
 
 macro_rules! int {
     ($value:literal) => {
+        ScalarExpr::Const(miden_diagnostics::Span::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            $value,
+        ))
+    };
+
+    ($value:expr) => {
         ScalarExpr::Const(miden_diagnostics::Span::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             $value,
@@ -441,6 +460,12 @@ macro_rules! let_ {
     };
 }
 
+macro_rules! return_ {
+    ($value:expr) => {
+        Statement::Expr($value)
+    };
+}
+
 macro_rules! enforce {
     ($expr:expr) => {
         Statement::Enforce($expr)
@@ -497,7 +522,14 @@ macro_rules! lc {
 
 macro_rules! range {
     ($range:expr) => {
-        Expr::Range(Span::new(SourceSpan::UNKNOWN, $range))
+        Expr::Range($range.into())
+    };
+    ($start:expr, $end:expr) => {
+        Expr::Range(RangeExpr {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            start: $start.into(),
+            end: $end.into(),
+        })
     };
 }
 
@@ -599,6 +631,7 @@ mod calls;
 mod constant_propagation;
 mod constants;
 mod evaluators;
+mod functions;
 mod identifiers;
 mod inlining;
 mod integrity_constraints;
@@ -619,25 +652,29 @@ mod variables;
 fn full_air_file() {
     // def SystemAir
     let mut expected = Program::new(ident!(SystemAir));
-    // public_inputs:
+    // public_inputs {
     //     inputs: [2]
+    // }
     expected.public_inputs.insert(
         ident!(inputs),
         PublicInput::new(miden_diagnostics::SourceSpan::UNKNOWN, ident!(inputs), 2),
     );
-    // trace_columns:
+    // trace_columns {
     //     main: [clk, fmp, ctx]
+    // }
     expected
         .trace_columns
         .push(trace_segment!(0, "$main", [(clk, 1), (fmp, 1), (ctx, 1)]));
-    // integrity_constraints:
+    // integrity_constraints {
     //     enf clk' = clk + 1
+    // }
     expected.integrity_constraints.push(enforce!(eq!(
         access!(clk, 1, Type::Felt),
         add!(access!(clk, Type::Felt), int!(1))
     )));
-    // boundary_constraints:
+    // boundary_constraints {
     //     enf clk.first = 0
+    // }
     expected.boundary_constraints.push(enforce!(eq!(
         bounded_access!(clk, Boundary::First, Type::Felt),
         int!(0)

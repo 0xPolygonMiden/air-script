@@ -275,7 +275,7 @@ pub enum Expr {
     /// A constant expression
     Const(Span<ConstantExpr>),
     /// An expression which evaluates to a vector of integers in the given range
-    Range(Span<Range>),
+    Range(RangeExpr),
     /// A vector of expressions
     ///
     /// A vector may be used to represent matrices in some situations, but such matrices
@@ -296,20 +296,29 @@ pub enum Expr {
     Call(Call),
     /// A generator expression which produces a vector or matrix of values
     ListComprehension(ListComprehension),
+    /// A `let` expression, used to bind temporaries in expression position during compilation.
+    ///
+    /// NOTE: The AirScript syntax only permits `let` in statement position, so this variant
+    /// is only present in the AST as the result of an explicit transformation.
+    Let(Box<Let>),
 }
 impl Expr {
     /// Returns true if this expression is constant
     ///
     /// NOTE: This only returns true for the `Const` and `Range` variants
     pub fn is_constant(&self) -> bool {
-        matches!(self, Self::Const(_) | Self::Range(_))
+        match self {
+            Self::Const(_) => true,
+            Self::Range(range) => range.is_constant(),
+            _ => false,
+        }
     }
 
     /// Returns the resolved type of this expression, if known
     pub fn ty(&self) -> Option<Type> {
         match self {
             Self::Const(constant) => Some(constant.ty()),
-            Self::Range(range) => Some(Type::Vector(range.item.end - range.item.start)),
+            Self::Range(range) => range.ty(),
             Self::Vector(vector) => match vector.first().and_then(|e| e.ty()) {
                 Some(Type::Felt) => Some(Type::Vector(vector.len())),
                 Some(Type::Vector(n)) => Some(Type::Matrix(vector.len(), n)),
@@ -325,6 +334,7 @@ impl Expr {
             Self::Binary(_) => Some(Type::Felt),
             Self::Call(ref call) => call.ty,
             Self::ListComprehension(ref lc) => lc.ty,
+            Self::Let(ref let_expr) => let_expr.ty(),
         }
     }
 }
@@ -332,7 +342,7 @@ impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Const(ref expr) => f.debug_tuple("Const").field(&expr.item).finish(),
-            Self::Range(ref expr) => f.debug_tuple("Range").field(&expr.item).finish(),
+            Self::Range(ref expr) => f.debug_tuple("Range").field(&expr).finish(),
             Self::Vector(ref expr) => f.debug_tuple("Vector").field(&expr.item).finish(),
             Self::Matrix(ref expr) => f.debug_tuple("Matrix").field(&expr.item).finish(),
             Self::SymbolAccess(ref expr) => f.debug_tuple("SymbolAccess").field(expr).finish(),
@@ -341,6 +351,7 @@ impl fmt::Debug for Expr {
             Self::ListComprehension(ref expr) => {
                 f.debug_tuple("ListComprehension").field(expr).finish()
             }
+            Self::Let(ref let_expr) => write!(f, "{let_expr:#?}"),
         }
     }
 }
@@ -348,7 +359,7 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Const(ref expr) => write!(f, "{}", &expr),
-            Self::Range(ref range) => write!(f, "{}..{}", range.start, range.end),
+            Self::Range(ref range) => write!(f, "{}", range),
             Self::Vector(ref expr) => write!(f, "{}", DisplayList(expr.as_slice())),
             Self::Matrix(ref expr) => {
                 f.write_str("[")?;
@@ -360,10 +371,18 @@ impl fmt::Display for Expr {
                 }
                 f.write_str("]")
             }
-            Self::ListComprehension(ref expr) => write!(f, "{}", DisplayBracketed(expr)),
             Self::SymbolAccess(ref expr) => write!(f, "{}", expr),
             Self::Binary(ref expr) => write!(f, "{}", expr),
             Self::Call(ref expr) => write!(f, "{}", expr),
+            Self::ListComprehension(ref expr) => write!(f, "{}", DisplayBracketed(expr)),
+            Self::Let(ref let_expr) => {
+                let display = DisplayLet {
+                    let_expr,
+                    indent: 0,
+                    in_expr_position: true,
+                };
+                write!(f, "{display}")
+            }
         }
     }
 }
@@ -391,22 +410,45 @@ impl From<ListComprehension> for Expr {
         Self::ListComprehension(expr)
     }
 }
+impl TryFrom<Let> for Expr {
+    type Error = InvalidExprError;
+
+    fn try_from(expr: Let) -> Result<Self, Self::Error> {
+        if expr.ty().is_some() {
+            Ok(Self::Let(Box::new(expr)))
+        } else {
+            Err(InvalidExprError::InvalidLetExpr(expr.span()))
+        }
+    }
+}
 impl TryFrom<ScalarExpr> for Expr {
     type Error = InvalidExprError;
 
     #[inline]
     fn try_from(expr: ScalarExpr) -> Result<Self, Self::Error> {
         match expr {
-            ScalarExpr::Const(spanned) => Ok(Expr::Const(Span::new(
+            ScalarExpr::Const(spanned) => Ok(Self::Const(Span::new(
                 spanned.span(),
                 ConstantExpr::Scalar(spanned.item),
             ))),
-            ScalarExpr::SymbolAccess(access) => Ok(Expr::SymbolAccess(access)),
-            ScalarExpr::Binary(expr) => Ok(Expr::Binary(expr)),
-            ScalarExpr::Call(expr) => Ok(Expr::Call(expr)),
+            ScalarExpr::SymbolAccess(access) => Ok(Self::SymbolAccess(access)),
+            ScalarExpr::Binary(expr) => Ok(Self::Binary(expr)),
+            ScalarExpr::Call(expr) => Ok(Self::Call(expr)),
             ScalarExpr::BoundedSymbolAccess(_) => {
                 Err(InvalidExprError::BoundedSymbolAccess(expr.span()))
             }
+            ScalarExpr::Let(expr) => Ok(Self::Let(expr)),
+        }
+    }
+}
+impl TryFrom<Statement> for Expr {
+    type Error = InvalidExprError;
+
+    fn try_from(stmt: Statement) -> Result<Self, Self::Error> {
+        match stmt {
+            Statement::Let(let_expr) => Ok(Self::Let(Box::new(let_expr))),
+            Statement::Expr(expr) => Ok(expr),
+            _ => Err(InvalidExprError::NotAnExpr(stmt.span())),
         }
     }
 }
@@ -430,19 +472,34 @@ pub enum ScalarExpr {
     Binary(BinaryExpr),
     /// A call to a pure function or evaluator
     ///
-    /// NOTE: This is only a valid expression when one of the following hold:
+    /// NOTE: This is only a valid scalar expression when one of the following hold:
     ///
     /// 1. The call is the top-level expression of a constraint, and is to an evaluator function
     /// 2. The call is not the top-level expression of a constraint, and is to a pure function
-    /// that produces a scalar value type.
+    ///    that produces a scalar value type.
     ///
     /// If neither of the above are true, the call is invalid in a `ScalarExpr` context
     Call(Call),
+    /// An expression that binds a local variable to a temporary value during evaluation.
+    ///
+    /// NOTE: This is only a valid scalar expression during the inlining phase, when we expand
+    /// binary expressions or function calls to a block of statements, and only when the result
+    /// of evaluating the `let` produces a valid scalar expression.
+    Let(Box<Let>),
 }
 impl ScalarExpr {
     /// Returns true if this is a constant value
     pub fn is_constant(&self) -> bool {
         matches!(self, Self::Const(_))
+    }
+
+    /// Returns true if this scalar expression could expand to a block, e.g. due to a function call being inlined.
+    pub fn has_block_like_expansion(&self) -> bool {
+        match self {
+            Self::Binary(ref expr) => expr.has_block_like_expansion(),
+            Self::Call(_) | Self::Let(_) => true,
+            _ => false,
+        }
     }
 
     /// Returns the resolved type of this expression, if known.
@@ -462,6 +519,7 @@ impl ScalarExpr {
                 _ => Err(expr.span()),
             },
             Self::Call(ref expr) => Ok(expr.ty),
+            Self::Let(ref expr) => Ok(expr.ty()),
         }
     }
 }
@@ -480,8 +538,31 @@ impl TryFrom<Expr> for ScalarExpr {
             Expr::SymbolAccess(sym) => Ok(Self::SymbolAccess(sym)),
             Expr::Binary(bin) => Ok(Self::Binary(bin)),
             Expr::Call(call) => Ok(Self::Call(call)),
+            Expr::Let(let_expr) => {
+                if let_expr.ty().is_none() {
+                    Err(InvalidExprError::InvalidScalarExpr(let_expr.span()))
+                } else {
+                    Ok(Self::Let(let_expr))
+                }
+            }
             invalid => Err(InvalidExprError::InvalidScalarExpr(invalid.span())),
         }
+    }
+}
+impl TryFrom<Statement> for ScalarExpr {
+    type Error = InvalidExprError;
+
+    fn try_from(stmt: Statement) -> Result<Self, Self::Error> {
+        match stmt {
+            Statement::Let(let_expr) => Self::try_from(Expr::Let(Box::new(let_expr))),
+            Statement::Expr(expr) => Self::try_from(expr),
+            stmt => Err(InvalidExprError::InvalidScalarExpr(stmt.span())),
+        }
+    }
+}
+impl From<u64> for ScalarExpr {
+    fn from(value: u64) -> Self {
+        Self::Const(Span::new(SourceSpan::UNKNOWN, value))
     }
 }
 impl fmt::Debug for ScalarExpr {
@@ -494,6 +575,7 @@ impl fmt::Debug for ScalarExpr {
             }
             Self::Binary(ref expr) => f.debug_tuple("Binary").field(expr).finish(),
             Self::Call(ref expr) => f.debug_tuple("Call").field(expr).finish(),
+            Self::Let(ref expr) => write!(f, "{:#?}", expr),
         }
     }
 }
@@ -505,6 +587,134 @@ impl fmt::Display for ScalarExpr {
             Self::BoundedSymbolAccess(ref expr) => write!(f, "{}.{}", &expr.column, &expr.boundary),
             Self::Binary(ref expr) => write!(f, "{}", expr),
             Self::Call(ref call) => write!(f, "{}", call),
+            Self::Let(ref let_expr) => {
+                let display = DisplayLet {
+                    let_expr,
+                    indent: 0,
+                    in_expr_position: true,
+                };
+                write!(f, "{display}")
+            }
+        }
+    }
+}
+
+/// Represents a symbol access to a named constant.
+#[derive(Clone, Spanned, Debug)]
+pub struct ConstSymbolAccess {
+    #[span]
+    pub span: SourceSpan,
+    pub name: ResolvableIdentifier,
+    pub ty: Option<Type>,
+}
+impl ConstSymbolAccess {
+    pub fn new(span: SourceSpan, name: Identifier) -> Self {
+        Self {
+            span,
+            name: ResolvableIdentifier::Unresolved(NamespacedIdentifier::Binding(name)),
+            ty: None,
+        }
+    }
+}
+impl Eq for ConstSymbolAccess {}
+impl PartialEq for ConstSymbolAccess {
+    fn eq(&self, other: &Self) -> bool {
+        self.name.eq(&other.name) && self.ty.eq(&other.ty)
+    }
+}
+impl fmt::Display for ConstSymbolAccess {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.name)
+    }
+}
+
+#[derive(Debug, Clone, Spanned)]
+pub struct RangeExpr {
+    #[span]
+    pub span: SourceSpan,
+    pub start: RangeBound,
+    pub end: RangeBound,
+}
+
+impl TryFrom<&RangeExpr> for Range {
+    type Error = InvalidExprError;
+
+    #[inline]
+    fn try_from(expr: &RangeExpr) -> Result<Self, InvalidExprError> {
+        match (&expr.start, &expr.end) {
+            (RangeBound::Const(lhs), RangeBound::Const(rhs)) => Ok(lhs.item..rhs.item),
+            _ => Err(InvalidExprError::NonConstantRangeExpr(expr.span)),
+        }
+    }
+}
+
+impl RangeExpr {
+    pub fn is_constant(&self) -> bool {
+        self.start.is_constant() && self.end.is_constant()
+    }
+
+    /// Converts this range expression to a `Range` type, assuming it is constant.
+    /// Panics if the range is not constant.
+    pub fn to_slice_range(&self) -> Range {
+        self.try_into()
+            .expect("attempted to convert non-constant range expression to constant")
+    }
+
+    pub fn ty(&self) -> Option<Type> {
+        match (&self.start, &self.end) {
+            (RangeBound::Const(start), RangeBound::Const(end)) => {
+                Some(Type::Vector(end.item.abs_diff(start.item)))
+            }
+            _ => None,
+        }
+    }
+}
+impl From<Range> for RangeExpr {
+    fn from(range: Range) -> Self {
+        Self {
+            span: SourceSpan::default(),
+            start: RangeBound::Const(Span::new(SourceSpan::UNKNOWN, range.start)),
+            end: RangeBound::Const(Span::new(SourceSpan::UNKNOWN, range.end)),
+        }
+    }
+}
+impl Eq for RangeExpr {}
+impl PartialEq for RangeExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.start.eq(&other.start) && self.end.eq(&other.end)
+    }
+}
+impl fmt::Display for RangeExpr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}..{}", &self.start, &self.end)
+    }
+}
+
+#[derive(Clone, Spanned, PartialEq, Eq, Debug)]
+pub enum RangeBound {
+    SymbolAccess(ConstSymbolAccess),
+    Const(Span<usize>),
+}
+impl RangeBound {
+    pub fn is_constant(&self) -> bool {
+        matches!(self, Self::Const(_))
+    }
+}
+impl From<Identifier> for RangeBound {
+    fn from(name: Identifier) -> Self {
+        Self::SymbolAccess(ConstSymbolAccess::new(name.span(), name))
+    }
+}
+impl From<usize> for RangeBound {
+    fn from(constant: usize) -> Self {
+        Self::Const(Span::new(SourceSpan::UNKNOWN, constant))
+    }
+}
+impl fmt::Display for RangeBound {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::SymbolAccess(sym) => write!(f, "{sym}"),
+            Self::Const(constant) => write!(f, "{constant}"),
         }
     }
 }
@@ -526,6 +736,12 @@ impl BinaryExpr {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
         }
+    }
+
+    /// Returns true if this binary expression could expand to a block, e.g. due to a function call being inlined.
+    #[inline]
+    pub fn has_block_like_expansion(&self) -> bool {
+        self.lhs.has_block_like_expansion() || self.rhs.has_block_like_expansion()
     }
 }
 impl Eq for BinaryExpr {}
@@ -597,7 +813,7 @@ pub enum AccessType {
     /// Access refers to the entire bound value
     Default,
     /// Access binds a sub-slice of a vector
-    Slice(Range),
+    Slice(RangeExpr),
     /// Access binds the value at a specific index of an aggregate value (i.e. vector or matrix)
     ///
     /// The result type may be either a scalar or a vector, depending on the type of the aggregate
@@ -691,7 +907,9 @@ impl SymbolAccess {
     pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
         match &self.access_type {
             AccessType::Default => self.access_default(access_type),
-            AccessType::Slice(base_range) => self.access_slice(base_range.clone(), access_type),
+            AccessType::Slice(base_range) => {
+                self.access_slice(base_range.to_slice_range(), access_type)
+            }
             AccessType::Index(base_idx) => self.access_index(*base_idx, access_type),
             AccessType::Matrix(_, _) => match access_type {
                 AccessType::Default => Ok(self.clone()),
@@ -720,10 +938,11 @@ impl SymbolAccess {
                 }),
             },
             AccessType::Slice(range) => {
-                let rlen = range.end - range.start;
+                let slice_range = range.to_slice_range();
+                let rlen = slice_range.end - slice_range.start;
                 match ty {
                     Type::Felt => Err(InvalidAccessError::IndexIntoScalar),
-                    Type::Vector(len) if range.end > len => {
+                    Type::Vector(len) if slice_range.end > len => {
                         Err(InvalidAccessError::IndexOutOfBounds)
                     }
                     Type::Vector(_) => Ok(Self {
@@ -731,7 +950,7 @@ impl SymbolAccess {
                         ty: Some(Type::Vector(rlen)),
                         ..self.clone()
                     }),
-                    Type::Matrix(rows, _) if range.end > rows => {
+                    Type::Matrix(rows, _) if slice_range.end > rows => {
                         Err(InvalidAccessError::IndexOutOfBounds)
                     }
                     Type::Matrix(_, cols) => Ok(Self {
@@ -779,14 +998,19 @@ impl SymbolAccess {
                 }),
             },
             AccessType::Slice(range) => {
+                let slice_range = range.to_slice_range();
                 let blen = base_range.end - base_range.start;
-                let rlen = range.end - range.start;
-                let start = base_range.start + range.start;
-                let end = range.start + range.end;
-                let shifted = start..end;
+                let rlen = slice_range.len();
+                let start = base_range.start + slice_range.start;
+                let end = slice_range.start + slice_range.end;
+                let shifted = RangeExpr {
+                    span: range.span,
+                    start: RangeBound::Const(Span::new(range.start.span(), start)),
+                    end: RangeBound::Const(Span::new(range.end.span(), end)),
+                };
                 match ty {
                     Type::Felt => unreachable!(),
-                    Type::Vector(_) if range.end > blen => {
+                    Type::Vector(_) if slice_range.end > blen => {
                         Err(InvalidAccessError::IndexOutOfBounds)
                     }
                     Type::Vector(_) => Ok(Self {
@@ -794,7 +1018,7 @@ impl SymbolAccess {
                         ty: Some(Type::Vector(rlen)),
                         ..self.clone()
                     }),
-                    Type::Matrix(rows, _) if range.end > rows => {
+                    Type::Matrix(rows, _) if slice_range.end > rows => {
                         Err(InvalidAccessError::IndexOutOfBounds)
                     }
                     Type::Matrix(_, cols) => Ok(Self {
@@ -1046,8 +1270,8 @@ pub struct Call {
     ///
     /// * Calls to evaluators produce no value, and thus have no type
     /// * When parsed, the callee has not yet been resolved, so we don't know the
-    /// type of the function being called. During semantic analysis, the callee is
-    /// resolved and this field is set to the result type of that function.
+    ///   type of the function being called. During semantic analysis, the callee is
+    ///   resolved and this field is set to the result type of that function.
     pub ty: Option<Type>,
 }
 impl Call {

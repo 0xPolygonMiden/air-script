@@ -75,12 +75,54 @@ fn constants() {
 }
 
 #[test]
+fn constant_in_range() {
+    let generated_air = Test::new("tests/constant_in_range/constant_in_range.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../constant_in_range/constant_in_range.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
 fn evaluators() {
     let generated_air = Test::new("tests/evaluators/evaluators.air".to_string())
         .transpile(Target::Winterfell)
         .unwrap();
 
     let expected = expect_file!["../evaluators/evaluators.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn functions_simple() {
+    let generated_air = Test::new("tests/functions/functions_simple.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../functions/functions_simple.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn functions_simple_inlined() {
+    // make sure that the constraints generated using inlined functions are the same as the ones
+    // generated using regular functions
+    let generated_air = Test::new("tests/functions/inlined_functions_simple.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../functions/functions_simple.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn functions_complex() {
+    let generated_air = Test::new("tests/functions/functions_complex.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../functions/functions_complex.rs"];
     expected.assert_eq(&generated_air);
 }
 

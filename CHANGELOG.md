@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.4.0 (TBD)
+
 ## 0.3.0 (2023-07-12)
 
 - Added support for library modules.

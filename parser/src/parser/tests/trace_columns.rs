@@ -12,18 +12,21 @@ fn trace_columns() {
     let source = r#"
     def test
 
-    trace_columns:
-        main: [clk, fmp, ctx]
+    trace_columns {
+        main: [clk, fmp, ctx],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf clk = 0
-    "#;
+    integrity_constraints {
+        enf clk = 0;
+    }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
         .trace_columns
@@ -51,19 +54,22 @@ fn trace_columns_main_and_aux() {
     let source = r#"
     def test
 
-    trace_columns:
-        main: [clk, fmp, ctx]
-        aux: [rc_bus, ch_bus]
+    trace_columns {
+        main: [clk, fmp, ctx],
+        aux: [rc_bus, ch_bus],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf clk = 0
-    "#;
+    integrity_constraints {
+        enf clk = 0;
+    }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
         .trace_columns
@@ -94,20 +100,23 @@ fn trace_columns_groups() {
     let source = r#"
     def test
 
-    trace_columns:
-        main: [clk, fmp, ctx, a[3]]
-        aux: [rc_bus, b[4], ch_bus]
+    trace_columns {
+        main: [clk, fmp, ctx, a[3]],
+        aux: [rc_bus, b[4], ch_bus],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf a[1]' = 1
-        enf clk' = clk - 1
-    "#;
+    integrity_constraints {
+        enf a[1]' = 1;
+        enf clk' = clk - 1;
+    }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected.trace_columns.push(trace_segment!(
         0,
@@ -145,7 +154,7 @@ fn err_empty_trace_columns() {
     let source = r#"
     def test
 
-    trace_columns:
+    trace_columns {}
     "#;
 
     // Trace columns cannot be empty
@@ -158,15 +167,18 @@ fn err_main_trace_cols_missing() {
     let source = r#"
     def test
 
-    trace_columns:
-        aux: [clk]
-    public_inputs:
-        stack_inputs: [16]
-    integrity_constraints:
-        enf clk' = clk + 1
-    boundary_constraints:
-        enf clk.first = 0
-    "#;
+    trace_columns {
+        aux: [clk],
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }
+    boundary_constraints {
+        enf clk.first = 0;
+    }"#;
 
     ParseTest::new()
         .expect_module_diagnostic(source, "declaration of main trace columns is required");

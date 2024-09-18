@@ -12,17 +12,21 @@ fn integrity_constraints() {
     let source = "
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {
+        main: [clk],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf clk' = clk + 1";
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -51,17 +55,21 @@ fn err_integrity_constraints_invalid() {
     let source = "
     def test
 
-    trace_columns:
+    trace_columns {
         main: [clk]
+    }
 
-    public_inputs:
+    public_inputs {
         inputs: [2]
+    }
 
-    boundary_constraints:
+    boundary_constraints {
         enf clk.first = 0
+    }
 
-    integrity_constraints:
-        enf clk' = clk = 1";
+    integrity_constraints {
+        enf clk' = clk = 1
+    }";
 
     ParseTest::new().expect_unrecognized_token(source);
 }
@@ -71,18 +79,22 @@ fn multiple_integrity_constraints() {
     let source = "
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {
+        main: [clk],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf clk' = clk + 1
-        enf clk' - clk = 1";
+    integrity_constraints {
+        enf clk' = clk + 1;
+        enf clk' - clk = 1;
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -114,20 +126,25 @@ fn integrity_constraint_with_periodic_col() {
     let source = "
     def test
 
-    trace_columns:
-        main: [b]
+    trace_columns {
+        main: [b],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    periodic_columns:
-        k0: [1, 0]
+    periodic_columns {
+        k0: [1, 0],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf k0 + b = 0";
+    integrity_constraints {
+        enf k0 + b = 0;
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -160,21 +177,26 @@ fn integrity_constraint_with_random_value() {
     let source = "
     def test
 
-    trace_columns:
-        main: [a]
-        aux: [aux0[2]]
+    trace_columns {
+        main: [a],
+        aux: [aux0[2]],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    random_values:
-        rand: [2]
+    random_values {
+        rand: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf a + $rand[1] = 0";
+    integrity_constraints {
+        enf a + $rand[1] = 0;
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -210,21 +232,25 @@ fn integrity_constraint_with_constants() {
     let source = "
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {
+        main: [clk],
+    }
 
-    const A = 0
-    const B = [0, 1]
-    const C = [[0, 1], [1, 0]]
+    const A = 0;
+    const B = [0, 1];
+    const C = [[0, 1], [1, 0]];
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf clk + A = B[1] + C[1][1]";
+    integrity_constraints {
+        enf clk + A = B[1] + C[1][1];
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -261,20 +287,24 @@ fn integrity_constraint_with_variables() {
     let source = "
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {
+        main: [clk],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        let a = 2^2
-        let b = [a, 2 * a]
-        let c = [[a - 1, a^2], [b[0], b[1]]]
-        enf clk + a = b[1] + c[1][1]";
+    integrity_constraints {
+        let a = 2^2;
+        let b = [a, 2 * a];
+        let c = [[a - 1, a^2], [b[0], b[1]]];
+        enf clk + a = b[1] + c[1][1];
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -306,19 +336,23 @@ fn integrity_constraint_with_indexed_trace_access() {
     let source = "
     def test
 
-    trace_columns:
-        main: [a, b]
-        aux: [c, d]
+    trace_columns {
+        main: [a, b],
+        aux: [c, d],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf $main[0]' = $main[1] + 1
-        enf $aux[0]' - $aux[1] = 1";
+    integrity_constraints {
+        enf $main[0]' = $main[1] + 1;
+        enf $aux[0]' - $aux[1] = 1;
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -362,17 +396,21 @@ fn ic_comprehension_one_iterable_identifier() {
     let source = "
     def test
 
-    trace_columns:
-        main: [a, b, c[4]]
+    trace_columns {
+        main: [a, b, c[4]],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf x = a + b for x in c";
+    integrity_constraints {
+        enf x = a + b for x in c;
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -403,17 +441,21 @@ fn ic_comprehension_one_iterable_range() {
     let source = "
     def test
 
-    trace_columns:
-        main: [a, b, c[4]]
+    trace_columns {
+        main: [a, b, c[4]],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf x = a + b for x in (1..4)";
+    integrity_constraints {
+        enf x = a + b for x in (1..4);
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -444,17 +486,21 @@ fn ic_comprehension_with_selectors() {
     let source = "
     def test
 
-    trace_columns:
-        main: [s[2], a, b, c[4]]
+    trace_columns {
+        main: [s[2], a, b, c[4]],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf x = a + b for x in c when s[0] & s[1]";
+    integrity_constraints {
+        enf x = a + b for x in c when s[0] & s[1];
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -485,20 +531,25 @@ fn ic_comprehension_with_evaluator_call() {
     let source = "
     def test
 
-    ev is_binary([x]):
-        enf x^2 = x
+    ev is_binary([x]) {
+        enf x^2 = x;
+    }
 
-    trace_columns:
-        main: [a, b, c[4], d[4]]
+    trace_columns {
+        main: [a, b, c[4], d[4]],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf is_binary([x]) for x in c";
+    integrity_constraints {
+        enf is_binary([x]) for x in c;
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -538,20 +589,25 @@ fn ic_comprehension_with_evaluator_and_selectors() {
     let source = "
     def test
 
-    ev is_binary([x]):
-        enf x^2 = x
+    ev is_binary([x]) {
+        enf x^2 = x;
+    }
 
-    trace_columns:
-        main: [s[2], a, b, c[4], d[4]]
+    trace_columns {
+        main: [s[2], a, b, c[4], d[4]],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf is_binary([x]) for x in c when s[0] & s[1]";
+    integrity_constraints {
+        enf is_binary([x]) for x in c when s[0] & s[1];
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected.trace_columns.push(trace_segment!(
@@ -593,22 +649,28 @@ fn ic_match_constraint() {
     let source = "
     def test
 
-    ev is_binary([x]):
-        enf x^2 = x
+    ev is_binary([x]) {
+        enf x^2 = x;
+    }
 
-    trace_columns:
-        main: [s[2], a, b, c[4], d[4]]
+    trace_columns {
+        main: [s[2], a, b, c[4], d[4]],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf clk.first = 0
+    boundary_constraints {
+        enf clk.first = 0;
+    }
 
-    integrity_constraints:
-        enf match:
-            case s[0] & s[1]: is_binary([c[0]])
-            case s[0]: c[1] = c[2]";
+    integrity_constraints {
+        enf match {
+            case s[0] & s[1]: is_binary([c[0]]),
+            case s[0]: c[1] = c[2],
+        };
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected.trace_columns.push(trace_segment!(
@@ -658,11 +720,13 @@ fn err_ic_comprehension_one_member_two_iterables() {
     let source = "
     def test
 
-    trace_columns:
-        main: [a, b, c[4]]
+    trace_columns {
+        main: [a, b, c[4]],
+    }
 
-    integrity_constraints:
-        enf a = c for c in (c, d)";
+    integrity_constraints {
+        enf a = c for c in (c, d);
+    }";
 
     ParseTest::new()
         .expect_module_diagnostic(source, "bindings and iterables lengths are mismatched");
@@ -673,11 +737,13 @@ fn err_ic_comprehension_two_members_one_iterable() {
     let source = "
     def test
 
-    trace_columns:
-        main: [a, b, c[4]]
+    trace_columns {
+        main: [a, b, c[4]],
+    }
 
-    integrity_constraints:
-        enf a = c + d for (c, d) in c";
+    integrity_constraints {
+        enf a = c + d for (c, d) in c;
+    }";
 
     ParseTest::new()
         .expect_module_diagnostic(source, "bindings and iterables lengths are mismatched");
@@ -691,13 +757,15 @@ fn err_missing_integrity_constraint() {
     let source = "
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {
+        main: [clk],
+    }
 
-    integrity_constraints:
-        let a = 2^2
-        let b = [a, 2 * a]
-        let c = [[a - 1, a^2], [b[0], b[1]]]";
+    integrity_constraints {
+        let a = 2^2;
+        let b = [a, 2 * a];
+        let c = [[a - 1, a^2], [b[0], b[1]]];
+    }";
     ParseTest::new().expect_module_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
 }
 
@@ -706,11 +774,13 @@ fn ic_invalid() {
     let source = "
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {
+        main: [clk],
+    }
 
-    integrity_constraints:
-        enf clk' = clk = 1";
+    integrity_constraints {
+        enf clk' = clk = 1
+    }";
     ParseTest::new().expect_unrecognized_token(source);
 }
 
@@ -719,11 +789,13 @@ fn error_invalid_next_usage() {
     let source = "
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {
+        main: [clk],
+    }
 
-    integrity_constraints:
-        enf clk'' = clk + 1";
+    integrity_constraints {
+        enf clk'' = clk + 1
+    }";
     ParseTest::new().expect_unrecognized_token(source);
 }
 
@@ -732,12 +804,14 @@ fn err_empty_integrity_constraints() {
     let source = "
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {
+        main: [clk],
+    }
 
-    integrity_constraints:
+    integrity_constraints {}
         
-    boundary_constraints:
-        enf clk.first = 1";
+    boundary_constraints {
+        enf clk.first = 1
+    }";
     ParseTest::new().expect_unrecognized_token(source);
 }

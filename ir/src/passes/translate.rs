@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use air_parser::ast;
+use air_parser::{ast, LexicalScope};
 use air_pass::Pass;
 
 use miden_diagnostics::{DiagnosticsHandler, Severity, Span, Spanned};
@@ -47,15 +45,15 @@ impl<'p> Pass for AstToAir<'p> {
             builder.build_boundary_constraint(bc)?;
         }
 
-        for bc in integrity_constraints.iter() {
-            builder.build_integrity_constraint(bc)?;
+        for ic in integrity_constraints.iter() {
+            builder.build_integrity_constraint(ic)?;
         }
 
         Ok(air)
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 enum MemoizedBinding {
     /// The binding was reduced to a node in the graph
     Scalar(NodeIndex),
@@ -70,7 +68,7 @@ struct AirBuilder<'a> {
     air: &'a mut Air,
     random_values: Option<ast::RandomValues>,
     trace_columns: Vec<ast::TraceSegment>,
-    bindings: HashMap<Identifier, MemoizedBinding>,
+    bindings: LexicalScope<Identifier, MemoizedBinding>,
 }
 impl<'a> AirBuilder<'a> {
     fn build_boundary_constraint(&mut self, bc: &ast::Statement) -> Result<(), CompileError> {
@@ -98,8 +96,8 @@ impl<'a> AirBuilder<'a> {
         }
     }
 
-    fn build_integrity_constraint(&mut self, bc: &ast::Statement) -> Result<(), CompileError> {
-        match bc {
+    fn build_integrity_constraint(&mut self, ic: &ast::Statement) -> Result<(), CompileError> {
+        match ic {
             ast::Statement::Enforce(ast::ScalarExpr::Binary(ast::BinaryExpr {
                 op: ast::BinaryOp::Eq,
                 ref lhs,
@@ -140,145 +138,13 @@ impl<'a> AirBuilder<'a> {
     where
         F: FnMut(&mut AirBuilder, &ast::Statement) -> Result<(), CompileError>,
     {
-        let prev = self.bindings.clone();
-        match expr.value {
-            ast::Expr::Const(ref constant) => match &constant.item {
-                ast::ConstantExpr::Scalar(value) => {
-                    let value = self.insert_constant(*value);
-                    self.bindings
-                        .insert(expr.name, MemoizedBinding::Scalar(value));
-                }
-                ast::ConstantExpr::Vector(values) => {
-                    let values = self.insert_constants(values.as_slice());
-                    self.bindings
-                        .insert(expr.name, MemoizedBinding::Vector(values));
-                }
-                ast::ConstantExpr::Matrix(values) => {
-                    let values = values
-                        .iter()
-                        .map(|vs| self.insert_constants(vs.as_slice()))
-                        .collect();
-                    self.bindings
-                        .insert(expr.name, MemoizedBinding::Matrix(values));
-                }
-            },
-            ast::Expr::Range(ref values) => {
-                let values = values
-                    .item
-                    .clone()
-                    .map(|v| self.insert_constant(v as u64))
-                    .collect();
-                self.bindings
-                    .insert(expr.name, MemoizedBinding::Vector(values));
-            }
-            ast::Expr::Vector(ref values) => match values[0].ty().unwrap() {
-                ast::Type::Felt => {
-                    let mut nodes = vec![];
-                    for value in values.iter().cloned() {
-                        let value = value.try_into().unwrap();
-                        nodes.push(self.insert_scalar_expr(&value));
-                    }
-                    self.bindings
-                        .insert(expr.name, MemoizedBinding::Vector(nodes));
-                }
-                ast::Type::Vector(n) => {
-                    let mut nodes = vec![];
-                    for row in values.iter().cloned() {
-                        match row {
-                            ast::Expr::Const(Span {
-                                item: ast::ConstantExpr::Vector(vs),
-                                ..
-                            }) => {
-                                nodes.push(self.insert_constants(vs.as_slice()));
-                            }
-                            ast::Expr::SymbolAccess(access) => {
-                                let mut cols = vec![];
-                                for i in 0..n {
-                                    let access = ast::ScalarExpr::SymbolAccess(
-                                        access.access(AccessType::Index(i)).unwrap(),
-                                    );
-                                    let node = self.insert_scalar_expr(&access);
-                                    cols.push(node);
-                                }
-                                nodes.push(cols);
-                            }
-                            ast::Expr::Vector(ref elems) => {
-                                let mut cols = vec![];
-                                for elem in elems.iter().cloned() {
-                                    let elem: ast::ScalarExpr = elem.try_into().unwrap();
-                                    let node = self.insert_scalar_expr(&elem);
-                                    cols.push(node);
-                                }
-                                nodes.push(cols);
-                            }
-                            _ => unreachable!(),
-                        }
-                    }
-                    self.bindings
-                        .insert(expr.name, MemoizedBinding::Matrix(nodes));
-                }
-                _ => unreachable!(),
-            },
-            ast::Expr::Matrix(ref values) => {
-                let values = values
-                    .iter()
-                    .map(|vs| vs.iter().map(|v| self.insert_scalar_expr(v)).collect())
-                    .collect();
-                self.bindings
-                    .insert(expr.name, MemoizedBinding::Matrix(values));
-            }
-            ast::Expr::Binary(ref bexpr) => {
-                let value = self.insert_binary_expr(bexpr);
-                self.bindings
-                    .insert(expr.name, MemoizedBinding::Scalar(value));
-            }
-            ast::Expr::SymbolAccess(ref access) => {
-                match self.bindings.get(access.name.as_ref()) {
-                    None => {
-                        // Must be a reference to a declaration
-                        let value = self.insert_symbol_access(access);
-                        self.bindings
-                            .insert(expr.name, MemoizedBinding::Scalar(value));
-                    }
-                    Some(MemoizedBinding::Scalar(node)) => {
-                        assert_eq!(access.access_type, AccessType::Default);
-                        self.bindings
-                            .insert(expr.name, MemoizedBinding::Scalar(*node));
-                    }
-                    Some(MemoizedBinding::Vector(nodes)) => {
-                        let value = match &access.access_type {
-                            AccessType::Default => MemoizedBinding::Vector(nodes.clone()),
-                            AccessType::Index(idx) => MemoizedBinding::Scalar(nodes[*idx]),
-                            AccessType::Slice(range) => {
-                                MemoizedBinding::Vector(nodes[range.start..range.end].to_vec())
-                            }
-                            AccessType::Matrix(_, _) => unreachable!(),
-                        };
-                        self.bindings.insert(expr.name, value);
-                    }
-                    Some(MemoizedBinding::Matrix(nodes)) => {
-                        let value = match &access.access_type {
-                            AccessType::Default => MemoizedBinding::Matrix(nodes.clone()),
-                            AccessType::Index(idx) => MemoizedBinding::Vector(nodes[*idx].clone()),
-                            AccessType::Slice(range) => {
-                                MemoizedBinding::Matrix(nodes[range.start..range.end].to_vec())
-                            }
-                            AccessType::Matrix(row, col) => {
-                                MemoizedBinding::Scalar(nodes[*row][*col])
-                            }
-                        };
-                        self.bindings.insert(expr.name, value);
-                    }
-                }
-            }
-            ast::Expr::Call(_) | ast::Expr::ListComprehension(_) => unreachable!(),
+        let bound = self.eval_expr(&expr.value)?;
+        self.bindings.enter();
+        self.bindings.insert(expr.name, bound);
+        for stmt in expr.body.iter() {
+            statement_builder(self, stmt)?;
         }
-
-        for statement in expr.body.iter() {
-            statement_builder(self, statement)?;
-        }
-
-        self.bindings = prev;
+        self.bindings.exit();
         Ok(())
     }
 
@@ -326,7 +192,7 @@ impl<'a> AirBuilder<'a> {
 
         let lhs = self.insert_op(Operation::Value(Value::TraceAccess(trace_access)));
         // Insert the right-hand expression into the graph
-        let rhs = self.insert_scalar_expr(rhs);
+        let rhs = self.insert_scalar_expr(rhs)?;
         // Compare the inferred trace segment and domain of the operands
         let domain = access.boundary.into();
         {
@@ -372,9 +238,12 @@ impl<'a> AirBuilder<'a> {
         rhs: &ast::ScalarExpr,
         condition: Option<&ast::ScalarExpr>,
     ) -> Result<(), CompileError> {
-        let lhs = self.insert_scalar_expr(lhs);
-        let rhs = self.insert_scalar_expr(rhs);
-        let condition = condition.as_ref().map(|cond| self.insert_scalar_expr(cond));
+        let lhs = self.insert_scalar_expr(lhs)?;
+        let rhs = self.insert_scalar_expr(rhs)?;
+        let condition = match condition {
+            Some(cond) => Some(self.insert_scalar_expr(cond)?),
+            None => None,
+        };
         let root = self.merge_equal_exprs(lhs, rhs, condition);
         // Get the trace segment and domain of the constraint.
         //
@@ -405,34 +274,213 @@ impl<'a> AirBuilder<'a> {
         }
     }
 
-    fn insert_scalar_expr(&mut self, expr: &ast::ScalarExpr) -> NodeIndex {
+    fn eval_let_expr(&mut self, expr: &ast::Let) -> Result<MemoizedBinding, CompileError> {
+        let mut next_let = Some(expr);
+        let snapshot = self.bindings.clone();
+        loop {
+            let let_expr = next_let.take().expect("invalid empty let body");
+            let bound = self.eval_expr(&let_expr.value)?;
+            self.bindings.enter();
+            self.bindings.insert(let_expr.name, bound);
+            match let_expr.body.last().unwrap() {
+                ast::Statement::Let(ref inner_let) => {
+                    next_let = Some(inner_let);
+                }
+                ast::Statement::Expr(ref expr) => {
+                    let value = self.eval_expr(expr);
+                    self.bindings = snapshot;
+                    break value;
+                }
+                ast::Statement::Enforce(_)
+                | ast::Statement::EnforceIf(_, _)
+                | ast::Statement::EnforceAll(_) => {
+                    unreachable!()
+                }
+            }
+        }
+    }
+
+    fn eval_expr(&mut self, expr: &ast::Expr) -> Result<MemoizedBinding, CompileError> {
+        match expr {
+            ast::Expr::Const(ref constant) => match &constant.item {
+                ast::ConstantExpr::Scalar(value) => {
+                    let value = self.insert_constant(*value);
+                    Ok(MemoizedBinding::Scalar(value))
+                }
+                ast::ConstantExpr::Vector(values) => {
+                    let values = self.insert_constants(values.as_slice());
+                    Ok(MemoizedBinding::Vector(values))
+                }
+                ast::ConstantExpr::Matrix(values) => {
+                    let values = values
+                        .iter()
+                        .map(|vs| self.insert_constants(vs.as_slice()))
+                        .collect();
+                    Ok(MemoizedBinding::Matrix(values))
+                }
+            },
+            ast::Expr::Range(ref values) => {
+                let values = values
+                    .to_slice_range()
+                    .map(|v| self.insert_constant(v as u64))
+                    .collect();
+                Ok(MemoizedBinding::Vector(values))
+            }
+            ast::Expr::Vector(ref values) => match values[0].ty().unwrap() {
+                ast::Type::Felt => {
+                    let mut nodes = vec![];
+                    for value in values.iter().cloned() {
+                        let value = value.try_into().unwrap();
+                        nodes.push(self.insert_scalar_expr(&value)?);
+                    }
+                    Ok(MemoizedBinding::Vector(nodes))
+                }
+                ast::Type::Vector(n) => {
+                    let mut nodes = vec![];
+                    for row in values.iter().cloned() {
+                        match row {
+                            ast::Expr::Const(Span {
+                                item: ast::ConstantExpr::Vector(vs),
+                                ..
+                            }) => {
+                                nodes.push(self.insert_constants(vs.as_slice()));
+                            }
+                            ast::Expr::SymbolAccess(access) => {
+                                let mut cols = vec![];
+                                for i in 0..n {
+                                    let access = ast::ScalarExpr::SymbolAccess(
+                                        access.access(AccessType::Index(i)).unwrap(),
+                                    );
+                                    let node = self.insert_scalar_expr(&access)?;
+                                    cols.push(node);
+                                }
+                                nodes.push(cols);
+                            }
+                            ast::Expr::Vector(ref elems) => {
+                                let mut cols = vec![];
+                                for elem in elems.iter().cloned() {
+                                    let elem: ast::ScalarExpr = elem.try_into().unwrap();
+                                    let node = self.insert_scalar_expr(&elem)?;
+                                    cols.push(node);
+                                }
+                                nodes.push(cols);
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    Ok(MemoizedBinding::Matrix(nodes))
+                }
+                _ => unreachable!(),
+            },
+            ast::Expr::Matrix(ref values) => {
+                let mut rows = Vec::with_capacity(values.len());
+                for vs in values.iter() {
+                    let mut cols = Vec::with_capacity(vs.len());
+                    for value in vs {
+                        cols.push(self.insert_scalar_expr(value)?);
+                    }
+                    rows.push(cols);
+                }
+                Ok(MemoizedBinding::Matrix(rows))
+            }
+            ast::Expr::Binary(ref bexpr) => {
+                let value = self.insert_binary_expr(bexpr)?;
+                Ok(MemoizedBinding::Scalar(value))
+            }
+            ast::Expr::SymbolAccess(ref access) => {
+                match self.bindings.get(access.name.as_ref()) {
+                    None => {
+                        // Must be a reference to a declaration
+                        let value = self.insert_symbol_access(access);
+                        Ok(MemoizedBinding::Scalar(value))
+                    }
+                    Some(MemoizedBinding::Scalar(node)) => {
+                        assert_eq!(access.access_type, AccessType::Default);
+                        Ok(MemoizedBinding::Scalar(*node))
+                    }
+                    Some(MemoizedBinding::Vector(nodes)) => {
+                        let value = match &access.access_type {
+                            AccessType::Default => MemoizedBinding::Vector(nodes.clone()),
+                            AccessType::Index(idx) => MemoizedBinding::Scalar(nodes[*idx]),
+                            AccessType::Slice(range) => {
+                                MemoizedBinding::Vector(nodes[range.to_slice_range()].to_vec())
+                            }
+                            AccessType::Matrix(_, _) => unreachable!(),
+                        };
+                        Ok(value)
+                    }
+                    Some(MemoizedBinding::Matrix(nodes)) => {
+                        let value = match &access.access_type {
+                            AccessType::Default => MemoizedBinding::Matrix(nodes.clone()),
+                            AccessType::Index(idx) => MemoizedBinding::Vector(nodes[*idx].clone()),
+                            AccessType::Slice(range) => {
+                                MemoizedBinding::Matrix(nodes[range.to_slice_range()].to_vec())
+                            }
+                            AccessType::Matrix(row, col) => {
+                                MemoizedBinding::Scalar(nodes[*row][*col])
+                            }
+                        };
+                        Ok(value)
+                    }
+                }
+            }
+            ast::Expr::Let(ref let_expr) => self.eval_let_expr(let_expr),
+            // These node types should not exist at this point
+            ast::Expr::Call(_) | ast::Expr::ListComprehension(_) => unreachable!(),
+        }
+    }
+
+    fn insert_scalar_expr(&mut self, expr: &ast::ScalarExpr) -> Result<NodeIndex, CompileError> {
         match expr {
             ast::ScalarExpr::Const(value) => {
-                self.insert_op(Operation::Value(Value::Constant(value.item)))
+                Ok(self.insert_op(Operation::Value(Value::Constant(value.item))))
             }
-            ast::ScalarExpr::SymbolAccess(access) => self.insert_symbol_access(access),
+            ast::ScalarExpr::SymbolAccess(access) => Ok(self.insert_symbol_access(access)),
             ast::ScalarExpr::Binary(expr) => self.insert_binary_expr(expr),
+            ast::ScalarExpr::Let(ref let_expr) => match self.eval_let_expr(let_expr)? {
+                MemoizedBinding::Scalar(node) => Ok(node),
+                invalid => {
+                    panic!("expected scalar expression to produce scalar value, got: {invalid:?}")
+                }
+            },
             ast::ScalarExpr::Call(_) | ast::ScalarExpr::BoundedSymbolAccess(_) => unreachable!(),
         }
     }
 
-    fn insert_binary_expr(&mut self, expr: &ast::BinaryExpr) -> NodeIndex {
+    // Use square and multiply algorithm to expand the exp into a series of multiplications
+    fn expand_exp(&mut self, lhs: NodeIndex, rhs: u64) -> NodeIndex {
+        match rhs {
+            0 => self.insert_constant(1),
+            1 => lhs,
+            n if n % 2 == 0 => {
+                let square = self.insert_op(Operation::Mul(lhs, lhs));
+                self.expand_exp(square, n / 2)
+            }
+            n => {
+                let square = self.insert_op(Operation::Mul(lhs, lhs));
+                let rec = self.expand_exp(square, (n - 1) / 2);
+                self.insert_op(Operation::Mul(lhs, rec))
+            }
+        }
+    }
+
+    fn insert_binary_expr(&mut self, expr: &ast::BinaryExpr) -> Result<NodeIndex, CompileError> {
         if expr.op == ast::BinaryOp::Exp {
-            let lhs = self.insert_scalar_expr(expr.lhs.as_ref());
+            let lhs = self.insert_scalar_expr(expr.lhs.as_ref())?;
             let ast::ScalarExpr::Const(rhs) = expr.rhs.as_ref() else {
                 unreachable!();
             };
-            return self.insert_op(Operation::Exp(lhs, rhs.item as usize));
+            return Ok(self.expand_exp(lhs, rhs.item));
         }
 
-        let lhs = self.insert_scalar_expr(expr.lhs.as_ref());
-        let rhs = self.insert_scalar_expr(expr.rhs.as_ref());
-        match expr.op {
+        let lhs = self.insert_scalar_expr(expr.lhs.as_ref())?;
+        let rhs = self.insert_scalar_expr(expr.rhs.as_ref())?;
+        Ok(match expr.op {
             ast::BinaryOp::Add => self.insert_op(Operation::Add(lhs, rhs)),
             ast::BinaryOp::Sub => self.insert_op(Operation::Sub(lhs, rhs)),
             ast::BinaryOp::Mul => self.insert_op(Operation::Mul(lhs, rhs)),
             _ => unreachable!(),
-        }
+        })
     }
 
     fn insert_symbol_access(&mut self, access: &ast::SymbolAccess) -> NodeIndex {

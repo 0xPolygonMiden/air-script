@@ -3,16 +3,18 @@ use super::{expect_valid_tokenization, Symbol, Token};
 #[test]
 fn random_values_empty_list() {
     let source = "
-random_values:
-    rand: []";
+random_values {
+    rand: []
+}";
 
     let tokens = vec![
         Token::RandomValues,
-        Token::Colon,
+        Token::LBrace,
         Token::Ident(Symbol::intern("rand")),
         Token::Colon,
         Token::LBracket,
         Token::RBracket,
+        Token::RBrace,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -20,17 +22,19 @@ random_values:
 #[test]
 fn random_values_fixed_list() {
     let source = "
-random_values:
-    rand: [15]";
+random_values {
+    rand: [15]
+}";
 
     let tokens = vec![
         Token::RandomValues,
-        Token::Colon,
+        Token::LBrace,
         Token::Ident(Symbol::intern("rand")),
         Token::Colon,
         Token::LBracket,
         Token::Num(15),
         Token::RBracket,
+        Token::RBrace,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -38,12 +42,13 @@ random_values:
 #[test]
 fn random_values_ident_vector() {
     let source = "
-random_values:
-    rand: [a, b[12], c]";
+random_values {
+    rand: [a, b[12], c]
+}";
 
     let tokens = vec![
         Token::RandomValues,
-        Token::Colon,
+        Token::LBrace,
         Token::Ident(Symbol::intern("rand")),
         Token::Colon,
         Token::LBracket,
@@ -56,6 +61,7 @@ random_values:
         Token::Comma,
         Token::Ident(Symbol::intern("c")),
         Token::RBracket,
+        Token::RBrace,
     ];
     expect_valid_tokenization(source, tokens);
 }
@@ -63,12 +69,13 @@ random_values:
 #[test]
 fn random_values_index_access() {
     let source = "
-    integrity_constraints:
-        enf a + $alphas[1] = 0";
+    integrity_constraints {
+        enf a + $alphas[1] = 0
+    }";
 
     let tokens = vec![
         Token::IntegrityConstraints,
-        Token::Colon,
+        Token::LBrace,
         Token::Enf,
         Token::Ident(Symbol::intern("a")),
         Token::Plus,
@@ -78,6 +85,7 @@ fn random_values_index_access() {
         Token::RBracket,
         Token::Equal,
         Token::Num(0),
+        Token::RBrace,
     ];
     expect_valid_tokenization(source, tokens);
 }

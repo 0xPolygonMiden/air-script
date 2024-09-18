@@ -11,24 +11,27 @@ use utils::{codegen, test_code, to_stack_order, Data};
 static ARITH_AIR: &str = "
 def SimpleArithmetic
 
-trace_columns:
-    main: [a, b]
+trace_columns {
+    main: [a, b],
+}
 
-public_inputs:
-    stack_inputs: [16]
+public_inputs {
+    stack_inputs: [16],
+}
 
-boundary_constraints:
-    enf a.first = 0
+boundary_constraints {
+    enf a.first = 0;
+}
 
-integrity_constraints:
-    enf a + a = 0
-    enf a - a = 0
-    enf a * a = 0
+integrity_constraints {
+    enf a + a = 0;
+    enf a - a = 0;
+    enf a * a = 0;
 
-    enf b + a = 0
-    enf b - a = 0
-    enf b * a = 0
-";
+    enf b + a = 0;
+    enf b - a = 0;
+    enf b * a = 0;
+}";
 
 #[test]
 fn test_simple_arithmetic() {
@@ -100,22 +103,25 @@ fn test_simple_arithmetic() {
 static EXP_AIR: &str = "
 def Exp
 
-trace_columns:
-    main: [a, b]
+trace_columns {
+    main: [a, b],
+}
 
-public_inputs:
-    stack_inputs: [16]
+public_inputs {
+    stack_inputs: [16],
+}
 
-boundary_constraints:
-    enf a.first = 0
+boundary_constraints {
+    enf a.first = 0;
+}
 
-integrity_constraints:
-    enf b^1 = 0
-    enf b^2 = 0
-    enf b^3 = 0
-    enf b^4 = 0
-    enf b^5 = 0
-";
+integrity_constraints {
+    enf b^1 = 0;
+    enf b^2 = 0;
+    enf b^3 = 0;
+    enf b^4 = 0;
+    enf b^5 = 0;
+}";
 
 #[test]
 fn test_exp() {
@@ -186,18 +192,21 @@ fn test_exp() {
 static LONG_TRACE: &str = "
 def LongTrace
 
-trace_columns:
-    main: [a, b, c, d, e, f, g, h, i]
+trace_columns {
+    main: [a, b, c, d, e, f, g, h, i],
+}
 
-public_inputs:
-    stack_inputs: [16]
+public_inputs {
+    stack_inputs: [16],
+}
 
-boundary_constraints:
-    enf a.first = 0
+boundary_constraints {
+    enf a.first = 0;
+}
 
-integrity_constraints:
-    enf a * b * c + d - e = 0
-";
+integrity_constraints {
+    enf a * b * c + d - e = 0;
+}";
 
 #[test]
 fn test_long_trace() {
@@ -265,18 +274,21 @@ fn test_long_trace() {
 static VECTOR: &str = "
 def Vector
 
-trace_columns:
-    main: [clk, fmp[2]]
+trace_columns {
+    main: [clk, fmp[2]],
+}
 
-public_inputs:
-    stack_inputs: [16]
+public_inputs {
+    stack_inputs: [16],
+}
 
-boundary_constraints:
-    enf clk.first = 0
+boundary_constraints {
+    enf clk.first = 0;
+}
 
-integrity_constraints:
-    enf clk - fmp[0] + fmp[1] = 0
-";
+integrity_constraints {
+    enf clk - fmp[0] + fmp[1] = 0;
+}";
 
 #[test]
 fn test_vector() {
@@ -342,19 +354,22 @@ fn test_vector() {
 static MULTIPLE_ROWS_AIR: &str = "
 def MultipleRows
 
-trace_columns:
-    main: [a, b]
+trace_columns {
+    main: [a, b],
+}
 
-public_inputs:
-    stack_inputs: [16]
+public_inputs {
+    stack_inputs: [16],
+}
 
-boundary_constraints:
-    enf a.first = 0
+boundary_constraints {
+    enf a.first = 0;
+}
 
-integrity_constraints:
-    enf a' = a * 2
-    enf b' = a + b
-";
+integrity_constraints {
+    enf a' = a * 2;
+    enf b' = a + b;
+}";
 
 #[test]
 fn test_multiple_rows() {

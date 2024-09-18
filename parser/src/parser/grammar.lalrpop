@@ -75,6 +75,7 @@ Declaration: Declaration = {
     PeriodicColumns => Declaration::PeriodicColumns(<>),
     RandomValues => Declaration::RandomValues(<>),
     EvaluatorFunction => Declaration::EvaluatorFunction(<>),
+    Function => Declaration::Function(<>),
     <l:@L> <trace:Trace> <r:@R> => Declaration::Trace(Span::new(span!(l, r), trace)),
     <PublicInputs> => Declaration::PublicInputs(<>),
     <BoundaryConstraints> => Declaration::BoundaryConstraints(<>),
@@ -82,8 +83,8 @@ Declaration: Declaration = {
 }
 
 Import: Span<Import> = {
-    <l:@L> "use" <module:Identifier> "::" "*" <r:@R> => Span::new(span!(l, r), Import::All { module: Identifier::new(span!(l, r), module.name()) }),
-    <l:@L> "use" <module:Identifier> "::" <item:Identifier> <r:@R> => {
+    <l:@L> "use" <module:Identifier> "::" "*" ";" <r:@R> => Span::new(span!(l, r), Import::All { module: Identifier::new(span!(l, r), module.name()) }),
+    <l:@L> "use" <module:Identifier> "::" <item:Identifier> ";" <r:@R> => {
         let mut items: HashSet<Identifier> = HashSet::default();
         items.insert(item);
         Span::new(span!(l, r), Import::Partial { module, items })
@@ -94,7 +95,7 @@ Import: Span<Import> = {
 // ================================================================================================
 
 Trace: Vec<TraceSegment> = {
-    <l:@L> "trace_columns" ":" <main: MainTraceBindings?> <aux: AuxTraceBindings?> <r:@R> =>?
+    <l:@L> "trace_columns" "{" <main: MainTraceBindings?> <aux: AuxTraceBindings?> "}" <r:@R> =>?
         match (main, aux) {
             (Some(main), Some(aux)) => Ok(vec![main, aux]),
             (Some(main), None) => Ok(vec![main]),
@@ -124,12 +125,12 @@ AuxSegmentId: Identifier = {
 }
 
 MainTraceBindings: TraceSegment = {
-    <l:@L> <name:MainSegmentId> ":" <bindings: Vector<TraceBinding>> <r:@R> =>
+    <l:@L> <name:MainSegmentId> ":" <bindings: Vector<TraceBinding>> "," <r:@R> =>
         TraceSegment::new(span!(l, r), 0, name, bindings),
 }
 
 AuxTraceBindings: TraceSegment = {
-    <l:@L> <name:AuxSegmentId> ":" <bindings: Vector<TraceBinding>> <r:@R> =>
+    <l:@L> <name:AuxSegmentId> ":" <bindings: Vector<TraceBinding>> "," <r:@R> =>
         TraceSegment::new(span!(l, r), 1, name, bindings),
 }
 
@@ -142,7 +143,7 @@ TraceBinding: Span<(Identifier, usize)> = {
 // ================================================================================================
 
 Constant: Constant = {
-    <l:@L> "const" <name: Identifier> "=" <value: ConstExpr> <r:@R>
+    <l:@L> "const" <name: Identifier> "=" <value: ConstExpr> ";" <r:@R>
         => Constant::new(span!(l, r), name, value),
 }
 
@@ -157,11 +158,11 @@ ConstExpr: ConstantExpr = {
 
 // At least one public input is required.
 PublicInputs: Span<Vec<PublicInput>> = {
-    <l:@L> "public_inputs" ":" <inputs:PublicInput+> <r:@R> => Span::new(span!(l, r), inputs)
+    <l:@L> "public_inputs" "{" <inputs:PublicInput+> "}" <r:@R> => Span::new(span!(l, r), inputs)
 }
 
 PublicInput: PublicInput = {
-    <l:@L> <name: Identifier> ":" <size: Size> <r:@R>
+    <l:@L> <name: Identifier> ":" <size: Size> "," <r:@R>
         => PublicInput::new(span!(l, r), name, size),
 }
 
@@ -170,12 +171,12 @@ PublicInput: PublicInput = {
 
 // Periodic columns are not required, and there is no limit to the number that can be provided.
 PeriodicColumns: Span<Vec<PeriodicColumn>> = {
-    <l:@L> "periodic_columns" ":" <columns:PeriodicColumn*> <r:@R>
+    <l:@L> "periodic_columns" "{" <columns:PeriodicColumn*> "}" <r:@R>
         => Span::new(span!(l, r), columns)
 }
 
 PeriodicColumn: PeriodicColumn = {
-    <l:@L> <name: Identifier> ":" <values: Vector<Num_u64>> <r:@R>
+    <l:@L> <name: Identifier> ":" <values: Vector<Num_u64>> "," <r:@R>
         => PeriodicColumn::new(span!(l, r), name, values),
 }
 
@@ -183,7 +184,7 @@ PeriodicColumn: PeriodicColumn = {
 // ================================================================================================
 
 RandomValues: RandomValues = {
-    "random_values" ":" <random_values: RandValuesDef> <l:@L> <extra: RandValuesDef*> <r:@R> =>? {
+    "random_values" "{" <random_values: RandValuesDef> <l:@L> <extra: RandValuesDef*> "}" <r:@R> =>? {
         if !extra.is_empty() {
             diagnostics.diagnostic(Severity::Warning)
                 .with_message("only one declaration may appear in random_values")
@@ -195,18 +196,18 @@ RandomValues: RandomValues = {
 }
 
 RandValuesDef: RandomValues = {
-    <l:@L> <name: Identifier> ":" <size: Size> <r:@R> => {
+    <l:@L> <name: Identifier> ":" <size: Size> "," <r:@R> => {
         let name = Identifier::new(name.span(), Symbol::intern(format!("${}", &name)));
         RandomValues::with_size(span!(l, r), name, size as usize)
     },
-    <l:@L> <ignored: Identifier> ":" "[" "]" <r:@R> =>? {
+    <l:@L> <ignored: Identifier> ":" "[" "]" "," <r:@R> =>? {
         diagnostics.diagnostic(Severity::Error)
             .with_message("random values cannot be empty")
             .with_primary_label(span!(l, r), "invalid declaration occurs here")
             .emit();
         Err(ParseError::Failed.into())
     },
-    <l:@L> <name: Identifier> ":" <bindings: Vector<RandBinding>> <r:@R> => {
+    <l:@L> <name: Identifier> ":" <bindings: Vector<RandBinding>> "," <r:@R> => {
         let name = Identifier::new(name.span(), Symbol::intern(format!("${}", &name)));
         RandomValues::new(span!(l, r), name, bindings)
     },
@@ -221,7 +222,7 @@ RandBinding: Span<(Identifier, usize)> = {
 // ================================================================================================
 
 EvaluatorFunction: EvaluatorFunction = {
-    <l:@L> "ev" <name: FunctionIdentifier> "(" <params: EvaluatorBindings> ")" ":" <body: StatementBlock> <r:@R>
+    <l:@L> "ev" <name: FunctionIdentifier> "(" <params: EvaluatorBindings> ")" "{" <body: StatementBlock> "}" <r:@R>
         => EvaluatorFunction::new(span!(l, r), name, params, body)
 }
 
@@ -256,11 +257,46 @@ EvaluatorSegmentBindings: (SourceSpan, Vec<Span<(Identifier, usize)>>) = {
     <l:@L> "[" "]" <r:@R> => (span!(l, r), vec![]),
 }
 
+// FUNCTIONS
+// ================================================================================================
+
+Function: Function = {
+    <l:@L> "fn" <name: FunctionIdentifier> "(" <params: FunctionBindings> ")" "->" <ty: FunctionBindingType> "{" <body: FunctionBody> "}" <r:@R>
+        => Function::new(span!(l, r), name, params, ty, body)
+}
+
+FunctionBindings: Vec<(Identifier, Type)> = {
+    <l:@L> <params: Comma<FunctionBinding>> <r:@R> => params,
+}
+
+FunctionBinding: (Identifier, Type) = {
+    <name: Identifier> ":" <ty: FunctionBindingType> => (name, ty),
+}
+
+FunctionBindingType: Type = {
+    <l:@L> "felt" <r:@R> => Type::Felt,
+    <l:@L> "felt" <size: Size> <r:@R> => Type::Vector(size as usize),
+    <l:@L> "felt" "[" <row_size: Num_u64> "," <col_size: Num_u64> "]" <r:@R> => Type::Matrix(row_size as usize, col_size as usize),
+}
+
+FunctionBody: Vec<Statement> = {
+    <l:@L> <stmts: StatementBlock> <r:@R> =>? {
+        if stmts.len() > 1 {
+            diagnostics.diagnostic(Severity::Error)
+            .with_message("invalid function definition")
+            .with_primary_label(span!(l, r), "function should have 0 or more let statements followed by a return statement.")
+            .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(stmts)
+    },
+}
+
 // BOUNDARY CONSTRAINTS
 // ================================================================================================
 
 BoundaryConstraints: Span<Vec<Statement>> = {
-    <l:@L> "boundary_constraints" ":" <body: StatementBlock> <r:@R> => Span::new(span!(l, r), body),
+    <l:@L> "boundary_constraints" "{" <body: StatementBlock> "}" <r:@R> => Span::new(span!(l, r), body),
 }
 
 Boundary: Boundary = {
@@ -272,7 +308,7 @@ Boundary: Boundary = {
 // ================================================================================================
 
 IntegrityConstraints: Span<Vec<Statement>> = {
-    <l:@L> "integrity_constraints" ":" <body: StatementBlock> <r:@R>
+    <l:@L> "integrity_constraints" "{" <body: StatementBlock> "}" <r:@R>
         => Span::new(span!(l, r), body)
 }
 
@@ -287,10 +323,11 @@ StatementBlock: Vec<Statement> = {
         stmts
     },
     <ConstraintStatements>,
+    <ReturnStatement> => vec![Statement::Expr(<>)],
 }
 
 Let: Let = {
-    <l:@L> "let" <name: Identifier> "=" <value: Expr> <r:@R> <body: StatementBlock>
+    <l:@L> "let" <name: Identifier> "=" <value: Expr> ";" <r:@R> <body: StatementBlock>
         => Let::new(span!(l, r), name, value, body)
 }
 
@@ -301,16 +338,20 @@ ConstraintStatements: Vec<Statement> = {
 }
 
 ConstraintStatement: Vec<Statement> = {
-    "enf" "match" ":" <MatchArm+> => <>,
-    "enf" <ConstraintExpr> => vec![<>],
+    "enf" "match" "{" <MatchArm+> "}" ";" => <>,
+    "enf" <ConstraintExpr> ";" => vec![<>],
+}
+
+ReturnStatement: Expr = {
+    <l:@L> "return" <expr: Expr> ";" <r:@R> => expr,
 }
 
 MatchArm: Statement = {
-    <l:@L> "case" <selector:ScalarExpr> ":" <constraint:ScalarConstraintExpr> <r:@R> => {
+    <l:@L> "case" <selector:ScalarExpr> ":" <constraint:ScalarConstraintExpr> "," <r:@R> => {
         let generated_name = format!("%{}", *next_var);
         *next_var += 1;
         let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
-        let context = vec![(generated_binding, Expr::Range(Span::new(SourceSpan::UNKNOWN, 0..1)))];
+        let context = vec![(generated_binding, Expr::Range(RangeExpr::from(0..1)))];
         Statement::EnforceAll(ListComprehension::new(span!(l, r), constraint, context, Some(selector)))
     }
 }
@@ -355,7 +396,7 @@ ConstraintExpr: Statement = {
                 let generated_name = format!("%{}", *next_var);
                 *next_var += 1;
                 let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
-                let context = vec![(generated_binding, Expr::Range(Span::new(SourceSpan::UNKNOWN, 0..1)))];
+                let context = vec![(generated_binding, Expr::Range(RangeExpr::from(0..1)))];
                 Statement::EnforceAll(ListComprehension::new(span!(l, r), expr, context, selector))
             } else {
                 Statement::Enforce(expr)
@@ -514,12 +555,22 @@ Iterables: Vec<Expr> = {
 
 Iterable: Expr = {
     <ident: Identifier> => Expr::SymbolAccess(SymbolAccess::new(ident.span(), ident, AccessType::Default, 0)),
-    <l:@L> <range: Range> <r:@R> => Expr::Range(Span::new(span!(l, r), range)),
+    <range: Range> => Expr::Range(range),
     <l:@L> <ident: Identifier> "[" <range: Range> "]" <r:@R> => Expr::SymbolAccess(SymbolAccess::new(span!(l, r), ident, AccessType::Slice(range), 0)),
+    <l:@L> <function_call: FunctionCall> <r:@R> => if let ScalarExpr::Call(call) = function_call {
+        Expr::Call(call)
+    } else {
+        unreachable!()
+    }
 }
 
-Range: Range = {
-    <start: Num_u64> ".." <end: Num_u64> => Range { start: start as usize, end: end as usize }
+Range: RangeExpr = {
+    <l:@L> <start: RangeBound> ".." <end: RangeBound> <r:@R> => RangeExpr { span: span!(l, r), start, end }
+}
+
+RangeBound: RangeBound = {
+    <l:@L> <value:Num_u64> <r:@R> => RangeBound::Const(Span::new(span!(l, r), value as usize)),
+    <l:@L> <name:Identifier> <r:@R> => RangeBound::SymbolAccess(ConstSymbolAccess::new(span!(l, r), name)),
 }
 
 // ATOMS
@@ -532,6 +583,15 @@ Vector<T>: Vec<T> = {
 Matrix<T>: Vec<Vec<T>> = {
     Vector<Vector<T>>,
 }
+
+Tuple<T>: Vec<T> = {
+    "(" <v1:T> "," <v2:T> <v:("," <T>)*> ")" => {
+        let mut v = v;
+        v.insert(0, v2);
+        v.insert(0, v1);
+        v
+    }
+};
 
 Size: u64 = {
     "[" <Num_u64> "]" => <>
@@ -591,10 +651,13 @@ extern {
         "last" => Token::Last,
         "integrity_constraints" => Token::IntegrityConstraints,
         "ev" => Token::Ev,
+        "fn" => Token::Fn,
         "enf" => Token::Enf,
+        "return" => Token::Return,
         "match" => Token::Match,
         "case" => Token::Case,
         "when" => Token::When,
+        "felt" => Token::Felt,
         "'" => Token::Quote,
         "=" => Token::Equal,
         "+" => Token::Plus,
@@ -611,7 +674,11 @@ extern {
         "]" => Token::RBracket,
         "(" => Token::LParen,
         ")" => Token::RParen,
+        "{" => Token::LBrace,
+        "}" => Token::RBrace,
         "." => Token::Dot,
         ".." => Token::DotDot,
+        "->" => Token::Arrow,
+        ";" => Token::SemiColon,
     }
 }

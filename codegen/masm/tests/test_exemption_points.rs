@@ -11,18 +11,21 @@ use utils::{codegen, test_code, to_stack_order, Data};
 static SIMPLE_AIR: &str = "
 def Simple
 
-trace_columns:
-    main: [a]
+trace_columns {
+    main: [a],
+}
 
-public_inputs:
-    stack_inputs: [16]
+public_inputs {
+    stack_inputs: [16],
+}
 
-boundary_constraints:
-    enf a.first = 0
+boundary_constraints {
+    enf a.first = 0;
+}
 
-integrity_constraints:
-    enf a + a = 0
-";
+integrity_constraints {
+    enf a + a = 0;
+}";
 
 #[test]
 fn test_exemption_points() {

@@ -16,13 +16,6 @@ pub enum Operation {
     Sub(NodeIndex, NodeIndex),
     /// Evaluates by multiplication over two operands (given as nodes in the graph)
     Mul(NodeIndex, NodeIndex),
-    /// Evaluates by exponentiation over two operands (the first given as a node
-    /// in the graph, the second as a constant).
-    ///
-    /// NOTE: The exponent _must_ be a constant value currently. In the future,
-    /// it may be possible to support non-constant exponents, but it is not
-    /// supported at this time.
-    Exp(NodeIndex, usize),
 }
 impl Operation {
     /// Corresponds to the binding power of this [Operation]

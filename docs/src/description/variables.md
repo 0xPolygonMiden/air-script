@@ -8,30 +8,35 @@ In AirScript, variables can be declared in `boundary_constraints` and `integrity
 ```
 def VariablesExample
 
-const A = 1
-const B = 2
+const A = 1;
+const B = 2;
 
-trace_columns:
-    main: [a, b, c, d]
-    aux: [e, f]
+trace_columns {
+    main: [a, b, c, d],
+    aux: [e, f],
+}
 
-public_inputs:
-    stack_inputs: [16]
+public_inputs {
+    stack_inputs: [16],
+}
 
-random_values:
-    rand: [16]
+random_values {
+    rand: [16],
+}
 
-boundary_constraints:
-    let x = stack_inputs[0] + stack_inputs[1]   
-    let y = [$rand[0], $rand[1]]  
-    enf e.first = x + y[0] + y[1]
+boundary_constraints {
+    let x = stack_inputs[0] + stack_inputs[1]   ;
+    let y = [$rand[0], $rand[1]]  ;
+    enf e.first = x + y[0] + y[1];
+}
 
-integrity_constraints:
+integrity_constraints {
     let z = [
         [a + b, c + d],
         [A * a, B * b]
-    ]
-    enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1]
+    ];
+    enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1];
+}
 ```
 
 ### Syntax restriction for local variables
@@ -43,13 +48,14 @@ Currently, it is not possible to:
 
     ```
     ...
-    boundary_constraints:
-        let a = [[1,2], [3,4]]  # <-- this is allowed
-        let b = [1, 2]
-        let c = [a[1], b]  # <-- this is allowed
-        let d = [b, [3, 4]]  # <-- this is not allowed, because `d` consists of array `[3, 4]` and reference to array `b`
+    boundary_constraints {
+        let a = [[1,2], [3,4]];  # <-- this is allowed
+        let b = [1, 2];
+        let c = [a[1], b];  # <-- this is allowed
+        let d = [b, [3, 4]];  # <-- this is not allowed, because `d` consists of array `[3, 4]` and reference to array `b`
         enf ...
     ...
+    }
     ```
 2. Create variables with list comprehension for which the source array is a inlined vector, a matrix row, or a range in matrix row.
 
@@ -57,15 +63,16 @@ Currently, it is not possible to:
 
     ```
     ...
-    integrity_constraints:
-        let a = [[1, 2], [3, 4]]
-        let b = [5, 6]
-        let c = 7
-        let d = [e for e in [8, 9, 10]]  # <-- source array is an inlined vector
-        let f = [g for g in a[1]]  # <-- source is a matrix row
-        let h = [i for i in a[0][0..2]]  # <-- source is a range in matrix row
+    integrity_constraints {
+        let a = [[1, 2], [3, 4]];
+        let b = [5, 6];
+        let c = 7;
+        let d = [e for e in [8, 9, 10]];  # <-- source array is an inlined vector
+        let f = [g for g in a[1]];  # <-- source is a matrix row
+        let h = [i for i in a[0][0..2]];  # <-- source is a range in matrix row
         enf ...
     ...
+    }
     ```
 
 ## Built-in variables

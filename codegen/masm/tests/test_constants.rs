@@ -11,26 +11,29 @@ use utils::{codegen, test_code, to_stack_order, Data};
 static CONSTANTS_AIR: &str = "
 def ConstantsAir
 
-const A = 2
-const B = [3, 5]
-const C = [[7, 11], [13, 17]]
+const A = 2;
+const B = [3, 5];
+const C = [[7, 11], [13, 17]];
 
-trace_columns:
-    main: [a, b, c]
+trace_columns {
+    main: [a, b, c],
+}
 
-public_inputs:
-    stack_inputs: [16]
+public_inputs {
+    stack_inputs: [16],
+}
 
-boundary_constraints:
-    enf a.first = A
-    enf b.first = A + B[0] * C[0][1]
-    enf c.last = A - B[1] * C[0][0]
+boundary_constraints {
+    enf a.first = A;
+    enf b.first = A + B[0] * C[0][1];
+    enf c.last = A - B[1] * C[0][0];
+}
 
-integrity_constraints:
-    enf a' = a + A
-    enf b' = B[0] * b
-    enf c' = (C[0][0] + B[0]) * c
-";
+integrity_constraints {
+    enf a' = a + A;
+    enf b' = B[0] * b;
+    enf c' = (C[0][0] + B[0]) * c;
+}";
 const A: QuadExtension<Felt> = QuadExtension::new(Felt::new(2), Felt::ZERO);
 const B_0: QuadExtension<Felt> = QuadExtension::new(Felt::new(3), Felt::ZERO);
 const C_0_0: QuadExtension<Felt> = QuadExtension::new(Felt::new(7), Felt::ZERO);
@@ -63,7 +66,7 @@ fn test_constants() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 3]),
+                data: to_stack_order(&[one; 3]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },

@@ -11,23 +11,26 @@ use utils::{codegen, test_code, to_stack_order, Data};
 static SIMPLE_BOUNDARY_AIR: &str = "
 def SimpleBoundary
 
-trace_columns:
-    main: [a, b, len]
+trace_columns {
+    main: [a, b, len],
+}
 
-public_inputs:
-    target: [1]
+public_inputs {
+    target: [1],
+}
 
-boundary_constraints:
-    enf a.first = 1
-    enf b.first = 1
+boundary_constraints {
+    enf a.first = 1;
+    enf b.first = 1;
 
-    enf len.first = 0
-    enf len.last = target[0]
+    enf len.first = 0;
+    enf len.last = target[0];
+}
 
-integrity_constraints:
-    enf a' = a + b
-    enf b' = a
-";
+integrity_constraints {
+    enf a' = a + b;
+    enf b' = a;
+}";
 
 #[test]
 fn test_simple_boundary() {
@@ -35,18 +38,18 @@ fn test_simple_boundary() {
 
     let trace_len = 32u64;
     let one = QuadExtension::ONE;
-    let z = one.clone();
+    let z = one;
     let a = QuadExtension::new(Felt::new(514229), Felt::ZERO);
     let b = QuadExtension::new(Felt::new(317811), Felt::ZERO);
     let len = QuadExtension::new(Felt::new(27), Felt::ZERO);
     let a_prime = QuadExtension::new(Felt::new(514229 + 317811), Felt::ZERO);
-    let b_prime = a.clone();
+    let b_prime = a;
 
     let code = test_code(
         code,
         vec![
             Data {
-                data: to_stack_order(&[a, a_prime, b, b_prime, len.clone(), len.clone()]),
+                data: to_stack_order(&[a, a_prime, b, b_prime, len, len]),
                 address: constants::OOD_FRAME_ADDRESS,
                 descriptor: "main_trace",
             },
@@ -104,39 +107,43 @@ fn test_simple_boundary() {
 static COMPLEX_BOUNDARY_AIR: &str = "
 def ComplexBoundary
 
-const A = 1
-const B = [0, 1]
-const C = [[1, 2], [2, 0]]
+const A = 1;
+const B = [0, 1];
+const C = [[1, 2], [2, 0]];
 
-trace_columns:
-    main: [a, b, c, d, e[2]]
-    aux: [f]
+trace_columns {
+    main: [a, b, c, d, e[2]],
+    aux: [f],
+}
 
-public_inputs:
-    stack_inputs: [2]
-    stack_outputs: [2]
+public_inputs {
+    stack_inputs: [2],
+    stack_outputs: [2],
+}
 
-random_values:
-    rand: [2]
+random_values {
+    rand: [2],
+}
 
-boundary_constraints:
-    enf a.first = stack_inputs[0]
-    enf b.first = stack_inputs[1]
-    enf a.last = stack_outputs[0]
-    enf b.last = stack_outputs[1]
+boundary_constraints {
+    enf a.first = stack_inputs[0];
+    enf b.first = stack_inputs[1];
+    enf a.last = stack_outputs[0];
+    enf b.last = stack_outputs[1];
 
-    enf c.first = (B[0] - C[1][1]) * A
-    enf d.first = 1
+    enf c.first = (B[0] - C[1][1]) * A;
+    enf d.first = 1;
 
-    enf e[0].first = 0
-    enf e[1].first = 1
+    enf e[0].first = 0;
+    enf e[1].first = 1;
 
-    enf f.first = $rand[0]
-    enf f.last = 1
+    enf f.first = $rand[0];
+    enf f.last = 1;
+}
 
-integrity_constraints:
-    enf a + b = 0
-";
+integrity_constraints {
+    enf a + b = 0;
+}";
 
 #[test]
 fn test_complex_boundary() {
@@ -144,7 +151,7 @@ fn test_complex_boundary() {
 
     let trace_len = 32u64;
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
-    let z = one.clone();
+    let z = one;
 
     let public_inputs = [
         // stack_inputs

@@ -4,9 +4,9 @@ Evaluators are sets of constraints logically grouped together. The primary purpo
 ## Defining evaluators
 An evaluator consists of a declaration which specifies evaluator metadata and a body which contains descriptions of integrity constraints.
 
-Evaluator declaration starts with the `ev` keyword, followed by the name of the evaluator, parameter declarations, and a semicolon. For example:
+Evaluator declaration starts with the `ev` keyword, followed by the name of the evaluator, parameter declarations, and a code block surrounded by braces. For example:
 ```
-ev foo([a, b, c], [p]):
+ev foo([a, b, c], [p]) {}
 ```
 Evaluator name must:
 - Be a string consisting of alpha-numeric characters and underscores.
@@ -17,17 +17,18 @@ Evaluator parameters define an evaluator's view into the execution trace. Specif
 
 If an evaluator needs to access only the main trace segment, we can omit the parameters for the auxiliary trace segment. For example:
 ```
-ev bar([a, b, c]):
+ev bar([a, b, c]) {}
 ```
 If, however, an evaluator needs to access only the auxiliary trace segments, we must define the main trace segment parameters as an empty set like so:
 ```
-ev baz([], [p]):
+ev baz([], [p]) {}
 ```
 
 An evaluator body must contain at least one integrity constraint. For example:
 ```
-ev foo([a, b]):
+ev foo([a, b]) {
     enf a' = a + b
+}
 ```
 In general, an evaluator body may contain any set of expressions allowed in the [integrity constraints](./constraints.md#integrity-constraints-integrity_constraints) section subject to the following caveats:
 
@@ -40,70 +41,86 @@ Evaluators can be declared anywhere in a module, but usually are declared toward
 ## Using evaluators
 An evaluator defined in a module or [imported](./organization.md#importing-evaluators) from a different module can be invoked via the `enf` keyword. For example (public inputs and boundary constraints omitted for brevity):
 ```
-trace_columns:
-    main: [a, b]
+trace_columns {
+    main: [a, b],
+}
 
-integrity_constraints:
-    enf foo([a, b])
+integrity_constraints {
+    enf foo([a, b]);
+}
 
-ev foo([x, y]):
-    enf x' = x + y
+ev foo([x, y]) {
+    enf x' = x + y;
+}
 ```
 In the above example, evaluator `foo` is invoked using trace columns `a` and `b`, but notice that within the evaluator we refer to these columns by different names (specifically, `x` and `y` respectively). The above example is equivalent to:
 ```
-trace_columns:
-    main: [a, b]
+trace_columns {
+    main: [a, b],
+}
 
-integrity_constraints:
-    enf a' = a + b
+integrity_constraints {
+    enf a' = a + b;
+}
 ```
 That is, we can think of evaluators as being *inlined* at their call sites.
 
 Evaluators can be invoked multiple times. For example:
 ```
-trace_columns:
-    main: [a, b, c]
+trace_columns {
+    main: [a, b, c],
+}
 
-integrity_constraints:
-    enf foo([a, b])
-    enf foo([c, a])
+integrity_constraints {
+    enf foo([a, b]);
+    enf foo([c, a]);
+}
 
-ev foo([x, y]):
-    enf x' = x + y
+ev foo([x, y]) {
+    enf x' = x + y;
+}
 ```
 This is equivalent to:
 ```
-trace_columns:
-    main: [a, b, c]
+trace_columns {
+    main: [a, b, c],
+}
 
-integrity_constraints:
-    enf a' = a + b
-    enf c' = c + a
+integrity_constraints {
+    enf a' = a + b;
+    enf c' = c + a;
+}
 ```
 Evaluators can also invoke other evaluators. For example:
 ```
-trace_columns:
-    main: [a, b]
+trace_columns {
+    main: [a, b],
+}
 
-integrity_constraints:
-    enf foo([a, b])
+integrity_constraints {
+    enf foo([a, b]);
+}
 
-ev foo([x, y]):
-    enf x' = x + y
-    enf bar([y, x])
+ev foo([x, y]) {
+    enf x' = x + y;
+    enf bar([y, x]);
+}
 
-ev bar([x, y]):
-    enf x' = x * y
+ev bar([x, y]) {
+    enf x' = x * y;
+}
 ```
 The above is equivalent to:
 
 ```
-trace_columns:
-    main: [a, b]
+trace_columns {
+    main: [a, b],
+}
 
-integrity_constraints:
-    enf a' = a + b
-    enf b' = b * a
+integrity_constraints {
+    enf a' = a + b;
+    enf b' = b * a;
+}
 ```
 
 ### Using in conditional constraints

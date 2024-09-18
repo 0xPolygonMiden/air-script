@@ -41,6 +41,10 @@ pub enum Declaration {
     ///
     /// Evaluator functions can be defined in any module of the program
     EvaluatorFunction(EvaluatorFunction),
+    /// A pure function definition
+    ///
+    /// Pure functions can be defined in any module of the program
+    Function(Function),
     /// A `periodic_columns` section declaration
     ///
     /// This may appear any number of times in the program, and may be declared in any module.
@@ -292,15 +296,17 @@ impl PartialEq for PublicInput {
 /// size `15`:
 ///
 /// ```airscript
-/// random_values:
+/// random_values {
 ///     rand: [15]
+/// }
 /// ```
 ///
 /// A `random_values` declaration like the following however:
 ///
 /// ```airscript
-/// random_values:
+/// random_values {
 ///     rand: [a, b[12]]
+/// }
 /// ```
 ///
 /// It is equivalent to creating it with `RandomValues::new`, with two separate bindings,
@@ -430,21 +436,31 @@ impl RandBinding {
 
     /// Derive a new [RandBinding] derived from the current one given an [AccessType]
     pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
+        use super::{RangeBound, RangeExpr};
         match access_type {
             AccessType::Default => Ok(*self),
             AccessType::Slice(_) if self.is_scalar() => Err(InvalidAccessError::SliceOfScalar),
-            AccessType::Slice(range) if range.end > self.size => {
-                Err(InvalidAccessError::IndexOutOfBounds)
-            }
-            AccessType::Slice(range) => {
-                let offset = self.offset + range.start;
-                let size = range.end - range.start;
+            AccessType::Slice(RangeExpr {
+                start: RangeBound::Const(start),
+                end: RangeBound::Const(end),
+                ..
+            }) if start > end => Err(InvalidAccessError::IndexOutOfBounds),
+            AccessType::Slice(RangeExpr {
+                start: RangeBound::Const(start),
+                end: RangeBound::Const(end),
+                ..
+            }) => {
+                let offset = self.offset + start.item;
+                let size = end.item - start.item;
                 Ok(Self {
                     offset,
                     size,
                     ty: Type::Vector(size),
                     ..*self
                 })
+            }
+            AccessType::Slice(_) => {
+                unreachable!("expected non-constant range bounds to have been erased by this point")
             }
             AccessType::Index(_) if self.is_scalar() => Err(InvalidAccessError::IndexIntoScalar),
             AccessType::Index(idx) if idx >= self.size => Err(InvalidAccessError::IndexOutOfBounds),
@@ -521,5 +537,52 @@ impl Eq for EvaluatorFunction {}
 impl PartialEq for EvaluatorFunction {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.params == other.params && self.body == other.body
+    }
+}
+
+/// Functions take a group of expressions as parameters and returns a value.
+///
+/// The result value of a function may be a felt, vector, or a matrix.
+///
+/// NOTE: Functions do not take trace bindings as parameters.
+#[derive(Debug, Clone, Spanned)]
+pub struct Function {
+    #[span]
+    pub span: SourceSpan,
+    pub name: Identifier,
+    pub params: Vec<(Identifier, Type)>,
+    pub return_type: Type,
+    pub body: Vec<Statement>,
+}
+impl Function {
+    /// Creates a new function.
+    pub const fn new(
+        span: SourceSpan,
+        name: Identifier,
+        params: Vec<(Identifier, Type)>,
+        return_type: Type,
+        body: Vec<Statement>,
+    ) -> Self {
+        Self {
+            span,
+            name,
+            params,
+            return_type,
+            body,
+        }
+    }
+
+    pub fn param_types(&self) -> Vec<Type> {
+        self.params.iter().map(|(_, ty)| *ty).collect::<Vec<_>>()
+    }
+}
+
+impl Eq for Function {}
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.params == other.params
+            && self.return_type == other.return_type
+            && self.body == other.body
     }
 }

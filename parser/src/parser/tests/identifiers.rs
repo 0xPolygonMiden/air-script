@@ -11,11 +11,13 @@ fn error_invalid_int() {
         r#"
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {{
+        main: [clk],
+    }}
 
-    integrity_constraints:
+    integrity_constraints {{
         enf clk' = clk + {}
+    }}
     "#,
         num
     );
@@ -48,11 +50,13 @@ fn error_identifier_starting_with_int() {
     let source = r#"
     def test
 
-    trace_columns:
+    trace_columns {
         main: [clk]
+    }
 
-    integrity_constraints:
+    integrity_constraints {
         enf 1clk' = clk + 1
+    }
     "#;
 
     ParseTest::new().expect_unrecognized_token(source);

@@ -3,7 +3,6 @@ use crate::constants::{AUX_TRACE, MAIN_TRACE};
 use crate::error::CodegenError;
 use crate::utils::{
     boundary_group_to_procedure_name, load_quadratic_element, periodic_group_to_memory_offset,
-    quadratic_element_square,
 };
 use crate::visitor::{
     walk_boundary_constraints, walk_integrity_constraints, walk_periodic_columns, AirVisitor,
@@ -902,56 +901,6 @@ impl<'ast> AirVisitor<'ast> for Backend<'ast> {
                 self.visit_node_index(left)?;
                 self.visit_node_index(right)?;
                 self.writer.ext2mul();
-            }
-            Operation::Exp(left, exp) => {
-                // NOTE: The VM doesn't support exponentiation of extension elements.
-                //
-                // Ref: https://github.com/facebook/winterfell/blob/0acb2a148e2e8445d5f6a3511fa9d852e54818dd/math/src/field/traits.rs#L124-L150
-
-                self.visit_node_index(left)?;
-
-                self.writer.header("push the accumulator to the stack");
-                self.writer.push(1);
-                self.writer.movdn(2);
-                self.writer.push(0);
-                self.writer.movdn(2);
-                self.writer.header("=> [b1, b0, r1, r0, ...]");
-
-                // emitted code computes exponentiation via square-and-multiply
-                let mut e: usize = *exp;
-                while e != 0 {
-                    self.writer
-                        .header(format!("square {} times", e.trailing_zeros()));
-                    quadratic_element_square(&mut self.writer, e.trailing_zeros());
-
-                    // account for the exponentiations done above
-                    e = e >> e.trailing_zeros();
-
-                    self.writer.header("multiply");
-                    self.writer.dup(1);
-                    self.writer.dup(1);
-                    self.writer.movdn(5);
-                    self.writer.movdn(5);
-                    self.writer
-                        .header("=> [b1, b0, r1, r0, b1, b0, ...] (4 cycles)");
-
-                    self.writer.ext2mul();
-                    self.writer.movdn(3);
-                    self.writer.movdn(3);
-                    self.writer.header("=> [b1, b0, r1', r0', ...] (5 cycles)");
-
-                    // account for the multiply done above
-                    assert!(
-                        e & 1 == 1,
-                        "this loop is only executed if the number is non-zero"
-                    );
-                    e ^= 1;
-                }
-
-                self.writer.header("clean stack");
-                self.writer.drop();
-                self.writer.drop();
-                self.writer.header("=> [r1, r0, ...] (2 cycles)");
             }
         };
 

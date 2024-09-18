@@ -12,8 +12,9 @@ fn ev_fn_main_cols() {
     let source = "
     mod test
 
-    ev advance_clock([clk]):
-        enf clk' = clk + 1";
+    ev advance_clock([clk]) {
+        enf clk' = clk + 1;
+    }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
     expected.evaluators.insert(
@@ -33,8 +34,9 @@ fn ev_fn_aux_cols() {
     let source = "
     mod test
 
-    ev foo([], [p]):
-        enf p' = p + 1";
+    ev foo([], [p]) {
+        enf p' = p + 1;
+    }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
     expected.evaluators.insert(
@@ -57,10 +59,11 @@ fn ev_fn_main_and_aux_cols() {
     let source = "
     mod test
 
-    ev ev_func([clk], [a, b]):
-        let z = a + b
-        enf clk' = clk + 1
-        enf a' = a + z";
+    ev ev_func([clk], [a, b]) {
+        let z = a + b;
+        enf clk' = clk + 1;
+        enf a' = a + z;
+    }";
 
     let body = vec![let_!(z = expr!(add!(access!(a), access!(b))) =>
             enforce!(eq!(access!(clk, 1), add!(access!(clk), int!(1)))), enforce!(eq!(access!(a, 1), add!(access!(a), access!(z)))))];
@@ -85,17 +88,21 @@ fn ev_fn_call_simple() {
     let source = "
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {
+        main: [clk],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf a.first = 0
+    boundary_constraints {
+        enf a.first = 0;
+    }
 
-    integrity_constraints:
-        enf advance_clock([clk])";
+    integrity_constraints {
+        enf advance_clock([clk]);
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -122,17 +129,21 @@ fn ev_fn_call() {
     let source = "
     def test
 
-    trace_columns:
-        main: [a[2], b[4], c[6]]
+    trace_columns {
+        main: [a[2], b[4], c[6]],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf a.first = 0
+    boundary_constraints {
+        enf a.first = 0;
+    }
 
-    integrity_constraints:
-        enf advance_clock([a, b[1..3], c[2..4]])";
+    integrity_constraints {
+        enf advance_clock([a, b[1..3], c[2..4]]);
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -163,8 +174,9 @@ fn ev_fn_call_inside_ev_fn() {
     let source = "
     mod test
 
-    ev ev_func([clk], [a, b]):
-        enf advance_clock([clk])";
+    ev ev_func([clk], [a, b]) {
+        enf advance_clock([clk]);
+    }";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
     let body = vec![enforce!(call!(advance_clock(vector!(access!(clk)))))];
@@ -189,17 +201,21 @@ fn ev_fn_call_with_more_than_two_args() {
     let source = "
     def test
 
-    trace_columns:
-        main: [a, b, c]
+    trace_columns {
+        main: [a, b, c],
+    }
 
-    public_inputs:
-        inputs: [2]
+    public_inputs {
+        inputs: [2],
+    }
 
-    boundary_constraints:
-        enf a.first = 0
+    boundary_constraints {
+        enf a.first = 0;
+    }
 
-    integrity_constraints:
-        enf advance_clock([a], [b], [c])";
+    integrity_constraints {
+        enf advance_clock([a], [b], [c]);
+    }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
     expected
@@ -233,8 +249,9 @@ fn ev_fn_def_with_empty_final_arg() {
     let source = "
     mod test
 
-    ev ev_func([clk], []):
-        enf clk' = clk + 1";
+    ev ev_func([clk], []) {
+        enf clk' = clk + 1
+    }";
     ParseTest::new().expect_module_diagnostic(source, "the last trace segment cannot be empty");
 }
 
@@ -243,11 +260,13 @@ fn ev_fn_call_with_no_args() {
     let source = "
     def test
 
-    trace_columns:
-        main: [clk]
+    trace_columns {
+        main: [clk],
+    }
 
-    integrity_constraints:
-        enf advance_clock()";
+    integrity_constraints {
+        enf advance_clock()
+    }";
     ParseTest::new().expect_unrecognized_token(source);
 }
 
@@ -255,25 +274,29 @@ fn ev_fn_call_with_no_args() {
 fn ev_fn_with_invalid_params() {
     let source = "
     mod test
-    ev advance_clock():
-        enf clk' = clk + 1";
+    ev advance_clock() {
+        enf clk' = clk + 1
+    }";
     ParseTest::new().expect_unrecognized_token(source);
 
     let source = "
     mod test
-    ev advance_clock([clk] [a, b]):
-        enf clk' = clk + 1";
+    ev advance_clock([clk] [a, b]) {
+        enf clk' = clk + 1
+    }";
     ParseTest::new().expect_unrecognized_token(source);
 
     let source = "
     mod test
-    ev advance_clock(, [a, b]):
-        enf clk' = clk + 1";
+    ev advance_clock(, [a, b]) {
+        enf clk' = clk + 1
+    }";
     ParseTest::new().expect_unrecognized_token(source);
 
     let source = "
     mod test
-    ev advance_clock([clk],):
-        enf clk' = clk + 1";
+    ev advance_clock([clk],) {
+        enf clk' = clk + 1
+    }";
     ParseTest::new().expect_unrecognized_token(source);
 }

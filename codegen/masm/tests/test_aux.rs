@@ -11,25 +11,28 @@ use utils::{codegen, test_code, to_stack_order, Data};
 static SIMPLE_AUX_AIR: &str = "
 def SimpleAux
 
-trace_columns:
-    main: [a]
-    aux: [b]
+trace_columns {
+    main: [a],
+    aux: [b],
+}
 
-public_inputs:
-    stack_inputs: [16]
+public_inputs {
+    stack_inputs: [16],
+}
 
-boundary_constraints:
-    enf a.first = 0
+boundary_constraints {
+    enf a.first = 0;
+}
 
-integrity_constraints:
-    enf a + a = 0
-    enf a - a = 0
-    enf a * a = 0
+integrity_constraints {
+    enf a + a = 0;
+    enf a - a = 0;
+    enf a * a = 0;
 
-    enf b + a = 0
-    enf b - a = 0
-    enf b * a = 0
-";
+    enf b + a = 0;
+    enf b - a = 0;
+    enf b * a = 0;
+}";
 
 #[test]
 fn test_simple_aux() {
@@ -37,7 +40,7 @@ fn test_simple_aux() {
 
     let trace_len = 2u64.pow(4);
     let one = QuadExtension::new(Felt::new(1), Felt::ZERO);
-    let z = one.clone();
+    let z = one;
     let a = QuadExtension::new(Felt::new(3), Felt::ZERO);
     let b = QuadExtension::new(Felt::new(7), Felt::ZERO);
     let a_prime = a;
@@ -57,7 +60,7 @@ fn test_simple_aux() {
                 descriptor: "aux_trace",
             },
             Data {
-                data: to_stack_order(&vec![one; 6]),
+                data: to_stack_order(&[one; 6]),
                 address: constants::COMPOSITION_COEF_ADDRESS,
                 descriptor: "composition_coefficients",
             },
