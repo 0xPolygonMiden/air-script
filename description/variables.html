@@ -183,34 +183,34 @@
 <p>In AirScript, variables can be declared in <code>boundary_constraints</code> and <code>integrity_constraints</code> sections and can contain any expression that would be valid within that source section. Variables can be of type scalar, vector or matrix. In the example below, <code>x</code> is a variable of type <code>scalar</code>, <code>y</code> is a variable of type <code>vector</code> and <code>z</code> is a variable of type <code>matrix</code>.</p>
 <pre><code>def VariablesExample
 
-const A = 1
-const B = 2
+const A = 1;
+const B = 2;
 
 trace_columns {
-    main: [a, b, c, d]
-    aux: [e, f]
+    main: [a, b, c, d],
+    aux: [e, f],
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16],
 }
 
 random_values {
-    rand: [16]
+    rand: [16],
 }
 
 boundary_constraints {
-    let x = stack_inputs[0] + stack_inputs[1]   
-    let y = [$rand[0], $rand[1]]  
-    enf e.first = x + y[0] + y[1]
+    let x = stack_inputs[0] + stack_inputs[1]   ;
+    let y = [$rand[0], $rand[1]]  ;
+    enf e.first = x + y[0] + y[1];
 }
 
 integrity_constraints {
     let z = [
         [a + b, c + d],
         [A * a, B * b]
-    ]
-    enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1]
+    ];
+    enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1];
 }
 </code></pre>
 <h3 id="syntax-restriction-for-local-variables"><a class="header" href="#syntax-restriction-for-local-variables">Syntax restriction for local variables</a></h3>
@@ -221,10 +221,10 @@ integrity_constraints {
 <p>Example:</p>
 <pre><code>...
 boundary_constraints {
-    let a = [[1,2], [3,4]]  # &lt;-- this is allowed
-    let b = [1, 2]
-    let c = [a[1], b]  # &lt;-- this is allowed
-    let d = [b, [3, 4]]  # &lt;-- this is not allowed, because `d` consists of array `[3, 4]` and reference to array `b`
+    let a = [[1,2], [3,4]];  # &lt;-- this is allowed
+    let b = [1, 2];
+    let c = [a[1], b];  # &lt;-- this is allowed
+    let d = [b, [3, 4]];  # &lt;-- this is not allowed, because `d` consists of array `[3, 4]` and reference to array `b`
     enf ...
 ...
 }
@@ -235,12 +235,12 @@ boundary_constraints {
 <p>Example:</p>
 <pre><code>...
 integrity_constraints {
-    let a = [[1, 2], [3, 4]]
-    let b = [5, 6]
-    let c = 7
-    let d = [e for e in [8, 9, 10]]  # &lt;-- source array is an inlined vector
-    let f = [g for g in a[1]]  # &lt;-- source is a matrix row
-    let h = [i for i in a[0][0..2]]  # &lt;-- source is a range in matrix row
+    let a = [[1, 2], [3, 4]];
+    let b = [5, 6];
+    let c = 7;
+    let d = [e for e in [8, 9, 10]];  # &lt;-- source array is an inlined vector
+    let f = [g for g in a[1]];  # &lt;-- source is a matrix row
+    let h = [i for i in a[0][0..2]];  # &lt;-- source is a range in matrix row
     enf ...
 ...
 }

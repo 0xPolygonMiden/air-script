@@ -184,7 +184,8 @@
 <li><code>:</code> is used as a delimiter when declaring <a href="./organization.html#source-sections">source sections</a> and <a href="./declarations.html">types</a></li>
 <li><code>.</code> is used to access a boundary on a trace column, e.g. <code>a.first</code> or <code>a.last</code></li>
 <li><code>[</code> and <code>]</code> are used for defining arrays in <a href="./declarations.html">type declarations</a> and for indexing in <a href="./constraints.html">constraint descriptions</a></li>
-<li><code>,</code> is used as a delimiter for defining arrays in <a href="./declarations.html">type declarations</a></li>
+<li><code>,</code> is used as a delimiter for defining arrays in <a href="./declarations.html">type declarations</a>, as well as a separator in when declaring <a href="./organization.html#source-sections">source sections</a></li>
+<li><code>;</code> is used as a statement terminator in <a href="./constraints.html">constraint descriptions</a> and <a href="./variables.html">variable declarations</a></li>
 <li><code>$</code> is used to access random values or built-in variables by their identifier. For example, the column at index <code>i</code> in the main execution trace can be accessed by <code>$main[i]</code>.</li>
 </ul>
 <h2 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h2>
@@ -228,17 +229,17 @@
 </ul>
 <p>Here is an example of usage of first and last boundaries and a public input within a boundary constraint:</p>
 <pre><code>trace_columns {
-    main: [a]
+    main: [a],
 }
 
 public_inputs {
-    stack_inputs: [4]
-    stack_outputs: [4]
+    stack_inputs: [4],
+    stack_outputs: [4],
 }
 
 boundary_constraints {
-    enf a.first = stack_inputs[0]
-    enf a.last = stack_outputs[0]
+    enf a.first = stack_inputs[0];
+    enf a.last = stack_outputs[0];
 }
 </code></pre>
 <h3 id="integrity-constraints"><a class="header" href="#integrity-constraints"><a href="./constraints.html#integrity_constraints">Integrity constraints</a></a></h3>
@@ -248,12 +249,12 @@ boundary_constraints {
 </ul>
 <p>Here is an example of usage of the Next Row operator within an integrity constraint:</p>
 <pre><code>trace_columns {
-  main: [a]
-  aux: [p]
+  main: [a],
+  aux: [p],
 }
 
 integrity_constraints {
-  enf p' = p * a
+  enf p' = p * a;
 }
 </code></pre>
 

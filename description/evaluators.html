@@ -212,77 +212,77 @@
 <h2 id="using-evaluators"><a class="header" href="#using-evaluators">Using evaluators</a></h2>
 <p>An evaluator defined in a module or <a href="./organization.html#importing-evaluators">imported</a> from a different module can be invoked via the <code>enf</code> keyword. For example (public inputs and boundary constraints omitted for brevity):</p>
 <pre><code>trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf foo([a, b])
+    enf foo([a, b]);
 }
 
 ev foo([x, y]) {
-    enf x' = x + y
+    enf x' = x + y;
 }
 </code></pre>
 <p>In the above example, evaluator <code>foo</code> is invoked using trace columns <code>a</code> and <code>b</code>, but notice that within the evaluator we refer to these columns by different names (specifically, <code>x</code> and <code>y</code> respectively). The above example is equivalent to:</p>
 <pre><code>trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf a' = a + b
+    enf a' = a + b;
 }
 </code></pre>
 <p>That is, we can think of evaluators as being <em>inlined</em> at their call sites.</p>
 <p>Evaluators can be invoked multiple times. For example:</p>
 <pre><code>trace_columns {
-    main: [a, b, c]
+    main: [a, b, c],
 }
 
 integrity_constraints {
-    enf foo([a, b])
-    enf foo([c, a])
+    enf foo([a, b]);
+    enf foo([c, a]);
 }
 
 ev foo([x, y]) {
-    enf x' = x + y
+    enf x' = x + y;
 }
 </code></pre>
 <p>This is equivalent to:</p>
 <pre><code>trace_columns {
-    main: [a, b, c]
+    main: [a, b, c],
 }
 
 integrity_constraints {
-    enf a' = a + b
-    enf c' = c + a
+    enf a' = a + b;
+    enf c' = c + a;
 }
 </code></pre>
 <p>Evaluators can also invoke other evaluators. For example:</p>
 <pre><code>trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf foo([a, b])
+    enf foo([a, b]);
 }
 
 ev foo([x, y]) {
-    enf x' = x + y
-    enf bar([y, x])
+    enf x' = x + y;
+    enf bar([y, x]);
 }
 
 ev bar([x, y]) {
-    enf x' = x * y
+    enf x' = x * y;
 }
 </code></pre>
 <p>The above is equivalent to:</p>
 <pre><code>trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf a' = a + b
-    enf b' = b * a
+    enf a' = a + b;
+    enf b' = b * a;
 }
 </code></pre>
 <h3 id="using-in-conditional-constraints"><a class="header" href="#using-in-conditional-constraints">Using in conditional constraints</a></h3>

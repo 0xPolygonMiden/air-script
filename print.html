@@ -185,16 +185,16 @@
 <p>AirScript includes the following features:</p>
 <ul>
 <li>
-<p><strong>Trace Columns</strong>: Users can declare trace columns for main and auxiliary traces as individual columns or groups of columns (e.g. <code>main: [a, b, c[3], d]</code> where <code>a</code>, <code>b</code>, and <code>d</code> are single columns and <code>c</code> refers to a group of 3 columns)</p>
+<p><strong>Trace Columns</strong>: Users can declare trace columns for main and auxiliary traces as individual columns or groups of columns (e.g. <code>main: [a, b, c[3], d],</code> where <code>a</code>, <code>b</code>, and <code>d</code> are single columns and <code>c</code> refers to a group of 3 columns)</p>
 </li>
 <li>
-<p><strong>Public Inputs</strong>: Users can declare public inputs where each public input is a named vector (e.g. <code>stack_inputs: [16]</code>)</p>
+<p><strong>Public Inputs</strong>: Users can declare public inputs where each public input is a named vector (e.g. <code>stack_inputs: [16],</code>)</p>
 </li>
 <li>
-<p><strong>Periodic Columns</strong>: Users can declare periodic columns (e.g. <code>k0: [1, 0, 0, 0]</code>)</p>
+<p><strong>Periodic Columns</strong>: Users can declare periodic columns (e.g. <code>k0: [1, 0, 0, 0],</code>)</p>
 </li>
 <li>
-<p><strong>Random Values</strong>: Users can define random values provided by the verifier (e.g. <code>alphas: [x, y[14], z]</code> or <code>rand: [16]</code>)</p>
+<p><strong>Random Values</strong>: Users can define random values provided by the verifier (e.g. <code>alphas: [x, y[14], z],</code> or <code>rand: [16],</code>)</p>
 </li>
 <li>
 <p><strong>Boundary Constraints</strong>: Users can enforce boundary constraints on main and auxiliary trace columns using public inputs, random values, constants and variables.</p>
@@ -204,10 +204,10 @@
 </li>
 <li>
 <p><strong>Constants</strong>: Users can declare module level constants. Constants can be scalars, vectors or matrices.
-(e.g. <code>const A = 123</code>, <code>const B = [1, 2, 3]</code>, <code>const C = [[1, 2, 3], [4, 5, 6]]</code>)</p>
+(e.g. <code>const A = 123;</code>, <code>const B = [1, 2, 3];</code>, <code>const C = [[1, 2, 3], [4, 5, 6]];</code>)</p>
 </li>
 <li>
-<p><strong>Variables</strong>: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. <code>let x = k * c[1]'</code>, <code>let y = [k * c[1], l * c[2], m * c[3]]</code> or <code>let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]]</code>)</p>
+<p><strong>Variables</strong>: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. <code>let x = k * c[1];'</code>, <code>let y = [k * c[1], l * c[2], m * c[3]];</code> or <code>let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]];</code>)</p>
 </li>
 <li>
 <p><strong>Evaluators</strong>: Users can declare evaluator functions to group multiple related integrity constraints together. Evaluators can be declared locally or imported from other modules. This helps increase modularity and readability of AirScript code.</p>
@@ -215,9 +215,9 @@
 </ul>
 <p>The language also includes some convenience syntax to make writing constraints easier. This includes:</p>
 <ul>
-<li><strong>List comprehension</strong> - e.g., <code>let x = [k * c for (k, c) in (k, c[1..4])]</code>.</li>
-<li><strong>List folding</strong> - e.g., <code>let y = sum([k * c for (k, c) in (k, c[1..4])])</code>.</li>
-<li><strong>Constraint comprehension</strong> - e.g., <code>enf x^2 = x for x in a</code>.</li>
+<li><strong>List comprehension</strong> - e.g., <code>let x = [k * c for (k, c) in (k, c[1..4])];</code>.</li>
+<li><strong>List folding</strong> - e.g., <code>let y = sum([k * c for (k, c) in (k, c[1..4])]);</code>.</li>
+<li><strong>Constraint comprehension</strong> - e.g., <code>enf x^2 = x for x in a;</code>.</li>
 <li><strong>Conditional constraints</strong> - which enable convenient syntax for turning constraints on or off based on selector values.</li>
 </ul>
 <h3 id="cli"><a class="header" href="#cli">CLI</a></h3>
@@ -278,7 +278,8 @@
 <li><code>:</code> is used as a delimiter when declaring <a href="description/./organization.html#source-sections">source sections</a> and <a href="description/./declarations.html">types</a></li>
 <li><code>.</code> is used to access a boundary on a trace column, e.g. <code>a.first</code> or <code>a.last</code></li>
 <li><code>[</code> and <code>]</code> are used for defining arrays in <a href="description/./declarations.html">type declarations</a> and for indexing in <a href="description/./constraints.html">constraint descriptions</a></li>
-<li><code>,</code> is used as a delimiter for defining arrays in <a href="description/./declarations.html">type declarations</a></li>
+<li><code>,</code> is used as a delimiter for defining arrays in <a href="description/./declarations.html">type declarations</a>, as well as a separator in when declaring <a href="description/./organization.html#source-sections">source sections</a></li>
+<li><code>;</code> is used as a statement terminator in <a href="description/./constraints.html">constraint descriptions</a> and <a href="description/./variables.html">variable declarations</a></li>
 <li><code>$</code> is used to access random values or built-in variables by their identifier. For example, the column at index <code>i</code> in the main execution trace can be accessed by <code>$main[i]</code>.</li>
 </ul>
 <h2 id="identifiers"><a class="header" href="#identifiers">Identifiers</a></h2>
@@ -322,17 +323,17 @@
 </ul>
 <p>Here is an example of usage of first and last boundaries and a public input within a boundary constraint:</p>
 <pre><code>trace_columns {
-    main: [a]
+    main: [a],
 }
 
 public_inputs {
-    stack_inputs: [4]
-    stack_outputs: [4]
+    stack_inputs: [4],
+    stack_outputs: [4],
 }
 
 boundary_constraints {
-    enf a.first = stack_inputs[0]
-    enf a.last = stack_outputs[0]
+    enf a.first = stack_inputs[0];
+    enf a.last = stack_outputs[0];
 }
 </code></pre>
 <h3 id="integrity-constraints"><a class="header" href="#integrity-constraints"><a href="description/./constraints.html#integrity_constraints">Integrity constraints</a></a></h3>
@@ -342,12 +343,12 @@ boundary_constraints {
 </ul>
 <p>Here is an example of usage of the Next Row operator within an integrity constraint:</p>
 <pre><code>trace_columns {
-  main: [a]
-  aux: [p]
+  main: [a],
+  aux: [p],
 }
 
 integrity_constraints {
-  enf p' = p * a
+  enf p' = p * a;
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/katex.min.css">
@@ -424,9 +425,9 @@ use my_other_module::baz
 <h2 id="constants-const"><a class="header" href="#constants-const">Constants (<code>const</code>)</a></h2>
 <p>Constants can be optionally declared with the const keyword at the top of an AirScript module just below the declaration of the module name. They can be scalars, vectors or matrices. Constant names must contain only uppercase letters.</p>
 <p>Each constant is defined by an identifier and a value in the following format:</p>
-<pre><code>const FOO = 123
-const BAR = [1, 2, 3]
-const BAZ = [[1, 2, 3], [4, 5, 6]]
+<pre><code>const FOO = 123;
+const BAR = [1, 2, 3];
+const BAZ = [[1, 2, 3], [4, 5, 6]];
 </code></pre>
 <p>In the above example, <code>FOO</code> is a constant of type scalar with value <code>123</code>, BAR is a constant of type vector with value <code>[1, 2, 3]</code>, and BAZ is a constant of type matrix with value <code>[[1, 2, 3], [4, 5, 6]]</code>.</p>
 <h2 id="execution-trace-trace_columns"><a class="header" href="#execution-trace-trace_columns">Execution trace (<code>trace_columns</code>)</a></h2>
@@ -448,9 +449,9 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
 </code></pre>
 <p>The following is an example of a valid <code>public_inputs</code> source section:</p>
 <pre><code>public_inputs {
-    program_hash: [4]
-    stack_inputs: [16]
-    stack_outputs: [16]
+    program_hash: [4],
+    stack_inputs: [16],
+    stack_outputs: [16],
 }
 </code></pre>
 <p>In the above example, the public input <code>program_hash</code> is an array of length <code>4</code>. <code>stack_inputs</code> and <code>stack_outputs</code> are both arrays of length <code>16</code>.</p>
@@ -460,13 +461,13 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
 <p>There is no limit to how many of them can be declared within the <code>periodic_columns</code> section.</p>
 <p><strong>Periodic columns are optional.</strong> It is equally valid to define an empty <code>periodic_columns</code> section or to omit the <code>periodic_columns</code> section declaration entirely.</p>
 <p>Each periodic column is described by an identifier and an array of integers in the following format. These integers are the periodic values.</p>
-<pre><code>identifier: [i, j, k, n]
+<pre><code>identifier: [i, j, k, n],
 </code></pre>
 <p>The length of each of the array must be a power of two which is greater than or equal to <code>2</code>.</p>
 <p>The following is an example of a valid <code>periodic_columns</code> source section:</p>
 <pre><code>periodic_columns {
-    k0: [0, 0, 0, 1]
-    k1: [1, 1, 1, 1, 1, 1, 1, 0]
+    k0: [0, 0, 0, 1],
+    k1: [1, 1, 1, 1, 1, 1, 1, 0],
 }
 </code></pre>
 <p>In the above example, <code>k0</code> declares a periodic column with a cycle of length <code>4</code>, and <code>k1</code> declares a periodic column with a cycle of length <code>8</code>.</p>
@@ -477,13 +478,13 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
 <p><strong>Random values are optional.</strong> However if the section is declared then it cannot be empty and it can only contain a single declaration.</p>
 <p>The following is an example of a valid <code>random_values</code> source section:</p>
 <pre><code>random_values {
-    rand: [4]
+    rand: [4],
 }
 </code></pre>
 <p>In the above example, <code>rand</code> is a random value array of length <code>4</code>. Random values can be accessed using <code>$</code> followed by the name of the array and the index of the value. For example, <code>$rand[2]</code> would refer to the third random value in the array.</p>
 <p>The following is an example of a valid <code>random_values</code> section with named bindings to particular random values and groups of random values:</p>
 <pre><code>random_values {
-    rand: [a, b, c[2]]
+    rand: [a, b, c[2]],
 }
 </code></pre>
 <p>In the above example, <code>rand</code> is a random value array of length <code>4</code> and <code>a</code> and <code>b</code> are individual random value bindings and <code>c</code> is a binding referring to a group of 2 random values. In this case, random values can be accessed similarly (e.g. <code>$rand[2]</code>) or using named bindings (e.g. <code>a</code> or <code>c[0]</code>). Here, <code>$rand[2]</code> and <code>c[0]</code> refer to the same random value.</p>
@@ -607,8 +608,8 @@ integrity_constraints {
 <pre><code>def IntegrityConstraintsExample
 
 trace_columns {
-    main: [a, b]
-    aux: [p]
+    main: [a, b],
+    aux: [p],
 }
 
 public_inputs {
@@ -621,11 +622,11 @@ boundary_constraints {
 
 integrity_constraints {
     # these are main constraints. they both express the same constraint.
-    enf a' = a + 1
-    enf b' - b - 1 = 0
+    enf a' = a + 1;
+    enf b' - b - 1 = 0;
 
     # this is an auxiliary constraint, since it uses an auxiliary trace column.
-    enf p = p' * a
+    enf p = p' * a;
 }
 </code></pre>
 <h3 id="periodic-columns-and-random-values"><a class="header" href="#periodic-columns-and-random-values">Periodic columns and random values</a></h3>
@@ -637,8 +638,8 @@ integrity_constraints {
 <pre><code>def IntegrityConstraintsExample
 
 trace_columns {
-    main: [a, b]
-    aux: [p0, p1]
+    main: [a, b],
+    aux: [p0, p1],
 }
 
 public_inputs {
@@ -646,11 +647,11 @@ public_inputs {
 }
 
 periodic_columns {
-    k: [1, 1, 1, 0]
+    k: [1, 1, 1, 0],
 }
 
 random_values {
-    rand: [16]
+    rand: [16],
 }
 
 boundary_constraints {
@@ -659,14 +660,14 @@ boundary_constraints {
 
 integrity_constraints {
     # this is a main constraint that uses a periodic column.
-    enf a' = k * a
+    enf a' = k * a;
 
     # this is an auxiliary constraint that uses a periodic column.
-    enf p0' = k * p0
+    enf p0' = k * p0;
 
     # these are auxiliary constraints that use random values from the verifier.
-    enf b = a + $rand[0]
-    enf p1 = k * (a + $rand[0]) * (b + $rand[1])
+    enf b = a + $rand[0];
+    enf p1 = k * (a + $rand[0]) * (b + $rand[1]);
 }
 </code></pre>
 <h3 id="intermediate-variables-1"><a class="header" href="#intermediate-variables-1">Intermediate variables</a></h3>
@@ -710,34 +711,34 @@ integrity_constraints {
 <p>In AirScript, variables can be declared in <code>boundary_constraints</code> and <code>integrity_constraints</code> sections and can contain any expression that would be valid within that source section. Variables can be of type scalar, vector or matrix. In the example below, <code>x</code> is a variable of type <code>scalar</code>, <code>y</code> is a variable of type <code>vector</code> and <code>z</code> is a variable of type <code>matrix</code>.</p>
 <pre><code>def VariablesExample
 
-const A = 1
-const B = 2
+const A = 1;
+const B = 2;
 
 trace_columns {
-    main: [a, b, c, d]
-    aux: [e, f]
+    main: [a, b, c, d],
+    aux: [e, f],
 }
 
 public_inputs {
-    stack_inputs: [16]
+    stack_inputs: [16],
 }
 
 random_values {
-    rand: [16]
+    rand: [16],
 }
 
 boundary_constraints {
-    let x = stack_inputs[0] + stack_inputs[1]   
-    let y = [$rand[0], $rand[1]]  
-    enf e.first = x + y[0] + y[1]
+    let x = stack_inputs[0] + stack_inputs[1]   ;
+    let y = [$rand[0], $rand[1]]  ;
+    enf e.first = x + y[0] + y[1];
 }
 
 integrity_constraints {
     let z = [
         [a + b, c + d],
         [A * a, B * b]
-    ]
-    enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1]
+    ];
+    enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1];
 }
 </code></pre>
 <h3 id="syntax-restriction-for-local-variables"><a class="header" href="#syntax-restriction-for-local-variables">Syntax restriction for local variables</a></h3>
@@ -748,10 +749,10 @@ integrity_constraints {
 <p>Example:</p>
 <pre><code>...
 boundary_constraints {
-    let a = [[1,2], [3,4]]  # &lt;-- this is allowed
-    let b = [1, 2]
-    let c = [a[1], b]  # &lt;-- this is allowed
-    let d = [b, [3, 4]]  # &lt;-- this is not allowed, because `d` consists of array `[3, 4]` and reference to array `b`
+    let a = [[1,2], [3,4]];  # &lt;-- this is allowed
+    let b = [1, 2];
+    let c = [a[1], b];  # &lt;-- this is allowed
+    let d = [b, [3, 4]];  # &lt;-- this is not allowed, because `d` consists of array `[3, 4]` and reference to array `b`
     enf ...
 ...
 }
@@ -762,12 +763,12 @@ boundary_constraints {
 <p>Example:</p>
 <pre><code>...
 integrity_constraints {
-    let a = [[1, 2], [3, 4]]
-    let b = [5, 6]
-    let c = 7
-    let d = [e for e in [8, 9, 10]]  # &lt;-- source array is an inlined vector
-    let f = [g for g in a[1]]  # &lt;-- source is a matrix row
-    let h = [i for i in a[0][0..2]]  # &lt;-- source is a range in matrix row
+    let a = [[1, 2], [3, 4]];
+    let b = [5, 6];
+    let c = 7;
+    let d = [e for e in [8, 9, 10]];  # &lt;-- source array is an inlined vector
+    let f = [g for g in a[1]];  # &lt;-- source is a matrix row
+    let h = [i for i in a[0][0..2]];  # &lt;-- source is a range in matrix row
     enf ...
 ...
 }
@@ -820,77 +821,77 @@ integrity_constraints {
 <h2 id="using-evaluators"><a class="header" href="#using-evaluators">Using evaluators</a></h2>
 <p>An evaluator defined in a module or <a href="description/./organization.html#importing-evaluators">imported</a> from a different module can be invoked via the <code>enf</code> keyword. For example (public inputs and boundary constraints omitted for brevity):</p>
 <pre><code>trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf foo([a, b])
+    enf foo([a, b]);
 }
 
 ev foo([x, y]) {
-    enf x' = x + y
+    enf x' = x + y;
 }
 </code></pre>
 <p>In the above example, evaluator <code>foo</code> is invoked using trace columns <code>a</code> and <code>b</code>, but notice that within the evaluator we refer to these columns by different names (specifically, <code>x</code> and <code>y</code> respectively). The above example is equivalent to:</p>
 <pre><code>trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf a' = a + b
+    enf a' = a + b;
 }
 </code></pre>
 <p>That is, we can think of evaluators as being <em>inlined</em> at their call sites.</p>
 <p>Evaluators can be invoked multiple times. For example:</p>
 <pre><code>trace_columns {
-    main: [a, b, c]
+    main: [a, b, c],
 }
 
 integrity_constraints {
-    enf foo([a, b])
-    enf foo([c, a])
+    enf foo([a, b]);
+    enf foo([c, a]);
 }
 
 ev foo([x, y]) {
-    enf x' = x + y
+    enf x' = x + y;
 }
 </code></pre>
 <p>This is equivalent to:</p>
 <pre><code>trace_columns {
-    main: [a, b, c]
+    main: [a, b, c],
 }
 
 integrity_constraints {
-    enf a' = a + b
-    enf c' = c + a
+    enf a' = a + b;
+    enf c' = c + a;
 }
 </code></pre>
 <p>Evaluators can also invoke other evaluators. For example:</p>
 <pre><code>trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf foo([a, b])
+    enf foo([a, b]);
 }
 
 ev foo([x, y]) {
-    enf x' = x + y
-    enf bar([y, x])
+    enf x' = x + y;
+    enf bar([y, x]);
 }
 
 ev bar([x, y]) {
-    enf x' = x * y
+    enf x' = x * y;
 }
 </code></pre>
 <p>The above is equivalent to:</p>
 <pre><code>trace_columns {
-    main: [a, b]
+    main: [a, b],
 }
 
 integrity_constraints {
-    enf a' = a + b
-    enf b' = b * a
+    enf a' = a + b;
+    enf b' = b * a;
 }
 </code></pre>
 <h3 id="using-in-conditional-constraints"><a class="header" href="#using-in-conditional-constraints">Using in conditional constraints</a></h3>
@@ -900,98 +901,102 @@ integrity_constraints {
 <p>To make writing constraints easier, AirScript provides a number of syntactic conveniences. These are described in this section.</p>
 <h2 id="list-comprehension"><a class="header" href="#list-comprehension">List comprehension</a></h2>
 <p>List comprehension provides a simple way to create new vectors. It is similar to the list comprehension syntax in Python. The following examples show how to use list comprehension in AirScript.</p>
-<pre><code>let x = [a * 2 for a in b]
+<pre><code>let x = [a * 2 for a in b];
 </code></pre>
 <p>This will create a new vector with the same length as <code>b</code> and the value of each element will be twice that of the corresponding element in <code>b</code>.</p>
-<pre><code>let x = [a + b for (a, b) in (c, d)]
+<pre><code>let x = [a + b for (a, b) in (c, d)];
 </code></pre>
 <p>This will create a new vector with the same length as <code>c</code> and <code>d</code> and the value of each element will be the sum of the corresponding elements in <code>c</code> and <code>d</code>. This will throw an error if <code>c</code> and <code>d</code> vectors are of unequal lengths.</p>
-<pre><code>let x = [2^i * a for (i, a) in (0..5, b)]
+<pre><code>let x = [2^i * a for (i, a) in (0..5, b)];
 </code></pre>
 <p>Ranges can also be used as iterables, which makes it easy to refer to an element and its index at the same time. This will create a new vector with length 5 and each element will be the corresponding element in <code>b</code> multiplied by 2 raised to the power of the element's index. This will throw an error if <code>b</code> is not of length 5.</p>
-<pre><code>let x = [m + n + o for (m, n, o) in (a, 0..5, c[0..5])]
+<pre><code>const MAX = 5;
+let x = [2^i * a for (i, a) in (0..MAX, b)];
+</code></pre>
+<p>Ranges are defined with each bound being either an integer literal, or a <a href="description/./declarations.html#constants-const">named constant</a> of type scalar.</p>
+<pre><code>let x = [m + n + o for (m, n, o) in (a, 0..5, c[0..5])];
 </code></pre>
 <p>Slices can also be used as iterables. This will create a new vector with length 5 and each element will be the sum of the corresponding elements in <code>a</code>, the range 0 to 5, and the first 5 elements of <code>c</code>. This will throw an error if <code>a</code> is not of length 5 or if <code>c</code> is of length less than 5.</p>
 <h2 id="list-folding"><a class="header" href="#list-folding">List folding</a></h2>
 <p>List folding provides syntactic convenience for folding vectors into expressions. It is similar to the list folding syntax in Python. List folding can be applied to vectors, list comprehension or identifiers referring to vectors and list comprehension. The following examples show how to use list folding in AirScript.</p>
 <pre><code>trace_columns {
-    main: [a[5], b, c]
+    main: [a[5], b, c],
 }
 
 integrity_constraints {
-    let x = sum(a)
-    let y = sum([a[0], a[1], a[2], a[3], a[4]])
-    let z = sum([a * 2 for a in a])
+    let x = sum(a);
+    let y = sum([a[0], a[1], a[2], a[3], a[4]]);
+    let z = sum([a * 2 for a in a]);
 }
 </code></pre>
 <p>In the above, <code>x</code> and <code>y</code> both represent the sum of all trace column values in the trace column group <code>a</code>. <code>z</code> represents the sum of all trace column values in the trace column group <code>a</code> multiplied by <code>2</code>.</p>
 <pre><code>trace_columns {
-    main: [a[5], b, c]
+    main: [a[5], b, c],
 }
 
 integrity_constraints {
-    let x = prod(a)
-    let y = prod([a[0], a[1], a[2], a[3], a[4]])
-    let z = prod([a + 2 for a in a])
+    let x = prod(a);
+    let y = prod([a[0], a[1], a[2], a[3], a[4]]);
+    let z = prod([a + 2 for a in a]);
 }
 </code></pre>
 <p>In the above, <code>x</code> and <code>y</code> both represent the product of all trace column values in the trace column group <code>a</code>. <code>z</code> represents the product of all trace column values in the trace column group <code>a</code> added by <code>2</code>.</p>
 <h2 id="constraint-comprehension"><a class="header" href="#constraint-comprehension">Constraint comprehension</a></h2>
 <p>Constraint comprehension provides a way to enforce the same constraint on multiple values. Conceptually, it is very similar to the list comprehension described above. For example:</p>
 <pre><code>trace_columns {
-    main: [a[5], b, c]
+    main: [a[5], b, c],
 }
 
 integrity_constraints {
-    enf v^2 = v for v in a
+    enf v^2 = v for v in a;
 }
 </code></pre>
 <p>The above will enforce <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.0728em;vertical-align:-0.2587em;"></span><span class="mord"><span class="mord mathnormal">a</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-2.4413em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2587em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">a</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span> constraint for all columns in the trace column group <code>a</code>. Semantically, this is equivalent to:</p>
 <pre><code>trace_columns {
-    main: [a[5], b, c]
+    main: [a[5], b, c],
 }
 
 integrity_constraints {
-    enf a[0]^2 = a[0]
-    enf a[1]^2 = a[1]
-    enf a[2]^2 = a[2]
-    enf a[3]^2 = a[3]
-    enf a[4]^2 = a[4]
+    enf a[0]^2 = a[0];
+    enf a[1]^2 = a[1];
+    enf a[2]^2 = a[2];
+    enf a[3]^2 = a[3];
+    enf a[4]^2 = a[4];
 }
 </code></pre>
 <p>Similar to list comprehension, constraints in constraint comprehension can involve values from multiple lists. For example:</p>
 <pre><code>trace_columns {
-    main: [a[5], b[5]]
+    main: [a[5], b[5]],
 }
 
 integrity_constraints {
-    enf x' = i * y for (x, y, i) in (a, b, 0..5)
+    enf x' = i * y for (x, y, i) in (a, b, 0..5);
 }
 </code></pre>
 <p>The above will enforce that <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.0106em;vertical-align:-0.2587em;"></span><span class="mord"><span class="mord mathnormal">a</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.7519em;"><span style="top:-2.4413em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2587em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6595em;"></span><span class="mord mathnormal">i</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8444em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">b</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span> for <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6986em;vertical-align:-0.0391em;"></span><span class="mord mathnormal">i</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">[</span><span class="mord">0</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">5</span><span class="mclose">)</span></span></span></span>. If the length of either <code>a</code> or <code>b</code> is not 5, this will throw an error.</p>
 <h2 id="conditional-constraints"><a class="header" href="#conditional-constraints">Conditional constraints</a></h2>
 <p>Frequently, we may want to enforce constraints based on some selectors. For example, let's say our trace has 4 columns: <code>a</code>, <code>b</code>, <code>c</code>, and <code>s</code>, and we want to enforce that <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7519em;"></span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7519em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal">a</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal">b</span></span></span></span> when <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">s</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span> and <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7519em;"></span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7519em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.4445em;"></span><span class="mord mathnormal">a</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">c</span></span></span></span> when <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">s</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0</span></span></span></span>. We can write these constraints directly like so:</p>
 <pre><code>trace_columns {
-    main: [a, b, c, s]
+    main: [a, b, c, s],
 }
 
 integrity_constraints {
-    enf s^2 = s
-    enf c' = s * (a + b) + (1 - s) * (a * b)
+    enf s^2 = s;
+    enf c' = s * (a + b) + (1 - s) * (a * b);
 }
 </code></pre>
 <p>Notice that we also need to enforce <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">s</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">s</span></span></span></span> to ensure that column <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">s</span></span></span></span> can contain only binary values.</p>
 <p>While the above approach works, it gets more and more difficult to manage as selectors and constraints get more complicated. To simplify describing constraints for this use case, AirScript introduces <code>enf match</code> statement. The above constraints can be described using <code>enf match</code> statement as follows:</p>
 <pre><code>trace_columns {
-    main: [a, b, c, s]
+    main: [a, b, c, s],
 }
 
 integrity_constraints {
-    enf s^2 = s
+    enf s^2 = s;
     enf match {
         case s: c' = a + b
         case !s: c' = a * c
-    }
+    };
 }
 </code></pre>
 <p>In the above, the syntax of each "option" is <code>case &lt;selector expression&gt;: &lt;constraint&gt;</code>, where selector expression consists of values composed using binary operands and logical operators <code>!</code>, <code>&amp;</code>, and <code>|</code>. AirScript reduces logical operations to their equivalent algebraic operations as follows:</p>
@@ -1002,18 +1007,18 @@ integrity_constraints {
 </ul>
 <p>The example below illustrates how these operators can be used to build more complex selectors:</p>
 <pre><code>trace_columns {
-    main: [a, b, c, s0, s1]
+    main: [a, b, c, s0, s1],
 }
 
 integrity_constraints {
-    enf s0^2 = s0
-    enf s1^2 = s1
+    enf s0^2 = s0;
+    enf s1^2 = s1;
     enf match {
         case s0 &amp; s1:   c' = a + b
         case s0 &amp; !s1:  c' = a * c
         case !s0 &amp; s1:  c' = a - b
         case !s0 &amp; !s1: c' = c
-    }
+    };
 }
 </code></pre>
 <p>AirScript makes the following assumptions about selector expressions, which are not yet enforced by the language:</p>
@@ -1024,23 +1029,23 @@ integrity_constraints {
 <h3 id="conditional-evaluators"><a class="header" href="#conditional-evaluators">Conditional evaluators</a></h3>
 <p>In addition to applying selectors to individual constraints, we can apply them to <a href="description/./evaluators.html">evaluators</a>. For example:</p>
 <pre><code>trace_columns {
-    main: [a, b, c, s]
+    main: [a, b, c, s],
 }
 
 integrity_constraints {
-    enf s^2 = s
+    enf s^2 = s;
     enf match {
         case s: foo([a, b, c])
         case !s: bar([a, b, c])
-    }
+    };
 }
 
 ev foo([a, b, c]) {
-    enf c' = a + b
+    enf c' = a + b;
 }
 
 ev bar([a, b, c]) {
-    enf c' = a * b
+    enf c' = a * b;
 }
 </code></pre>
 <p>The above is equivalent to the first example in this section. However, the real power of combining evaluators and conditional constraints comes from two aspects:</p>
@@ -1050,27 +1055,27 @@ ev bar([a, b, c]) {
 </ol>
 <p>The example below illustrates the latter point.</p>
 <pre><code>trace_columns {
-    main: [a, b, c, s]
+    main: [a, b, c, s],
 }
 
 integrity_constraints {
-    enf s^2 = s
+    enf s^2 = s;
     enf match {
         case s: foo([a, b, c])
         case !s: bar([a, b, c])
-    }
+    };
 }
 
 ev foo([a, b, c]) {
-    enf a' = a * 2
-    enf b' = b + 1
-    enf c' = a + b
+    enf a' = a * 2;
+    enf b' = b + 1;
+    enf c' = a + b;
 }
 
 ev bar([a, b, c]) {
-    enf a' = a + 1
-    enf b' = b * 3
-    enf c' = a * b
+    enf a' = a + 1;
+    enf b' = b * 3;
+    enf c' = a * b;
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/katex.min.css">
@@ -1079,49 +1084,49 @@ ev bar([a, b, c]) {
 <pre><code>def ExampleAir
 
 trace_columns {
-    main: [s, a, b, c]
-    aux: [p]
+    main: [s, a, b, c],
+    aux: [p],
 }
 
 public_inputs {
-    stack_inputs: [16]
-    stack_outputs: [16]
+    stack_inputs: [16],
+    stack_outputs: [16],
 }
 
 periodic_columns {
-    k0: [1, 1, 1, 1, 1, 1, 1, 0]
+    k0: [1, 1, 1, 1, 1, 1, 1, 0],
 }
 
 boundary_constraints {
     # define boundary constraints against the main trace at the first row of the trace.
-    enf a.first = stack_inputs[0]
-    enf b.first = stack_inputs[1]
-    enf c.first = stack_inputs[2]
+    enf a.first = stack_inputs[0];
+    enf b.first = stack_inputs[1];
+    enf c.first = stack_inputs[2];
 
     # define boundary constraints against the main trace at the last row of the trace.
-    enf a.last = stack_outputs[0]
-    enf b.last = stack_outputs[1]
-    enf c.last = stack_outputs[2]
+    enf a.last = stack_outputs[0];
+    enf b.last = stack_outputs[1];
+    enf c.last = stack_outputs[2];
 
     # set the first row of the auxiliary column p to 1
-    enf p.first = 1
+    enf p.first = 1;
 }
 
 integrity_constraints {
     # the selector must be binary.
-    enf s^2 = s
+    enf s^2 = s;
 
     # selector should stay the same for all rows of an 8-row cycle.
-    enf k0 * (s' - s) = 0
+    enf k0 * (s' - s) = 0;
 
     # c = a + b when s = 0.
-    enf (1 - s) * (c - a - b) = 0
+    enf (1 - s) * (c - a - b) = 0;
 
     # c = a * b when s = 1.
-    enf s * (c - a * b) = 0
+    enf s * (c - a * b) = 0;
 
     # the auxiliary column contains the product of values of c offset by a random value.
-    enf p' = p * (c + $rand[0])
+    enf p' = p * (c + $rand[0]);
 }
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/katex.min.css">

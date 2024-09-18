@@ -184,16 +184,16 @@
 <p>AirScript includes the following features:</p>
 <ul>
 <li>
-<p><strong>Trace Columns</strong>: Users can declare trace columns for main and auxiliary traces as individual columns or groups of columns (e.g. <code>main: [a, b, c[3], d]</code> where <code>a</code>, <code>b</code>, and <code>d</code> are single columns and <code>c</code> refers to a group of 3 columns)</p>
+<p><strong>Trace Columns</strong>: Users can declare trace columns for main and auxiliary traces as individual columns or groups of columns (e.g. <code>main: [a, b, c[3], d],</code> where <code>a</code>, <code>b</code>, and <code>d</code> are single columns and <code>c</code> refers to a group of 3 columns)</p>
 </li>
 <li>
-<p><strong>Public Inputs</strong>: Users can declare public inputs where each public input is a named vector (e.g. <code>stack_inputs: [16]</code>)</p>
+<p><strong>Public Inputs</strong>: Users can declare public inputs where each public input is a named vector (e.g. <code>stack_inputs: [16],</code>)</p>
 </li>
 <li>
-<p><strong>Periodic Columns</strong>: Users can declare periodic columns (e.g. <code>k0: [1, 0, 0, 0]</code>)</p>
+<p><strong>Periodic Columns</strong>: Users can declare periodic columns (e.g. <code>k0: [1, 0, 0, 0],</code>)</p>
 </li>
 <li>
-<p><strong>Random Values</strong>: Users can define random values provided by the verifier (e.g. <code>alphas: [x, y[14], z]</code> or <code>rand: [16]</code>)</p>
+<p><strong>Random Values</strong>: Users can define random values provided by the verifier (e.g. <code>alphas: [x, y[14], z],</code> or <code>rand: [16],</code>)</p>
 </li>
 <li>
 <p><strong>Boundary Constraints</strong>: Users can enforce boundary constraints on main and auxiliary trace columns using public inputs, random values, constants and variables.</p>
@@ -203,10 +203,10 @@
 </li>
 <li>
 <p><strong>Constants</strong>: Users can declare module level constants. Constants can be scalars, vectors or matrices.
-(e.g. <code>const A = 123</code>, <code>const B = [1, 2, 3]</code>, <code>const C = [[1, 2, 3], [4, 5, 6]]</code>)</p>
+(e.g. <code>const A = 123;</code>, <code>const B = [1, 2, 3];</code>, <code>const C = [[1, 2, 3], [4, 5, 6]];</code>)</p>
 </li>
 <li>
-<p><strong>Variables</strong>: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. <code>let x = k * c[1]'</code>, <code>let y = [k * c[1], l * c[2], m * c[3]]</code> or <code>let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]]</code>)</p>
+<p><strong>Variables</strong>: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. <code>let x = k * c[1];'</code>, <code>let y = [k * c[1], l * c[2], m * c[3]];</code> or <code>let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]];</code>)</p>
 </li>
 <li>
 <p><strong>Evaluators</strong>: Users can declare evaluator functions to group multiple related integrity constraints together. Evaluators can be declared locally or imported from other modules. This helps increase modularity and readability of AirScript code.</p>
@@ -214,9 +214,9 @@
 </ul>
 <p>The language also includes some convenience syntax to make writing constraints easier. This includes:</p>
 <ul>
-<li><strong>List comprehension</strong> - e.g., <code>let x = [k * c for (k, c) in (k, c[1..4])]</code>.</li>
-<li><strong>List folding</strong> - e.g., <code>let y = sum([k * c for (k, c) in (k, c[1..4])])</code>.</li>
-<li><strong>Constraint comprehension</strong> - e.g., <code>enf x^2 = x for x in a</code>.</li>
+<li><strong>List comprehension</strong> - e.g., <code>let x = [k * c for (k, c) in (k, c[1..4])];</code>.</li>
+<li><strong>List folding</strong> - e.g., <code>let y = sum([k * c for (k, c) in (k, c[1..4])]);</code>.</li>
+<li><strong>Constraint comprehension</strong> - e.g., <code>enf x^2 = x for x in a;</code>.</li>
 <li><strong>Conditional constraints</strong> - which enable convenient syntax for turning constraints on or off based on selector values.</li>
 </ul>
 <h3 id="cli"><a class="header" href="#cli">CLI</a></h3>

@@ -181,9 +181,9 @@
 <h2 id="constants-const"><a class="header" href="#constants-const">Constants (<code>const</code>)</a></h2>
 <p>Constants can be optionally declared with the const keyword at the top of an AirScript module just below the declaration of the module name. They can be scalars, vectors or matrices. Constant names must contain only uppercase letters.</p>
 <p>Each constant is defined by an identifier and a value in the following format:</p>
-<pre><code>const FOO = 123
-const BAR = [1, 2, 3]
-const BAZ = [[1, 2, 3], [4, 5, 6]]
+<pre><code>const FOO = 123;
+const BAR = [1, 2, 3];
+const BAZ = [[1, 2, 3], [4, 5, 6]];
 </code></pre>
 <p>In the above example, <code>FOO</code> is a constant of type scalar with value <code>123</code>, BAR is a constant of type vector with value <code>[1, 2, 3]</code>, and BAZ is a constant of type matrix with value <code>[[1, 2, 3], [4, 5, 6]]</code>.</p>
 <h2 id="execution-trace-trace_columns"><a class="header" href="#execution-trace-trace_columns">Execution trace (<code>trace_columns</code>)</a></h2>
@@ -205,9 +205,9 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
 </code></pre>
 <p>The following is an example of a valid <code>public_inputs</code> source section:</p>
 <pre><code>public_inputs {
-    program_hash: [4]
-    stack_inputs: [16]
-    stack_outputs: [16]
+    program_hash: [4],
+    stack_inputs: [16],
+    stack_outputs: [16],
 }
 </code></pre>
 <p>In the above example, the public input <code>program_hash</code> is an array of length <code>4</code>. <code>stack_inputs</code> and <code>stack_outputs</code> are both arrays of length <code>16</code>.</p>
@@ -217,13 +217,13 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
 <p>There is no limit to how many of them can be declared within the <code>periodic_columns</code> section.</p>
 <p><strong>Periodic columns are optional.</strong> It is equally valid to define an empty <code>periodic_columns</code> section or to omit the <code>periodic_columns</code> section declaration entirely.</p>
 <p>Each periodic column is described by an identifier and an array of integers in the following format. These integers are the periodic values.</p>
-<pre><code>identifier: [i, j, k, n]
+<pre><code>identifier: [i, j, k, n],
 </code></pre>
 <p>The length of each of the array must be a power of two which is greater than or equal to <code>2</code>.</p>
 <p>The following is an example of a valid <code>periodic_columns</code> source section:</p>
 <pre><code>periodic_columns {
-    k0: [0, 0, 0, 1]
-    k1: [1, 1, 1, 1, 1, 1, 1, 0]
+    k0: [0, 0, 0, 1],
+    k1: [1, 1, 1, 1, 1, 1, 1, 0],
 }
 </code></pre>
 <p>In the above example, <code>k0</code> declares a periodic column with a cycle of length <code>4</code>, and <code>k1</code> declares a periodic column with a cycle of length <code>8</code>.</p>
@@ -234,13 +234,13 @@ const BAZ = [[1, 2, 3], [4, 5, 6]]
 <p><strong>Random values are optional.</strong> However if the section is declared then it cannot be empty and it can only contain a single declaration.</p>
 <p>The following is an example of a valid <code>random_values</code> source section:</p>
 <pre><code>random_values {
-    rand: [4]
+    rand: [4],
 }
 </code></pre>
 <p>In the above example, <code>rand</code> is a random value array of length <code>4</code>. Random values can be accessed using <code>$</code> followed by the name of the array and the index of the value. For example, <code>$rand[2]</code> would refer to the third random value in the array.</p>
 <p>The following is an example of a valid <code>random_values</code> section with named bindings to particular random values and groups of random values:</p>
 <pre><code>random_values {
-    rand: [a, b, c[2]]
+    rand: [a, b, c[2]],
 }
 </code></pre>
 <p>In the above example, <code>rand</code> is a random value array of length <code>4</code> and <code>a</code> and <code>b</code> are individual random value bindings and <code>c</code> is a binding referring to a group of 2 random values. In this case, random values can be accessed similarly (e.g. <code>$rand[2]</code>) or using named bindings (e.g. <code>a</code> or <code>c[0]</code>). Here, <code>$rand[2]</code> and <code>c[0]</code> refer to the same random value.</p>
