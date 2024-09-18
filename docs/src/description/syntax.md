@@ -7,7 +7,8 @@ This page specifies the basic syntax and types.
 - `:` is used as a delimiter when declaring [source sections](./organization.md#source-sections) and [types](./declarations.md)
 - `.` is used to access a boundary on a trace column, e.g. `a.first` or `a.last`
 - `[` and `]` are used for defining arrays in [type declarations](./declarations.md) and for indexing in [constraint descriptions](./constraints.md)
-- `,` is used as a delimiter for defining arrays in [type declarations](./declarations.md)
+- `,` is used as a delimiter for defining arrays in [type declarations](./declarations.md), as well as a separator in when declaring [source sections](./organization.md#source-sections)
+- `;` is used as a statement terminator in [constraint descriptions](./constraints.md) and [variable declarations](./variables.md)
 - `$` is used to access random values or built-in variables by their identifier. For example, the column at index `i` in the main execution trace can be accessed by `$main[i]`.
 
 ## Identifiers
@@ -69,17 +70,17 @@ Here is an example of usage of first and last boundaries and a public input with
 
 ```
 trace_columns {
-    main: [a]
+    main: [a],
 }
 
 public_inputs {
-    stack_inputs: [4]
-    stack_outputs: [4]
+    stack_inputs: [4],
+    stack_outputs: [4],
 }
 
 boundary_constraints {
-    enf a.first = stack_inputs[0]
-    enf a.last = stack_outputs[0]
+    enf a.first = stack_inputs[0];
+    enf a.last = stack_outputs[0];
 }
 ```
 
@@ -93,11 +94,11 @@ Here is an example of usage of the Next Row operator within an integrity constra
 
 ```
 trace_columns {
-  main: [a]
-  aux: [p]
+  main: [a],
+  aux: [p],
 }
 
 integrity_constraints {
-  enf p' = p * a
+  enf p' = p * a;
 }
 ```

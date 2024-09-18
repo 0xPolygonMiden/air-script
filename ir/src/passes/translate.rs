@@ -321,8 +321,7 @@ impl<'a> AirBuilder<'a> {
             },
             ast::Expr::Range(ref values) => {
                 let values = values
-                    .item
-                    .clone()
+                    .to_slice_range()
                     .map(|v| self.insert_constant(v as u64))
                     .collect();
                 Ok(MemoizedBinding::Vector(values))
@@ -404,7 +403,7 @@ impl<'a> AirBuilder<'a> {
                             AccessType::Default => MemoizedBinding::Vector(nodes.clone()),
                             AccessType::Index(idx) => MemoizedBinding::Scalar(nodes[*idx]),
                             AccessType::Slice(range) => {
-                                MemoizedBinding::Vector(nodes[range.start..range.end].to_vec())
+                                MemoizedBinding::Vector(nodes[range.to_slice_range()].to_vec())
                             }
                             AccessType::Matrix(_, _) => unreachable!(),
                         };
@@ -415,7 +414,7 @@ impl<'a> AirBuilder<'a> {
                             AccessType::Default => MemoizedBinding::Matrix(nodes.clone()),
                             AccessType::Index(idx) => MemoizedBinding::Vector(nodes[*idx].clone()),
                             AccessType::Slice(range) => {
-                                MemoizedBinding::Matrix(nodes[range.start..range.end].to_vec())
+                                MemoizedBinding::Matrix(nodes[range.to_slice_range()].to_vec())
                             }
                             AccessType::Matrix(row, col) => {
                                 MemoizedBinding::Scalar(nodes[*row][*col])

@@ -44,20 +44,28 @@ impl Type {
             ty if access_type == AccessType::Default => Ok(ty),
             Self::Felt => Err(InvalidAccessError::IndexIntoScalar),
             Self::Vector(len) => match access_type {
-                AccessType::Slice(range) if range.end > len => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
+                AccessType::Slice(range) => {
+                    let slice_range = range.to_slice_range();
+                    if slice_range.end > len {
+                        Err(InvalidAccessError::IndexOutOfBounds)
+                    } else {
+                        Ok(Self::Vector(slice_range.len()))
+                    }
                 }
-                AccessType::Slice(range) => Ok(Self::Vector(range.end - range.start)),
                 AccessType::Index(idx) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 AccessType::Index(_) => Ok(Self::Felt),
                 AccessType::Matrix(_, _) => Err(InvalidAccessError::IndexIntoScalar),
                 _ => unreachable!(),
             },
             Self::Matrix(rows, cols) => match access_type {
-                AccessType::Slice(range) if range.end > rows => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
+                AccessType::Slice(range) => {
+                    let slice_range = range.to_slice_range();
+                    if slice_range.end > rows {
+                        Err(InvalidAccessError::IndexOutOfBounds)
+                    } else {
+                        Ok(Self::Matrix(slice_range.len(), cols))
+                    }
                 }
-                AccessType::Slice(range) => Ok(Self::Matrix(range.end - range.start, cols)),
                 AccessType::Index(idx) if idx >= rows => Err(InvalidAccessError::IndexOutOfBounds),
                 AccessType::Index(_) => Ok(Self::Vector(cols)),
                 AccessType::Matrix(row, col) if row >= rows || col >= cols => {

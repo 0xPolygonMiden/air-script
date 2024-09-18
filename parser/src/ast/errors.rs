@@ -7,6 +7,8 @@ pub enum InvalidExprError {
     InvalidExponent(SourceSpan),
     #[error("expected exponent to be a constant")]
     NonConstantExponent(SourceSpan),
+    #[error("expected constant range expression")]
+    NonConstantRangeExpr(SourceSpan),
     #[error("accessing column boundaries is not allowed here")]
     BoundedSymbolAccess(SourceSpan),
     #[error("expected scalar expression")]
@@ -34,6 +36,14 @@ impl ToDiagnostic for InvalidExprError {
                 .with_notes(vec![
                     "Only constant powers are supported with the exponentiation operator currently"
                         .to_string(),
+                ]),
+            Self::NonConstantRangeExpr(span) => Diagnostic::error()
+                .with_message("invalid expression")
+                .with_labels(vec![
+                    Label::primary(span.source_id(), span).with_message(message)
+                ])
+                .with_notes(vec![
+                    "Range expression must be a constant to do this operation".to_string(),
                 ]),
             Self::InvalidExponent(span)
             | Self::BoundedSymbolAccess(span)

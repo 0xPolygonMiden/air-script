@@ -7,9 +7,9 @@ Constants can be optionally declared with the const keyword at the top of an Air
 Each constant is defined by an identifier and a value in the following format:
 
 ```
-const FOO = 123
-const BAR = [1, 2, 3]
-const BAZ = [[1, 2, 3], [4, 5, 6]]
+const FOO = 123;
+const BAR = [1, 2, 3];
+const BAZ = [[1, 2, 3], [4, 5, 6]];
 ```
 
 In the above example, `FOO` is a constant of type scalar with value `123`, BAR is a constant of type vector with value `[1, 2, 3]`, and BAZ is a constant of type matrix with value `[[1, 2, 3], [4, 5, 6]]`.
@@ -49,9 +49,9 @@ The following is an example of a valid `public_inputs` source section:
 
 ```
 public_inputs {
-    program_hash: [4]
-    stack_inputs: [16]
-    stack_outputs: [16]
+    program_hash: [4],
+    stack_inputs: [16],
+    stack_outputs: [16],
 }
 ```
 
@@ -70,7 +70,7 @@ There is no limit to how many of them can be declared within the `periodic_colum
 Each periodic column is described by an identifier and an array of integers in the following format. These integers are the periodic values.
 
 ```
-identifier: [i, j, k, n]
+identifier: [i, j, k, n],
 ```
 
 The length of each of the array must be a power of two which is greater than or equal to `2`.
@@ -79,8 +79,8 @@ The following is an example of a valid `periodic_columns` source section:
 
 ```
 periodic_columns {
-    k0: [0, 0, 0, 1]
-    k1: [1, 1, 1, 1, 1, 1, 1, 0]
+    k0: [0, 0, 0, 1],
+    k1: [1, 1, 1, 1, 1, 1, 1, 0],
 }
 ```
 
@@ -100,7 +100,7 @@ The following is an example of a valid `random_values` source section:
 
 ```
 random_values {
-    rand: [4]
+    rand: [4],
 }
 ```
 
@@ -110,7 +110,7 @@ The following is an example of a valid `random_values` section with named bindin
 
 ```
 random_values {
-    rand: [a, b, c[2]]
+    rand: [a, b, c[2]],
 }
 ```
 

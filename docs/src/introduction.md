@@ -8,30 +8,30 @@ Currently, AirScript is on version 0.3, which includes about 95% of features nee
 
 AirScript includes the following features:
 
-- **Trace Columns**: Users can declare trace columns for main and auxiliary traces as individual columns or groups of columns (e.g. `main: [a, b, c[3], d]` where `a`, `b`, and `d` are single columns and `c` refers to a group of 3 columns)
+- **Trace Columns**: Users can declare trace columns for main and auxiliary traces as individual columns or groups of columns (e.g. `main: [a, b, c[3], d],` where `a`, `b`, and `d` are single columns and `c` refers to a group of 3 columns)
 
-- **Public Inputs**: Users can declare public inputs where each public input is a named vector (e.g. `stack_inputs: [16]`)
+- **Public Inputs**: Users can declare public inputs where each public input is a named vector (e.g. `stack_inputs: [16],`)
 
-- **Periodic Columns**: Users can declare periodic columns (e.g. `k0: [1, 0, 0, 0]`)
+- **Periodic Columns**: Users can declare periodic columns (e.g. `k0: [1, 0, 0, 0],`)
 
-- **Random Values**: Users can define random values provided by the verifier (e.g. `alphas: [x, y[14], z]` or `rand: [16]`)
+- **Random Values**: Users can define random values provided by the verifier (e.g. `alphas: [x, y[14], z],` or `rand: [16],`)
 
 - **Boundary Constraints**: Users can enforce boundary constraints on main and auxiliary trace columns using public inputs, random values, constants and variables.
 
 - **Integrity Constraints**: Users can enforce integrity constraints on main and auxiliary trace columns using trace columns, periodic columns, random values, constants and variables.
 
 - **Constants**: Users can declare module level constants. Constants can be scalars, vectors or matrices.
-  (e.g. `const A = 123`, `const B = [1, 2, 3]`, `const C = [[1, 2, 3], [4, 5, 6]]`)
+  (e.g. `const A = 123;`, `const B = [1, 2, 3];`, `const C = [[1, 2, 3], [4, 5, 6]];`)
 
-- **Variables**: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. `let x = k * c[1]'`, `let y = [k * c[1], l * c[2], m * c[3]]` or `let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]]`)
+- **Variables**: Local variables can be declared for use in defining boundary and integrity constraints. Variables can be scalars, vectors or matrices built from expressions (e.g. `let x = k * c[1];'`, `let y = [k * c[1], l * c[2], m * c[3]];` or `let z = [[k * c[1], l * c[2]], [m * c[3], n * c[4]]];`)
 
 - **Evaluators**: Users can declare evaluator functions to group multiple related integrity constraints together. Evaluators can be declared locally or imported from other modules. This helps increase modularity and readability of AirScript code.
 
 The language also includes some convenience syntax to make writing constraints easier. This includes:
 
-- **List comprehension** - e.g., `let x = [k * c for (k, c) in (k, c[1..4])]`.
-- **List folding** - e.g., `let y = sum([k * c for (k, c) in (k, c[1..4])])`.
-- **Constraint comprehension** - e.g., `enf x^2 = x for x in a`.
+- **List comprehension** - e.g., `let x = [k * c for (k, c) in (k, c[1..4])];`.
+- **List folding** - e.g., `let y = sum([k * c for (k, c) in (k, c[1..4])]);`.
+- **Constraint comprehension** - e.g., `enf x^2 = x for x in a;`.
 - **Conditional constraints** - which enable convenient syntax for turning constraints on or off based on selector values.
 
 ### CLI

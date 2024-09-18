@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt, mem,
     ops::ControlFlow,
 };
@@ -63,6 +63,7 @@ pub struct SemanticAnalysis<'a> {
     deps: &'a mut DependencyGraph,
     imported: Imported,
     globals: HashMap<Identifier, BindingType>,
+    constants: BTreeMap<Identifier, ConstantExpr>,
     locals: LexicalScope<NamespacedIdentifier, BindingType>,
     referenced: HashMap<QualifiedIdentifier, DependencyType>,
     current_module: Option<ModuleId>,
@@ -88,6 +89,7 @@ impl<'a> SemanticAnalysis<'a> {
             deps,
             imported,
             globals: Default::default(),
+            constants: Default::default(),
             locals: Default::default(),
             referenced: Default::default(),
             current_module: None,
@@ -137,6 +139,14 @@ impl<'a> SemanticAnalysis<'a> {
 impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
     fn visit_mut_module(&mut self, module: &mut Module) -> ControlFlow<SemanticAnalysisError> {
         self.current_module = Some(module.name);
+
+        // Collect the values of all named constants that can be referenced in range declarations
+        self.constants.extend(
+            module
+                .constants
+                .iter()
+                .map(|(id, c)| (*id, c.value.clone())),
+        );
 
         // Register all globals implicitly defined in the module before all locally bound names
         //
@@ -733,6 +743,98 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         }
     }
 
+    fn visit_mut_range_bound(
+        &mut self,
+        expr: &mut crate::ast::RangeBound,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        match expr {
+            crate::ast::RangeBound::Const(_) => ControlFlow::Continue(()),
+            crate::ast::RangeBound::SymbolAccess(ref mut access) => {
+                self.visit_mut_const_symbol_access(access)?;
+                // The identifier must have been resolved to reach here
+                let qid = access.name.resolved().unwrap();
+                let value = if self.current_module.as_ref() == Some(&qid.module) {
+                    &self.constants[&qid.item.id()]
+                } else {
+                    &self.library.modules[&qid.module].constants[&qid.item.id()].value
+                };
+                match value {
+                    ConstantExpr::Scalar(value) => {
+                        let value = usize::try_from(*value).map_err(|err| {
+                            self.diagnostics
+                                .diagnostic(Severity::Error)
+                                .with_primary_label(
+                                    expr.span(),
+                                    format!("constant is not a valid range bound: {err}"),
+                                )
+                                .emit();
+                            SemanticAnalysisError::Invalid
+                        });
+                        match value {
+                            Ok(value) => {
+                                *expr =
+                                    crate::ast::RangeBound::Const(Span::new(expr.span(), value));
+                                ControlFlow::Continue(())
+                            }
+                            Err(err) => ControlFlow::Break(err),
+                        }
+                    }
+                    const_expr => {
+                        self.diagnostics
+                            .diagnostic(Severity::Error)
+                            .with_primary_label(
+                                expr.span(),
+                                format!(
+                                    "constant is not a valid range bound: expected scalar, got {}",
+                                    const_expr.ty()
+                                ),
+                            )
+                            .emit();
+                        ControlFlow::Break(SemanticAnalysisError::Invalid)
+                    }
+                }
+            }
+        }
+    }
+
+    fn visit_mut_const_symbol_access(
+        &mut self,
+        expr: &mut crate::ast::ConstSymbolAccess,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        self.visit_mut_resolvable_identifier(&mut expr.name)?;
+
+        // The identifier must have been resolved to reach here
+        let binding_ty = match self.resolvable_binding_type(&expr.name) {
+            Ok(ty) => ty,
+            Err(err) => {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_primary_label(expr.span, format!("invalid constant identifier: {err}"))
+                    .emit();
+                return ControlFlow::Break(SemanticAnalysisError::Invalid);
+            }
+        };
+        match binding_ty.item {
+            BindingType::Constant(ty) => {
+                expr.ty = Some(ty);
+                ControlFlow::Continue(())
+            }
+            binding_ty => {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_primary_label(
+                        expr.span,
+                        format!(
+                            "invalid constant identifier '{}', got binding of type {binding_ty}",
+                            &expr.name
+                        ),
+                    )
+                    .emit();
+                ControlFlow::Break(SemanticAnalysisError::Invalid)
+            }
+        }
+    }
+
     fn visit_mut_bounded_symbol_access(
         &mut self,
         expr: &mut BoundedSymbolAccess,
@@ -756,6 +858,7 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
         expr: &mut SymbolAccess,
     ) -> ControlFlow<SemanticAnalysisError> {
         self.visit_mut_resolvable_identifier(&mut expr.name)?;
+        self.visit_mut_access_type(&mut expr.access_type)?;
 
         let resolved_binding_ty = match self.resolvable_binding_type(&expr.name) {
             Ok(ty) => ty,
@@ -823,7 +926,8 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
                     // with a single column is dependent on the access type. A slice of columns of size 1 must
                     // be captured as a vector of size 1
                     AccessType::Slice(ref range) => {
-                        assert_eq!(expr.ty.replace(Type::Vector(range.end - range.start)), None)
+                        let range = range.to_slice_range();
+                        assert_eq!(expr.ty.replace(Type::Vector(range.len())), None)
                     }
                     // All other access types can be derived from the binding type
                     _ => assert_eq!(expr.ty.replace(binding_ty.ty().unwrap()), None),
@@ -840,7 +944,10 @@ impl<'a> VisitMut<SemanticAnalysisError> for SemanticAnalysis<'a> {
                     .emit();
                 // Continue with a fabricated type
                 let ty = match &expr.access_type {
-                    AccessType::Slice(ref range) => Type::Vector(range.end - range.start),
+                    AccessType::Slice(ref range) => {
+                        let range = range.to_slice_range();
+                        Type::Vector(range.len())
+                    }
                     _ => Type::Felt,
                 };
                 assert_eq!(expr.ty.replace(ty), None);
@@ -1533,7 +1640,9 @@ impl<'a> SemanticAnalysis<'a> {
     fn expr_binding_type(&self, expr: &Expr) -> Result<BindingType, InvalidAccessError> {
         match expr {
             Expr::Const(constant) => Ok(BindingType::Local(constant.ty())),
-            Expr::Range(range) => Ok(BindingType::Local(Type::Vector(range.end - range.start))),
+            Expr::Range(range) => Ok(BindingType::Local(Type::Vector(
+                range.to_slice_range().len(),
+            ))),
             Expr::Vector(ref elems) => {
                 let mut binding_tys = Vec::with_capacity(elems.len());
                 for elem in elems.iter() {

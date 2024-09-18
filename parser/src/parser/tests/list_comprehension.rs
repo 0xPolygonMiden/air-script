@@ -59,6 +59,8 @@ fn bc_identifier_and_range_lc() {
     let source = "
     def test
 
+    const THREE = 3;
+
     trace_columns {
         main: [a, b, c[4]],
     }
@@ -72,11 +74,14 @@ fn bc_identifier_and_range_lc() {
     }
 
     boundary_constraints {
-        let x = [2^i * c for (i, c) in (0..3, c)];
+        let x = [2^i * c for (i, c) in (0..THREE, c)];
         enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    expected
+        .constants
+        .insert(ident!(THREE), constant!(THREE = 3));
     expected
         .trace_columns
         .push(trace_segment!(0, "$main", [(a, 1), (b, 1), (c, 4)]));
@@ -91,7 +96,7 @@ fn bc_identifier_and_range_lc() {
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
         vec![
-            let_!(x = lc!(((i, range!(0..3)), (c, expr!(access!(c)))) => mul!(exp!(int!(2), access!(i)), access!(c))).into() =>
+            let_!(x = lc!(((i, range!(0usize, ident!(THREE))), (c, expr!(access!(c)))) => mul!(exp!(int!(2), access!(i)), access!(c))).into() =>
                   enforce!(eq!(bounded_access!(a, Boundary::First), add!(add!(add!(access!(x[0]), access!(x[1])), access!(x[2])), access!(x[3]))))),
         ],
     ));

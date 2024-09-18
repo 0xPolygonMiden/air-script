@@ -149,8 +149,8 @@ The following is a simple example of a valid `integrity_constraints` source sect
 def IntegrityConstraintsExample
 
 trace_columns {
-    main: [a, b]
-    aux: [p]
+    main: [a, b],
+    aux: [p],
 }
 
 public_inputs {
@@ -163,11 +163,11 @@ boundary_constraints {
 
 integrity_constraints {
     # these are main constraints. they both express the same constraint.
-    enf a' = a + 1
-    enf b' - b - 1 = 0
+    enf a' = a + 1;
+    enf b' - b - 1 = 0;
 
     # this is an auxiliary constraint, since it uses an auxiliary trace column.
-    enf p = p' * a
+    enf p = p' * a;
 }
 ```
 
@@ -187,8 +187,8 @@ The following is an example of a valid `integrity_constraints` source section th
 def IntegrityConstraintsExample
 
 trace_columns {
-    main: [a, b]
-    aux: [p0, p1]
+    main: [a, b],
+    aux: [p0, p1],
 }
 
 public_inputs {
@@ -196,11 +196,11 @@ public_inputs {
 }
 
 periodic_columns {
-    k: [1, 1, 1, 0]
+    k: [1, 1, 1, 0],
 }
 
 random_values {
-    rand: [16]
+    rand: [16],
 }
 
 boundary_constraints {
@@ -209,14 +209,14 @@ boundary_constraints {
 
 integrity_constraints {
     # this is a main constraint that uses a periodic column.
-    enf a' = k * a
+    enf a' = k * a;
 
     # this is an auxiliary constraint that uses a periodic column.
-    enf p0' = k * p0
+    enf p0' = k * p0;
 
     # these are auxiliary constraints that use random values from the verifier.
-    enf b = a + $rand[0]
-    enf p1 = k * (a + $rand[0]) * (b + $rand[1])
+    enf b = a + $rand[0];
+    enf p1 = k * (a + $rand[0]) * (b + $rand[1]);
 }
 ```
 
