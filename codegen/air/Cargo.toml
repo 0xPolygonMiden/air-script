@@ -1,5 +1,5 @@
 [package]
-name = "mir"
+name = "air-ir"
 version = "0.4.0"
 description = "Intermediate representation for the AirScript language"
 authors = ["miden contributors"]
@@ -12,8 +12,8 @@ rust-version.workspace = true
 edition.workspace = true
 
 [dependencies]
-air-parser = { package = "air-parser", path = "../parser", version = "0.4" }
-air-pass = { package = "air-pass", path = "../pass", version = "0.1" }
+air-parser = { package = "air-parser", path = "../../parser", version = "0.4" }
+air-pass = { package = "air-pass", path = "../../pass", version = "0.1" }
 anyhow = "1.0"
 miden-diagnostics = "0.1"
 thiserror = "1.0"
