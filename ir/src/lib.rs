@@ -6,7 +6,7 @@ pub mod passes;
 mod tests;
 
 pub use self::codegen::CodeGenerator;
-pub use self::graph::{AlgebraicGraph, Node, NodeIndex};
+pub use self::graph::{MirGraph, Node, NodeIndex};
 pub use self::ir::*;
 
 use miden_diagnostics::{Diagnostic, ToDiagnostic};

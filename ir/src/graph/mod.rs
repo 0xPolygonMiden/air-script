@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use crate::ir::*;
 
 /// A unique identifier for a node in an [AlgebraicGraph]
@@ -37,7 +35,7 @@ impl Node {
     }
 }
 
-/// The AlgebraicGraph is a directed acyclic graph used to represent integrity constraints. To
+/// The MirGraph is a directed acyclic graph used to represent integrity constraints. To
 /// store it compactly, it is represented as a vector of nodes where each node references other
 /// nodes by their index in the vector.
 ///
@@ -50,11 +48,11 @@ impl Node {
 ///   do not necessarily represent all constraints. There could be constraints which are also
 ///   subgraphs of other constraints.
 #[derive(Default, Debug, Clone)]
-pub struct AlgebraicGraph {
+pub struct MirGraph {
     /// All nodes in the graph.
     nodes: Vec<Node>,
 }
-impl AlgebraicGraph {
+impl MirGraph {
     /// Creates a new graph from a list of nodes.
     pub const fn new(nodes: Vec<Node>) -> Self {
         Self { nodes }
@@ -70,6 +68,7 @@ impl AlgebraicGraph {
         self.nodes.len()
     }
 
+    /*
     /// Returns the degree of the subgraph which has the specified node as its tip.
     pub fn degree(&self, index: &NodeIndex) -> IntegrityConstraintDegree {
         let mut cycles = BTreeMap::default();
@@ -80,60 +79,60 @@ impl AlgebraicGraph {
         } else {
             IntegrityConstraintDegree::with_cycles(base, cycles.values().copied().collect())
         }
-    }
-
-    /// TODO: docs
-    pub fn node_details(
-        &self,
-        index: &NodeIndex,
-        default_domain: ConstraintDomain,
-    ) -> Result<(TraceSegmentId, ConstraintDomain), ConstraintError> {
-        // recursively walk the subgraph and infer the trace segment and domain
-        match self.node(index).op() {
-            Operation::Value(value) => match value {
-                Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
-                Value::PeriodicColumn(_) => {
-                    assert!(
-                        !default_domain.is_boundary(),
-                        "unexpected access to periodic column in boundary constraint"
-                    );
-                    // the default domain for [IntegrityConstraints] is `EveryRow`
-                    Ok((DEFAULT_SEGMENT, ConstraintDomain::EveryRow))
-                }
-                Value::PublicInput(_) => {
-                    assert!(
-                        !default_domain.is_integrity(),
-                        "unexpected access to public input in integrity constraint"
-                    );
-                    Ok((DEFAULT_SEGMENT, default_domain))
-                }
-                Value::RandomValue(_) => Ok((AUX_SEGMENT, default_domain)),
-                Value::TraceAccess(trace_access) => {
-                    let domain = if default_domain.is_boundary() {
-                        assert_eq!(
-                            trace_access.row_offset, 0,
-                            "unexpected trace offset in boundary constraint"
+    }*/
+    /*
+        /// TODO: docs
+        pub fn node_details(
+            &self,
+            index: &NodeIndex,
+            default_domain: ConstraintDomain,
+        ) -> Result<(TraceSegmentId, ConstraintDomain), ConstraintError> {
+            // recursively walk the subgraph and infer the trace segment and domain
+            match self.node(index).op() {
+                Operation::Value(value) => match value {
+                    Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
+                    Value::PeriodicColumn(_) => {
+                        assert!(
+                            !default_domain.is_boundary(),
+                            "unexpected access to periodic column in boundary constraint"
                         );
-                        default_domain
-                    } else {
-                        ConstraintDomain::from_offset(trace_access.row_offset)
-                    };
+                        // the default domain for [IntegrityConstraints] is `EveryRow`
+                        Ok((DEFAULT_SEGMENT, ConstraintDomain::EveryRow))
+                    }
+                    Value::PublicInput(_) => {
+                        assert!(
+                            !default_domain.is_integrity(),
+                            "unexpected access to public input in integrity constraint"
+                        );
+                        Ok((DEFAULT_SEGMENT, default_domain))
+                    }
+                    Value::RandomValue(_) => Ok((AUX_SEGMENT, default_domain)),
+                    Value::TraceAccess(trace_access) => {
+                        let domain = if default_domain.is_boundary() {
+                            assert_eq!(
+                                trace_access.row_offset, 0,
+                                "unexpected trace offset in boundary constraint"
+                            );
+                            default_domain
+                        } else {
+                            ConstraintDomain::from_offset(trace_access.row_offset)
+                        };
 
-                    Ok((trace_access.segment, domain))
+                        Ok((trace_access.segment, domain))
+                    }
+                },
+                Operation::Add(lhs, rhs) | Operation::Sub(lhs, rhs) | Operation::Mul(lhs, rhs) => {
+                    let (lhs_segment, lhs_domain) = self.node_details(lhs, default_domain)?;
+                    let (rhs_segment, rhs_domain) = self.node_details(rhs, default_domain)?;
+
+                    let trace_segment = lhs_segment.max(rhs_segment);
+                    let domain = lhs_domain.merge(rhs_domain)?;
+
+                    Ok((trace_segment, domain))
                 }
-            },
-            Operation::Add(lhs, rhs) | Operation::Sub(lhs, rhs) | Operation::Mul(lhs, rhs) => {
-                let (lhs_segment, lhs_domain) = self.node_details(lhs, default_domain)?;
-                let (rhs_segment, rhs_domain) = self.node_details(rhs, default_domain)?;
-
-                let trace_segment = lhs_segment.max(rhs_segment);
-                let domain = lhs_domain.merge(rhs_domain)?;
-
-                Ok((trace_segment, domain))
             }
         }
-    }
-
+    */
     /// Insert the operation and return its node index. If an identical node already exists, return
     /// that index instead.
     pub(crate) fn insert_node(&mut self, op: Operation) -> NodeIndex {
@@ -151,6 +150,7 @@ impl AlgebraicGraph {
         )
     }
 
+    /*
     /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.
     fn accumulate_degree(
         &self,
@@ -184,4 +184,5 @@ impl AlgebraicGraph {
             }
         }
     }
+    */
 }

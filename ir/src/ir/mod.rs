@@ -1,3 +1,4 @@
+mod block;
 mod constraints;
 mod degree;
 mod operation;
@@ -31,7 +32,7 @@ use std::collections::BTreeMap;
 
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::graph::AlgebraicGraph;
+use crate::graph::MirGraph;
 
 /// The intermediate representation of a complete AirScript program
 ///
@@ -116,13 +117,13 @@ impl Air {
         self.constraints.integrity_constraints(trace_segment)
     }
 
-    /// Return the set of [IntegrityConstraintDegree] corresponding to each integrity constraint
+    /* /// Return the set of [IntegrityConstraintDegree] corresponding to each integrity constraint
     pub fn integrity_constraint_degrees(
         &self,
         trace_segment: TraceSegmentId,
     ) -> Vec<IntegrityConstraintDegree> {
         self.constraints.integrity_constraint_degrees(trace_segment)
-    }
+    }*/
 
     /// Return an [Iterator] over the validity constraints for the given trace segment
     pub fn validity_constraints(
@@ -148,13 +149,13 @@ impl Air {
 
     /// Return a reference to the raw [AlgebraicGraph] corresponding to the constraints
     #[inline]
-    pub fn constraint_graph(&self) -> &AlgebraicGraph {
+    pub fn constraint_graph(&self) -> &MirGraph {
         self.constraints.graph()
     }
 
     /// Return a mutable reference to the raw [AlgebraicGraph] corresponding to the constraints
     #[inline]
-    pub fn constraint_graph_mut(&mut self) -> &mut AlgebraicGraph {
+    pub fn constraint_graph_mut(&mut self) -> &mut MirGraph {
         self.constraints.graph_mut()
     }
 }

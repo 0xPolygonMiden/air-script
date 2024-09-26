@@ -150,117 +150,117 @@ impl<'a> AirBuilder<'a> {
 
     fn build_boundary_equality(
         &mut self,
-        lhs: &ast::ScalarExpr,
-        rhs: &ast::ScalarExpr,
+        _lhs: &ast::ScalarExpr,
+        _rhs: &ast::ScalarExpr,
     ) -> Result<(), CompileError> {
-        let lhs_span = lhs.span();
-        let rhs_span = rhs.span();
+        /*        let lhs_span = lhs.span();
+                let rhs_span = rhs.span();
 
-        // The left-hand side of a boundary constraint equality expression is always a bounded symbol access
-        // against a trace column. It is fine to panic here if that is ever violated.
-        let ast::ScalarExpr::BoundedSymbolAccess(ref access) = lhs else {
-            self.diagnostics
-                .diagnostic(Severity::Bug)
-                .with_message("invalid boundary constraint")
-                .with_primary_label(
+                // The left-hand side of a boundary constraint equality expression is always a bounded symbol access
+                // against a trace column. It is fine to panic here if that is ever violated.
+                let ast::ScalarExpr::BoundedSymbolAccess(ref access) = lhs else {
+                    self.diagnostics
+                        .diagnostic(Severity::Bug)
+                        .with_message("invalid boundary constraint")
+                        .with_primary_label(
+                            lhs_span,
+                            "expected bounded trace column access here, e.g. 'main[0].first'",
+                        )
+                        .emit();
+                    return Err(CompileError::Failed);
+                };
+                // Insert the trace access into the graph
+                let trace_access = self.trace_access(&access.column).unwrap();
+
+                // Raise a validation error if this column boundary has already been constrained
+                if let Some(prev) = self.trace_columns[trace_access.segment].mark_constrained(
                     lhs_span,
-                    "expected bounded trace column access here, e.g. 'main[0].first'",
-                )
-                .emit();
-            return Err(CompileError::Failed);
-        };
-        // Insert the trace access into the graph
-        let trace_access = self.trace_access(&access.column).unwrap();
+                    trace_access.column,
+                    access.boundary,
+                ) {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("overlapping boundary constraints")
+                        .with_primary_label(
+                            lhs_span,
+                            "this constrains a column and boundary that has already been constrained",
+                        )
+                        .with_secondary_label(prev, "previous constraint occurs here")
+                        .emit();
+                    return Err(CompileError::Failed);
+                }
 
-        // Raise a validation error if this column boundary has already been constrained
-        if let Some(prev) = self.trace_columns[trace_access.segment].mark_constrained(
-            lhs_span,
-            trace_access.column,
-            access.boundary,
-        ) {
-            self.diagnostics
-                .diagnostic(Severity::Error)
-                .with_message("overlapping boundary constraints")
-                .with_primary_label(
-                    lhs_span,
-                    "this constrains a column and boundary that has already been constrained",
-                )
-                .with_secondary_label(prev, "previous constraint occurs here")
-                .emit();
-            return Err(CompileError::Failed);
-        }
-
-        let lhs = self.insert_op(Operation::Value(Value::TraceAccess(trace_access)));
-        // Insert the right-hand expression into the graph
-        let rhs = self.insert_scalar_expr(rhs)?;
-        // Compare the inferred trace segment and domain of the operands
-        let domain = access.boundary.into();
-        {
-            let graph = self.air.constraint_graph();
-            let (lhs_segment, lhs_domain) = graph.node_details(&lhs, domain)?;
-            let (rhs_segment, rhs_domain) = graph.node_details(&rhs, domain)?;
-            if lhs_segment < rhs_segment {
-                // trace segment inference defaults to the lowest segment (the main trace) and is
-                // adjusted according to the use of random values and trace columns.
-                let lhs_segment_name = self.trace_columns[lhs_segment].name;
-                let rhs_segment_name = self.trace_columns[rhs_segment].name;
-                self.diagnostics.diagnostic(Severity::Error)
-                    .with_message("invalid boundary constraint")
-                    .with_primary_label(lhs_span, format!("this constrains a column in the '{lhs_segment_name}' trace segment"))
-                    .with_secondary_label(rhs_span, format!("but this expression implies the '{rhs_segment_name}' trace segment"))
-                    .with_note("Boundary constraints require both sides of the constraint to apply to the same trace segment.")
-                    .emit();
-                return Err(CompileError::Failed);
-            }
-            if lhs_domain != rhs_domain {
-                self.diagnostics.diagnostic(Severity::Error)
-                    .with_message("invalid boundary constraint")
-                    .with_primary_label(lhs_span, format!("this has a constraint domain of {lhs_domain}"))
-                    .with_secondary_label(rhs_span, format!("this has a constraint domain of {rhs_domain}"))
-                    .with_note("Boundary constraints require both sides of the constraint to be in the same domain.")
-                    .emit();
-                return Err(CompileError::Failed);
-            }
-        }
-        // Merge the expressions into a single constraint
-        let root = self.merge_equal_exprs(lhs, rhs, None);
-        // Store the generated constraint
-        self.air
-            .constraints
-            .insert_constraint(trace_access.segment, root, domain);
-
+                let lhs = self.insert_op(Operation::Value(Value::TraceAccess(trace_access)));
+                // Insert the right-hand expression into the graph
+                let rhs = self.insert_scalar_expr(rhs)?;
+                // Compare the inferred trace segment and domain of the operands
+                let domain = access.boundary.into();
+                {
+                    let graph = self.air.constraint_graph();
+                    let (lhs_segment, lhs_domain) = graph.node_details(&lhs, domain)?;
+                    let (rhs_segment, rhs_domain) = graph.node_details(&rhs, domain)?;
+                    if lhs_segment < rhs_segment {
+                        // trace segment inference defaults to the lowest segment (the main trace) and is
+                        // adjusted according to the use of random values and trace columns.
+                        let lhs_segment_name = self.trace_columns[lhs_segment].name;
+                        let rhs_segment_name = self.trace_columns[rhs_segment].name;
+                        self.diagnostics.diagnostic(Severity::Error)
+                            .with_message("invalid boundary constraint")
+                            .with_primary_label(lhs_span, format!("this constrains a column in the '{lhs_segment_name}' trace segment"))
+                            .with_secondary_label(rhs_span, format!("but this expression implies the '{rhs_segment_name}' trace segment"))
+                            .with_note("Boundary constraints require both sides of the constraint to apply to the same trace segment.")
+                            .emit();
+                        return Err(CompileError::Failed);
+                    }
+                    if lhs_domain != rhs_domain {
+                        self.diagnostics.diagnostic(Severity::Error)
+                            .with_message("invalid boundary constraint")
+                            .with_primary_label(lhs_span, format!("this has a constraint domain of {lhs_domain}"))
+                            .with_secondary_label(rhs_span, format!("this has a constraint domain of {rhs_domain}"))
+                            .with_note("Boundary constraints require both sides of the constraint to be in the same domain.")
+                            .emit();
+                        return Err(CompileError::Failed);
+                    }
+                }
+                // Merge the expressions into a single constraint
+                let root = self.merge_equal_exprs(lhs, rhs, None);
+                // Store the generated constraint
+                self.air
+                    .constraints
+                    .insert_constraint(trace_access.segment, root, domain);
+        */
         Ok(())
     }
 
     fn build_integrity_equality(
         &mut self,
-        lhs: &ast::ScalarExpr,
-        rhs: &ast::ScalarExpr,
-        condition: Option<&ast::ScalarExpr>,
+        _lhs: &ast::ScalarExpr,
+        _rhs: &ast::ScalarExpr,
+        _condition: Option<&ast::ScalarExpr>,
     ) -> Result<(), CompileError> {
-        let lhs = self.insert_scalar_expr(lhs)?;
-        let rhs = self.insert_scalar_expr(rhs)?;
-        let condition = match condition {
-            Some(cond) => Some(self.insert_scalar_expr(cond)?),
-            None => None,
-        };
-        let root = self.merge_equal_exprs(lhs, rhs, condition);
-        // Get the trace segment and domain of the constraint.
-        //
-        // The default domain for integrity constraints is `EveryRow`
-        let (trace_segment, domain) = self
-            .air
-            .constraint_graph()
-            .node_details(&root, ConstraintDomain::EveryRow)?;
-        // Save the constraint information
-        self.air
-            .constraints
-            .insert_constraint(trace_segment, root, domain);
-
+        /*        let lhs = self.insert_scalar_expr(lhs)?;
+                let rhs = self.insert_scalar_expr(rhs)?;
+                let condition = match condition {
+                    Some(cond) => Some(self.insert_scalar_expr(cond)?),
+                    None => None,
+                };
+                let root = self.merge_equal_exprs(lhs, rhs, condition);
+                // Get the trace segment and domain of the constraint.
+                //
+                // The default domain for integrity constraints is `EveryRow`
+                let (trace_segment, domain) = self
+                    .air
+                    .constraint_graph()
+                    .node_details(&root, ConstraintDomain::EveryRow)?;
+                // Save the constraint information
+                self.air
+                    .constraints
+                    .insert_constraint(trace_segment, root, domain);
+        */
         Ok(())
     }
 
-    fn merge_equal_exprs(
+    /*fn merge_equal_exprs(
         &mut self,
         lhs: NodeIndex,
         rhs: NodeIndex,
@@ -272,7 +272,7 @@ impl<'a> AirBuilder<'a> {
         } else {
             self.insert_op(Operation::Sub(lhs, rhs))
         }
-    }
+    }*/
 
     fn eval_let_expr(&mut self, expr: &ast::Let) -> Result<MemoizedBinding, CompileError> {
         let mut next_let = Some(expr);

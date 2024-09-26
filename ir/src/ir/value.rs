@@ -1,6 +1,6 @@
 use super::*;
 
-/// Represents a scalar value in the [AlgebraicGraph]
+/// Represents a scalar value in the [MIR]
 ///
 /// Values are either constant, or evaluated at runtime using the context
 /// provided to an AirScript program (i.e. random values, public inputs, etc.).
