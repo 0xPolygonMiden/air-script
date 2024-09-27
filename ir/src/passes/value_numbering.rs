@@ -27,6 +27,7 @@ impl<'a> ValueNumbering<'a> {
         Self { diagnostics }
     }
 
+    //TODO MIR: Implement value numbering pass on MIR
     fn run_visitor(&mut self, ir: &mut MirGraph) -> ControlFlow<()> {
         ControlFlow::Continue(())
     }

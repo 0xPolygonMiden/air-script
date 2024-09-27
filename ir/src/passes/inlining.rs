@@ -27,6 +27,7 @@ impl<'a> Inlining<'a> {
         Self { diagnostics }
     }
 
+    //TODO MIR: Implement inlining pass on MIR
     fn run_visitor(&mut self, ir: &mut MirGraph) -> ControlFlow<()> {
         ControlFlow::Continue(())
     }

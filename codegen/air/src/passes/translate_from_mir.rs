@@ -2,43 +2,49 @@ use air_parser::{ast, LexicalScope};
 use air_pass::Pass;
 
 use miden_diagnostics::{DiagnosticsHandler, Severity, Span, Spanned};
+use mir::Mir;
 
-use crate::{graph::NodeIndex, ir::*, CompileError, MirGraph};
+use crate::{graph::NodeIndex, ir::*, CompileError};
 
-pub struct AstToMir<'a> {
+pub struct MirToAir<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
-impl<'a> AstToMir<'a> {
+impl<'a> MirToAir<'a> {
     /// Create a new instance of this pass
     #[inline]
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self { diagnostics }
     }
 }
-impl<'p> Pass for AstToMir<'p> {
-    type Input<'a> = ast::Program;
-    type Output<'a> = Mir;
+impl<'p> Pass for MirToAir<'p> {
+    type Input<'a> = Mir;
+    type Output<'a> = Air;
     type Error = CompileError;
 
-    fn run<'a>(&mut self, program: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
-        let mut mir = Mir::new(program.name.clone());
+    fn run<'a>(&mut self, mir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
+        let air = Air::new(mir.name);
 
-        //TODO MIR: Implement AST > MIR lowering
+        //TODO: Implement MIR > AIR lowering
+        
+        /*let random_values = mir.random_values;
+        let trace_columns = mir.trace_columns;
+        let boundary_constraints = mir.boundary_constraints;
+        let integrity_constraints = mir.integrity_constraints;
 
-        let random_values = program.random_values;
-        let trace_columns = program.trace_columns;
-        let boundary_constraints = program.boundary_constraints;
-        let integrity_constraints = program.integrity_constraints;
+        air.trace_segment_widths = trace_columns.iter().map(|ts| ts.size as u16).collect();
+        air.num_random_values = random_values.as_ref().map(|rv| rv.size as u16).unwrap_or(0);
+        air.periodic_columns = mir.periodic_columns;
+        air.public_inputs = mir.public_inputs;
 
-        let mut builder = MirBuilder {
+        let mut builder = AirBuilder {
             diagnostics: self.diagnostics,
-            mir: &mut mir,
+            air: &mut air,
             random_values,
             trace_columns,
             bindings: Default::default(),
         };
 
-        /*for bc in boundary_constraints.iter() {
+        for bc in boundary_constraints.iter() {
             builder.build_boundary_constraint(bc)?;
         }
 
@@ -46,7 +52,7 @@ impl<'p> Pass for AstToMir<'p> {
             builder.build_integrity_constraint(ic)?;
         }*/
 
-        Ok(mir)
+        Ok(air)
     }
 }
 
@@ -60,14 +66,14 @@ enum MemoizedBinding {
     Matrix(Vec<Vec<NodeIndex>>),
 }
 
-struct MirBuilder<'a> {
+struct AirBuilder<'a> {
     diagnostics: &'a DiagnosticsHandler,
-    mir: &'a mut Mir,
+    air: &'a mut Air,
     random_values: Option<ast::RandomValues>,
     trace_columns: Vec<ast::TraceSegment>,
     bindings: LexicalScope<Identifier, MemoizedBinding>,
 }
-impl<'a> MirBuilder<'a> {
+impl<'a> AirBuilder<'a> {
     fn build_boundary_constraint(&mut self, bc: &ast::Statement) -> Result<(), CompileError> {
         match bc {
             ast::Statement::Enforce(ast::ScalarExpr::Binary(ast::BinaryExpr {
@@ -133,7 +139,7 @@ impl<'a> MirBuilder<'a> {
         mut statement_builder: F,
     ) -> Result<(), CompileError>
     where
-        F: FnMut(&mut MirBuilder, &ast::Statement) -> Result<(), CompileError>,
+        F: FnMut(&mut AirBuilder, &ast::Statement) -> Result<(), CompileError>,
     {
         let bound = self.eval_expr(&expr.value)?;
         self.bindings.enter();
@@ -147,117 +153,117 @@ impl<'a> MirBuilder<'a> {
 
     fn build_boundary_equality(
         &mut self,
-        _lhs: &ast::ScalarExpr,
-        _rhs: &ast::ScalarExpr,
+        lhs: &ast::ScalarExpr,
+        rhs: &ast::ScalarExpr,
     ) -> Result<(), CompileError> {
-        /*        let lhs_span = lhs.span();
-                let rhs_span = rhs.span();
+        let lhs_span = lhs.span();
+        let rhs_span = rhs.span();
 
-                // The left-hand side of a boundary constraint equality expression is always a bounded symbol access
-                // against a trace column. It is fine to panic here if that is ever violated.
-                let ast::ScalarExpr::BoundedSymbolAccess(ref access) = lhs else {
-                    self.diagnostics
-                        .diagnostic(Severity::Bug)
-                        .with_message("invalid boundary constraint")
-                        .with_primary_label(
-                            lhs_span,
-                            "expected bounded trace column access here, e.g. 'main[0].first'",
-                        )
-                        .emit();
-                    return Err(CompileError::Failed);
-                };
-                // Insert the trace access into the graph
-                let trace_access = self.trace_access(&access.column).unwrap();
-
-                // Raise a validation error if this column boundary has already been constrained
-                if let Some(prev) = self.trace_columns[trace_access.segment].mark_constrained(
+        // The left-hand side of a boundary constraint equality expression is always a bounded symbol access
+        // against a trace column. It is fine to panic here if that is ever violated.
+        let ast::ScalarExpr::BoundedSymbolAccess(ref access) = lhs else {
+            self.diagnostics
+                .diagnostic(Severity::Bug)
+                .with_message("invalid boundary constraint")
+                .with_primary_label(
                     lhs_span,
-                    trace_access.column,
-                    access.boundary,
-                ) {
-                    self.diagnostics
-                        .diagnostic(Severity::Error)
-                        .with_message("overlapping boundary constraints")
-                        .with_primary_label(
-                            lhs_span,
-                            "this constrains a column and boundary that has already been constrained",
-                        )
-                        .with_secondary_label(prev, "previous constraint occurs here")
-                        .emit();
-                    return Err(CompileError::Failed);
-                }
+                    "expected bounded trace column access here, e.g. 'main[0].first'",
+                )
+                .emit();
+            return Err(CompileError::Failed);
+        };
+        // Insert the trace access into the graph
+        let trace_access = self.trace_access(&access.column).unwrap();
 
-                let lhs = self.insert_op(Operation::Value(Value::TraceAccess(trace_access)));
-                // Insert the right-hand expression into the graph
-                let rhs = self.insert_scalar_expr(rhs)?;
-                // Compare the inferred trace segment and domain of the operands
-                let domain = access.boundary.into();
-                {
-                    let graph = self.air.constraint_graph();
-                    let (lhs_segment, lhs_domain) = graph.node_details(&lhs, domain)?;
-                    let (rhs_segment, rhs_domain) = graph.node_details(&rhs, domain)?;
-                    if lhs_segment < rhs_segment {
-                        // trace segment inference defaults to the lowest segment (the main trace) and is
-                        // adjusted according to the use of random values and trace columns.
-                        let lhs_segment_name = self.trace_columns[lhs_segment].name;
-                        let rhs_segment_name = self.trace_columns[rhs_segment].name;
-                        self.diagnostics.diagnostic(Severity::Error)
-                            .with_message("invalid boundary constraint")
-                            .with_primary_label(lhs_span, format!("this constrains a column in the '{lhs_segment_name}' trace segment"))
-                            .with_secondary_label(rhs_span, format!("but this expression implies the '{rhs_segment_name}' trace segment"))
-                            .with_note("Boundary constraints require both sides of the constraint to apply to the same trace segment.")
-                            .emit();
-                        return Err(CompileError::Failed);
-                    }
-                    if lhs_domain != rhs_domain {
-                        self.diagnostics.diagnostic(Severity::Error)
-                            .with_message("invalid boundary constraint")
-                            .with_primary_label(lhs_span, format!("this has a constraint domain of {lhs_domain}"))
-                            .with_secondary_label(rhs_span, format!("this has a constraint domain of {rhs_domain}"))
-                            .with_note("Boundary constraints require both sides of the constraint to be in the same domain.")
-                            .emit();
-                        return Err(CompileError::Failed);
-                    }
-                }
-                // Merge the expressions into a single constraint
-                let root = self.merge_equal_exprs(lhs, rhs, None);
-                // Store the generated constraint
-                self.air
-                    .constraints
-                    .insert_constraint(trace_access.segment, root, domain);
-        */
+        // Raise a validation error if this column boundary has already been constrained
+        if let Some(prev) = self.trace_columns[trace_access.segment].mark_constrained(
+            lhs_span,
+            trace_access.column,
+            access.boundary,
+        ) {
+            self.diagnostics
+                .diagnostic(Severity::Error)
+                .with_message("overlapping boundary constraints")
+                .with_primary_label(
+                    lhs_span,
+                    "this constrains a column and boundary that has already been constrained",
+                )
+                .with_secondary_label(prev, "previous constraint occurs here")
+                .emit();
+            return Err(CompileError::Failed);
+        }
+
+        let lhs = self.insert_op(Operation::Value(Value::TraceAccess(trace_access)));
+        // Insert the right-hand expression into the graph
+        let rhs = self.insert_scalar_expr(rhs)?;
+        // Compare the inferred trace segment and domain of the operands
+        let domain = access.boundary.into();
+        {
+            let graph = self.air.constraint_graph();
+            let (lhs_segment, lhs_domain) = graph.node_details(&lhs, domain)?;
+            let (rhs_segment, rhs_domain) = graph.node_details(&rhs, domain)?;
+            if lhs_segment < rhs_segment {
+                // trace segment inference defaults to the lowest segment (the main trace) and is
+                // adjusted according to the use of random values and trace columns.
+                let lhs_segment_name = self.trace_columns[lhs_segment].name;
+                let rhs_segment_name = self.trace_columns[rhs_segment].name;
+                self.diagnostics.diagnostic(Severity::Error)
+                    .with_message("invalid boundary constraint")
+                    .with_primary_label(lhs_span, format!("this constrains a column in the '{lhs_segment_name}' trace segment"))
+                    .with_secondary_label(rhs_span, format!("but this expression implies the '{rhs_segment_name}' trace segment"))
+                    .with_note("Boundary constraints require both sides of the constraint to apply to the same trace segment.")
+                    .emit();
+                return Err(CompileError::Failed);
+            }
+            if lhs_domain != rhs_domain {
+                self.diagnostics.diagnostic(Severity::Error)
+                    .with_message("invalid boundary constraint")
+                    .with_primary_label(lhs_span, format!("this has a constraint domain of {lhs_domain}"))
+                    .with_secondary_label(rhs_span, format!("this has a constraint domain of {rhs_domain}"))
+                    .with_note("Boundary constraints require both sides of the constraint to be in the same domain.")
+                    .emit();
+                return Err(CompileError::Failed);
+            }
+        }
+        // Merge the expressions into a single constraint
+        let root = self.merge_equal_exprs(lhs, rhs, None);
+        // Store the generated constraint
+        self.air
+            .constraints
+            .insert_constraint(trace_access.segment, root, domain);
+
         Ok(())
     }
 
     fn build_integrity_equality(
         &mut self,
-        _lhs: &ast::ScalarExpr,
-        _rhs: &ast::ScalarExpr,
-        _condition: Option<&ast::ScalarExpr>,
+        lhs: &ast::ScalarExpr,
+        rhs: &ast::ScalarExpr,
+        condition: Option<&ast::ScalarExpr>,
     ) -> Result<(), CompileError> {
-        /*        let lhs = self.insert_scalar_expr(lhs)?;
-                let rhs = self.insert_scalar_expr(rhs)?;
-                let condition = match condition {
-                    Some(cond) => Some(self.insert_scalar_expr(cond)?),
-                    None => None,
-                };
-                let root = self.merge_equal_exprs(lhs, rhs, condition);
-                // Get the trace segment and domain of the constraint.
-                //
-                // The default domain for integrity constraints is `EveryRow`
-                let (trace_segment, domain) = self
-                    .air
-                    .constraint_graph()
-                    .node_details(&root, ConstraintDomain::EveryRow)?;
-                // Save the constraint information
-                self.air
-                    .constraints
-                    .insert_constraint(trace_segment, root, domain);
-        */
+        let lhs = self.insert_scalar_expr(lhs)?;
+        let rhs = self.insert_scalar_expr(rhs)?;
+        let condition = match condition {
+            Some(cond) => Some(self.insert_scalar_expr(cond)?),
+            None => None,
+        };
+        let root = self.merge_equal_exprs(lhs, rhs, condition);
+        // Get the trace segment and domain of the constraint.
+        //
+        // The default domain for integrity constraints is `EveryRow`
+        let (trace_segment, domain) = self
+            .air
+            .constraint_graph()
+            .node_details(&root, ConstraintDomain::EveryRow)?;
+        // Save the constraint information
+        self.air
+            .constraints
+            .insert_constraint(trace_segment, root, domain);
+
         Ok(())
     }
 
-    /*fn merge_equal_exprs(
+    fn merge_equal_exprs(
         &mut self,
         lhs: NodeIndex,
         rhs: NodeIndex,
@@ -269,7 +275,7 @@ impl<'a> MirBuilder<'a> {
         } else {
             self.insert_op(Operation::Sub(lhs, rhs))
         }
-    }*/
+    }
 
     fn eval_let_expr(&mut self, expr: &ast::Let) -> Result<MemoizedBinding, CompileError> {
         let mut next_let = Some(expr);
@@ -486,7 +492,7 @@ impl<'a> MirBuilder<'a> {
             // At this point during compilation, fully-qualified identifiers can only possibly refer
             // to a periodic column, as all functions have been inlined, and constants propagated.
             ResolvableIdentifier::Resolved(ref qid) => {
-                if let Some(pc) = self.mir.periodic_columns.get(qid) {
+                if let Some(pc) = self.air.periodic_columns.get(qid) {
                     self.insert_op(Operation::Value(Value::PeriodicColumn(
                         PeriodicColumnAccess::new(*qid, pc.period()),
                     )))
@@ -596,7 +602,7 @@ impl<'a> MirBuilder<'a> {
     }
 
     fn public_input_access(&self, access: &ast::SymbolAccess) -> Option<PublicInputAccess> {
-        let public_input = self.mir.public_inputs.get(access.name.as_ref())?;
+        let public_input = self.air.public_inputs.get(access.name.as_ref())?;
         if let AccessType::Index(index) = access.access_type {
             Some(PublicInputAccess::new(public_input.name, index))
         } else {
@@ -654,7 +660,7 @@ impl<'a> MirBuilder<'a> {
     /// Adds the specified operation to the graph and returns the index of its node.
     #[inline]
     fn insert_op(&mut self, op: Operation) -> NodeIndex {
-        self.mir.constraint_graph_mut().insert_node(op)
+        self.air.constraint_graph_mut().insert_node(op)
     }
 
     fn insert_constant(&mut self, value: u64) -> NodeIndex {

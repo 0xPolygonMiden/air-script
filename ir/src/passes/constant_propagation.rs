@@ -27,6 +27,7 @@ impl<'a> ConstantPropagation<'a> {
         Self { diagnostics }
     }
 
+    //TODO MIR: Implement constant propagation pass on MIR
     fn run_visitor(&mut self, ir: &mut MirGraph) -> ControlFlow<()> {
         ControlFlow::Continue(())
     }

@@ -14,6 +14,7 @@ edition.workspace = true
 [dependencies]
 air-parser = { package = "air-parser", path = "../../parser", version = "0.4" }
 air-pass = { package = "air-pass", path = "../../pass", version = "0.1" }
+mir = { package = "mir", path = "../../ir", version = "0.4" }
 anyhow = "1.0"
 miden-diagnostics = "0.1"
 thiserror = "1.0"
