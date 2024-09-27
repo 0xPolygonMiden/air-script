@@ -42,7 +42,7 @@ use crate::graph::MirGraph;
 /// translated into an algebraic graph representation, on which further analysis,
 /// optimization, and code generation are performed.
 #[derive(Debug, Spanned)]
-pub struct Air {
+pub struct Mir {
     /// The name of the [air_parser::ast::Program] from which this IR was derived
     #[span]
     pub name: Identifier,
@@ -62,7 +62,7 @@ pub struct Air {
     /// The constraints enforced by this program, in their algebraic graph representation.
     pub constraints: Constraints,
 }
-impl Default for Air {
+impl Default for Mir {
     fn default() -> Self {
         Self::new(Identifier::new(
             SourceSpan::UNKNOWN,
@@ -70,10 +70,10 @@ impl Default for Air {
         ))
     }
 }
-impl Air {
-    /// Create a new, empty [Air] container
+impl Mir {
+    /// Create a new, empty [Mir] container
     ///
-    /// An empty [Air] is meaningless until it has been populated with
+    /// An empty [Mir] is meaningless until it has been populated with
     /// constraints and associated metadata. This is typically done by converting
     /// an [air_parser::ast::Program] to this struct using the [crate::passes::AstToAir]
     /// translation pass.

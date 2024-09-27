@@ -3,53 +3,48 @@ use air_pass::Pass;
 
 use miden_diagnostics::{DiagnosticsHandler, Severity, Span, Spanned};
 
-use crate::{graph::NodeIndex, ir::*, CompileError};
+use crate::{graph::NodeIndex, ir::*, CompileError, MirGraph};
 
-pub struct AstToAir<'a> {
+pub struct AstToMir<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
-impl<'a> AstToAir<'a> {
+impl<'a> AstToMir<'a> {
     /// Create a new instance of this pass
     #[inline]
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self { diagnostics }
     }
 }
-impl<'p> Pass for AstToAir<'p> {
+impl<'p> Pass for AstToMir<'p> {
     type Input<'a> = ast::Program;
-    type Output<'a> = Air;
+    type Output<'a> = Mir;
     type Error = CompileError;
 
     fn run<'a>(&mut self, program: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
-        let mut air = Air::new(program.name);
+        let mut mir = Mir::new(program.name.clone());
 
         let random_values = program.random_values;
         let trace_columns = program.trace_columns;
         let boundary_constraints = program.boundary_constraints;
         let integrity_constraints = program.integrity_constraints;
 
-        air.trace_segment_widths = trace_columns.iter().map(|ts| ts.size as u16).collect();
-        air.num_random_values = random_values.as_ref().map(|rv| rv.size as u16).unwrap_or(0);
-        air.periodic_columns = program.periodic_columns;
-        air.public_inputs = program.public_inputs;
-
-        let mut builder = AirBuilder {
+        let mut builder = MirBuilder {
             diagnostics: self.diagnostics,
-            air: &mut air,
+            mir: &mut mir,
             random_values,
             trace_columns,
             bindings: Default::default(),
         };
 
-        for bc in boundary_constraints.iter() {
+        /*for bc in boundary_constraints.iter() {
             builder.build_boundary_constraint(bc)?;
         }
 
         for ic in integrity_constraints.iter() {
             builder.build_integrity_constraint(ic)?;
-        }
+        }*/
 
-        Ok(air)
+        Ok(mir)
     }
 }
 
@@ -63,14 +58,14 @@ enum MemoizedBinding {
     Matrix(Vec<Vec<NodeIndex>>),
 }
 
-struct AirBuilder<'a> {
+struct MirBuilder<'a> {
     diagnostics: &'a DiagnosticsHandler,
-    air: &'a mut Air,
+    mir: &'a mut Mir,
     random_values: Option<ast::RandomValues>,
     trace_columns: Vec<ast::TraceSegment>,
     bindings: LexicalScope<Identifier, MemoizedBinding>,
 }
-impl<'a> AirBuilder<'a> {
+impl<'a> MirBuilder<'a> {
     fn build_boundary_constraint(&mut self, bc: &ast::Statement) -> Result<(), CompileError> {
         match bc {
             ast::Statement::Enforce(ast::ScalarExpr::Binary(ast::BinaryExpr {
@@ -136,7 +131,7 @@ impl<'a> AirBuilder<'a> {
         mut statement_builder: F,
     ) -> Result<(), CompileError>
     where
-        F: FnMut(&mut AirBuilder, &ast::Statement) -> Result<(), CompileError>,
+        F: FnMut(&mut MirBuilder, &ast::Statement) -> Result<(), CompileError>,
     {
         let bound = self.eval_expr(&expr.value)?;
         self.bindings.enter();
@@ -489,7 +484,7 @@ impl<'a> AirBuilder<'a> {
             // At this point during compilation, fully-qualified identifiers can only possibly refer
             // to a periodic column, as all functions have been inlined, and constants propagated.
             ResolvableIdentifier::Resolved(ref qid) => {
-                if let Some(pc) = self.air.periodic_columns.get(qid) {
+                if let Some(pc) = self.mir.periodic_columns.get(qid) {
                     self.insert_op(Operation::Value(Value::PeriodicColumn(
                         PeriodicColumnAccess::new(*qid, pc.period()),
                     )))
@@ -599,7 +594,7 @@ impl<'a> AirBuilder<'a> {
     }
 
     fn public_input_access(&self, access: &ast::SymbolAccess) -> Option<PublicInputAccess> {
-        let public_input = self.air.public_inputs.get(access.name.as_ref())?;
+        let public_input = self.mir.public_inputs.get(access.name.as_ref())?;
         if let AccessType::Index(index) = access.access_type {
             Some(PublicInputAccess::new(public_input.name, index))
         } else {
@@ -657,7 +652,7 @@ impl<'a> AirBuilder<'a> {
     /// Adds the specified operation to the graph and returns the index of its node.
     #[inline]
     fn insert_op(&mut self, op: Operation) -> NodeIndex {
-        self.air.constraint_graph_mut().insert_node(op)
+        self.mir.constraint_graph_mut().insert_node(op)
     }
 
     fn insert_constant(&mut self, value: u64) -> NodeIndex {

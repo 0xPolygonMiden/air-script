@@ -1,6 +1,12 @@
+mod constant_propagation;
+mod inlining;
 mod translate;
+mod value_numbering;
 
-pub use self::translate::AstToAir;
+pub use self::constant_propagation::ConstantPropagation;
+pub use self::inlining::Inlining;
+pub use self::translate::AstToMir;
+pub use self::value_numbering::ValueNumbering;
 
 use air_pass::Pass;
 
