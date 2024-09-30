@@ -24,6 +24,10 @@ impl<'p> Pass for AstToMir<'p> {
         let mut mir = Mir::new(program.name.clone());
 
         //TODO MIR: Implement AST > MIR lowering
+        // 1. Start from the previous lowering from AST to AIR
+        // 2. Understand what changes when starting from an unoptimized AST
+        // (with no constant prop and no inlining)
+        // 3. Implement the needed changes
 
         let random_values = program.random_values;
         let trace_columns = program.trace_columns;

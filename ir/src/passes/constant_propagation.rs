@@ -28,6 +28,8 @@ impl<'a> ConstantPropagation<'a> {
     }
 
     //TODO MIR: Implement constant propagation pass on MIR
+    // Run through every operation in the graph
+    // If we can deduce the resulting value based on the constants of the operands, replace the operation itself with a constant
     fn run_visitor(&mut self, ir: &mut MirGraph) -> ControlFlow<()> {
         ControlFlow::Continue(())
     }

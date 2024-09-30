@@ -28,6 +28,9 @@ impl<'a> Inlining<'a> {
     }
 
     //TODO MIR: Implement inlining pass on MIR
+    // 1. Understand the basics of the previous inlining process
+    // 2. Remove what is done during lowering from AST to MIR (unroll, ...)
+    // 3. Check how it translates to the MIR structure
     fn run_visitor(&mut self, ir: &mut MirGraph) -> ControlFlow<()> {
         ControlFlow::Continue(())
     }
