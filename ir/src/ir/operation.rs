@@ -1,4 +1,5 @@
-use block::Block;
+
+use value::SpannedMirValue;
 
 use crate::graph::NodeIndex;
 
@@ -8,11 +9,10 @@ use super::*;
 /// in the [MIR].
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Operation {
-    Block(Block),
-    /// Evaluates to a [Value]
-    ///
-    /// This is always a leaf node in the graph.
-    Value(Value),
+    /// Begin primitive operations
+
+    /// Evaluates to a [TypedValue]
+    Value(SpannedMirValue),
     /// Evaluates by addition over two operands (given as nodes in the graph)
     Add(NodeIndex, NodeIndex),
     /// Evaluates by subtraction over two operands (given as nodes in the graph)
@@ -21,9 +21,24 @@ pub enum Operation {
     Mul(NodeIndex, NodeIndex),
     /// Enforces a constraint (a given value equals Zero)
     Enf(NodeIndex),
-    /// Call a block
-    Call(NodeIndex),
+
+    /// Begin structured operations
+    /// Call (body, arguments)
+    Call(NodeIndex, Vec<NodeIndex>),
+    /// Fold an Iterator according to a given FoldOperator and a given initial value 
+    Fold(NodeIndex, FoldOperator, NodeIndex),
+    /// For (iterator, body)
+    For(NodeIndex, NodeIndex),
+    /// If (condition, then, else)
+    If(NodeIndex, NodeIndex, NodeIndex),
 }
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum FoldOperator {
+    Add,
+    Mul,
+}
+
 impl Operation {
     /// Corresponds to the binding power of this [Operation]
     ///
@@ -35,10 +50,12 @@ impl Operation {
             Self::Add(_, _) => 1,
             Self::Sub(_, _) => 2,
             Self::Mul(_, _) => 3,
-            Self::Call(_) => 4,
-            Self::Enf(_) => 5,
+            Self::Call(_, _) => 4,
             Self::Value(_) => 5,
-            Self::Block(_) => 5,
+            Self::Enf(_) => 6,
+            _ => 0
+
         }
     }
+
 }

@@ -1,7 +1,7 @@
 use air_parser::{ast, LexicalScope};
 use air_pass::Pass;
 
-use miden_diagnostics::{DiagnosticsHandler, Severity, Span, Spanned};
+use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
 use crate::{graph::NodeIndex, ir::*, CompileError, MirGraph};
 
@@ -434,7 +434,12 @@ impl<'a> MirBuilder<'a> {
     fn insert_scalar_expr(&mut self, expr: &ast::ScalarExpr) -> Result<NodeIndex, CompileError> {
         match expr {
             ast::ScalarExpr::Const(value) => {
-                Ok(self.insert_op(Operation::Value(Value::Constant(value.item))))
+                Ok(self.insert_op(Operation::Value(
+                    SpannedMirValue {
+                        span: value.span(),
+                        value: MirValue::Constant(ConstantValue::Felt(value.item)),
+                    }
+                )))
             }
             ast::ScalarExpr::SymbolAccess(access) => Ok(self.insert_symbol_access(access)),
             ast::ScalarExpr::Binary(expr) => self.insert_binary_expr(expr),
@@ -491,9 +496,12 @@ impl<'a> MirBuilder<'a> {
             // to a periodic column, as all functions have been inlined, and constants propagated.
             ResolvableIdentifier::Resolved(ref qid) => {
                 if let Some(pc) = self.mir.periodic_columns.get(qid) {
-                    self.insert_op(Operation::Value(Value::PeriodicColumn(
-                        PeriodicColumnAccess::new(*qid, pc.period()),
-                    )))
+                    self.insert_op(Operation::Value(
+                        SpannedMirValue {
+                            span: qid.span(),
+                            value: MirValue::PeriodicColumn(PeriodicColumnAccess::new(*qid, pc.period())),
+                        }
+                    ))
                 } else {
                     // This is a qualified reference that should have been eliminated
                     // during inlining or constant propagation, but somehow slipped through.
@@ -509,12 +517,21 @@ impl<'a> MirBuilder<'a> {
                 // the random values array (generally the case), or the names of trace segments (e.g. `$main`)
                 if id.is_special() {
                     if let Some(rv) = self.random_value_access(access) {
-                        return self.insert_op(Operation::Value(Value::RandomValue(rv)));
+                        return self.insert_op(Operation::Value(
+                            SpannedMirValue {
+                                span: id.span(),
+                                value: MirValue::RandomValue(rv),
+                            }
+                        ));
                     }
 
                     // Must be a trace segment name
                     if let Some(ta) = self.trace_access(access) {
-                        return self.insert_op(Operation::Value(Value::TraceAccess(ta)));
+                        return self.insert_op(Operation::Value(
+                            SpannedMirValue {
+                                span: id.span(),
+                                value: MirValue::TraceAccess(ta),
+                            }));
                     }
 
                     // It should never be possible to reach this point - semantic analysis
@@ -527,15 +544,27 @@ impl<'a> MirBuilder<'a> {
 
                 // Otherwise, we check the trace bindings, random value bindings, and public inputs, in that order
                 if let Some(trace_access) = self.trace_access(access) {
-                    return self.insert_op(Operation::Value(Value::TraceAccess(trace_access)));
+                    return self.insert_op(Operation::Value(
+                        SpannedMirValue {
+                            span: id.span(),
+                            value: MirValue::TraceAccess(trace_access),
+                        }));
                 }
 
                 if let Some(random_value) = self.random_value_access(access) {
-                    return self.insert_op(Operation::Value(Value::RandomValue(random_value)));
+                    return self.insert_op(Operation::Value(
+                        SpannedMirValue {
+                            span: id.span(),
+                            value: MirValue::RandomValue(random_value),
+                        }));
                 }
 
                 if let Some(public_input) = self.public_input_access(access) {
-                    return self.insert_op(Operation::Value(Value::PublicInput(public_input)));
+                    return self.insert_op(Operation::Value(
+                        SpannedMirValue {
+                            span: id.span(),
+                            value: MirValue::PublicInput(public_input),
+                        }));
                 }
 
                 // If we reach here, this must be a let-bound variable
@@ -661,8 +690,13 @@ impl<'a> MirBuilder<'a> {
         self.mir.constraint_graph_mut().insert_node(op)
     }
 
+    // TODO: This should propagate the span if available
     fn insert_constant(&mut self, value: u64) -> NodeIndex {
-        self.insert_op(Operation::Value(Value::Constant(value)))
+        self.insert_op(Operation::Value(
+            SpannedMirValue {
+                span: SourceSpan::UNKNOWN,
+                value: MirValue::Constant(ConstantValue::Felt(value)),
+            }))
     }
 
     fn insert_constants(&mut self, values: &[u64]) -> Vec<NodeIndex> {

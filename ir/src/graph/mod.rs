@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::ir::*;
 
 /// A unique identifier for a node in an [AlgebraicGraph]
@@ -51,11 +53,12 @@ impl Node {
 pub struct MirGraph {
     /// All nodes in the graph.
     nodes: Vec<Node>,
+    use_list: HashMap<NodeIndex, Vec<NodeIndex>>,
 }
 impl MirGraph {
     /// Creates a new graph from a list of nodes.
-    pub const fn new(nodes: Vec<Node>) -> Self {
-        Self { nodes }
+    pub fn new(nodes: Vec<Node>) -> Self {
+        Self { nodes, use_list: HashMap::default() }
     }
 
     /// Returns the node with the specified index.
@@ -66,6 +69,35 @@ impl MirGraph {
     /// Returns the number of nodes in the graph.
     pub fn num_nodes(&self) -> usize {
         self.nodes.len()
+    }
+
+    // TODO : Instead of checking the all tree recursively, maybe we should:
+    // - Check each node when adding it to the graph (depending on its children)
+    // - Check the modified nodes when applying a pass (just to the edited ops, not the whole graph)
+    pub fn check_typing_rules(&self, node_index: NodeIndex) -> Result<(), ()> {
+
+        // Todo: implement the typing rules
+        // Propagate types recursively through the graph and check that the types are consistent?
+        match self.node(&node_index).op() {
+            Operation::Value(_) => Ok(()),
+            Operation::Add(lhs, rhs) => todo!(),
+            /*{
+                let lhs_node = self.node(lhs);
+                let rhs_node = self.node(rhs);
+                if lhs_node.ty() != rhs_node.ty() {
+                    Err(())
+                } else {
+                    Ok(())
+                }
+            },*/
+            Operation::Sub(node_index, node_index1) => todo!(),
+            Operation::Mul(node_index, node_index1) => todo!(),
+            Operation::Enf(node_index) => todo!(),
+            Operation::Call(node_index, vec) => todo!(),
+            Operation::Fold(node_index, fold_operator, node_index1) => todo!(),
+            Operation::For(node_index, node_index1) => todo!(),
+            Operation::If(node_index, node_index1, node_index2) => todo!(),
+        }
     }
 
     /*
