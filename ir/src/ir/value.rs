@@ -71,6 +71,7 @@ pub struct SpannedMirValue {
     pub value: MirValue,
 }
 
+#[derive(Debug,  Eq,PartialEq, Clone)]
 pub enum MirType {
     Felt,
     Vector(usize),
@@ -117,7 +118,7 @@ impl MirValue {
                 let inner_size = vec[0].len();
                 MirType::Matrix(size, inner_size)
             },
-            MirValue::FunctionInput(ty) => ty.clone(),
+            MirValue::Variable(ty) => ty.clone(),
 
         }
     }
