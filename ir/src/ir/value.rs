@@ -1,3 +1,5 @@
+use crate::NodeIndex;
+
 use super::*;
 
 /// Represents a scalar value in the [MIR]
@@ -15,7 +17,12 @@ pub enum MirValue {
     /// A reference to a specific column in the trace segment, with an optional offset.
     ///
     TraceAccess(TraceAccess),
-
+    /// A reference to a specific variable in a function
+    /// Variable(MirType, argument position, function index)
+    Variable(MirType, usize, NodeIndex),
+    /// A function definition
+    /// Definition(Vec<Variable>, body)
+    Definition(Vec<MirValue>, NodeIndex),
     /// A reference to a periodic column
     ///
     /// The value this corresponds to is determined by the current row of the trace.
@@ -78,46 +85,46 @@ pub enum MirType {
 
 impl MirValue {
     /*fn ty(&self) -> MirType {
-        match &self {
-            MirValue::Constant(c) => match c {
-                ConstantValue::Felt(_) => MirType::Felt,
-                ConstantValue::Vector(v) => MirType::Vector(v.len()),
-                ConstantValue::Matrix(m) => MirType::Matrix(m.len(), m[0].len()),
-            },
-            MirValue::TraceAccess(_) => MirType::Felt,
-            MirValue::PeriodicColumn(_) => MirType::Felt,
-            MirValue::PublicInput(_) => MirType::Felt,
-            MirValue::RandomValue(_) => MirType::Felt,
-            MirValue::TraceAccessBinding(trace_access_binding) => {
-                let size = trace_access_binding.size;
-                match size {
-                    1 => MirType::Felt,
-                    _ => MirType::Vector(size),
-                }
-            },
-            MirValue::RandomValueBinding(random_value_binding) =>  {
-                let size = random_value_binding.size;
-                match size {
-                    1 => MirType::Felt,
-                    _ => MirType::Vector(size),
-                }
-            },
-            MirValue::Vector(vec) => {
-                let size = vec.len();
-                let inner_ty = vec[0].ty();
-                match inner_ty {
-                    MirType::Felt => MirType::Vector(size),
-                    MirType::Vector(inner_size) => MirType::Matrix(size, inner_size),
-                    MirType::Matrix(_, _) => unreachable!(),
-                }
-            },
-            MirValue::Matrix(vec) => {
-                let size = vec.len();
-                let inner_size = vec[0].len();
-                MirType::Matrix(size, inner_size)
-            },
-        }
-    }*/
+            match &self {
+                MirValue::Constant(c) => match c {
+                    ConstantValue::Felt(_) => MirType::Felt,
+                    ConstantValue::Vector(v) => MirType::Vector(v.len()),
+                    ConstantValue::Matrix(m) => MirType::Matrix(m.len(), m[0].len()),
+                },
+                MirValue::TraceAccess(_) => MirType::Felt,
+                MirValue::PeriodicColumn(_) => MirType::Felt,
+                MirValue::PublicInput(_) => MirType::Felt,
+                MirValue::RandomValue(_) => MirType::Felt,
+                MirValue::TraceAccessBinding(trace_access_binding) => {
+                    let size = trace_access_binding.size;
+                    match size {
+                        1 => MirType::Felt,
+                        _ => MirType::Vector(size),
+                    }
+                },
+                MirValue::RandomValueBinding(random_value_binding) =>  {
+                    let size = random_value_binding.size;
+                    match size {
+                        1 => MirType::Felt,
+                        _ => MirType::Vector(size),
+                    }
+                },
+                MirValue::Vector(vec) => {
+                    let size = vec.len();
+                    let inner_ty = vec[0].ty();
+                    match inner_ty {
+                        MirType::Felt => MirType::Vector(size),
+                        MirType::Vector(inner_size) => MirType::Matrix(size, inner_size),
+                        MirType::Matrix(_, _) => unreachable!(),
+                    }
+                },
+                MirValue::Matrix(vec) => {
+                    let size = vec.len();
+                    let inner_size = vec[0].len();
+                    MirType::Matrix(size, inner_size)
+                },
+            }
+        }*/
 }
 
 impl SpannedMirValue {

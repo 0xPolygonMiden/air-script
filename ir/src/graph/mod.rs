@@ -79,10 +79,7 @@ impl MirGraph {
     }
 
     pub fn add_use(&mut self, node_index: NodeIndex, use_index: NodeIndex) {
-        self.use_list
-            .entry(node_index)
-            .or_default()
-            .push(use_index);
+        self.use_list.entry(node_index).or_default().push(use_index);
     }
 
     /// Returns the number of nodes in the graph.
@@ -201,7 +198,7 @@ impl MirGraph {
             },
         )
     }
-    
+
     /// Insert the operation and return its node index. If an identical node already exists, return
     /// that index instead.
     #[allow(unused)]
@@ -221,11 +218,15 @@ impl MirGraph {
         self.add_use(node_index, used_by);
         node_index
     }
-    
+
     /// Insert the operation and return its node index. If an identical node already exists, return
     /// that index instead.
     #[allow(unused)]
-    pub(crate) fn insert_node_and_use_vec(&mut self, op: Operation, used_by: Vec<NodeIndex>) -> NodeIndex {
+    pub(crate) fn insert_node_and_use_vec(
+        &mut self,
+        op: Operation,
+        used_by: Vec<NodeIndex>,
+    ) -> NodeIndex {
         let node_index = self.nodes.iter().position(|n| *n.op() == op).map_or_else(
             || {
                 // create a new node.
