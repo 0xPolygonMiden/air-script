@@ -54,11 +54,13 @@ pub struct MirGraph {
     /// All nodes in the graph.
     nodes: Vec<Node>,
     use_list: HashMap<NodeIndex, Vec<NodeIndex>>,
+    function: Vec<NodeIndex>
 }
+
 impl MirGraph {
     /// Creates a new graph from a list of nodes.
     pub fn new(nodes: Vec<Node>) -> Self {
-        Self { nodes, use_list: HashMap::default() }
+        Self { nodes, use_list: HashMap::default(), function: vec![] }
     }
 
     /// Returns the node with the specified index.

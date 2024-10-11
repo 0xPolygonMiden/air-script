@@ -13,7 +13,11 @@ pub enum MirValue {
     /// (Scalar, vectors and matrices)
     /// 
     /// A reference to a specific column in the trace segment, with an optional offset.
+    /// 
+    Variable(MirType),
+    
     TraceAccess(TraceAccess),
+    
     /// A reference to a periodic column
     ///
     /// The value this corresponds to is determined by the current row of the trace.
@@ -25,7 +29,7 @@ pub enum MirValue {
 
     /// Vector version of the above, if needed 
     /// (basically the same but with a size argument to allow for continuous access)
-    /// 
+    /// We should delete the <TraceAccess> and <RandomValue> variants if we decide to use only the most generic variants below 
     TraceAccessBinding(TraceAccessBinding),
     /// 
     RandomValueBinding(RandomValueBinding),
@@ -113,6 +117,7 @@ impl MirValue {
                 let inner_size = vec[0].len();
                 MirType::Matrix(size, inner_size)
             },
+            MirValue::FunctionInput(ty) => ty.clone(),
 
         }
     }
