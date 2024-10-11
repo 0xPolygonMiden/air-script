@@ -8,7 +8,6 @@ use super::*;
 pub enum MirValue {
     /// A constant value.
     Constant(ConstantValue),
-
     /// Following to update from the ast::BindingType enum
     /// Goal: To represent the different types of values that can be stored in the MIR
     /// (Scalar, vectors and matrices)
@@ -23,6 +22,17 @@ pub enum MirValue {
     PublicInput(PublicInputAccess),
     /// A reference to the `random_values` array, specifically the element at the given index
     RandomValue(usize),
+
+    /// Vector version of the above, if needed 
+    /// (basically the same but with a size argument to allow for continuous access)
+    /// 
+    TraceAccessBinding(TraceAccessBinding),
+    /// 
+    RandomValueBinding(RandomValueBinding),
+
+    /// Not sure if the following is needed, would be useful if we want to handle e.g. function call arguments with a single node?
+    Vector(Vec<MirValue>),
+    Matrix(Vec<Vec<MirValue>>),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -30,6 +40,23 @@ pub enum ConstantValue {
     Felt(u64),
     Vector(Vec<u64>),
     Matrix(Vec<Vec<u64>>),
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct TraceAccessBinding {
+    pub segment: TraceSegmentId,
+    /// The offset to the first column of the segment which is bound by this binding
+    pub offset: usize,
+    /// The number of columns which are bound
+    pub size: usize,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct RandomValueBinding {
+    /// The offset in the random values array where this binding begins
+    pub offset: usize,
+    /// The number of elements which are bound
+    pub size: usize,
 }
 
 /// Represents a typed value in the [MIR]
@@ -59,6 +86,7 @@ impl SpannedMirValue {
             MirValue::PeriodicColumn(p) => MirType::Felt,
             MirValue::PublicInput(p) => MirType::Felt,
             MirValue::RandomValue(_) => MirType::Felt,
+
         }
     }
 }
