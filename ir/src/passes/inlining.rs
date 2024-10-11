@@ -1,15 +1,19 @@
 use std::ops::ControlFlow;
 
 use air_pass::Pass;
-use miden_diagnostics::DiagnosticsHandler;
+//use miden_diagnostics::DiagnosticsHandler;
 
 use crate::MirGraph;
 
-pub struct Inlining<'a> {
-    #[allow(unused)]
-    diagnostics: &'a DiagnosticsHandler,
-}
-impl<'p> Pass for Inlining<'p> {
+//pub struct Inlining<'a> {
+//     #[allow(unused)]
+//     diagnostics: &'a DiagnosticsHandler,
+//}
+
+pub struct Inlining {}
+
+//impl<'p> Pass for Inlining<'p> {}
+impl Pass for Inlining {
     type Input<'a> = MirGraph;
     type Output<'a> = MirGraph;
     type Error = ();
@@ -22,16 +26,23 @@ impl<'p> Pass for Inlining<'p> {
     }
 }
 
-impl<'a> Inlining<'a> {
-    pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
-        Self { diagnostics }
+// impl<'a> Inlining<'a> {
+//     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
+//         Self { diagnostics }
+//         Self {}
+//     }
+// }
+impl Inlining {
+    pub fn new() -> Self {
+        Self {}
     }
-
     //TODO MIR: Implement inlining pass on MIR
     // 1. Understand the basics of the previous inlining process
     // 2. Remove what is done during lowering from AST to MIR (unroll, ...)
     // 3. Check how it translates to the MIR structure
-    fn run_visitor(&mut self, _ir: &mut MirGraph) -> ControlFlow<()> {
+    fn run_visitor(&mut self, ir: &mut MirGraph) -> ControlFlow<()> {
+        println!("Inlining pass");
+        println!("{:#?}", ir);
         ControlFlow::Continue(())
     }
 }

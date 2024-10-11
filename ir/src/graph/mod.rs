@@ -27,7 +27,7 @@ impl core::ops::Add<usize> for &NodeIndex {
 #[derive(Debug, Clone)]
 pub struct Node {
     /// The operation represented by this node
-    op: Operation,
+    pub op: Operation,
 }
 impl Node {
     /// Get the underlying [Operation] represented by this node
