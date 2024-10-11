@@ -73,10 +73,9 @@ pub enum MirType {
     Matrix(usize, usize),
 }
 
-impl SpannedMirValue {
-
+impl MirValue {
     fn ty(&self) -> MirType {
-        match &self.value {
+        match &self {
             MirValue::Constant(c) => match c {
                 ConstantValue::Felt(_) => MirType::Felt,
                 ConstantValue::Vector(v) => MirType::Vector(v.len()),
@@ -86,8 +85,43 @@ impl SpannedMirValue {
             MirValue::PeriodicColumn(p) => MirType::Felt,
             MirValue::PublicInput(p) => MirType::Felt,
             MirValue::RandomValue(_) => MirType::Felt,
+            MirValue::TraceAccessBinding(trace_access_binding) => {
+                let size = trace_access_binding.size;
+                match size {
+                    1 => MirType::Felt,
+                    _ => MirType::Vector(size),
+                }
+            },
+            MirValue::RandomValueBinding(random_value_binding) =>  {
+                let size = random_value_binding.size;
+                match size {
+                    1 => MirType::Felt,
+                    _ => MirType::Vector(size),
+                }
+            },
+            MirValue::Vector(vec) => {
+                let size = vec.len();
+                let inner_ty = vec[0].ty();
+                match inner_ty {
+                    MirType::Felt => MirType::Vector(size),
+                    MirType::Vector(inner_size) => MirType::Matrix(size, inner_size),
+                    MirType::Matrix(_, _) => unreachable!(),
+                }
+            },
+            MirValue::Matrix(vec) => {
+                let size = vec.len();
+                let inner_size = vec[0].len();
+                MirType::Matrix(size, inner_size)
+            },
 
         }
+    }
+}
+
+impl SpannedMirValue {
+
+    fn ty(&self) -> MirType {
+        self.value.ty()
     }
 }
 
