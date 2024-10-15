@@ -1,9 +1,9 @@
 use air_parser::{ast, LexicalScope};
 use air_pass::Pass;
 
-use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
+use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
 
-use crate::{graph::NodeIndex, ir::*, CompileError, MirGraph};
+use crate::{graph::NodeIndex, ir::*, CompileError};
 
 pub struct AstToMir<'a> {
     diagnostics: &'a DiagnosticsHandler,
@@ -21,7 +21,7 @@ impl<'p> Pass for AstToMir<'p> {
     type Error = CompileError;
 
     fn run<'a>(&mut self, program: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
-        let mut mir = Mir::new(program.name.clone());
+        let mut mir = Mir::new(program.name);
 
         //TODO MIR: Implement AST > MIR lowering
         // 1. Start from the previous lowering from AST to AIR
@@ -42,91 +42,137 @@ impl<'p> Pass for AstToMir<'p> {
             bindings: Default::default(),
         };
 
-        /*for bc in boundary_constraints.iter() {
+        // Insert placeholders nodes for future Operation::Definition (needed for function bodies to call other functions)
+        for (ident, _func) in program.functions.iter() {
+            let node_index = builder.insert_typed_constant(None, ast::ConstantExpr::Scalar(0));
+            builder
+                .mir
+                .constraint_graph_mut()
+                .functions
+                .insert(*ident, node_index);
+        }
+
+        for (ident, func) in program.functions.iter() {
+            builder.insert_function_body(ident, func)?;
+        }
+
+        for bc in boundary_constraints.iter() {
             builder.build_boundary_constraint(bc)?;
         }
 
         for ic in integrity_constraints.iter() {
             builder.build_integrity_constraint(ic)?;
-        }*/
+        }
 
         Ok(mir)
     }
 }
 
-#[derive(Debug, Clone)]
-enum MemoizedBinding {
-    /// The binding was reduced to a node in the graph
-    Scalar(NodeIndex),
-    /// The binding represents a vector of nodes in the graph
-    Vector(Vec<NodeIndex>),
-    /// The binding represents a matrix of nodes in the graph
-    Matrix(Vec<Vec<NodeIndex>>),
-}
-
 struct MirBuilder<'a> {
+    #[allow(unused)]
     diagnostics: &'a DiagnosticsHandler,
     mir: &'a mut Mir,
     random_values: Option<ast::RandomValues>,
     trace_columns: Vec<ast::TraceSegment>,
-    bindings: LexicalScope<Identifier, MemoizedBinding>,
+    bindings: LexicalScope<Identifier, NodeIndex>,
 }
 impl<'a> MirBuilder<'a> {
-    fn build_boundary_constraint(&mut self, bc: &ast::Statement) -> Result<(), CompileError> {
-        match bc {
-            ast::Statement::Enforce(ast::ScalarExpr::Binary(ast::BinaryExpr {
-                op: ast::BinaryOp::Eq,
-                ref lhs,
-                ref rhs,
-                ..
-            })) => self.build_boundary_equality(lhs, rhs),
-            ast::Statement::Let(expr) => {
-                self.build_let(expr, |bldr, stmt| bldr.build_boundary_constraint(stmt))
-            }
-            invalid => {
-                self.diagnostics
-                    .diagnostic(Severity::Bug)
-                    .with_message("invalid boundary constraint")
-                    .with_primary_label(
-                        invalid.span(),
-                        "expected this to have been reduced to an equality",
-                    )
-                    .emit();
-                Err(CompileError::Failed)
-            }
+    fn insert_variable(&mut self, span: SourceSpan, ty: ast::Type, index: usize) -> NodeIndex {
+        let mir_type = match ty {
+            ast::Type::Felt => MirType::Felt,
+            ast::Type::Vector(n) => MirType::Vector(n),
+            ast::Type::Matrix(n, m) => MirType::Matrix(n, m),
+        };
+
+        self.insert_op(Operation::Variable(SpannedVariable::new(
+            span, mir_type, index,
+        )))
+    }
+
+    fn insert_function_body(
+        &mut self,
+        ident: &QualifiedIdentifier,
+        func: &ast::Function,
+    ) -> Result<(), CompileError> {
+        let body = &func.body;
+        let params = &func.params;
+
+        let mut params_node_indices = Vec::with_capacity(params.len());
+        for (index, (ident, ty)) in params.iter().enumerate() {
+            let node_index = self.insert_variable(ident.span(), *ty, index);
+            params_node_indices.push(node_index);
         }
+
+        let return_variable_node_index = self.insert_variable(ident.span(), func.return_type, 0);
+
+        // Get the number of nodes before representing the body
+        let before_node_count = self.mir.constraints.graph().num_nodes();
+
+        // Insert the function body
+        for stmt in body.iter() {
+            self.build_function_body_statement(stmt)?;
+        }
+
+        let after_node_count = self.mir.constraints.graph().num_nodes();
+
+        let range = before_node_count..after_node_count;
+
+        // Reference all the new nodes created by the body in the definition
+        let node_index_to_update = *self.mir.constraint_graph().functions.get(ident).unwrap();
+        let operation_definition = Operation::Definition(
+            params_node_indices,
+            return_variable_node_index,
+            range.map(|i| NodeIndex::default() + i).collect(),
+        );
+
+        self.mir
+            .constraint_graph_mut()
+            .update_node(&node_index_to_update, operation_definition);
+
+        Ok(())
+    }
+
+    // TODO: Handle other types of statements
+    fn build_boundary_constraint(&mut self, bc: &ast::Statement) -> Result<(), CompileError> {
+        self.build_statement(bc)
     }
 
     fn build_integrity_constraint(&mut self, ic: &ast::Statement) -> Result<(), CompileError> {
-        match ic {
-            ast::Statement::Enforce(ast::ScalarExpr::Binary(ast::BinaryExpr {
-                op: ast::BinaryOp::Eq,
-                ref lhs,
-                ref rhs,
-                ..
-            })) => self.build_integrity_equality(lhs, rhs, None),
-            ast::Statement::EnforceIf(
-                ast::ScalarExpr::Binary(ast::BinaryExpr {
-                    op: ast::BinaryOp::Eq,
-                    ref lhs,
-                    ref rhs,
-                    ..
-                }),
-                ref condition,
-            ) => self.build_integrity_equality(lhs, rhs, Some(condition)),
+        self.build_statement(ic)
+    }
+
+    fn build_function_body_statement(&mut self, s: &ast::Statement) -> Result<(), CompileError> {
+        self.build_statement(s)
+    }
+
+    fn build_statement(&mut self, c: &ast::Statement) -> Result<(), CompileError> {
+        match c {
+            // If we have a let, update scoping and insertuate the body
             ast::Statement::Let(expr) => {
-                self.build_let(expr, |bldr, stmt| bldr.build_integrity_constraint(stmt))
+                self.build_let(expr, |bldr, stmt| bldr.build_statement(stmt))
             }
-            invalid => {
-                self.diagnostics
-                    .diagnostic(Severity::Bug)
-                    .with_message("invalid integrity constraint")
-                    .with_primary_label(
-                        invalid.span(),
-                        "expected this to have been reduced to an equality",
-                    )
-                    .emit();
-                Err(CompileError::Failed)
+            // Depending on the expression, we can have different types of operations in the
+            // If we have a symbol access, we have to get it depending on the scope and add the
+            // identifier to the graph nodes (SSA)
+            ast::Statement::Expr(expr) => {
+                self.insert_expr(expr)?;
+                Ok(())
+            }
+            // Enforce statements can be translated to Enf operations in the MIR on scalar expressions
+            ast::Statement::Enforce(scalar_expr) => {
+                let scalar_expr = self.insert_scalar_expr(scalar_expr)?;
+                self.insert_op(Operation::Enf(scalar_expr));
+
+                Ok(())
+            }
+            ast::Statement::EnforceIf(_, _) => unreachable!(), // This variant was only available after AST's inlining, we should handle EnforceAll instead
+            ast::Statement::EnforceAll(_list_comprehension) => {
+                //self.build_statement(&ast::Statement::Expr(ScalarExpr(list_comprehension.body))?;
+
+                // let scalar_expr = self.insert_scalar_expr(scalar_expr)?;
+                // let insert_op = self.insert_op(Operation::For(scalar_expr));
+
+                Ok(())
             }
         }
     }
@@ -139,7 +185,7 @@ impl<'a> MirBuilder<'a> {
     where
         F: FnMut(&mut MirBuilder, &ast::Statement) -> Result<(), CompileError>,
     {
-        let bound = self.eval_expr(&expr.value)?;
+        let bound = self.insert_expr(&expr.value)?;
         self.bindings.enter();
         self.bindings.insert(expr.name, bound);
         for stmt in expr.body.iter() {
@@ -149,138 +195,84 @@ impl<'a> MirBuilder<'a> {
         Ok(())
     }
 
-    fn build_boundary_equality(
-        &mut self,
-        _lhs: &ast::ScalarExpr,
-        _rhs: &ast::ScalarExpr,
-    ) -> Result<(), CompileError> {
-        /*        let lhs_span = lhs.span();
-                let rhs_span = rhs.span();
+    fn insert_expr(&mut self, expr: &ast::Expr) -> Result<NodeIndex, CompileError> {
+        match expr {
+            ast::Expr::Const(span) => {
+                let value = self.insert_typed_constant(Some(span.span()), span.item.clone());
+                Ok(value)
+            }
+            ast::Expr::Range(_range_expr) => todo!(),
+            ast::Expr::Vector(_span) => todo!(),
+            ast::Expr::Matrix(_span) => todo!(),
+            ast::Expr::SymbolAccess(_symbol_access) => {
+                // Should resolve the identifier depending on the scope, and add the access to the graph once it's resolved
+                todo!()
+            }
+            ast::Expr::Binary(binary_expr) => self.insert_binary_expr(binary_expr),
+            ast::Expr::Call(call) => {
 
-                // The left-hand side of a boundary constraint equality expression is always a bounded symbol access
-                // against a trace column. It is fine to panic here if that is ever violated.
-                let ast::ScalarExpr::BoundedSymbolAccess(ref access) = lhs else {
-                    self.diagnostics
-                        .diagnostic(Severity::Bug)
-                        .with_message("invalid boundary constraint")
-                        .with_primary_label(
-                            lhs_span,
-                            "expected bounded trace column access here, e.g. 'main[0].first'",
-                        )
-                        .emit();
-                    return Err(CompileError::Failed);
-                };
-                // Insert the trace access into the graph
-                let trace_access = self.trace_access(&access.column).unwrap();
+                // Insert the call args: as 1 node or N nodes?
+                let args_node_index: Vec<_> = call
+                    .args
+                    .iter()
+                    .map(|arg| self.insert_expr(arg).unwrap())
+                    .collect();
 
-                // Raise a validation error if this column boundary has already been constrained
-                if let Some(prev) = self.trace_columns[trace_access.segment].mark_constrained(
-                    lhs_span,
-                    trace_access.column,
-                    access.boundary,
-                ) {
-                    self.diagnostics
-                        .diagnostic(Severity::Error)
-                        .with_message("overlapping boundary constraints")
-                        .with_primary_label(
-                            lhs_span,
-                            "this constrains a column and boundary that has already been constrained",
-                        )
-                        .with_secondary_label(prev, "previous constraint occurs here")
-                        .emit();
-                    return Err(CompileError::Failed);
-                }
-
-                let lhs = self.insert_op(Operation::Value(Value::TraceAccess(trace_access)));
-                // Insert the right-hand expression into the graph
-                let rhs = self.insert_scalar_expr(rhs)?;
-                // Compare the inferred trace segment and domain of the operands
-                let domain = access.boundary.into();
-                {
-                    let graph = self.air.constraint_graph();
-                    let (lhs_segment, lhs_domain) = graph.node_details(&lhs, domain)?;
-                    let (rhs_segment, rhs_domain) = graph.node_details(&rhs, domain)?;
-                    if lhs_segment < rhs_segment {
-                        // trace segment inference defaults to the lowest segment (the main trace) and is
-                        // adjusted according to the use of random values and trace columns.
-                        let lhs_segment_name = self.trace_columns[lhs_segment].name;
-                        let rhs_segment_name = self.trace_columns[rhs_segment].name;
-                        self.diagnostics.diagnostic(Severity::Error)
-                            .with_message("invalid boundary constraint")
-                            .with_primary_label(lhs_span, format!("this constrains a column in the '{lhs_segment_name}' trace segment"))
-                            .with_secondary_label(rhs_span, format!("but this expression implies the '{rhs_segment_name}' trace segment"))
-                            .with_note("Boundary constraints require both sides of the constraint to apply to the same trace segment.")
-                            .emit();
-                        return Err(CompileError::Failed);
-                    }
-                    if lhs_domain != rhs_domain {
-                        self.diagnostics.diagnostic(Severity::Error)
-                            .with_message("invalid boundary constraint")
-                            .with_primary_label(lhs_span, format!("this has a constraint domain of {lhs_domain}"))
-                            .with_secondary_label(rhs_span, format!("this has a constraint domain of {rhs_domain}"))
-                            .with_note("Boundary constraints require both sides of the constraint to be in the same domain.")
-                            .emit();
-                        return Err(CompileError::Failed);
-                    }
-                }
-                // Merge the expressions into a single constraint
-                let root = self.merge_equal_exprs(lhs, rhs, None);
-                // Store the generated constraint
-                self.air
-                    .constraints
-                    .insert_constraint(trace_access.segment, root, domain);
-        */
-        Ok(())
-    }
-
-    fn build_integrity_equality(
-        &mut self,
-        _lhs: &ast::ScalarExpr,
-        _rhs: &ast::ScalarExpr,
-        _condition: Option<&ast::ScalarExpr>,
-    ) -> Result<(), CompileError> {
-        /*        let lhs = self.insert_scalar_expr(lhs)?;
-                let rhs = self.insert_scalar_expr(rhs)?;
-                let condition = match condition {
-                    Some(cond) => Some(self.insert_scalar_expr(cond)?),
-                    None => None,
-                };
-                let root = self.merge_equal_exprs(lhs, rhs, condition);
-                // Get the trace segment and domain of the constraint.
-                //
-                // The default domain for integrity constraints is `EveryRow`
-                let (trace_segment, domain) = self
-                    .air
+                // Get the known callee in the functions hashmap
+                // First, resolve the callee, panic if it's not resolved
+                let resolved_callee = call.callee.resolved().unwrap();
+                // Then, get the node index of the function definition
+                let callee_node_index = *self
+                    .mir
                     .constraint_graph()
-                    .node_details(&root, ConstraintDomain::EveryRow)?;
-                // Save the constraint information
-                self.air
-                    .constraints
-                    .insert_constraint(trace_segment, root, domain);
-        */
-        Ok(())
+                    .functions
+                    .get(&resolved_callee)
+                    .unwrap();
+
+                let call_node_index =
+                    self.insert_op(Operation::Call(callee_node_index, args_node_index));
+
+                Ok(call_node_index)
+            }
+            ast::Expr::ListComprehension(_list_comprehension) => {
+                /*/// 1. Add all the bindings of the list_comprehension
+                // 2. Constuct the body of the list comprehension
+                // 3. Add a "For" node to represent the list comprehension
+
+                let b = list_comprehension.bindings;
+                let bindings_node_index = self.insert_scalar_expr(&list_comprehension.body)?;
+
+                for binding in list_comprehension.bindings.iter() {
+                    let binding_node_index = // insert vae
+                }
+
+                for iterator in list_comprehension.iterables.iter() {
+                    let iterator_node_index = self.insert_expr(iterator)?;
+                }
+                let iterator_node_index = self.insert_expr(&list_comprehension.iterables)?;
+                let selector_node_index = if let Some(selector) = &list_comprehension.selector {
+                    Some(self.insert_scalar_expr(selector)?)
+                } else {
+                    None
+                };
+                let body_node_index = self.insert_scalar_expr(&list_comprehension.body)?;
+
+                let for_node_index = self.insert_op(Operation::For(bindings_node_index, body_node_index, selector_node_index));
+
+                Ok(for_node_index)*/
+
+                todo!()
+            }
+            ast::Expr::Let(expr) => self.expand_let_expr(expr),
+        }
     }
 
-    /*fn merge_equal_exprs(
-        &mut self,
-        lhs: NodeIndex,
-        rhs: NodeIndex,
-        selector: Option<NodeIndex>,
-    ) -> NodeIndex {
-        if let Some(selector) = selector {
-            let constraint = self.insert_op(Operation::Sub(lhs, rhs));
-            self.insert_op(Operation::Mul(constraint, selector))
-        } else {
-            self.insert_op(Operation::Sub(lhs, rhs))
-        }
-    }*/
-
-    fn eval_let_expr(&mut self, expr: &ast::Let) -> Result<MemoizedBinding, CompileError> {
+    fn expand_let_expr(&mut self, expr: &ast::Let) -> Result<NodeIndex, CompileError> {
         let mut next_let = Some(expr);
         let snapshot = self.bindings.clone();
         loop {
             let let_expr = next_let.take().expect("invalid empty let body");
-            let bound = self.eval_expr(&let_expr.value)?;
+            let bound = self.insert_expr(&let_expr.value)?;
             self.bindings.enter();
             self.bindings.insert(let_expr.name, bound);
             match let_expr.body.last().unwrap() {
@@ -288,7 +280,7 @@ impl<'a> MirBuilder<'a> {
                     next_let = Some(inner_let);
                 }
                 ast::Statement::Expr(ref expr) => {
-                    let value = self.eval_expr(expr);
+                    let value = self.insert_expr(expr);
                     self.bindings = snapshot;
                     break value;
                 }
@@ -301,21 +293,22 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
-    fn eval_expr(&mut self, expr: &ast::Expr) -> Result<MemoizedBinding, CompileError> {
+    // TODO: Merge with other insert_expr
+    /*fn insert_expr(&mut self, expr: &ast::Expr) -> Result<NodeIndex, CompileError> {
         match expr {
             ast::Expr::Const(ref constant) => match &constant.item {
                 ast::ConstantExpr::Scalar(value) => {
-                    let value = self.insert_constant(*value);
+                    let value = self.insert_constant(Some(constant.span()), *value);
                     Ok(MemoizedBinding::Scalar(value))
                 }
                 ast::ConstantExpr::Vector(values) => {
-                    let values = self.insert_constants(values.as_slice());
+                    let values = self.insert_constants(Some(constant.span()), values.as_slice());
                     Ok(MemoizedBinding::Vector(values))
                 }
                 ast::ConstantExpr::Matrix(values) => {
                     let values = values
                         .iter()
-                        .map(|vs| self.insert_constants(vs.as_slice()))
+                        .map(|vs| self.insert_constants(Some(constant.span()), vs.as_slice()))
                         .collect();
                     Ok(MemoizedBinding::Matrix(values))
                 }
@@ -323,7 +316,7 @@ impl<'a> MirBuilder<'a> {
             ast::Expr::Range(ref values) => {
                 let values = values
                     .to_slice_range()
-                    .map(|v| self.insert_constant(v as u64))
+                    .map(|v| self.insert_constant(Some(values.span()), v as u64))
                     .collect();
                 Ok(MemoizedBinding::Vector(values))
             }
@@ -340,12 +333,10 @@ impl<'a> MirBuilder<'a> {
                     let mut nodes = vec![];
                     for row in values.iter().cloned() {
                         match row {
-                            ast::Expr::Const(Span {
-                                item: ast::ConstantExpr::Vector(vs),
-                                ..
-                            }) => {
-                                nodes.push(self.insert_constants(vs.as_slice()));
+                            ast::Expr::Const(const_expr) => {
+                                self.insert_typed_constant(Some(const_expr.span()), const_expr.item);
                             }
+                            // Rework based on Continuous Symbol Access in the MIR ?
                             ast::Expr::SymbolAccess(access) => {
                                 let mut cols = vec![];
                                 for i in 0..n {
@@ -425,46 +416,90 @@ impl<'a> MirBuilder<'a> {
                     }
                 }
             }
-            ast::Expr::Let(ref let_expr) => self.eval_let_expr(let_expr),
+            ast::Expr::Let(ref let_expr) => self.insert_let_expr(let_expr),
+            ast::Expr::Call(call) => {
+
+            }
             // These node types should not exist at this point
             ast::Expr::Call(_) | ast::Expr::ListComprehension(_) => unreachable!(),
         }
-    }
+    }*/
 
     fn insert_scalar_expr(&mut self, expr: &ast::ScalarExpr) -> Result<NodeIndex, CompileError> {
         match expr {
             ast::ScalarExpr::Const(value) => {
-                Ok(self.insert_op(Operation::Value(
-                    SpannedMirValue {
-                        span: value.span(),
-                        value: MirValue::Constant(ConstantValue::Felt(value.item)),
-                    }
-                )))
+                Ok(self.insert_op(Operation::Value(SpannedMirValue {
+                    span: value.span(),
+                    value: MirValue::Constant(ConstantValue::Felt(value.item)),
+                })))
             }
             ast::ScalarExpr::SymbolAccess(access) => Ok(self.insert_symbol_access(access)),
             ast::ScalarExpr::Binary(expr) => self.insert_binary_expr(expr),
-            ast::ScalarExpr::Let(ref let_expr) => match self.eval_let_expr(let_expr)? {
-                MemoizedBinding::Scalar(node) => Ok(node),
-                invalid => {
-                    panic!("expected scalar expression to produce scalar value, got: {invalid:?}")
+            ast::ScalarExpr::Let(ref let_expr) => {
+                let index = self.expand_let_expr(let_expr)?;
+
+                // TODO: Check that the resulting expr is a scalar expr
+                Ok(index)
+            }
+            ast::ScalarExpr::Call(call) => {
+                // 1. Recup le NodeIndex correspondant a la Definition de func
+                // 2. Représenter z (l'argument) via son NodeIndex
+                // 3. Décrire le Call avec Operation::Call(NodeIndex, Vec<NodeIndex>)
+
+                let args_node_index: Vec<_> = call
+                    .args
+                    .iter()
+                    .map(|arg| self.insert_expr(arg).unwrap())
+                    .collect();
+
+                // Get the known callee in the functions hashmap
+                // First, resolve the callee, panic if it's not resolved
+                let resolved_callee = call.callee.resolved().unwrap();
+                // Then, get the node index of the function definition
+                let callee_node_index = *self
+                    .mir
+                    .constraint_graph()
+                    .functions
+                    .get(&resolved_callee)
+                    .unwrap();
+
+                let call_node_index =
+                    self.insert_op(Operation::Call(callee_node_index, args_node_index));
+
+                match self.mir.constraint_graph().node(&callee_node_index).op() {
+                    Operation::Definition(_, return_node_index, _) => {
+                        match self.mir.constraint_graph().node(return_node_index).op() {
+                            Operation::Variable(var) => {
+                                assert_eq!(
+                                    var.ty,
+                                    MirType::Felt,
+                                    "Call to a function that does not return a scalar value"
+                                );
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    _ => unreachable!(),
                 }
-            },
-            ast::ScalarExpr::Call(_) | ast::ScalarExpr::BoundedSymbolAccess(_) => unreachable!(),
+
+                Ok(call_node_index)
+            }
+            ast::ScalarExpr::BoundedSymbolAccess(_) => unreachable!(),
         }
     }
 
     // Use square and multiply algorithm to expand the exp into a series of multiplications
-    fn expand_exp(&mut self, lhs: NodeIndex, rhs: u64) -> NodeIndex {
+    fn expand_exp(&mut self, lhs: NodeIndex, rhs: u64, span: SourceSpan) -> NodeIndex {
         match rhs {
-            0 => self.insert_constant(1),
+            0 => self.insert_typed_constant(Some(span), ast::ConstantExpr::Scalar(1)),
             1 => lhs,
             n if n % 2 == 0 => {
                 let square = self.insert_op(Operation::Mul(lhs, lhs));
-                self.expand_exp(square, n / 2)
+                self.expand_exp(square, n / 2, span)
             }
             n => {
                 let square = self.insert_op(Operation::Mul(lhs, lhs));
-                let rec = self.expand_exp(square, (n - 1) / 2);
+                let rec = self.expand_exp(square, (n - 1) / 2, span);
                 self.insert_op(Operation::Mul(lhs, rec))
             }
         }
@@ -476,7 +511,7 @@ impl<'a> MirBuilder<'a> {
             let ast::ScalarExpr::Const(rhs) = expr.rhs.as_ref() else {
                 unreachable!();
             };
-            return Ok(self.expand_exp(lhs, rhs.item));
+            return Ok(self.expand_exp(lhs, rhs.item, expr.span()));
         }
 
         let lhs = self.insert_scalar_expr(expr.lhs.as_ref())?;
@@ -489,6 +524,7 @@ impl<'a> MirBuilder<'a> {
         })
     }
 
+    // Assumed inlining was done, to update
     fn insert_symbol_access(&mut self, access: &ast::SymbolAccess) -> NodeIndex {
         use air_parser::ast::ResolvableIdentifier;
         match access.name {
@@ -496,12 +532,13 @@ impl<'a> MirBuilder<'a> {
             // to a periodic column, as all functions have been inlined, and constants propagated.
             ResolvableIdentifier::Resolved(ref qid) => {
                 if let Some(pc) = self.mir.periodic_columns.get(qid) {
-                    self.insert_op(Operation::Value(
-                        SpannedMirValue {
-                            span: qid.span(),
-                            value: MirValue::PeriodicColumn(PeriodicColumnAccess::new(*qid, pc.period())),
-                        }
-                    ))
+                    self.insert_op(Operation::Value(SpannedMirValue {
+                        span: qid.span(),
+                        value: MirValue::PeriodicColumn(PeriodicColumnAccess::new(
+                            *qid,
+                            pc.period(),
+                        )),
+                    }))
                 } else {
                     // This is a qualified reference that should have been eliminated
                     // during inlining or constant propagation, but somehow slipped through.
@@ -517,21 +554,18 @@ impl<'a> MirBuilder<'a> {
                 // the random values array (generally the case), or the names of trace segments (e.g. `$main`)
                 if id.is_special() {
                     if let Some(rv) = self.random_value_access(access) {
-                        return self.insert_op(Operation::Value(
-                            SpannedMirValue {
-                                span: id.span(),
-                                value: MirValue::RandomValue(rv),
-                            }
-                        ));
+                        return self.insert_op(Operation::Value(SpannedMirValue {
+                            span: id.span(),
+                            value: MirValue::RandomValue(rv),
+                        }));
                     }
 
                     // Must be a trace segment name
                     if let Some(ta) = self.trace_access(access) {
-                        return self.insert_op(Operation::Value(
-                            SpannedMirValue {
-                                span: id.span(),
-                                value: MirValue::TraceAccess(ta),
-                            }));
+                        return self.insert_op(Operation::Value(SpannedMirValue {
+                            span: id.span(),
+                            value: MirValue::TraceAccess(ta),
+                        }));
                     }
 
                     // It should never be possible to reach this point - semantic analysis
@@ -544,35 +578,32 @@ impl<'a> MirBuilder<'a> {
 
                 // Otherwise, we check the trace bindings, random value bindings, and public inputs, in that order
                 if let Some(trace_access) = self.trace_access(access) {
-                    return self.insert_op(Operation::Value(
-                        SpannedMirValue {
-                            span: id.span(),
-                            value: MirValue::TraceAccess(trace_access),
-                        }));
+                    return self.insert_op(Operation::Value(SpannedMirValue {
+                        span: id.span(),
+                        value: MirValue::TraceAccess(trace_access),
+                    }));
                 }
 
                 if let Some(random_value) = self.random_value_access(access) {
-                    return self.insert_op(Operation::Value(
-                        SpannedMirValue {
-                            span: id.span(),
-                            value: MirValue::RandomValue(random_value),
-                        }));
+                    return self.insert_op(Operation::Value(SpannedMirValue {
+                        span: id.span(),
+                        value: MirValue::RandomValue(random_value),
+                    }));
                 }
 
                 if let Some(public_input) = self.public_input_access(access) {
-                    return self.insert_op(Operation::Value(
-                        SpannedMirValue {
-                            span: id.span(),
-                            value: MirValue::PublicInput(public_input),
-                        }));
+                    return self.insert_op(Operation::Value(SpannedMirValue {
+                        span: id.span(),
+                        value: MirValue::PublicInput(public_input),
+                    }));
                 }
 
                 // If we reach here, this must be a let-bound variable
-                match self
+                return *self
                     .bindings
                     .get(access.name.as_ref())
-                    .expect("undefined variable")
-                {
+                    .expect("undefined variable");
+                /*{
                     MemoizedBinding::Scalar(node) => {
                         assert_eq!(access.access_type, AccessType::Default);
                         *node
@@ -589,7 +620,7 @@ impl<'a> MirBuilder<'a> {
                         }
                         unreachable!("impossible matrix access: {:?}", access)
                     }
-                }
+                }*/
             }
             // These should have been eliminated by previous compiler passes
             ResolvableIdentifier::Unresolved(_) => {
@@ -601,6 +632,7 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
+    // Check assumptions, probably this assumed that the inlining pass did some work
     fn random_value_access(&self, access: &ast::SymbolAccess) -> Option<usize> {
         let rv = self.random_values.as_ref()?;
         let id = access.name.as_ref();
@@ -628,6 +660,7 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
+    // Check assumptions, probably this assumed that the inlining pass did some work
     fn public_input_access(&self, access: &ast::SymbolAccess) -> Option<PublicInputAccess> {
         let public_input = self.mir.public_inputs.get(access.name.as_ref())?;
         if let AccessType::Index(index) = access.access_type {
@@ -641,6 +674,7 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
+    // Check assumptions, probably this assumed that the inlining pass did some work
     fn trace_access(&self, access: &ast::SymbolAccess) -> Option<TraceAccess> {
         let id = access.name.as_ref();
         for (i, segment) in self.trace_columns.iter().enumerate() {
@@ -690,20 +724,19 @@ impl<'a> MirBuilder<'a> {
         self.mir.constraint_graph_mut().insert_node(op)
     }
 
-    // TODO: This should propagate the span if available
-    fn insert_constant(&mut self, value: u64) -> NodeIndex {
-        self.insert_op(Operation::Value(
-            SpannedMirValue {
-                span: SourceSpan::UNKNOWN,
-                value: MirValue::Constant(ConstantValue::Felt(value)),
-            }))
-    }
-
-    fn insert_constants(&mut self, values: &[u64]) -> Vec<NodeIndex> {
-        values
-            .iter()
-            .copied()
-            .map(|v| self.insert_constant(v))
-            .collect()
+    fn insert_typed_constant(
+        &mut self,
+        span: Option<SourceSpan>,
+        value: ast::ConstantExpr,
+    ) -> NodeIndex {
+        let mir_value = match value {
+            ast::ConstantExpr::Scalar(val) => ConstantValue::Felt(val),
+            ast::ConstantExpr::Vector(val) => ConstantValue::Vector(val),
+            ast::ConstantExpr::Matrix(val) => ConstantValue::Matrix(val),
+        };
+        self.insert_op(Operation::Value(SpannedMirValue {
+            span: span.unwrap_or_default(),
+            value: MirValue::Constant(mir_value),
+        }))
     }
 }

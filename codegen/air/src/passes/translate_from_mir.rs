@@ -25,7 +25,7 @@ impl<'p> Pass for MirToAir<'p> {
         let air = Air::new(mir.name);
 
         //TODO: Implement MIR > AIR lowering
-        
+
         /*let random_values = mir.random_values;
         let trace_columns = mir.trace_columns;
         let boundary_constraints = mir.boundary_constraints;

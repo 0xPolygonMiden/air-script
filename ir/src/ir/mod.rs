@@ -6,9 +6,11 @@ mod value;
 
 pub use self::constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints};
 pub use self::degree::IntegrityConstraintDegree;
-pub use self::operation::Operation;
+pub use self::operation::{Operation, SpannedVariable};
 pub use self::trace::TraceAccess;
-pub use self::value::{PeriodicColumnAccess, PublicInputAccess, SpannedMirValue, MirType, MirValue, ConstantValue};
+pub use self::value::{
+    ConstantValue, MirType, MirValue, PeriodicColumnAccess, PublicInputAccess, SpannedMirValue,
+};
 
 pub use air_parser::{
     ast::{

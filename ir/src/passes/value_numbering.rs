@@ -29,7 +29,7 @@ impl<'a> ValueNumbering<'a> {
 
     //TODO MIR: Implement value numbering pass on MIR
     // See https://en.wikipedia.org/wiki/Value_numbering
-    fn run_visitor(&mut self, ir: &mut MirGraph) -> ControlFlow<()> {
+    fn run_visitor(&mut self, _ir: &mut MirGraph) -> ControlFlow<()> {
         ControlFlow::Continue(())
     }
 }

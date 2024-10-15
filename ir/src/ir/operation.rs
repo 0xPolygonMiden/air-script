@@ -1,4 +1,3 @@
-
 use value::SpannedMirValue;
 
 use crate::graph::NodeIndex;
@@ -23,14 +22,38 @@ pub enum Operation {
     Enf(NodeIndex),
 
     /// Begin structured operations
-    /// Call (body, arguments)
+    /// Call (def, arguments)
     Call(NodeIndex, Vec<NodeIndex>),
-    /// Fold an Iterator according to a given FoldOperator and a given initial value 
+    /// Fold an Iterator according to a given FoldOperator and a given initial value
     Fold(NodeIndex, FoldOperator, NodeIndex),
-    /// For (iterator, body)
-    For(NodeIndex, NodeIndex),
+    /// For (iterator, body, selector)
+    For(NodeIndex, NodeIndex, Option<NodeIndex>),
     /// If (condition, then, else)
     If(NodeIndex, NodeIndex, NodeIndex),
+
+    /// A reference to a specific variable in a function
+    /// Variable(MirType, argument position)
+    Variable(SpannedVariable),
+    /// A function definition (Vec_params, return_variable, body)
+    /// Definition(Vec<Variable>, Variable, body)
+    Definition(Vec<NodeIndex>, NodeIndex, Vec<NodeIndex>),
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct SpannedVariable {
+    pub span: SourceSpan,
+    pub ty: MirType,
+    pub argument_position: usize,
+}
+
+impl SpannedVariable {
+    pub fn new(span: SourceSpan, ty: MirType, argument_position: usize) -> Self {
+        Self {
+            span,
+            ty,
+            argument_position,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -53,9 +76,7 @@ impl Operation {
             Self::Call(_, _) => 4,
             Self::Value(_) => 5,
             Self::Enf(_) => 6,
-            _ => 0
-
+            _ => 0,
         }
     }
-
 }

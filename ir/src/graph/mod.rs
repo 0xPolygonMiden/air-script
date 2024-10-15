@@ -1,12 +1,12 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
-use crate::ir::*;
+use crate::{ir::*, CompileError};
 
 /// A unique identifier for a node in an [AlgebraicGraph]
 ///
 /// The raw value of this identifier is an index in the `nodes` vector
 /// of the [AlgebraicGraph] struct.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeIndex(usize);
 impl core::ops::Add<usize> for NodeIndex {
     type Output = NodeIndex;
@@ -54,18 +54,35 @@ pub struct MirGraph {
     /// All nodes in the graph.
     nodes: Vec<Node>,
     use_list: HashMap<NodeIndex, Vec<NodeIndex>>,
-    function: Vec<NodeIndex>
+    pub functions: BTreeMap<QualifiedIdentifier, NodeIndex>,
 }
 
 impl MirGraph {
     /// Creates a new graph from a list of nodes.
     pub fn new(nodes: Vec<Node>) -> Self {
-        Self { nodes, use_list: HashMap::default(), function: vec![] }
+        Self {
+            nodes,
+            use_list: HashMap::default(),
+            functions: BTreeMap::new(),
+        }
     }
 
     /// Returns the node with the specified index.
     pub fn node(&self, index: &NodeIndex) -> &Node {
         &self.nodes[index.0]
+    }
+
+    pub fn update_node(&mut self, index: &NodeIndex, op: Operation) {
+        if let Some(node) = self.nodes.get_mut(index.0) {
+            *node = Node { op };
+        }
+    }
+
+    pub fn add_use(&mut self, node_index: NodeIndex, use_index: NodeIndex) {
+        self.use_list
+            .entry(node_index)
+            .or_default()
+            .push(use_index);
     }
 
     /// Returns the number of nodes in the graph.
@@ -76,13 +93,12 @@ impl MirGraph {
     // TODO : Instead of checking the all tree recursively, maybe we should:
     // - Check each node when adding it to the graph (depending on its children)
     // - Check the modified nodes when applying a pass (just to the edited ops, not the whole graph)
-    pub fn check_typing_rules(&self, node_index: NodeIndex) -> Result<(), ()> {
-
+    pub fn check_typing_rules(&self, node_index: NodeIndex) -> Result<(), CompileError> {
         // Todo: implement the typing rules
         // Propagate types recursively through the graph and check that the types are consistent?
         match self.node(&node_index).op() {
-            Operation::Value(_) => Ok(()),
-            Operation::Add(lhs, rhs) => todo!(),
+            Operation::Value(_val) => Ok(()),
+            Operation::Add(_lhs, _rhs) => todo!(),
             /*{
                 let lhs_node = self.node(lhs);
                 let rhs_node = self.node(rhs);
@@ -92,13 +108,15 @@ impl MirGraph {
                     Ok(())
                 }
             },*/
-            Operation::Sub(node_index, node_index1) => todo!(),
-            Operation::Mul(node_index, node_index1) => todo!(),
-            Operation::Enf(node_index) => todo!(),
-            Operation::Call(node_index, vec) => todo!(),
-            Operation::Fold(node_index, fold_operator, node_index1) => todo!(),
-            Operation::For(node_index, node_index1) => todo!(),
-            Operation::If(node_index, node_index1, node_index2) => todo!(),
+            Operation::Sub(_lhs, _rhs) => todo!(),
+            Operation::Mul(_lhs, _rhs) => todo!(),
+            Operation::Enf(_node_index) => todo!(),
+            Operation::Call(_func_def, _args) => todo!(),
+            Operation::Fold(_iterator, _fold_operator, _accumulator) => todo!(),
+            Operation::For(_iterator, _body, _selector) => todo!(),
+            Operation::If(_condition, _then, _else) => todo!(),
+            Operation::Variable(_var) => todo!(),
+            Operation::Definition(_params, _return, _body) => todo!(),
         }
     }
 
@@ -182,6 +200,48 @@ impl MirGraph {
                 NodeIndex(index)
             },
         )
+    }
+    
+    /// Insert the operation and return its node index. If an identical node already exists, return
+    /// that index instead.
+    #[allow(unused)]
+    pub(crate) fn insert_node_and_use(&mut self, op: Operation, used_by: NodeIndex) -> NodeIndex {
+        let node_index = self.nodes.iter().position(|n| *n.op() == op).map_or_else(
+            || {
+                // create a new node.
+                let index = self.nodes.len();
+                self.nodes.push(Node { op });
+                NodeIndex(index)
+            },
+            |index| {
+                // return the existing node's index.
+                NodeIndex(index)
+            },
+        );
+        self.add_use(node_index, used_by);
+        node_index
+    }
+    
+    /// Insert the operation and return its node index. If an identical node already exists, return
+    /// that index instead.
+    #[allow(unused)]
+    pub(crate) fn insert_node_and_use_vec(&mut self, op: Operation, used_by: Vec<NodeIndex>) -> NodeIndex {
+        let node_index = self.nodes.iter().position(|n| *n.op() == op).map_or_else(
+            || {
+                // create a new node.
+                let index = self.nodes.len();
+                self.nodes.push(Node { op });
+                NodeIndex(index)
+            },
+            |index| {
+                // return the existing node's index.
+                NodeIndex(index)
+            },
+        );
+        for used_by in used_by {
+            self.add_use(node_index, used_by);
+        }
+        node_index
     }
 
     /*
