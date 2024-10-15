@@ -1,4 +1,6 @@
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Display;
 
 use crate::{ir::*, CompileError};
 
@@ -7,7 +9,7 @@ use crate::{ir::*, CompileError};
 /// The raw value of this identifier is an index in the `nodes` vector
 /// of the [AlgebraicGraph] struct.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct NodeIndex(usize);
+pub struct NodeIndex(pub usize);
 impl core::ops::Add<usize> for NodeIndex {
     type Output = NodeIndex;
 
@@ -280,4 +282,170 @@ impl MirGraph {
         }
     }
     */
+}
+
+#[derive(Clone)]
+pub struct PrettyCtx<'a> {
+    pub graph: &'a MirGraph,
+    pub indent: usize,
+    pub nl: &'a str,
+    pub in_block: bool,
+    pub var_count: Cell<usize>,
+    pub fn_count: Cell<usize>,
+}
+
+impl<'a> PrettyCtx<'a> {
+    fn new(graph: &'a MirGraph) -> Self {
+        let res = Self {
+            graph,
+            indent: 0,
+            nl: "\n",
+            in_block: false,
+            var_count: Cell::new(0),
+            fn_count: Cell::new(0),
+        };
+        println!("ctx.new() -> {:?}", res);
+        res
+    }
+
+    fn add_indent(&self, indent: usize) -> Self {
+        let res = Self {
+            indent: self.indent + indent,
+            ..self.clone()
+        };
+        println!("ctx.add_indent({}) -> {:?}", indent, res);
+        res
+    }
+
+    fn with_indent(&self, indent: usize) -> Self {
+        let res = Self {
+            indent,
+            ..self.clone()
+        };
+        println!("ctx.with_indent({}) -> {:?}", indent, res);
+        res
+    }
+
+    fn increment_var_count(&self) -> Self {
+        self.var_count.set(self.var_count.get() + 1);
+        println!("ctx.increment_var_count() -> {:?}", self);
+        self.clone()
+    }
+
+    fn increment_fn_count(&self) -> Self {
+        self.fn_count.set(self.fn_count.get() + 1);
+        println!("ctx.increment_fn_count() -> {:?}", self);
+        self.clone()
+    }
+
+    fn with_nl(&self, nl: &'a str) -> Self {
+        let res = Self { nl, ..self.clone() };
+        println!("ctx.with_nl({:?}) -> {:?}", nl, res);
+        res
+    }
+
+    fn with_in_block(&self, in_block: bool) -> Self {
+        let res = Self {
+            in_block,
+            ..self.clone()
+        };
+        println!("ctx.with_in_block({}) -> {:?}", in_block, res);
+        res
+    }
+
+    fn indent_str(&self) -> String {
+        if self.nl == "\n" {
+            "  ".repeat(self.indent)
+        } else {
+            "".to_string()
+        }
+    }
+}
+
+impl std::fmt::Debug for PrettyCtx<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PrettyCtx")
+            .field("indent", &self.indent)
+            .field("nl", &self.nl)
+            .field("in_block", &self.in_block)
+            .field("var_count", &self.var_count)
+            .field("fn_count", &self.fn_count)
+            .finish()
+    }
+}
+
+pub fn pretty(graph: &MirGraph, roots: &[NodeIndex]) -> String {
+    let mut result = String::from("\n\n");
+    let mut ctx = PrettyCtx::new(graph);
+    for root in roots {
+        pretty_rec(*root, &mut ctx, &mut result);
+    }
+    result
+}
+
+fn pretty_rec(node: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
+    let node = ctx.graph.node(&node);
+    let op = node.op();
+    match op {
+        Operation::Definition(args_idx, ret_idx, body_idx) => {
+            result.push_str(&format!("{}fn f{}(", ctx.indent_str(), ctx.fn_count.get()));
+            ctx.increment_fn_count();
+            for (i, arg) in args_idx.iter().enumerate() {
+                if i > 0 {
+                    result.push_str(", ");
+                }
+                pretty_rec(*arg, &mut ctx.with_indent(0).with_nl(""), result);
+            }
+            result.push_str(") -> ");
+            pretty_rec(*ret_idx, &mut ctx.with_nl(" "), result);
+            result.push_str("{\n");
+            for op_idx in body_idx {
+                pretty_rec(*op_idx, &mut ctx.add_indent(1).with_in_block(true), result);
+            }
+            result.push_str(&format!(
+                "{}return x{};\n",
+                ctx.indent_str() + "  ",
+                ctx.var_count.get()
+            ));
+            result.push_str(&format!("{}}}\n", ctx.indent_str()));
+        }
+        Operation::Value(spanned_val) => {
+            let val = &spanned_val.value;
+            match val {
+                MirValue::Variable(ty, pos, func) => {
+                    if ctx.in_block {
+                        result.push_str(&format!("x{}", pos));
+                    } else {
+                        result.push_str(&format!(
+                            "{}x{}: {:?}{}",
+                            ctx.indent_str(),
+                            pos,
+                            ty,
+                            ctx.nl
+                        ));
+                    }
+                }
+                val => result.push_str(&format!("{}{:?}{}", ctx.indent_str(), val, ctx.nl)),
+            };
+        }
+        Operation::Add(lhs, rhs) => {
+            pretty_ssa((lhs, rhs), ctx, "+", result);
+        }
+        op => result.push_str(&format!("{}{:?}\n", ctx.indent_str(), op)),
+    }
+}
+
+fn pretty_ssa(
+    (lhs, rhs): (&NodeIndex, &NodeIndex),
+    ctx: &mut PrettyCtx,
+    op_str: &str,
+    result: &mut String,
+) {
+    result.push_str(&ctx.indent_str());
+    ctx.increment_var_count();
+    result.push_str(&format!("let x{} = ", ctx.var_count.get()));
+    pretty_rec(*lhs, &mut ctx.add_indent(1).with_nl(""), result);
+    result.push_str(&format!(" {} ", op_str));
+    pretty_rec(*rhs, &mut ctx.add_indent(1).with_nl(""), result);
+    result.push_str(&format!(";\n{}", if ctx.in_block { "" } else { ctx.nl }));
 }

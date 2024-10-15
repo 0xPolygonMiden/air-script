@@ -21,8 +21,8 @@ pub enum MirValue {
     /// Variable(MirType, argument position, function index)
     Variable(MirType, usize, NodeIndex),
     /// A function definition
-    /// Definition(Vec<Variable>, body)
-    Definition(Vec<MirValue>, NodeIndex),
+    /// Definition(arguments, return type, body)
+    Definition(Vec<NodeIndex>, NodeIndex, NodeIndex),
     /// A reference to a periodic column
     ///
     /// The value this corresponds to is determined by the current row of the trace.
@@ -81,6 +81,7 @@ pub enum MirType {
     Felt,
     Vector(usize),
     Matrix(usize, usize),
+    Definition(Vec<usize>, usize),
 }
 
 impl MirValue {
