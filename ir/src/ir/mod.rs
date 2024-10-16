@@ -6,10 +6,10 @@ mod value;
 
 pub use self::constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints};
 pub use self::degree::IntegrityConstraintDegree;
-pub use self::operation::{Operation, SpannedVariable};
+pub use self::operation::{Operation, SpannedVariable, FoldOperator};
 pub use self::trace::TraceAccess;
 pub use self::value::{
-    ConstantValue, MirType, MirValue, PeriodicColumnAccess, PublicInputAccess, SpannedMirValue,
+    ConstantValue, MirType, MirValue, PeriodicColumnAccess, PublicInputAccess, SpannedMirValue, TraceAccessBinding
 };
 
 pub use air_parser::{

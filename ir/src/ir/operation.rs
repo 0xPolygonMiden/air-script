@@ -26,17 +26,22 @@ pub enum Operation {
     Call(NodeIndex, Vec<NodeIndex>),
     /// Fold an Iterator according to a given FoldOperator and a given initial value
     Fold(NodeIndex, FoldOperator, NodeIndex),
-    /// For (iterator, body, selector)
-    For(NodeIndex, NodeIndex, Option<NodeIndex>),
+    /// For (iterators, body, selector)
+    For(Vec<NodeIndex>, NodeIndex, Option<NodeIndex>),
     /// If (condition, then, else)
     If(NodeIndex, NodeIndex, NodeIndex),
 
     /// A reference to a specific variable in a function
     /// Variable(MirType, argument position)
     Variable(SpannedVariable),
-    /// A function definition (Vec_params, return_variable, body)
+    /// A function definition (Vec_params, optional return_variable, body)
     /// Definition(Vec<Variable>, Variable, body)
-    Definition(Vec<NodeIndex>, NodeIndex, Vec<NodeIndex>),
+    Definition(Vec<NodeIndex>, Option<NodeIndex>, Vec<NodeIndex>),
+
+    Vector(Vec<NodeIndex>),
+    Matrix(Vec<Vec<NodeIndex>>),
+
+    Boundary(Boundary, NodeIndex),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]

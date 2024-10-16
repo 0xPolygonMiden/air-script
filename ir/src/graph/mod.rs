@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use crate::{ir::*, CompileError};
+use crate::ir::*;
 
 /// A unique identifier for a node in an [AlgebraicGraph]
 ///
@@ -55,6 +55,7 @@ pub struct MirGraph {
     nodes: Vec<Node>,
     use_list: HashMap<NodeIndex, Vec<NodeIndex>>,
     pub functions: BTreeMap<QualifiedIdentifier, NodeIndex>,
+    pub evaluator_functions: BTreeMap<QualifiedIdentifier, NodeIndex>,
 }
 
 impl MirGraph {
@@ -64,6 +65,7 @@ impl MirGraph {
             nodes,
             use_list: HashMap::default(),
             functions: BTreeMap::new(),
+            evaluator_functions: BTreeMap::new(),
         }
     }
 
@@ -93,7 +95,7 @@ impl MirGraph {
     // TODO : Instead of checking the all tree recursively, maybe we should:
     // - Check each node when adding it to the graph (depending on its children)
     // - Check the modified nodes when applying a pass (just to the edited ops, not the whole graph)
-    pub fn check_typing_rules(&self, node_index: NodeIndex) -> Result<(), CompileError> {
+    /*pub fn check_typing_rules(&self, node_index: NodeIndex) -> Result<(), CompileError> {
         // Todo: implement the typing rules
         // Propagate types recursively through the graph and check that the types are consistent?
         match self.node(&node_index).op() {
@@ -117,8 +119,10 @@ impl MirGraph {
             Operation::If(_condition, _then, _else) => todo!(),
             Operation::Variable(_var) => todo!(),
             Operation::Definition(_params, _return, _body) => todo!(),
+            Operation::Vector(_vec) => todo!(),
+            Operation::Matrix(_vec) => todo!(),
         }
-    }
+    }*/
 
     /*
     /// Returns the degree of the subgraph which has the specified node as its tip.

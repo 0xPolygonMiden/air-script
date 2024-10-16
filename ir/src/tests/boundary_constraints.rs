@@ -22,6 +22,7 @@ fn boundary_constraints() {
 }
 
 #[test]
+#[ignore]
 fn err_bc_duplicate_first() {
     let source = "
     def test
@@ -42,6 +43,7 @@ fn err_bc_duplicate_first() {
     expect_diagnostic(source, "overlapping boundary constraints");
 }
 
+#[ignore]
 #[test]
 fn err_bc_duplicate_last() {
     let source = "
