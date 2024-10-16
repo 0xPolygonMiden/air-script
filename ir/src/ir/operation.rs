@@ -22,7 +22,7 @@ pub enum Operation {
     Enf(NodeIndex),
 
     /// Begin structured operations
-    /// Call (def, arguments)
+    /// Call (body, arguments)
     Call(NodeIndex, Vec<NodeIndex>),
     /// Fold an Iterator according to a given FoldOperator and a given initial value
     Fold(NodeIndex, FoldOperator, NodeIndex),
