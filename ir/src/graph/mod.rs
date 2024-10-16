@@ -401,7 +401,10 @@ fn pretty_rec(node: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
                 pretty_rec(*arg, &mut ctx.with_indent(0).with_nl(""), result);
             }
             result.push_str(") -> ");
-            pretty_rec(*ret_idx, &mut ctx.with_nl(" "), result);
+            match ret_idx {
+                Some(ret_idx) => pretty_rec(*ret_idx, &mut ctx.with_indent(0).with_nl(""), result),
+                None => result.push_str("()"),
+            }
             result.push_str("{\n");
             for op_idx in body_idx {
                 pretty_rec(*op_idx, &mut ctx.add_indent(1).with_in_block(true), result);
