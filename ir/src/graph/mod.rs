@@ -1,6 +1,6 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
-use std::fmt::Display;
+use std::rc::Rc;
 
 use crate::ir::*;
 
@@ -288,73 +288,69 @@ impl MirGraph {
     */
 }
 
+#[derive(Debug, Clone)]
+struct PrettyCounters {
+    pub var_count: usize,
+    pub fn_count: usize,
+}
+
 #[derive(Clone)]
-pub struct PrettyCtx<'a> {
+struct PrettyCtx<'a> {
     pub graph: &'a MirGraph,
     pub indent: usize,
     pub nl: &'a str,
     pub in_block: bool,
-    pub var_count: Cell<usize>,
-    pub fn_count: Cell<usize>,
+    pub counters: Rc<RefCell<PrettyCounters>>,
 }
 
 impl<'a> PrettyCtx<'a> {
     fn new(graph: &'a MirGraph) -> Self {
-        let res = Self {
+        let counters = Rc::new(RefCell::new(PrettyCounters {
+            var_count: 0,
+            fn_count: 0,
+        }));
+        Self {
             graph,
             indent: 0,
             nl: "\n",
             in_block: false,
-            var_count: Cell::new(0),
-            fn_count: Cell::new(0),
-        };
-        println!("ctx.new() -> {:?}", res);
-        res
+            counters,
+        }
     }
 
     fn add_indent(&self, indent: usize) -> Self {
-        let res = Self {
+        Self {
             indent: self.indent + indent,
             ..self.clone()
-        };
-        println!("ctx.add_indent({}) -> {:?}", indent, res);
-        res
+        }
     }
 
     fn with_indent(&self, indent: usize) -> Self {
-        let res = Self {
+        Self {
             indent,
             ..self.clone()
-        };
-        println!("ctx.with_indent({}) -> {:?}", indent, res);
-        res
+        }
     }
 
     fn increment_var_count(&self) -> Self {
-        self.var_count.set(self.var_count.get() + 1);
-        println!("ctx.increment_var_count() -> {:?}", self);
+        self.counters.borrow_mut().var_count += 1;
         self.clone()
     }
 
     fn increment_fn_count(&self) -> Self {
-        self.fn_count.set(self.fn_count.get() + 1);
-        println!("ctx.increment_fn_count() -> {:?}", self);
+        self.counters.borrow_mut().fn_count += 1;
         self.clone()
     }
 
     fn with_nl(&self, nl: &'a str) -> Self {
-        let res = Self { nl, ..self.clone() };
-        println!("ctx.with_nl({:?}) -> {:?}", nl, res);
-        res
+        Self { nl, ..self.clone() }
     }
 
     fn with_in_block(&self, in_block: bool) -> Self {
-        let res = Self {
+        Self {
             in_block,
             ..self.clone()
-        };
-        println!("ctx.with_in_block({}) -> {:?}", in_block, res);
-        res
+        }
     }
 
     fn indent_str(&self) -> String {
@@ -372,8 +368,8 @@ impl std::fmt::Debug for PrettyCtx<'_> {
             .field("indent", &self.indent)
             .field("nl", &self.nl)
             .field("in_block", &self.in_block)
-            .field("var_count", &self.var_count)
-            .field("fn_count", &self.fn_count)
+            .field("var_count", &self.counters.borrow().var_count)
+            .field("fn_count", &self.counters.borrow().fn_count)
             .finish()
     }
 }
@@ -392,7 +388,11 @@ fn pretty_rec(node: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
     let op = node.op();
     match op {
         Operation::Definition(args_idx, ret_idx, body_idx) => {
-            result.push_str(&format!("{}fn f{}(", ctx.indent_str(), ctx.fn_count.get()));
+            result.push_str(&format!(
+                "{}fn f{}(",
+                ctx.indent_str(),
+                ctx.counters.borrow().fn_count
+            ));
             ctx.increment_fn_count();
             for (i, arg) in args_idx.iter().enumerate() {
                 if i > 0 {
@@ -411,8 +411,8 @@ fn pretty_rec(node: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
             }
             result.push_str(&format!(
                 "{}return x{};\n",
-                ctx.indent_str() + "  ",
-                ctx.var_count.get()
+                ctx.add_indent(1).indent_str(),
+                ctx.counters.borrow().var_count
             ));
             result.push_str(&format!("{}}}\n", ctx.indent_str()));
         }
@@ -450,7 +450,7 @@ fn pretty_ssa(
 ) {
     result.push_str(&ctx.indent_str());
     ctx.increment_var_count();
-    result.push_str(&format!("let x{} = ", ctx.var_count.get()));
+    result.push_str(&format!("let x{} = ", ctx.counters.borrow().var_count));
     pretty_rec(*lhs, &mut ctx.add_indent(1).with_nl(""), result);
     result.push_str(&format!(" {} ", op_str));
     pretty_rec(*rhs, &mut ctx.add_indent(1).with_nl(""), result);
