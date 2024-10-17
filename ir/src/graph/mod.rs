@@ -175,10 +175,7 @@ impl MirGraph {
     pub fn insert_placeholder_op(&mut self) -> NodeIndex {
         let index = self.nodes.len();
         self.nodes.push(Node {
-            op: Operation::Value(SpannedMirValue {
-                span: SourceSpan::default(),
-                value: MirValue::Constant(ConstantValue::Felt(0)),
-            }),
+            op: Operation::Placeholder
         });
         NodeIndex(index)
     }
@@ -391,5 +388,6 @@ fn get_children(op: Operation) -> Vec<NodeIndex> {
         Operation::Vector(vec) => vec,
         Operation::Matrix(vec) => vec.iter().flatten().copied().collect(),
         Operation::Boundary(_boundary, child_index) => vec![child_index],
+        Operation::Placeholder => vec![],
     }
 }

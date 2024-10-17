@@ -42,6 +42,7 @@ pub enum Operation {
     Matrix(Vec<Vec<NodeIndex>>),
 
     Boundary(Boundary, NodeIndex),
+    Placeholder,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
