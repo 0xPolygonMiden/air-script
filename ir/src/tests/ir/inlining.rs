@@ -105,8 +105,8 @@ mod tests {
                 // NodeIndex(7)
                 op: Operation::Definition(
                     vec![],
-                    Some(NodeIndex(4)), // return variable
-                    vec![NodeIndex(6)], // y = double(x)
+                    Some(NodeIndex(4)),               // return variable
+                    vec![NodeIndex(5), NodeIndex(6)], // y = double(x)
                 ),
             },
         ]);
