@@ -62,7 +62,7 @@ mod tests {
                 // NodeIndex(3)
                 op: Operation::Definition(
                     vec![NodeIndex(0)], // x
-                    Some(NodeIndex(1)),       // return
+                    Some(NodeIndex(1)), // return
                     vec![NodeIndex(2)], // y = x + x
                 ),
             },

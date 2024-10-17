@@ -49,7 +49,7 @@ impl<'p> Pass for AstToMir<'p> {
 
         // Insert placeholders nodes for future Operation::Definition (needed for function bodies to call other functions)
         for (ident, _func) in program.functions.iter() {
-            let node_index = builder.insert_typed_constant(None, ast::ConstantExpr::Scalar(0));
+            let node_index = builder.insert_placeholder();
             builder
                 .mir
                 .constraint_graph_mut()
@@ -59,11 +59,11 @@ impl<'p> Pass for AstToMir<'p> {
 
         // Insert placeholders nodes for future Operation::Definition (needed for function bodies to call other functions)
         for (ident, _func) in program.evaluators.iter() {
-            let node_index = builder.insert_typed_constant(None, ast::ConstantExpr::Scalar(0));
+            let node_index = builder.insert_placeholder();
             builder
                 .mir
                 .constraint_graph_mut()
-                .evaluator_functions
+                .evaluators
                 .insert(*ident, node_index);
         }
 
@@ -74,7 +74,7 @@ impl<'p> Pass for AstToMir<'p> {
         for (ident, func) in program.evaluators.iter() {
             builder.insert_evaluator_function_body(ident, func)?;
         }
-        
+
         for bc in boundary_constraints.iter() {
             builder.build_boundary_constraint(bc)?;
         }
@@ -96,6 +96,11 @@ struct MirBuilder<'a> {
     bindings: LexicalScope<Identifier, NodeIndex>,
 }
 impl<'a> MirBuilder<'a> {
+
+    fn insert_placeholder(&mut self) -> NodeIndex {
+        self.mir.constraint_graph_mut().insert_placeholder_op()
+    }
+
     fn insert_variable(&mut self, span: SourceSpan, ty: ast::Type, index: usize) -> NodeIndex {
         let mir_type = match ty {
             ast::Type::Felt => MirType::Felt,
@@ -129,13 +134,11 @@ impl<'a> MirBuilder<'a> {
             for binding in trace_segment.bindings.iter() {
                 let node_index = self.insert_op(Operation::Value(SpannedMirValue {
                     span: binding.span(),
-                    value: MirValue::TraceAccessBinding(
-                        TraceAccessBinding {
-                            segment: trace_segment.id,
-                            offset: binding.offset,
-                            size: binding.size,
-                        }
-                    )
+                    value: MirValue::TraceAccessBinding(TraceAccessBinding {
+                        segment: trace_segment.id,
+                        offset: binding.offset,
+                        size: binding.size,
+                    }),
                 }));
 
                 self.bindings.insert(binding.name.unwrap(), node_index);
@@ -156,7 +159,7 @@ impl<'a> MirBuilder<'a> {
         let range = before_node_count..after_node_count;
 
         // Reference all the new nodes created by the body in the definition
-        let node_index_to_update = *self.mir.constraint_graph().evaluator_functions.get(ident).unwrap();
+        let node_index_to_update = *self.mir.constraint_graph().evaluators.get(ident).unwrap();
         let operation_definition = Operation::Definition(
             params_node_indices,
             None,
@@ -293,7 +296,7 @@ impl<'a> MirBuilder<'a> {
                 let const_expr = ast::ConstantExpr::Vector(values.map(|v| v as u64).collect());
                 let node_index = self.insert_typed_constant(Some(range_expr.span()), const_expr);
                 Ok(node_index)
-            },
+            }
             ast::Expr::Vector(spanned_vec) => {
                 //let span = spanned_vec.span();
                 if spanned_vec.len() == 0 {
@@ -322,7 +325,10 @@ impl<'a> MirBuilder<'a> {
                         for row in spanned_vec.iter().cloned() {
                             match row {
                                 ast::Expr::Const(const_expr) => {
-                                    self.insert_typed_constant(Some(const_expr.span()), const_expr.item);
+                                    self.insert_typed_constant(
+                                        Some(const_expr.span()),
+                                        const_expr.item,
+                                    );
                                 }
                                 // Rework based on Continuous Symbol Access in the MIR ?
                                 ast::Expr::SymbolAccess(access) => {
@@ -331,19 +337,18 @@ impl<'a> MirBuilder<'a> {
                                         let node = match access.access_type {
                                             AccessType::Index(i) => {
                                                 let access = ast::ScalarExpr::SymbolAccess(
-                                                    access.access(AccessType::Index(i)).unwrap()
+                                                    access.access(AccessType::Index(i)).unwrap(),
                                                 );
                                                 self.insert_scalar_expr(&access)?
-                                            },
+                                            }
                                             AccessType::Default => {
                                                 let access = ast::ScalarExpr::SymbolAccess(
-                                                    access.access(AccessType::Index(i)).unwrap()
+                                                    access.access(AccessType::Index(i)).unwrap(),
                                                 );
                                                 self.insert_scalar_expr(&access)?
-                                            },
+                                            }
                                             AccessType::Slice(_range_expr) => todo!(),
                                             AccessType::Matrix(_, _) => todo!(),
-
                                         };
 
                                         cols.push(node);
@@ -367,8 +372,7 @@ impl<'a> MirBuilder<'a> {
                     }
                     _ => unreachable!(),
                 }
-                
-            },
+            }
             ast::Expr::Matrix(values) => {
                 let mut rows = Vec::with_capacity(values.len());
                 for vs in values.iter() {
@@ -380,7 +384,7 @@ impl<'a> MirBuilder<'a> {
                 }
                 let node_index = self.insert_op(Operation::Matrix(rows));
                 Ok(node_index)
-            },
+            }
             ast::Expr::SymbolAccess(access) => {
                 // Should resolve the identifier depending on the scope, and add the access to the graph once it's resolved
 
@@ -391,38 +395,34 @@ impl<'a> MirBuilder<'a> {
                         Ok(node_index)
                     }
                     // Otherwise, this has been added to the bindings (function and list comprehensions params, let expr...)
-                    Some(node_index) => {
-                        Ok(*node_index)
-                    }
-                    /*Some(MemoizedBinding::Vector(nodes)) => {
-                        let value = match &access.access_type {
-                            AccessType::Default => MemoizedBinding::Vector(nodes.clone()),
-                            AccessType::Index(idx) => MemoizedBinding::Scalar(nodes[*idx]),
-                            AccessType::Slice(range) => {
-                                MemoizedBinding::Vector(nodes[range.to_slice_range()].to_vec())
-                            }
-                            AccessType::Matrix(_, _) => unreachable!(),
-                        };
-                        Ok(value)
-                    }
-                    Some(MemoizedBinding::Matrix(nodes)) => {
-                        let value = match &access.access_type {
-                            AccessType::Default => MemoizedBinding::Matrix(nodes.clone()),
-                            AccessType::Index(idx) => MemoizedBinding::Vector(nodes[*idx].clone()),
-                            AccessType::Slice(range) => {
-                                MemoizedBinding::Matrix(nodes[range.to_slice_range()].to_vec())
-                            }
-                            AccessType::Matrix(row, col) => {
-                                MemoizedBinding::Scalar(nodes[*row][*col])
-                            }
-                        };
-                        Ok(value)
-                    }*/
+                    Some(node_index) => Ok(*node_index), /*Some(MemoizedBinding::Vector(nodes)) => {
+                                                             let value = match &access.access_type {
+                                                                 AccessType::Default => MemoizedBinding::Vector(nodes.clone()),
+                                                                 AccessType::Index(idx) => MemoizedBinding::Scalar(nodes[*idx]),
+                                                                 AccessType::Slice(range) => {
+                                                                     MemoizedBinding::Vector(nodes[range.to_slice_range()].to_vec())
+                                                                 }
+                                                                 AccessType::Matrix(_, _) => unreachable!(),
+                                                             };
+                                                             Ok(value)
+                                                         }
+                                                         Some(MemoizedBinding::Matrix(nodes)) => {
+                                                             let value = match &access.access_type {
+                                                                 AccessType::Default => MemoizedBinding::Matrix(nodes.clone()),
+                                                                 AccessType::Index(idx) => MemoizedBinding::Vector(nodes[*idx].clone()),
+                                                                 AccessType::Slice(range) => {
+                                                                     MemoizedBinding::Matrix(nodes[range.to_slice_range()].to_vec())
+                                                                 }
+                                                                 AccessType::Matrix(row, col) => {
+                                                                     MemoizedBinding::Scalar(nodes[*row][*col])
+                                                                 }
+                                                             };
+                                                             Ok(value)
+                                                         }*/
                 }
             }
             ast::Expr::Binary(binary_expr) => self.insert_binary_expr(binary_expr),
             ast::Expr::Call(call) => {
-
                 // First, resolve the callee, panic if it's not resolved
                 let resolved_callee = call.callee.resolved().unwrap();
 
@@ -431,22 +431,33 @@ impl<'a> MirBuilder<'a> {
                     match call.callee.as_ref().name() {
                         symbols::Sum => {
                             assert_eq!(call.args.len(), 1);
-                            let iterator_node_index = self.insert_expr(call.args.first().unwrap()).unwrap();
-                            let accumulator_node_index = self.insert_typed_constant(None, ast::ConstantExpr::Scalar(0));
-                            let node_index = self.insert_op(Operation::Fold(iterator_node_index, FoldOperator::Add, accumulator_node_index));
+                            let iterator_node_index =
+                                self.insert_expr(call.args.first().unwrap()).unwrap();
+                            let accumulator_node_index =
+                                self.insert_typed_constant(None, ast::ConstantExpr::Scalar(0));
+                            let node_index = self.insert_op(Operation::Fold(
+                                iterator_node_index,
+                                FoldOperator::Add,
+                                accumulator_node_index,
+                            ));
                             return Ok(node_index);
                         }
                         symbols::Prod => {
                             assert_eq!(call.args.len(), 1);
-                            let iterator_node_index = self.insert_expr(call.args.first().unwrap()).unwrap();
-                            let accumulator_node_index = self.insert_typed_constant(None, ast::ConstantExpr::Scalar(1));
-                            let node_index = self.insert_op(Operation::Fold(iterator_node_index, FoldOperator::Mul, accumulator_node_index));
+                            let iterator_node_index =
+                                self.insert_expr(call.args.first().unwrap()).unwrap();
+                            let accumulator_node_index =
+                                self.insert_typed_constant(None, ast::ConstantExpr::Scalar(1));
+                            let node_index = self.insert_op(Operation::Fold(
+                                iterator_node_index,
+                                FoldOperator::Mul,
+                                accumulator_node_index,
+                            ));
                             return Ok(node_index);
                         }
                         other => unimplemented!("unhandled builtin: {}", other),
                     }
                 } else {
-
                     let args_node_index: Vec<_> = call
                         .args
                         .iter()
@@ -469,12 +480,12 @@ impl<'a> MirBuilder<'a> {
                 }
             }
             ast::Expr::ListComprehension(list_comprehension) => {
-
                 self.bindings.enter();
                 let mut binding_nodes = Vec::new();
                 for (index, binding) in list_comprehension.bindings.iter().enumerate() {
                     // TODO: Add type info?
-                    let binding_node_index = self.insert_variable(binding.span(), ast::Type::Felt, index);
+                    let binding_node_index =
+                        self.insert_variable(binding.span(), ast::Type::Felt, index);
                     binding_nodes.push(binding_node_index);
                     self.bindings.insert(*binding, binding_node_index);
                 }
@@ -492,7 +503,11 @@ impl<'a> MirBuilder<'a> {
                 };
                 let body_node_index = self.insert_scalar_expr(&list_comprehension.body)?;
 
-                let for_node_index = self.insert_op(Operation::For(iterator_nodes, body_node_index, selector_node_index));
+                let for_node_index = self.insert_op(Operation::For(
+                    iterator_nodes,
+                    body_node_index,
+                    selector_node_index,
+                ));
 
                 self.bindings.exit();
                 Ok(for_node_index)
@@ -544,7 +559,6 @@ impl<'a> MirBuilder<'a> {
                 Ok(index)
             }
             ast::ScalarExpr::Call(call) => {
-
                 // First, resolve the callee, panic if it's not resolved
                 let resolved_callee = call.callee.resolved().unwrap();
 
@@ -553,22 +567,33 @@ impl<'a> MirBuilder<'a> {
                     match call.callee.as_ref().name() {
                         symbols::Sum => {
                             assert_eq!(call.args.len(), 1);
-                            let iterator_node_index = self.insert_expr(call.args.first().unwrap()).unwrap();
-                            let accumulator_node_index = self.insert_typed_constant(None, ast::ConstantExpr::Scalar(0));
-                            let node_index = self.insert_op(Operation::Fold(iterator_node_index, FoldOperator::Add, accumulator_node_index));
+                            let iterator_node_index =
+                                self.insert_expr(call.args.first().unwrap()).unwrap();
+                            let accumulator_node_index =
+                                self.insert_typed_constant(None, ast::ConstantExpr::Scalar(0));
+                            let node_index = self.insert_op(Operation::Fold(
+                                iterator_node_index,
+                                FoldOperator::Add,
+                                accumulator_node_index,
+                            ));
                             return Ok(node_index);
                         }
                         symbols::Prod => {
                             assert_eq!(call.args.len(), 1);
-                            let iterator_node_index = self.insert_expr(call.args.first().unwrap()).unwrap();
-                            let accumulator_node_index = self.insert_typed_constant(None, ast::ConstantExpr::Scalar(1));
-                            let node_index = self.insert_op(Operation::Fold(iterator_node_index, FoldOperator::Mul, accumulator_node_index));
+                            let iterator_node_index =
+                                self.insert_expr(call.args.first().unwrap()).unwrap();
+                            let accumulator_node_index =
+                                self.insert_typed_constant(None, ast::ConstantExpr::Scalar(1));
+                            let node_index = self.insert_op(Operation::Fold(
+                                iterator_node_index,
+                                FoldOperator::Mul,
+                                accumulator_node_index,
+                            ));
                             return Ok(node_index);
                         }
                         other => unimplemented!("unhandled builtin: {}", other),
                     }
                 } else {
-
                     // If not, check if evaluator or function
                     let is_pure_function = self
                         .mir
@@ -587,7 +612,8 @@ impl<'a> MirBuilder<'a> {
                             .mir
                             .constraint_graph()
                             .functions
-                            .get(&resolved_callee).unwrap();
+                            .get(&resolved_callee)
+                            .unwrap();
 
                         // We can only check this once all bodies have been inserted
                         /*match self.mir.constraint_graph().node(&callee_node_index).op() {
@@ -605,7 +631,8 @@ impl<'a> MirBuilder<'a> {
                             },
                             _ => unreachable!(),
                         };*/
-                        let call_node_index = self.insert_op(Operation::Call(*callee_node_index, args_node_index));
+                        let call_node_index =
+                            self.insert_op(Operation::Call(*callee_node_index, args_node_index));
                         return Ok(call_node_index);
                     } else {
                         let mut args_node_index = Vec::new();
@@ -618,9 +645,10 @@ impl<'a> MirBuilder<'a> {
                                         let expr_node_index = self.insert_expr(expr).unwrap();
                                         arg_node_index.push(expr_node_index);
                                     }
-                                    let arg_node = self.insert_op(Operation::Vector(arg_node_index));
+                                    let arg_node =
+                                        self.insert_op(Operation::Vector(arg_node_index));
                                     args_node_index.push(arg_node);
-                                },
+                                }
                                 _ => unreachable!(),
                             }
                         }
@@ -628,8 +656,9 @@ impl<'a> MirBuilder<'a> {
                         let callee_node_index = self
                             .mir
                             .constraint_graph()
-                            .evaluator_functions
-                            .get(&resolved_callee).unwrap();
+                            .evaluators
+                            .get(&resolved_callee)
+                            .unwrap();
 
                         // We can only check this once all bodies have been inserted
                         /*match self.mir.constraint_graph().node(&callee_node_index).op() {
@@ -639,7 +668,8 @@ impl<'a> MirBuilder<'a> {
                                 unreachable!();
                             },
                         };*/
-                        let call_node_index = self.insert_op(Operation::Call(*callee_node_index, args_node_index));
+                        let call_node_index =
+                            self.insert_op(Operation::Call(*callee_node_index, args_node_index));
                         return Ok(call_node_index);
                     }
                 }
@@ -669,13 +699,11 @@ impl<'a> MirBuilder<'a> {
         if expr.op == ast::BinaryOp::Exp {
             let lhs = self.insert_scalar_expr(expr.lhs.as_ref())?;
             let ast::ScalarExpr::Const(rhs) = expr.rhs.as_ref() else {
-                return Err(
-                    CompileError::SemanticAnalysis(
-                        SemanticAnalysisError::InvalidExpr(
-                            ast::InvalidExprError::NonConstantExponent(expr.rhs.span())
-                        )
-                    )
-                );
+                return Err(CompileError::SemanticAnalysis(
+                    SemanticAnalysisError::InvalidExpr(ast::InvalidExprError::NonConstantExponent(
+                        expr.rhs.span(),
+                    )),
+                ));
             };
             return Ok(self.expand_exp(lhs, rhs.item, expr.span()));
         }
@@ -689,12 +717,11 @@ impl<'a> MirBuilder<'a> {
             ast::BinaryOp::Eq => {
                 let sub_node_index = self.insert_op(Operation::Sub(lhs, rhs));
                 self.insert_op(Operation::Enf(sub_node_index))
-            },
-            _ => unreachable!()
+            }
+            _ => unreachable!(),
         })
     }
 
-    
     fn insert_bounded_symbol_access(&mut self, bsa: &ast::BoundedSymbolAccess) -> NodeIndex {
         let access_node_index = self.insert_symbol_access(&bsa.column);
         let node_index = self.insert_op(Operation::Boundary(bsa.boundary, access_node_index));
@@ -752,7 +779,7 @@ impl<'a> MirBuilder<'a> {
                             value: MirValue::TraceAccess(ta),
                         }));
                     }
-                    
+
                     // Must be a trace segment name
                     /*if let Some(ta) = self.trace_access_binding(access) {
                         return self.insert_op(Operation::Value(SpannedMirValue {
@@ -776,7 +803,7 @@ impl<'a> MirBuilder<'a> {
                         value: MirValue::TraceAccessBinding(tab),
                     }));
                 }
-                
+
                 if let Some(trace_access) = self.trace_access(access) {
                     return self.insert_op(Operation::Value(SpannedMirValue {
                         span: id.span(),
@@ -874,13 +901,10 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
-
     // Check assumptions, probably this assumed that the inlining pass did some work
     fn trace_access_binding(&self, access: &ast::SymbolAccess) -> Option<TraceAccessBinding> {
-
         let id = access.name.as_ref();
         for (_i, segment) in self.trace_columns.iter().enumerate() {
-
             if let Some(binding) = segment
                 .bindings
                 .iter()
@@ -893,11 +917,11 @@ impl<'a> MirBuilder<'a> {
                         size: binding.size,
                     }),
                     AccessType::Slice(range_expr) => Some(TraceAccessBinding {
-                            segment: binding.segment,
-                            offset: binding.offset,
-                            size: range_expr.to_slice_range().count(),
+                        segment: binding.segment,
+                        offset: binding.offset,
+                        size: range_expr.to_slice_range().count(),
                     }),
-                    _ => None
+                    _ => None,
                 };
             }
         }

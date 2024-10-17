@@ -2,6 +2,8 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
+use miden_diagnostics::SourceSpan;
+
 use crate::ir::*;
 
 /// A unique identifier for a node in an [AlgebraicGraph]
@@ -57,7 +59,7 @@ pub struct MirGraph {
     nodes: Vec<Node>,
     use_list: HashMap<NodeIndex, Vec<NodeIndex>>,
     pub functions: BTreeMap<QualifiedIdentifier, NodeIndex>,
-    pub evaluator_functions: BTreeMap<QualifiedIdentifier, NodeIndex>,
+    pub evaluators: BTreeMap<QualifiedIdentifier, NodeIndex>,
 }
 
 impl MirGraph {
@@ -67,7 +69,7 @@ impl MirGraph {
             nodes,
             use_list: HashMap::default(),
             functions: BTreeMap::new(),
-            evaluator_functions: BTreeMap::new(),
+            evaluators: BTreeMap::new(),
         }
     }
 
@@ -77,6 +79,21 @@ impl MirGraph {
     }
 
     pub fn update_node(&mut self, index: &NodeIndex, op: Operation) {
+        if let Some(node) = self.nodes.get(index.0) {
+            let prev_op = node.op().clone();
+            let prev_children_nodes = get_children(prev_op);
+
+            for child in prev_children_nodes {
+                self.remove_use(child, *index);
+            }
+
+            let children_nodes = get_children(op.clone());
+
+            for child in children_nodes {
+                self.add_use(child, *index);
+            }
+        }
+
         if let Some(node) = self.nodes.get_mut(index.0) {
             *node = Node { op };
         }
@@ -84,6 +101,12 @@ impl MirGraph {
 
     pub fn add_use(&mut self, node_index: NodeIndex, use_index: NodeIndex) {
         self.use_list.entry(node_index).or_default().push(use_index);
+    }
+
+    pub fn remove_use(&mut self, node_index: NodeIndex, use_index: NodeIndex) {
+        self.use_list
+            .entry(node_index)
+            .and_modify(|vec| vec.retain(|&index| index != use_index));
     }
 
     /// Returns the number of nodes in the graph.
@@ -123,92 +146,11 @@ impl MirGraph {
         }
     }*/
 
-    /*
-    /// Returns the degree of the subgraph which has the specified node as its tip.
-    pub fn degree(&self, index: &NodeIndex) -> IntegrityConstraintDegree {
-        let mut cycles = BTreeMap::default();
-        let base = self.accumulate_degree(&mut cycles, index);
-
-        if cycles.is_empty() {
-            IntegrityConstraintDegree::new(base)
-        } else {
-            IntegrityConstraintDegree::with_cycles(base, cycles.values().copied().collect())
-        }
-    }*/
-    /*
-        /// TODO: docs
-        pub fn node_details(
-            &self,
-            index: &NodeIndex,
-            default_domain: ConstraintDomain,
-        ) -> Result<(TraceSegmentId, ConstraintDomain), ConstraintError> {
-            // recursively walk the subgraph and infer the trace segment and domain
-            match self.node(index).op() {
-                Operation::Value(value) => match value {
-                    Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
-                    Value::PeriodicColumn(_) => {
-                        assert!(
-                            !default_domain.is_boundary(),
-                            "unexpected access to periodic column in boundary constraint"
-                        );
-                        // the default domain for [IntegrityConstraints] is `EveryRow`
-                        Ok((DEFAULT_SEGMENT, ConstraintDomain::EveryRow))
-                    }
-                    Value::PublicInput(_) => {
-                        assert!(
-                            !default_domain.is_integrity(),
-                            "unexpected access to public input in integrity constraint"
-                        );
-                        Ok((DEFAULT_SEGMENT, default_domain))
-                    }
-                    Value::RandomValue(_) => Ok((AUX_SEGMENT, default_domain)),
-                    Value::TraceAccess(trace_access) => {
-                        let domain = if default_domain.is_boundary() {
-                            assert_eq!(
-                                trace_access.row_offset, 0,
-                                "unexpected trace offset in boundary constraint"
-                            );
-                            default_domain
-                        } else {
-                            ConstraintDomain::from_offset(trace_access.row_offset)
-                        };
-
-                        Ok((trace_access.segment, domain))
-                    }
-                },
-                Operation::Add(lhs, rhs) | Operation::Sub(lhs, rhs) | Operation::Mul(lhs, rhs) => {
-                    let (lhs_segment, lhs_domain) = self.node_details(lhs, default_domain)?;
-                    let (rhs_segment, rhs_domain) = self.node_details(rhs, default_domain)?;
-
-                    let trace_segment = lhs_segment.max(rhs_segment);
-                    let domain = lhs_domain.merge(rhs_domain)?;
-
-                    Ok((trace_segment, domain))
-                }
-            }
-        }
-    */
     /// Insert the operation and return its node index. If an identical node already exists, return
     /// that index instead.
     pub(crate) fn insert_node(&mut self, op: Operation) -> NodeIndex {
-        self.nodes.iter().position(|n| *n.op() == op).map_or_else(
-            || {
-                // create a new node.
-                let index = self.nodes.len();
-                self.nodes.push(Node { op });
-                NodeIndex(index)
-            },
-            |index| {
-                // return the existing node's index.
-                NodeIndex(index)
-            },
-        )
-    }
+        let children_nodes = get_children(op.clone());
 
-    /// Insert the operation and return its node index. If an identical node already exists, return
-    /// that index instead.
-    #[allow(unused)]
-    pub(crate) fn insert_node_and_use(&mut self, op: Operation, used_by: NodeIndex) -> NodeIndex {
         let node_index = self.nodes.iter().position(|n| *n.op() == op).map_or_else(
             || {
                 // create a new node.
@@ -221,71 +163,25 @@ impl MirGraph {
                 NodeIndex(index)
             },
         );
-        self.add_use(node_index, used_by);
+
+        for child in children_nodes {
+            self.add_use(child, node_index);
+        }
+
         node_index
     }
 
-    /// Insert the operation and return its node index. If an identical node already exists, return
-    /// that index instead.
-    #[allow(unused)]
-    pub(crate) fn insert_node_and_use_vec(
-        &mut self,
-        op: Operation,
-        used_by: Vec<NodeIndex>,
-    ) -> NodeIndex {
-        let node_index = self.nodes.iter().position(|n| *n.op() == op).map_or_else(
-            || {
-                // create a new node.
-                let index = self.nodes.len();
-                self.nodes.push(Node { op });
-                NodeIndex(index)
-            },
-            |index| {
-                // return the existing node's index.
-                NodeIndex(index)
-            },
-        );
-        for used_by in used_by {
-            self.add_use(node_index, used_by);
-        }
-        node_index
+    /// Insert a placeholder operation and return its node index. This will create duplicate nodes if called multiple times.
+    pub fn insert_placeholder_op(&mut self) -> NodeIndex {
+        let index = self.nodes.len();
+        self.nodes.push(Node {
+            op: Operation::Value(SpannedMirValue {
+                span: SourceSpan::default(),
+                value: MirValue::Constant(ConstantValue::Felt(0)),
+            }),
+        });
+        NodeIndex(index)
     }
-
-    /*
-    /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.
-    fn accumulate_degree(
-        &self,
-        cycles: &mut BTreeMap<QualifiedIdentifier, usize>,
-        index: &NodeIndex,
-    ) -> usize {
-        // recursively walk the subgraph and compute the degree from the operation and child nodes
-        match self.node(index).op() {
-            Operation::Value(value) => match value {
-                Value::Constant(_) | Value::RandomValue(_) | Value::PublicInput(_) => 0,
-                Value::TraceAccess(_) => 1,
-                Value::PeriodicColumn(pc) => {
-                    cycles.insert(pc.name, pc.cycle);
-                    0
-                }
-            },
-            Operation::Add(lhs, rhs) => {
-                let lhs_base = self.accumulate_degree(cycles, lhs);
-                let rhs_base = self.accumulate_degree(cycles, rhs);
-                lhs_base.max(rhs_base)
-            }
-            Operation::Sub(lhs, rhs) => {
-                let lhs_base = self.accumulate_degree(cycles, lhs);
-                let rhs_base = self.accumulate_degree(cycles, rhs);
-                lhs_base.max(rhs_base)
-            }
-            Operation::Mul(lhs, rhs) => {
-                let lhs_base = self.accumulate_degree(cycles, lhs);
-                let rhs_base = self.accumulate_degree(cycles, rhs);
-                lhs_base + rhs_base
-            }
-        }
-    }
-    */
 }
 
 #[derive(Debug, Clone)]
@@ -455,4 +351,45 @@ fn pretty_ssa(
     result.push_str(&format!(" {} ", op_str));
     pretty_rec(*rhs, &mut ctx.add_indent(1).with_nl(""), result);
     result.push_str(&format!(";\n{}", if ctx.in_block { "" } else { ctx.nl }));
+}
+
+fn get_children(op: Operation) -> Vec<NodeIndex> {
+    match op {
+        Operation::Value(_spanned_mir_value) => vec![],
+        Operation::Add(lhs, rhs) => vec![lhs, rhs],
+        Operation::Sub(lhs, rhs) => vec![lhs, rhs],
+        Operation::Mul(lhs, rhs) => vec![lhs, rhs],
+        Operation::Enf(child_index) => vec![child_index],
+        Operation::Call(def, args) => {
+            let mut ret = args;
+            ret.push(def);
+            ret
+        }
+        Operation::Fold(iterator_index, _fold_operator, accumulator_index) => {
+            vec![iterator_index, accumulator_index]
+        }
+        Operation::For(iterators, body_index, selector_index) => {
+            let mut ret = iterators;
+            ret.push(body_index);
+            if let Some(selector_index) = selector_index {
+                ret.push(selector_index);
+            }
+            ret
+        }
+        Operation::If(condition_index, then_index, else_index) => {
+            vec![condition_index, then_index, else_index]
+        }
+        Operation::Variable(_spanned_variable) => vec![],
+        Operation::Definition(params, return_index, body) => {
+            let mut ret = params;
+            ret.extend_from_slice(&body);
+            if let Some(return_index) = return_index {
+                ret.push(return_index);
+            }
+            ret
+        }
+        Operation::Vector(vec) => vec,
+        Operation::Matrix(vec) => vec.iter().flatten().copied().collect(),
+        Operation::Boundary(_boundary, child_index) => vec![child_index],
+    }
 }
