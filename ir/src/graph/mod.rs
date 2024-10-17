@@ -175,7 +175,7 @@ impl MirGraph {
     pub fn insert_placeholder_op(&mut self) -> NodeIndex {
         let index = self.nodes.len();
         self.nodes.push(Node {
-            op: Operation::Placeholder
+            op: Operation::Placeholder,
         });
         NodeIndex(index)
     }
@@ -318,7 +318,7 @@ fn pretty_rec(node_idx: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
         Operation::Value(spanned_val) => {
             let val = &spanned_val.value;
             match val {
-                MirValue::Variable(ty, pos, func) => {
+                MirValue::Variable(ty, pos, _func) => {
                     if ctx.in_block {
                         result.push_str(&format!("x{}", pos));
                     } else {

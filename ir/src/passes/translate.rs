@@ -96,7 +96,6 @@ struct MirBuilder<'a> {
     bindings: LexicalScope<Identifier, NodeIndex>,
 }
 impl<'a> MirBuilder<'a> {
-
     fn insert_placeholder(&mut self) -> NodeIndex {
         self.mir.constraint_graph_mut().insert_placeholder_op()
     }
@@ -440,7 +439,7 @@ impl<'a> MirBuilder<'a> {
                                 FoldOperator::Add,
                                 accumulator_node_index,
                             ));
-                            return Ok(node_index);
+                            Ok(node_index)
                         }
                         symbols::Prod => {
                             assert_eq!(call.args.len(), 1);
@@ -453,7 +452,7 @@ impl<'a> MirBuilder<'a> {
                                 FoldOperator::Mul,
                                 accumulator_node_index,
                             ));
-                            return Ok(node_index);
+                            Ok(node_index)
                         }
                         other => unimplemented!("unhandled builtin: {}", other),
                     }
@@ -576,7 +575,7 @@ impl<'a> MirBuilder<'a> {
                                 FoldOperator::Add,
                                 accumulator_node_index,
                             ));
-                            return Ok(node_index);
+                            Ok(node_index)
                         }
                         symbols::Prod => {
                             assert_eq!(call.args.len(), 1);
@@ -589,7 +588,7 @@ impl<'a> MirBuilder<'a> {
                                 FoldOperator::Mul,
                                 accumulator_node_index,
                             ));
-                            return Ok(node_index);
+                            Ok(node_index)
                         }
                         other => unimplemented!("unhandled builtin: {}", other),
                     }
@@ -599,8 +598,7 @@ impl<'a> MirBuilder<'a> {
                         .mir
                         .constraint_graph()
                         .functions
-                        .get(&resolved_callee)
-                        .is_some();
+                        .contains_key(&resolved_callee);
 
                     if is_pure_function {
                         let args_node_index: Vec<_> = call
@@ -633,7 +631,7 @@ impl<'a> MirBuilder<'a> {
                         };*/
                         let call_node_index =
                             self.insert_op(Operation::Call(*callee_node_index, args_node_index));
-                        return Ok(call_node_index);
+                        Ok(call_node_index)
                     } else {
                         let mut args_node_index = Vec::new();
 
@@ -670,7 +668,7 @@ impl<'a> MirBuilder<'a> {
                         };*/
                         let call_node_index =
                             self.insert_op(Operation::Call(*callee_node_index, args_node_index));
-                        return Ok(call_node_index);
+                        Ok(call_node_index)
                     }
                 }
             }
@@ -724,9 +722,7 @@ impl<'a> MirBuilder<'a> {
 
     fn insert_bounded_symbol_access(&mut self, bsa: &ast::BoundedSymbolAccess) -> NodeIndex {
         let access_node_index = self.insert_symbol_access(&bsa.column);
-        let node_index = self.insert_op(Operation::Boundary(bsa.boundary, access_node_index));
-
-        node_index
+        self.insert_op(Operation::Boundary(bsa.boundary, access_node_index))
     }
 
     // Assumed inlining was done, to update
@@ -904,7 +900,7 @@ impl<'a> MirBuilder<'a> {
     // Check assumptions, probably this assumed that the inlining pass did some work
     fn trace_access_binding(&self, access: &ast::SymbolAccess) -> Option<TraceAccessBinding> {
         let id = access.name.as_ref();
-        for (_i, segment) in self.trace_columns.iter().enumerate() {
+        for segment in self.trace_columns.iter() {
             if let Some(binding) = segment
                 .bindings
                 .iter()
