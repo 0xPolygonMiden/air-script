@@ -182,9 +182,11 @@ impl MirGraph {
 }
 
 #[derive(Debug, Clone)]
-struct PrettyCounters {
+struct PrettyShared {
     pub var_count: usize,
     pub fn_count: usize,
+    // BTreeMap from function index to function id
+    pub fns: BTreeMap<usize, usize>,
 }
 
 #[derive(Clone)]
@@ -193,21 +195,22 @@ struct PrettyCtx<'a> {
     pub indent: usize,
     pub nl: &'a str,
     pub in_block: bool,
-    pub counters: Rc<RefCell<PrettyCounters>>,
+    pub shared: Rc<RefCell<PrettyShared>>,
 }
 
 impl<'a> PrettyCtx<'a> {
     fn new(graph: &'a MirGraph) -> Self {
-        let counters = Rc::new(RefCell::new(PrettyCounters {
+        let shared = Rc::new(RefCell::new(PrettyShared {
             var_count: 0,
             fn_count: 0,
+            fns: BTreeMap::new(),
         }));
         Self {
             graph,
             indent: 0,
             nl: "\n",
             in_block: false,
-            counters,
+            shared,
         }
     }
 
@@ -226,12 +229,14 @@ impl<'a> PrettyCtx<'a> {
     }
 
     fn increment_var_count(&self) -> Self {
-        self.counters.borrow_mut().var_count += 1;
+        self.shared.borrow_mut().var_count += 1;
         self.clone()
     }
 
-    fn increment_fn_count(&self) -> Self {
-        self.counters.borrow_mut().fn_count += 1;
+    fn increment_fn_count(&self, node_idx: &NodeIndex) -> Self {
+        let fn_count = self.shared.borrow().fn_count;
+        self.shared.borrow_mut().fns.insert(node_idx.0, fn_count);
+        self.shared.borrow_mut().fn_count += 1;
         self.clone()
     }
 
@@ -261,8 +266,8 @@ impl std::fmt::Debug for PrettyCtx<'_> {
             .field("indent", &self.indent)
             .field("nl", &self.nl)
             .field("in_block", &self.in_block)
-            .field("var_count", &self.counters.borrow().var_count)
-            .field("fn_count", &self.counters.borrow().fn_count)
+            .field("var_count", &self.shared.borrow().var_count)
+            .field("fn_count", &self.shared.borrow().fn_count)
             .finish()
     }
 }
@@ -272,21 +277,22 @@ pub fn pretty(graph: &MirGraph, roots: &[NodeIndex]) -> String {
     let mut ctx = PrettyCtx::new(graph);
     for root in roots {
         pretty_rec(*root, &mut ctx, &mut result);
+        ctx.shared.borrow_mut().var_count = 0; // reset var count for next function
     }
     result
 }
 
-fn pretty_rec(node: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
-    let node = ctx.graph.node(&node);
+fn pretty_rec(node_idx: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
+    let node = ctx.graph.node(&node_idx);
     let op = node.op();
     match op {
         Operation::Definition(args_idx, ret_idx, body_idx) => {
             result.push_str(&format!(
                 "{}fn f{}(",
                 ctx.indent_str(),
-                ctx.counters.borrow().fn_count
+                ctx.shared.borrow().fn_count
             ));
-            ctx.increment_fn_count();
+            ctx.increment_fn_count(&node_idx);
             for (i, arg) in args_idx.iter().enumerate() {
                 if i > 0 {
                     result.push_str(", ");
@@ -305,9 +311,9 @@ fn pretty_rec(node: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
             result.push_str(&format!(
                 "{}return x{};\n",
                 ctx.add_indent(1).indent_str(),
-                ctx.counters.borrow().var_count
+                ctx.shared.borrow().var_count
             ));
-            result.push_str(&format!("{}}}\n", ctx.indent_str()));
+            result.push_str(&format!("{}}}\n\n", ctx.indent_str()));
         }
         Operation::Value(spanned_val) => {
             let val = &spanned_val.value;
@@ -331,6 +337,21 @@ fn pretty_rec(node: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
         Operation::Add(lhs, rhs) => {
             pretty_ssa((lhs, rhs), ctx, "+", result);
         }
+        Operation::Call(func, args) => {
+            result.push_str(&format!(
+                "{}f{}(",
+                ctx.indent_str(),
+                ctx.shared.borrow().fns.get(&func.0).unwrap()
+            ));
+            for (i, arg) in args.iter().enumerate() {
+                if i > 0 {
+                    result.push_str(", ");
+                }
+                pretty_rec(*arg, &mut ctx.with_indent(0).with_nl(""), result);
+            }
+            result.push_str(");\n");
+        }
+
         op => result.push_str(&format!("{}{:?}\n", ctx.indent_str(), op)),
     }
 }
@@ -343,7 +364,7 @@ fn pretty_ssa(
 ) {
     result.push_str(&ctx.indent_str());
     ctx.increment_var_count();
-    result.push_str(&format!("let x{} = ", ctx.counters.borrow().var_count));
+    result.push_str(&format!("let x{} = ", ctx.shared.borrow().var_count));
     pretty_rec(*lhs, &mut ctx.add_indent(1).with_nl(""), result);
     result.push_str(&format!(" {} ", op_str));
     pretty_rec(*rhs, &mut ctx.add_indent(1).with_nl(""), result);
