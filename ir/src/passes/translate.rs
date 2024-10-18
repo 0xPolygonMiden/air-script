@@ -250,9 +250,14 @@ impl<'a> MirBuilder<'a> {
             // Enforce statements can be translated to Enf operations in the MIR on scalar expressions
             ast::Statement::Enforce(scalar_expr) => {
                 let scalar_expr = self.insert_scalar_expr(scalar_expr)?;
-                self.insert_op(Operation::Enf(scalar_expr));
-
-                Ok(())
+                match self.mir.constraint_graph().node(&scalar_expr).op() {
+                    Operation::Enf(_node_index) => Ok(()),
+                    _ => {
+                        self.insert_op(Operation::Enf(scalar_expr));
+                        Ok(())
+                    }
+                }
+                
             }
             ast::Statement::EnforceIf(_, _) => unreachable!(), // This variant was only available after AST's inlining, we should handle EnforceAll instead
             ast::Statement::EnforceAll(_list_comprehension) => {
