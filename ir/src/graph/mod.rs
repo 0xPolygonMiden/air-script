@@ -182,11 +182,12 @@ impl MirGraph {
 }
 
 #[derive(Debug, Clone)]
-struct PrettyShared {
+struct PrettyShared<'a> {
     pub var_count: usize,
     pub fn_count: usize,
     // BTreeMap from function index to function id
     pub fns: BTreeMap<usize, usize>,
+    pub roots: &'a [NodeIndex],
 }
 
 #[derive(Clone)]
@@ -195,15 +196,17 @@ struct PrettyCtx<'a> {
     pub indent: usize,
     pub nl: &'a str,
     pub in_block: bool,
-    pub shared: Rc<RefCell<PrettyShared>>,
+    pub show_var_names: bool,
+    pub shared: Rc<RefCell<PrettyShared<'a>>>,
 }
 
 impl<'a> PrettyCtx<'a> {
-    fn new(graph: &'a MirGraph) -> Self {
+    fn new(graph: &'a MirGraph, roots: &'a [NodeIndex]) -> Self {
         let shared = Rc::new(RefCell::new(PrettyShared {
             var_count: 0,
             fn_count: 0,
             fns: BTreeMap::new(),
+            roots,
         }));
         Self {
             graph,
@@ -211,6 +214,7 @@ impl<'a> PrettyCtx<'a> {
             nl: "\n",
             in_block: false,
             shared,
+            show_var_names: true,
         }
     }
 
@@ -258,6 +262,13 @@ impl<'a> PrettyCtx<'a> {
             "".to_string()
         }
     }
+
+    fn show_var_names(&self, show_var_names: bool) -> Self {
+        Self {
+            show_var_names,
+            ..self.clone()
+        }
+    }
 }
 
 impl std::fmt::Debug for PrettyCtx<'_> {
@@ -273,8 +284,8 @@ impl std::fmt::Debug for PrettyCtx<'_> {
 }
 
 pub fn pretty(graph: &MirGraph, roots: &[NodeIndex]) -> String {
-    let mut result = String::from("\n\n");
-    let mut ctx = PrettyCtx::new(graph);
+    let mut result = String::from("");
+    let mut ctx = PrettyCtx::new(graph, roots);
     for root in roots {
         pretty_rec(*root, &mut ctx, &mut result);
         ctx.shared.borrow_mut().var_count = 0; // reset var count for next function
@@ -301,10 +312,14 @@ fn pretty_rec(node_idx: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
             }
             result.push_str(") -> ");
             match ret_idx {
-                Some(ret_idx) => pretty_rec(*ret_idx, &mut ctx.with_indent(0).with_nl(""), result),
+                Some(ret_idx) => pretty_rec(
+                    *ret_idx,
+                    &mut ctx.with_indent(0).with_nl("").show_var_names(false),
+                    result,
+                ),
                 None => result.push_str("()"),
             }
-            result.push_str("{\n");
+            result.push_str(" {\n");
             for op_idx in body_idx {
                 pretty_rec(*op_idx, &mut ctx.add_indent(1).with_in_block(true), result);
             }
@@ -313,7 +328,10 @@ fn pretty_rec(node_idx: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
                 ctx.add_indent(1).indent_str(),
                 ctx.shared.borrow().var_count
             ));
-            result.push_str(&format!("{}}}\n\n", ctx.indent_str()));
+            result.push_str(&format!("{}}}", ctx.indent_str()));
+            if ctx.shared.borrow().fn_count != ctx.shared.borrow().roots.len() {
+                result.push_str("\n\n");
+            }
         }
         Operation::Value(spanned_val) => {
             let val = &spanned_val.value;
@@ -322,53 +340,72 @@ fn pretty_rec(node_idx: NodeIndex, ctx: &mut PrettyCtx, result: &mut String) {
                     if ctx.in_block {
                         result.push_str(&format!("x{}", pos));
                     } else {
-                        result.push_str(&format!(
-                            "{}x{}: {:?}{}",
-                            ctx.indent_str(),
-                            pos,
-                            ty,
-                            ctx.nl
-                        ));
+                        if ctx.show_var_names {
+                            result.push_str(&format!("{}x{}: ", ctx.indent_str(), pos));
+                        };
+                        result.push_str(&format!("{:?}{}", ty, ctx.nl));
                     }
+                }
+                MirValue::Constant(constant) => {
+                    result.push_str(&format!("{}{:?}{}", ctx.indent_str(), constant, ctx.nl));
                 }
                 val => result.push_str(&format!("{}{:?}{}", ctx.indent_str(), val, ctx.nl)),
             };
         }
         Operation::Add(lhs, rhs) => {
-            pretty_ssa((lhs, rhs), ctx, "+", result);
+            pretty_ssa_2ary((lhs, rhs), ctx, "+", result);
+        }
+        Operation::Sub(lhs, rhs) => {
+            pretty_ssa_2ary((lhs, rhs), ctx, "-", result);
+        }
+        Operation::Mul(lhs, rhs) => {
+            pretty_ssa_2ary((lhs, rhs), ctx, "*", result);
         }
         Operation::Call(func, args) => {
+            pretty_ssa_prefix(ctx, result);
             result.push_str(&format!(
-                "{}f{}(",
-                ctx.indent_str(),
+                "f{}(",
                 ctx.shared.borrow().fns.get(&func.0).unwrap()
             ));
             for (i, arg) in args.iter().enumerate() {
                 if i > 0 {
                     result.push_str(", ");
                 }
-                pretty_rec(*arg, &mut ctx.with_indent(0).with_nl(""), result);
+                match ctx.graph.node(arg).op() {
+                    Operation::Value(SpannedMirValue {
+                        value: MirValue::Variable(_, pos, _),
+                        ..
+                    }) => result.push_str(&format!("x{}", pos)),
+                    _ => pretty_rec(*arg, &mut ctx.with_indent(0).with_nl(""), result),
+                }
             }
-            result.push_str(");\n");
+            pretty_ssa_suffix(ctx, result);
         }
-
         op => result.push_str(&format!("{}{:?}\n", ctx.indent_str(), op)),
     }
 }
 
-fn pretty_ssa(
+fn pretty_ssa_prefix(ctx: &mut PrettyCtx, result: &mut String) {
+    result.push_str(&ctx.indent_str());
+    ctx.increment_var_count();
+    result.push_str(&format!("let x{} = ", ctx.shared.borrow().var_count));
+}
+
+fn pretty_ssa_suffix(ctx: &mut PrettyCtx, result: &mut String) {
+    result.push_str(&format!(";\n{}", if ctx.in_block { "" } else { ctx.nl }));
+}
+
+fn pretty_ssa_2ary(
     (lhs, rhs): (&NodeIndex, &NodeIndex),
     ctx: &mut PrettyCtx,
     op_str: &str,
     result: &mut String,
 ) {
-    result.push_str(&ctx.indent_str());
-    ctx.increment_var_count();
-    result.push_str(&format!("let x{} = ", ctx.shared.borrow().var_count));
+    pretty_ssa_prefix(ctx, result);
     pretty_rec(*lhs, &mut ctx.add_indent(1).with_nl(""), result);
     result.push_str(&format!(" {} ", op_str));
     pretty_rec(*rhs, &mut ctx.add_indent(1).with_nl(""), result);
-    result.push_str(&format!(";\n{}", if ctx.in_block { "" } else { ctx.nl }));
+    pretty_ssa_suffix(ctx, result);
 }
 
 fn get_children(op: Operation) -> Vec<NodeIndex> {

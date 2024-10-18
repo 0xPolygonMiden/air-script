@@ -1,8 +1,7 @@
-use crate::passes::Inlining;
-
 #[cfg(test)]
 mod tests {
     use crate::graph::pretty;
+    use crate::passes::Inlining;
     use crate::ConstantValue;
     use crate::MirGraph;
     use crate::MirType;
@@ -11,15 +10,19 @@ mod tests {
     use crate::NodeIndex;
     use crate::Operation;
     use crate::SpannedMirValue;
+    use air_pass::Pass;
 
     #[test]
     fn test_inlining() {
-        // double(x):
-        //   y = x + x
-        //   return y
-        // main:
-        //   x = 1
-        //   return double(x)
+        // fn f0(x0: Felt) -> Felt {
+        //   let x1 = x0 + x0;
+        //   return x1;
+        // }
+        //
+        // fn f1() -> Felt {
+        //   let x1 = f0(Felt(1);
+        //   return x1;
+        // }
         let original = MirGraph::new(vec![
             // double definition
             // x: Variable(Felt, 0, main)
@@ -110,21 +113,13 @@ mod tests {
 
         let double = NodeIndex(3);
         let main = NodeIndex(7);
-        println!("ORIGINAL: {}", pretty(&original, &[double, main]));
-        // let mut inliner = Inlining::new();
-        // let result = inliner.run(original);
-        // println!("RESULT: {:#?}", result);
+        println!("ORIGINAL:\n{}", pretty(&original, &[double, main]));
+        println!("ORIGINAL raw:\n{:?}", original);
+        println!("============= Inlining pass =============");
+        let mut inliner = Inlining::new();
+        let result = inliner.run(original.clone()).unwrap();
+        println!("=========================================");
+        println!("INLINED raw:\n{:?}", result);
+        println!("INLINED:\n{}", pretty(&result, &[double, main]));
     }
 }
-//
-// fn f0(x0: Felt) -> x1: Felt {
-//   let x0 = x0 + x0;
-//   return x0;
-// }
-//
-// fn main() -> x0: Felt {
-//   let x0 = 1;
-//   // return f0(x0);
-//   let x1 = x0 + x0;
-//   return x1;
-// }
