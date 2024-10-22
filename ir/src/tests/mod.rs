@@ -2,6 +2,7 @@ mod access;
 mod boundary_constraints;
 mod constant;
 mod evaluators;
+mod functions;
 mod integrity_constraints;
 mod ir;
 mod list_folding;
@@ -22,7 +23,7 @@ use miden_diagnostics::{CodeMap, DiagnosticsConfig, DiagnosticsHandler, Verbosit
 pub fn compile(source: &str) -> Result<crate::Mir, ()> {
     let compiler = Compiler::default();
     match compiler.compile(source) {
-        Ok(air) => Ok(air),
+        Ok(mir) => Ok(mir),
         Err(err) => {
             compiler.diagnostics.emit(err);
             compiler.emitter.print_captured_to_stderr();
