@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
 use miden_diagnostics::SourceSpan;
@@ -60,6 +60,7 @@ pub struct MirGraph {
     use_list: HashMap<NodeIndex, Vec<NodeIndex>>,
     pub functions: BTreeMap<QualifiedIdentifier, NodeIndex>,
     pub evaluators: BTreeMap<QualifiedIdentifier, NodeIndex>,
+    pub roots: HashSet<NodeIndex>,
 }
 
 impl MirGraph {
@@ -70,12 +71,21 @@ impl MirGraph {
             use_list: HashMap::default(),
             functions: BTreeMap::new(),
             evaluators: BTreeMap::new(),
+            roots: HashSet::new(),
         }
     }
 
     /// Returns the node with the specified index.
     pub fn node(&self, index: &NodeIndex) -> &Node {
         &self.nodes[index.0]
+    }
+
+    pub fn insert_root(&mut self, index: NodeIndex) {
+        self.roots.insert(index);
+    }
+
+    pub fn remove_root(&mut self, index: NodeIndex) {
+        self.roots.remove(&index);
     }
 
     pub fn update_node(&mut self, index: &NodeIndex, op: Operation) {

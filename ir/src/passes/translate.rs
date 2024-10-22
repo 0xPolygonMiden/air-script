@@ -250,22 +250,52 @@ impl<'a> MirBuilder<'a> {
             // Enforce statements can be translated to Enf operations in the MIR on scalar expressions
             ast::Statement::Enforce(scalar_expr) => {
                 let scalar_expr = self.insert_scalar_expr(scalar_expr)?;
-                match self.mir.constraint_graph().node(&scalar_expr).op() {
-                    Operation::Enf(_node_index) => Ok(()),
-                    _ => {
-                        self.insert_op(Operation::Enf(scalar_expr));
-                        Ok(())
+                match self.mir.constraint_graph().node(&scalar_expr).op().clone() {
+                    Operation::Enf(node_index) => {
+                        self.mir.constraint_graph_mut().insert_root(node_index)
                     }
-                }
-                
+                    _ => {
+                        let node_index = self.insert_op(Operation::Enf(scalar_expr));
+                        self.mir.constraint_graph_mut().insert_root(node_index)
+                    }
+                };
+                Ok(())
             }
             ast::Statement::EnforceIf(_, _) => unreachable!(), // This variant was only available after AST's inlining, we should handle EnforceAll instead
-            ast::Statement::EnforceAll(_list_comprehension) => {
-                //self.build_statement(&ast::Statement::Expr(ScalarExpr(list_comprehension.body))?;
+            ast::Statement::EnforceAll(list_comprehension) => {
+                self.bindings.enter();
+                let mut binding_nodes = Vec::new();
+                for (index, binding) in list_comprehension.bindings.iter().enumerate() {
+                    // TODO: Add type info?
+                    let binding_node_index =
+                        self.insert_variable(binding.span(), ast::Type::Felt, index);
+                    binding_nodes.push(binding_node_index);
+                    self.bindings.insert(*binding, binding_node_index);
+                }
 
-                // let scalar_expr = self.insert_scalar_expr(scalar_expr)?;
-                // let insert_op = self.insert_op(Operation::For(scalar_expr));
+                let mut iterator_nodes = Vec::new();
+                for iterator in list_comprehension.iterables.iter() {
+                    let iterator_node_index = self.insert_expr(iterator)?;
+                    iterator_nodes.push(iterator_node_index);
+                }
 
+                let selector_node_index = if let Some(selector) = &list_comprehension.selector {
+                    Some(self.insert_scalar_expr(selector)?)
+                } else {
+                    None
+                };
+                let body_node_index = self.insert_scalar_expr(&list_comprehension.body)?;
+
+                let for_node_index = self.insert_op(Operation::For(
+                    iterator_nodes,
+                    body_node_index,
+                    selector_node_index,
+                ));
+
+                // TODO: Should we also insert an Enf operation to differentiate between constraints and expressions that evaluate to a value?
+                self.mir.constraint_graph_mut().insert_root(for_node_index);
+
+                self.bindings.exit();
                 Ok(())
             }
         }
@@ -781,14 +811,6 @@ impl<'a> MirBuilder<'a> {
                         }));
                     }
 
-                    // Must be a trace segment name
-                    /*if let Some(ta) = self.trace_access_binding(access) {
-                        return self.insert_op(Operation::Value(SpannedMirValue {
-                            span: id.span(),
-                            value: MirValue::TraceAccessBinding(ta),
-                        }));
-                    }*/
-
                     // It should never be possible to reach this point - semantic analysis
                     // would have caught that this identifier is undefined.
                     unreachable!(
@@ -831,24 +853,6 @@ impl<'a> MirBuilder<'a> {
                     .bindings
                     .get(access.name.as_ref())
                     .expect("undefined variable");
-                /*{
-                    MemoizedBinding::Scalar(node) => {
-                        assert_eq!(access.access_type, AccessType::Default);
-                        *node
-                    }
-                    MemoizedBinding::Vector(nodes) => {
-                        if let AccessType::Index(idx) = &access.access_type {
-                            return nodes[*idx];
-                        }
-                        unreachable!("impossible vector access: {:?}", access)
-                    }
-                    MemoizedBinding::Matrix(nodes) => {
-                        if let AccessType::Matrix(row, col) = &access.access_type {
-                            return nodes[*row][*col];
-                        }
-                        unreachable!("impossible matrix access: {:?}", access)
-                    }
-                }*/
             }
             // These should have been eliminated by previous compiler passes
             ResolvableIdentifier::Unresolved(_) => {
