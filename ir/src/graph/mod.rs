@@ -10,7 +10,7 @@ use crate::ir::*;
 ///
 /// The raw value of this identifier is an index in the `nodes` vector
 /// of the [AlgebraicGraph] struct.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NodeIndex(pub usize);
 impl core::ops::Add<usize> for NodeIndex {
     type Output = NodeIndex;

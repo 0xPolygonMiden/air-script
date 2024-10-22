@@ -1,9 +1,9 @@
-use std::ops::ControlFlow;
+use std::{collections::BTreeMap, ops::ControlFlow};
 
 use air_pass::Pass;
 //use miden_diagnostics::DiagnosticsHandler;
 
-use crate::{graph::pretty, MirGraph, Node, NodeIndex, Operation, SpannedVariable};
+use crate::{MirGraph, NodeIndex, Operation};
 
 //pub struct Inlining<'a> {
 //     #[allow(unused)]
@@ -47,11 +47,12 @@ impl Inlining {
 }
 
 fn inline_all(ir: &mut MirGraph) {
+    // Find all definitions
     for node_uindex in 0..ir.num_nodes() {
         let def_node_index = NodeIndex(node_uindex);
         let def_node = ir.node(&def_node_index).clone();
         if let Operation::Definition(_, _, body) = &def_node.op {
-            println!("{}: Def node: {:?}", def_node_index.0, def_node);
+            // Find all calls in the body
             for (index_in_body, call_index) in body.iter().enumerate() {
                 inline_call(ir, call_index, &def_node_index, index_in_body);
             }
@@ -66,20 +67,19 @@ fn inline_call(
     index_in_body: usize,
 ) {
     let call_node = ir.node(call_index).clone();
-    if let Operation::Call(def_index, arg_indexes) = &call_node.op {
-        println!("Call: {:?} {:?}", def_index, arg_indexes);
-        let new_nodes = inline_body(ir, def_index);
-        println!("new_nodes: {:?}", new_nodes);
-        let def_node = ir.node(outer_def_index);
+    if let Operation::Call(def_index, arg_value_indexes) = &call_node.op {
+        let mut body_index_map = BTreeMap::new();
+        // Inline the body of the called function
+        let new_nodes = inline_body(ir, &mut body_index_map, def_index, arg_value_indexes);
+        let outer_def_node = ir.node(outer_def_index).clone();
         if let Operation::Definition(outer_func_arg_indexes, outer_func_ret, outer_body) =
-            &def_node.op
+            &outer_def_node.op
         {
-            println!(
-                "args: {:?} ret: {:?} body: {:?}",
-                outer_func_arg_indexes, outer_func_ret, outer_body
-            );
+            // Edit the body of the outer function
+            // body.last: swap the call with the last node
             let mut new_body = outer_body.clone();
             new_body[index_in_body] = *new_nodes.last().unwrap();
+            // body[..body.last]: insert the new nodes in reverse order
             for op_idx in new_nodes.iter().rev().skip(1) {
                 new_body.insert(index_in_body, *op_idx);
             }
@@ -87,41 +87,125 @@ fn inline_call(
                 outer_def_index,
                 Operation::Definition(outer_func_arg_indexes.clone(), *outer_func_ret, new_body),
             );
-            //inline_swap_args(ir, outer_func_arg_indexes, arg_indexes);
         }
     }
 }
 
-fn inline_body(ir: &mut MirGraph, def_index: &NodeIndex) -> Vec<NodeIndex> {
-    let def_node = ir.node(def_index).clone();
-    let mut new_nodes = vec![];
-    if let Operation::Definition(_, _, body) = &def_node.op {
-        for node_index in body {
-            new_nodes.push(inline_op(ir, node_index));
-        }
-    }
-    new_nodes
-}
-
-fn inline_op(ir: &mut MirGraph, op_index: &NodeIndex) -> NodeIndex {
-    let op_node = ir.node(op_index).clone();
-    let new_node = ir.insert_placeholder_op();
-    let op = op_node.op.clone();
-    ir.update_node(&new_node, op.clone());
-    new_node
-}
-
-fn inline_swap_args(
+fn inline_body(
     ir: &mut MirGraph,
-    outer_func_arg_indexes: &Vec<NodeIndex>,
-    call_arg_indexes: &Vec<NodeIndex>,
-) {
-    for (outer_func_arg_index, call_arg_index) in
-        outer_func_arg_indexes.iter().zip(call_arg_indexes)
-    {
-        println!(
-            "outer_func_arg_index: {:?} call_arg_index: {:?}",
-            outer_func_arg_index, call_arg_index
-        );
+    body_index_map: &mut BTreeMap<NodeIndex, NodeIndex>,
+    def_index: &NodeIndex,
+    arg_value_indexes: &[NodeIndex],
+) -> Vec<NodeIndex> {
+    let def_node = ir.node(def_index).clone();
+    let mut new_body = vec![];
+    if let Operation::Definition(arg_indexes, _, body) = &def_node.op {
+        // map the arguments to the values of the call
+        for (arg_index, arg_value_index) in arg_indexes.iter().zip(arg_value_indexes) {
+            body_index_map.insert(*arg_index, *arg_value_index);
+        }
+        // Inline the body of the called function
+        for node_index in body {
+            inline_op(ir, body_index_map, node_index, &mut new_body);
+        }
     }
+    new_body
+}
+
+fn inline_op(
+    ir: &mut MirGraph,
+    body_index_map: &mut BTreeMap<NodeIndex, NodeIndex>,
+    op_index: &NodeIndex,
+    new_body: &mut Vec<NodeIndex>,
+) {
+    // Clone the operation and insert it in the new body
+    let new_node = ir.insert_placeholder_op();
+    body_index_map.insert(*op_index, new_node);
+    let op_node = ir.node(op_index).clone();
+    // Update the operation with the new indexes
+    let op = match op_node.op.clone() {
+        Operation::Value(value) => Operation::Value(value),
+        Operation::Add(lhs, rhs) => Operation::Add(
+            *body_index_map.get(&lhs).expect("Add lhs not found"),
+            *body_index_map.get(&rhs).expect("Add rhs not found"),
+        ),
+        Operation::Sub(lhs, rhs) => Operation::Sub(
+            *body_index_map.get(&lhs).expect("Sub lhs not found"),
+            *body_index_map.get(&rhs).expect("Sub rhs not found"),
+        ),
+        Operation::Mul(lhs, rhs) => Operation::Mul(
+            *body_index_map.get(&lhs).expect("Mul lhs not found"),
+            *body_index_map.get(&rhs).expect("Mul rhs not found"),
+        ),
+        Operation::Vector(values) => Operation::Vector(
+            values
+                .iter()
+                .map(|value_index| {
+                    *body_index_map
+                        .get(value_index)
+                        .expect("Vector value not found")
+                })
+                .collect(),
+        ),
+        Operation::Matrix(rows) => Operation::Matrix(
+            rows.iter()
+                .map(|row| {
+                    row.iter()
+                        .map(|value_index| {
+                            *body_index_map
+                                .get(value_index)
+                                .expect("Matrix value not found")
+                        })
+                        .collect()
+                })
+                .collect(),
+        ),
+        Operation::Call(def_index, arg_value_indexes) => Operation::Call(
+            def_index,
+            arg_value_indexes
+                .iter()
+                .map(|arg_value_index| {
+                    *body_index_map
+                        .get(arg_value_index)
+                        .unwrap_or(arg_value_index)
+                })
+                .collect(),
+        ),
+        Operation::If(cond, then_index, else_index) => Operation::If(
+            *body_index_map.get(&cond).unwrap_or(&cond),
+            *body_index_map.get(&then_index).unwrap_or(&then_index),
+            *body_index_map.get(&else_index).unwrap_or(&else_index),
+        ),
+        Operation::For(iterators, body_index, opt_selector) => Operation::For(
+            iterators
+                .iter()
+                .map(|iterator_index| *body_index_map.get(iterator_index).unwrap_or(iterator_index))
+                .collect(),
+            *body_index_map.get(&body_index).unwrap_or(&body_index),
+            opt_selector.map(|selector_index| {
+                *body_index_map
+                    .get(&selector_index)
+                    .unwrap_or(&selector_index)
+            }),
+        ),
+        Operation::Fold(iterator_index, fold_op, init_index) => Operation::Fold(
+            *body_index_map
+                .get(&iterator_index)
+                .unwrap_or(&iterator_index),
+            fold_op,
+            *body_index_map.get(&init_index).unwrap_or(&init_index),
+        ),
+        Operation::Enf(value_index) => {
+            Operation::Enf(*body_index_map.get(&value_index).unwrap_or(&value_index))
+        }
+        Operation::Boundary(boundary, value_index) => Operation::Boundary(
+            boundary,
+            *body_index_map.get(&value_index).unwrap_or(&value_index),
+        ),
+        Operation::Variable(var) => Operation::Variable(var),
+        Operation::Definition(_, _, _) => unreachable!(),
+        Operation::Placeholder => Operation::Placeholder,
+    };
+    ir.update_node(&new_node, op);
+    new_body.push(new_node);
 }
