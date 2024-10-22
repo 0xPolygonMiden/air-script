@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
-use miden_diagnostics::SourceSpan;
+// use miden_diagnostics::SourceSpan;
 
 use crate::ir::*;
 
