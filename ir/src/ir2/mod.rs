@@ -111,6 +111,63 @@ impl Op for Add {
     }
 }
 
+pub struct Sub(RefCell<Operation>);
+impl Sub {
+    pub fn new(lhs: Rc<dyn Value>, rhs: Rc<dyn Value>, span: SourceSpan) -> Rc<Sub> {
+        let operation = Rc::new(Self(RefCell::new(Operation {
+            operands: vec![],
+            owner: None,
+            result: RefCell::new(OpResult {
+                owner: None,
+                id: 0,
+                span,
+            }),
+            span,
+        })));
+        let lhs = Rc::clone(&lhs);
+        let rhs = Rc::clone(&rhs);
+        <dyn Op>::append_operand(operation.clone(), lhs, span);
+        <dyn Op>::append_operand(operation.clone(), rhs, span);
+        let dyn_op = Rc::clone(&operation);
+        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
+        operation
+    }
+}
+impl Op for Sub {
+    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
+        self.0.borrow_mut()
+    }
+}
+
+pub struct Mul(RefCell<Operation>);
+impl Mul {
+    pub fn new(lhs: Rc<dyn Value>, rhs: Rc<dyn Value>, span: SourceSpan) -> Rc<Mul> {
+        let operation = Rc::new(Self(RefCell::new(Operation {
+            operands: vec![],
+            owner: None,
+            result: RefCell::new(OpResult {
+                owner: None,
+                id: 0,
+                span,
+            }),
+            span,
+        })));
+        let lhs = Rc::clone(&lhs);
+        let rhs = Rc::clone(&rhs);
+        <dyn Op>::append_operand(operation.clone(), lhs, span);
+        <dyn Op>::append_operand(operation.clone(), rhs, span);
+        let dyn_op = Rc::clone(&operation);
+        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
+        operation
+    }
+}
+
+impl Op for Mul {
+    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
+        self.0.borrow_mut()
+    }
+}
+
 pub struct Block {
     pub operations: Vec<Operation>,
     pub owner: Option<Rc<Region>>,
