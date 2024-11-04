@@ -1,14 +1,11 @@
+#![allow(unused)]
 use std::{
-    borrow::{Borrow, BorrowMut},
     cell::{Cell, RefCell, RefMut},
-    ops::Deref,
     rc::Rc,
 };
 
 use air_parser::ast::Type;
-use value::SpannedMirValue;
-
-use crate::graph::NodeIndex;
+use miden_diagnostics::{SourceSpan, Spanned};
 
 use super::*;
 

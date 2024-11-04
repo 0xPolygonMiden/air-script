@@ -1,6 +1,7 @@
 mod codegen;
 mod graph;
 mod ir;
+mod ir2;
 pub mod passes;
 #[cfg(test)]
 mod tests;
