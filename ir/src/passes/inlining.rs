@@ -119,7 +119,7 @@ fn inline_op(
     new_body: &mut Vec<NodeIndex>,
 ) {
     // Clone the operation and insert it in the new body
-    let new_node = ir.insert_placeholder_op();
+    let new_node = ir.insert_op_placeholder();
     body_index_map.insert(*op_index, new_node);
     let op_node = ir.node(op_index).clone();
     // Update the operation with the new indexes
