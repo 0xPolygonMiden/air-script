@@ -2,11 +2,13 @@ mod constant_propagation;
 mod inlining;
 mod translate;
 mod value_numbering;
+mod visitor;
 
 pub use self::constant_propagation::ConstantPropagation;
 pub use self::inlining::Inlining;
 pub use self::translate::AstToMir;
 pub use self::value_numbering::ValueNumbering;
+pub use self::visitor::{Visit, VisitContext};
 
 use air_pass::Pass;
 
