@@ -1,476 +1,169 @@
 #![allow(unused)]
-use std::{
-    cell::{Cell, RefCell, RefMut},
-    rc::Rc,
+mod constraints;
+mod degree;
+mod graph;
+mod operation;
+mod trace;
+mod value;
+
+pub use air_parser::{
+    ast::{
+        AccessType, Boundary as BoundaryAst, Identifier, PeriodicColumn, PublicInput,
+        QualifiedIdentifier, TraceSegmentId,
+    },
+    Symbol,
 };
 
-use air_parser::ast::{Boundary as AstBoundary, Type};
+//pub use self::constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints};
+pub use self::degree::IntegrityConstraintDegree;
+pub use self::operation::{
+    Add, Block, Boundary, BoundaryOpts, Call, Context, Enf, Evaluator, Fold, FoldOperator,
+    FoldOperatorOpts, For, Function, FunctionOrEvaluator, If, Matrix, Mul, Op, OpResult, Operand,
+    Operation, Parameter, Region, Sub, Value, Vector,
+};
+
+//pub use self::graph::MirGraph;
+pub use self::trace::TraceAccess;
+//pub use self::value::{
+//    ConstantValue, MirType, MirValue, PeriodicColumnAccess, PublicInputAccess, SpannedMirValue,
+//    TraceAccessBinding,
+//};
+
+/// The default segment against which a constraint is applied is the main trace segment.
+pub const DEFAULT_SEGMENT: TraceSegmentId = 0;
+/// The auxiliary trace segment.
+pub const AUX_SEGMENT: TraceSegmentId = 1;
+/// The offset of the "current" row during constraint evaluation.
+pub const CURRENT_ROW: usize = 0;
+/// The minimum cycle length of a periodic column
+pub const MIN_CYCLE_LENGTH: usize = 2;
+
+use std::collections::BTreeMap;
+
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use super::*;
-
-pub trait Value: Spanned {}
-
-pub trait Op {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation>;
-}
-
-/// We implement some functionality on `dyn Op` so that we can keep `Op` object safe, but still
-/// provide some of the richer mutation/transformation actions we want to support.
-impl dyn Op {
-    /// Add `value` as a new operand of this operation, adding the resulting operand
-    /// as a user of that value.
-    pub fn append_operand(self: Rc<Self>, value: Rc<dyn Value>, span: SourceSpan) -> Rc<Operand> {
-        let owner = RefCell::new(Rc::clone(&self));
-        let mut operation = self.as_operation_mut();
-        let index = operation.operands.len();
-        let operand = Rc::new(Operand {
-            span,
-            index,
-            value: RefCell::new(value),
-            owner,
-        });
-        operation.operands.push(Rc::clone(&operand));
-        operand
-    }
-}
-
-pub struct Context {
-    value_id: Cell<usize>,
-}
-impl Context {
-    pub fn make_value_id(&self) -> usize {
-        self.value_id.set(self.value_id.get() + 1);
-        self.value_id.get()
-    }
-}
-
-#[derive(Spanned)]
-pub struct Operand {
-    owner: RefCell<Rc<dyn Op>>,
-    value: RefCell<Rc<dyn Value>>,
+/// The intermediate representation of a complete AirScript program
+///
+/// This structure is produced from an [air_parser::ast::Program] that has
+/// been through semantic analysis, constant propagation, and inlining. It
+/// is equivalent to an [air_parser::ast::Program], except that it has been
+/// translated into an algebraic graph representation, on which further analysis,
+/// optimization, and code generation are performed.
+#[derive(Debug, Spanned)]
+pub struct Mir {
+    /// The name of the [air_parser::ast::Program] from which this IR was derived
     #[span]
-    span: SourceSpan,
-    // the index of the operand in the operation
-    index: usize,
+    pub name: Identifier,
+    /// The widths (number of columns) of each segment of the trace, in segment order (i.e. the
+    /// index in this vector matches the index of the segment in the program).
+    pub trace_segment_widths: Vec<u16>,
+    /// The periodic columns referenced by this program.
+    ///
+    /// These are taken straight from the [air_parser::ast::Program] without modification.
+    pub periodic_columns: BTreeMap<QualifiedIdentifier, PeriodicColumn>,
+    /// The public inputs referenced by this program.
+    ///
+    /// These are taken straight from the [air_parser::ast::Program] without modification.
+    pub public_inputs: BTreeMap<Identifier, PublicInput>,
+    /// The total number of elements in the random values array
+    pub num_random_values: u16,
+    ///// The constraints enforced by this program, in their algebraic graph representation.
+    //pub constraints: Constraints,
 }
-impl Value for Operand {}
-
-#[derive(Spanned)]
-pub struct OpResult {
-    owner: Option<Rc<dyn Op>>,
-    // SSA id
-    id: usize,
-    #[span]
-    span: SourceSpan,
-}
-impl OpResult {
-    pub fn new(span: SourceSpan, owner: Rc<dyn Op>, context: &Context) -> Rc<Self> {
-        Rc::new(Self {
-            owner: Some(owner),
-            id: context.make_value_id(),
-            span,
-        })
+impl Default for Mir {
+    fn default() -> Self {
+        Self::new(Identifier::new(
+            SourceSpan::UNKNOWN,
+            Symbol::intern("unnamed"),
+        ))
     }
 }
-
-#[derive(Spanned)]
-pub struct Operation {
-    pub operands: Vec<Rc<Operand>>,
-    pub owner: Option<Rc<Block>>,
-    pub result: RefCell<OpResult>,
-    #[span]
-    pub span: SourceSpan,
-}
-
-pub struct Add(RefCell<Operation>);
-impl Add {
-    pub fn new(lhs: Rc<dyn Value>, rhs: Rc<dyn Value>, span: SourceSpan) -> Rc<Add> {
-        let operation = Rc::new(Self(RefCell::new(Operation {
-            operands: vec![],
-            owner: None,
-            result: RefCell::new(OpResult {
-                owner: None,
-                id: 0,
-                span,
-            }),
-            span,
-        })));
-        let lhs = Rc::clone(&lhs);
-        let rhs = Rc::clone(&rhs);
-        <dyn Op>::append_operand(operation.clone(), lhs, span);
-        <dyn Op>::append_operand(operation.clone(), rhs, span);
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
-    }
-}
-impl Op for Add {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.0.borrow_mut()
-    }
-}
-
-pub struct Sub(RefCell<Operation>);
-impl Sub {
-    pub fn new(lhs: Rc<dyn Value>, rhs: Rc<dyn Value>, span: SourceSpan) -> Rc<Sub> {
-        let operation = Rc::new(Self(RefCell::new(Operation {
-            operands: vec![],
-            owner: None,
-            result: RefCell::new(OpResult {
-                owner: None,
-                id: 0,
-                span,
-            }),
-            span,
-        })));
-        let lhs = Rc::clone(&lhs);
-        let rhs = Rc::clone(&rhs);
-        <dyn Op>::append_operand(operation.clone(), lhs, span);
-        <dyn Op>::append_operand(operation.clone(), rhs, span);
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
-    }
-}
-impl Op for Sub {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.0.borrow_mut()
-    }
-}
-
-pub struct Mul(RefCell<Operation>);
-impl Mul {
-    pub fn new(lhs: Rc<dyn Value>, rhs: Rc<dyn Value>, span: SourceSpan) -> Rc<Mul> {
-        let operation = Rc::new(Self(RefCell::new(Operation {
-            operands: vec![],
-            owner: None,
-            result: RefCell::new(OpResult {
-                owner: None,
-                id: 0,
-                span,
-            }),
-            span,
-        })));
-        let lhs = Rc::clone(&lhs);
-        let rhs = Rc::clone(&rhs);
-        <dyn Op>::append_operand(operation.clone(), lhs, span);
-        <dyn Op>::append_operand(operation.clone(), rhs, span);
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
-    }
-}
-impl Op for Mul {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.0.borrow_mut()
-    }
-}
-
-pub struct Enf(RefCell<Operation>);
-impl Enf {
-    pub fn new(value: Rc<dyn Value>, span: SourceSpan) -> Rc<Enf> {
-        let operation = Rc::new(Self(RefCell::new(Operation {
-            operands: vec![],
-            owner: None,
-            result: RefCell::new(OpResult {
-                owner: None,
-                id: 0,
-                span,
-            }),
-            span,
-        })));
-        let value = Rc::clone(&value);
-        <dyn Op>::append_operand(operation.clone(), value, span);
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
-    }
-}
-impl Op for Enf {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.0.borrow_mut()
-    }
-}
-
-pub struct Call(RefCell<Operation>);
-impl Call {
-    pub fn new(func: Rc<dyn Value>, args: Vec<Rc<dyn Value>>, span: SourceSpan) -> Rc<Call> {
-        let operation = Rc::new(Self(RefCell::new(Operation {
-            operands: vec![],
-            owner: None,
-            result: RefCell::new(OpResult {
-                owner: None,
-                id: 0,
-                span,
-            }),
-            span,
-        })));
-        let func = Rc::clone(&func);
-        <dyn Op>::append_operand(operation.clone(), func, span);
-        for arg in args {
-            <dyn Op>::append_operand(operation.clone(), arg, span);
+impl Mir {
+    /// Create a new, empty [Mir] container
+    ///
+    /// An empty [Mir] is meaningless until it has been populated with
+    /// constraints and associated metadata. This is typically done by converting
+    /// an [air_parser::ast::Program] to this struct using the [crate::passes::AstToAir]
+    /// translation pass.
+    pub fn new(name: Identifier) -> Self {
+        Self {
+            name,
+            trace_segment_widths: vec![],
+            periodic_columns: Default::default(),
+            public_inputs: Default::default(),
+            num_random_values: 0,
+            //constraints: Default::default(),
         }
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
     }
-}
-impl Op for Call {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.0.borrow_mut()
-    }
-}
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum FoldOperatorOpts {
-    Add,
-    Mul,
-}
-#[derive(Spanned)]
-pub struct FoldOperator {
-    operator: FoldOperatorOpts,
-    #[span]
-    span: SourceSpan,
-}
-impl FoldOperator {
-    pub fn new(operator: FoldOperatorOpts, span: SourceSpan) -> Rc<FoldOperator> {
-        Rc::new(Self { operator, span })
+    /// Returns the name of the [air_parser::ast::Program] this [Air] was derived from, as a `str`
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.name.as_str()
     }
-}
-impl Value for FoldOperator {}
 
-pub struct Fold(RefCell<Operation>);
-impl Fold {
-    pub fn new(
-        iterable: Rc<dyn Value>,
-        operator: Rc<dyn Value>,
-        init: Rc<dyn Value>,
-        span: SourceSpan,
-    ) -> Rc<Fold> {
-        let operation = Rc::new(Self(RefCell::new(Operation {
-            operands: vec![],
-            owner: None,
-            result: RefCell::new(OpResult {
-                owner: None,
-                id: 0,
-                span,
-            }),
-            span,
-        })));
-        let iterable = Rc::clone(&iterable);
-        let operator = Rc::clone(&operator);
-        let init = Rc::clone(&init);
-        let operator = <dyn Op>::append_operand(operation.clone(), iterable, span);
-        let operator = <dyn Op>::append_operand(operation.clone(), operator, span);
-        let operator = <dyn Op>::append_operand(operation.clone(), init, span);
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
+    pub fn public_inputs(&self) -> impl Iterator<Item = &PublicInput> + '_ {
+        self.public_inputs.values()
     }
-}
-impl Op for Fold {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.0.borrow_mut()
-    }
-}
 
-pub struct For(RefCell<Operation>);
-impl For {
-    pub fn new(
-        iterators: Vec<Rc<dyn Value>>,
-        body: Rc<dyn Value>,
-        selector: Option<Rc<dyn Value>>,
-        span: SourceSpan,
-    ) -> Rc<For> {
-        let operation = Rc::new(Self(RefCell::new(Operation {
-            operands: vec![],
-            owner: None,
-            result: RefCell::new(OpResult {
-                owner: None,
-                id: 0,
-                span,
-            }),
-            span,
-        })));
-        for iterator in iterators {
-            <dyn Op>::append_operand(operation.clone(), iterator.clone(), span);
-        }
-        <dyn Op>::append_operand(operation.clone(), body.clone(), span);
-        if let Some(selector) = selector {
-            <dyn Op>::append_operand(operation.clone(), selector.clone(), span);
-        }
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
+    pub fn periodic_columns(&self) -> impl Iterator<Item = &PeriodicColumn> + '_ {
+        self.periodic_columns.values()
     }
-}
-impl Op for For {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.0.borrow_mut()
-    }
-}
 
-pub struct If(RefCell<Operation>);
-impl If {
-    pub fn new(
-        condition: Rc<dyn Value>,
-        then_branch: Rc<dyn Value>,
-        else_branch: Rc<dyn Value>,
-        span: SourceSpan,
-    ) -> Rc<If> {
-        let operation = Rc::new(Self(RefCell::new(Operation {
-            operands: vec![],
-            owner: None,
-            result: RefCell::new(OpResult {
-                owner: None,
-                id: 0,
-                span,
-            }),
-            span,
-        })));
-        let condition = Rc::clone(&condition);
-        let then_branch = Rc::clone(&then_branch);
-        let else_branch = Rc::clone(&else_branch);
-        <dyn Op>::append_operand(operation.clone(), condition, span);
-        <dyn Op>::append_operand(operation.clone(), then_branch, span);
-        <dyn Op>::append_operand(operation.clone(), else_branch, span);
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
-    }
-}
-impl Op for If {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.0.borrow_mut()
-    }
-}
+    ///// Return the number of boundary constraints
+    //pub fn num_boundary_constraints(&self, trace_segment: TraceSegmentId) -> usize {
+    //    self.constraints.num_boundary_constraints(trace_segment)
+    //}
 
-#[derive(Spanned)]
-pub struct Vector {
-    operation: RefCell<Operation>,
-    #[span]
-    pub span: SourceSpan,
-}
-impl Vector {
-    pub fn new(values: Vec<Rc<dyn Value>>, span: SourceSpan) -> Rc<Vector> {
-        let operation = Rc::new(Self {
-            operation: RefCell::new(Operation {
-                operands: vec![],
-                owner: None,
-                result: RefCell::new(OpResult {
-                    owner: None,
-                    id: 0,
-                    span,
-                }),
-                span,
-            }),
-            span,
-        });
-        for value in values {
-            <dyn Op>::append_operand(operation.clone(), value, span);
-        }
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
-    }
-}
-impl Op for Vector {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.operation.borrow_mut()
-    }
-}
-impl Value for Vector {}
+    ///// Return the set of [ConstraintRoot] corresponding to the boundary constraints
+    //pub fn boundary_constraints(&self, trace_segment: TraceSegmentId) -> &[ConstraintRoot] {
+    //    self.constraints.boundary_constraints(trace_segment)
+    //}
 
-pub struct Matrix(RefCell<Operation>);
-impl Matrix {
-    pub fn new(values: Vec<Vec<Rc<dyn Value>>>, span: SourceSpan) -> Rc<Matrix> {
-        let operation = Rc::new(Self(RefCell::new(Operation {
-            operands: vec![],
-            owner: None,
-            result: RefCell::new(OpResult {
-                owner: None,
-                id: 0,
-                span,
-            }),
-            span,
-        })));
-        for row in values {
-            let row = Vector::new(row, span);
-            <dyn Op>::append_operand(operation.clone(), row, span);
-        }
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
-    }
-}
-impl Op for Matrix {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.0.borrow_mut()
-    }
-}
+    ///// Return the set of [ConstraintRoot] corresponding to the integrity constraints
+    //pub fn integrity_constraints(&self, trace_segment: TraceSegmentId) -> &[ConstraintRoot] {
+    //    self.constraints.integrity_constraints(trace_segment)
+    //}
 
-#[derive(Spanned)]
-pub struct BoundaryOpts {
-    pub boundary: AstBoundary,
-    #[span]
-    pub span: SourceSpan,
-}
-impl Value for BoundaryOpts {}
+    /* /// Return the set of [IntegrityConstraintDegree] corresponding to each integrity constraint
+    pub fn integrity_constraint_degrees(
+        &self,
+        trace_segment: TraceSegmentId,
+    ) -> Vec<IntegrityConstraintDegree> {
+        self.constraints.integrity_constraint_degrees(trace_segment)
+    }*/
 
-pub struct Boundary(RefCell<Operation>);
-impl Boundary {
-    pub fn new(boundary: BoundaryOpts, value: Rc<dyn Value>, span: SourceSpan) -> Rc<Boundary> {
-        let operation = Rc::new(Self(RefCell::new(Operation {
-            operands: vec![],
-            owner: None,
-            result: RefCell::new(OpResult {
-                owner: None,
-                id: 0,
-                span,
-            }),
-            span,
-        })));
-        let value = Rc::clone(&value);
-        <dyn Op>::append_operand(operation.clone(), value, span);
-        let dyn_op = Rc::clone(&operation);
-        operation.as_operation_mut().result.borrow_mut().owner = Some(dyn_op);
-        operation
-    }
-}
-impl Op for Boundary {
-    fn as_operation_mut(&self) -> RefMut<'_, Operation> {
-        self.0.borrow_mut()
-    }
-}
+    ///// Return an [Iterator] over the validity constraints for the given trace segment
+    //pub fn validity_constraints(
+    //    &self,
+    //    trace_segment: TraceSegmentId,
+    //) -> impl Iterator<Item = &ConstraintRoot> + '_ {
+    //    self.constraints
+    //        .integrity_constraints(trace_segment)
+    //        .iter()
+    //        .filter(|constraint| matches!(constraint.domain(), ConstraintDomain::EveryRow))
+    //}
 
-// old name was Variable
-#[derive(Spanned)]
-pub struct Parameter {
-    pub ty: Type,
-    pub position: usize,
-    #[span]
-    pub span: SourceSpan,
-}
+    ///// Return an [Iterator] over the transition constraints for the given trace segment
+    //pub fn transition_constraints(
+    //    &self,
+    //    trace_segment: TraceSegmentId,
+    //) -> impl Iterator<Item = &ConstraintRoot> + '_ {
+    //    self.constraints
+    //        .integrity_constraints(trace_segment)
+    //        .iter()
+    //        .filter(|constraint| matches!(constraint.domain(), ConstraintDomain::EveryFrame(_)))
+    //}
 
-pub struct Block {
-    pub operations: Vec<Operation>,
-    pub owner: Option<Rc<Region>>,
-    pub span: SourceSpan,
-}
+    ///// Return a reference to the raw [AlgebraicGraph] corresponding to the constraints
+    //#[inline]
+    //pub fn constraint_graph(&self) -> &MirGraph {
+    //    self.constraints.graph()
+    //}
 
-pub struct Region {
-    pub blocks: Vec<Block>,
-    pub owner: Option<Rc<Function>>,
-    pub span: SourceSpan,
-}
-
-#[derive(Spanned)]
-pub struct Function {
-    pub name: QualifiedIdentifier,
-    pub params: Vec<Parameter>,
-    pub result: Type,
-    pub blocks: Vec<Block>,
-    #[span]
-    pub span: SourceSpan,
+    ///// Return a mutable reference to the raw [AlgebraicGraph] corresponding to the constraints
+    //#[inline]
+    //pub fn constraint_graph_mut(&mut self) -> &mut MirGraph {
+    //    self.constraints.graph_mut()
+    //}
 }
