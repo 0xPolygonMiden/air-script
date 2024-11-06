@@ -23,7 +23,7 @@ mod tests {
         //   let x1 = f0(Felt(1);
         //   return x1;
         // }
-        let original = MirGraph::new(vec![
+        let mut original = MirGraph::new(vec![
             // double definition
             // x: Variable(Felt, 0, main)
             Node {
@@ -110,9 +110,10 @@ mod tests {
                 ),
             },
         ]);
-
         let double = NodeIndex(3);
         let main = NodeIndex(7);
+        original.roots.insert(main);
+        original.roots.insert(double);
         println!("ORIGINAL:\n{}", pretty(&original, &[double, main]));
         println!("ORIGINAL raw:\n{:?}", original);
         println!("============= Inlining pass =============");
