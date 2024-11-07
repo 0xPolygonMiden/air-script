@@ -5,7 +5,7 @@ use air_pass::Pass;
 
 use crate::{MirGraph, NodeIndex, Operation};
 
-use super::{Visit, VisitContext};
+use super::{Visit, VisitContext, VisitOrder};
 
 //pub struct Inlining<'a> {
 //     #[allow(unused)]
@@ -29,6 +29,9 @@ impl VisitContext for Inlining {
     }
     fn roots(&self, graph: &MirGraph) -> HashSet<NodeIndex> {
         graph.roots.clone()
+    }
+    fn visit_order(&self) -> VisitOrder {
+        VisitOrder::DepthFirst
     }
 }
 

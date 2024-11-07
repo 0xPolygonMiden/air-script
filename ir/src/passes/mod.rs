@@ -8,7 +8,7 @@ pub use self::constant_propagation::ConstantPropagation;
 pub use self::inlining::Inlining;
 pub use self::translate::AstToMir;
 pub use self::value_numbering::ValueNumbering;
-pub use self::visitor::{Visit, VisitContext};
+pub use self::visitor::{Graph, Visit, VisitContext, VisitOrder};
 
 use air_pass::Pass;
 

@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
-
 // use miden_diagnostics::SourceSpan;
 
 use crate::ir::*;
+use crate::passes::Graph;
 
 /// A unique identifier for a node in an [AlgebraicGraph]
 ///
@@ -174,13 +174,13 @@ impl MirGraph {
     pub fn update_node(&mut self, index: &NodeIndex, op: Operation) {
         if let Some(node) = self.nodes.get(index.0) {
             let prev_op = node.op().clone();
-            let prev_children_nodes = get_children(prev_op);
+            let prev_children_nodes = self.children(&prev_op);
 
             for child in prev_children_nodes {
                 self.remove_use(child, *index);
             }
 
-            let children_nodes = get_children(op.clone());
+            let children_nodes = self.children(&op);
 
             for child in children_nodes {
                 self.add_use(child, *index);
@@ -242,7 +242,7 @@ impl MirGraph {
     /// Insert the operation and return its node index. If an identical node already exists, return
     /// that index instead.
     fn insert_node(&mut self, op: Operation) -> NodeIndex {
-        let children_nodes = get_children(op.clone());
+        let children_nodes = self.children(&op);
 
         let node_index = self.nodes.iter().position(|n| *n.op() == op).map_or_else(
             || {
@@ -271,6 +271,53 @@ impl MirGraph {
             op: Operation::Placeholder,
         });
         NodeIndex(index)
+    }
+}
+
+impl Graph for MirGraph {
+    fn node(&self, node_index: &NodeIndex) -> &Node {
+        MirGraph::node(self, node_index)
+    }
+    fn children(&self, node: &Operation) -> Vec<NodeIndex> {
+        match node {
+            Operation::Value(_spanned_mir_value) => vec![],
+            Operation::Add(lhs, rhs) => vec![*lhs, *rhs],
+            Operation::Sub(lhs, rhs) => vec![*lhs, *rhs],
+            Operation::Mul(lhs, rhs) => vec![*lhs, *rhs],
+            Operation::Enf(child_index) => vec![*child_index],
+            Operation::Call(def, args) => {
+                let mut ret = args.clone();
+                ret.push(*def);
+                ret
+            }
+            Operation::Fold(iterator_index, _fold_operator, accumulator_index) => {
+                vec![*iterator_index, *accumulator_index]
+            }
+            Operation::For(iterators, body_index, selector_index) => {
+                let mut ret = iterators.clone();
+                ret.push(*body_index);
+                if let Some(selector_index) = selector_index {
+                    ret.push(*selector_index);
+                }
+                ret
+            }
+            Operation::If(condition_index, then_index, else_index) => {
+                vec![*condition_index, *then_index, *else_index]
+            }
+            Operation::Variable(_spanned_variable) => vec![],
+            Operation::Definition(params, return_index, body) => {
+                let mut ret = params.clone();
+                ret.extend_from_slice(&body);
+                if let Some(return_index) = return_index {
+                    ret.push(*return_index);
+                }
+                ret
+            }
+            Operation::Vector(vec) => vec.clone(),
+            Operation::Matrix(vec) => vec.iter().flatten().copied().collect(),
+            Operation::Boundary(_boundary, child_index) => vec![*child_index],
+            Operation::Placeholder => vec![],
+        }
     }
 }
 
@@ -499,46 +546,4 @@ fn pretty_ssa_2ary(
     result.push_str(&format!(" {} ", op_str));
     pretty_rec(*rhs, &mut ctx.add_indent(1).with_nl(""), result);
     pretty_ssa_suffix(ctx, result);
-}
-
-fn get_children(op: Operation) -> Vec<NodeIndex> {
-    match op {
-        Operation::Value(_spanned_mir_value) => vec![],
-        Operation::Add(lhs, rhs) => vec![lhs, rhs],
-        Operation::Sub(lhs, rhs) => vec![lhs, rhs],
-        Operation::Mul(lhs, rhs) => vec![lhs, rhs],
-        Operation::Enf(child_index) => vec![child_index],
-        Operation::Call(def, args) => {
-            let mut ret = args;
-            ret.push(def);
-            ret
-        }
-        Operation::Fold(iterator_index, _fold_operator, accumulator_index) => {
-            vec![iterator_index, accumulator_index]
-        }
-        Operation::For(iterators, body_index, selector_index) => {
-            let mut ret = iterators;
-            ret.push(body_index);
-            if let Some(selector_index) = selector_index {
-                ret.push(selector_index);
-            }
-            ret
-        }
-        Operation::If(condition_index, then_index, else_index) => {
-            vec![condition_index, then_index, else_index]
-        }
-        Operation::Variable(_spanned_variable) => vec![],
-        Operation::Definition(params, return_index, body) => {
-            let mut ret = params;
-            ret.extend_from_slice(&body);
-            if let Some(return_index) = return_index {
-                ret.push(return_index);
-            }
-            ret
-        }
-        Operation::Vector(vec) => vec,
-        Operation::Matrix(vec) => vec.iter().flatten().copied().collect(),
-        Operation::Boundary(_boundary, child_index) => vec![child_index],
-        Operation::Placeholder => vec![],
-    }
 }
