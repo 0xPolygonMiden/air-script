@@ -7,6 +7,7 @@ pub trait Graph {
     fn node(&self, node_index: &NodeIndex) -> &Node;
 }
 pub enum VisitOrder {
+    Manual,
     DepthFirst,
     PostOrder,
 }
@@ -20,54 +21,56 @@ where
     fn roots(&self, graph: &Self::Graph) -> HashSet<NodeIndex>;
     fn visit_order(&self) -> VisitOrder;
 }
-
 pub trait Visit: VisitContext {
-    fn run(&mut self, graph: &mut Self::Graph);
-    fn visit_postorder(&mut self, graph: &mut Self::Graph);
-    fn visit_depthfirst(&mut self, graph: &mut Self::Graph);
-    fn next_node(&mut self) -> Option<NodeIndex>;
-    fn visit_later(&mut self, node_index: NodeIndex);
-}
-impl<T> Visit for T
-where
-    T: VisitContext,
-    T::Graph: Graph,
-{
     fn run(&mut self, graph: &mut Self::Graph) {
         match self.visit_order() {
-            VisitOrder::DepthFirst => self.visit_depthfirst(graph),
+            VisitOrder::Manual => self.visit_manual(graph),
             VisitOrder::PostOrder => self.visit_postorder(graph),
+            VisitOrder::DepthFirst => self.visit_depthfirst(graph),
         }
         while let Some(node_index) = self.next_node() {
             self.visit(graph, node_index);
         }
     }
-    fn visit_depthfirst(&mut self, graph: &mut Self::Graph) {
+    fn visit_manual(&mut self, graph: &mut Self::Graph) {
         for root_index in self.roots(graph).iter() {
             self.visit(graph, *root_index);
         }
     }
     fn visit_postorder(&mut self, graph: &mut Self::Graph) {
         for root_index in self.roots(graph).iter() {
-            let mut stack = vec![*root_index];
-            let mut node_index;
+            self.visit_later(*root_index);
             let mut last: Option<NodeIndex> = None;
-            while !stack.is_empty() {
-                // safe to unwrap because stack is not empty
-                node_index = *stack.last().unwrap();
+            while let Some(node_index) = self.peek() {
                 let node = graph.node(&node_index);
                 let children = graph.children(&node.op);
                 if children.is_empty() || last.is_some() && children.contains(&last.unwrap()) {
                     self.visit(graph, node_index);
-                    stack.pop();
+                    self.next_node();
                     last = Some(node_index);
                 } else {
                     for child in children.iter().rev() {
-                        stack.push(*child);
+                        self.visit_later(*child);
                     }
                 }
             }
         }
+    }
+    fn visit_depthfirst(&mut self, graph: &mut Self::Graph) {
+        for root_index in self.roots(graph).iter() {
+            self.visit_later(*root_index);
+            while let Some(node_index) = self.next_node() {
+                let node = graph.node(&node_index);
+                let children = graph.children(&node.op);
+                for child in children.iter().rev() {
+                    self.visit_later(*child);
+                }
+                self.visit(graph, node_index);
+            }
+        }
+    }
+    fn peek(&mut self) -> Option<NodeIndex> {
+        self.as_stack_mut().last().copied()
     }
     fn next_node(&mut self) -> Option<NodeIndex> {
         self.as_stack_mut().pop()
@@ -75,4 +78,11 @@ where
     fn visit_later(&mut self, node_index: NodeIndex) {
         self.as_stack_mut().push(node_index);
     }
+}
+
+impl<T> Visit for T
+where
+    T: VisitContext,
+    T::Graph: Graph,
+{
 }

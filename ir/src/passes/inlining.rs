@@ -31,7 +31,7 @@ impl VisitContext for Inlining {
         graph.roots.clone()
     }
     fn visit_order(&self) -> VisitOrder {
-        VisitOrder::DepthFirst
+        VisitOrder::Manual
     }
 }
 
