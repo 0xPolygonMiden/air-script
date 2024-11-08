@@ -38,13 +38,13 @@ where
             VisitOrder::DepthFirst => self.visit_depthfirst(graph),
             VisitOrder::PostOrder => self.visit_postorder(graph),
         }
+        while let Some(node_index) = self.next_node() {
+            self.visit(graph, node_index);
+        }
     }
     fn visit_depthfirst(&mut self, graph: &mut Self::Graph) {
         for root_index in self.roots(graph).iter() {
             self.visit(graph, *root_index);
-        }
-        while let Some(node_index) = self.next_node() {
-            self.visit(graph, node_index);
         }
     }
     fn visit_postorder(&mut self, graph: &mut Self::Graph) {
