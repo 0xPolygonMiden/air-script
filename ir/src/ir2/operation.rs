@@ -10,16 +10,13 @@ use miden_diagnostics::{SourceSpan, Spanned};
 
 use super::*;
 
-pub trait Value: Spanned {}
-
-impl Debug for dyn Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
+pub trait Value: Spanned + Debug {
+    fn as_value(&self) -> Rc<dyn Value>;
 }
+
 impl PartialEq for dyn Value {
     fn eq(&self, other: &Self) -> bool {
-        self == other
+        self.as_value() == other.as_value()
     }
 }
 impl Eq for dyn Value {}
@@ -72,7 +69,11 @@ pub struct Operand {
     // the index of the operand in the operation
     index: usize,
 }
-impl Value for Operand {}
+impl Value for Operand {
+    fn as_value(&self) -> Rc<dyn Value> {
+        Rc::clone(&self.value)
+    }
+}
 impl PartialEq for Operand {
     fn eq(&self, other: &Self) -> bool {
         self.value == other.value.clone()
@@ -144,6 +145,7 @@ impl PartialEq for Operation {
 }
 impl Eq for Operation {}
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Add(RefCell<Operation>);
 impl Add {
     pub fn new(
@@ -175,6 +177,7 @@ impl Op for Add {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Sub(RefCell<Operation>);
 impl Sub {
     pub fn new(lhs: Rc<dyn Value>, rhs: Rc<dyn Value>, span: SourceSpan) -> Rc<Sub> {
@@ -206,6 +209,7 @@ impl Op for Sub {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Mul(RefCell<Operation>);
 impl Mul {
     pub fn new(lhs: Rc<dyn Value>, rhs: Rc<dyn Value>, span: SourceSpan) -> Rc<Mul> {
@@ -237,6 +241,7 @@ impl Op for Mul {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Enf(RefCell<Operation>);
 impl Enf {
     pub fn new(value: Rc<dyn Value>, span: SourceSpan) -> Rc<Enf> {
@@ -266,6 +271,7 @@ impl Op for Enf {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Call(RefCell<Operation>);
 impl Call {
     pub fn new(func: Rc<dyn Value>, args: Vec<Rc<dyn Value>>, span: SourceSpan) -> Rc<Call> {
@@ -303,7 +309,7 @@ pub enum FoldOperatorOpts {
     Add,
     Mul,
 }
-#[derive(Spanned)]
+#[derive(Spanned, Clone, Debug, PartialEq, Eq)]
 pub struct FoldOperator {
     operator: FoldOperatorOpts,
     #[span]
@@ -314,8 +320,8 @@ impl FoldOperator {
         Rc::new(Self { operator, span })
     }
 }
-impl Value for FoldOperator {}
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Fold(RefCell<Operation>);
 impl Fold {
     pub fn new(
@@ -354,6 +360,7 @@ impl Op for Fold {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct For(RefCell<Operation>);
 impl For {
     pub fn new(
@@ -393,6 +400,7 @@ impl Op for For {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct If(RefCell<Operation>);
 impl If {
     pub fn new(
@@ -431,7 +439,7 @@ impl Op for If {
     }
 }
 
-#[derive(Spanned)]
+#[derive(Spanned, Clone, Debug, PartialEq, Eq)]
 pub struct Vector {
     operation: RefCell<Operation>,
     #[span]
@@ -468,8 +476,13 @@ impl Op for Vector {
         self.operation.borrow()
     }
 }
-impl Value for Vector {}
+impl Value for Vector {
+    fn as_value(&self) -> Rc<dyn Value> {
+        Rc::new(self.clone())
+    }
+}
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Matrix(RefCell<Operation>);
 impl Matrix {
     pub fn new(values: Vec<Vec<Rc<dyn Value>>>, span: SourceSpan) -> Rc<Matrix> {
@@ -501,14 +514,19 @@ impl Op for Matrix {
     }
 }
 
-#[derive(Spanned)]
+#[derive(Spanned, Clone, Debug, PartialEq, Eq)]
 pub struct BoundaryOpts {
     pub boundary: AstBoundary,
     #[span]
     pub span: SourceSpan,
 }
-impl Value for BoundaryOpts {}
+impl Value for BoundaryOpts {
+    fn as_value(&self) -> Rc<dyn Value> {
+        Rc::new(self.clone())
+    }
+}
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Boundary(RefCell<Operation>);
 impl Boundary {
     pub fn new(boundary: BoundaryOpts, value: Rc<dyn Value>, span: SourceSpan) -> Rc<Boundary> {
