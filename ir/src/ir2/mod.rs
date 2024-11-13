@@ -24,10 +24,10 @@ pub use self::operation::{
 
 //pub use self::graph::MirGraph;
 pub use self::trace::TraceAccess;
-//pub use self::value::{
-//    ConstantValue, MirType, MirValue, PeriodicColumnAccess, PublicInputAccess, SpannedMirValue,
-//    TraceAccessBinding,
-//};
+pub use self::value::{
+    ConstantValue, MirType, MirValue, PeriodicColumnAccess, PublicInputAccess, SpannedMirValue,
+    TraceAccessBinding,
+};
 
 /// The default segment against which a constraint is applied is the main trace segment.
 pub const DEFAULT_SEGMENT: TraceSegmentId = 0;
