@@ -60,7 +60,8 @@ pub struct MirGraph {
     use_list: HashMap<NodeIndex, Vec<NodeIndex>>,
     pub functions: BTreeMap<QualifiedIdentifier, NodeIndex>,
     pub evaluators: BTreeMap<QualifiedIdentifier, NodeIndex>,
-    pub roots: HashSet<NodeIndex>,
+    pub boundary_constraints_roots: HashSet<NodeIndex>,
+    pub integrity_constraints_roots: HashSet<NodeIndex>,
 }
 
 /// Helpers for inserting operations
@@ -154,7 +155,8 @@ impl MirGraph {
             use_list: HashMap::default(),
             functions: BTreeMap::new(),
             evaluators: BTreeMap::new(),
-            roots: HashSet::new(),
+            boundary_constraints_roots: HashSet::new(),
+            integrity_constraints_roots: HashSet::new(),
         }
     }
 
@@ -163,12 +165,20 @@ impl MirGraph {
         &self.nodes[index.0]
     }
 
-    pub fn insert_root(&mut self, index: NodeIndex) {
-        self.roots.insert(index);
+    pub fn insert_boundary_constraints_root(&mut self, index: NodeIndex) {
+        self.boundary_constraints_roots.insert(index);
     }
 
-    pub fn remove_root(&mut self, index: NodeIndex) {
-        self.roots.remove(&index);
+    pub fn remove_boundary_constraints_root(&mut self, index: NodeIndex) {
+        self.boundary_constraints_roots.remove(&index);
+    }
+
+    pub fn insert_integrity_constraints_root(&mut self, index: NodeIndex) {
+        self.integrity_constraints_roots.insert(index);
+    }
+
+    pub fn remove_integrity_constraints_root(&mut self, index: NodeIndex) {
+        self.integrity_constraints_roots.remove(&index);
     }
 
     pub fn update_node(&mut self, index: &NodeIndex, op: Operation) {

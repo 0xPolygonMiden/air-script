@@ -13,6 +13,7 @@ pub use self::value::{
     TraceAccessBinding,
 };
 
+use air_parser::ast::TraceSegment;
 pub use air_parser::{
     ast::{
         AccessType, Boundary, Identifier, PeriodicColumn, PublicInput, QualifiedIdentifier,
@@ -48,9 +49,9 @@ pub struct Mir {
     /// The name of the [air_parser::ast::Program] from which this IR was derived
     #[span]
     pub name: Identifier,
-    /// The widths (number of columns) of each segment of the trace, in segment order (i.e. the
-    /// index in this vector matches the index of the segment in the program).
-    pub trace_segment_widths: Vec<u16>,
+
+    pub trace_columns: Vec<TraceSegment>,
+    
     /// The periodic columns referenced by this program.
     ///
     /// These are taken straight from the [air_parser::ast::Program] without modification.
@@ -82,7 +83,7 @@ impl Mir {
     pub fn new(name: Identifier) -> Self {
         Self {
             name,
-            trace_segment_widths: vec![],
+            trace_columns: vec![],
             periodic_columns: Default::default(),
             public_inputs: Default::default(),
             num_random_values: 0,

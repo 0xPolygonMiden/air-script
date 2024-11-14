@@ -22,6 +22,18 @@ pub enum CompileError {
     #[error("compilation failed, see diagnostics for more information")]
     Failed,
 }
+
+impl From<mir::CompileError> for CompileError {
+    fn from(err: mir::CompileError) -> Self {
+        match err {
+            mir::CompileError::Parse(err) => Self::Parse(err),
+            mir::CompileError::SemanticAnalysis(err) => Self::SemanticAnalysis(err),
+            mir::CompileError::InvalidConstraint(_err) => Self::Failed,
+            mir::CompileError::Failed => Self::Failed,
+        }
+    }
+}
+
 impl ToDiagnostic for CompileError {
     fn to_diagnostic(self) -> Diagnostic {
         match self {

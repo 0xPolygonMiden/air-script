@@ -6,11 +6,13 @@ pub trait Graph {
     fn children(&self, node: &Operation) -> Vec<NodeIndex>;
     fn node(&self, node_index: &NodeIndex) -> &Node;
 }
+
 pub enum VisitOrder {
     Manual,
     DepthFirst,
     PostOrder,
 }
+pub trait VisitDefault {}
 pub trait VisitContext
 where
     Self::Graph: Graph,
@@ -18,7 +20,8 @@ where
     type Graph;
     fn visit(&mut self, graph: &mut Self::Graph, node_index: NodeIndex);
     fn as_stack_mut(&mut self) -> &mut Vec<NodeIndex>;
-    fn roots(&self, graph: &Self::Graph) -> HashSet<NodeIndex>;
+    fn boundary_roots(&self, graph: &Self::Graph) -> HashSet<NodeIndex>;
+    fn integrity_roots(&self, graph: &Self::Graph) -> HashSet<NodeIndex>;
     fn visit_order(&self) -> VisitOrder;
 }
 pub trait Visit: VisitContext {
@@ -33,12 +36,12 @@ pub trait Visit: VisitContext {
         }
     }
     fn visit_manual(&mut self, graph: &mut Self::Graph) {
-        for root_index in self.roots(graph).iter() {
+        for root_index in self.boundary_roots(graph).iter().chain(self.integrity_roots(graph).iter()) {
             self.visit(graph, *root_index);
         }
     }
     fn visit_postorder(&mut self, graph: &mut Self::Graph) {
-        for root_index in self.roots(graph).iter() {
+        for root_index in self.boundary_roots(graph).iter().chain(self.integrity_roots(graph).iter()) {
             self.visit_later(*root_index);
             let mut last: Option<NodeIndex> = None;
             while let Some(node_index) = self.peek() {
@@ -57,7 +60,7 @@ pub trait Visit: VisitContext {
         }
     }
     fn visit_depthfirst(&mut self, graph: &mut Self::Graph) {
-        for root_index in self.roots(graph).iter() {
+        for root_index in self.boundary_roots(graph).iter().chain(self.integrity_roots(graph).iter()) {
             self.visit_later(*root_index);
             while let Some(node_index) = self.next_node() {
                 let node = graph.node(&node_index);
@@ -82,7 +85,7 @@ pub trait Visit: VisitContext {
 
 impl<T> Visit for T
 where
-    T: VisitContext,
+    T: VisitContext + VisitDefault,
     T::Graph: Graph,
 {
 }

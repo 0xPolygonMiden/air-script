@@ -3,9 +3,9 @@ use std::collections::{BTreeMap, HashSet};
 use air_pass::Pass;
 //use miden_diagnostics::DiagnosticsHandler;
 
-use crate::{MirGraph, NodeIndex, Operation};
+use crate::{CompileError, Mir, MirGraph, NodeIndex, Operation};
 
-use super::{Visit, VisitContext, VisitOrder};
+use super::{visitor::VisitDefault, Visit, VisitContext, VisitOrder};
 
 //pub struct Inlining<'a> {
 //     #[allow(unused)]
@@ -27,8 +27,11 @@ impl VisitContext for Inlining {
     fn as_stack_mut(&mut self) -> &mut Vec<NodeIndex> {
         &mut self.work_stack
     }
-    fn roots(&self, graph: &MirGraph) -> HashSet<NodeIndex> {
-        graph.roots.clone()
+    fn boundary_roots(&self, graph: &MirGraph) -> HashSet<NodeIndex> {
+        graph.boundary_constraints_roots.clone()
+    }
+    fn integrity_roots(&self, graph: &MirGraph) -> HashSet<NodeIndex> {
+        graph.integrity_constraints_roots.clone()
     }
     fn visit_order(&self) -> VisitOrder {
         VisitOrder::Manual
@@ -37,16 +40,18 @@ impl VisitContext for Inlining {
 
 //impl<'p> Pass for Inlining<'p> {}
 impl Pass for Inlining {
-    type Input<'a> = MirGraph;
-    type Output<'a> = MirGraph;
-    type Error = ();
+    type Input<'a> = Mir;
+    type Output<'a> = Mir;
+    type Error = CompileError;
 
     fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
         let mut context = Inlining::new();
-        Visit::run(&mut context, &mut ir);
+        Visit::run(&mut context, &mut ir.constraint_graph_mut());
         Ok(ir)
     }
 }
+
+impl VisitDefault for Inlining {}
 
 // impl<'a> Inlining<'a> {
 //     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {

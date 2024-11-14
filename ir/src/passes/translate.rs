@@ -34,7 +34,7 @@ impl<'p> Pass for AstToMir<'p> {
         let boundary_constraints = program.boundary_constraints;
         let integrity_constraints = program.integrity_constraints;
 
-        mir.trace_segment_widths = trace_columns.iter().map(|ts| ts.size as u16).collect();
+        mir.trace_columns = trace_columns.clone();
         mir.num_random_values = random_values.as_ref().map(|rv| rv.size as u16).unwrap_or(0);
         mir.periodic_columns = program.periodic_columns;
         mir.public_inputs = program.public_inputs;
@@ -222,23 +222,23 @@ impl<'a> MirBuilder<'a> {
     }
 
     fn build_boundary_constraint(&mut self, bc: &ast::Statement) -> Result<(), CompileError> {
-        self.build_statement(bc)
+        self.build_statement(bc, true)
     }
 
     fn build_integrity_constraint(&mut self, ic: &ast::Statement) -> Result<(), CompileError> {
-        self.build_statement(ic)
+        self.build_statement(ic, false)
     }
 
     fn build_function_body_statement(&mut self, s: &ast::Statement) -> Result<(), CompileError> {
-        self.build_statement(s)
+        self.build_statement(s, false)
     }
 
     // TODO: Handle other types of statements
-    fn build_statement(&mut self, c: &ast::Statement) -> Result<(), CompileError> {
+    fn build_statement(&mut self, c: &ast::Statement, in_boundary: bool) -> Result<(), CompileError> {
         match c {
             // If we have a let, update scoping and insertuate the body
             ast::Statement::Let(expr) => {
-                self.build_let(expr, |bldr, stmt| bldr.build_statement(stmt))
+                self.build_let(expr, |bldr, stmt| bldr.build_statement(stmt, in_boundary))
             }
             // Depending on the expression, we can have different types of operations in the
             // If we have a symbol access, we have to get it depending on the scope and add the
@@ -252,11 +252,17 @@ impl<'a> MirBuilder<'a> {
                 let scalar_expr = self.insert_scalar_expr(scalar_expr)?;
                 match self.mir.constraint_graph().node(&scalar_expr).op().clone() {
                     Operation::Enf(node_index) => {
-                        self.mir.constraint_graph_mut().insert_root(node_index)
-                    }
+                        match in_boundary {
+                            true => self.mir.constraint_graph_mut().insert_boundary_constraints_root(node_index),
+                            false => self.mir.constraint_graph_mut().insert_integrity_constraints_root(node_index)
+                        }
+                    },
                     _ => {
                         let node_index = self.constraint_graph_mut().insert_op_enf(scalar_expr);
-                        self.mir.constraint_graph_mut().insert_root(node_index)
+                        match in_boundary {
+                            true => self.mir.constraint_graph_mut().insert_boundary_constraints_root(node_index),
+                            false => self.mir.constraint_graph_mut().insert_integrity_constraints_root(node_index)
+                        }
                     }
                 };
                 Ok(())
@@ -266,7 +272,6 @@ impl<'a> MirBuilder<'a> {
                 self.bindings.enter();
                 let mut binding_nodes = Vec::new();
                 for (index, binding) in list_comprehension.bindings.iter().enumerate() {
-                    // TODO: Add type info?
                     let binding_node_index =
                         self.insert_variable(binding.span(), ast::Type::Felt, index);
                     binding_nodes.push(binding_node_index);
@@ -292,8 +297,12 @@ impl<'a> MirBuilder<'a> {
                     selector_node_index,
                 );
 
-                // TODO: Should we also insert an Enf operation to differentiate between constraints and expressions that evaluate to a value?
-                self.mir.constraint_graph_mut().insert_root(for_node_index);
+                let enf_node_index = self.constraint_graph_mut().insert_op_enf(for_node_index);
+
+                match in_boundary {
+                    true => self.mir.constraint_graph_mut().insert_boundary_constraints_root(enf_node_index),
+                    false => self.mir.constraint_graph_mut().insert_integrity_constraints_root(enf_node_index)
+                }
 
                 self.bindings.exit();
                 Ok(())
