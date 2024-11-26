@@ -4,4 +4,4 @@ mod nodes;
 pub use graph::{Child, Graph, Leaf, Node, Parent};
 pub use link::{BackLink, Link};
 
-pub use nodes::{Add, Function, NodeTypes};
+pub use nodes::{Add, Function, LeafNode, MiddleNode, NodeType, RootNode};
