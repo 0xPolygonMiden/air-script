@@ -46,8 +46,37 @@ impl Debug for RootNode {
 }
 
 #[derive(Clone, Eq, PartialEq)]
+pub struct Felt {
+    value: i32,
+}
+
+impl Felt {
+    pub fn new(value: i32) -> Self {
+        Self { value }
+    }
+}
+
+impl Debug for Felt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Felt({})", self.value)
+    }
+}
+
+impl From<Leaf<Felt>> for Link<NodeType> {
+    fn from(felt: Leaf<Felt>) -> Link<NodeType> {
+        Link::new(NodeType::LeafNode(LeafNode::Value(felt)))
+    }
+}
+
+impl From<i32> for Link<NodeType> {
+    fn from(value: i32) -> Link<NodeType> {
+        Leaf::new(Felt::new(value)).into()
+    }
+}
+
+#[derive(Clone, Eq, PartialEq)]
 pub enum LeafNode {
-    I32(Leaf<i32>),
+    Value(Leaf<Felt>),
 }
 
 impl Parent for LeafNode {
@@ -59,12 +88,12 @@ impl Parent for LeafNode {
 impl Child for LeafNode {
     fn get_parent(&self) -> BackLink<NodeType> {
         match self {
-            LeafNode::I32(leaf) => leaf.get_parent(),
+            LeafNode::Value(leaf) => leaf.get_parent(),
         }
     }
     fn set_parent(&mut self, parent: Link<NodeType>) {
         match self {
-            LeafNode::I32(leaf) => leaf.set_parent(parent),
+            LeafNode::Value(leaf) => leaf.set_parent(parent),
         }
     }
 }
@@ -72,7 +101,7 @@ impl Child for LeafNode {
 impl From<LeafNode> for Link<NodeType> {
     fn from(leaf_node: LeafNode) -> Link<NodeType> {
         match leaf_node {
-            LeafNode::I32(leaf) => leaf.into(),
+            LeafNode::Value(leaf) => leaf.into(),
         }
     }
 }
@@ -80,7 +109,7 @@ impl From<LeafNode> for Link<NodeType> {
 impl Debug for LeafNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LeafNode::I32(leaf) => write!(f, "{:?}", leaf),
+            LeafNode::Value(leaf) => write!(f, "{:?}", leaf),
         }
     }
 }

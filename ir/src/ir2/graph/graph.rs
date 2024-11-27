@@ -20,34 +20,27 @@ pub trait Parent: Clone + Into<Link<NodeType>> + Debug {
     where
         Self: Debug,
     {
-        let children = self.get_children();
-        assert!(
-            !&children.borrow().is_empty(),
-            "first() called on node without children: {:?}",
-            self
-        );
-        let x = children
+        self.get_children()
             .borrow()
             .first()
             .expect("first() called on empty node")
-            .clone();
-        x
+            .clone()
     }
     fn last(&self) -> Link<NodeType>
     where
         Self: Debug,
     {
-        let children = self.get_children();
-        assert!(
-            !&children.borrow().is_empty(),
-            "last() called on node without children: {:?}",
-            self
-        );
-        let x = children.borrow().last().unwrap().clone();
-        x
+        self.get_children()
+            .borrow()
+            .last()
+            .expect("last() called on empty node")
+            .clone()
     }
-    fn new_i32(&mut self, data: i32) -> Link<NodeType> {
-        let node: Link<NodeType> = Leaf::new(data).into();
+    fn new_value<T>(&mut self, data: T) -> Link<NodeType>
+    where
+        T: Into<Link<NodeType>>,
+    {
+        let node: Link<NodeType> = data.into();
         self.add_child(node.clone());
         node
     }
@@ -76,8 +69,7 @@ pub trait Child: Clone + Into<Link<NodeType>> + Debug {
             }
         }
         // Change the parent
-        self.set_parent(new_parent.into());
-        dbg!(&self.get_parent());
+        self.set_parent(new_parent);
     }
 }
 
@@ -141,7 +133,10 @@ impl<T: Debug> Debug for Leaf<T> {
     }
 }
 
-impl Child for Leaf<i32> {
+impl<T: Clone + Debug> Child for Leaf<T>
+where
+    Leaf<T>: Into<Link<NodeType>>,
+{
     fn get_parent(&self) -> BackLink<NodeType> {
         self.parent.clone()
     }
@@ -150,9 +145,12 @@ impl Child for Leaf<i32> {
     }
 }
 
-impl From<Leaf<i32>> for Link<NodeType> {
-    fn from(value: Leaf<i32>) -> Self {
-        Link::new(NodeType::LeafNode(LeafNode::I32(value)))
+impl<T> From<Leaf<T>> for Link<NodeType>
+where
+    Leaf<T>: Into<NodeType>,
+{
+    fn from(value: Leaf<T>) -> Self {
+        Link::new(value.into())
     }
 }
 
