@@ -1,9 +1,5 @@
-use crate::graph::{Add, BackLink, LeafNode, Link, MiddleNode, NodeType, RootNode};
-use std::borrow::BorrowMut;
-use std::cell::RefMut;
+use crate::graph::{Add, BackLink, Link, MiddleNode, NodeType, RootNode, Scope};
 use std::fmt::Debug;
-use std::ops::DerefMut;
-use std::rc::Rc;
 
 pub trait Parent: Clone + Into<Link<NodeType>> + Debug {
     fn get_children(&self) -> Link<Vec<Link<NodeType>>>;
@@ -45,12 +41,12 @@ pub trait Parent: Clone + Into<Link<NodeType>> + Debug {
         node
     }
     fn new_add(&mut self) -> Link<NodeType> {
-        let node: Link<NodeType> = Add::new(BackLink::none(), Link::new(Vec::new())).into();
+        let node: Link<NodeType> = Add::default().into();
         self.add_child(node.clone());
         node
     }
-    fn new_body(&mut self) -> Link<NodeType> {
-        let node: Link<NodeType> = Node::new(BackLink::none(), Link::new(Vec::new())).into();
+    fn new_scope(&mut self) -> Link<NodeType> {
+        let node: Link<NodeType> = Scope::default().into();
         self.add_child(node.clone());
         node
     }
@@ -85,6 +81,15 @@ impl Node {
     }
 }
 
+impl Default for Node {
+    fn default() -> Self {
+        Self {
+            parent: BackLink::none(),
+            children: Link::new(Vec::new()),
+        }
+    }
+}
+
 impl Parent for Node {
     fn get_children(&self) -> Link<Vec<Link<NodeType>>> {
         self.children.clone()
@@ -108,7 +113,7 @@ impl Child for Node {
 
 impl From<Node> for Link<NodeType> {
     fn from(value: Node) -> Self {
-        Link::new(NodeType::MiddleNode(MiddleNode::Node(value)))
+        Link::new(NodeType::MiddleNode(MiddleNode::Scope(Scope::from(value))))
     }
 }
 
@@ -123,6 +128,18 @@ impl<T> Leaf<T> {
         Self {
             parent: BackLink::none(),
             data,
+        }
+    }
+}
+
+impl<T> Default for Leaf<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self {
+            parent: BackLink::none(),
+            data: T::default(),
         }
     }
 }
@@ -161,9 +178,15 @@ pub struct Graph {
 
 impl Graph {
     pub fn create() -> Link<NodeType> {
-        Link::new(NodeType::RootNode(RootNode::Graph(Graph {
-            nodes: Link::new(Vec::new()),
-        })))
+        Graph::default().into()
+    }
+}
+
+impl Default for Graph {
+    fn default() -> Self {
+        Self {
+            nodes: Link::new(Vec::default()),
+        }
     }
 }
 
