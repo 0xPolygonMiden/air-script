@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
-
 // use miden_diagnostics::SourceSpan;
 
 use crate::ir::*;
+use crate::passes::Graph;
 
 /// A unique identifier for a node in an [AlgebraicGraph]
 ///
@@ -60,7 +60,91 @@ pub struct MirGraph {
     use_list: HashMap<NodeIndex, Vec<NodeIndex>>,
     pub functions: BTreeMap<QualifiedIdentifier, NodeIndex>,
     pub evaluators: BTreeMap<QualifiedIdentifier, NodeIndex>,
-    pub roots: HashSet<NodeIndex>,
+    pub boundary_constraints_roots: HashSet<NodeIndex>,
+    pub integrity_constraints_roots: HashSet<NodeIndex>,
+}
+
+/// Helpers for inserting operations
+impl MirGraph {
+    pub fn insert_op_value(&mut self, value: SpannedMirValue) -> NodeIndex {
+        self.insert_node(Operation::Value(value))
+    }
+
+    pub fn insert_op_add(&mut self, lhs: NodeIndex, rhs: NodeIndex) -> NodeIndex {
+        self.insert_node(Operation::Add(lhs, rhs))
+    }
+
+    pub fn insert_op_sub(&mut self, lhs: NodeIndex, rhs: NodeIndex) -> NodeIndex {
+        self.insert_node(Operation::Sub(lhs, rhs))
+    }
+
+    pub fn insert_op_mul(&mut self, lhs: NodeIndex, rhs: NodeIndex) -> NodeIndex {
+        self.insert_node(Operation::Mul(lhs, rhs))
+    }
+
+    pub fn insert_op_enf(&mut self, node_index: NodeIndex) -> NodeIndex {
+        self.insert_node(Operation::Enf(node_index))
+    }
+
+    pub fn insert_op_call(&mut self, def: NodeIndex, args: Vec<NodeIndex>) -> NodeIndex {
+        self.insert_node(Operation::Call(def, args))
+    }
+
+    pub fn insert_op_fold(
+        &mut self,
+        iterator: NodeIndex,
+        fold_operator: FoldOperator,
+        accumulator: NodeIndex,
+    ) -> NodeIndex {
+        self.insert_node(Operation::Fold(iterator, fold_operator, accumulator))
+    }
+
+    pub fn insert_op_for(
+        &mut self,
+        iterators: Vec<NodeIndex>,
+        body: NodeIndex,
+        selector: Option<NodeIndex>,
+    ) -> NodeIndex {
+        self.insert_node(Operation::For(iterators, body, selector))
+    }
+
+    pub fn insert_op_if(
+        &mut self,
+        condition: NodeIndex,
+        then: NodeIndex,
+        else_: NodeIndex,
+    ) -> NodeIndex {
+        self.insert_node(Operation::If(condition, then, else_))
+    }
+
+    pub fn insert_op_variable(&mut self, variable: SpannedVariable) -> NodeIndex {
+        self.insert_node(Operation::Variable(variable))
+    }
+
+    pub fn insert_op_definition(
+        &mut self,
+        params: Vec<NodeIndex>,
+        return_: Option<NodeIndex>,
+        body: Vec<NodeIndex>,
+    ) -> NodeIndex {
+        self.insert_node(Operation::Definition(params, return_, body))
+    }
+
+    pub fn insert_op_vector(&mut self, vec: Vec<NodeIndex>) -> NodeIndex {
+        self.insert_node(Operation::Vector(vec))
+    }
+
+    pub fn insert_op_matrix(&mut self, vec: Vec<Vec<NodeIndex>>) -> NodeIndex {
+        self.insert_node(Operation::Matrix(vec))
+    }
+
+    pub fn insert_op_boundary(&mut self, boundary: Boundary, child: NodeIndex) -> NodeIndex {
+        self.insert_node(Operation::Boundary(boundary, child))
+    }
+
+    pub fn insert_op_placeholder(&mut self) -> NodeIndex {
+        self.insert_placeholder_op()
+    }
 }
 
 impl MirGraph {
@@ -71,7 +155,8 @@ impl MirGraph {
             use_list: HashMap::default(),
             functions: BTreeMap::new(),
             evaluators: BTreeMap::new(),
-            roots: HashSet::new(),
+            boundary_constraints_roots: HashSet::new(),
+            integrity_constraints_roots: HashSet::new(),
         }
     }
 
@@ -80,24 +165,32 @@ impl MirGraph {
         &self.nodes[index.0]
     }
 
-    pub fn insert_root(&mut self, index: NodeIndex) {
-        self.roots.insert(index);
+    pub fn insert_boundary_constraints_root(&mut self, index: NodeIndex) {
+        self.boundary_constraints_roots.insert(index);
     }
 
-    pub fn remove_root(&mut self, index: NodeIndex) {
-        self.roots.remove(&index);
+    pub fn remove_boundary_constraints_root(&mut self, index: NodeIndex) {
+        self.boundary_constraints_roots.remove(&index);
+    }
+
+    pub fn insert_integrity_constraints_root(&mut self, index: NodeIndex) {
+        self.integrity_constraints_roots.insert(index);
+    }
+
+    pub fn remove_integrity_constraints_root(&mut self, index: NodeIndex) {
+        self.integrity_constraints_roots.remove(&index);
     }
 
     pub fn update_node(&mut self, index: &NodeIndex, op: Operation) {
         if let Some(node) = self.nodes.get(index.0) {
             let prev_op = node.op().clone();
-            let prev_children_nodes = get_children(prev_op);
+            let prev_children_nodes = self.children(&prev_op);
 
             for child in prev_children_nodes {
                 self.remove_use(child, *index);
             }
 
-            let children_nodes = get_children(op.clone());
+            let children_nodes = self.children(&op);
 
             for child in children_nodes {
                 self.add_use(child, *index);
@@ -158,8 +251,8 @@ impl MirGraph {
 
     /// Insert the operation and return its node index. If an identical node already exists, return
     /// that index instead.
-    pub(crate) fn insert_node(&mut self, op: Operation) -> NodeIndex {
-        let children_nodes = get_children(op.clone());
+    fn insert_node(&mut self, op: Operation) -> NodeIndex {
+        let children_nodes = self.children(&op);
 
         let node_index = self.nodes.iter().position(|n| *n.op() == op).map_or_else(
             || {
@@ -182,12 +275,59 @@ impl MirGraph {
     }
 
     /// Insert a placeholder operation and return its node index. This will create duplicate nodes if called multiple times.
-    pub fn insert_placeholder_op(&mut self) -> NodeIndex {
+    fn insert_placeholder_op(&mut self) -> NodeIndex {
         let index = self.nodes.len();
         self.nodes.push(Node {
             op: Operation::Placeholder,
         });
         NodeIndex(index)
+    }
+}
+
+impl Graph for MirGraph {
+    fn node(&self, node_index: &NodeIndex) -> &Node {
+        MirGraph::node(self, node_index)
+    }
+    fn children(&self, node: &Operation) -> Vec<NodeIndex> {
+        match node {
+            Operation::Value(_spanned_mir_value) => vec![],
+            Operation::Add(lhs, rhs) => vec![*lhs, *rhs],
+            Operation::Sub(lhs, rhs) => vec![*lhs, *rhs],
+            Operation::Mul(lhs, rhs) => vec![*lhs, *rhs],
+            Operation::Enf(child_index) => vec![*child_index],
+            Operation::Call(def, args) => {
+                let mut ret = args.clone();
+                ret.push(*def);
+                ret
+            }
+            Operation::Fold(iterator_index, _fold_operator, accumulator_index) => {
+                vec![*iterator_index, *accumulator_index]
+            }
+            Operation::For(iterators, body_index, selector_index) => {
+                let mut ret = iterators.clone();
+                ret.push(*body_index);
+                if let Some(selector_index) = selector_index {
+                    ret.push(*selector_index);
+                }
+                ret
+            }
+            Operation::If(condition_index, then_index, else_index) => {
+                vec![*condition_index, *then_index, *else_index]
+            }
+            Operation::Variable(_spanned_variable) => vec![],
+            Operation::Definition(params, return_index, body) => {
+                let mut ret = params.clone();
+                ret.extend_from_slice(&body);
+                if let Some(return_index) = return_index {
+                    ret.push(*return_index);
+                }
+                ret
+            }
+            Operation::Vector(vec) => vec.clone(),
+            Operation::Matrix(vec) => vec.iter().flatten().copied().collect(),
+            Operation::Boundary(_boundary, child_index) => vec![*child_index],
+            Operation::Placeholder => vec![],
+        }
     }
 }
 
@@ -416,46 +556,4 @@ fn pretty_ssa_2ary(
     result.push_str(&format!(" {} ", op_str));
     pretty_rec(*rhs, &mut ctx.add_indent(1).with_nl(""), result);
     pretty_ssa_suffix(ctx, result);
-}
-
-fn get_children(op: Operation) -> Vec<NodeIndex> {
-    match op {
-        Operation::Value(_spanned_mir_value) => vec![],
-        Operation::Add(lhs, rhs) => vec![lhs, rhs],
-        Operation::Sub(lhs, rhs) => vec![lhs, rhs],
-        Operation::Mul(lhs, rhs) => vec![lhs, rhs],
-        Operation::Enf(child_index) => vec![child_index],
-        Operation::Call(def, args) => {
-            let mut ret = args;
-            ret.push(def);
-            ret
-        }
-        Operation::Fold(iterator_index, _fold_operator, accumulator_index) => {
-            vec![iterator_index, accumulator_index]
-        }
-        Operation::For(iterators, body_index, selector_index) => {
-            let mut ret = iterators;
-            ret.push(body_index);
-            if let Some(selector_index) = selector_index {
-                ret.push(selector_index);
-            }
-            ret
-        }
-        Operation::If(condition_index, then_index, else_index) => {
-            vec![condition_index, then_index, else_index]
-        }
-        Operation::Variable(_spanned_variable) => vec![],
-        Operation::Definition(params, return_index, body) => {
-            let mut ret = params;
-            ret.extend_from_slice(&body);
-            if let Some(return_index) = return_index {
-                ret.push(return_index);
-            }
-            ret
-        }
-        Operation::Vector(vec) => vec,
-        Operation::Matrix(vec) => vec.iter().flatten().copied().collect(),
-        Operation::Boundary(_boundary, child_index) => vec![child_index],
-        Operation::Placeholder => vec![],
-    }
 }

@@ -87,10 +87,16 @@ impl Compiler {
         air_parser::parse(&self.diagnostics, self.codemap.clone(), source)
             .map_err(CompileError::Parse)
             .and_then(|ast| {
-                let mut pipeline =
+                /*let mut pipeline =
                     air_parser::transforms::ConstantPropagation::new(&self.diagnostics)
                         .chain(air_parser::transforms::Inlining::new(&self.diagnostics))
-                        .chain(crate::passes::AstToAir::new(&self.diagnostics));
+                        .chain(crate::passes::AstToAir::new(&self.diagnostics));*/
+                let mut pipeline =
+                    air_parser::transforms::ConstantPropagation::new(&self.diagnostics)
+                        .chain(mir::passes::AstToMir::new(&self.diagnostics))
+                        .chain(mir::passes::Inlining::new(/*&self.diagnostics*/))
+                        .chain(mir::passes::Unrolling::new(/*&self.diagnostics*/))
+                        .chain(crate::passes::MirToAir::new(&self.diagnostics));
                 pipeline.run(ast)
             })
     }

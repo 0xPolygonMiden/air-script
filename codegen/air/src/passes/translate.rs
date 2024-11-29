@@ -221,6 +221,7 @@ impl<'a> AirBuilder<'a> {
                     .emit();
                 return Err(CompileError::Failed);
             }
+            
         }
         // Merge the expressions into a single constraint
         let root = self.merge_equal_exprs(lhs, rhs, None);

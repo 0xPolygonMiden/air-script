@@ -3,6 +3,7 @@ mod tests {
     use crate::graph::pretty;
     use crate::passes::Inlining;
     use crate::ConstantValue;
+    use crate::Mir;
     use crate::MirGraph;
     use crate::MirType;
     use crate::MirValue;
@@ -23,7 +24,7 @@ mod tests {
         //   let x1 = f0(Felt(1);
         //   return x1;
         // }
-        let original = MirGraph::new(vec![
+        let mut original = MirGraph::new(vec![
             // double definition
             // x: Variable(Felt, 0, main)
             Node {
@@ -110,16 +111,21 @@ mod tests {
                 ),
             },
         ]);
-
         let double = NodeIndex(3);
         let main = NodeIndex(7);
+        original.integrity_constraints_roots.insert(main);
+        original.integrity_constraints_roots.insert(double);
         println!("ORIGINAL:\n{}", pretty(&original, &[double, main]));
         println!("ORIGINAL raw:\n{:?}", original);
         println!("============= Inlining pass =============");
         let mut inliner = Inlining::new();
-        let result = inliner.run(original.clone()).unwrap();
+
+        let mut mir_original = Mir::default();
+        *mir_original.constraint_graph_mut() = original.clone();
+
+        let result = inliner.run(mir_original).unwrap();
         println!("=========================================");
         println!("INLINED raw:\n{:?}", result);
-        println!("INLINED:\n{}", pretty(&result, &[double, main]));
+        println!("INLINED:\n{}", pretty(&result.constraint_graph(), &[double, main]));
     }
 }

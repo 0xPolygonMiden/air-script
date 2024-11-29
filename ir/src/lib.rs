@@ -1,6 +1,7 @@
 mod codegen;
 mod graph;
 mod ir;
+mod ir2;
 pub mod passes;
 #[cfg(test)]
 mod tests;
@@ -22,6 +23,13 @@ pub enum CompileError {
     #[error("compilation failed, see diagnostics for more information")]
     Failed,
 }
+/*
+impl From<air_pass::Pass::Error> for CompileError {
+    fn from(err: CompileError) -> Self {
+        err.to_diagnostic()
+    }
+}*/
+
 impl ToDiagnostic for CompileError {
     fn to_diagnostic(self) -> Diagnostic {
         match self {
