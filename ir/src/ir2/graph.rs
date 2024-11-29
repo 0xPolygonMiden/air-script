@@ -1,7 +1,7 @@
-use crate::graph::{Add, BackLink, Link, MiddleNode, NodeType, RootNode, Scope};
+use crate::ir::{Add, BackLink, Link, MiddleNode, NodeType, RootNode, Scope};
 use std::fmt::Debug;
 
-pub trait Parent: Clone + Into<Link<NodeType>> + Debug {
+pub trait IsParent: Clone + Into<Link<NodeType>> + Debug {
     fn get_children(&self) -> Link<Vec<Link<NodeType>>>;
     fn add_child(&mut self, mut child: Link<NodeType>) -> Link<NodeType> {
         self.get_children().borrow_mut().push(child.clone());
@@ -52,7 +52,7 @@ pub trait Parent: Clone + Into<Link<NodeType>> + Debug {
     }
 }
 
-pub trait Child: Clone + Into<Link<NodeType>> + Debug {
+pub trait IsChild: Clone + Into<Link<NodeType>> + Debug {
     fn get_parent(&self) -> BackLink<NodeType>;
     fn set_parent(&mut self, parent: Link<NodeType>);
     fn swap_parent(&mut self, new_parent: Link<NodeType>) {
@@ -68,6 +68,18 @@ pub trait Child: Clone + Into<Link<NodeType>> + Debug {
         self.set_parent(new_parent);
     }
 }
+
+trait NotParent {}
+trait NotChild {}
+trait IsNode: IsParent + IsChild {}
+trait NotNode {}
+
+impl<T: NotParent + IsChild> NotNode for T {}
+impl<T: IsParent + IsChild> IsNode for T {}
+
+impl NotChild for Graph {}
+impl NotNode for Graph {}
+impl<T> NotParent for Leaf<T> {}
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct Node {
@@ -90,7 +102,7 @@ impl Default for Node {
     }
 }
 
-impl Parent for Node {
+impl IsParent for Node {
     fn get_children(&self) -> Link<Vec<Link<NodeType>>> {
         self.children.clone()
     }
@@ -102,7 +114,7 @@ impl Debug for Node {
     }
 }
 
-impl Child for Node {
+impl IsChild for Node {
     fn get_parent(&self) -> BackLink<NodeType> {
         self.parent.clone()
     }
@@ -150,7 +162,7 @@ impl<T: Debug> Debug for Leaf<T> {
     }
 }
 
-impl<T: Clone + Debug> Child for Leaf<T>
+impl<T: Clone + Debug> IsChild for Leaf<T>
 where
     Leaf<T>: Into<Link<NodeType>>,
 {
@@ -190,7 +202,7 @@ impl Default for Graph {
     }
 }
 
-impl Parent for Graph {
+impl IsParent for Graph {
     fn get_children(&self) -> Link<Vec<Link<NodeType>>> {
         self.nodes.clone()
     }
@@ -205,5 +217,82 @@ impl Debug for Graph {
 impl From<Graph> for Link<NodeType> {
     fn from(value: Graph) -> Self {
         Link::new(NodeType::RootNode(RootNode::Graph(value)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    trait IsParentTest {
+        fn parent(&self) -> bool {
+            true
+        }
+    }
+    trait NotParentTest {
+        fn parent(&self) -> bool {
+            false
+        }
+    }
+    trait IsChildTest {
+        fn child(&self) -> bool {
+            true
+        }
+    }
+    trait NotChildTest {
+        fn child(&self) -> bool {
+            false
+        }
+    }
+    trait IsNodeTest {
+        fn node(&self) -> bool {
+            true
+        }
+    }
+    trait NotNodeTest {
+        fn node(&self) -> bool {
+            false
+        }
+    }
+
+    struct GraphTest;
+    struct LeafTest;
+    struct NodeTest;
+
+    impl<T: NotParentTest + IsChildTest> NotNodeTest for T {}
+    impl<T: IsParentTest + IsChildTest> IsNodeTest for T {}
+
+    impl IsParentTest for GraphTest {}
+    impl NotChildTest for GraphTest {}
+    impl NotNodeTest for GraphTest {}
+    impl NotParentTest for LeafTest {}
+    impl IsChildTest for LeafTest {}
+    impl IsParentTest for NodeTest {}
+    impl IsChildTest for NodeTest {}
+
+    #[test]
+    fn test_negative_traits() {
+        let graph = GraphTest;
+        dbg!(graph.parent());
+        dbg!(graph.child());
+        dbg!(graph.node());
+        assert!(graph.parent());
+        assert!(!graph.child());
+        assert!(!graph.node());
+
+        let leaf = LeafTest;
+        dbg!(leaf.parent());
+        dbg!(leaf.child());
+        dbg!(leaf.node());
+        assert!(!leaf.parent());
+        assert!(leaf.child());
+        assert!(!leaf.node());
+
+        let node = NodeTest;
+        dbg!(node.parent());
+        dbg!(node.child());
+        dbg!(node.node());
+        assert!(node.parent());
+        assert!(node.child());
+        assert!(node.node());
     }
 }

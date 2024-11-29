@@ -1,4 +1,12 @@
-use crate::graph::{BackLink, Child, Graph, Leaf, Link, Node, Parent};
+mod add;
+mod felt;
+mod function;
+mod scope;
+use crate::ir::{BackLink, Graph, IsChild, IsParent, Leaf, Link};
+pub use add::Add;
+pub use felt::Felt;
+pub use function::Function;
+pub use scope::Scope;
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
 
@@ -7,7 +15,7 @@ pub enum RootNode {
     Graph(Graph),
 }
 
-impl Parent for RootNode {
+impl IsParent for RootNode {
     fn add_child(&mut self, child: Link<NodeType>) -> Link<NodeType> {
         match self {
             RootNode::Graph(graph) => graph.add_child(child),
@@ -20,7 +28,7 @@ impl Parent for RootNode {
     }
 }
 
-impl Child for RootNode {
+impl IsChild for RootNode {
     fn get_parent(&self) -> BackLink<NodeType> {
         unreachable!("RootNode has no parent: {:?}", self)
     }
@@ -46,46 +54,17 @@ impl Debug for RootNode {
 }
 
 #[derive(Clone, Eq, PartialEq)]
-pub struct Felt {
-    value: i32,
-}
-
-impl Felt {
-    pub fn new(value: i32) -> Self {
-        Self { value }
-    }
-}
-
-impl Debug for Felt {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Felt({})", self.value)
-    }
-}
-
-impl From<Leaf<Felt>> for Link<NodeType> {
-    fn from(felt: Leaf<Felt>) -> Link<NodeType> {
-        Link::new(NodeType::LeafNode(LeafNode::Value(felt)))
-    }
-}
-
-impl From<i32> for Link<NodeType> {
-    fn from(value: i32) -> Link<NodeType> {
-        Leaf::new(Felt::new(value)).into()
-    }
-}
-
-#[derive(Clone, Eq, PartialEq)]
 pub enum LeafNode {
     Value(Leaf<Felt>),
 }
 
-impl Parent for LeafNode {
+impl IsParent for LeafNode {
     fn get_children(&self) -> Link<Vec<Link<NodeType>>> {
         unreachable!("LeafNode has no children: {:?}", self)
     }
 }
 
-impl Child for LeafNode {
+impl IsChild for LeafNode {
     fn get_parent(&self) -> BackLink<NodeType> {
         match self {
             LeafNode::Value(leaf) => leaf.get_parent(),
@@ -121,7 +100,7 @@ pub enum MiddleNode {
     Scope(Scope),
 }
 
-impl Parent for MiddleNode {
+impl IsParent for MiddleNode {
     fn get_children(&self) -> Link<Vec<Link<NodeType>>> {
         match self {
             MiddleNode::Function(function) => function.get_children(),
@@ -131,7 +110,7 @@ impl Parent for MiddleNode {
     }
 }
 
-impl Child for MiddleNode {
+impl IsChild for MiddleNode {
     fn get_parent(&self) -> BackLink<NodeType> {
         match self {
             MiddleNode::Function(function) => function.get_parent(),
@@ -175,7 +154,7 @@ pub enum NodeType {
     MiddleNode(MiddleNode),
 }
 
-impl Parent for Link<NodeType> {
+impl IsParent for Link<NodeType> {
     fn get_children(&self) -> Link<Vec<Link<NodeType>>> {
         match self.borrow().deref() {
             NodeType::LeafNode(leaf_node) => leaf_node.get_children(),
@@ -185,7 +164,7 @@ impl Parent for Link<NodeType> {
     }
 }
 
-impl Child for Link<NodeType> {
+impl IsChild for Link<NodeType> {
     fn get_parent(&self) -> BackLink<NodeType> {
         match self.borrow().deref() {
             NodeType::LeafNode(leaf_node) => leaf_node.get_parent(),
@@ -209,164 +188,5 @@ impl Debug for NodeType {
             NodeType::RootNode(root_node) => write!(f, "{:?}", root_node),
             NodeType::MiddleNode(parent_and_child) => write!(f, "{:?}", parent_and_child),
         }
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Default)]
-pub struct Function {
-    node: Node,
-}
-
-impl Function {
-    pub fn new(args: Link<NodeType>, ret: Link<NodeType>, body: Link<NodeType>) -> Self {
-        Self {
-            node: Node::new(BackLink::none(), Link::new(vec![args, ret, body])),
-        }
-    }
-    pub fn args(&self) -> Link<NodeType> {
-        self.node.get_children().borrow().deref()[0].clone()
-    }
-    pub fn ret(&self) -> Link<NodeType> {
-        self.node.get_children().borrow().deref()[1].clone()
-    }
-    pub fn body(&self) -> Link<NodeType> {
-        self.node.get_children().borrow().deref()[2].clone()
-    }
-}
-
-impl Debug for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Function(args: {:?}, ret: {:?}, body: {:?})",
-            self.args(),
-            self.ret(),
-            self.body()
-        )
-    }
-}
-
-impl Parent for Function {
-    fn get_children(&self) -> Link<Vec<Link<NodeType>>> {
-        self.node.get_children()
-    }
-}
-
-impl Child for Function {
-    fn get_parent(&self) -> BackLink<NodeType> {
-        self.node.get_parent()
-    }
-    fn set_parent(&mut self, parent: Link<NodeType>) {
-        self.node.set_parent(parent);
-    }
-}
-
-impl From<Function> for Link<NodeType> {
-    fn from(function: Function) -> Link<NodeType> {
-        Link::new(NodeType::MiddleNode(MiddleNode::Function(function)))
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Default)]
-pub struct Add {
-    node: Node,
-}
-
-impl Add {
-    pub fn new(parent: BackLink<NodeType>, children: Link<Vec<Link<NodeType>>>) -> Self {
-        Self {
-            node: Node::new(parent, children),
-        }
-    }
-}
-
-impl Debug for Add {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Add{:?}", &self.node)
-    }
-}
-
-impl Parent for Add {
-    fn get_children(&self) -> Link<Vec<Link<NodeType>>> {
-        self.node.get_children()
-    }
-}
-
-impl Child for Add {
-    fn get_parent(&self) -> BackLink<NodeType> {
-        self.node.get_parent()
-    }
-    fn set_parent(&mut self, parent: Link<NodeType>) {
-        self.node.set_parent(parent);
-    }
-}
-
-impl From<Add> for Link<NodeType> {
-    fn from(add: Add) -> Link<NodeType> {
-        Link::new(NodeType::MiddleNode(MiddleNode::Add(add)))
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Default)]
-pub struct Scope {
-    node: Node,
-}
-
-impl Scope {
-    pub fn new(parent: BackLink<NodeType>, children: Link<Vec<Link<NodeType>>>) -> Self {
-        Self {
-            node: Node::new(parent, children),
-        }
-    }
-}
-
-impl Debug for Scope {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", &self.node)
-    }
-}
-
-impl Parent for Scope {
-    fn add_child(&mut self, mut child: Link<NodeType>) -> Link<NodeType> {
-        // Deduplicate children
-        if !self.node.get_children().borrow().contains(&child) {
-            self.node.get_children().borrow_mut().push(child.clone());
-            child.swap_parent(self.clone().into());
-        }
-        self.clone().into()
-    }
-    fn get_children(&self) -> Link<Vec<Link<NodeType>>> {
-        self.node.get_children()
-    }
-}
-
-impl Child for Scope {
-    fn get_parent(&self) -> BackLink<NodeType> {
-        self.node.get_parent()
-    }
-    fn set_parent(&mut self, parent: Link<NodeType>) {
-        self.node.set_parent(parent);
-    }
-}
-
-impl From<Scope> for Link<NodeType> {
-    fn from(scope: Scope) -> Link<NodeType> {
-        Link::new(NodeType::MiddleNode(MiddleNode::Scope(scope)))
-    }
-}
-
-impl From<Node> for Scope {
-    fn from(node: Node) -> Scope {
-        let scope = Scope { node };
-        let node_children = scope.node.get_children();
-        let mut children = Vec::new();
-
-        for child in node_children.borrow().iter() {
-            if !node_children.borrow().contains(child) {
-                children.push(child.clone());
-            }
-        }
-        *scope.node.get_children().borrow_mut().deref_mut() = children;
-        scope
     }
 }
