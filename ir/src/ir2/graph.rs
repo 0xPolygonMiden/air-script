@@ -1,4 +1,4 @@
-use crate::ir::{Add, BackLink, Link, MiddleNode, NodeType, RootNode, Scope};
+use crate::ir2::{Add, BackLink, Link, MiddleNode, NodeType, RootNode, Scope};
 use std::fmt::Debug;
 
 pub trait IsParent: Clone + Into<Link<NodeType>> + Debug {

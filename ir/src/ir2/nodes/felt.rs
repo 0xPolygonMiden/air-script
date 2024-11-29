@@ -1,4 +1,4 @@
-use crate::ir::{Leaf, LeafNode, Link, NodeType};
+use crate::ir2::{Leaf, LeafNode, Link, NodeType};
 use std::fmt::Debug;
 #[derive(Clone, Eq, PartialEq, Default)]
 pub struct Felt {

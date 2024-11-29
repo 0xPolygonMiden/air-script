@@ -1,4 +1,4 @@
-use crate::ir::{BackLink, IsChild, IsParent, Link, MiddleNode, Node, NodeType};
+use crate::ir2::{BackLink, IsChild, IsParent, Link, MiddleNode, Node, NodeType};
 use std::fmt::Debug;
 use std::ops::DerefMut;
 

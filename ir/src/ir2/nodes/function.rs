@@ -1,4 +1,4 @@
-use crate::ir::{IsNode, Node};
+use crate::ir2::{IsNode, Node};
 
 #[derive(Clone, Eq, PartialEq, Default, IsNode)]
 pub struct Function {

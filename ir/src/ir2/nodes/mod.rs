@@ -2,7 +2,7 @@ mod add;
 mod felt;
 mod function;
 mod scope;
-use crate::ir::{BackLink, Graph, IsChild, IsParent, Leaf, Link};
+use crate::ir2::{BackLink, Graph, IsChild, IsParent, Leaf, Link};
 pub use add::Add;
 pub use felt::Felt;
 pub use function::Function;

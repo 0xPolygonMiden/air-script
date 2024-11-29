@@ -10,7 +10,7 @@ pub fn impl_node_wrapper(input: &DeriveInput) -> proc_macro2::TokenStream {
     let new_signature = make_new_signature(&field_names);
     let getters = make_getters(&field_names);
     let impls = quote! {
-        use crate::ir::{BackLink, IsChild, Link, MiddleNode, NodeType, IsParent};
+        use crate::ir2::{BackLink, IsChild, Link, MiddleNode, NodeType, IsParent};
         use std::fmt::Debug;
         impl #ty {
             pub fn new(#(#new_signature)*) -> Self {
@@ -128,7 +128,7 @@ mod tests {
             }
         };
         let expected = quote! {
-            use crate::ir::{BackLink, IsChild, Link, MiddleNode, NodeType, IsParent};
+            use crate::ir2::{BackLink, IsChild, Link, MiddleNode, NodeType, IsParent};
             use std::fmt::Debug;
             impl Test {
                 pub fn new(parent: BackLink<NodeType>, lhs: Link<NodeType>, rhs: Link<NodeType>) -> Self {
