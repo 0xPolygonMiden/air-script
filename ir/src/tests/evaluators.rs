@@ -185,12 +185,12 @@ fn ev_call_inside_evaluator_with_aux() {
 fn ev_fn_call_with_column_group() {
     let source = "
     def test
-    ev clk_selectors([selectors[3], clk]) {
+    ev clk_selectors([selectors[3], a, clk]) {
         enf (clk' - clk) * selectors[0] * selectors[1] * selectors[2] = 0;
     }
     
     trace_columns {
-        main: [s[3], clk],
+        main: [s[3], a, clk],
     }
 
     public_inputs {
@@ -202,7 +202,7 @@ fn ev_fn_call_with_column_group() {
     }
 
     integrity_constraints {
-        enf clk_selectors([s, clk]);
+        enf clk_selectors([s, clk, a]);
     }";
 
     assert!(compile(source).is_ok());

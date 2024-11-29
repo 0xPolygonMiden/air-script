@@ -6,10 +6,14 @@ mod value;
 
 pub use self::constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints};
 pub use self::degree::IntegrityConstraintDegree;
-pub use self::operation::Operation;
+pub use self::operation::{FoldOperator, Operation, SpannedVariable};
 pub use self::trace::TraceAccess;
-pub use self::value::{PeriodicColumnAccess, PublicInputAccess, Value};
+pub use self::value::{
+    ConstantValue, MirType, MirValue, PeriodicColumnAccess, PublicInputAccess, SpannedMirValue,
+    TraceAccessBinding,
+};
 
+use air_parser::ast::TraceSegment;
 pub use air_parser::{
     ast::{
         AccessType, Boundary, Identifier, PeriodicColumn, PublicInput, QualifiedIdentifier,
@@ -31,7 +35,7 @@ use std::collections::BTreeMap;
 
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::graph::AlgebraicGraph;
+use crate::graph::MirGraph;
 
 /// The intermediate representation of a complete AirScript program
 ///
@@ -41,13 +45,13 @@ use crate::graph::AlgebraicGraph;
 /// translated into an algebraic graph representation, on which further analysis,
 /// optimization, and code generation are performed.
 #[derive(Debug, Spanned)]
-pub struct Air {
+pub struct Mir {
     /// The name of the [air_parser::ast::Program] from which this IR was derived
     #[span]
     pub name: Identifier,
-    /// The widths (number of columns) of each segment of the trace, in segment order (i.e. the
-    /// index in this vector matches the index of the segment in the program).
-    pub trace_segment_widths: Vec<u16>,
+
+    pub trace_columns: Vec<TraceSegment>,
+    
     /// The periodic columns referenced by this program.
     ///
     /// These are taken straight from the [air_parser::ast::Program] without modification.
@@ -61,7 +65,7 @@ pub struct Air {
     /// The constraints enforced by this program, in their algebraic graph representation.
     pub constraints: Constraints,
 }
-impl Default for Air {
+impl Default for Mir {
     fn default() -> Self {
         Self::new(Identifier::new(
             SourceSpan::UNKNOWN,
@@ -69,17 +73,17 @@ impl Default for Air {
         ))
     }
 }
-impl Air {
-    /// Create a new, empty [Air] container
+impl Mir {
+    /// Create a new, empty [Mir] container
     ///
-    /// An empty [Air] is meaningless until it has been populated with
+    /// An empty [Mir] is meaningless until it has been populated with
     /// constraints and associated metadata. This is typically done by converting
     /// an [air_parser::ast::Program] to this struct using the [crate::passes::AstToAir]
     /// translation pass.
     pub fn new(name: Identifier) -> Self {
         Self {
             name,
-            trace_segment_widths: vec![],
+            trace_columns: vec![],
             periodic_columns: Default::default(),
             public_inputs: Default::default(),
             num_random_values: 0,
@@ -116,13 +120,13 @@ impl Air {
         self.constraints.integrity_constraints(trace_segment)
     }
 
-    /// Return the set of [IntegrityConstraintDegree] corresponding to each integrity constraint
+    /* /// Return the set of [IntegrityConstraintDegree] corresponding to each integrity constraint
     pub fn integrity_constraint_degrees(
         &self,
         trace_segment: TraceSegmentId,
     ) -> Vec<IntegrityConstraintDegree> {
         self.constraints.integrity_constraint_degrees(trace_segment)
-    }
+    }*/
 
     /// Return an [Iterator] over the validity constraints for the given trace segment
     pub fn validity_constraints(
@@ -148,13 +152,13 @@ impl Air {
 
     /// Return a reference to the raw [AlgebraicGraph] corresponding to the constraints
     #[inline]
-    pub fn constraint_graph(&self) -> &AlgebraicGraph {
+    pub fn constraint_graph(&self) -> &MirGraph {
         self.constraints.graph()
     }
 
     /// Return a mutable reference to the raw [AlgebraicGraph] corresponding to the constraints
     #[inline]
-    pub fn constraint_graph_mut(&mut self) -> &mut AlgebraicGraph {
+    pub fn constraint_graph_mut(&mut self) -> &mut MirGraph {
         self.constraints.graph_mut()
     }
 }

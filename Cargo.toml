@@ -4,6 +4,7 @@ members = [
     "parser",
     "pass",
     "ir",
+    "codegen/air",
     "codegen/masm",
     "codegen/winterfell",
 ]

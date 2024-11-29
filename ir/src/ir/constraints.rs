@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::graph::{AlgebraicGraph, NodeIndex};
+use crate::graph::{MirGraph, NodeIndex};
 
 use super::*;
 
@@ -34,12 +34,12 @@ pub struct Constraints {
     /// where integrity constraints are any constraints that apply to every row or every frame.
     integrity_constraints: Vec<Vec<ConstraintRoot>>,
     /// A directed acyclic graph which represents all of the constraints and their subexpressions.
-    graph: AlgebraicGraph,
+    graph: MirGraph,
 }
 impl Constraints {
     /// Constructs a new [Constraints] graph from the given parts
     pub const fn new(
-        graph: AlgebraicGraph,
+        graph: MirGraph,
         boundary_constraints: Vec<Vec<ConstraintRoot>>,
         integrity_constraints: Vec<Vec<ConstraintRoot>>,
     ) -> Self {
@@ -71,7 +71,7 @@ impl Constraints {
         &self.boundary_constraints[trace_segment]
     }
 
-    /// Returns a vector of the degrees of the integrity constraints for the specified trace segment.
+    /*  /// Returns a vector of the degrees of the integrity constraints for the specified trace segment.
     pub fn integrity_constraint_degrees(
         &self,
         trace_segment: TraceSegmentId,
@@ -84,7 +84,7 @@ impl Constraints {
             .iter()
             .map(|entry_index| self.graph.degree(entry_index.node_index()))
             .collect()
-    }
+    }*/
 
     /// Returns the set of integrity constraints for the given trace segment.
     ///
@@ -119,15 +119,15 @@ impl Constraints {
         }
     }
 
-    /// Returns the underlying [AlgebraicGraph] representing all constraints and their sub-expressions.
+    /// Returns the underlying [MirGraph] representing all constraints and their sub-expressions.
     #[inline]
-    pub const fn graph(&self) -> &AlgebraicGraph {
+    pub const fn graph(&self) -> &MirGraph {
         &self.graph
     }
 
-    /// Returns a mutable reference to the underlying [AlgebraicGraph] representing all constraints and their sub-expressions.
+    /// Returns a mutable reference to the underlying [MirGraph] representing all constraints and their sub-expressions.
     #[inline]
-    pub fn graph_mut(&mut self) -> &mut AlgebraicGraph {
+    pub fn graph_mut(&mut self) -> &mut MirGraph {
         &mut self.graph
     }
 }

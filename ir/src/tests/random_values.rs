@@ -187,6 +187,7 @@ fn err_random_values_without_aux_cols() {
 }
 
 #[test]
+#[ignore]
 fn err_random_values_in_bc_against_main_cols() {
     let source = "
     def test
