@@ -1333,7 +1333,7 @@ impl<'a> SemanticAnalysis<'a> {
                                 }
                             }
                             // We take care to only allow constructing Call with a function identifier, but it
-                            // is possible for someone to unintentionally set the callee to a binding identifer, which is
+                            // is possible for someone to unintentionally set the callee to a binding identifier, which is
                             // a compiler internal error, hence the panic
                             id => panic!("invalid callee identifier, expected function id, got binding: {:#?}", id),
                         }
