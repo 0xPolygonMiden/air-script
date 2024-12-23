@@ -66,7 +66,7 @@ fn test_simple_boundary() {
         &[
             "compute_boundary_constraints_main_first",
             "compute_boundary_constraints_main_last",
-            // there are no auxiliary boundary constraints on this AIR defnition
+            // there are no auxiliary boundary constraints on this AIR definition
             // "compute_boundary_constraints_aux_first",
             // "compute_boundary_constraints_aux_last",
         ],
