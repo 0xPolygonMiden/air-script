@@ -28,9 +28,8 @@ impl Circuit {
         }
 
         // Random values
-        for (idx, node) in self.layout.random_values.iter_nodes().enumerate() {
-            writeln!(f, "{node} [label=\"R[{idx}]\"]")?;
-        }
+        writeln!(f, "{} [label=\"α\"]", self.layout.random_alpha_node())?;
+        writeln!(f, "{} [label=\"β\"]", self.layout.random_beta_node())?;
 
         // Main
         for (idx, node) in self.layout.trace_segments[0][0].iter_nodes().enumerate() {

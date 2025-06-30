@@ -77,7 +77,14 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
                     let idx = reduced_tables[&access];
                     ace_vars.reduced_tables[idx]
                 },
-                Value::RandomValue(idx) => ace_vars.rand[idx],
+                Value::RandomValue(idx) => {
+                    if idx == 0 {
+                        ace_vars.random_beta
+                    } else {
+                        let alpha_power = idx - 1;
+                        ace_vars.random_alpha.exp_vartime(alpha_power as u64)
+                    }
+                },
             },
             Operation::Add(l, r) => evals[usize::from(l)] + evals[usize::from(r)],
             Operation::Sub(l, r) => evals[usize::from(l)] - evals[usize::from(r)],

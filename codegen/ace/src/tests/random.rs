@@ -25,13 +25,13 @@ impl AceVars {
         let segments = layout
             .trace_segments
             .map(|segment_row| segment_row.map(|row_region| row_region.random()));
-        let rand = layout.random_values.random();
         let stark = StarkInputs::random(air, log_trace_len);
         Self {
             public,
             reduced_tables,
             segments,
-            rand,
+            random_alpha: rand_quad(),
+            random_beta: rand_quad(),
             stark,
         }
     }

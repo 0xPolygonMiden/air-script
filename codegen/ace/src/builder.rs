@@ -30,7 +30,6 @@ pub struct CircuitBuilder {
     ops_cache: BTreeMap<OperationNode, Node>,
     // A cache of nodes already inserted in the circuit, used to avoid duplicates.
     air_node_cache: BTreeMap<AirOperation, Node>,
-    random_values: Vec<Node>,
     // Cache mapping a periodic column identifier to the evaluation of a column at `z`.
     periodic_columns_cache: BTreeMap<QualifiedIdentifier, Node>,
 }
@@ -39,8 +38,6 @@ impl CircuitBuilder {
     /// Initializes a [`CircuitBuilder`] for a given [`Air`].
     pub fn new(air: &Air) -> Self {
         let layout = Layout::new(air);
-        let beta_node = layout.random_value_node(0).unwrap();
-        let alpha_node = layout.random_value_node(1).unwrap();
         Self {
             layout,
             constants: vec![],
@@ -48,7 +45,6 @@ impl CircuitBuilder {
             operations: vec![],
             ops_cache: BTreeMap::default(),
             air_node_cache: BTreeMap::default(),
-            random_values: vec![beta_node, alpha_node],
             periodic_columns_cache: BTreeMap::default(),
         }
     }
@@ -144,7 +140,10 @@ impl CircuitBuilder {
                     .expect("invalid public input access"),
                 Value::PublicInputTable(access) => {
                     let idx = self.layout.reduced_tables[access];
-                    self.layout.random_values.as_node(idx).expect("invalid random value index")
+                    self.layout
+                        .reduced_tables_region
+                        .as_node(idx)
+                        .expect("invalid public input table access")
                 },
                 Value::RandomValue(idx) => self.random(*idx),
             },
@@ -310,21 +309,23 @@ impl CircuitBuilder {
         Some(result)
     }
 
-    /// Returns a [`Node`] corresponding to the evaluation of the `periodic_column` at the
-    /// appropriate power of `z`. The evaluation is cached to avoid unnecessary computation.
+    /// Returns a [`Node`] corresponding to the random challenge at the given index.
+    /// We assume that the challenges are [ β, 1, α, α², α³, … ].
     fn random(&mut self, index: usize) -> Node {
-        if index < 2 {
-            return self.random_values[index];
+        if index == 0 {
+            return self.layout.random_beta_node();
+        }
+        // TODO: Does rand[1] equal 1, or alpha? We assume 1 here.
+        let mut alpha_power = index - 1;
+        let alpha_base = self.layout.random_alpha_node();
+        let mut alpha = self.constant(1);
+
+        while alpha_power > 0 {
+            alpha = self.mul(alpha_base, alpha);
+            alpha_power -= 1;
         }
 
-        let beta = self.random_values[1];
-        let mut last_beta = *self.random_values.last().unwrap();
-        while self.random_values.len() < index {
-            last_beta = self.mul(beta, last_beta);
-            self.random_values.push(last_beta);
-        }
-
-        last_beta
+        alpha
     }
 }
 

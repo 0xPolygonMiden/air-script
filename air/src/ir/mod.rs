@@ -103,6 +103,7 @@ impl Air {
         self.public_inputs.values()
     }
 
+    /// Returns a list of all access to reduced public input tables in canonical order.
     pub fn reduced_public_input_table_accesses(&self) -> Vec<PublicInputTableAccess> {
         let mut accesses: Vec<_> = self
             .buses
