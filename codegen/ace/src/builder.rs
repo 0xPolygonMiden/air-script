@@ -310,22 +310,21 @@ impl CircuitBuilder {
     }
 
     /// Returns a [`Node`] corresponding to the random challenge at the given index.
-    /// We assume that the challenges are [ β, 1, α, α², α³, … ].
+    /// We assume that the challenges are `[α, 1, β, β², β³, … ]`.
     fn random(&mut self, index: usize) -> Node {
         if index == 0 {
-            return self.layout.random_beta_node();
+            return self.layout.random_alpha_node();
         }
-        // TODO: Does rand[1] equal 1, or alpha? We assume 1 here.
-        let mut alpha_power = index - 1;
-        let alpha_base = self.layout.random_alpha_node();
-        let mut alpha = self.constant(1);
+        let mut beta_power = index - 1;
+        let beta_base = self.layout.random_beta_node();
+        let mut beta = self.constant(1);
 
-        while alpha_power > 0 {
-            alpha = self.mul(alpha_base, alpha);
-            alpha_power -= 1;
+        while beta_power > 0 {
+            beta = self.mul(beta_base, beta);
+            beta_power -= 1;
         }
 
-        alpha
+        beta
     }
 }
 

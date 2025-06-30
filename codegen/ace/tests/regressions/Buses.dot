@@ -20,8 +20,8 @@ input52 [label="zᵐᵃˣ"]
 op0 [label="op0\ninput31 - input15"]
 input31 -> op0
 input15 -> op0
-op1 [label="op1\ninput6 + input15"]
-input6 -> op1
+op1 [label="op1\ninput5 + input15"]
+input5 -> op1
 input15 -> op1
 op2 [label="op2\ninput16 × op1"]
 input16 -> op2

@@ -23,17 +23,20 @@ const NUM_QUOTIENT_PARTS: usize = 8;
 ///   TODO(Issue: #391): Derive the degree generically.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Layout {
-    /// Region for each set of public inputs, sorted by `Identifier`
-    /// Each public input slice is word aligned.
-    /// TODO: Should these be element-aligned instead?
+    /// Region for each set of public inputs, sorted by `Identifier`.
+    /// The arrays of inputs are laid out contiguously.
+    /// The last array is padded to ensure this entire region is double-word aligned.
     pub public_inputs: BTreeMap<Identifier, InputRegion>,
     /// Region containing the random-reduced public input tables for bus boundary constraints.
+    /// Each variable is word-aligned (interleaving with unused variables),
+    /// and the region is double-word aligned.
     pub reduced_tables_region: InputRegion,
     /// Index of a specific reduced table within the [`reduced_tables_region`].
     pub reduced_tables: BTreeMap<PublicInputTableAccess, usize>,
-    /// Indices of the random challenge α used to randomly reduce bus messages.
+    /// Index of the random challenge α used to randomize the multiset/logUp argument
+    /// in the *aux* trace.
     pub random_alpha: usize,
-    /// Indices of the random challenge β used to randomly reduce bus messages.
+    /// Index of the random challenge β used to randomly reduce/fingerprint bus messages.
     pub random_beta: usize,
     /// Regions containing the evaluations of each segment, ordered by
     /// `trace[row_offset][segment]`.
@@ -50,25 +53,26 @@ pub struct Layout {
     ///   row of each quotient part. These are unused by the circuit.
     /// - The rows must be ordered as follows: ```ignore main_curr, aux_curr, quotient_curr,
     ///   main_next, aux_next, quotient_next. ```
-    /// - Each trace must be padded with zero columns such that each row is word-aligned.
+    /// - Each segment is double-word aligned to facilitate the Merkle-tree openings during the FRI
+    ///   query phase. In practice, the traces are padded with empty columns.
     ///
     /// # TODO(Issue #391):
     /// The degree of the quotient is fixed to 8 matching the degree of the VM constraints, but
     /// the actual degree can be derived from the [`Air`].
     pub trace_segments: [[InputRegion; 3]; 2],
-    /// Index of the first auxiliary input describing variables
+    /// Region containing the [`StarkVar`] variables.
     pub stark_vars: InputRegion,
-    /// Total number of inputs
+    /// Total number of inputs, padded to the next word-multiple.
     pub num_inputs: usize,
 }
 
 impl Layout {
-    /// Returns a new [`Layout`] from a description of an [`Air`]. All regions are padded according
-    /// to `HASH_ALIGNMENT`, ensuring that each section starts at a word-aligned memory pointer.
+    /// Returns a new [`Layout`] from a description of an [`Air`].
+    /// Each region is aligned according to the requirements of the MASM verifier.
     pub fn new(air: &Air) -> Self {
         let offset = &mut 0;
 
-        // Returns an `InputRegion` of a given width, and increments the offset
+        // Returns an `InputRegion` of a given width and increments the offset
         // to satisfy the alignment.
         fn next_region(current_offset: &mut usize, width: usize, alignment: usize) -> InputRegion {
             let offset = *current_offset;
@@ -80,7 +84,7 @@ impl Layout {
             *offset += offset.next_multiple_of(alignment);
         }
 
-        // TODO: should these be element or word aligned?
+        // The arrays of all public inputs are stored contiguously.
         let public_inputs: BTreeMap<_, _> = air
             .public_inputs
             .iter()
@@ -95,14 +99,17 @@ impl Layout {
         let reduced_table_accesses = air.reduced_public_input_table_accesses();
 
         // Region containing all reduced public input table values.
+        // For MASM efficiency, we store one reduced table per word.
+        // Each variable therefore occupies two "variable slots".
         let reduced_tables_region =
-            next_region(offset, reduced_table_accesses.len(), WORD_ALIGNMENT);
+            next_region(offset, 2 * reduced_table_accesses.len(), DOUBLE_WORD_ALIGNMENT);
 
         // Mapping of each access to its index within `reduced_tables_region`
+        // The index is doubled to match the "one variable per word" requirement.
         let reduced_tables: BTreeMap<_, _> = reduced_table_accesses
             .into_iter()
             .enumerate()
-            .map(|(index, access)| (access, index))
+            .map(|(index, access)| (access, 2 * index))
             .collect();
 
         // Random challenges α, β used to fingerprint bus messages.
@@ -148,9 +155,8 @@ impl Layout {
 
         let stark_vars = next_region(offset, StarkVar::num_vars(), WORD_ALIGNMENT);
 
-        // Ensure the entire input region is double-word aligned
-        // TODO: Not sure if this is actually needed by the MASM verifier.
-        align(offset, DOUBLE_WORD_ALIGNMENT);
+        // Ensure the entire input region is word aligned
+        align(offset, WORD_ALIGNMENT);
 
         Self {
             public_inputs,

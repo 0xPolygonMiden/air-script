@@ -22,7 +22,7 @@ pub struct AirInputs {
     pub reduced_tables: Vec<QuadFelt>,
     /// Evaluations of the *main* trace.
     pub main: [Vec<QuadFelt>; 2],
-    /// Verifier challenge α used to fingerprint bus messages for the *aux* trace.
+    /// Verifier challenge α used to randomize the multi-set/logUp polynomials in the *aux* trace.
     pub random_alpha: QuadFelt,
     /// Verifier challenge β used to fingerprint bus messages for the *aux* trace.
     pub random_beta: QuadFelt,

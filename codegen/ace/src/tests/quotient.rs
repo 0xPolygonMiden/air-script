@@ -79,10 +79,10 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
                 },
                 Value::RandomValue(idx) => {
                     if idx == 0 {
-                        ace_vars.random_beta
+                        ace_vars.random_alpha
                     } else {
-                        let alpha_power = idx - 1;
-                        ace_vars.random_alpha.exp_vartime(alpha_power as u64)
+                        let beta_power = idx - 1;
+                        ace_vars.random_beta.exp_vartime(beta_power as u64)
                     }
                 },
             },
