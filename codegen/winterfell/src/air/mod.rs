@@ -12,7 +12,7 @@ mod boundary_constraints;
 use boundary_constraints::{add_fn_get_assertions, add_fn_get_aux_assertions};
 
 mod transition_constraints;
-use air_ir::{Air, Bus, BusBoundary, BusType, ConstraintDomain, Identifier, TraceSegmentId};
+use air_ir::{Air, BusBoundary, BusType, ConstraintDomain, PublicInputTableAccess, TraceSegmentId};
 use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_transition};
 
 use super::{Impl, Scope};
@@ -267,13 +267,19 @@ fn add_constraint_degrees(
     func_body.line(format!("let {decl_name} = vec![{}];", degrees.join(", ")));
 }
 
-fn call_bus_boundary_varlen_pubinput(bus: &Bus, table_name: Identifier) -> String {
-    match bus.bus_type {
+fn call_bus_boundary_varlen_pubinput(access: PublicInputTableAccess) -> String {
+    match access.bus_type {
         BusType::Multiset => {
-            format!("Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.{table_name})",)
+            format!(
+                "Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.{})",
+                access.table_name
+            )
         },
         BusType::Logup => {
-            format!("Self::bus_logup_boundary_varlen(aux_rand_elements, &self.{table_name})",)
+            format!(
+                "Self::bus_logup_boundary_varlen(aux_rand_elements, &self.{})",
+                access.table_name
+            )
         },
     }
 }
