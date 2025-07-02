@@ -85,29 +85,14 @@ fn add_aux_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
     // by the compiler.
     // TODO: These values are constant across all rows and therefore can be computed only once
     //       before starting the constraint evaluation.
-    let domains = [ConstraintDomain::FirstRow, ConstraintDomain::LastRow];
-    for domain in domains {
-        for bus in ir.buses.values() {
-            let bus_boundary = match domain {
-                ConstraintDomain::FirstRow => bus.first,
-                ConstraintDomain::LastRow => bus.last,
-                _ => unreachable!("Invalid domain for bus boundary constraint"),
-            };
-            match bus_boundary {
-                air_ir::BusBoundary::PublicInputTable(access) => {
-                    let boundary_value =
-                        air_ir::Value::PublicInputTable(access).to_string(ir, ElemType::Ext, 0);
-                    let expr_root_string =
-                        call_bus_boundary_varlen_pubinput(bus, access.table_name);
+    for access in ir.reduced_public_input_table_accesses() {
+        let boundary_value =
+            air_ir::Value::PublicInputTable(access).to_string(ir, ElemType::Ext, 0);
+        let expr_root_string = call_bus_boundary_varlen_pubinput(access);
 
-                    let boundary_value_init =
-                        format!("let {} = {};", boundary_value, expr_root_string);
+        let boundary_value_init = format!("let {boundary_value} = {expr_root_string};");
 
-                    func_body.line(boundary_value_init);
-                },
-                air_ir::BusBoundary::Null | air_ir::BusBoundary::Unconstrained => {},
-            }
-        }
+        func_body.line(boundary_value_init);
     }
 
     // add the boundary constraints that have already be expanded in the algebraic graph

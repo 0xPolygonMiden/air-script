@@ -138,12 +138,14 @@ impl CircuitBuilder {
                 Value::PublicInput(pi) => self.layout.public_inputs[&pi.name]
                     .as_node(pi.index)
                     .expect("invalid public input access"),
-                Value::PublicInputTable(_) => {
-                    todo!("public input tables are not supported yet (see #399)")
+                Value::PublicInputTable(access) => {
+                    let idx = self.layout.reduced_tables[access];
+                    self.layout
+                        .reduced_tables_region
+                        .as_node(idx)
+                        .expect("invalid public input table access")
                 },
-                Value::RandomValue(idx) => {
-                    self.layout.random_values.as_node(*idx).expect("invalid random value index")
-                },
+                Value::RandomValue(idx) => self.random(*idx),
             },
             AirOperation::Add(l_idx, r_idx) => {
                 let node_l = self.node_from_index(air, l_idx);
@@ -305,6 +307,24 @@ impl CircuitBuilder {
         // Cache evaluation
         self.periodic_columns_cache.insert(ident, result);
         Some(result)
+    }
+
+    /// Returns a [`Node`] corresponding to the random challenge at the given index.
+    /// We assume that the challenges are `[α, 1, β, β², β³, … ]`.
+    fn random(&mut self, index: usize) -> Node {
+        if index == 0 {
+            return self.layout.random_alpha_node();
+        }
+        let mut beta_power = index - 1;
+        let beta_base = self.layout.random_beta_node();
+        let mut beta = self.constant(1);
+
+        while beta_power > 0 {
+            beta = self.mul(beta_base, beta);
+            beta_power -= 1;
+        }
+
+        beta
     }
 }
 

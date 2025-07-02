@@ -1,13 +1,19 @@
 use std::{collections::BTreeMap, ops::Range};
 
-use air_ir::{Air, Identifier, PublicInputAccess, TraceAccess};
+use air_ir::{Air, Identifier, PublicInputAccess, PublicInputTableAccess, TraceAccess};
 
 use crate::circuit::Node;
 
-/// For each set of inputs read from the transcript, we treat them as extension field elements
-/// and pad them with zeros to the next multiple of 4. They can then be unhashed to a double-word
-/// aligned region in memory.
-const HASH_ALIGNMENT: usize = 4;
+/// Circuit inputs are represented as extension field elements and stored in a word-aligned region
+/// in memory. Each region has specific alignment requirements dictated by the recursive verifier.
+/// When the aligned region is larger than the actual number of inputs to the circuit, the
+/// region can be padded with arbitrary values as these will not be accessed by the circuit.
+/// In practice, we set these to zero.
+enum Alignment {
+    Element = 1,
+    Word = 2,
+    DoubleWord = 4,
+}
 
 const NUM_QUOTIENT_PARTS: usize = 8;
 
@@ -21,10 +27,21 @@ const NUM_QUOTIENT_PARTS: usize = 8;
 ///   TODO(Issue: #391): Derive the degree generically.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Layout {
-    /// Region for each set of public inputs, sorted by `Identifier`
+    /// Region for each set of public inputs, sorted by `Identifier`.
+    /// The arrays of inputs are laid out contiguously.
+    /// The last array is padded to ensure this entire region is double-word aligned.
     pub public_inputs: BTreeMap<Identifier, InputRegion>,
-    /// Region for auxiliary random inputs.
-    pub random_values: InputRegion,
+    /// Region containing the random-reduced public input tables for bus boundary constraints.
+    /// Each variable is word-aligned (interleaving with unused variables),
+    /// and the region is double-word aligned.
+    pub reduced_tables_region: InputRegion,
+    /// Index of a specific reduced table within the [`reduced_tables_region`].
+    pub reduced_tables: BTreeMap<PublicInputTableAccess, usize>,
+    /// Index of the random challenge α used to randomize the multiset/logUp argument
+    /// in the *aux* trace.
+    pub random_alpha: usize,
+    /// Index of the random challenge β used to randomly reduce/fingerprint bus messages.
+    pub random_beta: usize,
     /// Regions containing the evaluations of each segment, ordered by
     /// `trace[row_offset][segment]`.
     ///
@@ -40,37 +57,75 @@ pub struct Layout {
     ///   row of each quotient part. These are unused by the circuit.
     /// - The rows must be ordered as follows: ```ignore main_curr, aux_curr, quotient_curr,
     ///   main_next, aux_next, quotient_next. ```
-    /// - Each trace must be padded with zero columns such that each row is word-aligned.
+    /// - Each segment is double-word aligned to facilitate the Merkle-tree openings during the FRI
+    ///   query phase. In practice, the traces are padded with empty columns.
     ///
     /// # TODO(Issue #391):
     /// The degree of the quotient is fixed to 8 matching the degree of the VM constraints, but
     /// the actual degree can be derived from the [`Air`].
     pub trace_segments: [[InputRegion; 3]; 2],
-    /// Index of the first auxiliary input describing variables
+    /// Region containing the [`StarkVar`] variables.
     pub stark_vars: InputRegion,
-    /// Total number of inputs
+    /// Total number of inputs, padded to the next word-multiple.
     pub num_inputs: usize,
 }
 
 impl Layout {
-    /// Returns a new [`Layout`] from a description of an [`Air`]. All regions are padded according
-    /// to `HASH_ALIGNMENT`, ensuring that each section starts at a word-aligned memory pointer.
+    /// Returns a new [`Layout`] from a description of an [`Air`].
+    /// Each region is aligned according to the requirements of the MASM verifier.
     pub fn new(air: &Air) -> Self {
-        let mut inputs_offset = 0;
+        let offset = &mut 0;
 
-        fn next_region(current_offset: &mut usize, width: usize) -> InputRegion {
+        // Returns an `InputRegion` of a given width and increments the offset
+        // to satisfy the alignment.
+        fn next_region(
+            current_offset: &mut usize,
+            width: usize,
+            alignment: Alignment,
+        ) -> InputRegion {
             let offset = *current_offset;
-            *current_offset += width.next_multiple_of(HASH_ALIGNMENT);
+            *current_offset += width.next_multiple_of(alignment as usize);
             InputRegion { offset, width }
         }
 
+        fn align(offset: &mut usize, alignment: Alignment) {
+            *offset += offset.next_multiple_of(alignment as usize);
+        }
+
+        // The arrays of all public inputs are stored contiguously.
         let public_inputs: BTreeMap<_, _> = air
             .public_inputs
             .iter()
-            .map(|(ident, pi)| (*ident, next_region(&mut inputs_offset, pi.size())))
+            .map(|(ident, pi)| (*ident, next_region(offset, pi.size(), Alignment::Element)))
             .collect();
 
-        let random_values = next_region(&mut inputs_offset, air.num_random_values as usize);
+        // Ensure the entire region containing the public inputs is double-word aligned
+        // since it is hashed as one contiguous array.
+        align(offset, Alignment::DoubleWord);
+
+        // List of all reduced public input table accesses in canonical order.
+        let reduced_table_accesses = air.reduced_public_input_table_accesses();
+
+        // Region containing all reduced public input table values.
+        // For MASM efficiency, we store one reduced table per word.
+        // Each variable therefore occupies two "variable slots".
+        let reduced_tables_region =
+            next_region(offset, 2 * reduced_table_accesses.len(), Alignment::DoubleWord);
+
+        // Mapping of each access to its index within `reduced_tables_region`
+        // The index is doubled to match the "one variable per word" requirement.
+        let reduced_tables: BTreeMap<_, _> = reduced_table_accesses
+            .into_iter()
+            .enumerate()
+            .map(|(index, access)| (access, 2 * index))
+            .collect();
+
+        // Random challenges α, β.
+        let random_alpha = *offset;
+        let random_beta = *offset + 1;
+        *offset += 2;
+        // The next region must be word-aligned to facilitate hashing.
+        align(offset, Alignment::Word);
 
         // TODO(Issue: #391): Use the following to derive the degree generically, and maybe add it
         // to `Air`
@@ -98,17 +153,28 @@ impl Layout {
             // Quotient is stored as a segment
             num_quotient_parts,
         ];
-        let trace_segments = [0, 1]
-            .map(|_row_offset| segment_widths.map(|width| next_region(&mut inputs_offset, width)));
 
-        let stark_vars = next_region(&mut inputs_offset, StarkVar::num_vars());
+        // Each segment must be double-word aligned to facilitate the opening of rows
+        // during the FRI query phase.
+        // At the moment, we do so by padding each trace with zero-valued columns.
+        let trace_segments = [0, 1].map(|_row_offset| {
+            segment_widths.map(|width| next_region(offset, width, Alignment::DoubleWord))
+        });
+
+        let stark_vars = next_region(offset, StarkVar::num_vars(), Alignment::Word);
+
+        // Ensure the entire input region is word aligned
+        align(offset, Alignment::Word);
 
         Self {
             public_inputs,
+            reduced_tables_region,
+            reduced_tables,
+            random_alpha,
+            random_beta,
             trace_segments,
-            random_values,
             stark_vars,
-            num_inputs: inputs_offset,
+            num_inputs: *offset,
         }
     }
 
@@ -117,6 +183,13 @@ impl Layout {
         self.public_inputs
             .get(&public_input.name)
             .and_then(|region| region.as_node(public_input.index))
+    }
+
+    /// Input node associated with a reduced public input table variable.
+    pub fn reduced_table_node(&self, table_access: &PublicInputTableAccess) -> Option<Node> {
+        self.reduced_tables
+            .get(table_access)
+            .and_then(|index| self.reduced_tables_region.as_node(*index))
     }
 
     /// Input node associated with a trace variable.
@@ -131,9 +204,14 @@ impl Layout {
         segment_region.as_node(column)
     }
 
-    /// Input node associated with a random challenge variable.
-    pub fn random_value_node(&self, index: usize) -> Option<Node> {
-        self.random_values.as_node(index)
+    /// Input node associated with the variable for the random challenge α.
+    pub fn random_alpha_node(&self) -> Node {
+        Node::Input(self.random_alpha)
+    }
+
+    /// Input node associated with the variable for the random challenge β.
+    pub fn random_beta_node(&self) -> Node {
+        Node::Input(self.random_beta)
     }
 
     /// Input nodes associated with the quotient polynomial coefficients.

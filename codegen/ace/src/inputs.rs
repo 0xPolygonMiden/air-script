@@ -18,10 +18,14 @@ pub struct AirInputs {
     pub log_trace_len: u32,
     /// Public inputs in the same order as [`Air::public_inputs`].
     pub public: Vec<Vec<QuadFelt>>,
+    /// Reduced public input table values used as boundaries for buses.
+    pub reduced_tables: Vec<QuadFelt>,
     /// Evaluations of the *main* trace.
     pub main: [Vec<QuadFelt>; 2],
-    /// Verifier challenges used to derive the *aux* trace.
-    pub rand: Vec<QuadFelt>,
+    /// Verifier challenge α used to randomize the multi-set/logUp polynomials in the *aux* trace.
+    pub random_alpha: QuadFelt,
+    /// Verifier challenge β used to fingerprint bus messages for the *aux* trace.
+    pub random_beta: QuadFelt,
     /// Evaluations of the *aux* trace.
     pub aux: [Vec<QuadFelt>; 2],
     /// Evaluations of the *quotient* parts, including in the next row.
@@ -37,8 +41,10 @@ pub struct AirInputs {
 #[derive(Clone, Debug)]
 pub struct AceVars {
     pub(crate) public: Vec<Vec<QuadFelt>>,
+    pub(crate) reduced_tables: Vec<QuadFelt>,
     pub(crate) segments: [[Vec<QuadFelt>; 3]; 2],
-    pub(crate) rand: Vec<QuadFelt>,
+    pub(crate) random_alpha: QuadFelt,
+    pub(crate) random_beta: QuadFelt,
     pub(crate) stark: StarkInputs,
 }
 
@@ -53,8 +59,10 @@ impl AirInputs {
         let segments = [[main_curr, aux_curr, quotient_curr], [main_next, aux_next, quotient_next]];
         AceVars {
             public: self.public,
+            reduced_tables: self.reduced_tables,
             segments,
-            rand: self.rand,
+            random_alpha: self.random_alpha,
+            random_beta: self.random_beta,
             stark,
         }
     }
@@ -142,8 +150,18 @@ impl AceVars {
             store(&mut mem, pi_region, inputs)
         }
 
+        // Reduced public input table values, ordered by accesses
+        assert_eq!(layout.reduced_tables.len(), self.reduced_tables.len());
+        for (index, reduced_table_value) in
+            zip(layout.reduced_tables.values(), &self.reduced_tables)
+        {
+            let mem_index = layout.reduced_tables_region.index(*index).unwrap();
+            mem[mem_index] = *reduced_table_value;
+        }
+
         // Random values
-        store(&mut mem, &layout.random_values, &self.rand);
+        mem[layout.random_alpha] = self.random_alpha;
+        mem[layout.random_beta] = self.random_beta;
 
         // Trace values
         for row_offset in [0, 1] {
