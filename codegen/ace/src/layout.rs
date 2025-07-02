@@ -4,12 +4,16 @@ use air_ir::{Air, Identifier, PublicInputAccess, PublicInputTableAccess, TraceAc
 
 use crate::circuit::Node;
 
-/// For each set of inputs read from the transcript, we treat them as extension field elements
-/// and pad them with zeros to the next multiple of 4. They can then be unhashed to a double-word
-/// aligned region in memory.
-const ELEMENT_ALIGNMENT: usize = 1;
-const WORD_ALIGNMENT: usize = 2;
-const DOUBLE_WORD_ALIGNMENT: usize = 4;
+/// Circuit inputs are represented as extension field elements and stored in a word-aligned region
+/// in memory. Each region has specific alignment requirements dictated by the recursive verifier.
+/// When the aligned region is larger than the actual number of inputs to the circuit, the
+/// region can be padded with arbitrary values as these will not be accessed by the circuit.
+/// In practice, we set these to zero.
+enum Alignment {
+    Element = 1,
+    Word = 2,
+    DoubleWord = 4,
+}
 
 const NUM_QUOTIENT_PARTS: usize = 8;
 
@@ -74,26 +78,30 @@ impl Layout {
 
         // Returns an `InputRegion` of a given width and increments the offset
         // to satisfy the alignment.
-        fn next_region(current_offset: &mut usize, width: usize, alignment: usize) -> InputRegion {
+        fn next_region(
+            current_offset: &mut usize,
+            width: usize,
+            alignment: Alignment,
+        ) -> InputRegion {
             let offset = *current_offset;
-            *current_offset += width.next_multiple_of(alignment);
+            *current_offset += width.next_multiple_of(alignment as usize);
             InputRegion { offset, width }
         }
 
-        fn align(offset: &mut usize, alignment: usize) {
-            *offset += offset.next_multiple_of(alignment);
+        fn align(offset: &mut usize, alignment: Alignment) {
+            *offset += offset.next_multiple_of(alignment as usize);
         }
 
         // The arrays of all public inputs are stored contiguously.
         let public_inputs: BTreeMap<_, _> = air
             .public_inputs
             .iter()
-            .map(|(ident, pi)| (*ident, next_region(offset, pi.size(), ELEMENT_ALIGNMENT)))
+            .map(|(ident, pi)| (*ident, next_region(offset, pi.size(), Alignment::Element)))
             .collect();
 
         // Ensure the entire region containing the public inputs is double-word aligned
         // since it is hashed as one contiguous array.
-        align(offset, DOUBLE_WORD_ALIGNMENT);
+        align(offset, Alignment::DoubleWord);
 
         // List of all reduced public input table accesses in canonical order.
         let reduced_table_accesses = air.reduced_public_input_table_accesses();
@@ -102,7 +110,7 @@ impl Layout {
         // For MASM efficiency, we store one reduced table per word.
         // Each variable therefore occupies two "variable slots".
         let reduced_tables_region =
-            next_region(offset, 2 * reduced_table_accesses.len(), DOUBLE_WORD_ALIGNMENT);
+            next_region(offset, 2 * reduced_table_accesses.len(), Alignment::DoubleWord);
 
         // Mapping of each access to its index within `reduced_tables_region`
         // The index is doubled to match the "one variable per word" requirement.
@@ -117,7 +125,7 @@ impl Layout {
         let random_beta = *offset + 1;
         *offset += 2;
         // The next region must be word-aligned to facilitate hashing.
-        align(offset, WORD_ALIGNMENT);
+        align(offset, Alignment::Word);
 
         // TODO(Issue: #391): Use the following to derive the degree generically, and maybe add it
         // to `Air`
@@ -150,13 +158,13 @@ impl Layout {
         // during the FRI query phase.
         // At the moment, we do so by padding each trace with zero-valued columns.
         let trace_segments = [0, 1].map(|_row_offset| {
-            segment_widths.map(|width| next_region(offset, width, DOUBLE_WORD_ALIGNMENT))
+            segment_widths.map(|width| next_region(offset, width, Alignment::DoubleWord))
         });
 
-        let stark_vars = next_region(offset, StarkVar::num_vars(), WORD_ALIGNMENT);
+        let stark_vars = next_region(offset, StarkVar::num_vars(), Alignment::Word);
 
         // Ensure the entire input region is word aligned
-        align(offset, WORD_ALIGNMENT);
+        align(offset, Alignment::Word);
 
         Self {
             public_inputs,
