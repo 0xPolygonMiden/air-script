@@ -12,7 +12,7 @@ mod boundary_constraints;
 use boundary_constraints::{add_fn_get_assertions, add_fn_get_aux_assertions};
 
 mod transition_constraints;
-use air_ir::{Air, BusBoundary, BusType, ConstraintDomain, Identifier, TraceSegmentId};
+use air_ir::{Air, Bus, BusBoundary, BusType, ConstraintDomain, Identifier, TraceSegmentId};
 use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_transition};
 
 use super::{Impl, Scope};
@@ -113,15 +113,15 @@ fn impl_bus_multiset_boundary_varlen(base_impl: &mut Impl) {
         .new_fn("bus_multiset_boundary_varlen")
         .generic("'a")
         .generic("const N: usize")
-        .generic("I: IntoIterator<Item = &'a [Felt; N]> + Clone")
+        .generic("I: IntoIterator<Item = &'a [Felt; N]>")
         .generic("E: FieldElement<BaseField = Felt>")
         .arg("aux_rand_elements", "&AuxRandElements<E>")
-        .arg("public_inputs", "&I")
+        .arg("public_inputs", "I")
         .ret("E")
         .vis("pub")
         .line("let mut bus_p_last: E = E::ONE;")
         .line("let rand = aux_rand_elements.rand_elements();")
-        .line("for row in public_inputs.clone().into_iter() {")
+        .line("for row in public_inputs {")
         .line("    let mut p_last = rand[0];")
         .line("    for (c, p_i) in row.iter().enumerate() {")
         .line("        p_last += E::from(*p_i) * rand[c + 1];")
@@ -157,15 +157,15 @@ fn impl_bus_logup_boundary_varlen(base_impl: &mut Impl) {
         .new_fn("bus_logup_boundary_varlen")
         .generic("'a")
         .generic("const N: usize")
-        .generic("I: IntoIterator<Item = &'a [Felt; N]> + Clone")
+        .generic("I: IntoIterator<Item = &'a [Felt; N]>")
         .generic("E: FieldElement<BaseField = Felt>")
         .arg("aux_rand_elements", "&AuxRandElements<E>")
-        .arg("public_inputs", "&I")
+        .arg("public_inputs", "I")
         .ret("E")
         .vis("pub")
         .line("let mut bus_q_last = E::ZERO;")
         .line("let rand = aux_rand_elements.rand_elements();")
-        .line("for row in public_inputs.clone().into_iter() {")
+        .line("for row in public_inputs {")
         .line("    let mut q_last = rand[0];")
         .line("    for (c, p_i) in row.iter().enumerate() {")
         .line("        let p_i = *p_i;")
@@ -267,18 +267,13 @@ fn add_constraint_degrees(
     func_body.line(format!("let {decl_name} = vec![{}];", degrees.join(", ")));
 }
 
-fn call_bus_boundary_varlen_pubinput(
-    ir: &Air,
-    bus_name: Identifier,
-    table_name: Identifier,
-) -> String {
-    let bus = ir.buses.get(&bus_name).expect("bus not found");
+fn call_bus_boundary_varlen_pubinput(bus: &Bus, table_name: Identifier) -> String {
     match bus.bus_type {
-        BusType::Multiset => format!(
-            "Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.{table_name}.iter())",
-        ),
+        BusType::Multiset => {
+            format!("Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.{table_name})",)
+        },
         BusType::Logup => {
-            format!("Self::bus_logup_boundary_varlen(aux_rand_elements, &self.{table_name}.iter())",)
+            format!("Self::bus_logup_boundary_varlen(aux_rand_elements, &self.{table_name})",)
         },
     }
 }
