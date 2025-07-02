@@ -112,7 +112,7 @@ impl Layout {
             .map(|(index, access)| (access, 2 * index))
             .collect();
 
-        // Random challenges α, β used to fingerprint bus messages.
+        // Random challenges α, β.
         let random_alpha = *offset;
         let random_beta = *offset + 1;
         *offset += 2;
