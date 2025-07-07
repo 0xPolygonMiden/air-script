@@ -19,3 +19,5 @@ derive-ir = { package = "air-derive-ir", path = "./derive-ir", version = "0.5" }
 miden-diagnostics = { workspace = true }
 pretty_assertions = "1.4"
 thiserror = { workspace = true }
+rand = "0.9"
+winter-math = { package = "winter-math", version = "0.12", default-features = false }
