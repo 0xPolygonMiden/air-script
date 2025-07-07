@@ -194,19 +194,13 @@ fn list_folding() {
 
 #[test]
 fn selectors() {
-    let generated_air = Test::new("tests/selectors/selectors.air".to_string())
+    Test::new("tests/selectors/selectors.air".to_string())
         .transpile(Target::Winterfell, Pipeline::WithoutMIR)
-        .unwrap();
+        .expect_err("matches are not implemented for this Pipeline");
 
-    let expected = expect_file!["../selectors/selectors.rs"];
-    expected.assert_eq(&generated_air);
-
-    let generated_air = Test::new("tests/selectors/selectors_with_evaluators.air".to_string())
+    Test::new("tests/selectors/selectors_with_evaluators.air".to_string())
         .transpile(Target::Winterfell, Pipeline::WithoutMIR)
-        .unwrap();
-
-    let expected = expect_file!["../selectors/selectors.rs"];
-    expected.assert_eq(&generated_air);
+        .expect_err("matches are not implemented for this Pipeline");
 }
 
 #[test]

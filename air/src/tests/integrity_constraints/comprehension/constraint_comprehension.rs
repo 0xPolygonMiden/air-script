@@ -1,4 +1,5 @@
 use super::super::{Pipeline, compile};
+use crate::tests::expect_diagnostic;
 
 #[test]
 fn constraint_comprehension() {
@@ -38,6 +39,10 @@ fn ic_comprehension_with_selectors() {
         enf c = d for (c, d) in (c, d) when !fmp[0];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
+    expect_diagnostic(
+        source,
+        "matches are not implemented for this Pipeline",
+        Pipeline::WithoutMIR,
+    );
     assert!(compile(source, Pipeline::WithMIR).is_ok());
 }
