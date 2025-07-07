@@ -16,8 +16,8 @@ pub use unrolling::Unrolling;
 pub use visitor::Visitor;
 
 use crate::ir::{
-    Accessor, Add, Boundary, BusOp, Call, Enf, Exp, Fold, For, If, Link, Matrix, Mul, Node, Op,
-    Owner, Parameter, Parent, Sub, Value, Vector,
+    Accessor, Add, Boundary, BusOp, Call, Enf, Exp, Fold, For, If, Link, MatchArm, Matrix, Mul,
+    Node, Op, Owner, Parameter, Parent, Sub, Value, Vector,
 };
 
 /// Helper to duplicate a MIR node and its children recursively
@@ -72,13 +72,18 @@ pub fn duplicate_node(
             Exp::create(new_lhs_node, new_rhs_node, exp.span())
         },
         Op::If(if_node) => {
-            let condition = if_node.condition.clone();
-            let then_branch = if_node.then_branch.clone();
-            let else_branch = if_node.else_branch.clone();
-            let new_condition = duplicate_node(condition, current_replace_map);
-            let new_then_branch = duplicate_node(then_branch, current_replace_map);
-            let new_else_branch = duplicate_node(else_branch, current_replace_map);
-            If::create(new_condition, new_then_branch, new_else_branch, if_node.span())
+            let match_arms = if_node.match_arms.clone();
+            let new_match_arms = match_arms
+                .borrow()
+                .iter()
+                .cloned()
+                .map(|arm| {
+                    let new_expr = duplicate_node(arm.expr, current_replace_map);
+                    let new_cond = duplicate_node(arm.condition, current_replace_map);
+                    MatchArm::new(new_expr, new_cond)
+                })
+                .collect::<Vec<_>>();
+            If::create(new_match_arms, if_node.span())
         },
         Op::For(for_node) => {
             let new_for_node: Link<Op> =
@@ -272,18 +277,19 @@ pub fn duplicate_node_or_replace(
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::If(if_node) => {
-            let cond = if_node.condition.clone();
-            let then_branch = if_node.then_branch.clone();
-            let else_branch = if_node.else_branch.clone();
-            let new_cond = current_replace_map.get(&cond.get_ptr()).unwrap().1.clone();
-            let new_then_branch =
-                current_replace_map.get(&then_branch.get_ptr()).unwrap().1.clone();
-            let new_else_branch = if let Op::None(_) = else_branch.borrow().deref() {
-                else_branch.clone()
-            } else {
-                current_replace_map.get(&else_branch.get_ptr()).unwrap().1.clone()
-            };
-            let new_node = If::create(new_cond, new_then_branch, new_else_branch, if_node.span());
+            let match_arms = if_node.match_arms.clone();
+            let new_match_arms = match_arms
+                .borrow()
+                .iter()
+                .cloned()
+                .map(|arm| {
+                    let new_expr = current_replace_map.get(&arm.expr.get_ptr()).unwrap().1.clone();
+                    let new_cond =
+                        current_replace_map.get(&arm.condition.get_ptr()).unwrap().1.clone();
+                    MatchArm::new(new_expr, new_cond)
+                })
+                .collect::<Vec<_>>();
+            let new_node = If::create(new_match_arms, if_node.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::For(for_node) => {

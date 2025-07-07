@@ -487,26 +487,33 @@ impl UnrollingFirstPass<'_> {
 
         {
             let if_ref = if_node.as_if().unwrap();
-            let condition = if_ref.condition.clone();
-            let then_branch = if_ref.then_branch.clone();
-            let else_branch = if_ref.else_branch.clone();
 
             println!("Visiting If node: {}", if_ref._node.to_link().unwrap().debug());
 
-            println!("Condition: {}", if_ref.condition.debug());
-            println!("Then: {}", if_ref.then_branch.debug());
-            println!("Else: {}", if_ref.else_branch.debug());
-
-            println!();
-            println!();
-
+            let match_arms = if_ref.match_arms.borrow();
             let mut new_vec = vec![];
 
-            if let Op::Vector(then_branch_vector) = then_branch.clone().borrow().deref() {
-                let then_branch_vec = then_branch_vector.children().borrow().deref().clone();
+            for match_arm in match_arms.iter() {
+                let condition = match_arm.condition.clone();
+                let expr = match_arm.expr.clone();
 
-                for then_branch in then_branch_vec {
-                    let new_node = Mul::create(condition.clone(), then_branch, if_ref.span());
+                if let Op::Vector(expr_vector) = expr.borrow().deref() {
+                    let expr_vec = expr_vector.children().borrow().deref().clone();
+                    for expr in expr_vec {
+                        let new_node = Mul::create(condition.clone(), expr, if_ref.span());
+                        // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) ->
+                        // Enf(Sub(lhs, rhs) == 0), but it introduces an
+                        // unnecessary zero node
+                        let zero_node = Value::create(SpannedMirValue {
+                            span: Default::default(),
+                            value: MirValue::Constant(ConstantValue::Felt(0)),
+                        });
+                        let new_node_with_sub_zero =
+                            Sub::create(new_node, zero_node, if_ref.span());
+                        new_vec.push(new_node_with_sub_zero);
+                    }
+                } else {
+                    let new_node = Mul::create(condition.clone(), expr, if_ref.span());
                     // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs,
                     // rhs) == 0), but it introduces an unnecessary zero node
                     let zero_node = Value::create(SpannedMirValue {
@@ -516,58 +523,6 @@ impl UnrollingFirstPass<'_> {
                     let new_node_with_sub_zero = Sub::create(new_node, zero_node, if_ref.span());
                     new_vec.push(new_node_with_sub_zero);
                 }
-            } else {
-                let new_node = Mul::create(condition.clone(), then_branch, if_ref.span());
-                // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs, rhs)
-                // == 0), but it introduces an unnecessary zero node
-                let zero_node = Value::create(SpannedMirValue {
-                    span: Default::default(),
-                    value: MirValue::Constant(ConstantValue::Felt(0)),
-                });
-                let new_node_with_sub_zero = Sub::create(new_node, zero_node, if_ref.span());
-                new_vec.push(new_node_with_sub_zero);
-            }
-
-            let one_constant = SpannedMirValue {
-                span: Default::default(),
-                value: MirValue::Constant(ConstantValue::Felt(1)),
-            };
-
-            if let Op::Vector(else_branch_vector) = else_branch.clone().borrow().deref() {
-                let else_branch_vec = else_branch_vector.children().borrow().deref().clone();
-
-                for else_branch in else_branch_vec {
-                    let span = else_branch.span();
-                    let new_node = Mul::create(
-                        Sub::create(Value::create(one_constant.clone()), condition.clone(), span),
-                        else_branch,
-                        span,
-                    );
-                    // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs,
-                    // rhs) == 0), but it introduces an unnecessary zero node
-                    let zero_node = Value::create(SpannedMirValue {
-                        span: Default::default(),
-                        value: MirValue::Constant(ConstantValue::Felt(0)),
-                    });
-                    let new_node_with_sub_zero = Sub::create(new_node, zero_node, if_ref.span());
-                    new_vec.push(new_node_with_sub_zero);
-                }
-            } else if let Op::None(_) = else_branch.borrow().deref() {
-            } else {
-                let span = else_branch.span();
-                let new_node = Mul::create(
-                    Sub::create(Value::create(one_constant.clone()), condition.clone(), span),
-                    else_branch,
-                    span,
-                );
-                // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs,
-                // rhs) == 0), but it introduces an unnecessary zero node
-                let zero_node = Value::create(SpannedMirValue {
-                    span: Default::default(),
-                    value: MirValue::Constant(ConstantValue::Felt(0)),
-                });
-                let new_node_with_sub_zero = Sub::create(new_node, zero_node, if_ref.span());
-                new_vec.push(new_node_with_sub_zero);
             }
 
             updated_if = Some(Vector::create(new_vec, if_ref.span()));
