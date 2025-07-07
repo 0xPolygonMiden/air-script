@@ -101,8 +101,8 @@ impl fmt::Display for DisplayStatement<'_> {
             Statement::Enforce(expr) => {
                 write!(f, "enf {expr}")
             },
-            Statement::EnforceIf(expr, selector) => {
-                write!(f, "enf {expr} when {selector}")
+            Statement::EnforceIf(match_expr) => {
+                write!(f, "enf {match_expr}")
             },
             Statement::EnforceAll(expr) => {
                 write!(f, "enf {expr}")

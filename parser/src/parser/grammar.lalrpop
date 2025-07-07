@@ -305,7 +305,10 @@ ConstraintStatements: Vec<Statement> = {
 }
 
 ConstraintStatement: Vec<Statement> = {
-    "enf" "match" "{" <MatchArm+> "}" ";" => <>,
+    <l:@L> "enf" "match" "{" <arms: MatchArm+> "}" ";" <r:@R> => {
+        let match_expr = Match::new(span!(l, r), arms);
+        vec![Statement::EnforceIf(match_expr)]
+    },
     "enf" <ConstraintExpr> ";" => vec![<>],
     <BusConstraintExpr> ";" => vec![<>],
 }
@@ -314,9 +317,9 @@ ReturnStatement: Expr = {
     <l:@L> "return" <expr: Expr> ";" <r:@R> => expr,
 }
 
-MatchArm: Statement = {
+MatchArm: MatchArm = {
     <l:@L> "case" <selector:ScalarExpr> ":" <constraint:ScalarConstraintExpr> "," <r:@R> => {
-        Statement::EnforceIf(constraint, selector)
+        MatchArm::new(span!(l, r), constraint, selector)
     }
 }
 
@@ -357,7 +360,7 @@ ConstraintExpr: Statement = {
             // If we didn't parse this as a comprehension, but a selector is present, the constraint is in form 3,
             // so transform it into form 1. Otherwise, if no selector is present, this is form 4, i.e. simple.
             if let Some(selector) = selector {
-                Statement::EnforceIf(expr, selector)
+                Statement::EnforceIf(Match::new(span!(l,r), vec![MatchArm::new(span!(l,r), expr, selector)]))
             } else {
                 Statement::Enforce(expr)
             }
