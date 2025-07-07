@@ -47,7 +47,7 @@ impl Air for SelectorsAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![TransitionConstraintDegree::new(3), TransitionConstraintDegree::new(4), TransitionConstraintDegree::new(3)];
+        let main_degrees = vec![TransitionConstraintDegree::new(3), TransitionConstraintDegree::new(4)];
         let aux_degrees = vec![];
         let num_main_assertions = 1;
         let num_aux_assertions = 0;
@@ -83,8 +83,7 @@ impl Air for SelectorsAir {
         let main_current = frame.current();
         let main_next = frame.next();
         result[0] = main_current[0] * (E::ONE - main_current[1]) * (main_next[3] - E::ZERO) - E::ZERO;
-        result[1] = main_current[1] * main_current[2] * (main_current[0] * (main_next[3] - main_current[3]) - E::ZERO) - E::ZERO;
-        result[2] = (E::ONE - main_current[1]) * (E::ONE - main_current[2]) * (main_next[3] - E::ONE) - E::ZERO;
+        result[1] = main_current[1] * main_current[2] * (main_current[0] * (main_next[3] - main_current[3]) - E::ZERO) + (E::ONE - main_current[1]) * (E::ONE - main_current[2]) * (main_next[3] - E::ONE) - E::ZERO;
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxRandElements<E>, result: &mut [E])

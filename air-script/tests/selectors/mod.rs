@@ -1,9 +1,6 @@
 #[rustfmt::skip]
 #[allow(clippy::all)]
-mod selectors;
-#[rustfmt::skip]
-#[allow(clippy::all)]
-mod selectors_with_evaluators;
+mod selectors_combine;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 mod selectors_with_evaluators_with_mir;
