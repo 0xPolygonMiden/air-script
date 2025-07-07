@@ -268,7 +268,7 @@ fn selectors() {
 #[test]
 fn selectors_combine() {
     let generated_air = Test::new("tests/selectors/selectors_combine.air".to_string())
-        .transpile(Target::Winterfell, Pipeline::WithMIR)
+        .transpile(Target::Winterfell)
         .unwrap();
 
     let expected = expect_file!["../selectors/selectors_combine.rs"];
