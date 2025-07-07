@@ -102,12 +102,9 @@ impl AirBuilder<'_> {
                 rhs,
                 ..
             })) => self.build_integrity_equality(lhs, rhs, None),
-            ast::Statement::EnforceIf(
-                ast::ScalarExpr::Binary(ast::BinaryExpr {
-                    op: ast::BinaryOp::Eq, lhs, rhs, ..
-                }),
-                condition,
-            ) => self.build_integrity_equality(lhs, rhs, Some(condition)),
+            ast::Statement::EnforceIf(_) => {
+                unreachable!("`EnforceIf` not supported on this Pipeline")
+            },
             ast::Statement::Let(expr) => {
                 self.build_let(expr, |bldr, stmt| bldr.build_integrity_constraint(stmt))
             },
@@ -282,7 +279,7 @@ impl AirBuilder<'_> {
                     break value;
                 },
                 ast::Statement::Enforce(_)
-                | ast::Statement::EnforceIf(..)
+                | ast::Statement::EnforceIf(_)
                 | ast::Statement::EnforceAll(_)
                 | ast::Statement::BusEnforce(_) => {
                     unreachable!()

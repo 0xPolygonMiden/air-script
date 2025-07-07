@@ -271,20 +271,12 @@ impl<'a> Inlining<'a> {
             },
             // Conditional constraints are expanded like regular constraints, except the selector is
             // applied to all constraints in the expansion.
-            Statement::EnforceIf(expr, mut selector) => {
-                let mut statements = match expr {
-                    ScalarExpr::Call(call) => self.expand_evaluator_callsite(call)?,
-                    expr => self.expand_constraint(expr)?,
-                };
-                self.rewrite_scalar_expr(&mut selector)?;
-                // We need to make sure the selector is applied to all constraints in the expansion
-                for statement in statements.iter_mut() {
-                    let mut visitor = ApplyConstraintSelector { selector: &selector };
-                    if let ControlFlow::Break(err) = visitor.visit_mut_statement(statement) {
-                        return Err(err);
-                    }
-                }
-                Ok(statements)
+            Statement::EnforceIf(_) => {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("matches are not implemented for this Pipeline")
+                    .emit();
+                Err(SemanticAnalysisError::Invalid)
             },
             // Expresssions containing function calls require expansion via inlining, otherwise
             // all other expression types are introduced during inlining and are thus already
@@ -1039,7 +1031,13 @@ impl<'a> Inlining<'a> {
                 ScalarExpr::Const(_) => Statement::Enforce(body),
                 // We have a selector that requires evaluation at runtime, we need to emit a
                 // conditional scalar constraint
-                other => Statement::EnforceIf(body, other),
+                _other => {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("matches are not implemented for this Pipeline")
+                        .emit();
+                    return Err(SemanticAnalysisError::Invalid);
+                },
             }
         } else if self.in_comprehension_constraint {
             Statement::Enforce(body)
@@ -1785,48 +1783,6 @@ impl VisitMut<SemanticAnalysisError> for RewriteIterableBindingsVisitor<'_> {
             ScalarExpr::BusOperation(_) | ScalarExpr::Null(_) | ScalarExpr::Unconstrained(_) => {
                 ControlFlow::Break(SemanticAnalysisError::Invalid)
             },
-        }
-    }
-}
-
-/// This visitor is used to apply a selector expression to all constraints in a block
-///
-/// For constraints which already have a selector, this rewrites those selectors to be the
-/// logical AND of the original selector and the selector being applied.
-struct ApplyConstraintSelector<'a> {
-    selector: &'a ScalarExpr,
-}
-impl VisitMut<SemanticAnalysisError> for ApplyConstraintSelector<'_> {
-    fn visit_mut_statement(
-        &mut self,
-        statement: &mut Statement,
-    ) -> ControlFlow<SemanticAnalysisError> {
-        match statement {
-            Statement::Let(expr) => self.visit_mut_let(expr),
-            Statement::Enforce(expr) => {
-                let expr =
-                    core::mem::replace(expr, ScalarExpr::Const(Span::new(SourceSpan::UNKNOWN, 0)));
-                *statement = Statement::EnforceIf(expr, self.selector.clone());
-                ControlFlow::Continue(())
-            },
-            Statement::EnforceIf(_, selector) => {
-                // Combine the selectors
-                let lhs = core::mem::replace(
-                    selector,
-                    ScalarExpr::Const(Span::new(SourceSpan::UNKNOWN, 0)),
-                );
-                let rhs = self.selector.clone();
-                *selector = ScalarExpr::Binary(BinaryExpr::new(
-                    self.selector.span(),
-                    BinaryOp::Mul,
-                    lhs,
-                    rhs,
-                ));
-                ControlFlow::Continue(())
-            },
-            Statement::EnforceAll(_) => unreachable!(),
-            Statement::Expr(_) => ControlFlow::Continue(()),
-            Statement::BusEnforce(_) => ControlFlow::Break(SemanticAnalysisError::Invalid),
         }
     }
 }
