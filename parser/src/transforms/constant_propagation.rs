@@ -679,10 +679,13 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                     self.in_constraint_comprehension = false;
                 },
                 // This statement type is only present in the AST after inlining
-                Statement::EnforceIf(expr, selector) => {
+                Statement::EnforceIf(match_expr) => {
                     self.in_constraint_comprehension = true;
-                    self.visit_mut_scalar_expr(expr)?;
-                    self.visit_mut_scalar_expr(selector)?;
+                    for match_arm in match_expr.match_arms.iter_mut() {
+                        // Visit the expression and selector of the match arm
+                        self.visit_mut_scalar_expr(&mut match_arm.expr)?;
+                        self.visit_mut_scalar_expr(&mut match_arm.condition)?;
+                    }
                     self.in_constraint_comprehension = false;
                 },
             }

@@ -37,7 +37,7 @@ fn single_selector() {
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce_if!(eq!(access!(clk, 1), access!(clk)), access!(n1))],
+        vec![enforce_if!(match_arm!(eq!(access!(clk, 1), access!(clk)), access!(n1)))],
     ));
     ParseTest::new().expect_module_ast(source, expected);
 }
@@ -75,10 +75,10 @@ fn chained_selectors() {
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce_if!(
+        vec![enforce_if!(match_arm!(
             eq!(access!(clk, 1), access!(clk)),
             or!(and!(access!(n1), not!(access!(n2))), not!(access!(n3)))
-        )],
+        ))],
     ));
 
     ParseTest::new().expect_module_ast(source, expected);
