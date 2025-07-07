@@ -1,8 +1,15 @@
-use std::{collections::HashMap, ops::Deref, rc::Rc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    ops::Deref,
+    rc::Rc,
+    vec,
+};
 
 use air_parser::ast::AccessType;
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
+use rand::prelude::*;
+use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 
 use super::{duplicate_node_or_replace, visitor::Visitor};
 use crate::{CompileError, ir::*, passes::duplicate_node};
@@ -437,47 +444,6 @@ impl UnrollingFirstPass<'_> {
         Ok(None)
     }
 
-    /*fn visit_if_old(&mut self, _graph: &mut Graph, if_node: Link<Op>) -> Result<Option<Link<Op>>, CompileError>{
-        let if_ref = if_node.as_if().unwrap();
-        let condition = if_ref.condition.clone();
-        let then_branch = if_ref.then_branch.clone();
-        let else_branch = if_ref.else_branch.clone();
-
-        if let (
-            Op::Vector(condition_vector),
-            Op::Vector(then_branch_vector),
-            Op::Vector(else_branch_vector),
-        ) = (
-            condition.borrow().deref(),
-            then_branch.borrow().deref(),
-            else_branch.borrow().deref(),
-        ) {
-            let condition_vec = condition_vector.children().borrow().deref().clone();
-            let then_branch_vec = then_branch_vector.children().borrow().deref().clone();
-            let else_branch_vec = else_branch_vector.children().borrow().deref().clone();
-
-            if condition_vec.len() != then_branch_vec.len()
-                || condition_vec.len() != else_branch_vec.len()
-            {
-                // Raise diag
-            } else {
-                let mut new_vec = vec![];
-                for ((condition, then_branch), else_branch) in condition_vec
-                    .iter()
-                    .zip(then_branch_vec.iter())
-                    .zip(else_branch_vec.iter())
-                {
-                    let new_node =
-                        If::create(condition.clone(), then_branch.clone(), else_branch.clone());
-                    new_vec.push(new_node);
-                }
-                if_node.set(&Vector::create(new_vec));
-            }
-        };
-
-        Ok(())
-    }*/
-
     fn visit_if_bis(
         &mut self,
         _graph: &mut Graph,
@@ -487,13 +453,136 @@ impl UnrollingFirstPass<'_> {
 
         {
             let if_ref = if_node.as_if().unwrap();
-
-            println!("Visiting If node: {}", if_ref._node.to_link().unwrap().debug());
-
             let match_arms = if_ref.match_arms.borrow();
+
+            // 1. Evaluate all constraints to random points
+            let mut main_trace_evals = vec![];
+            let mut aux_trace_evals = vec![];
+
+            let mut eval_hashmap = BTreeMap::new();
+            for match_arm in match_arms.iter() {
+                let condition = match_arm.condition.clone();
+                let expr = match_arm.expr.clone();
+
+                let constraints_to_eval = if let Op::Vector(expr_vector) = expr.borrow().deref() {
+                    expr_vector.children().borrow().deref().clone()
+                } else {
+                    vec![expr.clone()]
+                };
+
+                for constraint in constraints_to_eval {
+                    let eval = eval_random_point(
+                        &mut main_trace_evals,
+                        &mut aux_trace_evals,
+                        constraint.clone(),
+                    )?;
+
+                    eval_hashmap
+                        .entry(eval.as_int())
+                        .and_modify(|v: &mut Vec<(Link<Op>, Link<Op>)>| {
+                            // If the constraint is not equivalent to another one with the same
+                            // condition for this eval, we add it
+                            if !v.iter().any(|(c, _)| c == &condition) {
+                                v.push((condition.clone(), constraint.clone()))
+                            }
+                        })
+                        .or_insert(vec![(condition.clone(), constraint.clone())]);
+                }
+            }
+
+            // 2. Sort the struct by the length of the vector of unique constraints evaluating to it
+            let mut eval_lens = BTreeMap::new();
+            for map_elem in eval_hashmap.iter() {
+                eval_lens
+                    .entry(map_elem.1.len())
+                    .and_modify(|v: &mut Vec<_>| v.push(*map_elem.0))
+                    .or_insert(vec![*map_elem.0]);
+            }
+
+            // 3. Construct the new vector of combined constraints
             let mut new_vec = vec![];
 
-            for match_arm in match_arms.iter() {
+            fn have_disjoint_conditions(
+                cur_constraints: Vec<Vec<(Link<Op>, Link<Op>)>>,
+                new_constraints: &[(Link<Op>, Link<Op>)],
+            ) -> bool {
+                for (condition, _) in new_constraints {
+                    if cur_constraints.iter().flatten().any(|(c, _)| c == condition) {
+                        return false; // Duplicate condition found
+                    }
+                }
+                true
+            }
+
+            while !eval_hashmap.is_empty() {
+                // Start from the largest length
+
+                let mut new_constraint = vec![];
+                let mut evals_to_remove = vec![];
+
+                for eval in eval_lens.values().cloned().rev().flatten() {
+                    let constraints = eval_hashmap.get(&eval).unwrap();
+
+                    if have_disjoint_conditions(new_constraint.clone(), constraints) {
+                        // If the new constraints are disjoint from the current ones, we can add
+                        // them
+                        new_constraint.push(constraints.clone());
+
+                        // Remove the constraints from the map
+                        evals_to_remove.push(eval);
+                    }
+                }
+
+                for eval in evals_to_remove {
+                    eval_hashmap.remove(&eval);
+                    eval_lens.iter_mut().for_each(|(_len, evals)| {
+                        evals.retain(|&e| e != eval);
+                    });
+                    eval_lens.retain(|_, evals| !evals.is_empty());
+                }
+
+                // Create combined constraint
+                let mut cur_node = None;
+                for equivalent_constraints in new_constraint {
+                    let mut cur_condition = None;
+                    for (condition, _) in equivalent_constraints.clone() {
+                        if cur_condition.is_none() {
+                            cur_condition = Some(condition.clone());
+                        } else {
+                            cur_condition = Some(Add::create(
+                                cur_condition.unwrap(),
+                                condition.clone(),
+                                if_ref.span(),
+                            ));
+                        }
+                    }
+                    let new_node = Mul::create(
+                        cur_condition.unwrap(),
+                        equivalent_constraints.first().unwrap().1.clone(),
+                        if_ref.span(),
+                    );
+
+                    cur_node = if let Some(cur_node) = cur_node {
+                        Some(Add::create(cur_node, new_node, if_ref.span()))
+                    } else {
+                        Some(new_node)
+                    };
+                }
+
+                let zero_node = Value::create(SpannedMirValue {
+                    span: Default::default(),
+                    value: MirValue::Constant(ConstantValue::Felt(0)),
+                });
+                let new_node_with_sub_zero =
+                    Sub::create(cur_node.unwrap(), zero_node, if_ref.span());
+                new_vec.push(new_node_with_sub_zero);
+                //new_vec.push(cur_node.unwrap());
+            }
+
+            updated_if = Some(Vector::create(new_vec, if_ref.span()));
+
+            // Legacy
+            /*for match_arm in match_arms.iter() {
                 let condition = match_arm.condition.clone();
                 let expr = match_arm.expr.clone();
 
@@ -525,7 +614,7 @@ impl UnrollingFirstPass<'_> {
                 }
             }
 
-            updated_if = Some(Vector::create(new_vec, if_ref.span()));
+            updated_if = Some(Vector::create(new_vec, if_ref.span()));*/
         }
 
         Ok(updated_if)
@@ -1061,5 +1150,79 @@ where
         f(graph, op)
     } else {
         Ok(None)
+    }
+}
+
+fn eval_random_point(
+    main_trace_evals: &mut Vec<Felt>,
+    aux_trace_evals: &mut Vec<Felt>,
+    op: Link<Op>,
+) -> Result<Felt, CompileError> {
+    match op.borrow().deref() {
+        Op::Enf(e) => {
+            let expr = eval_random_point(main_trace_evals, aux_trace_evals, e.expr.clone())?;
+            Ok(expr)
+        },
+        Op::Add(a) => {
+            let lhs = eval_random_point(main_trace_evals, aux_trace_evals, a.lhs.clone())?;
+            let rhs = eval_random_point(main_trace_evals, aux_trace_evals, a.rhs.clone())?;
+            Ok(lhs + rhs)
+        },
+        Op::Sub(s) => {
+            let lhs = eval_random_point(main_trace_evals, aux_trace_evals, s.lhs.clone())?;
+            let rhs = eval_random_point(main_trace_evals, aux_trace_evals, s.rhs.clone())?;
+            Ok(lhs - rhs)
+        },
+        Op::Mul(m) => {
+            let lhs = eval_random_point(main_trace_evals, aux_trace_evals, m.lhs.clone())?;
+            let rhs = eval_random_point(main_trace_evals, aux_trace_evals, m.rhs.clone())?;
+            Ok(lhs * rhs)
+        },
+        Op::Exp(e) => {
+            let lhs = eval_random_point(main_trace_evals, aux_trace_evals, e.lhs.clone())?;
+            let rhs = eval_random_point(main_trace_evals, aux_trace_evals, e.rhs.clone())?;
+            Ok(lhs.exp(rhs.as_int()))
+        },
+        Op::Value(v) => {
+            match &v.value.value {
+                MirValue::Constant(ConstantValue::Felt(c)) => Ok(Felt::new(*c)),
+                MirValue::TraceAccess(trace_access) => match trace_access.segment {
+                    0 => {
+                        let index = trace_access.column * 2 + trace_access.row_offset;
+                        if main_trace_evals.len() <= index {
+                            let mut rng = rand::rngs::SmallRng::seed_from_u64(0);
+                            main_trace_evals
+                                .resize_with(index + 1, || Felt::new(rng.random::<u64>()));
+                        }
+                        Ok(main_trace_evals[index])
+                    },
+                    1 => {
+                        let index = trace_access.column * 2 + trace_access.row_offset;
+                        if aux_trace_evals.len() <= index {
+                            let mut rng = rand::rngs::SmallRng::seed_from_u64(0);
+                            aux_trace_evals
+                                .resize_with(index + 1, || Felt::new(rng.random::<u64>()));
+                        }
+                        Ok(aux_trace_evals[index])
+                    },
+                    _ => {
+                        println!(
+                            "Unexpected segment in eval_random_point: {}",
+                            trace_access.segment
+                        );
+                        Err(CompileError::Failed)
+                    },
+                },
+                val => {
+                    // These cases are not handled in this function
+                    println!("Unexpected value in eval_random_point: {val:?}");
+                    Err(CompileError::Failed)
+                },
+            }
+        },
+        op => {
+            println!("Unexpected operation in eval_random_point: {op:?}");
+            Err(CompileError::Failed)
+        },
     }
 }
