@@ -13,26 +13,29 @@ use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singlet
 #[enum_wrapper(Op)]
 pub struct If {
     pub parents: Vec<BackLink<Owner>>,
-    pub condition: Link<Op>,
-    pub then_branch: Link<Op>,
-    pub else_branch: Link<Op>,
+    pub match_arms: Link<Vec<MatchArm>>,
     pub _node: Singleton<Node>,
     pub _owner: Singleton<Owner>,
     #[span]
     pub span: SourceSpan,
 }
 
+#[derive(Default, Clone, PartialEq, Eq, Debug, Hash)]
+pub struct MatchArm {
+    pub condition: Link<Op>,
+    pub expr: Link<Op>,
+}
+
+impl MatchArm {
+    pub fn new(expr: Link<Op>, condition: Link<Op>) -> Self {
+        Self { condition, expr }
+    }
+}
+
 impl If {
-    pub fn create(
-        condition: Link<Op>,
-        then_branch: Link<Op>,
-        else_branch: Link<Op>,
-        span: SourceSpan,
-    ) -> Link<Op> {
+    pub fn create(match_arms: Vec<MatchArm>, span: SourceSpan) -> Link<Op> {
         Op::If(Self {
-            condition,
-            then_branch,
-            else_branch,
+            match_arms: match_arms.into(),
             span,
             ..Default::default()
         })
@@ -43,7 +46,13 @@ impl If {
 impl Parent for If {
     type Child = Op;
     fn children(&self) -> Link<Vec<Link<Self::Child>>> {
-        Link::new(vec![self.condition.clone(), self.then_branch.clone(), self.else_branch.clone()])
+        Link::new(
+            self.match_arms
+                .borrow()
+                .iter()
+                .flat_map(|arm| vec![arm.condition.clone(), arm.expr.clone()])
+                .collect(),
+        )
     }
 }
 

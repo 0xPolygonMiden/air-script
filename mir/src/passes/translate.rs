@@ -9,9 +9,9 @@ use crate::{
     CompileError,
     ir::{
         Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue,
-        Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, Matrix, Mir, MirType,
-        MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess, Root,
-        SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value, Vector,
+        Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir,
+        MirType, MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess,
+        Root, SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value, Vector,
     },
     passes::duplicate_node,
 };
@@ -377,7 +377,7 @@ impl<'a> MirBuilder<'a> {
             ast::Statement::Let(let_stmt) => self.translate_let(let_stmt),
             ast::Statement::Expr(expr) => self.translate_expr(expr),
             ast::Statement::Enforce(enf) => self.translate_enforce(enf),
-            ast::Statement::EnforceIf(enf, cond) => self.translate_enforce_if(enf, cond),
+            ast::Statement::EnforceIf(match_expr) => self.translate_enforce_if(match_expr),
             ast::Statement::EnforceAll(list_comp) => self.translate_enforce_all(list_comp),
             ast::Statement::BusEnforce(list_comp) => self.translate_bus_enforce(list_comp),
         }
@@ -423,12 +423,17 @@ impl<'a> MirBuilder<'a> {
 
     fn translate_enforce_if(
         &mut self,
-        expr: &'a ast::ScalarExpr,
-        cond: &'a ast::ScalarExpr,
+        match_expr: &'a ast::Match,
     ) -> Result<Link<Op>, CompileError> {
-        let expr_node = self.translate_scalar_expr(expr)?;
-        let cond_node = self.translate_scalar_expr(cond)?;
-        let if_node = If::create(cond_node, expr_node, Op::None(expr.span()).into(), expr.span());
+        let mut match_arms = Vec::new();
+
+        for match_arm in match_expr.match_arms.iter() {
+            let expr_node = self.translate_scalar_expr(&match_arm.expr)?;
+            let cond_node = self.translate_scalar_expr(&match_arm.condition)?;
+            match_arms.push(MatchArm::new(expr_node, cond_node));
+        }
+
+        let if_node = If::create(match_arms, match_expr.span());
         self.insert_enforce(if_node)
     }
 
