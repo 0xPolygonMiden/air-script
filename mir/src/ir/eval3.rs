@@ -27,7 +27,7 @@ impl Eval {
     }
 
     /// Creates a new [Eval] with random values.
-    fn new_random(rng: &mut SmallRng) -> Eval {
+    fn new_random<R: Rng + ?Sized>(rng: &mut R) -> Eval {
         // Note: using a uniform distribution over all u64 values would lead to a non-uniform
         // distribution of Felt values.
         let distr = Uniform::new(0, Felt::MODULUS).unwrap(); // Unwrap is safe as Felt::MODULUS is > 0
@@ -101,7 +101,7 @@ pub struct CurrentEvals {
 
 /// Helper function to either query an existing evaluation or create a new random one if the index
 /// is out of bounds.
-fn query_cur_eval(rng: &mut SmallRng, cur_eval_vec: &mut Vec<Eval>, index: usize) -> Eval {
+fn query_cur_eval<R: Rng + ?Sized>(rng: &mut R, cur_eval_vec: &mut Vec<Eval>, index: usize) -> Eval {
     if cur_eval_vec.len() <= index {
         cur_eval_vec.resize_with(index + 1, || Eval::new_random(rng));
     }
@@ -109,8 +109,8 @@ fn query_cur_eval(rng: &mut SmallRng, cur_eval_vec: &mut Vec<Eval>, index: usize
 }
 
 /// Evaluates a given MIR node at random points.
-pub fn eval_random_point(
-    rng: &mut SmallRng,
+pub fn eval_random_point<R: Rng + ?Sized>(
+    rng: &mut R,
     current_evals: &mut CurrentEvals,
     op: Link<Op>,
 ) -> Result<Eval, CompileError> {

@@ -8,7 +8,7 @@ use std::{
 use air_parser::ast::AccessType;
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
-use rand::{SeedableRng, rngs::SmallRng};
+use rand::prelude::*;
 
 use super::{duplicate_node_or_replace, visitor::Visitor};
 use crate::{CompileError, ir::*, passes::duplicate_node};
@@ -50,7 +50,7 @@ pub struct UnrollingFirstPass<'a> {
     work_stack: Vec<Link<Node>>,
 
     // rng used for random evaluations and combine selector expressions
-    rng: SmallRng,
+    rng: ThreadRng,
 
     // For each child of a For node encountered, we store the context to inline it in the second
     // pass
@@ -68,7 +68,7 @@ impl<'a> UnrollingFirstPass<'a> {
         Self {
             diagnostics,
             work_stack: vec![],
-            rng: SmallRng::seed_from_u64(0),
+            rng: rand::rng(),
             bodies_to_inline: vec![],
             params_for_ref_node: HashMap::new(),
             all_for_nodes: HashMap::new(),
@@ -460,8 +460,9 @@ impl UnrollingFirstPass<'_> {
 
             // 1. Evaluate all constraints to random points
             let mut current_evals = CurrentEvals::default();
+            let mut node_evals = Vec::new();
 
-            let mut eval_hashmap = BTreeMap::new();
+            let mut constraints_evaluation_indices: BTreeMap<usize, Vec<_>> = BTreeMap::new();
             for match_arm in match_arms.iter() {
                 let condition = match_arm.condition.clone();
                 let expr = match_arm.expr.clone();
@@ -475,23 +476,44 @@ impl UnrollingFirstPass<'_> {
                 for constraint in constraints_to_eval {
                     let eval =
                         eval_random_point(&mut self.rng, &mut current_evals, constraint.clone())?;
-
-                    eval_hashmap
-                        .entry(eval)
-                        .and_modify(|v: &mut Vec<(Link<Op>, Link<Op>)>| {
-                            // If the constraint is not equivalent to another one with the same
-                            // condition for this eval, we add it
-                            if !v.iter().any(|(c, _)| c == &condition) {
-                                v.push((condition.clone(), constraint.clone()))
+                    match node_evals.iter().position(|e| e == &eval) {
+                        Some(index) => {
+                            // If the eval is already in the list, we use its index
+                            // and add the constraint to the corresponding condition
+                            if let Some(v) = constraints_evaluation_indices.get_mut(&index) {
+                                // If the constraint is not equivalent to another one with the same
+                                // condition for this eval, we add it
+                                if !v.iter().any(|(c, _)| c == &condition) {
+                                    v.push((condition.clone(), constraint.clone()))
+                                }
+                            } else {
+                                // ERROR: This should not happen, as we should have already added
+                                // the eval to the list
+                                self.diagnostics.error("Unexpected evaluation index");
+                                return Err(CompileError::Failed);
                             }
-                        })
-                        .or_insert(vec![(condition.clone(), constraint.clone())]);
+                        },
+                        None => {
+                            // Otherwise, we add it to the list and use its index
+                            node_evals.push(eval);
+                            let index = node_evals.len() - 1;
+                            if constraints_evaluation_indices
+                                .insert(index, vec![(condition.clone(), constraint.clone())])
+                                .is_some()
+                            {
+                                // ERROR: This should not happen, as we should have already added
+                                // the eval to the list
+                                self.diagnostics.error("Unexpected evaluation index");
+                                return Err(CompileError::Failed);
+                            }
+                        },
+                    }
                 }
             }
 
             // 2. Sort the struct by the length of the vector of unique constraints evaluating to it
             let mut eval_lens = BTreeMap::new();
-            for map_elem in eval_hashmap.iter() {
+            for map_elem in constraints_evaluation_indices.iter() {
                 eval_lens
                     .entry(map_elem.1.len())
                     .and_modify(|v: &mut Vec<_>| v.push(*map_elem.0))
@@ -513,14 +535,14 @@ impl UnrollingFirstPass<'_> {
                 true
             }
 
-            while !eval_hashmap.is_empty() {
+            while !constraints_evaluation_indices.is_empty() {
                 // Start from the largest length
 
                 let mut new_constraint = vec![];
-                let mut evals_to_remove = vec![];
+                let mut eval_index_to_remove = vec![];
 
-                for eval in eval_lens.values().cloned().rev().flatten() {
-                    let constraints = eval_hashmap.get(&eval).unwrap();
+                for eval_index in eval_lens.values().cloned().rev().flatten() {
+                    let constraints = constraints_evaluation_indices.get(&eval_index).unwrap();
 
                     if have_disjoint_conditions(new_constraint.clone(), constraints) {
                         // If the new constraints are disjoint from the current ones, we can add
@@ -528,16 +550,16 @@ impl UnrollingFirstPass<'_> {
                         new_constraint.push(constraints.clone());
 
                         // Remove the constraints from the map
-                        evals_to_remove.push(eval);
+                        eval_index_to_remove.push(eval_index);
                     }
                 }
 
-                for eval in evals_to_remove {
-                    eval_hashmap.remove(&eval);
+                for eval_index in eval_index_to_remove {
+                    constraints_evaluation_indices.remove(&eval_index);
                     eval_lens.iter_mut().for_each(|(_len, evals)| {
-                        evals.retain(|&e| e != eval);
+                        evals.retain(|&e_idx| e_idx != eval_index);
                     });
-                    eval_lens.retain(|_, evals| !evals.is_empty());
+                    eval_lens.retain(|_, constraints| !constraints.is_empty());
                 }
 
                 // Create combined constraint
@@ -579,41 +601,6 @@ impl UnrollingFirstPass<'_> {
             }
 
             updated_if = Some(Vector::create(new_vec, if_ref.span()));
-
-            // Legacy
-            /*for match_arm in match_arms.iter() {
-                let condition = match_arm.condition.clone();
-                let expr = match_arm.expr.clone();
-
-                if let Op::Vector(expr_vector) = expr.borrow().deref() {
-                    let expr_vec = expr_vector.children().borrow().deref().clone();
-                    for expr in expr_vec {
-                        let new_node = Mul::create(condition.clone(), expr, if_ref.span());
-                        // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) ->
-                        // Enf(Sub(lhs, rhs) == 0), but it introduces an
-                        // unnecessary zero node
-                        let zero_node = Value::create(SpannedMirValue {
-                            span: Default::default(),
-                            value: MirValue::Constant(ConstantValue::Felt(0)),
-                        });
-                        let new_node_with_sub_zero =
-                            Sub::create(new_node, zero_node, if_ref.span());
-                        new_vec.push(new_node_with_sub_zero);
-                    }
-                } else {
-                    let new_node = Mul::create(condition.clone(), expr, if_ref.span());
-                    // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs,
-                    // rhs) == 0), but it introduces an unnecessary zero node
-                    let zero_node = Value::create(SpannedMirValue {
-                        span: Default::default(),
-                        value: MirValue::Constant(ConstantValue::Felt(0)),
-                    });
-                    let new_node_with_sub_zero = Sub::create(new_node, zero_node, if_ref.span());
-                    new_vec.push(new_node_with_sub_zero);
-                }
-            }
-
-            updated_if = Some(Vector::create(new_vec, if_ref.span()));*/
         }
 
         Ok(updated_if)
