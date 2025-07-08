@@ -8,8 +8,7 @@ use std::{
 use air_parser::ast::AccessType;
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
-use rand::prelude::*;
-use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
+use rand::{SeedableRng, rngs::SmallRng};
 
 use super::{duplicate_node_or_replace, visitor::Visitor};
 use crate::{CompileError, ir::*, passes::duplicate_node};
@@ -50,6 +49,9 @@ pub struct UnrollingFirstPass<'a> {
     // general context
     work_stack: Vec<Link<Node>>,
 
+    // rng used for random evaluations and combine selector expressions
+    rng: SmallRng,
+
     // For each child of a For node encountered, we store the context to inline it in the second
     // pass
     bodies_to_inline: Vec<(Link<Op>, ForInliningContext)>,
@@ -66,6 +68,7 @@ impl<'a> UnrollingFirstPass<'a> {
         Self {
             diagnostics,
             work_stack: vec![],
+            rng: SmallRng::seed_from_u64(0),
             bodies_to_inline: vec![],
             params_for_ref_node: HashMap::new(),
             all_for_nodes: HashMap::new(),
@@ -456,8 +459,7 @@ impl UnrollingFirstPass<'_> {
             let match_arms = if_ref.match_arms.borrow();
 
             // 1. Evaluate all constraints to random points
-            let mut main_trace_evals = vec![];
-            let mut aux_trace_evals = vec![];
+            let mut current_evals = CurrentEvals::default();
 
             let mut eval_hashmap = BTreeMap::new();
             for match_arm in match_arms.iter() {
@@ -471,14 +473,11 @@ impl UnrollingFirstPass<'_> {
                 };
 
                 for constraint in constraints_to_eval {
-                    let eval = eval_random_point(
-                        &mut main_trace_evals,
-                        &mut aux_trace_evals,
-                        constraint.clone(),
-                    )?;
+                    let eval =
+                        eval_random_point(&mut self.rng, &mut current_evals, constraint.clone())?;
 
                     eval_hashmap
-                        .entry(eval.as_int())
+                        .entry(eval)
                         .and_modify(|v: &mut Vec<(Link<Op>, Link<Op>)>| {
                             // If the constraint is not equivalent to another one with the same
                             // condition for this eval, we add it
@@ -1150,79 +1149,5 @@ where
         f(graph, op)
     } else {
         Ok(None)
-    }
-}
-
-fn eval_random_point(
-    main_trace_evals: &mut Vec<Felt>,
-    aux_trace_evals: &mut Vec<Felt>,
-    op: Link<Op>,
-) -> Result<Felt, CompileError> {
-    match op.borrow().deref() {
-        Op::Enf(e) => {
-            let expr = eval_random_point(main_trace_evals, aux_trace_evals, e.expr.clone())?;
-            Ok(expr)
-        },
-        Op::Add(a) => {
-            let lhs = eval_random_point(main_trace_evals, aux_trace_evals, a.lhs.clone())?;
-            let rhs = eval_random_point(main_trace_evals, aux_trace_evals, a.rhs.clone())?;
-            Ok(lhs + rhs)
-        },
-        Op::Sub(s) => {
-            let lhs = eval_random_point(main_trace_evals, aux_trace_evals, s.lhs.clone())?;
-            let rhs = eval_random_point(main_trace_evals, aux_trace_evals, s.rhs.clone())?;
-            Ok(lhs - rhs)
-        },
-        Op::Mul(m) => {
-            let lhs = eval_random_point(main_trace_evals, aux_trace_evals, m.lhs.clone())?;
-            let rhs = eval_random_point(main_trace_evals, aux_trace_evals, m.rhs.clone())?;
-            Ok(lhs * rhs)
-        },
-        Op::Exp(e) => {
-            let lhs = eval_random_point(main_trace_evals, aux_trace_evals, e.lhs.clone())?;
-            let rhs = eval_random_point(main_trace_evals, aux_trace_evals, e.rhs.clone())?;
-            Ok(lhs.exp(rhs.as_int()))
-        },
-        Op::Value(v) => {
-            match &v.value.value {
-                MirValue::Constant(ConstantValue::Felt(c)) => Ok(Felt::new(*c)),
-                MirValue::TraceAccess(trace_access) => match trace_access.segment {
-                    0 => {
-                        let index = trace_access.column * 2 + trace_access.row_offset;
-                        if main_trace_evals.len() <= index {
-                            let mut rng = rand::rngs::SmallRng::seed_from_u64(0);
-                            main_trace_evals
-                                .resize_with(index + 1, || Felt::new(rng.random::<u64>()));
-                        }
-                        Ok(main_trace_evals[index])
-                    },
-                    1 => {
-                        let index = trace_access.column * 2 + trace_access.row_offset;
-                        if aux_trace_evals.len() <= index {
-                            let mut rng = rand::rngs::SmallRng::seed_from_u64(0);
-                            aux_trace_evals
-                                .resize_with(index + 1, || Felt::new(rng.random::<u64>()));
-                        }
-                        Ok(aux_trace_evals[index])
-                    },
-                    _ => {
-                        println!(
-                            "Unexpected segment in eval_random_point: {}",
-                            trace_access.segment
-                        );
-                        Err(CompileError::Failed)
-                    },
-                },
-                val => {
-                    // These cases are not handled in this function
-                    println!("Unexpected value in eval_random_point: {val:?}");
-                    Err(CompileError::Failed)
-                },
-            }
-        },
-        op => {
-            println!("Unexpected operation in eval_random_point: {op:?}");
-            Err(CompileError::Failed)
-        },
     }
 }
