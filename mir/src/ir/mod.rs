@@ -1,4 +1,5 @@
 mod bus;
+mod eval;
 mod graph;
 mod link;
 mod mir;
@@ -10,6 +11,7 @@ pub extern crate derive_ir;
 
 pub use bus::Bus;
 pub use derive_ir::Builder;
+pub use eval::{CurrentEvals, Eval, eval_random_point};
 pub use graph::Graph;
 pub use link::{BackLink, Link, Singleton};
 pub use mir::Mir;
