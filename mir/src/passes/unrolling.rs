@@ -123,7 +123,7 @@ impl Pass for Unrolling<'_> {
     }
 }
 
-// For the first pass of Unrolling, we use a tweeked version of the Visitor trait,
+// For the first pass of Unrolling, we use a tweaked version of the Visitor trait,
 // each visit_*_bis function returns an Option<Link<Op>> instead of Result<(), CompileError>,
 // to mutate the nodes (e.g. modifying a Operation<Vectors> to Vector<Operations>)
 impl UnrollingFirstPass<'_> {
