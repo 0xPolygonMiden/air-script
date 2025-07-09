@@ -56,7 +56,10 @@ fn add_main_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
             split_boundary_constraint(ir.constraint_graph(), constraint.node_index());
         debug_assert_eq!(trace_access.segment, main_trace_segment);
 
-        let expr_root_string = expr_root.to_string(ir, elem_type, main_trace_segment);
+        let expr_root_string = match expr_root {
+            Some(node_index) => node_index.to_string(ir, elem_type, main_trace_segment),
+            None => "Felt::ZERO".to_string(), // If no root, the expression is zero
+        };
 
         let assertion = format!(
             "result.push(Assertion::single({}, {}, {}));",
@@ -102,7 +105,10 @@ fn add_aux_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
             split_boundary_constraint(ir.constraint_graph(), constraint.node_index());
         debug_assert_eq!(trace_access.segment, aux_trace_segment);
 
-        let expr_root_string = expr_root.to_string(ir, elem_type, aux_trace_segment);
+        let expr_root_string = match expr_root {
+            Some(node_index) => node_index.to_string(ir, elem_type, aux_trace_segment),
+            None => "E::ZERO".to_string(), // If no root, the expression is zero
+        };
 
         let assertion = format!(
             "result.push(Assertion::single({}, {}, {}));",
@@ -133,23 +139,31 @@ fn domain_to_str(domain: ConstraintDomain) -> String {
 /// boundary constraint expression must hold, as well as the node index that represents the root
 /// of the constraint expression that must equal zero during evaluation.
 ///
+/// Note: If, after the CSE pass, the boundary constraint is a single trace access, we return None
+/// and assume that the expression is zero.
+///
 /// TODO: replace panics with Result and Error
 pub fn split_boundary_constraint(
     graph: &AlgebraicGraph,
     index: &NodeIndex,
-) -> (TraceAccess, NodeIndex) {
+) -> (TraceAccess, Option<NodeIndex>) {
     let node = graph.node(index);
-    match node.op() {
+    match *node.op() {
         Operation::Sub(lhs, rhs) => {
-            if let Operation::Value(air_ir::Value::TraceAccess(trace_access)) = graph.node(lhs).op()
+            if let Operation::Value(air_ir::Value::TraceAccess(trace_access)) =
+                graph.node(&lhs).op()
             {
                 debug_assert_eq!(trace_access.row_offset, 0);
-                (*trace_access, *rhs)
+                (*trace_access, Some(rhs))
             } else {
                 panic!(
                     "InvalidUsage: index {index:?} is not the constraint root of a boundary constraint"
                 );
             }
+        },
+        Operation::Value(air_ir::Value::TraceAccess(trace_access)) => {
+            debug_assert_eq!(trace_access.row_offset, 0);
+            (trace_access, None)
         },
         _ => panic!("InvalidUsage: index {index:?} is not the root index of a constraint"),
     }
