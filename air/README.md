@@ -20,11 +20,13 @@ let pipeline_with_mir = air_parser::transforms::ConstantPropagation::new(&diagno
   .chain(mir::passes::Inlining::new(&diagnostics))
   .chain(mir::passes::Unrolling::new(&diagnostics))
   .chain(air_ir::passes::MirToAir::new(&diagnostics))
-  .chain(air_ir::passes::BusOpExpand::new(&diagnostics));
+  .chain(air_ir::passes::BusOpExpand::new(&diagnostics))
+  .chain(air_ir::passes::CommonSubexpressionElimination::new(&diagnostics));
 
 let pipeline_without_mir = air_parser::transforms::ConstantPropagation::new(&diagnostics)
   .chain(air_parser::transforms::Inlining::new(&diagnostics))
-  .chain(air_ir::passes::AstToAir::new(&diagnostics));
+  .chain(air_ir::passes::AstToAir::new(&diagnostics))
+  .chain(air_ir::passes::CommonSubexpressionElimination::new(&diagnostics));
   
 // process the AST to get a Result containing the AIR or a CompileError
 let air_from_ast = pipeline_without_mir.run(ast)

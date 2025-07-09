@@ -1,12 +1,14 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
-use crate::ir::*;
+use rand::Rng;
+
+use crate::{CompileError, ir::*};
 
 /// A unique identifier for a node in an [AlgebraicGraph]
 ///
 /// The raw value of this identifier is an index in the `nodes` vector
 /// of the [AlgebraicGraph] struct.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeIndex(usize);
 impl core::ops::Add<usize> for NodeIndex {
     type Output = NodeIndex;
@@ -80,6 +82,74 @@ impl AlgebraicGraph {
     /// Returns the number of nodes in the graph.
     pub fn num_nodes(&self) -> usize {
         self.nodes.len()
+    }
+
+    pub fn evaluate_all_nodes<R: Rng + ?Sized>(
+        &mut self,
+        rng: &mut R,
+    ) -> Result<BTreeMap<NodeIndex, Eval<NUM_EVALS>>, CompileError> {
+        let mut evals = BTreeMap::new();
+        let mut current_evals: CurrentEvals<NUM_EVALS> = CurrentEvals::default();
+        for index in 0..self.num_nodes() {
+            let node_index = NodeIndex(index);
+            eval_random_point(rng, &mut current_evals, &mut evals, self, &node_index)?;
+        }
+        Ok(evals)
+    }
+
+    pub fn eliminate_common_subexpressions(
+        &mut self,
+        evals: &BTreeMap<NodeIndex, Eval<NUM_EVALS>>,
+    ) -> HashMap<NodeIndex, NodeIndex> {
+        let mut new_nodes = Vec::new();
+
+        // 1. Keep track of evaluations, indices rewrites and node removals (for offset)
+        let mut evals_vec: Vec<Eval<NUM_EVALS>> = Vec::with_capacity(evals.len());
+        let mut renumbering_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
+
+        for (node_index, eval) in evals.iter() {
+            // 2. For each node, check if its evaluation already exists in the map.
+            if let Some(existing_index) = evals_vec.iter().position(|e| e == eval) {
+                // 3. If it does, we will replace the node with the existing one
+                renumbering_map.insert(*node_index, NodeIndex(existing_index));
+            } else {
+                // 4. If it doesn't, rewrite the node indices if needed and add the node to the new
+                //    graph
+                evals_vec.push(*eval);
+
+                let op = self.node(node_index).op();
+                let new_op = match op {
+                    Operation::Value(_) => {
+                        // Values do not need renumbering, they are leaf nodes
+                        *op
+                    },
+                    Operation::Add(lhs, rhs) => {
+                        let new_lhs = *renumbering_map.get(lhs).unwrap();
+                        let new_rhs = *renumbering_map.get(rhs).unwrap();
+                        Operation::Add(new_lhs, new_rhs)
+                    },
+                    Operation::Sub(lhs, rhs) => {
+                        let new_lhs = *renumbering_map.get(lhs).unwrap();
+                        let new_rhs = *renumbering_map.get(rhs).unwrap();
+                        Operation::Sub(new_lhs, new_rhs)
+                    },
+                    Operation::Mul(lhs, rhs) => {
+                        let new_lhs = *renumbering_map.get(lhs).unwrap();
+                        let new_rhs = *renumbering_map.get(rhs).unwrap();
+                        Operation::Mul(new_lhs, new_rhs)
+                    },
+                };
+                let new_node = Node { op: new_op };
+                let new_index = new_nodes.len();
+                new_nodes.push(new_node);
+                renumbering_map.insert(*node_index, NodeIndex(new_index));
+            }
+        }
+
+        // Replace the nodes in the graph with the new nodes
+        self.nodes = new_nodes;
+
+        renumbering_map
     }
 
     /// Returns the degree of the subgraph which has the specified node as its tip.

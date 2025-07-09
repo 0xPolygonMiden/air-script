@@ -1,6 +1,7 @@
 mod bus;
 mod constraints;
 mod degree;
+mod eval;
 mod operation;
 mod trace;
 mod value;
@@ -17,6 +18,7 @@ pub use self::{
     bus::{Bus, BusBoundary, BusOp, BusOpKind, BusType, PublicInputTableAccess},
     constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints},
     degree::IntegrityConstraintDegree,
+    eval::{CurrentEvals, Eval, NUM_EVALS, eval_random_point},
     operation::Operation,
     trace::TraceAccess,
     value::{PeriodicColumnAccess, PublicInputAccess, Value},
@@ -31,7 +33,7 @@ pub const CURRENT_ROW: usize = 0;
 /// The minimum cycle length of a periodic column
 pub const MIN_CYCLE_LENGTH: usize = 2;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use miden_diagnostics::{SourceSpan, Spanned};
 

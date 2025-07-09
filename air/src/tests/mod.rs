@@ -93,7 +93,10 @@ impl Compiler {
                             .chain(mir::passes::Inlining::new(&self.diagnostics))
                             .chain(mir::passes::Unrolling::new(&self.diagnostics))
                             .chain(crate::passes::MirToAir::new(&self.diagnostics))
-                            .chain(crate::passes::BusOpExpand::new(&self.diagnostics));
+                            .chain(crate::passes::BusOpExpand::new(&self.diagnostics))
+                            .chain(crate::passes::CommonSubexpressionElimination::new(
+                                &self.diagnostics,
+                            ));
                     pipeline.run(ast)
                 }),
             Pipeline::WithoutMIR => {
@@ -103,7 +106,10 @@ impl Compiler {
                         let mut pipeline =
                             air_parser::transforms::ConstantPropagation::new(&self.diagnostics)
                                 .chain(air_parser::transforms::Inlining::new(&self.diagnostics))
-                                .chain(crate::passes::AstToAir::new(&self.diagnostics));
+                                .chain(crate::passes::AstToAir::new(&self.diagnostics))
+                                .chain(crate::passes::CommonSubexpressionElimination::new(
+                                    &self.diagnostics,
+                                ));
                         pipeline.run(ast)
                     })
             },

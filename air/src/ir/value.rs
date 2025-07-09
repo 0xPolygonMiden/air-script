@@ -23,7 +23,7 @@ pub enum Value {
 }
 
 /// Represents an access of a [PeriodicColumn], similar in nature to [TraceAccess]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PeriodicColumnAccess {
     pub name: QualifiedIdentifier,
     pub cycle: usize,
@@ -35,7 +35,7 @@ impl PeriodicColumnAccess {
 }
 
 /// Represents an access of a [PublicInput], similar in nature to [TraceAccess]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PublicInputAccess {
     /// The name of the public input to access
     pub name: Identifier,

@@ -48,6 +48,24 @@ impl Constraints {
         }
     }
 
+    pub fn renumber_constraints(&mut self, renumbering_map: &HashMap<NodeIndex, NodeIndex>) {
+        // Renumber the boundary constraints
+        for segment_constraints in self.boundary_constraints.iter_mut() {
+            for constraint in segment_constraints.iter_mut() {
+                constraint
+                    .update_node_index(*renumbering_map.get(constraint.node_index()).unwrap());
+            }
+        }
+
+        // Renumber the integrity constraints
+        for segment_constraints in self.integrity_constraints.iter_mut() {
+            for constraint in segment_constraints.iter_mut() {
+                constraint
+                    .update_node_index(*renumbering_map.get(constraint.node_index()).unwrap());
+            }
+        }
+    }
+
     /// Returns the number of boundary constraints applied against the specified trace segment.
     pub fn num_boundary_constraints(&self, trace_segment: TraceSegmentId) -> usize {
         if self.boundary_constraints.len() <= trace_segment {
@@ -150,6 +168,10 @@ impl ConstraintRoot {
     /// Returns the index of the entry node of the subgraph representing the constraint.
     pub const fn node_index(&self) -> &NodeIndex {
         &self.index
+    }
+
+    pub fn update_node_index(&mut self, new_index: NodeIndex) {
+        self.index = new_index;
     }
 
     /// Returns the [ConstraintDomain] for this constraint, which specifies the rows against which
