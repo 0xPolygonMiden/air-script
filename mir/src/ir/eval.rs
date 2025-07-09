@@ -1,14 +1,12 @@
 use std::{
-    hash::{DefaultHasher, Hash, Hasher},
-    ops::{Add, Deref, Mul, Sub},
+    collections::HashMap, hash::{DefaultHasher, Hash, Hasher}, ops::{Add, Deref, Mul, Sub}
 };
 
 use rand::{distr::Uniform, prelude::*};
 use winter_math::{FieldElement, StarkField, fields::f64::BaseElement as Felt};
 
 use crate::{
-    CompileError,
-    ir::{ConstantValue, Link, MirValue, Op},
+    ir::{ConstantValue, Link, MirValue, Op, PeriodicColumnAccess, PublicInputAccess, PublicInputTableAccess}, CompileError
 };
 
 pub const NUM_EVALS: usize = 3; // Number of random evaluation points
@@ -133,12 +131,14 @@ pub struct CurrentEvals<const NUM_EVALS: usize> {
     main_trace: Vec<Eval<NUM_EVALS>>,
     aux_trace: Vec<Eval<NUM_EVALS>>,
     rand_values: Vec<Eval<NUM_EVALS>>,
-    public_inputs: Vec<Eval<NUM_EVALS>>,
+    public_inputs: HashMap<PublicInputAccess, Eval<NUM_EVALS>>,
+    periodic_columns: HashMap<PeriodicColumnAccess, Eval<NUM_EVALS>>,
+    public_input_tables: HashMap<PublicInputTableAccess, Eval<NUM_EVALS>>,
 }
 
 /// Helper function to either query an existing evaluation or create a new random one if the index
 /// is out of bounds.
-fn query_cur_eval<R: Rng + ?Sized>(
+fn query_indexed_cur_eval<R: Rng + ?Sized>(
     rng: &mut R,
     cur_eval_vec: &mut Vec<Eval<NUM_EVALS>>,
     index: usize,
@@ -147,6 +147,20 @@ fn query_cur_eval<R: Rng + ?Sized>(
         cur_eval_vec.resize_with(index + 1, || Eval::new_random(rng));
     }
     cur_eval_vec[index]
+}
+
+/// Helper function to either query an existing evaluation or create a new random one if the element
+/// is not present in the map.
+fn query_hashed_cur_eval<R: Rng + ?Sized, H: Hash + Eq + Clone>(
+    rng: &mut R,
+    cur_eval_map: &mut HashMap<H, Eval<NUM_EVALS>>,
+    element: &H,
+) -> Eval<NUM_EVALS> {
+    if cur_eval_map.get(element).is_none() {
+        let eval = Eval::new_random(rng);
+        cur_eval_map.insert(element.clone(), eval);
+    }
+    cur_eval_map.get(element).unwrap().clone()
 }
 
 /// Evaluates a given MIR node at random points.
@@ -202,11 +216,11 @@ pub fn eval_random_point<R: Rng + ?Sized>(
                 MirValue::TraceAccess(trace_access) => match trace_access.segment {
                     0 => {
                         let index = trace_access.column * 2 + trace_access.row_offset;
-                        Ok(query_cur_eval(rng, &mut current_evals.main_trace, index))
+                        Ok(query_indexed_cur_eval(rng, &mut current_evals.main_trace, index))
                     },
                     1 => {
                         let index = trace_access.column * 2 + trace_access.row_offset;
-                        Ok(query_cur_eval(rng, &mut current_evals.aux_trace, index))
+                        Ok(query_indexed_cur_eval(rng, &mut current_evals.aux_trace, index))
                     },
                     _ => {
                         println!(
@@ -217,27 +231,20 @@ pub fn eval_random_point<R: Rng + ?Sized>(
                     },
                 },
                 MirValue::RandomValue(u) => {
-                    Ok(query_cur_eval(rng, &mut current_evals.rand_values, *u))
+                    Ok(query_indexed_cur_eval(rng, &mut current_evals.rand_values, *u))
                 },
                 MirValue::PublicInput(pi) => {
-                    let index = pi.index;
-                    Ok(query_cur_eval(rng, &mut current_evals.public_inputs, index))
+                    Ok(query_hashed_cur_eval(rng, &mut current_evals.public_inputs, pi))
                 },
                 MirValue::PeriodicColumn(pc) => {
-                    let mut hasher = DefaultHasher::new();
-                    "PeriodicColumn".hash(&mut hasher);
-                    pc.hash(&mut hasher);
-                    let hash = hasher.finish();
-                    let felt = Felt::new(hash);
-                    Ok(Eval::new_const(felt))
+                    Ok(query_hashed_cur_eval(rng, &mut current_evals.periodic_columns, pc))
                 },
                 MirValue::PublicInputTable(pita) => {
-                    let mut hasher = DefaultHasher::new();
-                    "PublicInputTable".hash(&mut hasher);
-                    pita.hash(&mut hasher);
-                    let hash = hasher.finish();
-                    let felt = Felt::new(hash);
-                    Ok(Eval::new_const(felt))
+                    Ok(query_hashed_cur_eval(
+                        rng,
+                        &mut current_evals.public_input_tables,
+                        pita,
+                    ))
                 },
                 MirValue::Null
                 | MirValue::BusAccess(_)
@@ -257,10 +264,10 @@ pub fn eval_random_point<R: Rng + ?Sized>(
                     let index = trace_access.column * 2 + a.offset;
                     match trace_access.segment {
                         0 => {
-                            return Ok(query_cur_eval(rng, &mut current_evals.main_trace, index));
+                            return Ok(query_indexed_cur_eval(rng, &mut current_evals.main_trace, index));
                         },
                         1 => {
-                            return Ok(query_cur_eval(rng, &mut current_evals.aux_trace, index));
+                            return Ok(query_indexed_cur_eval(rng, &mut current_evals.aux_trace, index));
                         },
                         _ => {
                             println!(
