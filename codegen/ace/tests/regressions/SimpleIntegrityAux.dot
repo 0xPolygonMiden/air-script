@@ -1,6 +1,6 @@
 digraph G {
-const0 [label="0"]
-const1 [label="1"]
+const0 [label="1"]
+const1 [label="0"]
 input0 [label="PI[stack_inputs][0]"]
 input5 [label="α"]
 input6 [label="β"]
@@ -12,18 +12,18 @@ input41 [label="⍺"]
 input42 [label="z"]
 input43 [label="zⁿ"]
 input44 [label="zᵐᵃˣ"]
-op0 [label="op0\ninput42 - const1"]
+op0 [label="op0\ninput42 - const0"]
 input42 -> op0
-const1 -> op0
+const0 -> op0
 op1 [label="op1\ninput42 - input39"]
 input42 -> op1
 input39 -> op1
 op2 [label="op2\ninput42 - input40"]
 input42 -> op2
 input40 -> op2
-op3 [label="op3\ninput43 - const1"]
+op3 [label="op3\ninput43 - const0"]
 input43 -> op3
-const1 -> op3
+const0 -> op3
 op4 [label="op4\nop0 × op1"]
 op0 -> op4
 op1 -> op4
