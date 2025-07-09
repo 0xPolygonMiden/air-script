@@ -1,12 +1,18 @@
 use std::{
-    collections::HashMap, hash::{DefaultHasher, Hash, Hasher}, ops::{Add, Deref, Mul, Sub}
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+    ops::{Add, Deref, Mul, Sub},
 };
 
 use rand::{distr::Uniform, prelude::*};
 use winter_math::{FieldElement, StarkField, fields::f64::BaseElement as Felt};
 
 use crate::{
-    ir::{ConstantValue, Link, MirValue, Op, PeriodicColumnAccess, PublicInputAccess, PublicInputTableAccess}, CompileError
+    CompileError,
+    ir::{
+        ConstantValue, Link, MirValue, Op, PeriodicColumnAccess, PublicInputAccess,
+        PublicInputTableAccess,
+    },
 };
 
 pub const NUM_EVALS: usize = 3; // Number of random evaluation points
@@ -160,7 +166,7 @@ fn query_hashed_cur_eval<R: Rng + ?Sized, H: Hash + Eq + Clone>(
         let eval = Eval::new_random(rng);
         cur_eval_map.insert(element.clone(), eval);
     }
-    cur_eval_map.get(element).unwrap().clone()
+    *cur_eval_map.get(element).unwrap()
 }
 
 /// Evaluates a given MIR node at random points.
@@ -240,11 +246,7 @@ pub fn eval_random_point<R: Rng + ?Sized>(
                     Ok(query_hashed_cur_eval(rng, &mut current_evals.periodic_columns, pc))
                 },
                 MirValue::PublicInputTable(pita) => {
-                    Ok(query_hashed_cur_eval(
-                        rng,
-                        &mut current_evals.public_input_tables,
-                        pita,
-                    ))
+                    Ok(query_hashed_cur_eval(rng, &mut current_evals.public_input_tables, pita))
                 },
                 MirValue::Null
                 | MirValue::BusAccess(_)
@@ -264,10 +266,18 @@ pub fn eval_random_point<R: Rng + ?Sized>(
                     let index = trace_access.column * 2 + a.offset;
                     match trace_access.segment {
                         0 => {
-                            return Ok(query_indexed_cur_eval(rng, &mut current_evals.main_trace, index));
+                            return Ok(query_indexed_cur_eval(
+                                rng,
+                                &mut current_evals.main_trace,
+                                index,
+                            ));
                         },
                         1 => {
-                            return Ok(query_indexed_cur_eval(rng, &mut current_evals.aux_trace, index));
+                            return Ok(query_indexed_cur_eval(
+                                rng,
+                                &mut current_evals.aux_trace,
+                                index,
+                            ));
                         },
                         _ => {
                             println!(
