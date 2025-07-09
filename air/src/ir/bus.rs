@@ -33,7 +33,7 @@ pub enum BusBoundary {
 /// Represents an access of a public input table.
 ///
 /// It can only be bound to a [Bus]'s .first or .last boundary constraints.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PublicInputTableAccess {
     /// The name of the public input to bind
     pub table_name: Identifier,
