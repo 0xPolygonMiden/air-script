@@ -50,7 +50,7 @@ impl Constraints {
 
     pub fn renumber_constraints(&mut self, renumbering_map: &HashMap<NodeIndex, NodeIndex>) {
         // Renumber the boundary constraints
-        for segment_constraints in self.boundary_constraints.iter_mut() {
+        for (_, segment_constraints) in self.boundary_constraints.iter_mut() {
             for constraint in segment_constraints.iter_mut() {
                 constraint
                     .update_node_index(*renumbering_map.get(constraint.node_index()).unwrap());
@@ -58,7 +58,7 @@ impl Constraints {
         }
 
         // Renumber the integrity constraints
-        for segment_constraints in self.integrity_constraints.iter_mut() {
+        for (_, segment_constraints) in self.integrity_constraints.iter_mut() {
             for constraint in segment_constraints.iter_mut() {
                 constraint
                     .update_node_index(*renumbering_map.get(constraint.node_index()).unwrap());

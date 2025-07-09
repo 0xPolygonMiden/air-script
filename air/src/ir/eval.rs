@@ -4,6 +4,7 @@ use std::{
     ops::{Add, Mul, Sub},
 };
 
+use air_parser::ast::TraceSegmentId;
 use rand::{distr::Uniform, prelude::*};
 use winter_math::{StarkField, fields::f64::BaseElement as Felt};
 
@@ -203,21 +204,17 @@ pub fn eval_random_point<R: Rng + ?Sized>(
                 Ok(eval)
             },
             Value::TraceAccess(trace_access) => match trace_access.segment {
-                0 => {
+                TraceSegmentId::Main => {
                     let index = trace_access.column * 2 + trace_access.row_offset;
                     let eval = query_cur_eval(rng, &mut current_evals.main_trace, index);
                     evals_map.insert(*node_index, eval);
                     Ok(eval)
                 },
-                1 => {
+                TraceSegmentId::Aux => {
                     let index = trace_access.column * 2 + trace_access.row_offset;
                     let eval = query_cur_eval(rng, &mut current_evals.aux_trace, index);
                     evals_map.insert(*node_index, eval);
                     Ok(eval)
-                },
-                _ => {
-                    println!("Unexpected segment in eval_random_point: {}", trace_access.segment);
-                    Err(CompileError::Failed)
                 },
             },
             Value::PeriodicColumn(pc) => {
