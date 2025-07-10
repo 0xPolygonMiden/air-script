@@ -66,7 +66,7 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     // add a method to get the variable length public inputs bus boundary constraints.
     let (mut add_bus_multiset_boundary_varlen, mut add_bus_logup_boundary_varlen) = (false, false);
     for bus in ir.buses.values() {
-        // Check which bus type is refering to variable length public inputs
+        // Check which bus type is referring to variable length public inputs
         let bus_constraints = [&bus.first, &bus.last];
         for fl in bus_constraints {
             if let BusBoundary::PublicInputTable(_) = fl {

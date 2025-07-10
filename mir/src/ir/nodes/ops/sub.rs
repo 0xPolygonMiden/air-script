@@ -2,7 +2,7 @@ use miden_diagnostics::{SourceSpan, Spanned};
 
 use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
 
-/// A MIR operation to represent the substraction of two MIR ops, `lhs` and `rhs`
+/// A MIR operation to represent the subtraction of two MIR ops, `lhs` and `rhs`
 #[derive(Default, Clone, PartialEq, Eq, Debug, Hash, Builder, Spanned)]
 #[enum_wrapper(Op)]
 pub struct Sub {
