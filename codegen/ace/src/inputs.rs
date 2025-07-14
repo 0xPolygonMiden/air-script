@@ -123,12 +123,12 @@ impl StarkInputs {
     /// Returns all values as a `Vec` in the same order as [`crate::StarkVar`].
     pub(crate) fn to_vec(&self) -> Vec<QuadFelt> {
         vec![
-            self.gen_penultimate,
-            self.gen_last,
             self.alpha,
             self.z,
             self.z_pow_n,
+            self.gen_last,
             self.z_max_cycle,
+            self.gen_penultimate,
         ]
     }
 }
@@ -151,7 +151,6 @@ impl AceVars {
         }
 
         // Reduced public input table values, ordered by accesses
-        assert_eq!(layout.reduced_tables.len(), self.reduced_tables.len());
         for (index, reduced_table_value) in
             zip(layout.reduced_tables.values(), &self.reduced_tables)
         {

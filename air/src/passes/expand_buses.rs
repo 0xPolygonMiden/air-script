@@ -54,24 +54,27 @@ impl Pass for BusOpExpand<'_> {
                         bus_trace_access_with_offset,
                     )));
 
-            // Then, depending on the bus type, expand the integrity constraint
-            match bus_type {
-                BusType::Multiset => {
-                    self.expand_multiset_constraint(
-                        &mut ir,
-                        bus_ops,
-                        bus_access,
-                        bus_access_with_offset,
-                    );
-                },
-                BusType::Logup => {
-                    self.expand_logup_constraint(
-                        &mut ir,
-                        bus_ops,
-                        bus_access,
-                        bus_access_with_offset,
-                    );
-                },
+            // Then, depending on the bus type, expand the integrity constraint if
+            // the bus is constrained
+            if !bus_ops.is_empty() {
+                match bus_type {
+                    BusType::Multiset => {
+                        self.expand_multiset_constraint(
+                            &mut ir,
+                            bus_ops,
+                            bus_access,
+                            bus_access_with_offset,
+                        );
+                    },
+                    BusType::Logup => {
+                        self.expand_logup_constraint(
+                            &mut ir,
+                            bus_ops,
+                            bus_access,
+                            bus_access_with_offset,
+                        );
+                    },
+                }
             }
         }
 

@@ -1,6 +1,8 @@
 use std::{collections::BTreeMap, ops::Range};
 
-use air_ir::{Air, Identifier, PublicInputAccess, PublicInputTableAccess, TraceAccess};
+use air_ir::{
+    Air, Identifier, PublicInput, PublicInputAccess, PublicInputTableAccess, TraceAccess,
+};
 
 use crate::circuit::Node;
 
@@ -13,6 +15,7 @@ enum Alignment {
     Element = 1,
     Word = 2,
     DoubleWord = 4,
+    DoubleDoubleWord = 8,
 }
 
 const NUM_QUOTIENT_PARTS: usize = 8;
@@ -78,7 +81,7 @@ impl Layout {
 
         // Returns an `InputRegion` of a given width and increments the offset
         // to satisfy the alignment.
-        fn next_region(
+        fn allocate_region(
             current_offset: &mut usize,
             width: usize,
             alignment: Alignment,
@@ -89,19 +92,25 @@ impl Layout {
         }
 
         fn align(offset: &mut usize, alignment: Alignment) {
-            *offset += offset.next_multiple_of(alignment as usize);
+            *offset = offset.next_multiple_of(alignment as usize);
         }
 
         // The arrays of all public inputs are stored contiguously.
         let public_inputs: BTreeMap<_, _> = air
             .public_inputs
             .iter()
-            .map(|(ident, pi)| (*ident, next_region(offset, pi.size(), Alignment::Element)))
+            .filter_map(|(ident, pi)| {
+                if let PublicInput::Vector { .. } = pi {
+                    Some((*ident, allocate_region(offset, pi.size(), Alignment::Element)))
+                } else {
+                    None
+                }
+            })
             .collect();
 
         // Ensure the entire region containing the public inputs is double-word aligned
         // since it is hashed as one contiguous array.
-        align(offset, Alignment::DoubleWord);
+        align(offset, Alignment::DoubleDoubleWord);
 
         // List of all reduced public input table accesses in canonical order.
         let reduced_table_accesses = air.reduced_public_input_table_accesses();
@@ -110,7 +119,7 @@ impl Layout {
         // For MASM efficiency, we store one reduced table per word.
         // Each variable therefore occupies two "variable slots".
         let reduced_tables_region =
-            next_region(offset, 2 * reduced_table_accesses.len(), Alignment::DoubleWord);
+            allocate_region(offset, 2 * reduced_table_accesses.len(), Alignment::Word);
 
         // Mapping of each access to its index within `reduced_tables_region`
         // The index is doubled to match the "one variable per word" requirement.
@@ -158,10 +167,10 @@ impl Layout {
         // during the FRI query phase.
         // At the moment, we do so by padding each trace with zero-valued columns.
         let trace_segments = [0, 1].map(|_row_offset| {
-            segment_widths.map(|width| next_region(offset, width, Alignment::DoubleWord))
+            segment_widths.map(|width| allocate_region(offset, width, Alignment::DoubleWord))
         });
 
-        let stark_vars = next_region(offset, StarkVar::num_vars(), Alignment::Word);
+        let stark_vars = allocate_region(offset, StarkVar::num_vars(), Alignment::Word);
 
         // Ensure the entire input region is word aligned
         align(offset, Alignment::Word);
@@ -259,21 +268,21 @@ impl InputRegion {
 /// List of STARK variables and challenges, derived from the public parameters and proof transcript.
 #[derive(Copy, Clone, Debug)]
 pub enum StarkVar {
-    /// The variable g⁻² corresponding to the penultimate point in the subgroup over which the
-    /// trace is interpolated.
-    GenPenultimate = 0,
+    /// The variable α used as for random linear-combination of constraints.
+    Alpha = 0,
+    /// The variable z at which the constraints evaluation check is performed.
+    Z = 1,
+    /// The variable zⁿ, where `n = trace_len`
+    ZPowN = 2,
     /// The variable g⁻¹ corresponding to the last point in the subgroup over which the trace is
     /// interpolated.
-    GenLast = 1,
-    /// The variable α used as for random linear-combination of constraints.
-    Alpha = 2,
-    /// The variable z at which the constraints evaluation check is performed.
-    Z = 3,
-    /// The variable zⁿ, where `n = trace_len`
-    ZPowN = 4,
+    GenLast = 3,
     /// The variable `zᵐᵃˣ`, where `max` is equal to `trace_len / max_cycle_len`. Details can be
     /// found in [`crate::builder::CircuitBuilder::periodic_column`]
-    ZMaxCycle = 5,
+    ZMaxCycle = 4,
+    /// The variable g⁻² corresponding to the penultimate point in the subgroup over which the
+    /// trace is interpolated.
+    GenPenultimate = 5,
 }
 
 impl StarkVar {
