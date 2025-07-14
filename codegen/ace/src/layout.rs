@@ -23,6 +23,9 @@ const NUM_QUOTIENT_PARTS: usize = 8;
 /// Describes the layout of inputs given to an ACE circuit.
 /// Each set of variables is aligned to the next multiple of 4, ensuring they can be efficiently
 /// unhashed from the transcript and that each input region is aligned to `HASH_ALIGNMENT`.
+/// An exception to this are the `public_inputs` input regions, which are padded to the next
+/// multiple of 8. This is because, during recursive verification, we load (fixed) public inputs
+/// in groups of 8 (base) field elements which are stored as 8 extension field elements.
 ///
 /// We assume the following about the underlying `Air` from which the layout is constructed
 /// - The proof always contains a `main` and `aux` segment, even when the latter is unused,
@@ -108,8 +111,8 @@ impl Layout {
             })
             .collect();
 
-        // Ensure the entire region containing the public inputs is double-word aligned
-        // since it is hashed as one contiguous array.
+        // Ensure the entire region containing the public inputs is double-double-word aligned
+        // since it is hashed as one contiguous array and processed in batches of 8 inputs.
         align(offset, Alignment::DoubleDoubleWord);
 
         // List of all reduced public input table accesses in canonical order.
@@ -296,12 +299,12 @@ impl TryFrom<usize> for StarkVar {
 
     fn try_from(value: usize) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Self::GenPenultimate),
-            1 => Ok(Self::GenLast),
-            2 => Ok(Self::Alpha),
-            3 => Ok(Self::Z),
-            4 => Ok(Self::ZPowN),
-            5 => Ok(Self::ZMaxCycle),
+            0 => Ok(Self::Alpha),
+            1 => Ok(Self::Z),
+            2 => Ok(Self::ZPowN),
+            3 => Ok(Self::GenLast),
+            4 => Ok(Self::ZMaxCycle),
+            5 => Ok(Self::GenPenultimate),
             _ => Err(value),
         }
     }

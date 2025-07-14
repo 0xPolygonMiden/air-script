@@ -57,7 +57,7 @@ type QuadFelt = QuadExtension<Felt>;
 /// - a dummy section of 8 quotient evaluation for the next row, unused by the ACE circuit.
 ///
 /// Additionally, the ACE chiplet expects the following 5 auxiliary "STARK" inputs, whose order
-/// is defined by `StarkVar`, given by `[g⁻¹, g⁻¹, α, z, zⁿ, zᵐᵃˣ`].
+/// is defined by `StarkVar`, given by `[α, z, zⁿ, g⁻¹, zᵐᵃˣ, g⁻²]`.
 pub fn build_ace_circuit(air: &Air) -> anyhow::Result<(AceNode, AceCircuit)> {
     // A circuit builder is instantiated with the inputs of the circuits plus the 13 needed by the
     // ACE chiplet
