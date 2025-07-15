@@ -155,7 +155,7 @@ impl AirBuilder<'_> {
         match rhs {
             0 => self.insert_op(Operation::Value(Value::Constant(1))),
             1 => lhs,
-            n if n % 2 == 0 => {
+            n if n.is_multiple_of(2) => {
                 let square = self.insert_op(Operation::Mul(lhs, lhs));
                 self.expand_exp(square, n / 2)
             },

@@ -20,7 +20,7 @@ use crate::{
 ///   - *Constants*: Fixed values that can be referenced by instructions.
 /// - *Instructions*: List of arithmetic gates to be evaluated. Each instruction is encoded as a
 ///   single field element. It is padded with instructions which square the output, as this still
-///   ensures the final evaluation is still evaluates to zero.
+///   ensures the final evaluation still evaluates to zero.
 pub struct EncodedCircuit {
     num_vars: usize,
     num_ops: usize,
@@ -55,7 +55,7 @@ impl EncodedCircuit {
 
     /// Number of constant nodes.
     pub fn num_constants(&self) -> usize {
-        self.num_nodes() - self.num_ops
+        (self.instructions.len() - self.num_ops) / 2
     }
 
     /// Number of nodes (variables and operations).
@@ -66,6 +66,11 @@ impl EncodedCircuit {
     /// List of encoded instructions (constants and operations).
     pub fn instructions(&self) -> &[Felt] {
         &self.instructions
+    }
+
+    /// Returns the size of the encoded circuit in field elements.
+    pub fn size_in_felt(&self) -> usize {
+        self.instructions.len()
     }
 
     /// Returns the digest of the circuit, represented by the constants and instructions.
@@ -104,26 +109,40 @@ impl Circuit {
 
         assert!(self.num_nodes() as u64 <= MAX_NODE_ID, "more than 2^30 nodes");
 
-        // Constants are encoded two-by-two as extension field elements, followed by operations.
-        let num_const = self.constants.len().next_multiple_of(2);
-        let num_ops = self.operations.len().next_multiple_of(4);
-        let len_const = num_const * 2;
-        let len_circuit = len_const + num_ops;
-        let mut instructions = Vec::with_capacity(len_circuit);
+        // Constants are encoded two-by-two as extension field elements, followed by operations,
+        // one per field element.
+        let num_const_nodes = self.constants.len().next_multiple_of(2);
+        let num_op_nodes = self.operations.len();
+
+        let num_const_felts = num_const_nodes * 2;
+        let num_op_felts = num_op_nodes;
+
+        // we need to have the size of the encoded circuit in field elements to be divisible
+        // by 8 so as to facilitate un-hashing in the VM
+        let len_circuit = num_const_felts + num_op_felts;
+        let len_circuit_padded = len_circuit.next_multiple_of(8);
+
+        let mut instructions = Vec::with_capacity(len_circuit_padded);
 
         // Add constants
         instructions
             .extend(self.constants.iter().flat_map(|c| QuadFelt::from(*c).to_base_elements()));
         // Since constants are treated as extension field elements, we pad this section with zeros
         // to ensure it is aligned in memory.
-        instructions.resize(len_const, Felt::ZERO);
+        instructions.resize(num_const_felts, Felt::ZERO);
 
-        let num_inputs = self.layout.num_inputs;
+        // we replace the padding above with squaring gates as these will not alter the final
+        // result, provided it is equal to zero. Note that this relies implicitly on the fact
+        // that fields do not have zero divisors
+        let num_input_nodes = self.layout.num_inputs;
         let num_constants = self.constants.len();
-        let num_nodes = num_inputs + num_constants + num_ops;
+        let num_padding_felt = len_circuit_padded - len_circuit;
+        let num_padding_nodes = num_padding_felt;
+        let num_nodes = num_input_nodes + num_const_nodes + num_op_nodes + num_padding_nodes;
+
         let node_id = |node: Node| -> u64 {
             let input_start = num_nodes - 1;
-            let constants_start = input_start - num_inputs;
+            let constants_start = input_start - num_input_nodes;
             let ops_start = constants_start - num_constants;
 
             match node {
@@ -145,17 +164,16 @@ impl Circuit {
             let instruction = (id_0) + (id_1 * ID_1_OFFSET) + (op_tag * OP_OFFSET);
             Felt::new(instruction)
         };
+
         for operation in &self.operations {
             let encoded = operation_to_instruction(operation);
             instructions.push(encoded);
         }
 
-        // Since an ACE circuit's last node must evaluate to 0, we pad it with
-        // operations which square the last node.
-        // Each operation is encoded as a single field element, so the total number
-        // of operations must be a multiple of 4.
+        // Since an ACE circuit's last node must evaluate to 0, we add padding gates which
+        // square the output of the last node.
         let mut last_node_index = self.operations.len() - 1;
-        while instructions.len() % 4 != 0 {
+        while !instructions.len().is_multiple_of(8) {
             let last_node = Node::Operation(last_node_index);
             let dummy_op = OperationNode {
                 op: ArithmeticOp::Mul,
@@ -166,8 +184,10 @@ impl Circuit {
             instructions.push(encoded);
             last_node_index += 1;
         }
+        assert_eq!(instructions.len(), len_circuit_padded);
 
-        let num_vars = num_inputs + num_constants;
+        let num_vars = num_input_nodes + num_constants;
+        let num_ops = num_op_nodes + num_padding_nodes;
         EncodedCircuit { num_vars, num_ops, instructions }
     }
 
@@ -176,9 +196,9 @@ impl Circuit {
     /// - Inputs and constants lie two-by-two in memory, treated as extension field elements,
     /// - Operations are encoded as single field elements.
     pub fn is_padded(&self) -> bool {
-        (self.layout.num_inputs % 2 == 0)
-            && (self.constants.len() % 2 == 0)
-            && (self.operations.len() % 4 == 0)
+        (self.layout.num_inputs.is_multiple_of(2))
+            && (self.constants.len().is_multiple_of(2))
+            && (self.operations.len().is_multiple_of(4))
     }
 }
 
@@ -218,6 +238,7 @@ mod tests {
                     InputRegion { offset: 1, width: 0 },
                 ],
                 [
+                    // Main
                     InputRegion { offset: 1, width: 1 },
                     // Aux
                     InputRegion { offset: 2, width: 0 },
@@ -262,13 +283,6 @@ mod tests {
                     node_l: Node::Operation(1), // id = 2
                     node_r: one,                // id = 5
                 },
-                // Padding with squaring of last operation.
-                // // id = 0, {[(input + 1) * input] - 1}^2
-                // OperationNode {
-                //     op: ArithmeticOp::Mul,      // op = 1
-                //     node_l: Node::Operation(1), // id = 1
-                //     node_r: Node::Operation(1), // id = 1
-                // },
             ],
         };
         let encoded = circuit.to_ace();
