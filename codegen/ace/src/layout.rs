@@ -15,7 +15,7 @@ enum Alignment {
     Element = 1,
     Word = 2,
     DoubleWord = 4,
-    DoubleDoubleWord = 8,
+    QuadWord = 8,
 }
 
 const NUM_QUOTIENT_PARTS: usize = 8;
@@ -113,7 +113,7 @@ impl Layout {
 
         // Ensure the entire region containing the public inputs is double-double-word aligned
         // since it is hashed as one contiguous array and processed in batches of 8 inputs.
-        align(offset, Alignment::DoubleDoubleWord);
+        align(offset, Alignment::QuadWord);
 
         // List of all reduced public input table accesses in canonical order.
         let reduced_table_accesses = air.reduced_public_input_table_accesses();
