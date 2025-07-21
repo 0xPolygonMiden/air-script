@@ -266,12 +266,22 @@ fn selectors() {
 }
 
 #[test]
-fn selectors_combine() {
-    let generated_air = Test::new("tests/selectors/selectors_combine.air".to_string())
+fn selectors_combine_simple() {
+    let generated_air = Test::new("tests/selectors/selectors_combine_simple.air".to_string())
         .transpile(Target::Winterfell)
         .unwrap();
 
-    let expected = expect_file!["../selectors/selectors_combine.rs"];
+    let expected = expect_file!["../selectors/selectors_combine_simple.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn selectors_combine_complex() {
+    let generated_air = Test::new("tests/selectors/selectors_combine_complex.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../selectors/selectors_combine_complex.rs"];
     expected.assert_eq(&generated_air);
 }
 

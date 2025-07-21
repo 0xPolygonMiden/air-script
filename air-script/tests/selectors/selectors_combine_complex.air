@@ -1,0 +1,45 @@
+def SelectorsAir
+
+const R = [0, 1, 2, 3, 4, 5];
+
+trace_columns {
+    main: [s[3], c],
+}
+
+public_inputs {
+    stack_inputs: [1],
+}
+
+boundary_constraints {
+    enf c.first = 0;
+}
+
+ev ev_s0([c]) {
+    enf c = R[0]; #a
+    enf c = R[1]; #b
+    enf c = R[0]; #c
+    enf c = R[2]; #d
+}
+
+ev ev_s1([c]) {
+    enf c = R[3]; #e
+    enf c = R[0]; #f
+    enf c = R[4]; #g
+}
+
+ev ev_s2([c]) {
+    enf c = R[4]; #h
+    enf c = R[5]; #i
+}
+
+integrity_constraints {
+    let s0 = s[0];
+    let s1 = !s[0] & s[1];
+    let s2 = !s[0] & !s[1];
+
+    enf match {
+        case s0: ev_s0([c]),
+        case s1: ev_s1([c]),
+        case s2: ev_s2([c]),
+    };
+}
