@@ -682,9 +682,9 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                 Statement::EnforceIf(match_expr) => {
                     self.in_constraint_comprehension = true;
                     for match_arm in match_expr.match_arms.iter_mut() {
-                        // Visit the expression and selector of the match arm
-                        self.visit_mut_scalar_expr(&mut match_arm.expr)?;
+                        // Visit the selector and expression of the match arm
                         self.visit_mut_scalar_expr(&mut match_arm.condition)?;
+                        self.visit_mut_scalar_expr(&mut match_arm.expr)?;
                     }
                     self.in_constraint_comprehension = false;
                 },

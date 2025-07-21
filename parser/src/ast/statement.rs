@@ -65,7 +65,7 @@ pub enum Statement {
     BusEnforce(ListComprehension),
 }
 
-#[derive(Clone, Spanned, Debug)]
+#[derive(Clone, Spanned, Debug, Eq)]
 pub struct Match {
     #[span]
     pub span: SourceSpan,
@@ -78,7 +78,6 @@ impl Match {
     }
 }
 
-impl Eq for Match {}
 impl PartialEq for Match {
     fn eq(&self, other: &Self) -> bool {
         self.match_arms == other.match_arms
@@ -95,7 +94,7 @@ impl fmt::Display for Match {
     }
 }
 
-#[derive(Clone, Spanned, Debug)]
+#[derive(Clone, Spanned, Debug, Eq)]
 pub struct MatchArm {
     #[span]
     pub span: SourceSpan,
@@ -111,7 +110,6 @@ impl MatchArm {
     }
 }
 
-impl Eq for MatchArm {}
 impl PartialEq for MatchArm {
     fn eq(&self, other: &Self) -> bool {
         self.condition == other.condition && self.expr == other.expr

@@ -428,8 +428,8 @@ impl<'a> MirBuilder<'a> {
         let mut match_arms = Vec::new();
 
         for match_arm in match_expr.match_arms.iter() {
-            let expr_node = self.translate_scalar_expr(&match_arm.expr)?;
             let cond_node = self.translate_scalar_expr(&match_arm.condition)?;
+            let expr_node = self.translate_scalar_expr(&match_arm.expr)?;
             match_arms.push(MatchArm::new(expr_node, cond_node));
         }
 
