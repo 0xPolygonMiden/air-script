@@ -4,7 +4,7 @@ use winterfell::{Trace, TraceTable};
 
 use crate::{
     helpers::{AirTester, MyTraceTable},
-    list_comprehension::list_comprehension_with_mir::{ListComprehensionAir, PublicInputs},
+    list_comprehension::list_comprehension::{ListComprehensionAir, PublicInputs},
 };
 
 #[derive(Clone)]

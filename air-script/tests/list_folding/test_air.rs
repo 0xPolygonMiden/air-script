@@ -4,7 +4,7 @@ use winterfell::{Trace, TraceTable};
 
 use crate::{
     helpers::{AirTester, MyTraceTable},
-    list_folding::list_folding_with_mir::{ListFoldingAir, PublicInputs},
+    list_folding::list_folding::{ListFoldingAir, PublicInputs},
 };
 
 #[derive(Clone)]

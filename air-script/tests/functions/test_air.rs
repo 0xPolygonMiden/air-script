@@ -3,7 +3,7 @@ use winter_math::fields::f64::BaseElement as Felt;
 use winterfell::{Trace, TraceTable};
 
 use crate::{
-    functions::functions_complex_with_mir::{FunctionsAir, PublicInputs},
+    functions::functions_complex::{FunctionsAir, PublicInputs},
     helpers::{AirTester, MyTraceTable},
 };
 

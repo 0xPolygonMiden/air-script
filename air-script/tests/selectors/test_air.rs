@@ -4,7 +4,7 @@ use winterfell::{Trace, TraceTable};
 
 use crate::{
     helpers::{AirTester, MyTraceTable},
-    selectors::selectors_with_evaluators_with_mir::{PublicInputs, SelectorsAir},
+    selectors::selectors_with_evaluators::{PublicInputs, SelectorsAir},
 };
 
 #[derive(Clone)]
