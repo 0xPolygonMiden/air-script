@@ -8,7 +8,6 @@ use std::{
 use air_parser::ast::AccessType;
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
-use rand::prelude::*;
 
 use super::{duplicate_node_or_replace, visitor::Visitor};
 use crate::{CompileError, ir::*, passes::duplicate_node};
@@ -49,8 +48,8 @@ pub struct UnrollingFirstPass<'a> {
     // general context
     work_stack: Vec<Link<Node>>,
 
-    // rng used for random evaluations and combine selector expressions
-    rng: ThreadRng,
+    // current evaluations of nodes at random points
+    random_inputs: RandomInputs,
 
     // For each child of a For node encountered, we store the context to inline it in the second
     // pass
@@ -68,7 +67,7 @@ impl<'a> UnrollingFirstPass<'a> {
         Self {
             diagnostics,
             work_stack: vec![],
-            rng: rand::rng(),
+            random_inputs: RandomInputs::default(),
             bodies_to_inline: vec![],
             params_for_ref_node: HashMap::new(),
             all_for_nodes: HashMap::new(),
@@ -452,159 +451,150 @@ impl UnrollingFirstPass<'_> {
         _graph: &mut Graph,
         if_node: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let updated_if;
+        let if_ref = if_node.as_if().unwrap();
+        let match_arms = if_ref.match_arms.borrow();
 
-        {
-            let if_ref = if_node.as_if().unwrap();
-            let match_arms = if_ref.match_arms.borrow();
+        // 1. We evaluate all constraints of this match node at random points
+        let mut node_evals = Vec::new();
 
-            // 1. We evaluate all constraints of this match node at random points
-            let mut current_evals = CurrentEvals::default();
-            let mut node_evals = Vec::new();
+        // Used to keep track of the evaluation of each constraint
+        // We use indices to the node_evals vector as keys, to avoid non-determinism for
+        // iterating across
+        let mut constraints_evaluation_indices: BTreeMap<usize, Vec<_>> = BTreeMap::new();
+        for match_arm in match_arms.iter() {
+            let condition = match_arm.condition.clone();
+            let expr = match_arm.expr.clone();
 
-            // Used to keep track of the evaluation of each constraint
-            // We use indices to the node_evals vector as keys, to avoid non-determinism for
-            // iterating across
-            let mut constraints_evaluation_indices: BTreeMap<usize, Vec<_>> = BTreeMap::new();
-            for match_arm in match_arms.iter() {
-                let condition = match_arm.condition.clone();
-                let expr = match_arm.expr.clone();
+            // Get all the individual constraints corresponding to this arm
+            let constraints_to_eval = if let Op::Vector(expr_vector) = expr.borrow().deref() {
+                expr_vector.children().borrow().deref().clone()
+            } else {
+                vec![expr.clone()]
+            };
 
-                // Get all the individual constraints corresponding to this arm
-                let constraints_to_eval = if let Op::Vector(expr_vector) = expr.borrow().deref() {
-                    expr_vector.children().borrow().deref().clone()
-                } else {
-                    vec![expr.clone()]
-                };
-
-                for constraint in constraints_to_eval {
-                    let eval =
-                        eval_random_point(&mut self.rng, &mut current_evals, constraint.clone())?;
-                    // Check if we already have this eval in our list
-                    match node_evals.iter().position(|e| e == &eval) {
-                        Some(index) => {
-                            // If the eval is already in the list, we use its index in the
-                            // node_evals vec
-                            let Some(constraints_vec) =
-                                constraints_evaluation_indices.get_mut(&index)
-                            else {
-                                unreachable!(
-                                    "Error: Reference to an evaluation index not found in constraints_evaluation_indices"
-                                );
-                            };
-                            // We add the constraint to the corresponding vector only if the
-                            // condition is not already present
-                            // to remove duplicate constraints for the same selector
-                            if !constraints_vec.iter().any(|(c, _)| c == &condition) {
-                                constraints_vec.push((condition.clone(), constraint.clone()))
-                            }
-                        },
-                        None => {
-                            // Otherwise, we add it to the list and use its index
-                            node_evals.push(eval);
-                            let index = node_evals.len() - 1;
-                            if constraints_evaluation_indices
-                                .insert(index, vec![(condition.clone(), constraint.clone())])
-                                .is_some()
-                            {
-                                unreachable!(
-                                    "Error: A new evaluation index was found in constraints_evaluation_indices"
-                                );
-                            }
-                        },
-                    }
-                }
-            }
-
-            // 2. For each evaluation, we keep track of the length of the vector of unique
-            //    constraints evaluating to it
-            // This len will be used to combine the constraints by taking the most constrained
-            // evaluations first, in order to minimize the number of constraints in the
-            // final vector
-
-            // eval_lens: BTreeMap<len, Vec<evaluation_index>>
-            let mut eval_lens = BTreeMap::new();
-            for (eval_index, constraints_vec) in constraints_evaluation_indices.iter() {
-                eval_lens
-                    .entry(constraints_vec.len())
-                    .and_modify(|v: &mut Vec<_>| v.push(*eval_index))
-                    .or_insert(vec![*eval_index]);
-            }
-
-            // 3. Construct the new vector of combined constraints
-            let mut new_vec = vec![];
-
-            // Note: this will always terminate as we always remove at least one constraint per
-            // iteration
-            while !constraints_evaluation_indices.is_empty() {
-                let mut new_constraint = vec![];
-                let mut taken_eval_indices = vec![];
-
-                // Start picking constraints from the biggest sets that evaluate to the same values
-                for eval_index in eval_lens.values().cloned().rev().flatten() {
-                    let constraints = constraints_evaluation_indices.get(&eval_index).unwrap();
-
-                    if have_disjoint_conditions(new_constraint.clone(), constraints) {
-                        // If the new constraints are disjoint from the current ones, we can add
-                        // them
-                        new_constraint.push(constraints.clone());
-                        taken_eval_indices.push(eval_index);
-                    }
-                }
-
-                // Remove the taken evaluation indices from all the structures
-                for eval_index in taken_eval_indices {
-                    constraints_evaluation_indices.remove(&eval_index);
-                    eval_lens.iter_mut().for_each(|(_len, evals)| {
-                        evals.retain(|&e_idx| e_idx != eval_index);
-                    });
-                    eval_lens.retain(|_, constraints| !constraints.is_empty());
-                }
-
-                // Create combined constraint
-                let mut cur_node = None;
-                for equivalent_constraints in new_constraint {
-                    let mut cur_condition = None;
-                    for (condition, _) in equivalent_constraints.clone() {
-                        if cur_condition.is_none() {
-                            cur_condition = Some(condition.clone());
-                        } else {
-                            cur_condition = Some(Add::create(
-                                cur_condition.unwrap(),
-                                condition.clone(),
-                                if_ref.span(),
-                            ));
+            for constraint in constraints_to_eval {
+                let eval = self.random_inputs.eval(constraint.clone())?;
+                // Check if we already have this eval in our list
+                match node_evals.iter().position(|e| e == &eval) {
+                    Some(index) => {
+                        // If the eval is already in the list, we use its index in the
+                        // node_evals vec
+                        let Some(constraints_vec) = constraints_evaluation_indices.get_mut(&index)
+                        else {
+                            unreachable!(
+                                "Error: Reference to an evaluation index not found in constraints_evaluation_indices"
+                            );
+                        };
+                        // We add the constraint to the corresponding vector only if the
+                        // condition is not already present
+                        // to remove duplicate constraints for the same selector
+                        if !constraints_vec.iter().any(|(c, _)| c == &condition) {
+                            constraints_vec.push((condition.clone(), constraint.clone()))
                         }
-                    }
-                    let new_node = Mul::create(
-                        cur_condition.unwrap(),
-                        equivalent_constraints.first().unwrap().1.clone(),
-                        if_ref.span(),
-                    );
-
-                    cur_node = if let Some(cur_node) = cur_node {
-                        Some(Add::create(cur_node, new_node, if_ref.span()))
-                    } else {
-                        Some(new_node)
-                    };
+                    },
+                    None => {
+                        // Otherwise, we add it to the list and use its index
+                        node_evals.push(eval);
+                        let index = node_evals.len() - 1;
+                        if constraints_evaluation_indices
+                            .insert(index, vec![(condition.clone(), constraint.clone())])
+                            .is_some()
+                        {
+                            unreachable!(
+                                "Error: A new evaluation index was found in constraints_evaluation_indices"
+                            );
+                        }
+                    },
                 }
-
-                // Note: This will ensure the resulting constraint is in the form `Sub(x,y)`
-                // representing `enf x = y`
-                let zero_node = Value::create(SpannedMirValue {
-                    span: Default::default(),
-                    value: MirValue::Constant(ConstantValue::Felt(0)),
-                });
-                // The following unwrap is safe as we always have at least one constraint above
-                let new_node_with_sub_zero =
-                    Sub::create(cur_node.unwrap(), zero_node, if_ref.span());
-                new_vec.push(new_node_with_sub_zero);
             }
-
-            updated_if = Some(Vector::create(new_vec, if_ref.span()));
         }
 
-        Ok(updated_if)
+        // 2. For each evaluation, we keep track of the length of the vector of unique constraints
+        //    evaluating to it
+        // This len will be used to combine the constraints by taking the most constrained
+        // evaluations first, in order to minimize the number of constraints in the
+        // final vector
+
+        // eval_lens: BTreeMap<len, Vec<evaluation_index>>
+        let mut eval_lens = BTreeMap::new();
+        for (eval_index, constraints_vec) in constraints_evaluation_indices.iter() {
+            eval_lens
+                .entry(constraints_vec.len())
+                .and_modify(|v: &mut Vec<_>| v.push(*eval_index))
+                .or_insert(vec![*eval_index]);
+        }
+
+        // 3. Construct the new vector of combined constraints
+        let mut new_vec = vec![];
+
+        // Note: this will always terminate as we always remove at least one constraint per
+        // iteration
+        while !constraints_evaluation_indices.is_empty() {
+            let mut new_constraint = vec![];
+            let mut taken_eval_indices = vec![];
+
+            // Start picking constraints from the biggest sets that evaluate to the same values
+            for eval_index in eval_lens.values().cloned().rev().flatten() {
+                let constraints = constraints_evaluation_indices.get(&eval_index).unwrap();
+
+                if have_disjoint_conditions(new_constraint.clone(), constraints) {
+                    // If the new constraints are disjoint from the current ones, we can add
+                    // them
+                    new_constraint.push(constraints.clone());
+                    taken_eval_indices.push(eval_index);
+                }
+            }
+
+            // Remove the taken evaluation indices from all the structures
+            for eval_index in taken_eval_indices {
+                constraints_evaluation_indices.remove(&eval_index);
+                eval_lens.iter_mut().for_each(|(_len, evals)| {
+                    evals.retain(|&e_idx| e_idx != eval_index);
+                });
+                eval_lens.retain(|_, constraints| !constraints.is_empty());
+            }
+
+            // Create combined constraint
+            let mut cur_node = None;
+            for equivalent_constraints in new_constraint {
+                let mut cur_condition = None;
+                for (condition, _) in equivalent_constraints.clone() {
+                    if cur_condition.is_none() {
+                        cur_condition = Some(condition.clone());
+                    } else {
+                        cur_condition = Some(Add::create(
+                            cur_condition.unwrap(),
+                            condition.clone(),
+                            if_ref.span(),
+                        ));
+                    }
+                }
+                let new_node = Mul::create(
+                    cur_condition.unwrap(),
+                    equivalent_constraints.first().unwrap().1.clone(),
+                    if_ref.span(),
+                );
+
+                cur_node = if let Some(cur_node) = cur_node {
+                    Some(Add::create(cur_node, new_node, if_ref.span()))
+                } else {
+                    Some(new_node)
+                };
+            }
+
+            // Note: This will ensure the resulting constraint is in the form `Sub(x,y)`
+            // representing `enf x = y`
+            let zero_node = Value::create(SpannedMirValue {
+                span: Default::default(),
+                value: MirValue::Constant(ConstantValue::Felt(0)),
+            });
+            // The following unwrap is safe as we always have at least one constraint above
+            let new_node_with_sub_zero = Sub::create(cur_node.unwrap(), zero_node, if_ref.span());
+
+            new_vec.push(new_node_with_sub_zero);
+        }
+
+        Ok(Some(Vector::create(new_vec, if_ref.span())))
     }
 
     fn visit_boundary_bis(
