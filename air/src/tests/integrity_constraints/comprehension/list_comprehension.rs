@@ -1,4 +1,4 @@
-use super::super::{Pipeline, compile, expect_diagnostic};
+use super::super::{compile, expect_diagnostic};
 
 #[test]
 fn list_comprehension() {
@@ -18,8 +18,7 @@ fn list_comprehension() {
         enf clk = x[1];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -41,8 +40,7 @@ fn lc_with_const_exp() {
         enf clk = y[1] + z[1];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -63,8 +61,7 @@ fn lc_with_non_const_exp() {
         enf clk = enumerate[3];
     }";
 
-    expect_diagnostic(source, "expected exponent to be a constant", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "expected exponent to be a constant", Pipeline::WithMIR);
+    expect_diagnostic(source, "expected exponent to be a constant");
 }
 
 #[test]
@@ -85,8 +82,7 @@ fn lc_with_two_lists() {
         enf clk = diff[0];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -107,8 +103,7 @@ fn lc_with_two_slices() {
         enf clk = diff[1];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -129,8 +124,7 @@ fn lc_with_multiple_lists() {
         enf a = x[0] + x[1] + x[2];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -152,16 +146,7 @@ fn err_index_out_of_range_lc_ident() {
         enf clk = x[2];
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -184,16 +169,7 @@ fn err_index_out_of_range_lc_slice() {
         enf clk = x[3];
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -216,8 +192,7 @@ fn err_non_const_exp_ident_iterable() {
         enf clk = invalid_exp_lc[1];
     }";
 
-    expect_diagnostic(source, "expected exponent to be a constant", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "expected exponent to be a constant", Pipeline::WithMIR);
+    expect_diagnostic(source, "expected exponent to be a constant");
 }
 
 #[test]
@@ -240,8 +215,7 @@ fn err_non_const_exp_slice_iterable() {
         enf clk = invalid_exp_lc[1];
     }";
 
-    expect_diagnostic(source, "expected exponent to be a constant", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "expected exponent to be a constant", Pipeline::WithMIR);
+    expect_diagnostic(source, "expected exponent to be a constant");
 }
 
 #[test]
@@ -264,14 +238,5 @@ fn err_duplicate_member() {
         enf clk = duplicate_member_lc[1];
     }";
 
-    expect_diagnostic(
-        source,
-        "this name is already bound in this comprehension",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "this name is already bound in this comprehension",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "this name is already bound in this comprehension");
 }

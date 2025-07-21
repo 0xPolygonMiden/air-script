@@ -1,4 +1,4 @@
-use super::super::{Pipeline, compile};
+use super::super::compile;
 
 #[test]
 fn constraint_comprehension() {
@@ -17,8 +17,7 @@ fn constraint_comprehension() {
         enf c = d for (c, d) in (c, d);
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -38,6 +37,5 @@ fn ic_comprehension_with_selectors() {
         enf c = d for (c, d) in (c, d) when !fmp[0];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
