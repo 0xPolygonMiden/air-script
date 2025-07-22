@@ -72,8 +72,18 @@ impl RandomInputs {
             Op::Exp(e) => {
                 let lhs = self.eval(e.lhs.clone())?;
                 let rhs = self.eval(e.rhs.clone())?;
-                let power = rhs.to_base_elements()[0].as_int();
-                Ok(lhs.exp(power))
+                let base_elems = rhs.to_base_elements();
+                if base_elems[1].as_int() != 0 {
+                    // If the second base element is not zero, we cannot evaluate the exponentiation
+                    // This should not happen because either the non-constant powers would have been
+                    // caught in the parser or it is in the body of a list
+                    // comprehension which has not been expanded yet (and we would have a
+                    // Op::Parameter instead)
+                    Err(CompileError::Failed)
+                } else {
+                    let power = rhs.to_base_elements()[0].as_int();
+                    Ok(lhs.exp(power))
+                }
             },
             Op::BusOp(b) => {
                 // For a given bus operation, we hash the operation and its parameters to create a
@@ -97,6 +107,13 @@ impl RandomInputs {
                         let felt = Felt::new(*c);
                         Ok(const_quad_felt(felt))
                     },
+                    // For each trace segment, we associate a random value to the each trace access
+                    // indexed in the following way, each column having two
+                    // distinct evaluations to account for the two possible row offsets:
+                    // $main[0], $main[0]', $main[1], $main[1]', $main[2], ...
+                    // Note: if we encounter a trace access corresponding to an index we have not
+                    // yet evaluated, we will randomly generate values for
+                    // this trace access, but also for all previous indices.
                     MirValue::TraceAccess(trace_access) => match trace_access.segment {
                         0 => {
                             let index = trace_access.column * 2 + trace_access.row_offset;
