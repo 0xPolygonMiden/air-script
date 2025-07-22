@@ -6,7 +6,7 @@ This crate aggregates all components of the AirScript compiler into a single pla
 
 An in-depth description of AirScript is available in the full AirScript [documentation](https://0xpolygonmiden.github.io/air-script/).
 
-The compiler has three stages, which can be imported and used independently or together.
+The compiler has four stages, which can be imported and used independently or together.
 
 1. [Parser](../parser/): scans and parses AirScript files and builds an AST
 2. [MIR](../mir/): produces a middle intermediate representation from the AirScript AST
