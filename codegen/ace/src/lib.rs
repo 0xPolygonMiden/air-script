@@ -8,7 +8,7 @@ mod layout;
 mod tests;
 
 use air_ir::{Air, ConstraintDomain};
-use miden_core::{Felt, QuadExtension};
+pub use mir::ir::QuadFelt;
 
 use crate::{
     builder::{CircuitBuilder, LinearCombination},
@@ -20,8 +20,6 @@ pub use crate::{
     inputs::{AceVars, AirInputs},
     layout::Layout as AirLayout,
 };
-
-type QuadFelt = QuadExtension<Felt>;
 
 /// Air constraints are organized in 3 main groups: integrity roots,
 /// boundary-first roots and boundary-last roots.

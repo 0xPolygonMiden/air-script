@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     hash::{DefaultHasher, Hash, Hasher},
-    ops::{Add, Deref, Mul, Sub},
+    ops::Deref,
 };
 
 use rand::{distr::Uniform, prelude::*};
@@ -18,76 +18,20 @@ use crate::{
     },
 };
 
-#[derive(Eq, PartialEq, Clone, Debug, Copy)]
-pub struct QuadFelt(pub QuadExtension<Felt>);
+pub type QuadFelt = QuadExtension<Felt>;
 
-impl QuadFelt {
-    pub fn new_random<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        // Note: using a uniform distribution over all u64 values would lead to a non-uniform
-        // distribution of Felt values.
-        let distr = Uniform::new(0, Felt::MODULUS).unwrap(); // Unwrap is safe as Felt::MODULUS is > 0
+/// Returns a random [QuadFelt] value.
+fn rand_quad_felt<R: Rng + ?Sized>(rng: &mut R) -> QuadFelt {
+    // Note: using a uniform distribution over all u64 values would lead to a non-uniform
+    // distribution of Felt values.
+    let distr = Uniform::new(0, Felt::MODULUS).unwrap(); // Unwrap is safe as Felt::MODULUS is > 0
 
-        QuadFelt(QuadExtension::new(Felt::new(rng.sample(distr)), Felt::new(rng.sample(distr))))
-    }
-
-    pub fn new_const(felt: Felt) -> Self {
-        QuadFelt(QuadExtension::new(felt, Felt::ZERO))
-    }
-
-    /// Returns the integer representation of the evaluations.
-    fn as_ints(&self) -> [u64; 2] {
-        self.0.to_base_elements().map(|f| Felt::as_int(&f))
-    }
-
-    fn exp(
-        self,
-        power: <QuadExtension<winter_math::fields::f64::BaseElement> as FieldElement>::PositiveInteger,
-    ) -> Self {
-        QuadFelt(self.0.exp(power))
-    }
+    QuadFelt::new(Felt::new(rng.sample(distr)), Felt::new(rng.sample(distr)))
 }
 
-impl Add for QuadFelt {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self::Output {
-        QuadFelt(self.0 + other.0)
-    }
-}
-
-impl Sub for QuadFelt {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self::Output {
-        QuadFelt(self.0 - other.0)
-    }
-}
-
-impl Mul for QuadFelt {
-    type Output = Self;
-
-    fn mul(self, other: Self) -> Self::Output {
-        QuadFelt(self.0 * other.0)
-    }
-}
-
-impl Hash for QuadFelt {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_ints().hash(state);
-    }
-}
-
-impl Ord for QuadFelt {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Here we can reuse the existing comparison implementation for arrays
-        self.as_ints().cmp(&other.as_ints())
-    }
-}
-
-impl PartialOrd for QuadFelt {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
+/// Returns a [QuadFelt] corresponding to a given base element.
+fn const_quad_felt(felt: Felt) -> QuadFelt {
+    QuadFelt::new(felt, Felt::ZERO)
 }
 
 /// Represents the current existing evaluations to persist random values taken by the same values.
@@ -128,7 +72,7 @@ impl RandomInputs {
             Op::Exp(e) => {
                 let lhs = self.eval(e.lhs.clone())?;
                 let rhs = self.eval(e.rhs.clone())?;
-                let power = rhs.as_ints()[0];
+                let power = rhs.to_base_elements()[0].as_int();
                 Ok(lhs.exp(power))
             },
             Op::BusOp(b) => {
@@ -140,18 +84,18 @@ impl RandomInputs {
                 b.hash(&mut hasher);
                 let hash = hasher.finish();
                 let felt = Felt::new(hash);
-                Ok(QuadFelt::new_const(felt))
+                Ok(const_quad_felt(felt))
             },
             Op::Parameter(_) => {
                 // We cannot easily detect that two parameters refer to the same For, so we consider
                 // them to be all different
-                Ok(QuadFelt::new_random(&mut self.rng))
+                Ok(rand_quad_felt(&mut self.rng))
             },
             Op::Value(v) => {
                 match &v.value.value {
                     MirValue::Constant(ConstantValue::Felt(c)) => {
                         let felt = Felt::new(*c);
-                        Ok(QuadFelt::new_const(felt))
+                        Ok(const_quad_felt(felt))
                     },
                     MirValue::TraceAccess(trace_access) => match trace_access.segment {
                         0 => {
@@ -252,7 +196,7 @@ fn query_indexed_cur_eval<R: Rng + ?Sized>(
     index: usize,
 ) -> QuadFelt {
     if cur_eval_vec.len() <= index {
-        cur_eval_vec.resize_with(index + 1, || QuadFelt::new_random(rng));
+        cur_eval_vec.resize_with(index + 1, || rand_quad_felt(rng));
     }
     cur_eval_vec[index]
 }
@@ -264,5 +208,5 @@ fn query_hashed_cur_eval<R: Rng + ?Sized, H: Hash + Eq + Clone>(
     cur_eval_map: &mut HashMap<H, QuadFelt>,
     element: &H,
 ) -> QuadFelt {
-    *cur_eval_map.entry(element.clone()).or_insert_with(|| QuadFelt::new_random(rng))
+    *cur_eval_map.entry(element.clone()).or_insert_with(|| rand_quad_felt(rng))
 }
