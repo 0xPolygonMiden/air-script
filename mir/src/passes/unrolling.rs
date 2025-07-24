@@ -545,7 +545,7 @@ impl UnrollingFirstPass<'_> {
                 }
             }
 
-            // Remove the taken evaluation indices from all the structures
+            // Remove the picked evaluation indices from all structures
             for eval_index in taken_eval_indices {
                 constraints_evaluation_indices.remove(&eval_index);
                 eval_lens.iter_mut().for_each(|(_len, evals)| {
@@ -575,10 +575,9 @@ impl UnrollingFirstPass<'_> {
                     if_ref.span(),
                 );
 
-                cur_node = if let Some(cur_node) = cur_node {
-                    Some(Add::create(cur_node, new_node, if_ref.span()))
-                } else {
-                    Some(new_node)
+                cur_node = match cur_node {
+                    Some(existing) => Some(Add::create(existing, new_node, if_ref.span())),
+                    None => Some(new_node),
                 };
             }
 
