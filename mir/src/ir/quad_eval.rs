@@ -4,11 +4,9 @@ use std::{
     ops::Deref,
 };
 
+use miden_core::{Felt, QuadExtension};
 use rand::{distr::Uniform, prelude::*};
-use winter_math::{
-    FieldElement, StarkField,
-    fields::{QuadExtension, f64::BaseElement as Felt},
-};
+use winter_math::{FieldElement, StarkField};
 
 use crate::{
     CompileError,
