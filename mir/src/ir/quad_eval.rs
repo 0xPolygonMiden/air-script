@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    hash::{DefaultHasher, Hash, Hasher},
-    ops::Deref,
-};
+use std::{collections::HashMap, hash::Hash, ops::Deref};
 
 use miden_core::{Felt, QuadExtension};
 use rand::{distr::Uniform, prelude::*};
@@ -85,17 +81,6 @@ impl RandomInputs {
                     let power = rhs.to_base_elements()[0].as_int();
                     Ok(lhs.exp(power))
                 }
-            },
-            Op::BusOp(b) => {
-                // For a given bus operation, we hash the operation and its parameters to create a
-                // unique identifier for this operation in the extension field,
-                // as we haven't expanded the bus constraints yet.
-                let mut hasher = DefaultHasher::new();
-                "BusOp".hash(&mut hasher);
-                b.hash(&mut hasher);
-                let hash = hasher.finish();
-                let felt = Felt::new(hash);
-                Ok(const_quad_felt(felt))
             },
             Op::Parameter(_) => {
                 // We cannot easily detect that two parameters refer to the same For, so we consider
@@ -193,6 +178,7 @@ impl RandomInputs {
             Op::Call(_)
             | Op::Fold(_)
             | Op::Boundary(_)
+            | Op::BusOp(_)
             | Op::For(_)
             | Op::If(_)
             | Op::Vector(_)

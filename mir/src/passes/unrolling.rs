@@ -454,6 +454,9 @@ impl UnrollingFirstPass<'_> {
         let if_ref = if_node.as_if().unwrap();
         let match_arms = if_ref.match_arms.borrow();
 
+        #[allow(clippy::mutable_key_type)] // We will not mutate the keys
+        let mut bus_related_constraints = HashMap::new();
+
         // 1. We evaluate all constraints of this match node at random points
         let mut node_evals = Vec::new();
 
@@ -465,12 +468,49 @@ impl UnrollingFirstPass<'_> {
             let condition = match_arm.condition.clone();
             let expr = match_arm.expr.clone();
 
-            // Get all the individual constraints corresponding to this arm
-            let constraints_to_eval = if let Op::Vector(expr_vector) = expr.borrow().deref() {
+            // 1. Get all the individual constraints corresponding to this arm
+            let all_constraints = if let Op::Vector(expr_vector) = expr.borrow().deref() {
                 expr_vector.children().borrow().deref().clone()
             } else {
                 vec![expr.clone()]
             };
+            let mut constraints_to_eval = Vec::new();
+            let mut bus_related_constraints_for_match_arm = Vec::new();
+
+            // 2. Filter out all BusOp nodes from the constraints
+            for constraint in all_constraints {
+                match constraint.borrow().deref() {
+                    Op::BusOp(_) => {
+                        // We will handle these separately
+                        bus_related_constraints_for_match_arm.push(constraint.clone());
+                    },
+                    Op::Enf(enf) => {
+                        match enf.expr.borrow().deref() {
+                            Op::BusOp(_) => {
+                                // We will handle these separately
+                                bus_related_constraints_for_match_arm.push(enf.expr.clone());
+                            },
+                            _ => {
+                                // We can evaluate this constraint
+                                constraints_to_eval.push(constraint.clone());
+                            },
+                        }
+                    },
+                    _ => {
+                        // We can evaluate this constraint
+                        constraints_to_eval.push(constraint.clone());
+                    },
+                }
+                /*if matches!(constraint.borrow().deref(), Op::BusOp(_)) {
+                    println!("BusOp found in match arm, will be handled separately");
+                    bus_related_constraints_for_match_arm.push(constraint.clone());
+                } else {
+                    println!("Adding constraint to evaluation: {constraint:?}");
+                    constraints_to_eval.push(constraint.clone());
+                }*/
+            }
+            bus_related_constraints
+                .insert(condition.clone(), bus_related_constraints_for_match_arm);
 
             for constraint in constraints_to_eval {
                 let eval = self.random_inputs.eval(constraint.clone())?;
@@ -593,6 +633,24 @@ impl UnrollingFirstPass<'_> {
             new_vec.push(new_node_with_sub_zero);
         }
 
+        // Add all the constraints that are bus-related
+        for (condition, constraints) in bus_related_constraints.iter_mut() {
+            for constraint in constraints.iter_mut() {
+                let cur_latch = constraint.as_bus_op().unwrap().latch.clone();
+                let new_latch = Mul::create(
+                    condition.clone(),
+                    duplicate_node(cur_latch, &mut HashMap::new()),
+                    if_ref.span(),
+                );
+                constraint
+                    .as_bus_op_mut()
+                    .unwrap()
+                    .latch
+                    .borrow_mut()
+                    .clone_from(&new_latch.borrow());
+                new_vec.push(constraint.clone());
+            }
+        }
         Ok(Some(Vector::create(new_vec, if_ref.span())))
     }
 
