@@ -1,4 +1,4 @@
-use super::{Pipeline, compile};
+use super::compile;
 
 #[test]
 fn single_selector() {
@@ -18,8 +18,7 @@ fn single_selector() {
         enf clk' = clk when s[0];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -40,8 +39,7 @@ fn chained_selectors() {
         enf clk' = clk when (s[0] & !s[1]) | !s[2]';
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -68,8 +66,7 @@ fn multiconstraint_selectors() {
         };
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -96,8 +93,7 @@ fn selectors_in_evaluators() {
         enf evaluator_with_selector([s[0], clk]);
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -124,8 +120,7 @@ fn multiple_selectors_in_evaluators() {
         enf evaluator_with_selector([s[0], s[1], clk]);
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -152,8 +147,7 @@ fn selector_with_evaluator_call() {
         enf unchanged([clk]) when s[0] & !s[1];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -192,6 +186,5 @@ fn selectors_inside_match() {
         };
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }

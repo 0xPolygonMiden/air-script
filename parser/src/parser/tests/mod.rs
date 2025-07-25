@@ -266,18 +266,6 @@ macro_rules! expr {
     };
 }
 
-macro_rules! scalar {
-    ($expr:expr) => {
-        ScalarExpr::try_from($expr).unwrap()
-    };
-}
-
-macro_rules! statement {
-    ($expr:expr) => {
-        Statement::try_from($expr).unwrap()
-    };
-}
-
 macro_rules! slice {
     ($name:ident, $range:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
@@ -659,7 +647,6 @@ mod constants;
 mod evaluators;
 mod functions;
 mod identifiers;
-mod inlining;
 mod integrity_constraints;
 mod list_comprehension;
 mod modules;

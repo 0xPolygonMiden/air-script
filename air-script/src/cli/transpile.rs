@@ -18,11 +18,6 @@ impl Target {
         }
     }
 }
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-pub enum Pipeline {
-    WithMIR,
-    WithoutMIR,
-}
 
 #[derive(Args)]
 pub struct Transpile {
@@ -38,13 +33,6 @@ pub struct Transpile {
 
     #[arg(short, long, help = "Defines the target language, defaults to Winterfell")]
     target: Option<Target>,
-
-    #[arg(
-        short,
-        long,
-        help = "Defines the compilation pipeline (WithMIR or WithoutMIR), defaults to WithMIR"
-    )]
-    pipeline: Option<Pipeline>,
 }
 
 impl Transpile {
@@ -57,37 +45,18 @@ impl Transpile {
         let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
         let diagnostics = DiagnosticsHandler::new(Default::default(), codemap.clone(), emitter);
 
-        let pipeline = self.pipeline.unwrap_or(Pipeline::WithMIR);
         // Parse from file to internal representation
-        let air = match pipeline {
-            Pipeline::WithMIR => {
-                println!("Transpiling with Mir pipeline...");
-                air_parser::parse_file(&diagnostics, codemap, input_path)
-                    .map_err(CompileError::Parse)
-                    .and_then(|ast| {
-                        let mut pipeline =
-                            air_parser::transforms::ConstantPropagation::new(&diagnostics)
-                                .chain(mir::passes::AstToMir::new(&diagnostics))
-                                .chain(mir::passes::Inlining::new(&diagnostics))
-                                .chain(mir::passes::Unrolling::new(&diagnostics))
-                                .chain(air_ir::passes::MirToAir::new(&diagnostics))
-                                .chain(air_ir::passes::BusOpExpand::new(&diagnostics));
-                        pipeline.run(ast)
-                    })
-            },
-            Pipeline::WithoutMIR => {
-                println!("Transpiling without Mir pipeline...");
-                air_parser::parse_file(&diagnostics, codemap, input_path)
-                    .map_err(CompileError::Parse)
-                    .and_then(|ast| {
-                        let mut pipeline =
-                            air_parser::transforms::ConstantPropagation::new(&diagnostics)
-                                .chain(air_parser::transforms::Inlining::new(&diagnostics))
-                                .chain(air_ir::passes::AstToAir::new(&diagnostics));
-                        pipeline.run(ast)
-                    })
-            },
-        };
+        let air = air_parser::parse_file(&diagnostics, codemap, input_path)
+            .map_err(CompileError::Parse)
+            .and_then(|ast| {
+                let mut pipeline = air_parser::transforms::ConstantPropagation::new(&diagnostics)
+                    .chain(mir::passes::AstToMir::new(&diagnostics))
+                    .chain(mir::passes::Inlining::new(&diagnostics))
+                    .chain(mir::passes::Unrolling::new(&diagnostics))
+                    .chain(air_ir::passes::MirToAir::new(&diagnostics))
+                    .chain(air_ir::passes::BusOpExpand::new(&diagnostics));
+                pipeline.run(ast)
+            });
 
         match air {
             Ok(air) => {

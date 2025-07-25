@@ -1,4 +1,4 @@
-use super::{Pipeline, compile, expect_diagnostic};
+use super::{compile, expect_diagnostic};
 
 #[test]
 fn buses_in_boundary_constraints() {
@@ -29,8 +29,7 @@ fn buses_in_boundary_constraints() {
         enf a = 0;
     }";
 
-    expect_diagnostic(source, "buses are not implemented for this Pipeline", Pipeline::WithoutMIR);
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -70,8 +69,7 @@ fn buses_in_integrity_constraints() {
         q.remove(1, 2) with 2;
     }";
 
-    expect_diagnostic(source, "buses are not implemented for this Pipeline", Pipeline::WithoutMIR);
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 // Tests that should return errors
@@ -102,8 +100,7 @@ fn err_buses_boundaries_to_const() {
         enf a = 0;
     }";
 
-    expect_diagnostic(source, "error: invalid constraint", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "error: invalid constraint", Pipeline::WithMIR);
+    expect_diagnostic(source, "error: invalid constraint");
 }
 
 #[test]
@@ -132,8 +129,7 @@ fn err_trace_columns_constrained_with_null() {
         enf a = 0;
     }";
 
-    expect_diagnostic(source, "error: invalid constraint", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "error: invalid constraint", Pipeline::WithMIR);
+    expect_diagnostic(source, "error: invalid constraint");
 }
 
 #[test]
@@ -164,10 +160,5 @@ fn err_buses_unconstrained() {
         enf a = 0;
     }";
 
-    expect_diagnostic(
-        source,
-        "error: buses are not implemented for this Pipeline",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(source, "error: invalid bus boundary", Pipeline::WithMIR);
+    expect_diagnostic(source, "error: invalid bus boundary");
 }

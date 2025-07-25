@@ -83,7 +83,7 @@ impl Air for ListComprehensionAir {
         let main_current = frame.current();
         let main_next = frame.next();
         result[0] = main_current[0] - main_current[2];
-        result[1] = main_current[4] - main_current[0] * E::from(Felt::new(8_u64)) * main_current[11];
+        result[1] = main_current[4] - main_current[0] * E::from(Felt::new(2_u64)) * E::from(Felt::new(2_u64)) * E::from(Felt::new(2_u64)) * main_current[11];
         result[2] = main_current[4] - main_current[0] * (main_next[8] - main_next[12]);
         result[3] = main_current[6] - main_current[0] * (main_current[9] - main_current[14]);
         result[4] = main_current[1] - (E::ZERO + main_current[5] - main_current[8] - main_current[12] + E::ONE + main_current[6] - main_current[9] - main_current[13] + E::from(Felt::new(2_u64)) + main_current[7] - main_current[10] - main_current[14]);

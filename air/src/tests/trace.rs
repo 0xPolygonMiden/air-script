@@ -1,4 +1,4 @@
-use super::{Pipeline, compile, expect_diagnostic};
+use super::{compile, expect_diagnostic};
 
 #[test]
 fn trace_columns_index_access() {
@@ -17,8 +17,7 @@ fn trace_columns_index_access() {
         enf $main[0]' - $main[1] = 0;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -42,8 +41,7 @@ fn trace_cols_groups() {
         enf a[0]' = a[1] - 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile(source).is_ok());
 }
 
 #[test]
@@ -64,8 +62,7 @@ fn err_bc_column_undeclared() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithMIR);
+    expect_diagnostic(source, "this variable / bus is not defined");
 }
 
 #[test]
@@ -85,8 +82,7 @@ fn err_ic_column_undeclared() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithMIR);
+    expect_diagnostic(source, "this variable / bus is not defined");
 }
 
 #[test]
@@ -110,16 +106,7 @@ fn err_bc_trace_cols_access_out_of_bounds() {
         enf a[0]' = a[0] - 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -144,16 +131,7 @@ fn err_ic_trace_cols_access_out_of_bounds() {
         enf a[4]' = a[4] - 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -173,6 +151,5 @@ fn err_ic_trace_cols_group_used_as_scalar() {
         enf a[0]' = a + clk;
     }";
 
-    expect_diagnostic(source, "type mismatch", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "type mismatch", Pipeline::WithMIR);
+    expect_diagnostic(source, "type mismatch");
 }
