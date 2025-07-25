@@ -46,6 +46,9 @@ pub struct RandomInputs {
 
 impl RandomInputs {
     /// Evaluates a given MIR node at random points.
+    ///
+    /// Note that we currently assume this will be called only during the unrolling phase, some
+    /// operation types are not handled.
     pub fn eval(&mut self, op: Link<Op>) -> Result<QuadFelt, CompileError> {
         match op.borrow().deref() {
             Op::Enf(e) => {
@@ -123,7 +126,7 @@ impl RandomInputs {
                         },
                         _ => {
                             println!(
-                                "Unexpected segment in eval_random_point: {}",
+                                "Unexpected segment in RandomInputs::eval: {}",
                                 trace_access.segment
                             );
                             Err(CompileError::Failed)
@@ -149,7 +152,7 @@ impl RandomInputs {
                     | MirValue::TraceAccessBinding(_)
                     | MirValue::Constant(_) => {
                         // These values are not handled in this function
-                        println!("Unexpected values in eval_random_point: {op:?}");
+                        println!("Unexpected values in RandomInputs::eval: {op:?}");
                         Err(CompileError::Failed)
                     },
                 }
@@ -176,7 +179,7 @@ impl RandomInputs {
                             },
                             _ => {
                                 println!(
-                                    "Unexpected segment in eval_random_point: {}",
+                                    "Unexpected segment in RandomInputs::eval: {}",
                                     trace_access.segment
                                 );
                                 return Err(CompileError::Failed);
@@ -195,8 +198,9 @@ impl RandomInputs {
             | Op::Vector(_)
             | Op::Matrix(_)
             | Op::None(_) => {
-                // These operations are not handled in this function
-                println!("Unexpected operation in eval_random_point: {op:?}");
+                // These operations are not handled in this function, as we currently expect this
+                // function to be called only on during Unrolling.
+                println!("Unexpected operation in RandomInputs::eval: {op:?}");
                 Err(CompileError::Failed)
             },
         }
