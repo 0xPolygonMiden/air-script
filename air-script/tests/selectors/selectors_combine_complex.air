@@ -1,9 +1,13 @@
 def SelectorsAir
 
-const R = [0, 1, 2, 3, 4, 5];
+const R = [8, 4, 20, 31, 5, 15];
 
 trace_columns {
     main: [s[3], c],
+}
+
+buses {
+    multiset p,
 }
 
 public_inputs {
@@ -12,18 +16,33 @@ public_inputs {
 
 boundary_constraints {
     enf c.first = 0;
+    enf p.first = null;
+    enf p.last = null;
 }
 
+fn double_with_mult(a: felt) -> felt {
+    return 2*a;
+}
+
+fn double_with_add(a: felt) -> felt {
+    return a+a;
+}
+
+# Note: we want the following values to be equal:
+# a = c = f
+# g = h
+
 ev ev_s0([c]) {
-    enf c = R[0]; #a
+    p.insert(1, 2) when c;
+    enf c = double_with_mult(R[0]); #a
     enf c = R[1]; #b
-    enf c = R[0]; #c
+    enf c = double_with_add(R[0]); #c
     enf c = R[2]; #d
 }
 
 ev ev_s1([c]) {
     enf c = R[3]; #e
-    enf c = R[0]; #f
+    enf c = 16; #f
     enf c = R[4]; #g
 }
 

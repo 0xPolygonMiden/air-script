@@ -48,9 +48,9 @@ impl Air for SelectorsAir {
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
         let main_degrees = vec![TransitionConstraintDegree::new(3), TransitionConstraintDegree::new(3), TransitionConstraintDegree::new(3)];
-        let aux_degrees = vec![];
+        let aux_degrees = vec![TransitionConstraintDegree::new(3)];
         let num_main_assertions = 1;
-        let num_aux_assertions = 0;
+        let num_aux_assertions = 2;
 
         let context = AirContext::new_multi_segment(
             trace_info,
@@ -76,15 +76,17 @@ impl Air for SelectorsAir {
 
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
+        result.push(Assertion::single(0, 0, E::ONE));
+        result.push(Assertion::single(0, self.last_step(), E::ONE));
         result
     }
 
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = (main_current[0] + (E::ONE - main_current[0]) * main_current[1]) * (main_current[3] - E::ZERO) + (E::ONE - main_current[0]) * (E::ONE - main_current[1]) * (main_current[3] - E::from(Felt::new(5_u64))) - E::ZERO;
-        result[1] = ((E::ONE - main_current[0]) * main_current[1] + (E::ONE - main_current[0]) * (E::ONE - main_current[1])) * (main_current[3] - E::from(Felt::new(4_u64))) + main_current[0] * (main_current[3] - E::ONE) - E::ZERO;
-        result[2] = main_current[0] * (main_current[3] - E::from(Felt::new(2_u64))) + (E::ONE - main_current[0]) * main_current[1] * (main_current[3] - E::from(Felt::new(3_u64))) - E::ZERO;
+        result[0] = (main_current[0] + (E::ONE - main_current[0]) * main_current[1]) * (main_current[3] - E::from(Felt::new(2_u64)) * E::from(Felt::new(8_u64))) + (E::ONE - main_current[0]) * (E::ONE - main_current[1]) * (main_current[3] - E::from(Felt::new(15_u64))) - E::ZERO;
+        result[1] = ((E::ONE - main_current[0]) * main_current[1] + (E::ONE - main_current[0]) * (E::ONE - main_current[1])) * (main_current[3] - E::from(Felt::new(5_u64))) + main_current[0] * (main_current[3] - E::from(Felt::new(4_u64))) - E::ZERO;
+        result[2] = main_current[0] * (main_current[3] - E::from(Felt::new(20_u64))) + (E::ONE - main_current[0]) * main_current[1] * (main_current[3] - E::from(Felt::new(31_u64))) - E::ZERO;
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxRandElements<E>, result: &mut [E])
@@ -95,5 +97,6 @@ impl Air for SelectorsAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
+        result[0] = ((aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * E::from(main_current[0]) * E::from(main_current[3]) + E::ONE - E::from(main_current[0]) * E::from(main_current[3])) * aux_current[0] - aux_next[0];
     }
 }
