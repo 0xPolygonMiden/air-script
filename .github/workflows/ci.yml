@@ -6,6 +6,9 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   test:
     name: Test Rust ${{matrix.toolchain}} on ${{matrix.os}}
@@ -16,51 +19,60 @@ jobs:
         toolchain: [stable, nightly]
         os: [ubuntu]
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v4
       - name: Install rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{matrix.toolchain}}
           override: true
-      - name: Test
-        uses: actions-rs/cargo@v1
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Run tests
+        run: make test
+
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          command: test
+          toolchain: stable
+          override: true
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Run check
+        run: make check
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@main
-      - name: Install minimal stable with clippy
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
+          toolchain: nightly
           components: clippy
           override: true
-
-      - name: Clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all -- -D clippy::all -D warnings
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Run clippy
+        run: make lint
 
   rustfmt:
     name: rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@main
-      - name: Install minimal stable with rustfmt
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
+          toolchain: nightly
           components: rustfmt
           override: true
-
-      - name: rustfmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Run rustfmt
+        run: make format-check
