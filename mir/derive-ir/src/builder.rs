@@ -12,10 +12,8 @@ pub enum EnumWrapper {
 pub fn impl_builder(input: &DeriveInput) -> proc_macro2::TokenStream {
     let enum_wrapper = get_enum_wrapper(input);
     let name = &input.ident;
-    let (yes_name, no_name) = (
-        format_ident!("{}BuilderYes", name),
-        format_ident!("{}BuilderNo", name),
-    );
+    let (yes_name, no_name) =
+        (format_ident!("{}BuilderYes", name), format_ident!("{}BuilderNo", name));
     let (fields, hidden_fields) = extract_fields(input);
     let (builder_struct_fields, builder_states, transition_table) =
         make_builder_struct_fields(&fields);
@@ -81,7 +79,7 @@ fn extract_fields(data: &syn::DeriveInput) -> (Vec<(&syn::Ident, &syn::Type)>, V
                         "_" => {
                             hidden_fields.push(ident);
                             None
-                        }
+                        },
                         _ => Some((ident, &field.ty)),
                     }
                 })
@@ -102,7 +100,7 @@ fn next_ty(ty: &syn::PathSegment) -> Option<syn::PathSegment> {
         }) => match args.first().unwrap() {
             syn::GenericArgument::Type(syn::Type::Path(syn::TypePath { path, .. })) => {
                 Some(path.segments.first().unwrap().clone())
-            }
+            },
             _ => None,
         },
         syn::PathArguments::None => Some(syn::PathSegment {
@@ -157,20 +155,20 @@ type StructFields<'a> = (
 /// enum Op {}
 ///
 /// struct Foo {
-///    parent: BackLink<Owner>,
-///    a: Link<Node>,
-///    bs: Link<Vec<Link<Op>>>,
-///    cs: Vec<Link<Op>>,
-///    count: i32,
+///     parent: BackLink<Owner>,
+///     a: Link<Node>,
+///     bs: Link<Vec<Link<Op>>>,
+///     cs: Vec<Link<Op>>,
+///     count: i32,
 /// }
 /// // the builder struct fields would be:
 /// struct FooBuilder<State> {
-///    _builder_state: std::marker::PhantomData<State>,
-///    parent: BackLink<Owner>,
-///    a: Option<Link<Node>>,
-///    bs: Link<Vec<Link<Op>>>,
-///    cs: Vec<Link<Op>>,
-///    count: Option<i32>,
+///     _builder_state: std::marker::PhantomData<State>,
+///     parent: BackLink<Owner>,
+///     a: Option<Link<Node>>,
+///     bs: Link<Vec<Link<Op>>>,
+///     cs: Vec<Link<Op>>,
+///     count: Option<i32>,
 /// }
 /// ```
 /// we generate a vec of the struct's fields, it will be our columns in the transition table.
@@ -291,11 +289,8 @@ fn make_builder_struct_fields<'a>(fields: &[(&'a syn::Ident, &'a syn::Type)]) ->
 
     let initial_state = initial_state.clone();
     let states = make_states(&initial_state);
-    let reverse_states: HashMap<Vec<bool>, usize> = states
-        .iter()
-        .enumerate()
-        .map(|(i, state)| (state.clone(), i))
-        .collect();
+    let reverse_states: HashMap<Vec<bool>, usize> =
+        states.iter().enumerate().map(|(i, state)| (state.clone(), i)).collect();
     let mut transition_table: Vec<Vec<usize>> = vec![];
     for state in states.iter() {
         let mut row = vec![];
@@ -378,18 +373,13 @@ fn sorted_leftmost_layered_gray_codes(n: usize) -> Vec<Vec<bool>> {
 /// For example, for the initial state `[false, true, false, true]`:
 /// ```rust
 /// // We first generate the gray code for `2` false values.
-/// let sorted_gray_codes = [
-///    [false, false],
-///    [true, false],
-///    [false, true],
-///    [true, true],
-/// ];
+/// let sorted_gray_codes = [[false, false], [true, false], [false, true], [true, true]];
 /// // Then we merge it with the initial state's false values.
 /// let states = [
-///   [false, true, false, true],
-///   [true,  true, false,  true],
-///   [false, true, true,  true],
-///   [true,  true, true,  true],
+///     [false, true, false, true],
+///     [true, true, false, true],
+///     [false, true, true, true],
+///     [true, true, true, true],
 /// ];
 /// ```
 fn make_states(initial_state: &[bool]) -> Vec<Vec<bool>> {
@@ -427,7 +417,7 @@ fn make_builder_struct<'a>(
     )],
 ) -> proc_macro2::TokenStream {
     let builder_struct_name = format_ident!("{}Builder", name);
-    let struct_fields = fields.iter().map(|(_, _, field, _, _, _)| field);
+    let struct_fields = fields.iter().map(|(_, _, field, ..)| field);
     let builder_struct = quote! {
         #[derive(Debug)]
         pub struct #builder_struct_name<State> {
@@ -521,10 +511,7 @@ fn make_builder_impls<'a>(
                 let (ret, body_ret) = if next_state_name == state_name {
                     (quote! { Self }, quote! { self })
                 } else {
-                    (
-                        quote! { #next_state_name },
-                        quote! { unsafe { std::mem::transmute(self) } },
-                    )
+                    (quote! { #next_state_name }, quote! { unsafe { std::mem::transmute(self) } })
                 };
                 quote! {
                     pub fn #ident(#arg) -> #ret {
@@ -535,16 +522,8 @@ fn make_builder_impls<'a>(
             })
             .collect::<Vec<_>>();
         if i == states.len() - 1 {
-            let builder = fields
-                .iter()
-                .map(|(_, _, _, _, _, builder)| builder)
-                .collect::<Vec<_>>();
-            methods.push(make_build_method(
-                name,
-                &builder,
-                enum_wrapper,
-                hidden_fields,
-            ));
+            let builder = fields.iter().map(|(_, _, _, _, _, builder)| builder).collect::<Vec<_>>();
+            methods.push(make_build_method(name, &builder, enum_wrapper, hidden_fields));
         };
         quote! {
             impl #state_name {
@@ -552,7 +531,7 @@ fn make_builder_impls<'a>(
             }
         }
     });
-    let field_names = fields.iter().map(|(ident, _, _, _, _, _)| ident);
+    let field_names = fields.iter().map(|(ident, ..)| ident);
     quote! {
         impl Default for #empty_state {
             fn default() -> Self {
@@ -572,11 +551,10 @@ fn make_build_method(
     enum_wrapper: &EnumWrapper,
     hidden_fields: &[&syn::Ident],
 ) -> proc_macro2::TokenStream {
-    let fields = builders.iter().map(|builder| quote! { #builder }).chain(
-        hidden_fields
-            .iter()
-            .map(|field| quote! { #field: Default::default() }),
-    );
+    let fields = builders
+        .iter()
+        .map(|builder| quote! { #builder })
+        .chain(hidden_fields.iter().map(|field| quote! { #field: Default::default() }));
 
     match enum_wrapper {
         EnumWrapper::Op => quote! {
@@ -602,17 +580,15 @@ fn make_build_method(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::helpers::fmt;
     use pretty_assertions::assert_eq;
     use syn::parse2;
 
+    use super::*;
+    use crate::helpers::fmt;
+
     #[test]
     fn test_derive_builder() {
-        let (y, n) = (
-            format_ident!("FooBuilderYes"),
-            format_ident!("FooBuilderNo"),
-        );
+        let (y, n) = (format_ident!("FooBuilderYes"), format_ident!("FooBuilderNo"));
         let input = quote! {
             #[derive(Builder)]
             #[enum_wrapper(Op)]

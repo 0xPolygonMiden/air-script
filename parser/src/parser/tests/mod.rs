@@ -36,17 +36,11 @@ macro_rules! ident {
     };
 
     ($name:literal) => {
-        Identifier::new(
-            miden_diagnostics::SourceSpan::UNKNOWN,
-            crate::Symbol::intern($name),
-        )
+        Identifier::new(miden_diagnostics::SourceSpan::UNKNOWN, crate::Symbol::intern($name))
     };
 
     ($module:ident, $name:ident) => {
-        QualifiedIdentifier::new(
-            ident!($module),
-            NamespacedIdentifier::Binding(ident!($name)),
-        )
+        QualifiedIdentifier::new(ident!($module), NamespacedIdentifier::Binding(ident!($name)))
     };
 }
 
@@ -56,10 +50,7 @@ macro_rules! function_ident {
     };
 
     ($module:ident, $name:ident) => {
-        QualifiedIdentifier::new(
-            ident!($module),
-            NamespacedIdentifier::Function(ident!($name)),
-        )
+        QualifiedIdentifier::new(ident!($module), NamespacedIdentifier::Function(ident!($name)))
     };
 }
 
@@ -173,7 +164,7 @@ macro_rules! access {
         })
     };
 
-    ($name:ident [ $idx:literal ]) => {
+    ($name:ident[$idx:literal]) => {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
@@ -182,7 +173,7 @@ macro_rules! access {
         ))
     };
 
-    ($name:literal [ $idx:literal ]) => {
+    ($name:literal[$idx:literal]) => {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
@@ -191,7 +182,7 @@ macro_rules! access {
         ))
     };
 
-    ($name:ident [ $row:literal ] [ $col:literal ]) => {
+    ($name:ident[$row:literal][$col:literal]) => {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
@@ -200,7 +191,7 @@ macro_rules! access {
         ))
     };
 
-    ($name:ident [ $row:literal ] [ $col:literal ], $ty:expr) => {
+    ($name:ident[$row:literal][$col:literal], $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
@@ -210,7 +201,7 @@ macro_rules! access {
         })
     };
 
-    ($module:ident, $name:ident [ $idx:literal ], $ty:expr) => {
+    ($module:ident, $name:ident[$idx:literal], $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ident!($module, $name).into(),
@@ -220,7 +211,7 @@ macro_rules! access {
         })
     };
 
-    ($module:ident, $name:ident [ $row:literal ] [ $col:literal ], $ty:expr) => {
+    ($module:ident, $name:ident[$row:literal][$col:literal], $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ident!($module, $name).into(),
@@ -230,7 +221,7 @@ macro_rules! access {
         })
     };
 
-    ($name:ident [ $idx:literal ], $offset:literal) => {
+    ($name:ident[$idx:literal], $offset:literal) => {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
@@ -239,7 +230,7 @@ macro_rules! access {
         ))
     };
 
-    ($name:ident [ $idx:literal ], $ty:expr) => {
+    ($name:ident[$idx:literal], $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
@@ -249,7 +240,7 @@ macro_rules! access {
         })
     };
 
-    ($name:ident [ $idx:literal ], $offset:literal, $ty:expr) => {
+    ($name:ident[$idx:literal], $offset:literal, $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
@@ -259,7 +250,7 @@ macro_rules! access {
         })
     };
 
-    ($name:literal [ $idx:literal ], $offset:literal) => {
+    ($name:literal[$idx:literal], $offset:literal) => {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
@@ -337,7 +328,7 @@ macro_rules! bounded_access {
         ))
     };
 
-    ($name:ident [ $idx:literal ], $bound:expr) => {
+    ($name:ident[$idx:literal], $bound:expr) => {
         ScalarExpr::BoundedSymbolAccess(BoundedSymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             SymbolAccess::new(
@@ -350,7 +341,7 @@ macro_rules! bounded_access {
         ))
     };
 
-    ($name:ident [ $idx:literal ], $bound:expr, $ty:expr) => {
+    ($name:ident[$idx:literal], $bound:expr, $ty:expr) => {
         ScalarExpr::BoundedSymbolAccess(BoundedSymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             SymbolAccess {
@@ -383,10 +374,7 @@ macro_rules! int {
 
 macro_rules! null {
     () => {
-        ScalarExpr::Null(miden_diagnostics::Span::new(
-            miden_diagnostics::SourceSpan::UNKNOWN,
-            (),
-        ))
+        ScalarExpr::Null(miden_diagnostics::Span::new(miden_diagnostics::SourceSpan::UNKNOWN, ()))
     };
 }
 
@@ -468,7 +456,7 @@ macro_rules! enforce {
         Statement::Enforce($expr)
     };
 
-    ($expr:expr, when $selector:expr) => {
+    ($expr:expr,when $selector:expr) => {
         Statement::EnforceIf($expr, $selector)
     };
 }
@@ -650,9 +638,7 @@ macro_rules! exp {
 
 macro_rules! import_all {
     ($module:ident) => {
-        Import::All {
-            module: ident!($module),
-        }
+        Import::All { module: ident!($module) }
     };
 }
 
@@ -660,10 +646,7 @@ macro_rules! import {
     ($module:ident, $item:ident) => {{
         let mut items: std::collections::HashSet<Identifier> = std::collections::HashSet::default();
         items.insert(ident!($item));
-        Import::Partial {
-            module: ident!($module),
-            items,
-        }
+        Import::Partial { module: ident!($module), items }
     }};
 }
 
@@ -717,10 +700,9 @@ fn full_air_file() {
     // boundary_constraints {
     //     enf clk.first = 0
     // }
-    expected.boundary_constraints.push(enforce!(eq!(
-        bounded_access!(clk, Boundary::First, Type::Felt),
-        int!(0)
-    )));
+    expected
+        .boundary_constraints
+        .push(enforce!(eq!(bounded_access!(clk, Boundary::First, Type::Felt), int!(0))));
 
     ParseTest::new().expect_program_ast_from_file("src/parser/tests/input/system.air", expected);
 }
