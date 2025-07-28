@@ -6,10 +6,7 @@ use winter_math::{FieldElement, StarkField};
 
 use crate::{
     CompileError,
-    ir::{
-        ConstantValue, Link, MirValue, Op, PeriodicColumnAccess, PublicInputAccess,
-        PublicInputTableAccess,
-    },
+    ir::{ConstantValue, Link, MirValue, Op, PeriodicColumnAccess, PublicInputAccess},
 };
 
 pub type QuadFelt = QuadExtension<Felt>;
@@ -32,12 +29,12 @@ fn const_quad_felt(felt: Felt) -> QuadFelt {
 #[derive(Debug, Clone, Default)]
 pub struct RandomInputs {
     rng: ThreadRng,
+    // A vector to hold the random values taken for the main trace, indexed in the following way:
+    // $main[0], $main[0]', $main[1], $main[1]', $main[2], ...
     main_trace: Vec<QuadFelt>,
-    aux_trace: Vec<QuadFelt>,
     rand_values: Vec<QuadFelt>,
     public_inputs: HashMap<PublicInputAccess, QuadFelt>,
     periodic_columns: HashMap<PeriodicColumnAccess, QuadFelt>,
-    public_input_tables: HashMap<PublicInputTableAccess, QuadFelt>,
 }
 
 impl RandomInputs {
@@ -93,7 +90,7 @@ impl RandomInputs {
                         let felt = Felt::new(*c);
                         Ok(const_quad_felt(felt))
                     },
-                    // For each trace segment, we associate a random value to the each trace access
+                    // We associate a random value to each trace access of the main trace,
                     // indexed in the following way, each column having two
                     // distinct evaluations to account for the two possible row offsets:
                     // $main[0], $main[0]', $main[1], $main[1]', $main[2], ...
@@ -105,13 +102,9 @@ impl RandomInputs {
                             let index = trace_access.column * 2 + trace_access.row_offset;
                             Ok(query_indexed_cur_eval(&mut self.rng, &mut self.main_trace, index))
                         },
-                        1 => {
-                            let index = trace_access.column * 2 + trace_access.row_offset;
-                            Ok(query_indexed_cur_eval(&mut self.rng, &mut self.aux_trace, index))
-                        },
                         _ => {
                             println!(
-                                "Unexpected segment in RandomInputs::eval: {}",
+                                "Unexpected trace_access segment in RandomInputs::eval: {}. This segment should only be used for buses and should be handled separately.",
                                 trace_access.segment
                             );
                             Err(CompileError::Failed)
@@ -120,24 +113,30 @@ impl RandomInputs {
                     MirValue::RandomValue(u) => {
                         Ok(query_indexed_cur_eval(&mut self.rng, &mut self.rand_values, *u))
                     },
+                    // For PublicInput and PeriodicColumn, we use the Hash of the element to
+                    // associate a unique random value or each public input and
+                    // each periodic column access
                     MirValue::PublicInput(pi) => {
                         Ok(query_hashed_cur_eval(&mut self.rng, &mut self.public_inputs, pi))
                     },
                     MirValue::PeriodicColumn(pc) => {
                         Ok(query_hashed_cur_eval(&mut self.rng, &mut self.periodic_columns, pc))
                     },
-                    MirValue::PublicInputTable(pita) => Ok(query_hashed_cur_eval(
-                        &mut self.rng,
-                        &mut self.public_input_tables,
-                        pita,
-                    )),
                     MirValue::Null
                     | MirValue::BusAccess(_)
                     | MirValue::Unconstrained
-                    | MirValue::TraceAccessBinding(_)
-                    | MirValue::Constant(_) => {
-                        // These values are not handled in this function
-                        println!("Unexpected values in RandomInputs::eval: {op:?}");
+                    | MirValue::PublicInputTable(_) => {
+                        // Bus related values, we expect these to be handled separately
+                        println!(
+                            "Unexpected values in RandomInputs::eval, the following op should only be used for Bus expressions and should be handled separately: {op:?}"
+                        );
+                        Err(CompileError::Failed)
+                    },
+                    MirValue::TraceAccessBinding(_) | MirValue::Constant(_) => {
+                        // These should have been unrolled as Vector and handled beforehand
+                        println!(
+                            "Unexpected values in RandomInputs::eval, the following op should already be Unrolled at this stage: {op:?}"
+                        );
                         Err(CompileError::Failed)
                     },
                 }
@@ -155,16 +154,9 @@ impl RandomInputs {
                                     index,
                                 ));
                             },
-                            1 => {
-                                return Ok(query_indexed_cur_eval(
-                                    &mut self.rng,
-                                    &mut self.aux_trace,
-                                    index,
-                                ));
-                            },
                             _ => {
                                 println!(
-                                    "Unexpected segment in RandomInputs::eval: {}",
+                                    "Unexpected trace_access segment in RandomInputs::eval: {}. This segment should only be used for buses and should be handled separately.",
                                     trace_access.segment
                                 );
                                 return Err(CompileError::Failed);
@@ -175,18 +167,30 @@ impl RandomInputs {
                 let indexable = self.eval(a.indexable.clone())?;
                 Ok(indexable)
             },
-            Op::Call(_)
-            | Op::Fold(_)
-            | Op::Boundary(_)
-            | Op::BusOp(_)
-            | Op::For(_)
-            | Op::If(_)
-            | Op::Vector(_)
-            | Op::Matrix(_)
-            | Op::None(_) => {
-                // These operations are not handled in this function, as we currently expect this
-                // function to be called only on during Unrolling.
-                println!("Unexpected operation in RandomInputs::eval: {op:?}");
+            Op::Call(_) => {
+                // We expect Inlining to have already been done before Unrolling
+                println!(
+                    "Unexpected operation in RandomInputs::eval, Calls should have been Inlined in a previous pass: {op:?}"
+                );
+                Err(CompileError::Failed)
+            },
+            Op::Fold(_) | Op::Vector(_) | Op::Matrix(_) | Op::For(_) | Op::If(_) | Op::None(_) => {
+                println!(
+                    "Unexpected operation in RandomInputs::eval, the following operation should already be Unrolled at this stage: {op:?}"
+                );
+                Err(CompileError::Failed)
+            },
+            Op::Boundary(_) => {
+                println!(
+                    "Unexpected operation in RandomInputs::eval, the following operation is not valid in integrity constraints: {op:?}"
+                );
+                Err(CompileError::Failed)
+            },
+            Op::BusOp(_) => {
+                // Bus related operation, we expect these to be handled separately
+                println!(
+                    "Unexpected operation in RandomInputs::eval, the following op should only be used for Bus expressions and should be handled separately: {op:?}"
+                );
                 Err(CompileError::Failed)
             },
         }
