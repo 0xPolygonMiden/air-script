@@ -454,8 +454,7 @@ impl UnrollingFirstPass<'_> {
         let if_ref = if_node.as_if().unwrap();
         let match_arms = if_ref.match_arms.borrow();
 
-        #[allow(clippy::mutable_key_type)] // We will not mutate the keys
-        let mut bus_related_constraints = HashMap::new();
+        let mut bus_related_constraints = Vec::new();
 
         // 1. We evaluate all constraints of this match node at random points
         let mut node_evals = Vec::new();
@@ -491,7 +490,7 @@ impl UnrollingFirstPass<'_> {
                 }
             }
             bus_related_constraints
-                .insert(condition.clone(), bus_related_constraints_for_match_arm);
+                .push((condition.clone(), bus_related_constraints_for_match_arm));
 
             // 1.3. Evaluate all the other constraints at random points
             for constraint in constraints_to_eval {
