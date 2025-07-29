@@ -5,6 +5,7 @@ mod mir;
 mod node;
 mod nodes;
 mod owner;
+mod quad_eval;
 mod utils;
 pub extern crate derive_ir;
 
@@ -16,6 +17,7 @@ pub use mir::Mir;
 pub use node::Node;
 pub use nodes::*;
 pub use owner::Owner;
+pub use quad_eval::{QuadFelt, RandomInputs};
 pub use utils::*;
 /// A trait for nodes that can have children
 /// This is used with the Child trait to allow for easy traversal and manipulation of the graph

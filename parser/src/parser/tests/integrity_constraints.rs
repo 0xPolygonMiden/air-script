@@ -654,14 +654,13 @@ fn ic_match_constraint() {
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![
-            enforce_all!(
-                lc!((("%1", range!(0..1))) => call!(is_binary(vector!(access!(c[0])))), when and!(access!(s[0]), access!(s[1])))
+        vec![enforce_if!(
+            match_arm!(
+                call!(is_binary(vector!(access!(c[0])))),
+                and!(access!(s[0]), access!(s[1]))
             ),
-            enforce_all!(
-                lc!((("%2", range!(0..1))) => eq!(access!(c[1]), access!(c[2])), when access!(s[0]))
-            ),
-        ],
+            match_arm!(eq!(access!(c[1]), access!(c[2])), access!(s[0]))
+        )],
     ));
     ParseTest::new().expect_module_ast(source, expected);
 }

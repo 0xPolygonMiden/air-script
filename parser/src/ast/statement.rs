@@ -55,7 +55,7 @@ pub enum Statement {
     /// perform inlining/unrolling of comprehensions, and at that time we need `EnforceIf` in
     /// order to represent unrolled constraints which have a selector that is only resolvable at
     /// runtime.
-    EnforceIf(#[span] ScalarExpr, ScalarExpr),
+    EnforceIf(Match),
     /// Declares a constraint to be enforced over a vector of values produced by a comprehension.
     ///
     /// Just like `Enforce`, except the constraint is contained in the body of a list comprehension,
@@ -64,6 +64,65 @@ pub enum Statement {
     /// Declares a bus related constraint
     BusEnforce(ListComprehension),
 }
+
+#[derive(Clone, Spanned, Debug, Eq)]
+pub struct Match {
+    #[span]
+    pub span: SourceSpan,
+    pub match_arms: Vec<MatchArm>,
+}
+
+impl Match {
+    pub fn new(span: SourceSpan, match_arms: Vec<MatchArm>) -> Self {
+        Self { span, match_arms }
+    }
+}
+
+impl PartialEq for Match {
+    fn eq(&self, other: &Self) -> bool {
+        self.match_arms == other.match_arms
+    }
+}
+
+impl fmt::Display for Match {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "match: ")?;
+        for arm in self.match_arms.iter() {
+            write!(f, "{arm}")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Spanned, Debug, Eq)]
+pub struct MatchArm {
+    #[span]
+    pub span: SourceSpan,
+    /// The condition to be matched
+    pub condition: ScalarExpr,
+    /// The expression to be enforced if the condition is matched
+    pub expr: ScalarExpr,
+}
+
+impl MatchArm {
+    pub fn new(span: SourceSpan, expr: ScalarExpr, condition: ScalarExpr) -> Self {
+        Self { span, expr, condition }
+    }
+}
+
+impl PartialEq for MatchArm {
+    fn eq(&self, other: &Self) -> bool {
+        self.condition == other.condition && self.expr == other.expr
+    }
+}
+
+impl fmt::Display for MatchArm {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} when {}", self.expr, self.condition)?;
+        Ok(())
+    }
+}
+
 impl Statement {
     /// Checks this statement to see if it contains any constraints
     ///

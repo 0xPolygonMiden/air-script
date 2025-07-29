@@ -445,7 +445,22 @@ macro_rules! enforce {
     };
 
     ($expr:expr, when $selector:expr) => {
-        Statement::EnforceIf($expr, $selector)
+        Statement::EnforceIf(Match::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            vec![MatchArm::new(miden_diagnostics::SourceSpan::UNKNOWN, $expr, $selector)],
+        ))
+    };
+}
+
+macro_rules! enforce_if {
+    ($($match_arms:expr),+) => {
+        Statement::EnforceIf(Match::new(miden_diagnostics::SourceSpan::UNKNOWN, vec![$($match_arms),+]))
+    };
+}
+
+macro_rules! match_arm {
+    ($expr:expr, $selector:expr) => {
+        MatchArm::new(miden_diagnostics::SourceSpan::UNKNOWN, $expr, $selector)
     };
 }
 

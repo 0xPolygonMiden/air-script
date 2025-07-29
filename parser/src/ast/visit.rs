@@ -169,13 +169,12 @@ pub trait VisitMut<T> {
     fn visit_mut_enforce(&mut self, expr: &mut ast::ScalarExpr) -> ControlFlow<T> {
         visit_mut_scalar_expr(self, expr)
     }
-    fn visit_mut_enforce_if(
-        &mut self,
-        expr: &mut ast::ScalarExpr,
-        selector: &mut ast::ScalarExpr,
-    ) -> ControlFlow<T> {
-        self.visit_mut_enforce(expr)?;
-        self.visit_mut_scalar_expr(selector)
+    fn visit_mut_enforce_if(&mut self, match_expr: &mut ast::Match) -> ControlFlow<T> {
+        for arm in match_expr.match_arms.iter_mut() {
+            self.visit_mut_scalar_expr(&mut arm.condition)?;
+            self.visit_mut_scalar_expr(&mut arm.expr)?;
+        }
+        ControlFlow::Continue(())
     }
     fn visit_mut_enforce_all(&mut self, expr: &mut ast::ListComprehension) -> ControlFlow<T> {
         self.visit_mut_list_comprehension(expr)
@@ -321,12 +320,8 @@ where
     fn visit_mut_enforce(&mut self, expr: &mut ast::ScalarExpr) -> ControlFlow<T> {
         (**self).visit_mut_enforce(expr)
     }
-    fn visit_mut_enforce_if(
-        &mut self,
-        expr: &mut ast::ScalarExpr,
-        selector: &mut ast::ScalarExpr,
-    ) -> ControlFlow<T> {
-        (**self).visit_mut_enforce_if(expr, selector)
+    fn visit_mut_enforce_if(&mut self, match_expr: &mut ast::Match) -> ControlFlow<T> {
+        (**self).visit_mut_enforce_if(match_expr)
     }
     fn visit_mut_enforce_all(&mut self, expr: &mut ast::ListComprehension) -> ControlFlow<T> {
         (**self).visit_mut_enforce_all(expr)
@@ -570,7 +565,7 @@ where
     match expr {
         ast::Statement::Let(expr) => visitor.visit_mut_let(expr),
         ast::Statement::Enforce(expr) => visitor.visit_mut_enforce(expr),
-        ast::Statement::EnforceIf(expr, selector) => visitor.visit_mut_enforce_if(expr, selector),
+        ast::Statement::EnforceIf(match_expr) => visitor.visit_mut_enforce_if(match_expr),
         ast::Statement::EnforceAll(expr) => visitor.visit_mut_enforce_all(expr),
         ast::Statement::Expr(expr) => visitor.visit_mut_expr(expr),
         ast::Statement::BusEnforce(expr) => visitor.visit_mut_bus_enforce(expr),

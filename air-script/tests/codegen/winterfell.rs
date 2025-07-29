@@ -266,6 +266,26 @@ fn selectors() {
 }
 
 #[test]
+fn selectors_combine_simple() {
+    let generated_air = Test::new("tests/selectors/selectors_combine_simple.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../selectors/selectors_combine_simple.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn selectors_combine_complex() {
+    let generated_air = Test::new("tests/selectors/selectors_combine_complex.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../selectors/selectors_combine_complex.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
 fn constraint_comprehension() {
     let generated_air =
         Test::new("tests/constraint_comprehension/constraint_comprehension.air".to_string())

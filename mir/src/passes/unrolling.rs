@@ -1,11 +1,16 @@
-use std::{collections::HashMap, ops::Deref, rc::Rc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    ops::Deref,
+    rc::Rc,
+    vec,
+};
 
 use air_parser::ast::AccessType;
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
 
 use super::{duplicate_node_or_replace, visitor::Visitor};
-use crate::{CompileError, ir::*};
+use crate::{CompileError, ir::*, passes::duplicate_node};
 
 /// This pass follows a similar approach as the Inlining pass.
 /// It requires that this Inlining pass has already been done.
@@ -43,6 +48,9 @@ pub struct UnrollingFirstPass<'a> {
     // general context
     work_stack: Vec<Link<Node>>,
 
+    // current evaluations of nodes at random points
+    random_inputs: RandomInputs,
+
     // For each child of a For node encountered, we store the context to inline it in the second
     // pass
     bodies_to_inline: Vec<(Link<Op>, ForInliningContext)>,
@@ -59,6 +67,7 @@ impl<'a> UnrollingFirstPass<'a> {
         Self {
             diagnostics,
             work_stack: vec![],
+            random_inputs: RandomInputs::default(),
             bodies_to_inline: vec![],
             params_for_ref_node: HashMap::new(),
             all_for_nodes: HashMap::new(),
@@ -437,105 +446,194 @@ impl UnrollingFirstPass<'_> {
         Ok(None)
     }
 
-    /*fn visit_if_old(&mut self, _graph: &mut Graph, if_node: Link<Op>) -> Result<Option<Link<Op>>, CompileError>{
-        let if_ref = if_node.as_if().unwrap();
-        let condition = if_ref.condition.clone();
-        let then_branch = if_ref.then_branch.clone();
-        let else_branch = if_ref.else_branch.clone();
-
-        if let (
-            Op::Vector(condition_vector),
-            Op::Vector(then_branch_vector),
-            Op::Vector(else_branch_vector),
-        ) = (
-            condition.borrow().deref(),
-            then_branch.borrow().deref(),
-            else_branch.borrow().deref(),
-        ) {
-            let condition_vec = condition_vector.children().borrow().deref().clone();
-            let then_branch_vec = then_branch_vector.children().borrow().deref().clone();
-            let else_branch_vec = else_branch_vector.children().borrow().deref().clone();
-
-            if condition_vec.len() != then_branch_vec.len()
-                || condition_vec.len() != else_branch_vec.len()
-            {
-                // Raise diag
-            } else {
-                let mut new_vec = vec![];
-                for ((condition, then_branch), else_branch) in condition_vec
-                    .iter()
-                    .zip(then_branch_vec.iter())
-                    .zip(else_branch_vec.iter())
-                {
-                    let new_node =
-                        If::create(condition.clone(), then_branch.clone(), else_branch.clone());
-                    new_vec.push(new_node);
-                }
-                if_node.set(&Vector::create(new_vec));
-            }
-        };
-
-        Ok(())
-    }*/
-
     fn visit_if_bis(
         &mut self,
         _graph: &mut Graph,
         if_node: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let updated_if;
+        let if_ref = if_node.as_if().unwrap();
+        let match_arms = if_ref.match_arms.borrow();
 
-        {
-            let if_ref = if_node.as_if().unwrap();
-            let condition = if_ref.condition.clone();
-            let then_branch = if_ref.then_branch.clone();
-            let else_branch = if_ref.else_branch.clone();
+        let mut bus_related_constraints = Vec::new();
 
-            let mut new_vec = vec![];
+        // 1. We evaluate all constraints of this match node at random points
+        let mut node_evals = Vec::new();
 
-            if let Op::Vector(then_branch_vector) = then_branch.clone().borrow().deref() {
-                let then_branch_vec = then_branch_vector.children().borrow().deref().clone();
+        // Used to keep track of the evaluation of each constraint
+        // We use indices to the node_evals vector as keys, to avoid non-determinism for
+        // iterating across
+        let mut constraints_evaluation_indices: BTreeMap<usize, Vec<_>> = BTreeMap::new();
+        for match_arm in match_arms.iter() {
+            let condition = match_arm.condition.clone();
+            let expr = match_arm.expr.clone();
 
-                for then_branch in then_branch_vec {
-                    let new_node = Mul::create(condition.clone(), then_branch, if_ref.span());
-                    new_vec.push(new_node);
-                }
+            // 1.1. Get all the individual constraints corresponding to this arm
+            let all_constraints = if let Op::Vector(expr_vector) = expr.borrow().deref() {
+                expr_vector.children().borrow().deref().clone()
             } else {
-                let new_node = Mul::create(condition.clone(), then_branch, if_ref.span());
-                new_vec.push(new_node);
-            }
-
-            let one_constant = SpannedMirValue {
-                span: Default::default(),
-                value: MirValue::Constant(ConstantValue::Felt(1)),
+                vec![expr.clone()]
             };
+            let mut constraints_to_eval = Vec::new();
+            let mut bus_related_constraints_for_match_arm = Vec::new();
 
-            if let Op::Vector(else_branch_vector) = else_branch.clone().borrow().deref() {
-                let else_branch_vec = else_branch_vector.children().borrow().deref().clone();
-
-                for else_branch in else_branch_vec {
-                    let span = else_branch.span();
-                    let new_node = Mul::create(
-                        Sub::create(Value::create(one_constant.clone()), condition.clone(), span),
-                        else_branch,
-                        span,
-                    );
-                    new_vec.push(new_node);
+            // 1.2. Filter out all BusOp nodes from the constraints, we will handle them separately
+            for constraint in all_constraints {
+                match constraint.borrow().deref() {
+                    Op::BusOp(_) => bus_related_constraints_for_match_arm.push(constraint.clone()),
+                    Op::Enf(enf) => match enf.expr.borrow().deref() {
+                        Op::BusOp(_) => {
+                            bus_related_constraints_for_match_arm.push(enf.expr.clone())
+                        },
+                        _ => constraints_to_eval.push(constraint.clone()),
+                    },
+                    _ => constraints_to_eval.push(constraint.clone()),
                 }
-            } else {
-                let span = else_branch.span();
-                let new_node = Mul::create(
-                    Sub::create(Value::create(one_constant.clone()), condition.clone(), span),
-                    else_branch,
-                    span,
-                );
-                new_vec.push(new_node);
             }
+            bus_related_constraints
+                .push((condition.clone(), bus_related_constraints_for_match_arm));
 
-            updated_if = Some(Vector::create(new_vec, if_ref.span()));
+            // 1.3. Evaluate all the other constraints at random points
+            for constraint in constraints_to_eval {
+                let eval = self.random_inputs.eval(constraint.clone())?;
+                // Check if we already have this eval in our list
+                match node_evals.iter().position(|e| e == &eval) {
+                    Some(index) => {
+                        // If the eval is already in the list, we use its index in the
+                        // node_evals vec
+                        let Some(constraints_vec) = constraints_evaluation_indices.get_mut(&index)
+                        else {
+                            unreachable!(
+                                "Error: Reference to an evaluation index not found in constraints_evaluation_indices"
+                            );
+                        };
+                        // We add the constraint to the corresponding vector only if the
+                        // condition is not already present
+                        // to remove duplicate constraints for the same selector
+                        if !constraints_vec.iter().any(|(c, _)| c == &condition) {
+                            constraints_vec.push((condition.clone(), constraint.clone()))
+                        }
+                    },
+                    None => {
+                        // Otherwise, we add it to the list and use its index
+                        node_evals.push(eval);
+                        let index = node_evals.len() - 1;
+                        if constraints_evaluation_indices
+                            .insert(index, vec![(condition.clone(), constraint.clone())])
+                            .is_some()
+                        {
+                            unreachable!(
+                                "Error: A new evaluation index was found in constraints_evaluation_indices"
+                            );
+                        }
+                    },
+                }
+            }
         }
 
-        Ok(updated_if)
+        // 2. For each evaluation, we keep track of the length of the vector of unique constraints
+        //    evaluating to it
+        // This len will be used to combine the constraints by taking the most constrained
+        // evaluations first, in order to minimize the number of constraints in the
+        // final vector
+
+        // eval_lens: BTreeMap<len, Vec<evaluation_index>>
+        let mut eval_lens = BTreeMap::new();
+        for (eval_index, constraints_vec) in constraints_evaluation_indices.iter() {
+            eval_lens
+                .entry(constraints_vec.len())
+                .and_modify(|v: &mut Vec<_>| v.push(*eval_index))
+                .or_insert(vec![*eval_index]);
+        }
+
+        // 3. Construct the new vector of combined constraints
+        let mut new_vec = vec![];
+
+        // Note: this will always terminate as we always remove at least one constraint per
+        // iteration
+        while !constraints_evaluation_indices.is_empty() {
+            let mut new_constraint = vec![];
+            let mut taken_eval_indices = vec![];
+
+            // Start picking constraints from the biggest sets that evaluate to the same values
+            for eval_index in eval_lens.values().cloned().rev().flatten() {
+                let constraints = constraints_evaluation_indices.get(&eval_index).unwrap();
+
+                if have_disjoint_conditions(new_constraint.clone(), constraints) {
+                    // If the new constraints are disjoint from the current ones, we can add
+                    // them
+                    new_constraint.push(constraints.clone());
+                    taken_eval_indices.push(eval_index);
+                }
+            }
+
+            // Remove the picked evaluation indices from all structures
+            for eval_index in taken_eval_indices {
+                constraints_evaluation_indices.remove(&eval_index);
+                eval_lens.iter_mut().for_each(|(_len, evals)| {
+                    evals.retain(|&e_idx| e_idx != eval_index);
+                });
+                eval_lens.retain(|_, constraints| !constraints.is_empty());
+            }
+
+            // Create combined constraint
+            let mut cur_node = None;
+            for equivalent_constraints in new_constraint {
+                let mut cur_condition = None;
+                for (condition, _) in equivalent_constraints.clone() {
+                    if cur_condition.is_none() {
+                        cur_condition = Some(condition.clone());
+                    } else {
+                        cur_condition = Some(Add::create(
+                            cur_condition.unwrap(),
+                            condition.clone(),
+                            if_ref.span(),
+                        ));
+                    }
+                }
+                let new_node = Mul::create(
+                    cur_condition.unwrap(),
+                    equivalent_constraints.first().unwrap().1.clone(),
+                    if_ref.span(),
+                );
+
+                cur_node = match cur_node {
+                    Some(existing) => Some(Add::create(existing, new_node, if_ref.span())),
+                    None => Some(new_node),
+                };
+            }
+
+            // Note: This will ensure the resulting constraint is in the form `Sub(x,y)`
+            // representing `enf x = y`
+            let zero_node = Value::create(SpannedMirValue {
+                span: Default::default(),
+                value: MirValue::Constant(ConstantValue::Felt(0)),
+            });
+            // The following unwrap is safe as we always have at least one constraint above
+            let new_node_with_sub_zero = Sub::create(cur_node.unwrap(), zero_node, if_ref.span());
+
+            new_vec.push(new_node_with_sub_zero);
+        }
+
+        // 4. Add all the constraints that are bus-related
+        for (condition, constraints) in bus_related_constraints.iter_mut() {
+            for constraint in constraints.iter_mut() {
+                let cur_latch = constraint.as_bus_op().unwrap().latch.clone();
+                let new_latch = Mul::create(
+                    condition.clone(),
+                    duplicate_node(cur_latch, &mut HashMap::new()),
+                    if_ref.span(),
+                );
+                constraint
+                    .as_bus_op_mut()
+                    .unwrap()
+                    .latch
+                    .borrow_mut()
+                    .clone_from(&new_latch.borrow());
+                new_vec.push(constraint.clone());
+            }
+        }
+
+        Ok(Some(Vector::create(new_vec, if_ref.span())))
     }
 
     fn visit_boundary_bis(
@@ -581,31 +679,21 @@ impl UnrollingFirstPass<'_> {
             if indexable.clone().as_parameter().is_none() {
                 match access_type {
                     AccessType::Default => {
-                        /*// Check that the child node is a scalar, raise diag otherwise
-                        if indexable.clone().as_vector().is_some() {
-                            unreachable!(); // raise diag
-                        }
-                        if indexable.clone().as_matrix().is_some() {
-                            unreachable!(); // raise diag
-                        }*/
                         updated_accessor = Some(indexable.clone());
 
                         if let Some(value) = indexable.clone().as_value() {
                             let mir_value = value.value.value.clone();
 
-                            match mir_value {
-                                MirValue::TraceAccess(trace_access) => {
-                                    let new_node = Value::create(SpannedMirValue {
-                                        span: Default::default(),
-                                        value: MirValue::TraceAccess(TraceAccess {
-                                            segment: trace_access.segment,
-                                            column: trace_access.column,
-                                            row_offset: trace_access.row_offset + offset,
-                                        }),
-                                    });
-                                    updated_accessor = Some(new_node);
-                                },
-                                _ => unreachable!(),
+                            if let MirValue::TraceAccess(trace_access) = mir_value {
+                                let new_node = Value::create(SpannedMirValue {
+                                    span: value.value.span(),
+                                    value: MirValue::TraceAccess(TraceAccess {
+                                        segment: trace_access.segment,
+                                        column: trace_access.column,
+                                        row_offset: trace_access.row_offset + offset,
+                                    }),
+                                });
+                                updated_accessor = Some(new_node);
                             }
                         }
                     },
@@ -613,7 +701,6 @@ impl UnrollingFirstPass<'_> {
                         // Check that the child node is a vector, raise diag otherwise
                         // Replace the current node by the index-th element of the vector
                         // Raise diag if index is out of bounds
-
                         if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
                             let indexable_vec =
                                 indexable_vector.children().borrow().deref().clone();
@@ -626,7 +713,7 @@ impl UnrollingFirstPass<'_> {
                                 match mir_value {
                                     MirValue::TraceAccess(trace_access) => {
                                         let new_node = Value::create(SpannedMirValue {
-                                            span: Default::default(),
+                                            span: value.value.span(),
                                             value: MirValue::TraceAccess(TraceAccess {
                                                 segment: trace_access.segment,
                                                 column: trace_access.column,
@@ -993,13 +1080,42 @@ impl Visitor for UnrollingSecondPass<'_> {
             let new_node_with_selector_if_needed = if let Some(selector) =
                 self.for_inlining_context.clone().unwrap().selector
             {
-                let zero_node = Value::create(SpannedMirValue {
-                    span: Default::default(),
-                    value: MirValue::Constant(ConstantValue::Felt(0)),
-                });
-                // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs, rhs)
-                // == 0), but it introduces an unnecessary zero node
-                Sub::create(Mul::create(selector, new_node, root.span()), zero_node, root.span())
+                if let Op::Vector(new_node_vector) = new_node.borrow().deref() {
+                    let new_node_vec = new_node_vector.children().borrow().deref().clone();
+                    let mut new_vec = vec![];
+                    for new_node_child in new_node_vec.into_iter() {
+                        let zero_node = Value::create(SpannedMirValue {
+                            span: Default::default(),
+                            value: MirValue::Constant(ConstantValue::Felt(0)),
+                        });
+                        // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) ->
+                        // Enf(Sub(lhs, rhs) == 0), but it introduces an
+                        // unnecessary zero node
+                        let new_node_child_with_selector = Sub::create(
+                            Mul::create(
+                                duplicate_node(selector.clone(), &mut HashMap::new()),
+                                new_node_child,
+                                root.span(),
+                            ),
+                            zero_node,
+                            root.span(),
+                        );
+                        new_vec.push(new_node_child_with_selector);
+                    }
+                    Vector::create(new_vec, root.span())
+                } else {
+                    let zero_node = Value::create(SpannedMirValue {
+                        span: Default::default(),
+                        value: MirValue::Constant(ConstantValue::Felt(0)),
+                    });
+                    // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs,
+                    // rhs) == 0), but it introduces an unnecessary zero node
+                    Sub::create(
+                        Mul::create(selector, new_node, root.span()),
+                        zero_node,
+                        root.span(),
+                    )
+                }
             } else {
                 new_node
             };
@@ -1051,4 +1167,19 @@ where
     } else {
         Ok(None)
     }
+}
+
+/// Helper function used to check whether two sets of constraints have disjoint conditions.
+/// This is used to combine constraints in the `visit_if_bis` method, as we can only combine
+/// constraints that have disjoint selectors.
+fn have_disjoint_conditions(
+    cur_constraints: Vec<Vec<(Link<Op>, Link<Op>)>>,
+    new_constraints: &[(Link<Op>, Link<Op>)],
+) -> bool {
+    for (condition, _) in new_constraints {
+        if cur_constraints.iter().flatten().any(|(c, _)| c == condition) {
+            return false; // Duplicate condition found
+        }
+    }
+    true
 }
