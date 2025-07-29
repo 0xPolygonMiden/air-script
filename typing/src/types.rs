@@ -527,11 +527,22 @@ impl BinType {
     /// - symmetric over the operands,
     /// - felt - any -> felt
     /// - bool - any -> felt
-    /// - ?    - any -> ?
     /// - int  - int -> int
+    /// - ?    - any -> ?
     /// - everything else is an unknown scalar type `_`
     ///
-    /// This is the same as `infer_bin_ty_add`, so it reuses that method.
+    /// This is the same as [BinType::infer_bin_ty_add], so it reuses that method.
+    ///
+    /// NOTE: if we refine the types as described in #432, this method will need to be
+    /// updated to handle the substraction of `bool` and `int` types correctly.
+    /// This will no longer be symmetric over the operands!
+    /// Because:
+    /// - 0    - bool = - bool -> felt
+    /// - bool -    0          -> bool
+    /// - 0    -  int = - int  -> int (or error depending on the design)
+    /// - int  -    0          -> int
+    /// - 1    - bool          -> bool
+    /// - bool -    1          -> felt
     pub fn infer_bin_ty_sub(&self) -> Result<Option<Type>, TypeError> {
         self.infer_bin_ty_add()
     }
