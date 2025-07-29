@@ -223,21 +223,21 @@ pub enum BinType {
 impl BinType {
     pub fn lhs(&self) -> Option<Type> {
         match self {
-            Self::Eq(lhs, _, _)
-            | Self::Add(lhs, _, _)
-            | Self::Sub(lhs, _, _)
-            | Self::Mul(lhs, _, _)
-            | Self::Exp(lhs, _, _) => *lhs,
+            Self::Eq(lhs, ..)
+            | Self::Add(lhs, ..)
+            | Self::Sub(lhs, ..)
+            | Self::Mul(lhs, ..)
+            | Self::Exp(lhs, ..) => *lhs,
         }
     }
 
     pub fn lhs_mut(&mut self) -> &mut Option<Type> {
         match self {
-            Self::Eq(lhs, _, _)
-            | Self::Add(lhs, _, _)
-            | Self::Sub(lhs, _, _)
-            | Self::Mul(lhs, _, _)
-            | Self::Exp(lhs, _, _) => lhs,
+            Self::Eq(lhs, ..)
+            | Self::Add(lhs, ..)
+            | Self::Sub(lhs, ..)
+            | Self::Mul(lhs, ..)
+            | Self::Exp(lhs, ..) => lhs,
         }
     }
 

@@ -80,8 +80,8 @@ pub trait Typing {
     /// - both are vectors of the same length
     /// - both are vectors with one of the lengths being `u32::MAX`
     /// - both are matrices with the same number of rows and columns
-    /// - both are matrices with one or more of the rows or columns
-    ///   being `u32::MAX`, the other pair (if any) being equal
+    /// - both are matrices with one or more of the rows or columns being `u32::MAX`, the other pair
+    ///   (if any) being equal
     ///
     /// self\\other || _[r,c] | _[l] | _ | ?
     /// ============||========|======|===|==
@@ -111,8 +111,8 @@ pub trait Typing {
     /// - both are vectors of the same length
     /// - both are vectors with one of the lengths being `u32::MAX`
     /// - both are matrices with the same number of rows and columns
-    /// - both are matrices with one or more of the rows or columns
-    ///   being `u32::MAX`, the other pair (if any) being equal
+    /// - both are matrices with one or more of the rows or columns being `u32::MAX`, the other pair
+    ///   (if any) being equal
     ///
     /// self\\other || _[r,c] | _[l] | _ | ?
     /// ============||========|======|===|==
@@ -144,10 +144,8 @@ pub trait Typing {
     ///
     /// Which means:
     /// - `_` is a subtype of all scalar types
-    /// - `bool` is a subtype of `felt`:
-    ///   a `bool` is a `felt with a `is_bool` property
-    /// - `int` is a subtype of `felt`
-    ///   a `int` is a `felt` with the `constant` property
+    /// - `bool` is a subtype of `felt`: a `bool` is a `felt with a `is_bool` property
+    /// - `int` is a subtype of `felt`: a `int` is a `felt` with the `constant` property
     ///
     /// self\\other || felt | bool | int | _ |
     /// ============||======|======|=====|===|
@@ -327,7 +325,7 @@ impl Typing for Type {
         match self {
             Type::Scalar(st) => *st,
             Type::Vector(st, _) => *st,
-            Type::Matrix(st, _, _) => *st,
+            Type::Matrix(st, ..) => *st,
         }
     }
 }
@@ -337,7 +335,7 @@ impl ScalarTypeMut for Type {
         match self {
             Type::Scalar(st) => st,
             Type::Vector(st, _) => st,
-            Type::Matrix(st, _, _) => st,
+            Type::Matrix(st, ..) => st,
         }
     }
 }
@@ -430,7 +428,7 @@ impl ScalarTypeMut for Option<Type> {
         match self {
             Some(Type::Scalar(st)) => st,
             Some(Type::Vector(st, _)) => st,
-            Some(Type::Matrix(st, _, _)) => st,
+            Some(Type::Matrix(st, ..)) => st,
             None => panic!("Cannot mutate scalar type of None"),
         }
     }
@@ -484,9 +482,10 @@ macro_rules! assert_subtype {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::*;
     use crate::{sty, ty};
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_typing() {
