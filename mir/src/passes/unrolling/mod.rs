@@ -4,6 +4,7 @@ use miden_diagnostics::DiagnosticsHandler;
 use super::visitor::Visitor;
 use crate::{CompileError, ir::*};
 
+mod match_optimizer;
 mod unrolling_first_pass;
 mod unrolling_second_pass;
 
