@@ -9,6 +9,7 @@ use crate::{
     AlgebraicGraph, CompileError, NodeIndex, Operation, PeriodicColumnAccess, PublicInputAccess,
     PublicInputTableAccess, Value,
 };
+
 /// Represents the current existing evaluations to persist random values taken by the same values.
 #[derive(Debug, Clone, Default)]
 pub struct RandomInputs {

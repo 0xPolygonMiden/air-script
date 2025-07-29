@@ -48,6 +48,8 @@ impl Constraints {
         }
     }
 
+    /// Updates the root boundary and integrity constraints to use the new node indices
+    /// values, given in the `renumbering_map`.
     pub fn renumber_constraints(&mut self, renumbering_map: &HashMap<NodeIndex, NodeIndex>) {
         // Renumber the boundary constraints
         for (_, segment_constraints) in self.boundary_constraints.iter_mut() {

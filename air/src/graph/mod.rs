@@ -84,6 +84,8 @@ impl AlgebraicGraph {
         self.nodes.len()
     }
 
+    /// Evaluates all the nodes in the graph at random points
+    /// and returns a map of node indices to their evaluations.
     pub fn evaluate_all_nodes(
         &mut self,
         random_inputs: &mut RandomInputs,
@@ -95,13 +97,19 @@ impl AlgebraicGraph {
         Ok(random_inputs.evals_map.clone())
     }
 
+    /// Given the map of evaluations of all nodes in the graph,
+    /// eliminates common subexpressions by replacing nodes with identical evaluations.
+    ///
+    /// In the process, as some nodes will be removed from the graph, node indices need to be
+    /// remapped to keep consistent values (from `NodeIndex(0)` to `NodeIndex(self.num_nodes())`).
+    /// This function returns the node indices remapping map.
     pub fn eliminate_common_subexpressions(
         &mut self,
         evals: &BTreeMap<NodeIndex, QuadFelt>,
     ) -> HashMap<NodeIndex, NodeIndex> {
         let mut new_nodes = Vec::new();
 
-        // 1. Keep track of evaluations, indices rewrites and node removals (for offset)
+        // 1. Keep track of evaluations, indices rewrites
         let mut evals_vec: Vec<QuadFelt> = Vec::with_capacity(evals.len());
         let mut renumbering_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
 
@@ -121,19 +129,24 @@ impl AlgebraicGraph {
                         // Values do not need renumbering, they are leaf nodes
                         *op
                     },
+                    // Note: for Add, Sub, and Mul operations, we assume it's children have already
+                    // been handled. This holds because when building the graph,
+                    // we always insert children before parents, so their
+                    // indices will always be lower and thus have been already processed and added
+                    // to the `renumbering_map`.
                     Operation::Add(lhs, rhs) => {
-                        let new_lhs = *renumbering_map.get(lhs).unwrap();
-                        let new_rhs = *renumbering_map.get(rhs).unwrap();
+                        let new_lhs = *renumbering_map.get(lhs).expect("Child of an operation not found in renumbering_map, but we should have already processed it");
+                        let new_rhs = *renumbering_map.get(rhs).expect("Child of an operation not found in renumbering_map, but we should have already processed it");
                         Operation::Add(new_lhs, new_rhs)
                     },
                     Operation::Sub(lhs, rhs) => {
-                        let new_lhs = *renumbering_map.get(lhs).unwrap();
-                        let new_rhs = *renumbering_map.get(rhs).unwrap();
+                        let new_lhs = *renumbering_map.get(lhs).expect("Child of an operation not found in renumbering_map, but we should have already processed it");
+                        let new_rhs = *renumbering_map.get(rhs).expect("Child of an operation not found in renumbering_map, but we should have already processed it");
                         Operation::Sub(new_lhs, new_rhs)
                     },
                     Operation::Mul(lhs, rhs) => {
-                        let new_lhs = *renumbering_map.get(lhs).unwrap();
-                        let new_rhs = *renumbering_map.get(rhs).unwrap();
+                        let new_lhs = *renumbering_map.get(lhs).expect("Child of an operation not found in renumbering_map, but we should have already processed it");
+                        let new_rhs = *renumbering_map.get(rhs).expect("Child of an operation not found in renumbering_map, but we should have already processed it");
                         Operation::Mul(new_lhs, new_rhs)
                     },
                 };

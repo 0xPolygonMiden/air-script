@@ -141,6 +141,8 @@ fn domain_to_str(domain: ConstraintDomain) -> String {
 /// Note: If, after the CSE pass, the boundary constraint is a single trace access,
 /// we return None for the constraint expression. This expression should then be assumed to be zero
 /// during evaluation by the caller.
+///
+/// TODO: replace panics with Result and Error
 pub fn split_boundary_constraint(
     graph: &AlgebraicGraph,
     index: &NodeIndex,
