@@ -1,8 +1,8 @@
 mod bus;
 mod constraints;
 mod degree;
-mod eval;
 mod operation;
+mod random_inputs;
 mod trace;
 mod value;
 
@@ -18,8 +18,8 @@ pub use self::{
     bus::{Bus, BusBoundary, BusOp, BusOpKind, BusType, PublicInputTableAccess},
     constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints},
     degree::IntegrityConstraintDegree,
-    eval::{CurrentEvals, Eval, NUM_EVALS, eval_random_point},
     operation::Operation,
+    random_inputs::RandomInputs,
     trace::TraceAccess,
     value::{PeriodicColumnAccess, PublicInputAccess, Value},
 };

@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use rand::Rng;
+use mir::ir::QuadFelt;
 
 use crate::{CompileError, ir::*};
 
@@ -84,27 +84,25 @@ impl AlgebraicGraph {
         self.nodes.len()
     }
 
-    pub fn evaluate_all_nodes<R: Rng + ?Sized>(
+    pub fn evaluate_all_nodes(
         &mut self,
-        rng: &mut R,
-    ) -> Result<BTreeMap<NodeIndex, Eval<NUM_EVALS>>, CompileError> {
-        let mut evals = BTreeMap::new();
-        let mut current_evals: CurrentEvals<NUM_EVALS> = CurrentEvals::default();
+        random_inputs: &mut RandomInputs,
+    ) -> Result<BTreeMap<NodeIndex, QuadFelt>, CompileError> {
         for index in 0..self.num_nodes() {
             let node_index = NodeIndex(index);
-            eval_random_point(rng, &mut current_evals, &mut evals, self, &node_index)?;
+            random_inputs.eval(self, &node_index)?;
         }
-        Ok(evals)
+        Ok(random_inputs.evals_map.clone())
     }
 
     pub fn eliminate_common_subexpressions(
         &mut self,
-        evals: &BTreeMap<NodeIndex, Eval<NUM_EVALS>>,
+        evals: &BTreeMap<NodeIndex, QuadFelt>,
     ) -> HashMap<NodeIndex, NodeIndex> {
         let mut new_nodes = Vec::new();
 
         // 1. Keep track of evaluations, indices rewrites and node removals (for offset)
-        let mut evals_vec: Vec<Eval<NUM_EVALS>> = Vec::with_capacity(evals.len());
+        let mut evals_vec: Vec<QuadFelt> = Vec::with_capacity(evals.len());
         let mut renumbering_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
 
         for (node_index, eval) in evals.iter() {

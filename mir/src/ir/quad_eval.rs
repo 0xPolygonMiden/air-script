@@ -22,8 +22,31 @@ fn rand_quad_felt<R: Rng + ?Sized>(rng: &mut R) -> QuadFelt {
 }
 
 /// Returns a [QuadFelt] corresponding to a given base element.
-fn const_quad_felt(felt: Felt) -> QuadFelt {
+pub fn const_quad_felt(felt: Felt) -> QuadFelt {
     QuadFelt::new(felt, Felt::ZERO)
+}
+
+/// Helper function to either query an existing evaluation or create a new random one if the index
+/// is out of bounds.
+pub fn query_indexed_cur_eval<R: Rng + ?Sized>(
+    rng: &mut R,
+    cur_eval_vec: &mut Vec<QuadFelt>,
+    index: usize,
+) -> QuadFelt {
+    if cur_eval_vec.len() <= index {
+        cur_eval_vec.resize_with(index + 1, || rand_quad_felt(rng));
+    }
+    cur_eval_vec[index]
+}
+
+/// Helper function to either query an existing evaluation or create a new random one if the element
+/// is not present in the map.
+pub fn query_hashed_cur_eval<R: Rng + ?Sized, H: Hash + Eq + Clone>(
+    rng: &mut R,
+    cur_eval_map: &mut HashMap<H, QuadFelt>,
+    element: &H,
+) -> QuadFelt {
+    *cur_eval_map.entry(element.clone()).or_insert_with(|| rand_quad_felt(rng))
 }
 
 /// Represents the current existing evaluations to persist random values taken by the same values.
@@ -196,27 +219,4 @@ impl RandomInputs {
             },
         }
     }
-}
-
-/// Helper function to either query an existing evaluation or create a new random one if the index
-/// is out of bounds.
-fn query_indexed_cur_eval<R: Rng + ?Sized>(
-    rng: &mut R,
-    cur_eval_vec: &mut Vec<QuadFelt>,
-    index: usize,
-) -> QuadFelt {
-    if cur_eval_vec.len() <= index {
-        cur_eval_vec.resize_with(index + 1, || rand_quad_felt(rng));
-    }
-    cur_eval_vec[index]
-}
-
-/// Helper function to either query an existing evaluation or create a new random one if the element
-/// is not present in the map.
-fn query_hashed_cur_eval<R: Rng + ?Sized, H: Hash + Eq + Clone>(
-    rng: &mut R,
-    cur_eval_map: &mut HashMap<H, QuadFelt>,
-    element: &H,
-) -> QuadFelt {
-    *cur_eval_map.entry(element.clone()).or_insert_with(|| rand_quad_felt(rng))
 }

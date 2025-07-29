@@ -1,11 +1,13 @@
 use air_pass::Pass;
 use miden_diagnostics::DiagnosticsHandler;
 
-use crate::{Air, CompileError};
+use crate::{Air, CompileError, RandomInputs};
 
 pub struct CommonSubexpressionElimination<'a> {
     #[allow(unused)]
     diagnostics: &'a DiagnosticsHandler,
+    // current evaluations of nodes at random points
+    random_inputs: RandomInputs,
 }
 
 impl Pass for CommonSubexpressionElimination<'_> {
@@ -15,8 +17,7 @@ impl Pass for CommonSubexpressionElimination<'_> {
 
     fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
         // 1. Start by going through all the nodes in the Air and evaluating them at random points.
-        let mut rng = rand::rng();
-        let evals = ir.constraint_graph_mut().evaluate_all_nodes(&mut rng)?;
+        let evals = ir.constraint_graph_mut().evaluate_all_nodes(&mut self.random_inputs)?;
 
         // 2. Then, eliminate common subexpressions in the graph based on the evaluations.
         // This will both:
@@ -34,6 +35,9 @@ impl Pass for CommonSubexpressionElimination<'_> {
 impl<'a> CommonSubexpressionElimination<'a> {
     #[allow(unused)]
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
-        Self { diagnostics }
+        Self {
+            diagnostics,
+            random_inputs: RandomInputs::default(),
+        }
     }
 }
