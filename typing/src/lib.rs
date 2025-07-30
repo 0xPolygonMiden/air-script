@@ -466,6 +466,22 @@ impl<T: Typing> Typing for Span<T> {
     }
 }
 
+impl<T: Typing> Typing for Vec<T> {
+    fn kind(&self) -> Option<Kind> {
+        match self.first().map(|t| t.kind())?? {
+            Kind::Value(ty) => ty.map(|t| Kind::Value(Some(t))),
+            Kind::Callable(_) => unimplemented!("A vector of callables is not supported"),
+        }
+    }
+    fn ty(&self) -> Option<Type> {
+        match self.first().map(|t| t.ty())?? {
+            Type::Scalar(st) => ty!(st[self.len()]),
+            Type::Vector(st, cols) => ty!(st[self.len(), cols]),
+            Type::Matrix(..) => unimplemented!("A vector of matrices is not supported"),
+        }
+    }
+}
+
 #[macro_export]
 macro_rules! assert_subtype {
     ($a:expr; !$b:expr) => {
