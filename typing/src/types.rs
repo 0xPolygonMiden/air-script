@@ -41,6 +41,9 @@ macro_rules! sty {
     (int) => {
         Some($crate::ScalarType::Int)
     };
+    ($sty:ident) => {
+        $sty
+    };
 }
 
 /// The types of values which can be represented in an AirScript program
