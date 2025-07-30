@@ -7,5 +7,8 @@ repository.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[dependencies]
+miden-diagnostics = { workspace = true }
+
 [dev-dependencies]
 pretty_assertions = "1.4.1"

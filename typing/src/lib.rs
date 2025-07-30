@@ -2,6 +2,7 @@ mod types;
 
 use std::fmt::Debug;
 
+use miden_diagnostics::Span;
 pub use types::*;
 
 pub enum TypeError {
@@ -460,6 +461,15 @@ impl<T: Typing> Typing for Option<T> {
     }
     fn scalar_ty(&self) -> Option<ScalarType> {
         self.as_ref().and_then(|t| t.scalar_ty())
+    }
+}
+
+impl<T: Typing> Typing for Span<T> {
+    fn kind(&self) -> Option<Kind> {
+        self.item.kind()
+    }
+    fn ty(&self) -> Option<Type> {
+        self.item.ty()
     }
 }
 
