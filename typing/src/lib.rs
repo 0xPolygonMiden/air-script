@@ -73,6 +73,17 @@ pub trait Typing {
     fn is_matrix(&self) -> bool {
         matches!(self.ty(), Some(Type::Matrix(_, _, _)))
     }
+    /// Returns true if this type is an aggregate
+    #[inline]
+    fn is_aggregate(&self) -> bool {
+        self.is_vector() || self.is_matrix()
+    }
+
+    /// Returns true if this type is a valid iterable in a comprehension
+    #[inline]
+    fn is_iterable(&self) -> bool {
+        self.is_vector()
+    }
     /// Returns true if the shape of `self` is a sub-shape of the shape of `other`
     /// The shapes are compatible if:
     /// - self is `?` (None)
@@ -354,13 +365,13 @@ impl Typing for FunctionType {
 
 impl ScalarTypeMut for BinType {
     fn scalar_ty_mut(&mut self) -> &mut Option<ScalarType> {
-        self.ret_mut().scalar_ty_mut()
+        self.result_mut().scalar_ty_mut()
     }
 }
 
 impl TypeMut for BinType {
     fn ty_mut(&mut self) -> &mut Option<Type> {
-        self.ret_mut()
+        self.result_mut()
     }
 }
 

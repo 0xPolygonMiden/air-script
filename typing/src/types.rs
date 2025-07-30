@@ -1,6 +1,6 @@
 use crate::{TypeError, Typing};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScalarType {
     Felt,
     Bool,
@@ -43,7 +43,8 @@ macro_rules! sty {
     };
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The types of values which can be represented in an AirScript program
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Type {
     // annotation: sty
     // where sty is the scalar type
@@ -148,9 +149,13 @@ macro_rules! tty {
     };
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Represents the type signature of a function
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum FunctionType {
+    /// An evaluator function, which has no results, and has
+    /// a complex type signature due to the nature of trace bindings
     Evaluator(Vec<Option<Type>>),
+    /// A standard function with one or more inputs, and a result
     Function(Vec<Option<Type>>, Option<Type>),
 }
 
@@ -162,7 +167,7 @@ impl FunctionType {
         }
     }
 
-    pub fn ret(&self) -> Option<Type> {
+    pub fn result(&self) -> Option<Type> {
         match self {
             Self::Evaluator(_) => None,
             Self::Function(_, ret) => *ret,
@@ -211,7 +216,7 @@ macro_rules! fty {
     };
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinType {
     Eq(Option<Type>, Option<Type>, Option<Type>),
     Add(Option<Type>, Option<Type>, Option<Type>),
@@ -261,7 +266,7 @@ impl BinType {
         }
     }
 
-    pub fn ret(&self) -> Option<Type> {
+    pub fn result(&self) -> Option<Type> {
         match self {
             Self::Eq(_, _, ret)
             | Self::Add(_, _, ret)
@@ -271,7 +276,7 @@ impl BinType {
         }
     }
 
-    pub fn ret_mut(&mut self) -> &mut Option<Type> {
+    pub fn result_mut(&mut self) -> &mut Option<Type> {
         match self {
             Self::Eq(_, _, ret)
             | Self::Add(_, _, ret)
@@ -359,7 +364,7 @@ impl core::fmt::Display for BinType {
 macro_rules! bty {
     ($($bty:tt)+ -> $($ret:tt)+) => {{
         let b = $crate::bty!($($bty)+);
-        b.ret_mut().replace($crate::ty!($($ret)+));
+        b.result_mut().replace($crate::ty!($($ret)+));
         b
     }};
     // for pattern matching
@@ -455,7 +460,7 @@ impl BinType {
     /// - any == ? -> ?,
     /// - always `bool` otherwise
     pub fn infer_bin_ty_eq(&self) -> Result<Option<Type>, TypeError> {
-        if let Some(ret) = self.ret() {
+        if let Some(ret) = self.result() {
             return Ok(Some(ret));
         }
         let lhs = self.lhs();
@@ -492,7 +497,7 @@ impl BinType {
     /// - int  + int -> int
     /// - everything else is an unknown scalar type `_`
     pub fn infer_bin_ty_add(&self) -> Result<Option<Type>, TypeError> {
-        if let Some(ret) = self.ret() {
+        if let Some(ret) = self.result() {
             return Ok(Some(ret));
         }
         let lhs = self.lhs();
@@ -570,7 +575,7 @@ impl BinType {
     /// - bool * x -> x
     /// - everything else is an unknown scalar type `_`
     pub fn infer_bin_ty_mul(&self) -> Result<Option<Type>, TypeError> {
-        if let Some(ret) = self.ret() {
+        if let Some(ret) = self.result() {
             return Ok(Some(ret));
         }
         let lhs = self.lhs();
@@ -621,7 +626,7 @@ impl BinType {
     /// - a _ to any power is still a _
     /// - a ? to any power is still a ?
     pub fn infer_bin_ty_exp(&self) -> Result<Option<Type>, TypeError> {
-        if let Some(ret) = self.ret() {
+        if let Some(ret) = self.result() {
             return Ok(Some(ret));
         }
         let lhs = self.lhs();
@@ -641,7 +646,7 @@ impl BinType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum Kind {
     Value(Option<Type>),
     Callable(FunctionType),
