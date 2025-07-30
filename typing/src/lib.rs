@@ -32,7 +32,9 @@ pub enum TypeError {
 }
 
 pub trait Typing {
-    fn kind(&self) -> Option<Kind>;
+    fn kind(&self) -> Option<Kind> {
+        Some(Kind::Value(self.ty()))
+    }
     fn ty(&self) -> Option<Type>;
     fn shape(&self) -> Option<Type> {
         self.ty().and_then(|t| match t {
@@ -315,9 +317,6 @@ impl core::fmt::Display for ShowOption<ScalarType> {
 }
 
 impl Typing for ScalarType {
-    fn kind(&self) -> Option<Kind> {
-        Some(Kind::Value(self.ty()))
-    }
     fn ty(&self) -> Option<Type> {
         Some(Type::Scalar(Some(*self)))
     }
@@ -327,9 +326,6 @@ impl Typing for ScalarType {
 }
 
 impl Typing for Type {
-    fn kind(&self) -> Option<Kind> {
-        Some(Kind::Value(self.ty()))
-    }
     fn ty(&self) -> Option<Type> {
         Some(*self)
     }
@@ -377,9 +373,6 @@ impl TypeMut for BinType {
 }
 
 impl Typing for BinType {
-    fn kind(&self) -> Option<Kind> {
-        self.as_fn().kind()
-    }
     fn ty(&self) -> Option<Type> {
         self.infer_ty().ok()?
     }
