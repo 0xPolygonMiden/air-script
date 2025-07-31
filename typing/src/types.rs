@@ -12,7 +12,7 @@ impl core::fmt::Display for ScalarType {
         match self {
             Self::Felt => f.write_str("felt"),
             Self::Bool => f.write_str("bool"),
-            Self::Int => f.write_str("int"),
+            Self::Int => f.write_str("uint"),
         }
     }
 }
@@ -38,7 +38,7 @@ macro_rules! sty {
     (bool) => {
         Some($crate::ScalarType::Bool)
     };
-    (int) => {
+    (uint) => {
         Some($crate::ScalarType::Int)
     };
     ($sty:ident) => {
@@ -468,11 +468,11 @@ impl BinType {
     ///
     /// Assuming shapes are compatible, the following table shows the result type
     /// based on the scalar types of the operands:
-    /// ? == ?   || felt | bool | int  | _    | ?
+    /// ? == ?   || felt | bool | uint | _    | ?
     /// =========||======|======|======|======|=====
     /// felt     || bool | bool | bool | bool |    ?
     /// bool     || bool | bool | bool | bool |    ?
-    /// int      || bool | bool | bool | bool |    ?
+    /// uint     || bool | bool | bool | bool |    ?
     /// _        || bool | bool | bool | bool |    ?
     /// ?        ||    ? |    ? |    ? |    ? |    ?
     ///
@@ -502,21 +502,21 @@ impl BinType {
     /// If lhs or rhs is not a scalar type or `?`, it returns a [TypeError::IncompatibleShapes].
     ///
     /// based on the scalar types of the operands:
-    /// ? + ?    || felt | bool |  int |    _ |    ?
+    /// ? + ?    || felt | bool | uint |    _ |    ?
     /// =========||======|======|======|======|=====
     /// felt     || felt | felt | felt | felt | felt
     /// bool     || felt | felt | felt | felt | felt
-    /// int      || felt | felt |  int |    _ |    ?
+    /// uint     || felt | felt | uint |    _ |    ?
     /// _        || felt | felt |    _ |    _ |    ?
     /// ?        || felt | felt |    ? |    ? |    ?
     ///
     /// So, the result type of an addition is:
     /// - an error if lhs or rhs is not a scalar type or `?`,
     /// - symmetric over the operands,
-    /// - felt + any -> felt
-    /// - bool + any -> felt
-    /// - ?    + any -> ?
-    /// - int  + int -> int
+    /// - felt + any  -> felt
+    /// - bool + any  -> felt
+    /// - ?    + any  -> ?
+    /// - uint + uint -> uint
     /// - everything else is an unknown scalar type `_`
     pub fn infer_bin_ty_add(&self) -> Result<Option<Type>, TypeError> {
         if let Some(ret) = self.result() {
@@ -531,7 +531,7 @@ impl BinType {
             bty!(felt + any) | bty!(any + felt) => Ok(ty!(felt)),
             bty!(bool + any) | bty!(any + bool) => Ok(ty!(felt)),
             bty!(? + any) | bty!(any + ?) => Ok(ty!(?)),
-            bty!(int + int) => Ok(ty!(int)),
+            bty!(uint + uint) => Ok(ty!(uint)),
             _ => Ok(ty!(_)),
         }
     }
@@ -541,33 +541,33 @@ impl BinType {
     /// If lhs or rhs is not a scalar type or `?`, it returns a [TypeError::IncompatibleShapes].
     ///
     /// based on the scalar types of the operands:
-    /// ? - ?    || felt | bool |  int |    _ |    ?
+    /// ? - ?    || felt | bool | uint |    _ |    ?
     /// =========||======|======|======|======|=====
     /// felt     || felt | felt | felt | felt | felt
     /// bool     || felt | felt | felt | felt | felt
-    /// int      || felt | felt |  int |    _ |    ?
+    /// uint     || felt | felt | uint |    _ |    ?
     /// _        || felt | felt |    _ |    _ |    ?
     /// ?        || felt | felt |    ? |    ? |    ?
     ///
     /// So, the result type of a substraction is:
     /// - an error if either lhs or rhs is not a scalar type or `?`,
     /// - symmetric over the operands,
-    /// - felt - any -> felt
-    /// - bool - any -> felt
-    /// - int  - int -> int
-    /// - ?    - any -> ?
+    /// - felt - any  -> felt
+    /// - bool - any  -> felt
+    /// - uint - uint -> uint
+    /// - ?    - any  -> ?
     /// - everything else is an unknown scalar type `_`
     ///
     /// This is the same as [BinType::infer_bin_ty_add], so it reuses that method.
     ///
     /// NOTE: if we refine the types as described in #432, this method will need to be
-    /// updated to handle the substraction of `bool` and `int` types correctly.
+    /// updated to handle the substraction of `bool` and `uint` types correctly.
     /// This will no longer be symmetric over the operands!
     /// Because:
     /// - 0    - bool = - bool -> felt
     /// - bool -    0          -> bool
-    /// - 0    -  int = - int  -> int (or error depending on the design)
-    /// - int  -    0          -> int
+    /// - 0    - uint = - uint -> uint (or error depending on the design)
+    /// - uint -    0          -> uint
     /// - 1    - bool          -> bool
     /// - bool -    1          -> felt
     pub fn infer_bin_ty_sub(&self) -> Result<Option<Type>, TypeError> {
@@ -579,22 +579,22 @@ impl BinType {
     /// If lhs or rhs is not a scalar type or `?`, it returns a [TypeError::IncompatibleShapes].
     ///
     /// based on the scalar types of the operands:
-    /// ? * ?    || felt | bool |  int |    _ |    ?
+    /// ? * ?    || felt | bool | uint |    _ |    ?
     /// =========||======|======|======|======|=====
     /// felt     || felt | felt | felt | felt | felt
-    /// bool     || felt | bool |  int |    _ |    ?
-    /// int      || felt |  int |  int |    _ |    ?
+    /// bool     || felt | bool | uint |    _ |    ?
+    /// uint     || felt | uint | uint |    _ |    ?
     /// _        || felt |    _ |    _ |    _ |    ?
     /// ?        || felt |    ? |    ? |    ? |    ?
     ///
     /// So, the result type of a multiplication is:
     /// - an error if either lhs or rhs is not a scalar type or `?`,
     /// - symmetric over the operands,
-    /// - felt * any -> felt
-    /// - ?    * any -> ?
-    /// - _    * any -> _
-    /// - int  * int -> int
-    /// - bool * x -> x
+    /// - felt * any  -> felt
+    /// - ?    * any  -> ?
+    /// - _    * any  -> _
+    /// - uint * uint -> uint
+    /// - bool * x    -> x
     /// - everything else is an unknown scalar type `_`
     pub fn infer_bin_ty_mul(&self) -> Result<Option<Type>, TypeError> {
         if let Some(ret) = self.result() {
@@ -609,7 +609,7 @@ impl BinType {
             bty!(felt * any) | bty!(any * felt) => Ok(ty!(felt)),
             bty!(? * any) | bty!(any * ?) => Ok(ty!(?)),
             bty!(_ * any) | bty!(any * _) => Ok(ty!(_)),
-            bty!(int * int) => Ok(ty!(int)),
+            bty!(uint * uint) => Ok(ty!(uint)),
             bty!(bool * any:x) | bty!(any:x * bool) => Ok(*x),
             _ => Ok(ty!(_)),
         }
@@ -620,31 +620,30 @@ impl BinType {
     /// If lhs or rhs is not a scalar type or `?`, it returns a [TypeError::IncompatibleBinOp].
     ///
     /// based on the scalar types of the operands:
-    /// ? ^ ?    || felt | bool |  int |    _ |    ?
+    /// ? ^ ?    || felt | bool | uint |    _ |    ?
     /// =========||======|======|======|======|=====
     /// felt     ||  err |  err | felt |    _ |    ?
     /// bool     ||  err |  err | bool |    _ |    ?
-    /// int      ||  err |  err |  int |    _ |    ?
+    /// uint     ||  err |  err | uint |    _ |    ?
     /// _        ||  err |  err |    _ |    _ |    ?
     /// ?        ||  err |  err |    ? |    ? |    ?
     ///
-    ///
     /// So, the result type of an exponentiation is:
     /// - an error if either lhs or rhs is not a scalar type or `?`,
-    /// - an error if the rhs is not an int or `?`,
-    /// - any   ^ ?   -> ?,
-    /// - ?     ^ any -> ?,
-    /// - any   ^ _   -> _,
-    /// - any:x ^ int -> lhs,
+    /// - an error if the rhs is not an uint or `?`,
+    /// - any   ^ ?    -> ?,
+    /// - ?     ^ any  -> ?,
+    /// - any   ^ _    -> _,
+    /// - any:x ^ uint -> lhs,
     ///
     /// Because:
     /// - it is an error if either lhs or rhs is not a scalar type or `?`,
-    /// - it is an error if rhs is not an int or `?`,
+    /// - it is an error if rhs is not an uint or `?`,
     /// - a bool to any power is still a bool:
     ///   - 0^n = 0
     ///   - 1^n = 1
     /// - a felt to any power is still a felt
-    /// - an int to any power is still an int
+    /// - an uint to any power is still an uint
     /// - a _ to any power is still a _
     /// - a ? to any power is still a ?
     pub fn infer_bin_ty_exp(&self) -> Result<Option<Type>, TypeError> {
@@ -662,7 +661,7 @@ impl BinType {
             },
             bty!(any ^ ?) | bty!(? ^ any) => Ok(ty!(?)),
             bty!(any ^ _) => Ok(ty!(_)),
-            bty!(any:lhs ^ int) => Ok(*lhs),
+            bty!(any:lhs ^ uint) => Ok(*lhs),
             _ => unreachable!("Undefined case for infer_bin_ty_exp: {self}"),
         }
     }
@@ -721,7 +720,7 @@ mod tests {
         assert_eq!(sty!(_), None::<ScalarType>);
         assert_eq!(sty!(felt), Some(ScalarType::Felt));
         assert_eq!(sty!(bool), Some(ScalarType::Bool));
-        assert_eq!(sty!(int), Some(ScalarType::Int));
+        assert_eq!(sty!(uint), Some(ScalarType::Int));
     }
 
     #[test]
@@ -730,9 +729,9 @@ mod tests {
         assert_eq!(ty!(_), Some(Type::Scalar(None)));
         assert_eq!(ty!(felt), Some(Type::Scalar(Some(ScalarType::Felt))));
         assert_eq!(ty!(bool), Some(Type::Scalar(Some(ScalarType::Bool))));
-        assert_eq!(ty!(int), Some(Type::Scalar(Some(ScalarType::Int))));
+        assert_eq!(ty!(uint), Some(Type::Scalar(Some(ScalarType::Int))));
         assert_eq!(ty!(_[5]), Some(Type::Vector(None, 5)));
-        assert_eq!(ty!(int[5]), Some(Type::Vector(Some(ScalarType::Int), 5)));
+        assert_eq!(ty!(uint[5]), Some(Type::Vector(Some(ScalarType::Int), 5)));
         assert_eq!(ty!(_[3, 4]), Some(Type::Matrix(None, 3, 4)));
         assert_eq!(ty!(felt[3, 4]), Some(Type::Matrix(Some(ScalarType::Felt), 3, 4)));
     }
@@ -762,30 +761,33 @@ mod tests {
             FunctionType::Evaluator(vec![ty!(felt[1]), ty!(felt[3])])
         );
 
-        assert_eq!(fty!(fn(int) -> felt), FunctionType::Function(vec![ty!(int)], ty!(felt)));
+        assert_eq!(fty!(fn(uint) -> felt), FunctionType::Function(vec![ty!(uint)], ty!(felt)));
         assert_eq!(
-            fty!(fn(int[5]) -> felt[3, 4]),
-            FunctionType::Function(vec![ty!(int[5])], ty!(felt[3, 4]),)
+            fty!(fn(uint[5]) -> felt[3, 4]),
+            FunctionType::Function(vec![ty!(uint[5])], ty!(felt[3, 4]),)
         );
         assert_eq!(
-            fty!(fn(int[5], felt) -> felt[3, 4]),
-            FunctionType::Function(vec![ty!(int[5]), ty!(felt)], ty!(felt[3, 4]),)
+            fty!(fn(uint[5], felt) -> felt[3, 4]),
+            FunctionType::Function(vec![ty!(uint[5]), ty!(felt)], ty!(felt[3, 4]),)
         );
         assert_eq!(
-            fty!(fn(int[5], felt, bool[3, 4]) -> felt[3, 4]),
-            FunctionType::Function(vec![ty!(int[5]), ty!(felt), ty!(bool[3, 4]),], ty!(felt[3, 4]),)
+            fty!(fn(uint[5], felt, bool[3, 4]) -> felt[3, 4]),
+            FunctionType::Function(
+                vec![ty!(uint[5]), ty!(felt), ty!(bool[3, 4]),],
+                ty!(felt[3, 4]),
+            )
         );
     }
 
     #[test]
     fn test_macro_bin_type() {
-        assert_eq!(bty!(int + felt), BinType::Add(ty!(int), ty!(felt), ty!(?)));
+        assert_eq!(bty!(uint + felt), BinType::Add(ty!(uint), ty!(felt), ty!(?)));
         assert_eq!(bty!(_ - felt), BinType::Sub(ty!(_), ty!(felt), ty!(?)));
         assert_eq!(bty!(? = felt), BinType::Eq(ty!(?), ty!(felt), ty!(?)));
-        assert_eq!(bty!(int + ?), BinType::Add(ty!(int), ty!(?), ty!(?)));
-        assert_eq!(bty!(int - felt), BinType::Sub(ty!(int), ty!(felt), ty!(?)));
-        assert_eq!(bty!(int[2] * felt[2]), BinType::Mul(ty!(int[2]), ty!(felt[2]), ty!(?)));
-        assert_eq!(bty!(int[2, 3] ^ _), BinType::Exp(ty!(int[2, 3]), ty!(_), ty!(?)));
+        assert_eq!(bty!(uint + ?), BinType::Add(ty!(uint), ty!(?), ty!(?)));
+        assert_eq!(bty!(uint - felt), BinType::Sub(ty!(uint), ty!(felt), ty!(?)));
+        assert_eq!(bty!(uint[2] * felt[2]), BinType::Mul(ty!(uint[2]), ty!(felt[2]), ty!(?)));
+        assert_eq!(bty!(uint[2, 3] ^ _), BinType::Exp(ty!(uint[2, 3]), ty!(_), ty!(?)));
         assert_eq!(bty!(bool[5] = _[5]), BinType::Eq(ty!(bool[5]), ty!(_[5]), ty!(?)));
     }
 
@@ -793,8 +795,8 @@ mod tests {
     fn test_macro_kind() {
         assert_eq!(kind!(ev([])), Kind::Callable(fty!(ev([]))));
         assert_eq!(kind!(ev([a])), Kind::Callable(fty!(ev([a]))));
-        assert_eq!(kind!(fn(int) -> felt), Kind::Callable(fty!(fn(int) -> felt)));
-        assert_eq!(kind!(int), Kind::Value(ty!(int)));
+        assert_eq!(kind!(fn(uint) -> felt), Kind::Callable(fty!(fn(uint) -> felt)));
+        assert_eq!(kind!(uint), Kind::Value(ty!(uint)));
         assert_eq!(kind!(_), Kind::Value(ty!(_)));
         assert_eq!(kind!(bool[3, 4]), Kind::Value(ty!(bool[3, 4])));
     }
