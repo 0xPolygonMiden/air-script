@@ -3,6 +3,15 @@ use miden_diagnostics::DiagnosticsHandler;
 
 use crate::{Air, CompileError, RandomInputs};
 
+/// This pass aims to remove duplicate nodes in the Algebraic Graph by evaluating
+/// each node at random inputs. The process relies on:
+/// - Iterating over and evaluating all the nodes in order of their NodeIndex
+/// - Do not insert nodes that evaluate to the same value as an existing node
+/// - Update the indices of the nodes in the graph to reflect the changes
+///
+/// Note: This pass requires that boundary constraint should be inserted in the graph before
+/// integrity constraints or buses, to keep the nodes consistent with Winterfell codegen's
+/// expectation.
 pub struct CommonSubexpressionElimination<'a> {
     #[allow(unused)]
     diagnostics: &'a DiagnosticsHandler,
