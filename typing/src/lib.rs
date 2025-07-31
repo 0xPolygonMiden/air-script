@@ -217,20 +217,20 @@ pub trait Typing {
     fn is_subtype(&self, other: &impl Typing) -> bool {
         self.is_subshape(other) && self.is_scalar_subtype(other)
     }
-    fn show_kind(&self) -> ShowOption<Kind> {
-        ShowOption(self.kind())
+    fn show_kind(&self) -> Show<Option<Kind>> {
+        Show(self.kind())
     }
-    fn show_fn_ty(&self) -> ShowOption<FunctionType> {
+    fn show_fn_ty(&self) -> Show<Option<FunctionType>> {
         match self.kind() {
-            Some(Kind::Callable(fn_ty)) => ShowOption(Some(fn_ty)),
-            _ => ShowOption(None),
+            Some(Kind::Callable(fn_ty)) => Show(Some(fn_ty)),
+            _ => Show(None),
         }
     }
-    fn show_ty(&self) -> ShowOption<Type> {
-        ShowOption(self.ty())
+    fn show_ty(&self) -> Show<Option<Type>> {
+        Show(self.ty())
     }
-    fn show_scalar_ty(&self) -> ShowOption<ScalarType> {
-        ShowOption(self.scalar_ty())
+    fn show_scalar_ty(&self) -> Show<Option<ScalarType>> {
+        Show(self.scalar_ty())
     }
     /// Returns the type of the current object, if it is known or can be inferred.
     /// If the type is not known, it returns `None`.
@@ -238,6 +238,38 @@ pub trait Typing {
     /// If the type cannot be inferred, it returns an appropriate error.
     fn infer_ty(&self) -> Result<Option<Type>, TypeError> {
         Ok(self.ty())
+    }
+    fn lowest_common_supertype(&self, other: &impl Typing) -> Option<Type> {
+        match (self.ty(), other.ty()) {
+            (ty!(?), _) | (_, ty!(?)) => ty!(?),
+            (ty!(_), Some(Type::Scalar(_))) | (Some(Type::Scalar(_)), ty!(_)) => ty!(_),
+            (Some(Type::Vector(sty!(_), llen)), Some(Type::Vector(_, rlen)))
+            | (Some(Type::Vector(_, llen)), Some(Type::Vector(sty!(_), rlen))) => {
+                ty!(_[llen.max(rlen)])
+            },
+            (Some(Type::Matrix(sty!(_), lrows, lcols)), Some(Type::Matrix(_, rrows, rcols)))
+            | (Some(Type::Matrix(_, lrows, lcols)), Some(Type::Matrix(sty!(_), rrows, rcols))) => {
+                ty!(_[lrows.max(rrows), lcols.max(rcols)])
+            },
+            (lhs, rhs) if lhs.is_subtype(&rhs) => rhs,
+            (lhs, rhs) if rhs.is_subtype(&lhs) => lhs,
+            (ty!(int), ty!(bool)) | (ty!(bool), ty!(int)) => ty!(felt),
+            (Some(Type::Vector(sty!(int), llen)), Some(Type::Vector(sty!(bool), rlen)))
+            | (Some(Type::Vector(sty!(bool), llen)), Some(Type::Vector(sty!(int), rlen))) => {
+                ty!(felt[core::cmp::max(llen, rlen)])
+            },
+            (
+                Some(Type::Matrix(sty!(int), lrows, lcols)),
+                Some(Type::Matrix(sty!(bool), rrows, rcols)),
+            )
+            | (
+                Some(Type::Matrix(sty!(bool), lrows, lcols)),
+                Some(Type::Matrix(sty!(int), rrows, rcols)),
+            ) => {
+                ty!(felt[core::cmp::max(lrows, rrows), core::cmp::max(lcols, rcols)])
+            },
+            _ => None,
+        }
     }
 }
 
@@ -278,9 +310,9 @@ pub trait TypeMut: Typing + ScalarTypeMut {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ShowOption<T>(Option<T>);
+pub struct Show<T>(T);
 
-impl core::fmt::Display for ShowOption<Kind> {
+impl core::fmt::Display for Show<Option<Kind>> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
             None => f.write_str("!"),
@@ -289,7 +321,7 @@ impl core::fmt::Display for ShowOption<Kind> {
     }
 }
 
-impl core::fmt::Display for ShowOption<FunctionType> {
+impl core::fmt::Display for Show<Option<FunctionType>> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
             None => f.write_str("?"),
@@ -298,7 +330,7 @@ impl core::fmt::Display for ShowOption<FunctionType> {
     }
 }
 
-impl core::fmt::Display for ShowOption<Type> {
+impl core::fmt::Display for Show<Option<Type>> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
             None => f.write_str("?"),
@@ -307,12 +339,46 @@ impl core::fmt::Display for ShowOption<Type> {
     }
 }
 
-impl core::fmt::Display for ShowOption<ScalarType> {
+impl core::fmt::Display for Show<Option<ScalarType>> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
             None => f.write_str("_"),
             Some(sty) => write!(f, "{sty}"),
         }
+    }
+}
+
+impl<T: Typing> core::fmt::Display for Show<Vec<T>> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "[{}]",
+            self.0.iter().map(|t| t.show_ty().to_string()).collect::<Vec<_>>().join(", ")
+        )
+    }
+}
+
+impl<T: Typing> Typing for Show<T> {
+    fn kind(&self) -> Option<Kind> {
+        self.0.kind()
+    }
+    fn ty(&self) -> Option<Type> {
+        self.0.ty()
+    }
+    fn scalar_ty(&self) -> Option<ScalarType> {
+        self.0.scalar_ty()
+    }
+    fn show_kind(&self) -> Show<Option<Kind>> {
+        self.0.show_kind()
+    }
+    fn show_fn_ty(&self) -> Show<Option<FunctionType>> {
+        self.0.show_fn_ty()
+    }
+    fn show_ty(&self) -> Show<Option<Type>> {
+        self.0.show_ty()
+    }
+    fn show_scalar_ty(&self) -> Show<Option<ScalarType>> {
+        self.0.show_scalar_ty()
     }
 }
 
@@ -396,6 +462,7 @@ impl ScalarTypeMut for Kind {
     fn scalar_ty_mut(&mut self) -> &mut Option<ScalarType> {
         match self {
             Kind::Value(ty) => ty.scalar_ty_mut(),
+            Kind::Aggregate(_) => panic!("Cannot mutate scalar type of an aggregate kind"),
             Kind::Callable(_) => panic!("Cannot mutate scalar type of a callable kind"),
         }
     }
@@ -405,6 +472,7 @@ impl TypeMut for Kind {
     fn ty_mut(&mut self) -> &mut Option<Type> {
         match self {
             Kind::Value(ty) => ty,
+            Kind::Aggregate(_) => panic!("Cannot mutate type of an aggregate kind"),
             Kind::Callable(_) => panic!("Cannot mutate type of a callable kind"),
         }
     }
@@ -415,10 +483,26 @@ impl Typing for Kind {
         Some(self.clone())
     }
     fn ty(&self) -> Option<Type> {
-        let Kind::Value(ty) = self else {
-            return None;
-        };
-        *ty
+        match self {
+            Kind::Value(ty) => *ty,
+            Kind::Aggregate(a) => {
+                let mut inner_ty = a.first().and_then(|t| t.ty());
+                for item in a.iter().skip(1) {
+                    let item_ty = item.ty();
+                    inner_ty = item_ty.lowest_common_supertype(&inner_ty);
+                }
+                match inner_ty {
+                    None => None,
+                    Some(Type::Scalar(st)) => ty!(st[a.len()]),
+                    Some(Type::Vector(st, cols)) => ty!(st[a.len(), cols]),
+                    Some(Type::Matrix(..)) => {
+                        // An aggregate of matrices is not supported
+                        None
+                    },
+                }
+            },
+            Kind::Callable(_) => None,
+        }
     }
 }
 
@@ -457,6 +541,15 @@ impl<T: Typing> Typing for Option<T> {
     }
 }
 
+impl<T: Typing> Typing for Box<T> {
+    fn kind(&self) -> Option<Kind> {
+        T::kind(self)
+    }
+    fn ty(&self) -> Option<Type> {
+        T::ty(self)
+    }
+}
+
 impl<T: Typing> Typing for Span<T> {
     fn kind(&self) -> Option<Kind> {
         self.item.kind()
@@ -468,17 +561,11 @@ impl<T: Typing> Typing for Span<T> {
 
 impl<T: Typing> Typing for Vec<T> {
     fn kind(&self) -> Option<Kind> {
-        match self.first().map(|t| t.kind())?? {
-            Kind::Value(ty) => ty.map(|t| Kind::Value(Some(t))),
-            Kind::Callable(_) => unimplemented!("A vector of callables is not supported"),
-        }
+        let agg = self.iter().map(|t| t.kind().map(Box::new)).collect();
+        Some(Kind::Aggregate(agg))
     }
     fn ty(&self) -> Option<Type> {
-        match self.first().map(|t| t.ty())?? {
-            Type::Scalar(st) => ty!(st[self.len()]),
-            Type::Vector(st, cols) => ty!(st[self.len(), cols]),
-            Type::Matrix(..) => unimplemented!("A vector of matrices is not supported"),
-        }
+        self.kind().ty()
     }
 }
 
@@ -730,5 +817,60 @@ mod tests {
         assert_subtype!(ty!(int[3, 4]); ty!(felt[3, 4]));
         assert_subtype!(ty!(int[3, 4]); !ty!(bool[3, 4]));
         assert_subtype!(ty!(int[3, 4]); ty!(int[3, 4]));
+    }
+
+    macro_rules! assert_ty_eq {
+        ($a:expr, $b:expr) => {{
+            eprintln!("{}: {} == {}", $a.show_kind(), $a.show_ty(), $b.show_ty());
+            assert_eq!(
+                $a.ty(),
+                $b,
+                "Expected {} to be equal to {}, but it was not",
+                $a.ty().show_ty(),
+                $b.show_ty(),
+            );
+        }};
+    }
+    #[track_caller]
+    fn assert_tys_eq_with_rev(a: Vec<impl Typing + Clone>, b: Option<Type>) {
+        assert_ty_eq!(a, b);
+        assert_ty_eq!(a.iter().rev().cloned().collect::<Vec<_>>(), b);
+    }
+    #[test]
+    fn test_vec_typing() {
+        assert_ty_eq!(vec![ty!(felt), ty!(felt), ty!(felt)], ty!(felt[3]));
+        assert_tys_eq_with_rev(tys!([int, felt]), ty!(felt[2]));
+        assert_tys_eq_with_rev(tys!([bool, int]), ty!(felt[2]));
+        assert_tys_eq_with_rev(tys!([_, int]), ty!(_[2]));
+        assert_tys_eq_with_rev(tys!([?, int]), ty!(?));
+        assert_tys_eq_with_rev(tys!([felt[5], felt[5]]), ty!(felt[2, 5]));
+        assert_tys_eq_with_rev(tys!([int[5], felt[5]]), ty!(felt[2, 5]));
+        assert_tys_eq_with_rev(tys!([bool[5], int[5]]), ty!(felt[2, 5]));
+        assert_tys_eq_with_rev(tys!([_[5], int[5]]), ty!(_[2, 5]));
+        assert_tys_eq_with_rev(tys!([bool[3], int[8]]), ty!(felt[2, 8]));
+        assert_tys_eq_with_rev(tys!([_[3], int[8]]), ty!(_[2, 8]));
+        assert_tys_eq_with_rev(tys!([?, int[5]]), ty!(?));
+        assert_tys_eq_with_rev(tys!([int[5], felt]), ty!(?));
+        assert_tys_eq_with_rev(tys!([bool[5, 2], felt]), ty!(?));
+        assert_tys_eq_with_rev(tys!([int[5], felt]), ty!(?));
+        assert_tys_eq_with_rev(tys!([bool[5, 2], felt]), ty!(?));
+        assert_tys_eq_with_rev(tys!([int[5, 2], _]), ty!(?));
+        assert_tys_eq_with_rev(tys!([int[5, 2]]), ty!(?));
+        assert_tys_eq_with_rev(tys!([int, felt]), ty!(felt[2]));
+        assert_tys_eq_with_rev(tys!([bool, int]), ty!(felt[2]));
+        assert_tys_eq_with_rev(tys!([_, int]), ty!(_[2]));
+        assert_tys_eq_with_rev(tys!([?, int]), ty!(?));
+
+        assert_tys_eq_with_rev(
+            vec![tys!([int, felt]), tys!([int, felt]), tys!([int, felt])],
+            ty!(felt[3, 2]),
+        );
+        assert_tys_eq_with_rev(
+            vec![tys!([bool, int]), tys!([bool, int]), tys!([bool, int])],
+            ty!(felt[3, 2]),
+        );
+        assert_tys_eq_with_rev(vec![tys!([_, int]), tys!([_, int]), tys!([_, int])], ty!(_[3, 2]));
+        assert_tys_eq_with_rev(vec![tys!([?, int]), tys!([?, int]), tys!([?, int])], ty!(?));
+        assert_tys_eq_with_rev(tys!([felt[5], int[5], bool[5]]), ty!(felt[3, 5]));
     }
 }

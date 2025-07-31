@@ -110,9 +110,9 @@ macro_rules! ty {
     };
 }
 
-pub struct Push(Vec<Option<Type>>);
-impl Push {
-    pub fn push(mut self, ty: Option<Type>) -> Self {
+pub struct Push<T>(pub Vec<T>);
+impl<T> Push<T> {
+    pub fn push(mut self, ty: T) -> Self {
         self.0.push(ty);
         self
     }
@@ -126,14 +126,33 @@ macro_rules! tys {
     (RES: $res:expr; ) => {
         $res
     };
-    (RES: $res:expr; ?) => {
-        tys!(RES: $crate::Push::push($res, $crate::ty!(?));)
+    (RES: $res:expr; ? $(, $($rest:tt)+)?) => {
+        tys!(RES: $crate::Push::push($res, $crate::ty!(?)); $($($rest)+)?)
     };
     (RES: $res:expr; _$([$($spec:tt)+])? $(, $($rest:tt)+)?) => {
         tys!(RES: $crate::Push::push($res, $crate::ty!(_$([$($spec)+])?)); $($($rest)+)?)
     };
     (RES: $res:expr; $name:ident$([$($spec:tt)+])? $(, $($rest:tt)+)?) => {
         tys!(RES: $crate::Push::push($res, $crate::ty!($name$([$($spec)+])?)); $($($rest)+)?)
+    };
+}
+
+#[macro_export]
+macro_rules! kinds {
+    ([$($args:tt)+]) => {
+        kinds!(RES: Push(vec![]); $($args)+).0
+    };
+    (RES: $res:expr; ) => {
+        $res
+    };
+    (RES: $res:expr; ?) => {
+        kinds!(RES: $crate::Push::push($res, $crate::kind!(?));)
+    };
+    (RES: $res:expr; _$([$($spec:tt)+])? $(, $($rest:tt)+)?) => {
+        kinds!(RES: $crate::Push::push($res, $crate::kind!(_$([$($spec)+])?)); $($($rest)+)?)
+    };
+    (RES: $res:expr; $name:ident$([$($spec:tt)+])? $(, $($rest:tt)+)?) => {
+        kinds!(RES: $crate::Push::push($res, $crate::kind!($name$([$($spec)+])?)); $($($rest)+)?)
     };
 }
 
@@ -652,6 +671,7 @@ impl BinType {
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum Kind {
     Value(Option<Type>),
+    Aggregate(Vec<Option<Box<Kind>>>),
     Callable(FunctionType),
 }
 
@@ -659,6 +679,18 @@ impl core::fmt::Display for Kind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Value(ty) => write!(f, "{}", ty.show_ty()),
+            Self::Aggregate(tys) => {
+                write!(
+                    f,
+                    "[{}]",
+                    tys.iter()
+                        .map(|ty| ty
+                            .as_ref()
+                            .map_or("?".to_string(), |k| k.show_kind().to_string()))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            },
             Self::Callable(fty) => write!(f, "{}", fty.show_fn_ty()),
         }
     }
@@ -671,6 +703,9 @@ macro_rules! kind {
     };
     (fn ($($args:tt)*) -> $($ret:tt)+) => {
         $crate::Kind::Callable($crate::fty!(fn ($($args)*) -> $($ret)+))
+    };
+    ([$($spec:tt)+]) => {
+        $crate::Kind::Aggregate(kinds!([$($spec)+]))
     };
     ($($spec:tt)+) => {
         $crate::Kind::Value($crate::ty!($($spec)+))
