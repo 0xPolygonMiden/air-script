@@ -2,32 +2,38 @@ mod types;
 
 use std::fmt::Debug;
 
-use miden_diagnostics::Span;
+use miden_diagnostics::{SourceSpan, Span};
 pub use types::*;
 
 pub enum TypeError {
     IncompatibleScalarTypes {
         lhs: Option<ScalarType>,
         rhs: Option<ScalarType>,
+        span: Option<SourceSpan>,
     },
     IncompatibleShapes {
         lhs: Option<Type>,
         rhs: Option<Type>,
+        span: Option<SourceSpan>,
     },
     IncompatibleType {
         lhs: Option<Type>,
         rhs: Option<Type>,
+        span: Option<SourceSpan>,
     },
     TypeAlreadySet {
         lhs: Option<Type>,
         rhs: Option<Type>,
+        span: Option<SourceSpan>,
     },
     NotASubtype {
         lhs: Option<Type>,
         rhs: Option<Type>,
+        span: Option<SourceSpan>,
     },
     IncompatibleBinOp {
         bin_ty: BinType,
+        span: Option<SourceSpan>,
     },
 }
 
@@ -285,7 +291,7 @@ pub trait ScalarTypeMut: Typing {
             // Allow widening of types
             *self.scalar_ty_mut() = new_ty;
         } else {
-            return Err(TypeError::IncompatibleScalarTypes { lhs: ty, rhs: new_ty });
+            return Err(TypeError::IncompatibleScalarTypes { lhs: ty, rhs: new_ty, span: None });
         }
         Ok(())
     }
@@ -303,7 +309,7 @@ pub trait TypeMut: Typing + ScalarTypeMut {
             // Allow widening of types
             *self.ty_mut() = new_ty;
         } else {
-            return Err(TypeError::NotASubtype { lhs: ty, rhs: new_ty });
+            return Err(TypeError::NotASubtype { lhs: ty, rhs: new_ty, span: None });
         }
         Ok(())
     }

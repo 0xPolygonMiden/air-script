@@ -493,7 +493,7 @@ impl BinType {
         if self.lhs().is_shape_compatible(&self.rhs()) {
             Ok(ty!(bool))
         } else {
-            Err(TypeError::IncompatibleBinOp { bin_ty: *self })
+            Err(TypeError::IncompatibleBinOp { bin_ty: *self, span: None })
         }
     }
 
@@ -525,7 +525,7 @@ impl BinType {
         let lhs = self.lhs();
         let rhs = self.rhs();
         if !((lhs.is_scalar() | lhs.is_none()) && (rhs.is_scalar() | rhs.is_none())) {
-            return Err(TypeError::IncompatibleShapes { lhs, rhs });
+            return Err(TypeError::IncompatibleShapes { lhs, rhs, span: None });
         }
         match self {
             bty!(felt + any) | bty!(any + felt) => Ok(ty!(felt)),
@@ -603,7 +603,7 @@ impl BinType {
         let lhs = self.lhs();
         let rhs = self.rhs();
         if !((lhs.is_scalar() | lhs.is_none()) && (rhs.is_scalar() | rhs.is_none())) {
-            return Err(TypeError::IncompatibleShapes { lhs, rhs });
+            return Err(TypeError::IncompatibleShapes { lhs, rhs, span: None });
         }
         match self {
             bty!(felt * any) | bty!(any * felt) => Ok(ty!(felt)),
@@ -653,11 +653,11 @@ impl BinType {
         let lhs = self.lhs();
         let rhs = self.rhs();
         if !((lhs.is_scalar() | lhs.is_none()) && (rhs.is_scalar() | rhs.is_none())) {
-            return Err(TypeError::IncompatibleBinOp { bin_ty: *self });
+            return Err(TypeError::IncompatibleBinOp { bin_ty: *self, span: None });
         }
         match self {
             bty!(any ^ felt) | bty!(any ^ bool) => {
-                Err(TypeError::IncompatibleBinOp { bin_ty: *self })
+                Err(TypeError::IncompatibleBinOp { bin_ty: *self, span: None })
             },
             bty!(any ^ ?) | bty!(? ^ any) => Ok(ty!(?)),
             bty!(any ^ _) => Ok(ty!(_)),
