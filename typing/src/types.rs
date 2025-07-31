@@ -4,7 +4,7 @@ use crate::{TypeError, Typing};
 pub enum ScalarType {
     Felt,
     Bool,
-    Int,
+    UInt,
 }
 
 impl core::fmt::Display for ScalarType {
@@ -12,7 +12,7 @@ impl core::fmt::Display for ScalarType {
         match self {
             Self::Felt => f.write_str("felt"),
             Self::Bool => f.write_str("bool"),
-            Self::Int => f.write_str("uint"),
+            Self::UInt => f.write_str("uint"),
         }
     }
 }
@@ -39,7 +39,7 @@ macro_rules! sty {
         Some($crate::ScalarType::Bool)
     };
     (uint) => {
-        Some($crate::ScalarType::Int)
+        Some($crate::ScalarType::UInt)
     };
     ($sty:ident) => {
         $sty
@@ -720,7 +720,7 @@ mod tests {
         assert_eq!(sty!(_), None::<ScalarType>);
         assert_eq!(sty!(felt), Some(ScalarType::Felt));
         assert_eq!(sty!(bool), Some(ScalarType::Bool));
-        assert_eq!(sty!(uint), Some(ScalarType::Int));
+        assert_eq!(sty!(uint), Some(ScalarType::UInt));
     }
 
     #[test]
@@ -729,9 +729,9 @@ mod tests {
         assert_eq!(ty!(_), Some(Type::Scalar(None)));
         assert_eq!(ty!(felt), Some(Type::Scalar(Some(ScalarType::Felt))));
         assert_eq!(ty!(bool), Some(Type::Scalar(Some(ScalarType::Bool))));
-        assert_eq!(ty!(uint), Some(Type::Scalar(Some(ScalarType::Int))));
+        assert_eq!(ty!(uint), Some(Type::Scalar(Some(ScalarType::UInt))));
         assert_eq!(ty!(_[5]), Some(Type::Vector(None, 5)));
-        assert_eq!(ty!(uint[5]), Some(Type::Vector(Some(ScalarType::Int), 5)));
+        assert_eq!(ty!(uint[5]), Some(Type::Vector(Some(ScalarType::UInt), 5)));
         assert_eq!(ty!(_[3, 4]), Some(Type::Matrix(None, 3, 4)));
         assert_eq!(ty!(felt[3, 4]), Some(Type::Matrix(Some(ScalarType::Felt), 3, 4)));
     }

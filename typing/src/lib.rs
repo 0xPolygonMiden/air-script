@@ -155,7 +155,7 @@ pub trait Typing {
     ///   Felt type
     /// bool: ScalarType::Bool
     ///   Boolean type
-    /// uint: ScalarType::Int
+    /// uint: ScalarType::UInt
     ///   Integer type
     ///
     /// Subtyping rules:
@@ -191,7 +191,7 @@ pub trait Typing {
     ///   Felt type
     /// bool: Type::Scalar(Some(ScalarType::Bool))
     ///   Boolean type
-    /// uint: Type::Scalar(Some(ScalarType::Int))
+    /// uint: Type::Scalar(Some(ScalarType::UInt))
     ///   Integer type
     /// sty[len]: Type::Vector(Some(sty), len)
     ///   Vector of length `len` with scalar type `sty`
