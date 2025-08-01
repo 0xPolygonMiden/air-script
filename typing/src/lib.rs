@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use miden_diagnostics::{SourceSpan, Span};
 pub use types::*;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypeError {
     IncompatibleScalarTypes {
         lhs: Option<ScalarType>,
@@ -35,6 +36,37 @@ pub enum TypeError {
         bin_ty: BinType,
         span: Option<SourceSpan>,
     },
+}
+
+impl core::fmt::Display for TypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeError::IncompatibleScalarTypes { lhs, rhs, .. } => {
+                write!(f, "incompatible scalar types: {} and {}", Show(*lhs), Show(*rhs))?;
+                Ok(())
+            },
+            TypeError::IncompatibleShapes { lhs, rhs, .. } => {
+                write!(f, "incompatible shapes: {} and {}", Show(*lhs), Show(*rhs))?;
+                Ok(())
+            },
+            TypeError::IncompatibleType { lhs, rhs, .. } => {
+                write!(f, "incompatible types: {} and {}", Show(*lhs), Show(*rhs))?;
+                Ok(())
+            },
+            TypeError::TypeAlreadySet { lhs, rhs, .. } => {
+                write!(f, "type already set: {} vs {}", Show(*lhs), Show(*rhs))?;
+                Ok(())
+            },
+            TypeError::NotASubtype { lhs, rhs, .. } => {
+                write!(f, "type {} is not a subtype of {}", Show(*lhs), Show(*rhs))?;
+                Ok(())
+            },
+            TypeError::IncompatibleBinOp { bin_ty, .. } => {
+                write!(f, "incompatible types for binary operation: {}", bin_ty.show_fn_ty())?;
+                Ok(())
+            },
+        }
+    }
 }
 
 pub trait Typing {
