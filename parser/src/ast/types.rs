@@ -1,6 +1,6 @@
+pub use typing::{bty, fty, kind, sty, tty, ty, tys, *};
+
 use super::*;
-pub use typing::*;
-pub use typing::{bty, fty, kind, sty, tty, ty, tys};
 
 impl Access for Type {
     type Accessed = Self;

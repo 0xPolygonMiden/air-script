@@ -444,7 +444,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
 
                 if is_constant {
                     let new_expr = match vector.ty().expect("vector type must be known") {
-                        Type::Vector(_, _) => ConstantExpr::Vector(
+                        Type::Vector(..) => ConstantExpr::Vector(
                             vector
                                 .iter()
                                 .map(|expr| match expr {

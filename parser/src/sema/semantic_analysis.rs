@@ -638,7 +638,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
 
         // Store the result type of this comprehension
         result_ty = match result_ty {
-            Some(Type::Vector(_, _)) => result_ty,
+            Some(Type::Vector(..)) => result_ty,
             Some(Type::Matrix(sty, rows, _)) => ty!(sty[rows]),
             _ => None,
         };
@@ -750,8 +750,8 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
     //         (Some(lty), Some(rty)) => {
     //             if lty != rty {
     //                 self.has_type_errors = true;
-    //                 // Note: We don't break here but at the end of the module's compilation, as we
-    //                 // want to continue to gather as many errors as possible
+    //                 // Note: We don't break here but at the end of the module's compilation, as
+    // we                 // want to continue to gather as many errors as possible
     //                 let _ = self.type_mismatch(
     //                     Some(&lty),
     //                     expr.lhs.span(),

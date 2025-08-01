@@ -1083,47 +1083,48 @@ impl Visitor for UnrollingSecondPass<'_> {
             let new_node = self.nodes_to_replace.get(&body.get_ptr()).unwrap().1.clone();
 
             // If there is a selector, we need to enforce it on the body
-            let new_node_with_selector_if_needed =
-                if let Some(selector) = self.for_inlining_context.clone().unwrap().selector {
-                    if let Op::Vector(new_node_vector) = new_node.borrow().deref() {
-                        let new_node_vec = new_node_vector.children().borrow().deref().clone();
-                        let mut new_vec = vec![];
-                        for new_node_child in new_node_vec.into_iter() {
-                            let zero_node = Value::create(SpannedMirValue {
-                                span: Default::default(),
-                                value: MirValue::Constant(ConstantValue::Felt(0)),
-                            });
-                            // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) ->
-                            // Enf(Sub(lhs, rhs) == 0), but it introduces an
-                            // unnecessary zero node
-                            let new_node_child_with_selector = Sub::create(
-                                Mul::create(
-                                    duplicate_node(selector.clone(), &mut HashMap::new()),
-                                    new_node_child,
-                                    root.span(),
-                                ),
-                                zero_node,
-                                root.span(),
-                            );
-                            new_vec.push(new_node_child_with_selector);
-                        }
-                        Vector::create(new_vec, root.span())
-                    } else {
+            let new_node_with_selector_if_needed = if let Some(selector) =
+                self.for_inlining_context.clone().unwrap().selector
+            {
+                if let Op::Vector(new_node_vector) = new_node.borrow().deref() {
+                    let new_node_vec = new_node_vector.children().borrow().deref().clone();
+                    let mut new_vec = vec![];
+                    for new_node_child in new_node_vec.into_iter() {
                         let zero_node = Value::create(SpannedMirValue {
                             span: Default::default(),
                             value: MirValue::Constant(ConstantValue::Felt(0)),
                         });
-                        // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs,
-                        // rhs) == 0), but it introduces an unnecessary zero node
-                        Sub::create(
-                            Mul::create(selector, new_node, root.span()),
+                        // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) ->
+                        // Enf(Sub(lhs, rhs) == 0), but it introduces an
+                        // unnecessary zero node
+                        let new_node_child_with_selector = Sub::create(
+                            Mul::create(
+                                duplicate_node(selector.clone(), &mut HashMap::new()),
+                                new_node_child,
+                                root.span(),
+                            ),
                             zero_node,
                             root.span(),
-                        )
+                        );
+                        new_vec.push(new_node_child_with_selector);
                     }
+                    Vector::create(new_vec, root.span())
                 } else {
-                    new_node
-                };
+                    let zero_node = Value::create(SpannedMirValue {
+                        span: Default::default(),
+                        value: MirValue::Constant(ConstantValue::Felt(0)),
+                    });
+                    // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs,
+                    // rhs) == 0), but it introduces an unnecessary zero node
+                    Sub::create(
+                        Mul::create(selector, new_node, root.span()),
+                        zero_node,
+                        root.span(),
+                    )
+                }
+            } else {
+                new_node
+            };
 
             root.as_op().unwrap().set(&new_node_with_selector_if_needed);
 

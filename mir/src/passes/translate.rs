@@ -1160,7 +1160,7 @@ impl<'a> MirBuilder<'a> {
             //
             // In that case, replacing the default type (Felt) with the one from the access
             if let Some(mut param) = let_bound_access_expr.as_parameter_mut() {
-                if let Some(_) = &access.ty {
+                if access.ty.is_some() {
                     param.ty = access.ty
                 }
             }

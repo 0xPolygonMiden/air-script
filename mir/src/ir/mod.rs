@@ -19,6 +19,7 @@ pub use node::Node;
 pub use nodes::*;
 pub use owner::Owner;
 pub use quad_eval::{QuadFelt, RandomInputs};
+#[allow(unused_imports)]
 pub use typing::*;
 pub use utils::*;
 /// A trait for nodes that can have children

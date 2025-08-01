@@ -1,10 +1,7 @@
-use air_parser::ast::{
-    self, BusType, Identifier, QualifiedIdentifier, TraceColumnIndex, TraceSegmentId,
-};
+use air_parser::ast::{BusType, Identifier, QualifiedIdentifier, TraceColumnIndex, TraceSegmentId};
 use miden_diagnostics::{SourceSpan, Spanned};
 
 use crate::ir::{BackLink, Builder, Bus, Child, Link, Node, Op, Owner, Singleton};
-use typing::*;
 
 /// A MIR operation to represent a known value, [Value].
 ///
