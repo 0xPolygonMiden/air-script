@@ -15,11 +15,9 @@ use unrolling_second_pass::UnrollingSecondPass;
 /// It requires that this Inlining pass has already been done.
 ///
 /// * In the first step, we visit the graph, unrolling each node type except For nodes. Instead, for
-///   these node types we gather the context to inline them in the second pass.
+///   these node types we gather the context to inline them in the second pass. In this first pass,
+///   we also optimize constraints found in match statements.
 /// * In the second pass, we inline the bodies of For nodes.
-///
-/// TODO:
-/// - [ ] Implement diagnostics for better error handling
 pub struct Unrolling<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
