@@ -676,6 +676,9 @@ impl Visitor for UnrollingFirstPass<'_> {
             self.all_for_nodes.insert(op.get_ptr(), (op.clone(), owner.clone()));
         }
 
+        // In this pass, we both need to dispatch the visitor depending on the node type,
+        // and also mutate the node if needed. We implement custom visit_*_bis methods
+        // that returns a Some(updated_node) if we need to update the node's value.
         let updated_op: Result<Option<Link<Op>>, CompileError> = match node.borrow().deref() {
             Node::Enf(e) => to_link_and(e.clone(), graph, |g, el| self.visit_enf_bis(g, el)),
             Node::Boundary(b) => {
