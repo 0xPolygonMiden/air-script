@@ -8,6 +8,7 @@ mod owner;
 mod quad_eval;
 mod utils;
 pub extern crate derive_ir;
+pub extern crate typing;
 
 pub use bus::Bus;
 pub use derive_ir::Builder;
@@ -18,6 +19,7 @@ pub use node::Node;
 pub use nodes::*;
 pub use owner::Owner;
 pub use quad_eval::{QuadFelt, RandomInputs};
+pub use typing::*;
 pub use utils::*;
 /// A trait for nodes that can have children
 /// This is used with the Child trait to allow for easy traversal and manipulation of the graph

@@ -2,8 +2,8 @@ use std::hash::{Hash, Hasher};
 
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use super::MirType;
 use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Singleton};
+use typing::*;
 
 /// A MIR operation to represent a `Parameter` in a function or evaluator.
 /// Also used in If and For loops to represent declared parameters.
@@ -16,19 +16,19 @@ pub struct Parameter {
     /// The position of the `Parameter` in the referred node's `Parameter` list
     pub position: usize,
     /// The type of the `Parameter`
-    pub ty: MirType,
+    pub ty: Option<Type>,
     pub _node: Singleton<Node>,
     #[span]
     pub span: SourceSpan,
 }
 
 impl Parameter {
-    pub fn create(position: usize, ty: MirType, span: SourceSpan) -> Link<Op> {
+    pub fn create(position: usize, ty: Type, span: SourceSpan) -> Link<Op> {
         Op::Parameter(Self {
             parents: Vec::default(),
             ref_node: BackLink::none(),
             position,
-            ty,
+            ty: Some(ty),
             _node: Singleton::none(),
             span,
         })

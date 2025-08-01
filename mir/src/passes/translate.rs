@@ -4,14 +4,15 @@ use std::ops::Deref;
 use air_parser::{LexicalScope, ast, ast::AccessType, symbols};
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
+use typing::*;
 
 use crate::{
     CompileError,
     ir::{
         Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue,
         Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir,
-        MirType, MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess,
-        Root, SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value, Vector,
+        MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess, Root,
+        SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Type, Value, Vector,
     },
     passes::duplicate_node,
 };
@@ -189,7 +190,7 @@ impl<'a> MirBuilder<'a> {
             for binding in trace_segment.bindings.iter() {
                 let name = binding.name.as_ref();
                 match &binding.ty {
-                    ast::Type::Vector(size) => {
+                    Type::Vector(_, size) => {
                         let mut params_vec = Vec::new();
                         let mut span = SourceSpan::UNKNOWN;
                         for _ in 0..*size {
@@ -203,7 +204,7 @@ impl<'a> MirBuilder<'a> {
                         let vector_node = Vector::create(params_vec, span);
                         self.bindings.insert(name.unwrap(), vector_node.clone());
                     },
-                    ast::Type::Felt => {
+                    Type::Scalar(_) => {
                         let param = all_params_flatten_for_trace_segment[i].clone();
                         i += 1;
                         self.bindings.insert(name.unwrap(), param.clone());
@@ -236,7 +237,7 @@ impl<'a> MirBuilder<'a> {
             func = func.parameters(param.clone());
         }
         i += 1;
-        let ret = Parameter::create(i, self.translate_type(&ast_func.return_type), ast_func.span());
+        let ret = Parameter::create(i, ast_func.return_type, ast_func.span());
         params.push(ret.clone());
 
         let func = func.return_type(ret).build();
@@ -272,25 +273,25 @@ impl<'a> MirBuilder<'a> {
         &mut self,
         span: SourceSpan,
         name: Option<&'a ast::Identifier>,
-        ty: &ast::Type,
+        ty: &Type,
         i: &mut usize,
     ) -> Result<Vec<Link<Op>>, CompileError> {
         match ty {
-            ast::Type::Felt => {
-                let param = Parameter::create(*i, MirType::Felt, span);
+            Type::Scalar(_) => {
+                let param = Parameter::create(*i, ty!(felt).unwrap(), span);
                 *i += 1;
                 Ok(vec![param])
             },
-            ast::Type::Vector(size) => {
+            Type::Vector(_, size) => {
                 let mut params = Vec::new();
                 for _ in 0..*size {
-                    let param = Parameter::create(*i, MirType::Felt, span);
+                    let param = Parameter::create(*i, ty!(felt[*size]).unwrap(), span);
                     *i += 1;
                     params.push(param);
                 }
                 Ok(params)
             },
-            ast::Type::Matrix(_rows, _cols) => {
+            Type::Matrix(..) => {
                 let span = if let Some(name) = name {
                     name.span()
                 } else {
@@ -310,21 +311,21 @@ impl<'a> MirBuilder<'a> {
         &mut self,
         span: SourceSpan,
         name: Option<&'a ast::Identifier>,
-        ty: &ast::Type,
+        ty: &Type,
         i: &mut usize,
     ) -> Result<Link<Op>, CompileError> {
         match ty {
-            ast::Type::Felt => {
-                let param = Parameter::create(*i, MirType::Felt, span);
+            Type::Scalar(_) => {
+                let param = Parameter::create(*i, *ty, span);
                 *i += 1;
                 Ok(param)
             },
-            ast::Type::Vector(size) => {
-                let param = Parameter::create(*i, MirType::Vector(*size), span);
+            Type::Vector(..) => {
+                let param = Parameter::create(*i, *ty, span);
                 *i += 1;
                 Ok(param)
             },
-            ast::Type::Matrix(_rows, _cols) => {
+            Type::Matrix(..) => {
                 let span = if let Some(name) = name {
                     name.span()
                 } else {
@@ -362,14 +363,6 @@ impl<'a> MirBuilder<'a> {
         }
         self.bindings.exit();
         Ok(func)
-    }
-
-    fn translate_type(&mut self, ty: &ast::Type) -> MirType {
-        match ty {
-            ast::Type::Felt => MirType::Felt,
-            ast::Type::Vector(size) => MirType::Vector(*size),
-            ast::Type::Matrix(rows, cols) => MirType::Matrix(*rows, *cols),
-        }
     }
 
     fn translate_statement(&mut self, stmt: &'a ast::Statement) -> Result<Link<Op>, CompileError> {
@@ -451,7 +444,8 @@ impl<'a> MirBuilder<'a> {
 
         self.bindings.enter();
         for (index, binding) in list_comp.bindings.iter().enumerate() {
-            let binding_node = Parameter::create(index, ast::Type::Felt.into(), binding.span());
+            // TODO: extract the type from the bound variable
+            let binding_node = Parameter::create(index, ty!(felt).unwrap(), binding.span());
             params.push(binding_node.clone());
             self.bindings.insert(binding, binding_node);
         }
@@ -941,7 +935,8 @@ impl<'a> MirBuilder<'a> {
         self.bindings.enter();
         let mut params = Vec::new();
         for (index, binding) in list_comp.bindings.iter().enumerate() {
-            let binding_node = Parameter::create(index, ast::Type::Felt.into(), binding.span());
+            // TODO: extract the type from the bound variable
+            let binding_node = Parameter::create(index, ty!(felt).unwrap(), binding.span());
             params.push(binding_node.clone());
             self.bindings.insert(binding, binding_node);
         }
@@ -1165,8 +1160,8 @@ impl<'a> MirBuilder<'a> {
             //
             // In that case, replacing the default type (Felt) with the one from the access
             if let Some(mut param) = let_bound_access_expr.as_parameter_mut() {
-                if let Some(access_ty) = &access.ty {
-                    param.ty = self.translate_type(access_ty);
+                if let Some(_) = &access.ty {
+                    param.ty = access.ty
                 }
             }
             let accessor: Link<Op> = Accessor::create(

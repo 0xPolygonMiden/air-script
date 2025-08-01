@@ -1,6 +1,7 @@
 use std::fmt;
 
 use miden_diagnostics::{SourceSpan, Spanned};
+use typing::{FunctionType, Kind, Typing, tty, ty};
 
 use super::*;
 
@@ -27,6 +28,7 @@ pub struct TraceSegment {
     /// A vector of `size` elements which tracks for every column whether a
     /// constraint has been applied to that column, and on what boundaries.
     pub boundary_constrained: Vec<Span<ColumnBoundaryFlags>>,
+    pub fn_ty: Option<FunctionType>,
 }
 impl TraceSegment {
     /// Constructs a new [TraceSegment] given a span, segment id, name, and a vector of (Identifier,
@@ -42,16 +44,21 @@ impl TraceSegment {
         for binding in raw_bindings.into_iter() {
             let (name, size) = binding.item;
             let ty = match size {
-                1 => Type::Felt,
-                n => Type::Vector(n),
-            };
+                1 => tty!(name),
+                n => tty!(name[n]),
+            }
+            .unwrap_or_else(|| {
+                unreachable!(
+                    "Trace segment binding types should always be known, but got None for {name} with size {size}"
+                )
+            });
             bindings.push(TraceBinding::new(binding.span(), name, id, offset, size, ty));
             offset += size;
         }
 
         // The size of the segment is the sum of the sizes of all the bindings
         let size = offset;
-        Self {
+        let mut res = Self {
             span,
             id,
             name,
@@ -61,7 +68,13 @@ impl TraceSegment {
                 Span::new(SourceSpan::UNKNOWN, ColumnBoundaryFlags::EMPTY);
                 size
             ],
-        }
+            fn_ty: None,
+        };
+        res.fn_ty = match res.kind() {
+            Some(Kind::Callable(fty)) => Some(fty),
+            _ => None,
+        };
+        res
     }
 
     /// Returns true if `column` is constrained on `boundary`
@@ -93,6 +106,16 @@ impl TraceSegment {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.size == 0
+    }
+}
+impl Typing for TraceSegment {
+    fn ty(&self) -> Option<Type> {
+        None
+    }
+    fn kind(&self) -> Option<Kind> {
+        Some(Kind::Callable(FunctionType::Evaluator(
+            self.bindings.iter().map(|b| b.ty()).collect(),
+        )))
     }
 }
 impl fmt::Debug for TraceSegment {
@@ -227,20 +250,22 @@ impl TraceBinding {
             ty,
         }
     }
+}
 
+impl Typing for TraceBinding {
     /// Returns a [Type] that describes what type of value this binding represents
-    #[inline]
-    pub fn ty(&self) -> Type {
-        self.ty
+    fn ty(&self) -> Option<Type> {
+        Some(self.ty)
     }
-
-    #[inline]
-    pub fn is_scalar(&self) -> bool {
-        self.ty.is_scalar()
+    fn kind(&self) -> Option<Kind> {
+        Some(Kind::Value(self.ty()))
     }
+}
 
+impl Access for TraceBinding {
+    type Accessed = Self;
     /// Derive a new [TraceBinding] derived from the current one given an [AccessType]
-    pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
+    fn access(&self, access_type: AccessType) -> Result<Self::Accessed, InvalidAccessError> {
         match access_type {
             AccessType::Default => Ok(*self),
             AccessType::Slice(_) if self.is_scalar() => Err(InvalidAccessError::SliceOfScalar),
@@ -254,7 +279,7 @@ impl TraceBinding {
                     Ok(Self {
                         offset,
                         size,
-                        ty: Type::Vector(size),
+                        ty: ty!(felt[size]).unwrap(),
                         ..*self
                     })
                 }
@@ -263,7 +288,12 @@ impl TraceBinding {
             AccessType::Index(idx) if idx >= self.size => Err(InvalidAccessError::IndexOutOfBounds),
             AccessType::Index(idx) => {
                 let offset = self.offset + idx;
-                Ok(Self { offset, size: 1, ty: Type::Felt, ..*self })
+                Ok(Self {
+                    offset,
+                    size: 1,
+                    ty: ty!(felt).unwrap(),
+                    ..*self
+                })
             },
             AccessType::Matrix(..) => Err(InvalidAccessError::IndexIntoScalar),
         }

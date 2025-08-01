@@ -7,8 +7,8 @@ use super::{duplicate_node_or_replace, visitor::Visitor};
 use crate::{
     CompileError,
     ir::{
-        Accessor, Graph, Link, Mir, MirType, MirValue, Node, Op, Parameter, Parent, Root,
-        SpannedMirValue, TraceAccessBinding, Value, Vector,
+        Accessor, Graph, Link, Mir, MirValue, Node, Op, Parameter, Parent, Root, SpannedMirValue,
+        TraceAccessBinding, Type, Value, Vector,
     },
 };
 
@@ -515,8 +515,8 @@ fn check_evaluator_argument_sizes(
             } else if let Some(parameter) = child.as_parameter() {
                 let Parameter { ty, .. } = parameter.deref();
                 let size = match ty {
-                    MirType::Felt => 1,
-                    MirType::Vector(len) => *len,
+                    Some(Type::Scalar(_)) => 1,
+                    Some(Type::Vector(_, len)) => *len,
                     _ => unreachable!("expected felt or vector, got {:?}", ty),
                 };
                 trace_segments_arg_vector_len += size;
@@ -535,8 +535,8 @@ fn check_evaluator_argument_sizes(
                 } else if let Some(parameter) = indexable.as_parameter() {
                     let Parameter { ty, .. } = parameter.deref();
                     let size = match ty {
-                        MirType::Felt => 1,
-                        MirType::Vector(len) => *len,
+                        Some(Type::Scalar(_)) => 1,
+                        Some(Type::Vector(_, len)) => *len,
                         _ => unreachable!("expected felt or vector, got {:?}", ty),
                     };
                     trace_segments_arg_vector_len += size;
@@ -637,8 +637,8 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                 } else if let Some(parameter) = indexable.as_parameter() {
                     let Parameter { ty, .. } = parameter.deref();
                     let _size = match ty {
-                        MirType::Felt => 1,
-                        MirType::Vector(len) => *len,
+                        Some(Type::Scalar(_)) => 1,
+                        Some(Type::Vector(_, len)) => *len,
                         _ => unreachable!("expected felt or vector, got {:?}", ty),
                     };
 

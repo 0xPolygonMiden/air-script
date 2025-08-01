@@ -4,6 +4,7 @@ use air_parser::ast::{
 use miden_diagnostics::{SourceSpan, Spanned};
 
 use crate::ir::{BackLink, Builder, Bus, Child, Link, Node, Op, Owner, Singleton};
+use typing::*;
 
 /// A MIR operation to represent a known value, [Value].
 ///
@@ -147,24 +148,6 @@ pub struct SpannedMirValue {
     #[span]
     pub span: SourceSpan,
     pub value: MirValue,
-}
-
-#[derive(Debug, Default, Eq, PartialEq, Clone, Hash)]
-pub enum MirType {
-    #[default]
-    Felt,
-    Vector(usize),
-    Matrix(usize, usize),
-}
-
-impl From<ast::Type> for MirType {
-    fn from(value: ast::Type) -> Self {
-        match value {
-            ast::Type::Felt => MirType::Felt,
-            ast::Type::Vector(n) => MirType::Vector(n),
-            ast::Type::Matrix(cols, rows) => MirType::Matrix(cols, rows),
-        }
-    }
 }
 
 /// Represents an access of a PeriodicColumn, similar in nature to [TraceAccess].

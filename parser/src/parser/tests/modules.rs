@@ -68,10 +68,10 @@ fn modules_integration_test() {
             vec![trace_segment!(0, "%0", [(clk, 1)])],
             vec![enforce_if!(match_arm!(
                 eq!(
-                    access!(clk, 1, Type::Felt),
-                    add!(access!(clk, Type::Felt), access!(bar, k0, Type::Felt))
+                    access!(clk, 1, ty!(felt).unwrap()),
+                    add!(access!(clk, ty!(felt).unwrap()), access!(bar, k0, ty!(felt).unwrap()))
                 ),
-                access!(bar, k0, Type::Felt)
+                access!(bar, k0, ty!(felt).unwrap())
             ))],
         ),
     );
@@ -85,8 +85,11 @@ fn modules_integration_test() {
             ident!(foo_constraint),
             vec![trace_segment!(0, "%0", [(clk, 1)])],
             vec![enforce_if!(match_arm!(
-                eq!(access!(clk, 1, Type::Felt), add!(access!(clk, Type::Felt), int!(1))),
-                access!(foo, k0, Type::Felt)
+                eq!(
+                    access!(clk, 1, ty!(felt).unwrap()),
+                    add!(access!(clk, ty!(felt).unwrap()), int!(1))
+                ),
+                access!(foo, k0, ty!(felt).unwrap())
             ))],
         ),
     );
@@ -95,13 +98,14 @@ fn modules_integration_test() {
         .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected
         .integrity_constraints
-        .push(enforce!(call!(foo::foo_constraint(vector!(access!(clk, Type::Felt))))));
+        .push(enforce!(call!(foo::foo_constraint(vector!(access!(clk, ty!(felt).unwrap()))))));
     expected
         .integrity_constraints
-        .push(enforce!(call!(bar::bar_constraint(vector!(access!(clk, Type::Felt))))));
-    expected
-        .boundary_constraints
-        .push(enforce!(eq!(bounded_access!(clk, Boundary::First, Type::Felt), int!(0))));
+        .push(enforce!(call!(bar::bar_constraint(vector!(access!(clk, ty!(felt).unwrap()))))));
+    expected.boundary_constraints.push(enforce!(eq!(
+        bounded_access!(clk, Boundary::First, ty!(felt).unwrap()),
+        int!(0)
+    )));
 
     ParseTest::new()
         .expect_program_ast_from_file("src/parser/tests/input/import_example.air", expected);

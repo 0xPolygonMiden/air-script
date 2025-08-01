@@ -153,8 +153,13 @@ pub enum Token {
     Match,
     Case,
     When,
-    Felt,
     With,
+
+    // SCALAR TYPES
+    // --------------------------------------------------------------------------------------------
+    Felt,
+    Bool,
+    UInt,
 
     // PUNCTUATION
     // --------------------------------------------------------------------------------------------
@@ -196,6 +201,8 @@ impl Token {
             "ev" => Self::Ev,
             "fn" => Self::Fn,
             "felt" => Self::Felt,
+            "bool" => Self::Bool,
+            "uint" => Self::UInt,
             "buses" => Self::Buses,
             "multiset" => Self::Multiset,
             "logup" => Self::Logup,
@@ -275,6 +282,8 @@ impl fmt::Display for Token {
             Self::Ev => write!(f, "ev"),
             Self::Fn => write!(f, "fn"),
             Self::Felt => write!(f, "felt"),
+            Self::Bool => write!(f, "bool"),
+            Self::UInt => write!(f, "uint"),
             Self::Buses => write!(f, "buses"),
             Self::Multiset => write!(f, "multiset"),
             Self::Logup => write!(f, "logup"),

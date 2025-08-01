@@ -815,9 +815,12 @@ impl UnrollingFirstPass<'_> {
                 AccessType::Matrix(..) => 1,
             },
             Op::Parameter(parameter) => match parameter.ty {
-                MirType::Felt => 1,
-                MirType::Vector(l) => l,
-                MirType::Matrix(l, _) => l,
+                Some(Type::Scalar(_)) => 1,
+                Some(Type::Vector(_, l)) => l,
+                Some(Type::Matrix(_, l, _)) => l,
+                _ => {
+                    unreachable!("Parameter should have a type"); // Raise diag
+                },
             },
             _ => 1,
         }
@@ -862,8 +865,11 @@ impl UnrollingFirstPass<'_> {
             let mut new_vec = vec![];
 
             for i in 0..iterator_expected_len {
-                let new_node =
-                    Parameter::create(i, MirType::Felt, for_node.as_for().unwrap().deref().span());
+                let new_node = Parameter::create(
+                    i,
+                    ty!(felt).unwrap(),
+                    for_node.as_for().unwrap().deref().span(),
+                );
                 new_vec.push(new_node.clone());
 
                 let iterators_i = iterators
@@ -1077,48 +1083,47 @@ impl Visitor for UnrollingSecondPass<'_> {
             let new_node = self.nodes_to_replace.get(&body.get_ptr()).unwrap().1.clone();
 
             // If there is a selector, we need to enforce it on the body
-            let new_node_with_selector_if_needed = if let Some(selector) =
-                self.for_inlining_context.clone().unwrap().selector
-            {
-                if let Op::Vector(new_node_vector) = new_node.borrow().deref() {
-                    let new_node_vec = new_node_vector.children().borrow().deref().clone();
-                    let mut new_vec = vec![];
-                    for new_node_child in new_node_vec.into_iter() {
+            let new_node_with_selector_if_needed =
+                if let Some(selector) = self.for_inlining_context.clone().unwrap().selector {
+                    if let Op::Vector(new_node_vector) = new_node.borrow().deref() {
+                        let new_node_vec = new_node_vector.children().borrow().deref().clone();
+                        let mut new_vec = vec![];
+                        for new_node_child in new_node_vec.into_iter() {
+                            let zero_node = Value::create(SpannedMirValue {
+                                span: Default::default(),
+                                value: MirValue::Constant(ConstantValue::Felt(0)),
+                            });
+                            // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) ->
+                            // Enf(Sub(lhs, rhs) == 0), but it introduces an
+                            // unnecessary zero node
+                            let new_node_child_with_selector = Sub::create(
+                                Mul::create(
+                                    duplicate_node(selector.clone(), &mut HashMap::new()),
+                                    new_node_child,
+                                    root.span(),
+                                ),
+                                zero_node,
+                                root.span(),
+                            );
+                            new_vec.push(new_node_child_with_selector);
+                        }
+                        Vector::create(new_vec, root.span())
+                    } else {
                         let zero_node = Value::create(SpannedMirValue {
                             span: Default::default(),
                             value: MirValue::Constant(ConstantValue::Felt(0)),
                         });
-                        // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) ->
-                        // Enf(Sub(lhs, rhs) == 0), but it introduces an
-                        // unnecessary zero node
-                        let new_node_child_with_selector = Sub::create(
-                            Mul::create(
-                                duplicate_node(selector.clone(), &mut HashMap::new()),
-                                new_node_child,
-                                root.span(),
-                            ),
+                        // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs,
+                        // rhs) == 0), but it introduces an unnecessary zero node
+                        Sub::create(
+                            Mul::create(selector, new_node, root.span()),
                             zero_node,
                             root.span(),
-                        );
-                        new_vec.push(new_node_child_with_selector);
+                        )
                     }
-                    Vector::create(new_vec, root.span())
                 } else {
-                    let zero_node = Value::create(SpannedMirValue {
-                        span: Default::default(),
-                        value: MirValue::Constant(ConstantValue::Felt(0)),
-                    });
-                    // FIXME: The Sub here is used to keep the form of Eq(lhs, rhs) -> Enf(Sub(lhs,
-                    // rhs) == 0), but it introduces an unnecessary zero node
-                    Sub::create(
-                        Mul::create(selector, new_node, root.span()),
-                        zero_node,
-                        root.span(),
-                    )
-                }
-            } else {
-                new_node
-            };
+                    new_node
+                };
 
             root.as_op().unwrap().set(&new_node_with_selector_if_needed);
 

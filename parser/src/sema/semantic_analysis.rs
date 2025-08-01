@@ -168,7 +168,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                             name: Some(segment.name),
                             offset: 0,
                             size: segment.size,
-                            ty: Type::Vector(segment.size),
+                            ty: ty!(felt[segment.size]).unwrap(),
                         })
                     ),
                     None
@@ -194,7 +194,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                 assert_eq!(
                     self.locals.insert(
                         NamespacedIdentifier::Binding(input.name()),
-                        BindingType::PublicInput(Type::Vector(input.size()))
+                        BindingType::PublicInput(ty!(felt[input.size()]).unwrap())
                     ),
                     None
                 );
@@ -215,7 +215,8 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
             }
             // It should be impossible for there to be a local by this name at this point
             assert_eq!(
-                self.locals.insert(namespaced_name, BindingType::Constant(constant.ty())),
+                self.locals
+                    .insert(namespaced_name, BindingType::Constant(constant.ty().unwrap())),
                 None
             );
         }
@@ -229,10 +230,8 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                 self.declaration_import_conflict(namespaced_name.span(), prev.span())?;
             }
             assert_eq!(
-                self.locals.insert(
-                    namespaced_name,
-                    BindingType::Function(FunctionType::Evaluator(function.params.clone()))
-                ),
+                self.locals
+                    .insert(namespaced_name, BindingType::Function(function.fn_ty.clone())),
                 None
             );
         }
@@ -243,13 +242,8 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                 self.declaration_import_conflict(namespaced_name.span(), prev.span())?;
             }
             assert_eq!(
-                self.locals.insert(
-                    namespaced_name,
-                    BindingType::Function(FunctionType::Function(
-                        function.param_types(),
-                        function.return_type
-                    ))
-                ),
+                self.locals
+                    .insert(namespaced_name, BindingType::Function(function.fn_ty.clone())),
                 None
             );
         }
@@ -620,7 +614,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
 
         // If we were unable to determine a type for any of the bindings, use a large vector as a
         // placeholder
-        let expected = BindingType::Local(result_ty.unwrap_or(Type::Vector(u32::MAX as usize)));
+        let expected = BindingType::Local(result_ty.unwrap_or(ty!(_[u32::MAX as usize]).unwrap()));
 
         // Bind everything now, resolving any deferred types using our fallback expected type
         for (binding, _, binding_ty) in binding_tys.drain(..) {
@@ -644,8 +638,8 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
 
         // Store the result type of this comprehension
         result_ty = match result_ty {
-            Some(Type::Vector(_)) => result_ty,
-            Some(Type::Matrix(rows, _)) => Some(Type::Vector(rows)),
+            Some(Type::Vector(_, _)) => result_ty,
+            Some(Type::Matrix(sty, rows, _)) => ty!(sty[rows]),
             _ => None,
         };
         expr.ty = result_ty;
@@ -719,7 +713,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         // * Must be trace bindings or aliases of same
         // * Must match the type signature of the callee
         if let Ok(ty) = callee_binding_ty {
-            if let BindingType::Function(FunctionType::Evaluator(ref params)) = ty.item {
+            if let BindingType::Evaluator(params) = ty.item {
                 for (arg, param) in expr.args.iter().zip(params.iter()) {
                     self.validate_evaluator_argument(expr.span(), arg, param)?;
                 }
@@ -737,25 +731,40 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         self.visit_mut_scalar_expr(expr.rhs.as_mut())?;
 
         // Validate the operand types
-        match (expr.lhs.ty(), expr.rhs.ty()) {
-            (Ok(Some(lty)), Ok(Some(rty))) => {
-                if lty != rty {
-                    self.has_type_errors = true;
-                    // Note: We don't break here but at the end of the module's compilation, as we
-                    // want to continue to gather as many errors as possible
-                    let _ = self.type_mismatch(
-                        Some(&lty),
-                        expr.lhs.span(),
-                        &rty,
-                        expr.rhs.span(),
-                        expr.span(),
-                    );
-                }
+        match expr.bin_ty.infer_ty() {
+            Err(err) => {
+                self.has_type_errors = true;
+                // Note: We don't break here but at the end of the module's compilation, as we
+                // want to continue to gather as many errors as possible
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("invalid binary expression")
+                    .with_primary_label(expr.span(), format!("{err}"))
+                    .emit();
                 ControlFlow::Continue(())
             },
-            _ => ControlFlow::Continue(()),
+            Ok(_) => ControlFlow::Continue(()),
         }
     }
+    //     match (expr.lhs.ty(), expr.rhs.ty()) {
+    //         (Some(lty), Some(rty)) => {
+    //             if lty != rty {
+    //                 self.has_type_errors = true;
+    //                 // Note: We don't break here but at the end of the module's compilation, as we
+    //                 // want to continue to gather as many errors as possible
+    //                 let _ = self.type_mismatch(
+    //                     Some(&lty),
+    //                     expr.lhs.span(),
+    //                     &rty,
+    //                     expr.rhs.span(),
+    //                     expr.span(),
+    //                 );
+    //             }
+    //             ControlFlow::Continue(())
+    //         },
+    //         _ => ControlFlow::Continue(()),
+    //     }
+    // }
 
     fn visit_mut_range_bound(
         &mut self,
@@ -799,8 +808,8 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                             .with_primary_label(
                                 expr.span(),
                                 format!(
-                                    "constant is not a valid range bound: expected scalar, got {}",
-                                    const_expr.ty()
+                                    "constant is not a valid range bound: expected uint, got {}",
+                                    const_expr.show_ty()
                                 ),
                             )
                             .emit();
@@ -942,7 +951,9 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                     // be captured as a vector of size 1
                     AccessType::Slice(ref range) => {
                         let range = range.to_slice_range();
-                        assert_eq!(expr.ty.replace(Type::Vector(range.len())), None)
+                        let sty = expr.ty.scalar_ty();
+                        let new_ty = ty!(sty[range.len()]).unwrap();
+                        assert_eq!(expr.ty.replace(new_ty), None)
                     },
                     // All other access types can be derived from the binding type
                     _ => assert_eq!(expr.ty.replace(binding_ty.ty().unwrap()), None),
@@ -958,14 +969,14 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                     .with_secondary_label(derived_from, "references this declaration")
                     .emit();
                 // Continue with a fabricated type
-                let ty = match &expr.access_type {
+                let new_ty = match &expr.access_type {
                     AccessType::Slice(range) => {
                         let range = range.to_slice_range();
-                        Type::Vector(range.len())
+                        ty!(felt[range.len()]).unwrap()
                     },
-                    _ => Type::Felt,
+                    _ => ty!(felt).unwrap(),
                 };
-                assert_eq!(expr.ty.replace(ty), None);
+                assert_eq!(expr.ty.replace(new_ty), None);
                 ControlFlow::Continue(())
             },
         }
@@ -1010,6 +1021,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                         // These binding types are module-local declarations
                         BindingType::Constant(_)
                         | BindingType::Function(_)
+                        | BindingType::Evaluator(_)
                         | BindingType::PeriodicColumn(_) => {
                             *expr = ResolvableIdentifier::Resolved(QualifiedIdentifier::new(
                                 current_module,
@@ -1227,9 +1239,9 @@ impl SemanticAnalysis<'_> {
                             // Note: We don't break here but at the end of the module's compilation,
                             // as we want to continue to gather as many errors as possible
                             let _ = self.type_mismatch(
-                                Some(&Type::Vector(param.size)),
+                                ty!(_[param.size]).as_ref(),
                                 arg.span(),
-                                &Type::Vector(size),
+                                &ty!(_[size]).unwrap(),
                                 param.span(),
                                 span,
                             );
@@ -1243,7 +1255,7 @@ impl SemanticAnalysis<'_> {
                             param.id,
                             0,
                             param.size,
-                            Type::Vector(param.size),
+                            ty!(felt[param.size]).unwrap(),
                         ));
                         // Note: We don't break here but at the end of the module's compilation, as
                         // we want to continue to gather as many errors as possible
@@ -1367,9 +1379,9 @@ impl SemanticAnalysis<'_> {
                                         } else {
                                             let inferred = tb.ty();
                                             return self.type_mismatch(
-                                                Some(&inferred),
+                                                inferred.as_ref(),
                                                 access.span(),
-                                                &Type::Felt,
+                                                &ty!(felt).unwrap(),
                                                 ty.span(),
                                                 constraint_span,
                                             );
@@ -1386,7 +1398,7 @@ impl SemanticAnalysis<'_> {
                                             0,
                                             0,
                                             1,
-                                            Type::Felt,
+                                            ty!(felt).unwrap(),
                                         ));
                                         return self.binding_mismatch(
                                             &aty,
@@ -1483,7 +1495,7 @@ impl SemanticAnalysis<'_> {
                                         self.type_mismatch(
                                             Some(ty),
                                             access.span(),
-                                            &Type::Felt,
+                                            &ty!(_).unwrap(),
                                             found.span(),
                                             constraint_span,
                                         )?;
@@ -1503,7 +1515,7 @@ impl SemanticAnalysis<'_> {
                                         self.type_mismatch(
                                             access.ty.as_ref(),
                                             access.span(),
-                                            &Type::Felt,
+                                            &ty!(_).unwrap(),
                                             access.name.span(),
                                             constraint_span,
                                         )?;
@@ -1776,9 +1788,11 @@ impl SemanticAnalysis<'_> {
 
     fn expr_binding_type(&self, expr: &Expr) -> Result<BindingType, InvalidAccessError> {
         match expr {
-            Expr::Const(constant) => Ok(BindingType::Local(constant.ty())),
+            Expr::Const(constant) => {
+                Ok(BindingType::Local(constant.ty().expect("constant type should be known")))
+            },
             Expr::Range(range) => {
-                Ok(BindingType::Local(Type::Vector(range.to_slice_range().len())))
+                Ok(BindingType::Local(ty!(uint[range.to_slice_range().len()]).unwrap()))
             },
             Expr::Vector(elems) => {
                 let mut binding_tys = Vec::with_capacity(elems.len());
@@ -1789,14 +1803,12 @@ impl SemanticAnalysis<'_> {
                 Ok(BindingType::Vector(binding_tys))
             },
             Expr::Matrix(expr) => {
-                let rows = expr.len();
-                let columns = expr[0].len();
-                Ok(BindingType::Local(Type::Matrix(rows, columns)))
+                Ok(BindingType::Local(expr.ty().expect("matrix type should be known")))
             },
             Expr::SymbolAccess(expr) => self.access_binding_type(expr),
             Expr::Call(Call { ty: None, .. }) => Err(InvalidAccessError::InvalidBinding),
             Expr::Call(Call { ty: Some(ty), .. }) => Ok(BindingType::Local(*ty)),
-            Expr::Binary(_) => Ok(BindingType::Local(Type::Felt)),
+            Expr::Binary(be) => Ok(BindingType::Local(be.ty().or(ty!(felt)).unwrap())),
             Expr::ListComprehension(lc) => {
                 match lc.ty {
                     Some(ty) => Ok(BindingType::Local(ty)),
@@ -1816,8 +1828,9 @@ impl SemanticAnalysis<'_> {
                     .emit();
                 Err(InvalidAccessError::InvalidBinding)
             },
-            Expr::BusOperation(_expr) => Ok(BindingType::Local(Type::Felt)),
-            Expr::Null(_) | Expr::Unconstrained(_) => Ok(BindingType::Local(Type::Felt)),
+            Expr::BusOperation(_) | Expr::Null(_) | Expr::Unconstrained(_) => {
+                Ok(BindingType::Local(ty!(felt).unwrap()))
+            },
         }
     }
 
@@ -1882,8 +1895,7 @@ impl SemanticAnalysis<'_> {
                     // it elsewhere. For the time being, functions are not
                     // implemented, so the only place this comes up is with these
                     // list folding builtins
-                    let folder_ty =
-                        FunctionType::Function(vec![Type::Vector(usize::MAX)], Type::Felt);
+                    let folder_ty = FunctionType::Function(vec![ty!(felt[usize::MAX])], ty!(felt));
                     Ok(Span::new(qid.span(), BindingType::Function(folder_ty)))
                 },
                 name => unimplemented!("unsupported builtin: {}", name),
@@ -1896,14 +1908,17 @@ impl SemanticAnalysis<'_> {
             imported_from
                 .constants
                 .get(qid.as_ref())
-                .map(|c| Span::new(c.span(), BindingType::Constant(c.ty())))
+                .map(|c| {
+                    Span::new(
+                        c.span(),
+                        BindingType::Constant(c.ty().expect("constant type should be known")),
+                    )
+                })
                 .or_else(|| {
-                    imported_from.evaluators.get(qid.as_ref()).map(|e| {
-                        Span::new(
-                            e.span(),
-                            BindingType::Function(FunctionType::Evaluator(e.params.clone())),
-                        )
-                    })
+                    imported_from
+                        .evaluators
+                        .get(qid.as_ref())
+                        .map(|e| Span::new(e.span(), BindingType::Evaluator(e.params.clone())))
                 })
                 .ok_or(InvalidAccessError::UndefinedVariable)
         }
