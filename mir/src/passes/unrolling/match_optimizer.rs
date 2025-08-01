@@ -105,6 +105,7 @@ impl MatchOptimizer {
 
     /// For each evaluation, computes the number of constraints (with different selectors)
     /// evaluating to it.
+    // Returns eval_lens: BTreeMap<len, Vec<evaluation_index>>
     pub fn compute_eval_lens(
         &self,
         constraints_evaluation_indices: &ConstraintEvaluationMap,

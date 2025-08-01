@@ -58,21 +58,10 @@ impl Visitor for UnrollingSecondPass<'_> {
     }
     fn run(&mut self, graph: &mut Graph) -> Result<(), CompileError> {
         for root in self.root_nodes_to_visit(graph).iter() {
-            // Set context to inline the body for this index
-            let for_inlining_context = self.bodies_to_inline.iter().find_map(|(node, context)| {
-                if Rc::ptr_eq(&node.clone().as_node().link, &root.link) {
-                    Some(context.clone())
-                } else {
-                    None
-                }
-            });
+            // Set the context corresponding to the For node we are inlining
+            self.set_context(root);
 
-            self.for_inlining_context = for_inlining_context;
-            // We inline a new body, so we clear the nodes to replace and the parameters for the ref
-            // node
-            self.nodes_to_replace.clear();
-            self.params_for_ref_node.clear();
-
+            // Recursively scan the body of the For node to inline
             self.scan_node(graph, self.for_inlining_context.clone().unwrap().body.as_node())?;
             while let Some(node) = self.work_stack().pop() {
                 self.visit_node(graph, node.clone())?;
@@ -141,5 +130,25 @@ impl Visitor for UnrollingSecondPass<'_> {
             &mut self.params_for_ref_node,
         );
         Ok(())
+    }
+}
+
+impl<'a> UnrollingSecondPass<'a> {
+    /// Sets the context for inlining a For node based on the root node.
+    fn set_context(&mut self, root: &Link<Node>) {
+        // Set context to inline the body for this index
+        let for_inlining_context = self.bodies_to_inline.iter().find_map(|(node, context)| {
+            if Rc::ptr_eq(&node.clone().as_node().link, &root.link) {
+                Some(context.clone())
+            } else {
+                None
+            }
+        });
+
+        self.for_inlining_context = for_inlining_context;
+        // We inline a new body, so we clear the nodes to replace and the parameters for the ref
+        // node
+        self.nodes_to_replace.clear();
+        self.params_for_ref_node.clear();
     }
 }

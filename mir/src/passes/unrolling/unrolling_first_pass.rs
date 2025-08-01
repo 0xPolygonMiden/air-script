@@ -261,40 +261,6 @@ fn unroll_accessor_matrix_access_type(
     }
 }
 
-fn compute_iterator_len(iterator: Link<Op>) -> usize {
-    match iterator.borrow().deref() {
-        Op::Vector(vector) => vector.size,
-        Op::Matrix(matrix) => matrix.size,
-        Op::Accessor(accessor) => match &accessor.access_type {
-            AccessType::Default => compute_iterator_len(accessor.indexable.clone()),
-            AccessType::Slice(range_expr) => range_expr.to_slice_range().count(),
-            AccessType::Index(_) => match accessor.indexable.borrow().deref() {
-                Op::Vector(_) => 1,
-                Op::Matrix(matrix) => {
-                    let children = matrix.children().borrow().deref().clone();
-                    match children.first() {
-                        Some(first_row) => match first_row.as_vector() {
-                            Some(row_vector) => row_vector.size,
-                            _ => unreachable!(), // Raise diag
-                        },
-                        None => {
-                            unreachable!(); // Raise diag
-                        },
-                    }
-                },
-                _ => unreachable!(), // Raise diag
-            },
-            AccessType::Matrix(..) => 1,
-        },
-        Op::Parameter(parameter) => match parameter.ty {
-            MirType::Felt => 1,
-            MirType::Vector(l) => l,
-            MirType::Matrix(l, _) => l,
-        },
-        _ => 1,
-    }
-}
-
 // For the first pass of Unrolling, we use a tweaked version of the Visitor trait,
 // each visit_*_bis function returns an Option<Link<Op>> instead of Result<(), CompileError>,
 // to mutate the nodes (e.g. modifying a Operation<Vectors> to Vector<Operations>)
@@ -567,8 +533,6 @@ impl UnrollingFirstPass<'_> {
         // This len will be used to combine the constraints by taking the most constrained
         // evaluations first, in order to minimize the number of constraints in the
         // final vector
-
-        // eval_lens: BTreeMap<len, Vec<evaluation_index>>
         let mut eval_lens = self.match_optimizer.compute_eval_lens(&constraints_evaluation_indices);
 
         // 3. Construct the new vector of combined constraints
@@ -609,22 +573,9 @@ impl UnrollingFirstPass<'_> {
             let expr = for_ref.expr.clone();
             let selector = for_ref.selector.clone();
 
-            // Check iterator lengths
-            if iterators.is_empty() {
-                unreachable!(); // Raise diag
-            }
-            let iterator_expected_len = compute_iterator_len(iterators[0].clone());
-
-            for iterator in iterators.iter().skip(1) {
-                let iterator_len = compute_iterator_len(iterator.clone());
-                if iterator_len != iterator_expected_len {
-                    unreachable!()
-                    // Raise diag
-                }
-            }
+            let iterator_expected_len = validate_iterators_and_get_expected_len(iterators);
 
             let mut new_vec = vec![];
-
             for i in 0..iterator_expected_len {
                 let new_node =
                     Parameter::create(i, MirType::Felt, for_node.as_for().unwrap().deref().span());
@@ -632,33 +583,7 @@ impl UnrollingFirstPass<'_> {
 
                 let iterators_i = iterators
                     .iter()
-                    .map(|op| {
-                        match op.borrow().deref() {
-                            Op::Vector(vector) => {
-                                let children = vector.children().borrow().deref().clone();
-                                children[i].clone()
-                            },
-                            Op::Matrix(matrix) => {
-                                let children = matrix.children().borrow().deref().clone();
-                                children[i].clone()
-                            },
-                            Op::Accessor(accessor) => {
-                                match accessor.indexable.borrow().deref() {
-                                    // If we access an outer loop parameter in the body of an inner
-                                    // loop, we need to create
-                                    // an Accessor for the correct index in this parameter
-                                    Op::Parameter(_parameter) => Accessor::create(
-                                        accessor.indexable.clone(),
-                                        AccessType::Index(i),
-                                        0,
-                                        accessor.span(),
-                                    ),
-                                    _ => op.clone(),
-                                }
-                            },
-                            _ => op.clone(),
-                        }
-                    })
+                    .map(|iterator| get_iterator_child(iterator.clone(), i))
                     .collect::<Vec<_>>();
                 let selector = if let Op::None(_) = selector.borrow().deref() {
                     None
@@ -791,6 +716,11 @@ impl Visitor for UnrollingFirstPass<'_> {
     }
 }
 
+// HELPERS FUNCTIONS
+// ================================================================================================
+
+/// Tries to upgrade a BackLink to a Link<Op> and apply a given closure to it if it is successful,
+/// otherwise returns None.
 fn to_link_and<F>(
     back: BackLink<Op>,
     graph: &mut Graph,
@@ -803,5 +733,85 @@ where
         f(graph, op)
     } else {
         Ok(None)
+    }
+}
+
+/// Sanity check that all iterators have the same length.
+/// Note that semantic analysis should have already checked they are valid.
+fn validate_iterators_and_get_expected_len(iterators: &[Link<Op>]) -> usize {
+    if iterators.is_empty() {
+        unreachable!("Semantic analysis should have catched empty iterators");
+    }
+    let iterator_expected_len = compute_iterator_len(iterators[0].clone());
+    for iterator in iterators.iter().skip(1) {
+        let iterator_len = compute_iterator_len(iterator.clone());
+        if iterator_len != iterator_expected_len {
+            unreachable!("Semantic analysis should have catched iterator length mismatch");
+        }
+    }
+    iterator_expected_len
+}
+
+/// Computes the length of a node that is used as an iterator in a For node.
+fn compute_iterator_len(iterator: Link<Op>) -> usize {
+    match iterator.borrow().deref() {
+        Op::Vector(vector) => vector.size,
+        Op::Matrix(matrix) => matrix.size,
+        Op::Accessor(accessor) => match &accessor.access_type {
+            AccessType::Default => compute_iterator_len(accessor.indexable.clone()),
+            AccessType::Slice(range_expr) => range_expr.to_slice_range().count(),
+            AccessType::Index(_) => match accessor.indexable.borrow().deref() {
+                Op::Vector(_) => 1,
+                Op::Matrix(matrix) => {
+                    let children = matrix.children().borrow().deref().clone();
+                    match children.first() {
+                        Some(first_row) => match first_row.as_vector() {
+                            Some(row_vector) => row_vector.size,
+                            _ => unreachable!("Unexpected row type in matrix"),
+                        },
+                        None => {
+                            unreachable!("Unexpected empty matrix");
+                        },
+                    }
+                },
+                _ => unreachable!("Unexpected index into non indexable type"),
+            },
+            AccessType::Matrix(..) => 1,
+        },
+        Op::Parameter(parameter) => match parameter.ty {
+            MirType::Felt => 1,
+            MirType::Vector(l) => l,
+            MirType::Matrix(l, _) => l,
+        },
+        _ => 1,
+    }
+}
+
+/// Returns the i-th child of an iterator node.
+fn get_iterator_child(op: Link<Op>, i: usize) -> Link<Op> {
+    match op.borrow().deref() {
+        Op::Vector(vector) => {
+            let children = vector.children().borrow().deref().clone();
+            children[i].clone()
+        },
+        Op::Matrix(matrix) => {
+            let children = matrix.children().borrow().deref().clone();
+            children[i].clone()
+        },
+        Op::Accessor(accessor) => {
+            match accessor.indexable.borrow().deref() {
+                // If we access an outer loop parameter in the body of an inner
+                // loop, we need to create
+                // an Accessor for the correct index in this parameter
+                Op::Parameter(_parameter) => Accessor::create(
+                    accessor.indexable.clone(),
+                    AccessType::Index(i),
+                    0,
+                    accessor.span(),
+                ),
+                _ => op.clone(),
+            }
+        },
+        _ => op.clone(),
     }
 }
