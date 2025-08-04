@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    ops::Deref,
-};
+use std::{collections::HashMap, ops::Deref};
 
 use air_parser::ast::AccessType;
 use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
@@ -10,8 +7,8 @@ use crate::{
     CompileError,
     ir::{
         Accessor, Add, BackLink, Boundary, ConstantValue, Enf, Exp, FoldOperator, Graph, Link,
-        Matrix, MirType, MirValue, Mul, Node, Op, Owner, Parameter, Parent, SpannedMirValue, Sub,
-        TraceAccess, TraceAccessBinding, Value, Vector,
+        Matrix, MirType, MirValue, Mul, Node, Op, Owner, Parameter, Parent, RandomInputs,
+        SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value, Vector,
     },
     passes::{
         Visitor,
@@ -26,7 +23,7 @@ pub struct UnrollingFirstPass<'a> {
     // general context
     work_stack: Vec<Link<Node>>,
     // current evaluations of nodes at random points
-    match_optimizer: MatchOptimizer,
+    random_inputs: RandomInputs,
     // For each child of a For node encountered, we store the context to inline it in the second
     // pass
     pub bodies_to_inline: Vec<(Link<Op>, ForInliningContext)>,
@@ -42,7 +39,7 @@ impl<'a> UnrollingFirstPass<'a> {
         Self {
             diagnostics,
             work_stack: vec![],
-            match_optimizer: MatchOptimizer::default(),
+            random_inputs: RandomInputs::default(),
             bodies_to_inline: vec![],
             params_for_ref_node: HashMap::new(),
             all_for_nodes: HashMap::new(),
@@ -511,41 +508,27 @@ impl UnrollingFirstPass<'_> {
         let if_ref = if_node.as_if().unwrap();
         let match_arms = if_ref.match_arms.borrow();
 
+        // 1. Instantiate a new MatchOptimizer to handle the constraints of this node
+        let mut match_optimizer = MatchOptimizer::new(&mut self.random_inputs);
+
         let mut bus_related_constraints = Vec::new();
 
-        // 1. We evaluate all constraints of this match node at random points
-        let mut node_evals = Vec::new();
+        // 2. For each match arm, gather bus-related constraints
+        // to be handled separately and evaluate the main constraints
+        for match_arm in match_arms.iter() {
+            let bus_related_constraints_for_match_arm =
+                match_optimizer.evaluate_match_arm(match_arm)?;
+            bus_related_constraints
+                .push((match_arm.condition.clone(), bus_related_constraints_for_match_arm));
+        }
 
-        // Used to keep track of the evaluation of each constraint
-        // We use indices to the node_evals vector as keys, to avoid non-determinism for
-        // iterating across
-        let mut constraints_evaluation_indices: BTreeMap<usize, Vec<_>> = BTreeMap::new();
-
-        self.match_optimizer.evaluate_match_arms(
-            &mut node_evals,
-            &mut constraints_evaluation_indices,
-            &mut bus_related_constraints,
-            match_arms,
-        )?;
-
-        // 2. For each evaluation, we keep track of the length of the vector of unique constraints
-        //    evaluating to it
-        // This len will be used to combine the constraints by taking the most constrained
-        // evaluations first, in order to minimize the number of constraints in the
-        // final vector
-        let mut eval_lens = self.match_optimizer.compute_eval_lens(&constraints_evaluation_indices);
-
-        // 3. Construct the new vector of combined constraints
-        let mut new_vec = self.match_optimizer.reduce_main_constraints(
-            &mut constraints_evaluation_indices,
-            &mut eval_lens,
-            if_ref.span,
-        );
+        // 3. Construct the new vector of combined main constraints
+        let combined_main_constraints = match_optimizer.reduce_main_constraints(if_ref.span);
 
         // 4. Add all the constraints that are bus-related
-        self.match_optimizer.add_bus_constaints(
+        let new_vec = MatchOptimizer::gather_all_constraints(
             &mut bus_related_constraints,
-            &mut new_vec,
+            combined_main_constraints,
             if_ref.span,
         );
 
