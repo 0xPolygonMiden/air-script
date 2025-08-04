@@ -68,7 +68,6 @@ pub struct CallInliningContext {
     pure_function: bool,
     ref_node: Link<Node>,
 }
-impl CallInliningContext {}
 
 pub struct InliningSecondPass<'a> {
     diagnostics: &'a DiagnosticsHandler,

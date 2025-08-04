@@ -36,7 +36,6 @@ pub struct ForInliningContext {
     selector: Option<Link<Op>>,
     ref_node: Link<Op>,
 }
-impl ForInliningContext {}
 
 impl Pass for Unrolling<'_> {
     type Input<'a> = Mir;
