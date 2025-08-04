@@ -14,10 +14,10 @@ use unrolling_second_pass::UnrollingSecondPass;
 /// This pass follows a similar approach as the Inlining pass.
 /// It requires that this Inlining pass has already been done.
 ///
-/// * In the first step, we visit the graph, unrolling each node type except For nodes. Instead, for
-///   these node types we gather the context to inline them in the second pass. In this first pass,
-///   we also optimize constraints found in match statements.
-/// * In the second pass, we inline the bodies of For nodes.
+/// * In the first step, we visit the graph, unrolling each node type except `For` nodes. Instead,
+///   for these node types we gather the context to inline them in the second pass. In this first
+///   pass, we also optimize constraints found in match statements.
+/// * In the second pass, we inline the bodies of `For` nodes.
 pub struct Unrolling<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }

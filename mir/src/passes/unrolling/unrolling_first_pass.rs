@@ -499,8 +499,8 @@ impl UnrollingFirstPass<'_> {
         Ok(updated_fold)
     }
 
-    /// Visiting an If node consists into evaluating all the main trace constraints contained in the
-    /// match arms, and combining them to optimize the resulting vector of constraints if
+    /// Visiting an `If` node consists into evaluating all the main trace constraints contained in
+    /// the match arms, and combining them to optimize the resulting vector of constraints if
     /// possible. We handle bus related constraints separately, as they cannot be combined with
     /// main trace constraints.
     fn visit_if_bis(

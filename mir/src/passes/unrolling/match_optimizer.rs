@@ -18,7 +18,7 @@ use crate::{
 type ConstraintEvaluationMap = BTreeMap<usize, Vec<(Link<Op>, Link<Op>)>>;
 
 /// This struct provides methods used to combine and optimize constraints contained in match
-/// statements (corresponding to If nodes in the MIR)
+/// statements (corresponding to `If` nodes in the MIR)
 #[derive(Debug, Clone, Default)]
 pub struct MatchOptimizer {
     random_inputs: RandomInputs,
