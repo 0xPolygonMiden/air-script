@@ -393,8 +393,8 @@ impl EvaluatorFunction {
         params: Vec<TraceSegment>,
         body: Vec<Statement>,
     ) -> Self {
-        let p = params.iter().map(|ty| ty.ty()).collect::<Vec<_>>();
-        let fn_ty = FunctionType::Evaluator(p);
+        let param_tys = params.iter().map(|ty| ty.ty()).collect::<Vec<_>>();
+        let fn_ty = FunctionType::Evaluator(param_tys);
         Self { span, name, params, body, fn_ty }
     }
 }
@@ -402,6 +402,14 @@ impl Eq for EvaluatorFunction {}
 impl PartialEq for EvaluatorFunction {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.params == other.params && self.body == other.body
+    }
+}
+impl Typing for EvaluatorFunction {
+    fn ty(&self) -> Option<Type> {
+        None
+    }
+    fn kind(&self) -> Option<Kind> {
+        Some(Kind::Callable(self.fn_ty.clone()))
     }
 }
 

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use miden_diagnostics::{SourceSpan, Spanned};
-use typing::{FunctionType, Kind, Typing, tty, ty};
+use typing::{Kind, Typing, tty, ty};
 
 use super::*;
 
@@ -28,7 +28,6 @@ pub struct TraceSegment {
     /// A vector of `size` elements which tracks for every column whether a
     /// constraint has been applied to that column, and on what boundaries.
     pub boundary_constrained: Vec<Span<ColumnBoundaryFlags>>,
-    pub fn_ty: Option<FunctionType>,
 }
 impl TraceSegment {
     /// Constructs a new [TraceSegment] given a span, segment id, name, and a vector of (Identifier,
@@ -58,7 +57,7 @@ impl TraceSegment {
 
         // The size of the segment is the sum of the sizes of all the bindings
         let size = offset;
-        let mut res = Self {
+        Self {
             span,
             id,
             name,
@@ -68,13 +67,7 @@ impl TraceSegment {
                 Span::new(SourceSpan::UNKNOWN, ColumnBoundaryFlags::EMPTY);
                 size
             ],
-            fn_ty: None,
-        };
-        res.fn_ty = match res.kind() {
-            Some(Kind::Callable(fty)) => Some(fty),
-            _ => None,
-        };
-        res
+        }
     }
 
     /// Returns true if `column` is constrained on `boundary`
@@ -110,12 +103,10 @@ impl TraceSegment {
 }
 impl Typing for TraceSegment {
     fn ty(&self) -> Option<Type> {
-        None
-    }
-    fn kind(&self) -> Option<Kind> {
-        Some(Kind::Callable(FunctionType::Evaluator(
-            self.bindings.iter().map(|b| b.ty()).collect(),
-        )))
+        match self.size {
+            1 => self.bindings.first().map(|b| b.ty())?,
+            _ => ty!(felt[self.size]),
+        }
     }
 }
 impl fmt::Debug for TraceSegment {
