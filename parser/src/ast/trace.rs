@@ -267,7 +267,11 @@ impl Access for TraceBinding {
     /// Derive a new [TraceBinding] derived from the current one given an [AccessType]
     fn access(&self, access_type: AccessType) -> Result<Self::Accessed, InvalidAccessError> {
         match access_type {
-            AccessType::Default => Ok(*self),
+            //
+            AccessType::Default => match self.size {
+                1 => Ok(Self { ty: ty!(felt).unwrap(), ..*self }),
+                _ => Ok(*self),
+            },
             AccessType::Slice(_) if self.is_scalar() => Err(InvalidAccessError::SliceOfScalar),
             AccessType::Slice(range) => {
                 let slice_range = range.to_slice_range();
