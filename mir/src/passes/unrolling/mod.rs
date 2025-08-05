@@ -11,8 +11,8 @@ mod unrolling_second_pass;
 use unrolling_first_pass::UnrollingFirstPass;
 use unrolling_second_pass::UnrollingSecondPass;
 
-/// This pass follows a similar approach as the Inlining pass.
-/// It requires that this Inlining pass has already been done.
+/// This pass follows a similar approach as the Inlining pass and requires that the latter has
+/// already been done.
 ///
 /// * In the first step, we visit the graph, unrolling each node type except `For` nodes. Instead,
 ///   for these node types we gather the context to inline them in the second pass. In this first

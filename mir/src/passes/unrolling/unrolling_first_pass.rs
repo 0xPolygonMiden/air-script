@@ -496,7 +496,7 @@ impl UnrollingFirstPass<'_> {
         Ok(updated_fold)
     }
 
-    /// Visiting an `If` node consists into evaluating all the main trace constraints contained in
+    /// Visiting an `If` node consists of evaluating all the main trace constraints contained in
     /// the match arms, and combining them to optimize the resulting vector of constraints if
     /// possible. We handle bus related constraints separately, as they cannot be combined with
     /// main trace constraints.
@@ -652,7 +652,8 @@ impl Visitor for UnrollingFirstPass<'_> {
     }
 
     fn visit_node(&mut self, graph: &mut Graph, node: Link<Node>) -> Result<(), CompileError> {
-        // We keep a reference to all For nodes to avoid dropping the backlinks stored in Parameters
+        // We keep a reference to all `For` nodes to avoid dropping the backlinks stored in
+        // `Parameters`
         if let Some(owner) = node.clone().as_owner()
             && let Some(op) = owner.clone().as_op()
             && let Some(_for_node) = op.as_for()

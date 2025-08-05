@@ -17,7 +17,7 @@ use crate::{
 /// It works in three steps:
 /// * Firstly, we visit the graph to build the call dependency graph.
 /// * This dependency graph is then used to compute the wanted inlining order (we first replace
-///   calls to callees that do not have `Call` in their body). If it is not possible create this
+///   calls to callees that do not have `Call` in their body). If it is not possible to create this
 ///   order, this means there is a circular dependency.
 /// * Then, we visit the graph again at each `Call` nodes, building a duplicate of the body (with
 ///   Parameter replaced by call arguments), and replacing the `Call` node by this duplicate body.
