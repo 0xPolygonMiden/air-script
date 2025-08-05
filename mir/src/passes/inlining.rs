@@ -25,6 +25,7 @@ use crate::{
 pub struct Inlining<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
+
 impl<'a> Inlining<'a> {
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self { diagnostics }
@@ -46,6 +47,7 @@ pub struct InliningFirstPass<'a> {
     // HashMap<CaleePtr, Callee, Vec<Call nodes where called>>
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
 }
+
 impl<'a> InliningFirstPass<'a> {
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self {
@@ -85,6 +87,7 @@ pub struct InliningSecondPass<'a> {
     // HashMap<CaleePtr, (Callee, Vec<Call nodes where called>)>
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
 }
+
 impl<'a> InliningSecondPass<'a> {
     pub fn new(
         diagnostics: &'a DiagnosticsHandler,
@@ -388,6 +391,7 @@ impl Visitor for InliningSecondPass<'_> {
         }
         Ok(())
     }
+
     fn scan_node(&mut self, _graph: &Graph, node: Link<Node>) -> Result<(), CompileError> {
         self.work_stack().push(node.clone());
         if let Some(op) = node.clone().as_op() {

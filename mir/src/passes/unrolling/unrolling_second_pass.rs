@@ -26,6 +26,7 @@ pub struct UnrollingSecondPass<'a> {
     // referencing them to be dropped
     all_for_nodes: HashMap<usize, (Link<Op>, Link<Owner>)>,
 }
+
 impl<'a> UnrollingSecondPass<'a> {
     pub fn new(
         diagnostics: &'a DiagnosticsHandler,
@@ -43,10 +44,12 @@ impl<'a> UnrollingSecondPass<'a> {
         }
     }
 }
+
 impl Visitor for UnrollingSecondPass<'_> {
     fn work_stack(&mut self) -> &mut Vec<Link<Node>> {
         &mut self.work_stack
     }
+
     // The root nodes visited during the second pass are the children of `For` nodes to inline
     fn root_nodes_to_visit(&self, _graph: &Graph) -> Vec<Link<Node>> {
         self.bodies_to_inline
@@ -56,6 +59,7 @@ impl Visitor for UnrollingSecondPass<'_> {
             .map(|op| op.as_node())
             .collect::<Vec<_>>()
     }
+
     fn run(&mut self, graph: &mut Graph) -> Result<(), CompileError> {
         for root in self.root_nodes_to_visit(graph).iter() {
             // Set the context corresponding to the `For` node we are inlining
@@ -100,6 +104,7 @@ impl Visitor for UnrollingSecondPass<'_> {
 
         Ok(())
     }
+
     fn visit_node(&mut self, _graph: &mut Graph, node: Link<Node>) -> Result<(), CompileError> {
         // Skip stale nodes
         if node.is_stale() {

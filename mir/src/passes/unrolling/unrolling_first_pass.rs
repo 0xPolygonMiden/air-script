@@ -630,6 +630,7 @@ impl Visitor for UnrollingFirstPass<'_> {
     fn work_stack(&mut self) -> &mut Vec<Link<Node>> {
         &mut self.work_stack
     }
+
     // We visit all boundary constraints and all integrity constraints
     // No need to visit the functions or evaluators, as they should have been inlined before this
     // pass
