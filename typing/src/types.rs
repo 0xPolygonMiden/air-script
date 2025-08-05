@@ -164,10 +164,13 @@ macro_rules! tty {
         ])
     };
     ($name:ident[$len:expr]) => {
-        $crate::ty!(felt[$len])
+        match $len {
+            1 => $crate::ty!(felt),
+            _ => $crate::ty!(felt[$len]),
+        }
     };
     ($name:ident) => {
-        $crate::ty!(felt[1])
+        $crate::ty!(felt)
     };
 }
 
@@ -738,28 +741,22 @@ mod tests {
 
     #[test]
     fn test_macro_trace_segment_type() {
-        assert_eq!(tty!(a), ty!(felt[1]));
+        assert_eq!(tty!(a), ty!(felt));
         assert_eq!(tty!(a[5]), ty!(felt[5]));
         assert_eq!(tty!([]), Vec::<Option<Type>>::new());
-        assert_eq!(tty!([a]), vec![ty!(felt[1])]);
+        assert_eq!(tty!([a]), vec![ty!(felt)]);
         assert_eq!(tty!([a[5]]), vec![ty!(felt[5])]);
-        assert_eq!(tty!([a[1], b[3]]), vec![ty!(felt[1]), ty!(felt[3])]);
+        assert_eq!(tty!([a[1], b[3]]), vec![ty!(felt), ty!(felt[3])]);
     }
 
     #[test]
     fn test_macro_function_type() {
         assert_eq!(fty!(ev([])), FunctionType::Evaluator(vec![]));
-        assert_eq!(fty!(ev([a])), FunctionType::Evaluator(vec![ty!(felt[1])]));
+        assert_eq!(fty!(ev([a])), FunctionType::Evaluator(vec![ty!(felt)]));
         assert_eq!(fty!(ev([a[5]])), FunctionType::Evaluator(vec![ty!(felt[5])]));
-        assert_eq!(fty!(ev([a, b[3]])), FunctionType::Evaluator(vec![ty!(felt[1]), ty!(felt[3])]));
-        assert_eq!(
-            fty!(ev([a[1], b[3]])),
-            FunctionType::Evaluator(vec![ty!(felt[1]), ty!(felt[3])])
-        );
-        assert_eq!(
-            fty!(ev([a[1], b[3]])),
-            FunctionType::Evaluator(vec![ty!(felt[1]), ty!(felt[3])])
-        );
+        assert_eq!(fty!(ev([a, b[3]])), FunctionType::Evaluator(vec![ty!(felt), ty!(felt[3])]));
+        assert_eq!(fty!(ev([a[1], b[3]])), FunctionType::Evaluator(vec![ty!(felt), ty!(felt[3])]));
+        assert_eq!(fty!(ev([a[1], b[3]])), FunctionType::Evaluator(vec![ty!(felt), ty!(felt[3])]));
 
         assert_eq!(fty!(fn(uint) -> felt), FunctionType::Function(vec![ty!(uint)], ty!(felt)));
         assert_eq!(
