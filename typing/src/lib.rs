@@ -126,8 +126,8 @@ pub trait Typing {
         self.is_vector()
     }
     /// Returns true if the shape of `self` is a sub-shape of the shape of `other`
-    /// The shapes are compatible if:
-    /// - self is `?` (None)
+    /// The shape of `self` is a sub-shape of the shape of `other` if:
+    /// - other is `?` (None)
     /// - both are scalars
     /// - both are vectors of the same length
     /// - both are vectors with one of the lengths being `u32::MAX`
@@ -135,15 +135,16 @@ pub trait Typing {
     /// - both are matrices with one or more of the rows or columns being `u32::MAX`, the other pair
     ///   (if any) being equal
     ///
-    /// self\\other || _[r,c] | _[l] | _ | ?
-    /// ============||========|======|===|==
-    /// _[r,c]      ||   y    |  n   | n | n
-    /// _[l]        ||   n    |  y   | n | n
-    /// _           ||   n    |  n   | y | n
-    /// ?           ||   y    |  y   | y | y
+    /// self\\other || ? | _ | _[l] | _[r,c]
+    /// ============||===|===|======|========
+    /// ?           || y | n |   n  |   n
+    /// _           || y | y |   n  |   n
+    /// _[l]        || y | n |   y  |   n
+    /// _[r,c]      || y | n |   n  |   y
+    ///
     fn is_subshape(&self, other: &impl Typing) -> bool {
         match (self.ty(), other.ty()) {
-            (None, _) => true,
+            (_, None) => true,
             (Some(Type::Scalar(_)), Some(Type::Scalar(_))) => true,
             (Some(Type::Vector(_, len1)), Some(Type::Vector(_, len2))) => {
                 len1 == len2 || len1 == u32::MAX as usize || len2 == u32::MAX as usize
@@ -166,18 +167,18 @@ pub trait Typing {
     /// - both are matrices with one or more of the rows or columns being `u32::MAX`, the other pair
     ///   (if any) being equal
     ///
-    /// self\\other || _[r,c] | _[l] | _ | ?
-    /// ============||========|======|===|==
-    /// _[r,c]      ||   y    |  n   | n | y
-    /// _[l]        ||   n    |  y   | n | y
-    /// _           ||   n    |  n   | y | y
-    /// ?           ||   y    |  y   | y | y
+    /// self\\other || ? | _ | _[l] | _[r,c]
+    /// ============||===|===|======|========
+    /// ?           || y | y |  y   |   y
+    /// _           || y | y |  n   |   n
+    /// _[l]        || y | n |  y   |   n
+    /// _[r,c]      || y | n |  n   |   y
     ///
     /// This is a more relaxed version of [Typing::is_subshape],
     /// allowing for bi-directional compatibility checks. The only
-    /// difference is that it allows for `other` to be `?` (None).
+    /// difference is that it allows for `self` to be `?` (None).
     fn is_shape_compatible(&self, other: &impl Typing) -> bool {
-        other.ty().is_none() || self.is_subshape(other)
+        self.ty().is_none() || self.is_subshape(other)
     }
     /// Returns true if `self` is a subtype of `other`
     /// Notation:
@@ -191,26 +192,27 @@ pub trait Typing {
     ///   Integer type
     ///
     /// Subtyping rules:
-    /// - felt > bool > _
-    /// - felt > uint > _
+    /// - _ > felt > bool
+    /// - _ > felt > uint
     ///
     /// Which means:
-    /// - `_` is a subtype of all scalar types
+    /// - all scalar types are subtypes of `_`
     /// - `bool` is a subtype of `felt`: a `bool` is a `felt with a `is_bool` property
     /// - `uint` is a subtype of `felt`: a `uint` is a `felt` with the `constant` property
     ///
-    /// self\\other || felt | bool | uint | _ |
-    /// ============||======|======|======|===|
-    /// felt        ||   y  |    n |    n | n |
-    /// bool        ||   y  |    y |    n | n |
-    /// uint        ||   y  |    n |    y | n |
-    /// _           ||   y  |    y |    y | y |
+    /// self\\other || _ | felt | bool | uint |
+    /// ============||===|======|======|======|
+    /// _           || y |   n  |    n |    n |
+    /// felt        || y |   y  |    n |    n |
+    /// bool        || y |   y  |    y |    n |
+    /// uint        || y |   y  |    n |    y |
     fn is_scalar_subtype(&self, other: &impl Typing) -> bool {
         !matches!(
             (self.scalar_ty(), other.scalar_ty()),
-            (sty!(felt), sty!(bool) | sty!(uint) | sty!(_))
-                | (sty!(bool), sty!(uint) | sty!(_))
-                | (sty!(uint), sty!(bool) | sty!(_))
+            (sty!(_), sty!(felt) | sty!(bool) | sty!(uint))
+                | (sty!(felt), sty!(bool) | sty!(uint))
+                | (sty!(bool), sty!(uint))
+                | (sty!(uint), sty!(bool))
         )
     }
     /// Returns true if `self` is a subtype of `other`
@@ -232,25 +234,26 @@ pub trait Typing {
     ///
     /// Subtyping rules:
     /// ? > _       > felt       > bool
-    ///         ... > felt       > uint
+    /// ? > _       > felt       > uint
     /// ? > _[l]    > felt[l]    > bool[l]
-    ///         ... > felt[l]    > uint[l]
+    /// ? > _[l]    > felt[l]    > uint[l]
     /// ? > _[r, c] > felt[r, c] > bool[r, c]
-    ///         ... > felt[r, c] > uint[r, c]
-    /// Assuming shapes are compatible, this function checks if the scalar types,
+    /// ? > _[r, c] > felt[r, c] > uint[r, c]
+    /// Assuming the shape of `self` is a sub-shape of the shape of `other`,
+    /// this function checks if `self` is a subtype of `other`,
     /// with the added case of `?`, which all types are subtypes of.
     /// See [Typing::is_scalar_subtype] for a more detailed explanation
     /// of the subtyping rules of scalar types.
     ///
-    /// self\\other || felt | bool | uint | _ | ? |
-    /// ============||======|======|======|===|===|
-    /// felt        ||[  y  |    n |    n | n]| n |
-    /// bool        ||[  y  |    y |    n | n]| n |
-    /// uint        ||[  y  |    n |    y | n]| n |
-    /// _           ||[  y  |    y |    y | y]| n |
-    /// ?           ||   y  |    y |    y | y | y |
+    /// self\\other || ? | _ | felt | bool | uint |
+    /// ============||===|===|======|======|======|
+    /// ?           || y | n |   n  |    n |    n |
+    /// _           || y |[y |   n  |    n |    n]|
+    /// felt        || y |[y |   y  |    n |    n]|
+    /// bool        || y |[y |   y  |    y |    n]|
+    /// uint        || y |[y |   y  |    n |    y]|
     ///
-    /// = self.is_scalar_subtype(other) | self == ?
+    /// = self.is_scalar_subtype(other) | other == ?
     /// [...] Denotes the result of the [Typing::is_scalar_subtype] method.
     fn is_subtype(&self, other: &impl Typing) -> bool {
         self.is_subshape(other) && self.is_scalar_subtype(other)
@@ -675,24 +678,24 @@ mod tests {
     #[test]
     fn test_typing_subtype() {
         assert_subtype!(ty!(?); ty!(?));
-        assert_subtype!(ty!(?); ty!(_));
-        assert_subtype!(ty!(?); ty!(felt));
-        assert_subtype!(ty!(?); ty!(bool));
-        assert_subtype!(ty!(?); ty!(uint));
-        assert_subtype!(ty!(?); ty!(_[5]));
-        assert_subtype!(ty!(?); ty!(felt[5]));
-        assert_subtype!(ty!(?); ty!(bool[5]));
-        assert_subtype!(ty!(?); ty!(uint[5]));
-        assert_subtype!(ty!(?); ty!(_[3, 4]));
-        assert_subtype!(ty!(?); ty!(felt[3, 4]));
-        assert_subtype!(ty!(?); ty!(bool[3, 4]));
-        assert_subtype!(ty!(?); ty!(uint[3, 4]));
+        assert_subtype!(ty!(?); !ty!(_));
+        assert_subtype!(ty!(?); !ty!(felt));
+        assert_subtype!(ty!(?); !ty!(bool));
+        assert_subtype!(ty!(?); !ty!(uint));
+        assert_subtype!(ty!(?); !ty!(_[5]));
+        assert_subtype!(ty!(?); !ty!(felt[5]));
+        assert_subtype!(ty!(?); !ty!(bool[5]));
+        assert_subtype!(ty!(?); !ty!(uint[5]));
+        assert_subtype!(ty!(?); !ty!(_[3, 4]));
+        assert_subtype!(ty!(?); !ty!(felt[3, 4]));
+        assert_subtype!(ty!(?); !ty!(bool[3, 4]));
+        assert_subtype!(ty!(?); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(_); !ty!(?));
+        assert_subtype!(ty!(_); ty!(?));
         assert_subtype!(ty!(_); ty!(_));
-        assert_subtype!(ty!(_); ty!(felt));
-        assert_subtype!(ty!(_); ty!(bool));
-        assert_subtype!(ty!(_); ty!(uint));
+        assert_subtype!(ty!(_); !ty!(felt));
+        assert_subtype!(ty!(_); !ty!(bool));
+        assert_subtype!(ty!(_); !ty!(uint));
         assert_subtype!(ty!(_); !ty!(_[5]));
         assert_subtype!(ty!(_); !ty!(felt[5]));
         assert_subtype!(ty!(_); !ty!(bool[5]));
@@ -702,8 +705,8 @@ mod tests {
         assert_subtype!(ty!(_); !ty!(bool[3, 4]));
         assert_subtype!(ty!(_); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(felt); !ty!(?));
-        assert_subtype!(ty!(felt); !ty!(_));
+        assert_subtype!(ty!(felt); ty!(?));
+        assert_subtype!(ty!(felt); ty!(_));
         assert_subtype!(ty!(felt); ty!(felt));
         assert_subtype!(ty!(felt); !ty!(bool));
         assert_subtype!(ty!(felt); !ty!(uint));
@@ -716,8 +719,8 @@ mod tests {
         assert_subtype!(ty!(felt); !ty!(bool[3, 4]));
         assert_subtype!(ty!(felt); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(bool); !ty!(?));
-        assert_subtype!(ty!(bool); !ty!(_));
+        assert_subtype!(ty!(bool); ty!(?));
+        assert_subtype!(ty!(bool); ty!(_));
         assert_subtype!(ty!(bool); ty!(felt));
         assert_subtype!(ty!(bool); ty!(bool));
         assert_subtype!(ty!(bool); !ty!(uint));
@@ -730,8 +733,8 @@ mod tests {
         assert_subtype!(ty!(bool); !ty!(bool[3, 4]));
         assert_subtype!(ty!(bool); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(uint); !ty!(?));
-        assert_subtype!(ty!(uint); !ty!(_));
+        assert_subtype!(ty!(uint); ty!(?));
+        assert_subtype!(ty!(uint); ty!(_));
         assert_subtype!(ty!(uint); ty!(felt));
         assert_subtype!(ty!(uint); !ty!(bool));
         assert_subtype!(ty!(uint); ty!(uint));
@@ -744,26 +747,26 @@ mod tests {
         assert_subtype!(ty!(uint); !ty!(bool[3, 4]));
         assert_subtype!(ty!(uint); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(_[5]); !ty!(?));
+        assert_subtype!(ty!(_[5]); ty!(?));
         assert_subtype!(ty!(_[5]); !ty!(_));
         assert_subtype!(ty!(_[5]); !ty!(felt));
         assert_subtype!(ty!(_[5]); !ty!(bool));
         assert_subtype!(ty!(_[5]); !ty!(uint));
         assert_subtype!(ty!(_[5]); ty!(_[5]));
-        assert_subtype!(ty!(_[5]); ty!(felt[5]));
-        assert_subtype!(ty!(_[5]); ty!(bool[5]));
-        assert_subtype!(ty!(_[5]); ty!(uint[5]));
+        assert_subtype!(ty!(_[5]); !ty!(felt[5]));
+        assert_subtype!(ty!(_[5]); !ty!(bool[5]));
+        assert_subtype!(ty!(_[5]); !ty!(uint[5]));
         assert_subtype!(ty!(_[5]); !ty!(_[3, 4]));
         assert_subtype!(ty!(_[5]); !ty!(felt[3, 4]));
         assert_subtype!(ty!(_[5]); !ty!(bool[3, 4]));
         assert_subtype!(ty!(_[5]); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(felt[5]); !ty!(?));
+        assert_subtype!(ty!(felt[5]); ty!(?));
         assert_subtype!(ty!(felt[5]); !ty!(_));
         assert_subtype!(ty!(felt[5]); !ty!(felt));
         assert_subtype!(ty!(felt[5]); !ty!(bool));
         assert_subtype!(ty!(felt[5]); !ty!(uint));
-        assert_subtype!(ty!(felt[5]); !ty!(_[5]));
+        assert_subtype!(ty!(felt[5]); ty!(_[5]));
         assert_subtype!(ty!(felt[5]); ty!(felt[5]));
         assert_subtype!(ty!(felt[5]); !ty!(bool[5]));
         assert_subtype!(ty!(felt[5]); !ty!(uint[5]));
@@ -772,12 +775,12 @@ mod tests {
         assert_subtype!(ty!(felt[5]); !ty!(bool[3, 4]));
         assert_subtype!(ty!(felt[5]); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(bool[5]); !ty!(?));
+        assert_subtype!(ty!(bool[5]); ty!(?));
         assert_subtype!(ty!(bool[5]); !ty!(_));
         assert_subtype!(ty!(bool[5]); !ty!(felt));
         assert_subtype!(ty!(bool[5]); !ty!(bool));
         assert_subtype!(ty!(bool[5]); !ty!(uint));
-        assert_subtype!(ty!(bool[5]); !ty!(_[5]));
+        assert_subtype!(ty!(bool[5]); ty!(_[5]));
         assert_subtype!(ty!(bool[5]); ty!(felt[5]));
         assert_subtype!(ty!(bool[5]); ty!(bool[5]));
         assert_subtype!(ty!(bool[5]); !ty!(uint[5]));
@@ -786,12 +789,12 @@ mod tests {
         assert_subtype!(ty!(bool[5]); !ty!(bool[3, 4]));
         assert_subtype!(ty!(bool[5]); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(uint[5]); !ty!(?));
+        assert_subtype!(ty!(uint[5]); ty!(?));
         assert_subtype!(ty!(uint[5]); !ty!(_));
         assert_subtype!(ty!(uint[5]); !ty!(felt));
         assert_subtype!(ty!(uint[5]); !ty!(bool));
         assert_subtype!(ty!(uint[5]); !ty!(uint));
-        assert_subtype!(ty!(uint[5]); !ty!(_[5]));
+        assert_subtype!(ty!(uint[5]); ty!(_[5]));
         assert_subtype!(ty!(uint[5]); ty!(felt[5]));
         assert_subtype!(ty!(uint[5]); !ty!(bool[5]));
         assert_subtype!(ty!(uint[5]); ty!(uint[5]));
@@ -800,7 +803,7 @@ mod tests {
         assert_subtype!(ty!(uint[5]); !ty!(bool[3, 4]));
         assert_subtype!(ty!(uint[5]); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(_[3, 4]); !ty!(?));
+        assert_subtype!(ty!(_[3, 4]); ty!(?));
         assert_subtype!(ty!(_[3, 4]); !ty!(_));
         assert_subtype!(ty!(_[3, 4]); !ty!(felt));
         assert_subtype!(ty!(_[3, 4]); !ty!(bool));
@@ -810,11 +813,11 @@ mod tests {
         assert_subtype!(ty!(_[3, 4]); !ty!(bool[5]));
         assert_subtype!(ty!(_[3, 4]); !ty!(uint[5]));
         assert_subtype!(ty!(_[3, 4]); ty!(_[3, 4]));
-        assert_subtype!(ty!(_[3, 4]); ty!(felt[3, 4]));
-        assert_subtype!(ty!(_[3, 4]); ty!(bool[3, 4]));
-        assert_subtype!(ty!(_[3, 4]); ty!(uint[3, 4]));
+        assert_subtype!(ty!(_[3, 4]); !ty!(felt[3, 4]));
+        assert_subtype!(ty!(_[3, 4]); !ty!(bool[3, 4]));
+        assert_subtype!(ty!(_[3, 4]); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(felt[3, 4]); !ty!(?));
+        assert_subtype!(ty!(felt[3, 4]); ty!(?));
         assert_subtype!(ty!(felt[3, 4]); !ty!(_));
         assert_subtype!(ty!(felt[3, 4]); !ty!(felt));
         assert_subtype!(ty!(felt[3, 4]); !ty!(bool));
@@ -823,12 +826,12 @@ mod tests {
         assert_subtype!(ty!(felt[3, 4]); !ty!(felt[5]));
         assert_subtype!(ty!(felt[3, 4]); !ty!(bool[5]));
         assert_subtype!(ty!(felt[3, 4]); !ty!(uint[5]));
-        assert_subtype!(ty!(felt[3, 4]); !ty!(_[3, 4]));
+        assert_subtype!(ty!(felt[3, 4]); ty!(_[3, 4]));
         assert_subtype!(ty!(felt[3, 4]); ty!(felt[3, 4]));
         assert_subtype!(ty!(felt[3, 4]); !ty!(bool[3, 4]));
         assert_subtype!(ty!(felt[3, 4]); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(bool[3, 4]); !ty!(?));
+        assert_subtype!(ty!(bool[3, 4]); ty!(?));
         assert_subtype!(ty!(bool[3, 4]); !ty!(_));
         assert_subtype!(ty!(bool[3, 4]); !ty!(felt));
         assert_subtype!(ty!(bool[3, 4]); !ty!(bool));
@@ -837,12 +840,12 @@ mod tests {
         assert_subtype!(ty!(bool[3, 4]); !ty!(felt[5]));
         assert_subtype!(ty!(bool[3, 4]); !ty!(bool[5]));
         assert_subtype!(ty!(bool[3, 4]); !ty!(uint[5]));
-        assert_subtype!(ty!(bool[3, 4]); !ty!(_[3, 4]));
+        assert_subtype!(ty!(bool[3, 4]); ty!(_[3, 4]));
         assert_subtype!(ty!(bool[3, 4]); ty!(felt[3, 4]));
         assert_subtype!(ty!(bool[3, 4]); ty!(bool[3, 4]));
         assert_subtype!(ty!(bool[3, 4]); !ty!(uint[3, 4]));
 
-        assert_subtype!(ty!(uint[3, 4]); !ty!(?));
+        assert_subtype!(ty!(uint[3, 4]); ty!(?));
         assert_subtype!(ty!(uint[3, 4]); !ty!(_));
         assert_subtype!(ty!(uint[3, 4]); !ty!(felt));
         assert_subtype!(ty!(uint[3, 4]); !ty!(bool));
@@ -851,7 +854,7 @@ mod tests {
         assert_subtype!(ty!(uint[3, 4]); !ty!(felt[5]));
         assert_subtype!(ty!(uint[3, 4]); !ty!(bool[5]));
         assert_subtype!(ty!(uint[3, 4]); !ty!(uint[5]));
-        assert_subtype!(ty!(uint[3, 4]); !ty!(_[3, 4]));
+        assert_subtype!(ty!(uint[3, 4]); ty!(_[3, 4]));
         assert_subtype!(ty!(uint[3, 4]); ty!(felt[3, 4]));
         assert_subtype!(ty!(uint[3, 4]); !ty!(bool[3, 4]));
         assert_subtype!(ty!(uint[3, 4]); ty!(uint[3, 4]));
