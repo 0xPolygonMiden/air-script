@@ -141,7 +141,6 @@ pub trait Typing {
     /// _           || y | y |   n  |   n
     /// _[l]        || y | n |   y  |   n
     /// _[r,c]      || y | n |   n  |   y
-    ///
     fn is_subshape(&self, other: &impl Typing) -> bool {
         match (self.ty(), other.ty()) {
             (_, None) => true,
