@@ -743,6 +743,25 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
 
         // Validate the operand types
         match expr.bin_ty.infer_ty() {
+            Ok(None) => {
+                self.has_type_errors = true;
+                // Note: We don't break here but at the end of the module's compilation, as we
+                // want to continue to gather as many errors as possible
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("invalid binary expression")
+                    .with_primary_label(expr.span(), "unable to infer type for binary expression")
+                    .with_secondary_label(
+                        expr.lhs.span(),
+                        format!("this expression has type: {}", expr.lhs.show_ty()),
+                    )
+                    .with_secondary_label(
+                        expr.rhs.span(),
+                        format!("this expression has type: {}", expr.rhs.show_ty()),
+                    )
+                    .emit();
+                ControlFlow::Continue(())
+            },
             Err(err) => {
                 self.has_type_errors = true;
                 // Note: We don't break here but at the end of the module's compilation, as we
@@ -751,6 +770,14 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                     .diagnostic(Severity::Error)
                     .with_message("invalid binary expression")
                     .with_primary_label(expr.span(), format!("{err}"))
+                    .with_secondary_label(
+                        expr.lhs.span(),
+                        format!("this expression has type: {}", expr.lhs.show_ty()),
+                    )
+                    .with_secondary_label(
+                        expr.rhs.span(),
+                        format!("this expression has type: {}", expr.rhs.show_ty()),
+                    )
                     .emit();
                 ControlFlow::Continue(())
             },
