@@ -112,11 +112,8 @@ impl Compiler {
         air_parser::parse(&self.diagnostics, self.codemap.clone(), source)
             .map_err(CompileError::Parse)
             .and_then(|ast| {
-                let mut pipeline =
-                    air_parser::transforms::ConstantPropagation::new(&self.diagnostics)
-                        .chain(crate::passes::AstToMir::new(&self.diagnostics))
-                        .chain(crate::passes::Inlining::new(&self.diagnostics))
-                        .chain(crate::passes::Unrolling::new(&self.diagnostics));
+                let mut pipeline = air_parser::AstPasses::new(&self.diagnostics)
+                    .chain(crate::MirPasses::new(&self.diagnostics));
                 pipeline.run(ast)
             })
     }

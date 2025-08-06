@@ -17,6 +17,7 @@ The compiler has four stages, which can be imported and used independently or to
 Example usage:
 
 ```Rust
+use air_ir::ast_to_air_pipeline;
 use air_script::{parse, Pass, WinterfellCodeGenerator};
 use miden_diagnostics::{
     term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
@@ -30,20 +31,10 @@ let diagnostics = DiagnosticsHandler::new(Default::default(), codemap.clone(), e
 // Parse into AST
 let ast = parse(&diagnostics, codemap, source.as_str()).expect("parsing failed");
 
-// Lower to MIR
-let mir = {
-   let mut pipeline = air_parser::transforms::ConstantPropagation::new(&diagnostics)
-      .chain(mir::passes::AstToMir::new(&diagnostics))
-      .chain(mir::passes::Inlining::new(&diagnostics))
-      .chain(mir::passes::Unrolling::new(&diagnostics));
-   pipeline.run(ast).expect("lowering failed")
-};
-
-// Lower to AIR
+// Lower to MIR, then AIR
 let air = {
-   let mut pipeline = air_ir::passes::MirToAir::new(&diagnostics)
-      .chain(air_ir::passes::BusOpExpand::new(&diagnostics));
-   pipeline.run(mir).expect("lowering failed")
+   let mut pipeline = ast_to_air_pipeline(&diagnostics);
+   pipeline.run(ast).expect("lowering failed")
 };
 
 // Generate Rust code targeting the Winterfell prover

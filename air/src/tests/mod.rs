@@ -18,6 +18,7 @@ use air_pass::Pass;
 use miden_diagnostics::{CodeMap, DiagnosticsConfig, DiagnosticsHandler, Verbosity};
 
 pub use crate::CompileError;
+use crate::ast_to_air_pipeline;
 
 pub fn compile(source: &str) -> Result<crate::Air, ()> {
     let compiler = Compiler::default();
@@ -77,13 +78,7 @@ impl Compiler {
         air_parser::parse(&self.diagnostics, self.codemap.clone(), source)
             .map_err(CompileError::Parse)
             .and_then(|ast| {
-                let mut pipeline =
-                    air_parser::transforms::ConstantPropagation::new(&self.diagnostics)
-                        .chain(mir::passes::AstToMir::new(&self.diagnostics))
-                        .chain(mir::passes::Inlining::new(&self.diagnostics))
-                        .chain(mir::passes::Unrolling::new(&self.diagnostics))
-                        .chain(crate::passes::MirToAir::new(&self.diagnostics))
-                        .chain(crate::passes::BusOpExpand::new(&self.diagnostics));
+                let mut pipeline = ast_to_air_pipeline(&self.diagnostics);
                 pipeline.run(ast)
             })
     }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use air_ir::Air;
+use air_ir::{Air, ast_to_air_pipeline};
 use miden_diagnostics::{
     CodeMap, DefaultEmitter, DiagnosticsHandler, term::termcolor::ColorChoice,
 };
@@ -25,12 +25,7 @@ pub fn generate_circuit(source: &str) -> (Air, Circuit, Node) {
     let air = air_parser::parse(&diagnostics, code_map, source)
         .map_err(air_ir::CompileError::Parse)
         .and_then(|ast| {
-            let mut pipeline = air_parser::transforms::ConstantPropagation::new(&diagnostics)
-                .chain(mir::passes::AstToMir::new(&diagnostics))
-                .chain(mir::passes::Inlining::new(&diagnostics))
-                .chain(mir::passes::Unrolling::new(&diagnostics))
-                .chain(air_ir::passes::MirToAir::new(&diagnostics))
-                .chain(air_ir::passes::BusOpExpand::new(&diagnostics));
+            let mut pipeline = ast_to_air_pipeline(&diagnostics);
             pipeline.run(ast)
         })
         .expect("lowering failed");

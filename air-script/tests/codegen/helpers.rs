@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use air_ir::{CodeGenerator, CompileError};
+use air_ir::{CodeGenerator, CompileError, ast_to_air_pipeline};
 use air_pass::Pass;
 use miden_diagnostics::{
     CodeMap, DefaultEmitter, DiagnosticsHandler, term::termcolor::ColorChoice,
@@ -27,12 +27,7 @@ impl Test {
         let air = air_parser::parse_file(&diagnostics, codemap, &self.input_path)
             .map_err(CompileError::Parse)
             .and_then(|ast| {
-                let mut pipeline = air_parser::transforms::ConstantPropagation::new(&diagnostics)
-                    .chain(mir::passes::AstToMir::new(&diagnostics))
-                    .chain(mir::passes::Inlining::new(&diagnostics))
-                    .chain(mir::passes::Unrolling::new(&diagnostics))
-                    .chain(air_ir::passes::MirToAir::new(&diagnostics))
-                    .chain(air_ir::passes::BusOpExpand::new(&diagnostics));
+                let mut pipeline = ast_to_air_pipeline(&diagnostics);
                 pipeline.run(ast)
             })?;
 

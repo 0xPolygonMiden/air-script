@@ -5,7 +5,9 @@ pub mod passes;
 #[cfg(test)]
 mod tests;
 
-use miden_diagnostics::{Diagnostic, ToDiagnostic};
+use air_parser::ast::Program;
+use air_pass::Pass;
+use miden_diagnostics::{Diagnostic, DiagnosticsHandler, ToDiagnostic};
 use mir::ir::Mir;
 
 pub use self::{
@@ -13,6 +15,25 @@ pub use self::{
     graph::{AlgebraicGraph, Node, NodeIndex},
     ir::*,
 };
+
+/// Creates a pipeline of passes that transforms an AST into AIR.
+pub fn ast_to_air_pipeline<'a>(
+    diagnostics: &DiagnosticsHandler,
+) -> impl Pass<Input<'a> = Program, Output<'a> = Air, Error = CompileError> {
+    // Note: Commented out code to remove if we go with the other approach below
+    /*air_parser::transforms::ConstantPropagation::new(diagnostics)
+    .chain(mir::passes::AstToMir::new(diagnostics))
+    .chain(mir::passes::Inlining::new(diagnostics))
+    .chain(mir::passes::Unrolling::new(diagnostics))
+    .chain(crate::passes::MirToAir::new(diagnostics))
+    .chain(crate::passes::BusOpExpand::new(diagnostics))*/
+
+    let ast_passes = air_parser::AstPasses::new(diagnostics);
+    let mir_passes = mir::MirPasses::new(diagnostics);
+    let air_ir_passes = crate::AirPasses::new(diagnostics);
+
+    ast_passes.chain(mir_passes).chain(air_ir_passes)
+}
 
 /// Abstracts the various passes done on the AIR representation of the program.
 pub struct AirPasses<'a> {
