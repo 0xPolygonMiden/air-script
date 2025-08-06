@@ -1,6 +1,8 @@
 use core::panic;
 
-use air_ir::{Air, AlgebraicGraph, ConstraintDomain, NodeIndex, Operation, TraceAccess};
+use air_ir::{
+    Air, AlgebraicGraph, ConstraintDomain, NodeIndex, Operation, TraceAccess, TraceSegmentId,
+};
 
 use super::{Codegen, ElemType, Impl};
 use crate::air::call_bus_boundary_varlen_pubinput;
@@ -45,18 +47,17 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &Air) {
 /// trace segment
 fn add_main_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
     let elem_type = ElemType::Base;
-    let main_trace_segment = 0;
 
     // declare the result vector to be returned.
     func_body.line("let mut result = Vec::new();");
 
     // add the main boundary constraints
-    for constraint in ir.boundary_constraints(main_trace_segment) {
+    for constraint in ir.boundary_constraints(TraceSegmentId::Main) {
         let (trace_access, expr_root) =
             split_boundary_constraint(ir.constraint_graph(), constraint.node_index());
-        debug_assert_eq!(trace_access.segment, main_trace_segment);
+        debug_assert_eq!(trace_access.segment, TraceSegmentId::Main);
 
-        let expr_root_string = expr_root.to_string(ir, elem_type, main_trace_segment);
+        let expr_root_string = expr_root.to_string(ir, elem_type, TraceSegmentId::Main);
 
         let assertion = format!(
             "result.push(Assertion::single({}, {}, {}));",
@@ -73,7 +74,6 @@ fn add_main_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
 /// trace segment (used for buses boundary constraints for variable length public inputs)
 fn add_aux_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
     let elem_type = ElemType::Ext;
-    let aux_trace_segment = 1;
 
     // declare the result vector to be returned.
     func_body.line("let mut result = Vec::new();");
@@ -86,8 +86,11 @@ fn add_aux_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
     // TODO: These values are constant across all rows and therefore can be computed only once
     //       before starting the constraint evaluation.
     for access in ir.reduced_public_input_table_accesses() {
-        let boundary_value =
-            air_ir::Value::PublicInputTable(access).to_string(ir, ElemType::Ext, 0);
+        let boundary_value = air_ir::Value::PublicInputTable(access).to_string(
+            ir,
+            ElemType::Ext,
+            TraceSegmentId::Aux,
+        );
         let expr_root_string = call_bus_boundary_varlen_pubinput(access);
 
         let boundary_value_init = format!("let {boundary_value} = {expr_root_string};");
@@ -97,12 +100,12 @@ fn add_aux_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
 
     // add the boundary constraints that have already be expanded in the algebraic graph
     // (currently, empty buses constraints)
-    for constraint in ir.boundary_constraints(aux_trace_segment) {
+    for constraint in ir.boundary_constraints(TraceSegmentId::Aux) {
         let (trace_access, expr_root) =
             split_boundary_constraint(ir.constraint_graph(), constraint.node_index());
-        debug_assert_eq!(trace_access.segment, aux_trace_segment);
+        debug_assert_eq!(trace_access.segment, TraceSegmentId::Aux);
 
-        let expr_root_string = expr_root.to_string(ir, elem_type, aux_trace_segment);
+        let expr_root_string = expr_root.to_string(ir, elem_type, TraceSegmentId::Aux);
 
         let assertion = format!(
             "result.push(Assertion::single({}, {}, {}));",

@@ -216,13 +216,16 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &Air) {
         .ret("Self");
 
     // define the integrity constraint degrees of the main trace `main_degrees`.
-    add_constraint_degrees(new, ir, 0, "main_degrees");
+    add_constraint_degrees(new, ir, TraceSegmentId::Main, "main_degrees");
 
     // define the integrity constraint degrees of the aux trace `aux_degrees`.
-    add_constraint_degrees(new, ir, 1, "aux_degrees");
+    add_constraint_degrees(new, ir, TraceSegmentId::Aux, "aux_degrees");
 
     // define the number of main trace boundary constraints `num_main_assertions`.
-    new.line(format!("let num_main_assertions = {};", ir.num_boundary_constraints(0)));
+    new.line(format!(
+        "let num_main_assertions = {};",
+        ir.num_boundary_constraints(TraceSegmentId::Main)
+    ));
 
     // define the number of aux trace boundary constraints `num_aux_assertions`.
     new.line(format!("let num_aux_assertions = {};", num_bus_boundary_constraints(ir)));
