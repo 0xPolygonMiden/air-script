@@ -563,19 +563,30 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
 
             let iterable = &expr.iterables[i];
             let iterable_ty = iterable.ty().unwrap();
-            if let Some(expected_ty) = result_ty.replace(iterable_ty) {
-                if expected_ty != iterable_ty {
-                    self.has_type_errors = true;
-                    // Note: We don't break here but at the end of the module's compilation, as we
-                    // want to continue to gather as many errors as possible
-                    let _ = self.type_mismatch(
-                        Some(&iterable_ty),
-                        iterable.span(),
-                        &expected_ty,
-                        expr.iterables[0].span(),
-                        expr.span(),
-                    );
-                }
+            let lowest_common_supertype = if result_ty.is_some() {
+                result_ty.lowest_common_supertype(&iterable_ty)
+            } else {
+                // If the result type is None, then we use the iterable type as the default
+                // This means that either:
+                // - we encountered an error previously,
+                // - or this is the first iterable we are processing
+                Some(iterable_ty)
+            };
+            if lowest_common_supertype.is_none() {
+                // If the lowest common supertype is None, and the result type is Some,
+                // then the types are incompatible
+                self.has_type_errors = true;
+                // Note: We don't break here but at the end of the module's compilation, as we
+                // want to continue to gather as many errors as possible
+                let _ = self.type_mismatch(
+                    result_ty.as_ref(),
+                    iterable.span(),
+                    &iterable_ty,
+                    expr.iterables[0].span(),
+                    expr.span(),
+                );
+            } else {
+                result_ty = lowest_common_supertype;
             }
             match self.expr_binding_type(iterable) {
                 Ok(iterable_binding_ty) => {
