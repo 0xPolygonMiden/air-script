@@ -1,5 +1,6 @@
 use std::{collections::HashMap, hash::Hash, ops::Deref};
 
+use air_parser::ast::TraceSegmentId;
 use miden_core::{Felt, QuadExtension};
 use rand::{distr::Uniform, prelude::*};
 use winter_math::{FieldElement, StarkField};
@@ -98,7 +99,7 @@ impl RandomInputs {
                     // yet evaluated, we will randomly generate values for
                     // this trace access, but also for all previous indices.
                     MirValue::TraceAccess(trace_access) => match trace_access.segment {
-                        0 => {
+                        TraceSegmentId::Main => {
                             let index = trace_access.column * 2 + trace_access.row_offset;
                             Ok(query_indexed_cur_eval(&mut self.rng, &mut self.main_trace, index))
                         },
@@ -147,7 +148,7 @@ impl RandomInputs {
                         // Use accessor offset instead of the trace_access row_offset
                         let index = trace_access.column * 2 + a.offset;
                         match trace_access.segment {
-                            0 => {
+                            TraceSegmentId::Main => {
                                 return Ok(query_indexed_cur_eval(
                                     &mut self.rng,
                                     &mut self.main_trace,

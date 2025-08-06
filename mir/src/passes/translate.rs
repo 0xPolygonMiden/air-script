@@ -1,7 +1,11 @@
 use core::panic;
 use std::ops::Deref;
 
-use air_parser::{LexicalScope, ast, ast::AccessType, symbols};
+use air_parser::{
+    LexicalScope,
+    ast::{self, AccessType, TraceSegmentId},
+    symbols,
+};
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
@@ -1281,10 +1285,10 @@ impl<'a> MirBuilder<'a> {
     // Check assumptions, probably this assumed that the inlining pass did some work
     fn trace_access(&self, access: &ast::SymbolAccess) -> Option<TraceAccess> {
         let id = access.name.as_ref();
-        for (i, segment) in self.trace_columns.iter().enumerate() {
+        if let Some(segment) = self.trace_columns.first() {
             if segment.name == id {
                 if let AccessType::Index(column) = access.access_type {
-                    return Some(TraceAccess::new(i, column, access.offset));
+                    return Some(TraceAccess::new(TraceSegmentId::Main, column, access.offset));
                 } else {
                     // This should have been caught earlier during compilation
                     unreachable!(
@@ -1304,11 +1308,6 @@ impl<'a> MirBuilder<'a> {
                         binding.offset + extra_offset,
                         access.offset,
                     )),
-                    // This should have been caught earlier during compilation
-                    /*_ => unreachable!(
-                        "unexpected trace access type encountered during lowering: {:#?}",
-                        access
-                    ),*/
                     _ => None,
                 };
             }

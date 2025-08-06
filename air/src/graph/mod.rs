@@ -103,29 +103,29 @@ impl AlgebraicGraph {
         // recursively walk the subgraph and infer the trace segment and domain
         match self.node(index).op() {
             Operation::Value(value) => match value {
-                Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
-                Value::RandomValue(_) => Ok((AUX_SEGMENT, default_domain)),
+                Value::Constant(_) => Ok((TraceSegmentId::Main, default_domain)),
+                Value::RandomValue(_) => Ok((TraceSegmentId::Aux, default_domain)),
                 Value::PeriodicColumn(_) => {
                     assert!(
                         !default_domain.is_boundary(),
                         "unexpected access to periodic column in boundary constraint"
                     );
                     // the default domain for [IntegrityConstraints] is `EveryRow`
-                    Ok((DEFAULT_SEGMENT, ConstraintDomain::EveryRow))
+                    Ok((TraceSegmentId::Main, ConstraintDomain::EveryRow))
                 },
                 Value::PublicInput(_) => {
                     assert!(
                         !default_domain.is_integrity(),
                         "unexpected access to public input in integrity constraint"
                     );
-                    Ok((DEFAULT_SEGMENT, default_domain))
+                    Ok((TraceSegmentId::Main, default_domain))
                 },
                 Value::PublicInputTable(_) => {
                     assert!(
                         !default_domain.is_integrity(),
                         "unexpected access to public input table in integrity constraint"
                     );
-                    Ok((DEFAULT_SEGMENT, default_domain))
+                    Ok((TraceSegmentId::Main, default_domain))
                 },
                 Value::TraceAccess(trace_access) => {
                     let domain = if default_domain.is_boundary() {
@@ -145,7 +145,10 @@ impl AlgebraicGraph {
                 let (lhs_segment, lhs_domain) = self.node_details(lhs, default_domain)?;
                 let (rhs_segment, rhs_domain) = self.node_details(rhs, default_domain)?;
 
-                let trace_segment = lhs_segment.max(rhs_segment);
+                let trace_segment = match (lhs_segment, rhs_segment) {
+                    (TraceSegmentId::Aux, _) | (_, TraceSegmentId::Aux) => TraceSegmentId::Aux,
+                    _ => TraceSegmentId::Main,
+                };
                 let domain = lhs_domain.merge(rhs_domain)?;
 
                 Ok((trace_segment, domain))

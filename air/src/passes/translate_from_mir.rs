@@ -34,33 +34,40 @@ impl Pass for MirToAir<'_> {
 
         let buses = mir.constraint_graph().buses.clone();
 
-        let mut trace_columns = mir.trace_columns.clone();
+        if mir.trace_columns.len() != 1 {
+            panic!("Expected one trace segment, but found multiple: {:?}", mir.trace_columns);
+        }
+        let main_trace_segment = mir.trace_columns.first().unwrap();
+        if main_trace_segment.id != TraceSegmentId::Main {
+            panic!(
+                "Expected trace segment to be the main segment, but found: {:?}",
+                main_trace_segment.id
+            );
+        }
+        let mut trace_columns = BTreeMap::new();
+        trace_columns.insert(main_trace_segment.id, main_trace_segment.clone());
 
         let mut bus_bindings_map = BTreeMap::new();
         if !buses.is_empty() {
             let bus_raw_bindings: Vec<_> = buses
                 .keys()
-                .map(|k| Span::new(k.span(), (Identifier::new(k.span(), k.name()), AUX_SEGMENT)))
+                .map(|k| Span::new(k.span(), (Identifier::new(k.span(), k.name()), 1)))
                 .collect();
 
             // Add buses as `aux` trace columns
             let aux_trace_segment = TraceSegment::new(
                 SourceSpan::default(),
-                AUX_SEGMENT,
-                Identifier::new(SourceSpan::default(), Symbol::new(AUX_SEGMENT as u32)),
+                TraceSegmentId::Aux,
+                Identifier::new(SourceSpan::default(), Symbol::new(TraceSegmentId::Aux as u32)),
                 bus_raw_bindings,
             );
             for binding in aux_trace_segment.bindings.iter() {
                 bus_bindings_map.insert(binding.name.unwrap(), binding.offset);
             }
-            if trace_columns.len() == 1 {
-                trace_columns.push(aux_trace_segment);
-            } else {
-                panic!("Expected only one trace segment, but found multiple: {trace_columns:?}",);
-            }
+            trace_columns.insert(aux_trace_segment.id, aux_trace_segment);
         }
 
-        air.trace_segment_widths = trace_columns.iter().map(|ts| ts.size as u16).collect();
+        air.trace_segment_widths = trace_columns.values().map(|ts| ts.size as u16).collect();
         air.num_random_values = mir.num_random_values;
         air.periodic_columns = mir.periodic_columns.clone();
         air.public_inputs = mir.public_inputs.clone();
@@ -98,7 +105,7 @@ impl Pass for MirToAir<'_> {
 struct AirBuilder<'a> {
     diagnostics: &'a DiagnosticsHandler,
     air: &'a mut Air,
-    trace_columns: Vec<TraceSegment>,
+    trace_columns: BTreeMap<TraceSegmentId, TraceSegment>,
     bus_bindings_map: BTreeMap<Identifier, usize>,
 }
 
@@ -264,7 +271,7 @@ impl AirBuilder<'_> {
                         let name = bus_access.bus.borrow().deref().name();
                         let column = self.bus_bindings_map.get(&name).unwrap();
                         crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: AUX_SEGMENT,
+                            segment: TraceSegmentId::Aux,
                             column: *column,
                             row_offset: bus_access.row_offset,
                         })
@@ -320,7 +327,7 @@ impl AirBuilder<'_> {
                         let name = bus_access.bus.borrow().deref().name();
                         let column = self.bus_bindings_map.get(&name).unwrap();
                         crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: AUX_SEGMENT,
+                            segment: TraceSegmentId::Aux,
                             column: *column,
                             row_offset: offset,
                         })
@@ -422,8 +429,11 @@ impl AirBuilder<'_> {
                         let bus = bus_access.bus;
                         let name = bus.borrow().deref().name();
                         let column = self.bus_bindings_map.get(&name).unwrap();
-                        let trace_access =
-                            mir::ir::TraceAccess::new(AUX_SEGMENT, *column, bus_access.row_offset);
+                        let trace_access = mir::ir::TraceAccess::new(
+                            TraceSegmentId::Aux,
+                            *column,
+                            bus_access.row_offset,
+                        );
                         (trace_access, lhs_span)
                     },
                     _ => unreachable!(
@@ -432,11 +442,12 @@ impl AirBuilder<'_> {
                     ), // Raise diag
                 };
 
-                if let Some(prev) = self.trace_columns[trace_access.segment].mark_constrained(
-                    lhs_span,
-                    trace_access.column,
-                    boundary.kind,
-                ) {
+                if let Some(prev) = self
+                    .trace_columns
+                    .get_mut(&trace_access.segment)
+                    .unwrap()
+                    .mark_constrained(lhs_span, trace_access.column, boundary.kind)
+                {
                     self.diagnostics
                         .diagnostic(Severity::Error)
                         .with_message("overlapping boundary constraints")
@@ -468,8 +479,8 @@ impl AirBuilder<'_> {
                         // trace segment inference defaults to the lowest segment (the main trace)
                         // and is adjusted according to the use of random
                         // values and trace columns.
-                        let lhs_segment_name = self.trace_columns[lhs_segment].name;
-                        let rhs_segment_name = self.trace_columns[rhs_segment].name;
+                        let lhs_segment_name = self.trace_columns[&lhs_segment].name;
+                        let rhs_segment_name = self.trace_columns[&rhs_segment].name;
                         self.diagnostics.diagnostic(Severity::Error)
                                     .with_message("invalid boundary constraint")
                                     .with_primary_label(lhs_span, format!("this constrains a column in the '{lhs_segment_name}' trace segment"))
