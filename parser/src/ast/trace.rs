@@ -5,7 +5,20 @@ use miden_diagnostics::{SourceSpan, Spanned};
 use super::*;
 
 /// The id of a trace segment is its index in the trace_columns declaration
-pub type TraceSegmentId = usize;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum TraceSegmentId {
+    Main,
+    Aux,
+}
+
+impl fmt::Display for TraceSegmentId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TraceSegmentId::Main => write!(f, "main"),
+            TraceSegmentId::Aux => write!(f, "aux"),
+        }
+    }
+}
 
 /// The index of a column in a particular trace segment
 pub type TraceColumnIndex = usize;
