@@ -84,7 +84,7 @@ impl Air for SelectorsAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = (main_current[0] + (E::ONE - main_current[0]) * main_current[1]) * (main_current[3] - E::from(Felt::new(2_u64)) * E::from(Felt::new(8_u64))) + (E::ONE - main_current[0]) * (E::ONE - main_current[1]) * (main_current[4] - E::from(Felt::new(5_u64))) - E::ZERO;
+        result[0] = (main_current[0] + (E::ONE - main_current[0]) * main_current[1]) * (main_current[3] - E::from(Felt::new(16_u64))) + (E::ONE - main_current[0]) * (E::ONE - main_current[1]) * (main_current[4] - E::from(Felt::new(5_u64))) - E::ZERO;
         result[1] = ((E::ONE - main_current[0]) * main_current[1] + (E::ONE - main_current[0]) * (E::ONE - main_current[1])) * (main_current[5] - E::from(Felt::new(5_u64))) + main_current[0] * (main_current[4] - E::from(Felt::new(4_u64))) - E::ZERO;
         result[2] = main_current[0] * (main_current[5] - E::from(Felt::new(20_u64))) + (E::ONE - main_current[0]) * main_current[1] * (main_current[4] - E::from(Felt::new(31_u64))) - E::ZERO;
     }

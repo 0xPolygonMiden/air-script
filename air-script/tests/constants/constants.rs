@@ -100,9 +100,9 @@ impl Air for ConstantsAir {
         let main_current = frame.current();
         let main_next = frame.next();
         result[0] = main_next[0] - (main_current[0] + E::ONE);
-        result[1] = main_next[1] - E::ZERO * main_current[1];
-        result[2] = main_next[2] - E::ONE * main_current[2];
-        result[3] = main_next[5] - (main_current[5] + E::ONE + E::ZERO);
+        result[1] = main_next[1] - E::ZERO;
+        result[2] = main_next[2] - main_current[2];
+        result[3] = main_next[5] - (main_current[5] + E::ONE);
         result[4] = main_current[4] - E::ONE;
     }
 
