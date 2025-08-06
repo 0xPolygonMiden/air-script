@@ -5,7 +5,9 @@ use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
 
 use super::visitor::Visitor;
 use crate::{
-    ir::{BackLink, ConstantValue, Graph, Link, Mir, MirValue, Node, Op, SpannedMirValue, Value}, passes::duplicate_node, CompileError
+    CompileError,
+    ir::{BackLink, ConstantValue, Graph, Link, Mir, MirValue, Node, Op, SpannedMirValue, Value},
+    passes::duplicate_node,
 };
 
 pub struct ConstantPropagation<'a> {
@@ -44,14 +46,8 @@ fn fold_binary_op(
     let zero_mir_value = MirValue::Constant(ConstantValue::Felt(0));
     let one_mir_value = MirValue::Constant(ConstantValue::Felt(1));
 
-    let zero_node = Value::create(SpannedMirValue {
-        value: zero_mir_value.clone(),
-        span,
-    });
-    let one_node = Value::create(SpannedMirValue {
-        value: one_mir_value.clone(),
-        span,
-    });
+    let zero_node = Value::create(SpannedMirValue { value: zero_mir_value.clone(), span });
+    let one_node = Value::create(SpannedMirValue { value: one_mir_value.clone(), span });
 
     match (lhs.borrow().deref(), rhs.borrow().deref()) {
         (
@@ -94,7 +90,9 @@ fn fold_binary_op(
             if *value == zero_mir_value =>
         {
             match parent.borrow().deref() {
-                Op::Add(_) => updated_binary_op = Some(duplicate_node(rhs.clone(), &mut HashMap::new())),
+                Op::Add(_) => {
+                    updated_binary_op = Some(duplicate_node(rhs.clone(), &mut HashMap::new()))
+                },
                 Op::Mul(_) | Op::Exp(_) => {
                     updated_binary_op = Some(zero_node);
                 },
@@ -106,10 +104,13 @@ fn fold_binary_op(
             if *value == zero_mir_value =>
         {
             match parent.borrow().deref() {
-                Op::Add(_) => updated_binary_op = Some(duplicate_node(lhs.clone(), &mut HashMap::new())),
+                Op::Add(_) => {
+                    updated_binary_op = Some(duplicate_node(lhs.clone(), &mut HashMap::new()))
+                },
                 Op::Sub(_) => {},
-                // FIXME: Sub with zero is a no-op, but we need it for Enf(Sub(x, 0)) to represent the constraint x = 0
-                //Op::Add(_) | Op::Sub(_) => updated_binary_op = Some(duplicate_node(lhs.clone(), &mut HashMap::new())),
+                // FIXME: Sub with zero is a no-op, but we need it for Enf(Sub(x, 0)) to represent
+                // the constraint x = 0 Op::Add(_) | Op::Sub(_) => updated_binary_op
+                // = Some(duplicate_node(lhs.clone(), &mut HashMap::new())),
                 Op::Mul(_) => {
                     updated_binary_op = Some(zero_node);
                 },
@@ -126,7 +127,8 @@ fn fold_binary_op(
             match parent.borrow().deref() {
                 Op::Add(_) | Op::Sub(_) | Op::Exp(_) => {},
                 Op::Mul(_) => {
-                    updated_binary_op = Some(duplicate_node(other.clone().into(), &mut HashMap::new()));
+                    updated_binary_op =
+                        Some(duplicate_node(other.clone().into(), &mut HashMap::new()));
                 },
                 _ => unreachable!("Unexpected parent operation: {:?}", parent),
             }
