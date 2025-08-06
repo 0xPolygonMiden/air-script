@@ -40,6 +40,23 @@ pub enum BindingType {
 }
 
 impl Typing for BindingType {
+    fn kind(&self) -> Option<Kind> {
+        match self {
+            Self::Alias(aliased) => aliased.kind(),
+            Self::Local(ty) => ty.kind(),
+            Self::Constant(ty) => ty.kind(),
+            Self::Function(func) => func.kind(),
+            Self::Evaluator(ev) => {
+                Some(Kind::Callable(FunctionType::Evaluator(ev.iter().map(|tb| tb.ty()).collect())))
+            },
+            Self::Bus(_) => self.ty().kind(),
+            Self::TraceColumn(tb) | Self::TraceParam(tb) => tb.kind(),
+            Self::Vector(elems) => elems.kind(),
+            Self::PublicInput(ty) => ty.kind(),
+            // NOTE: this may need to be felt?
+            Self::PeriodicColumn(_) => Some(kind!(bool)),
+        }
+    }
     /// Get the value type of this binding, if applicable
     fn ty(&self) -> Option<Type> {
         match self {
@@ -48,7 +65,7 @@ impl Typing for BindingType {
             Self::Alias(aliased) => aliased.ty(),
             Self::Local(ty) | Self::Constant(ty) | Self::PublicInput(ty) => Some(*ty),
             Self::PeriodicColumn(_) => ty!(felt),
-            Self::Function(ty) => ty.result(),
+            Self::Function(_) => None,
             Self::Evaluator(_) => None,
             Self::Bus(_) => ty!(felt),
         }

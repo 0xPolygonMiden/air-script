@@ -670,7 +670,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         match callee_binding_ty {
             Ok(ref binding_ty) => {
                 let derived_from = binding_ty.span();
-                if let BindingType::Function(ref fty) = binding_ty.item {
+                if let Some(Kind::Callable(ref fty)) = binding_ty.item.kind() {
                     // There must be an evaluator by this name
                     let qid = expr.callee.resolved().unwrap();
                     // Builtin functions are ignored here
