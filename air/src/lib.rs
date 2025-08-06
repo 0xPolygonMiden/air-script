@@ -6,12 +6,36 @@ pub mod passes;
 mod tests;
 
 use miden_diagnostics::{Diagnostic, ToDiagnostic};
+use mir::ir::Mir;
 
 pub use self::{
     codegen::CodeGenerator,
     graph::{AlgebraicGraph, Node, NodeIndex},
     ir::*,
 };
+
+/// Abstracts the various passes done on the AIR representation of the program.
+pub struct AirPasses<'a> {
+    diagnostics: &'a DiagnosticsHandler,
+}
+
+impl<'a> AirPasses<'a> {
+    pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
+        Self { diagnostics }
+    }
+}
+
+impl Pass for AirPasses<'_> {
+    type Input<'a> = Mir;
+    type Output<'a> = Air;
+    type Error = CompileError;
+
+    fn run<'a>(&mut self, input: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
+        let mut passes = passes::MirToAir::new(self.diagnostics)
+            .chain(passes::BusOpExpand::new(self.diagnostics));
+        passes.run(input)
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum CompileError {
