@@ -31,7 +31,8 @@ impl Pass for MirPasses<'_> {
     fn run<'a>(&mut self, input: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
         let mut passes = passes::AstToMir::new(self.diagnostics)
             .chain(passes::Inlining::new(self.diagnostics))
-            .chain(passes::Unrolling::new(self.diagnostics));
+            .chain(passes::Unrolling::new(self.diagnostics))
+            .chain(passes::ConstantPropagation::new(self.diagnostics));
         passes.run(input)
     }
 }

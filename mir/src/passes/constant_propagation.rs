@@ -3,8 +3,8 @@ use miden_diagnostics::DiagnosticsHandler;
 
 use super::visitor::Visitor;
 use crate::{
-    ir::{Link, Mir, Node},
     CompileError,
+    ir::{Link, Mir, Node},
 };
 
 /// TODO MIR:
@@ -12,7 +12,6 @@ use crate::{
 /// Run through every operation in the graph
 /// If we can deduce the resulting value based on the constants of the operands,
 /// replace the operation itself with a constant
-///
 pub struct ConstantPropagation<'a> {
     #[allow(unused)]
     diagnostics: &'a DiagnosticsHandler,
@@ -33,10 +32,7 @@ impl Pass for ConstantPropagation<'_> {
 impl<'a> ConstantPropagation<'a> {
     #[allow(unused)]
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
-        Self {
-            diagnostics,
-            work_stack: vec![],
-        }
+        Self { diagnostics, work_stack: vec![] }
     }
 }
 
@@ -54,12 +50,7 @@ impl Visitor for ConstantPropagation<'_> {
             .clone()
             .into_iter()
             .map(|bc| bc.as_node())
-            .chain(
-                integrity_constraints_roots_ref
-                    .clone()
-                    .into_iter()
-                    .map(|ic| ic.as_node()),
-            );
+            .chain(integrity_constraints_roots_ref.clone().into_iter().map(|ic| ic.as_node()));
         combined_roots.collect()
     }
 }
