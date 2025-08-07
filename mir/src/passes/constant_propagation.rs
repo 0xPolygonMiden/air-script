@@ -104,13 +104,15 @@ fn fold_binary_op(
             if *value == zero_mir_value =>
         {
             match parent.borrow().deref() {
-                Op::Add(_) => {
+                //Op::Add(_) => {
+                //    updated_binary_op = Some(duplicate_node(lhs.clone(), &mut HashMap::new()))
+                //},
+                //Op::Sub(_) => {},
+                // FIXME: Sub with zero is a no-op, but we need it for Enf(Sub(x, 0)) to represent
+                // the constraint x = 0
+                Op::Add(_) | Op::Sub(_) => {
                     updated_binary_op = Some(duplicate_node(lhs.clone(), &mut HashMap::new()))
                 },
-                Op::Sub(_) => {},
-                // FIXME: Sub with zero is a no-op, but we need it for Enf(Sub(x, 0)) to represent
-                // the constraint x = 0 Op::Add(_) | Op::Sub(_) => updated_binary_op
-                // = Some(duplicate_node(lhs.clone(), &mut HashMap::new())),
                 Op::Mul(_) => {
                     updated_binary_op = Some(zero_node);
                 },
@@ -225,6 +227,10 @@ impl Visitor for ConstantPropagation<'_> {
     }
 
     fn visit_node(&mut self, graph: &mut Graph, node: Link<Node>) -> Result<(), CompileError> {
+        if node.is_stale() || node.as_owner().is_some_and(|o| o.is_stale()) {
+            return Ok(());
+        }
+
         // In this pass, we both need to dispatch the visitor depending on the node type,
         // and also mutate the node if needed. We implement custom visit_*_bis methods
         // that returns a Some(updated_node) if we need to update the node's value.
@@ -258,8 +264,6 @@ impl Visitor for ConstantPropagation<'_> {
 
         // We update the node if needed
         if let Some(updated_op) = updated_op? {
-            //println!("Updating node: {}", node.debug());
-            //println!("  With: {:#?}", updated_op);
             node.as_op().unwrap().set(&updated_op);
         }
 
