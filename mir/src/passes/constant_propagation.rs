@@ -227,7 +227,7 @@ impl Visitor for ConstantPropagation<'_> {
     }
 
     fn visit_node(&mut self, graph: &mut Graph, node: Link<Node>) -> Result<(), CompileError> {
-        if node.is_stale() || node.as_owner().is_some_and(|o| o.is_stale()) {
+        if node.is_stale() {
             return Ok(());
         }
 
