@@ -514,6 +514,114 @@ impl AirBuilder<'_> {
                 self.air.constraints.insert_constraint(trace_access.segment, root, domain);
                 Ok(())
             },
+            Op::Boundary(boundary) => {
+                let expected_trace_access_expr = boundary.expr.clone();
+                let Op::Value(value) = expected_trace_access_expr.borrow().deref().clone() else {
+                    unreachable!(); // Raise diag
+                };
+
+                let (trace_access, _) = match value.value.clone() {
+                    SpannedMirValue {
+                        value: MirValue::TraceAccess(trace_access),
+                        span: lhs_span,
+                    } => (trace_access, lhs_span),
+                    SpannedMirValue {
+                        value: MirValue::TraceAccessBinding(trace_access_binding),
+                        span: lhs_span,
+                    } => {
+                        if trace_access_binding.size != 1 {
+                            self.diagnostics.diagnostic(Severity::Error)
+                                        .with_message("invalid boundary constraint")
+                                        .with_primary_label(lhs_span, "this has a trace access binding with a size greater than 1")
+                                        .with_note("Boundary constraints require both sides of the constraint to be single columns.")
+                                        .emit();
+                            return Err(CompileError::Failed);
+                        }
+                        let trace_access = mir::ir::TraceAccess {
+                            segment: trace_access_binding.segment,
+                            column: trace_access_binding.offset,
+                            row_offset: 0,
+                        };
+                        (trace_access, lhs_span)
+                    },
+                    SpannedMirValue {
+                        value: MirValue::BusAccess(bus_access),
+                        span: lhs_span,
+                    } => {
+                        let bus = bus_access.bus;
+                        let name = bus.borrow().deref().name();
+                        let column = self.bus_bindings_map.get(&name).unwrap();
+                        let trace_access =
+                            mir::ir::TraceAccess::new(AUX_SEGMENT, *column, bus_access.row_offset);
+                        (trace_access, lhs_span)
+                    },
+                    _ => unreachable!(
+                        "Expected TraceAccess or BusAccess, received {:?}",
+                        value.value
+                    ), // Raise diag
+                };
+
+                if let Some(prev) = self.trace_columns[trace_access.segment].mark_constrained(
+                    boundary.span(),
+                    trace_access.column,
+                    boundary.kind,
+                ) {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("overlapping boundary constraints")
+                        .with_primary_label(
+                            boundary.span(),
+                            "this constrains a column and boundary that has already been constrained",
+                        )
+                        .with_secondary_label(prev, "previous constraint occurs here")
+                        .emit();
+                    return Err(CompileError::Failed);
+                }
+
+                let lhs = self.air.constraint_graph_mut().insert_node(Operation::Value(
+                    crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+                        segment: trace_access.segment,
+                        column: trace_access.column,
+                        row_offset: trace_access.row_offset,
+                    }),
+                ));
+                let rhs = self.insert_op(Operation::Value(crate::ir::Value::Constant(0)));
+
+                // Compare the inferred trace segment and domain of the operands
+                let domain = boundary.kind.into();
+                {
+                    let graph = self.air.constraint_graph();
+                    let (lhs_segment, lhs_domain) = graph.node_details(&lhs, domain)?;
+                    let (rhs_segment, rhs_domain) = graph.node_details(&rhs, domain)?;
+                    if lhs_segment < rhs_segment {
+                        // trace segment inference defaults to the lowest segment (the main trace)
+                        // and is adjusted according to the use of random
+                        // values and trace columns.
+                        let lhs_segment_name = self.trace_columns[lhs_segment].name;
+                        self.diagnostics.diagnostic(Severity::Error)
+                                    .with_message("invalid boundary constraint")
+                                    .with_primary_label(boundary.span(), format!("this constrains a column in the '{lhs_segment_name}' trace segment"))
+                                    .with_note("Boundary constraints require both sides of the constraint to apply to the same trace segment.")
+                                    .emit();
+                        return Err(CompileError::Failed);
+                    }
+                    if lhs_domain != rhs_domain {
+                        self.diagnostics.diagnostic(Severity::Error)
+                                    .with_message("invalid boundary constraint")
+                                    .with_primary_label(boundary.span(), format!("this has a constraint domain of {lhs_domain}"))
+                                    .with_note("Boundary constraints require both sides of the constraint to be in the same domain.")
+                                    .emit();
+                        return Err(CompileError::Failed);
+                    }
+                }
+
+                // Merge the expressions into a single constraint
+                let root = self.insert_op(Operation::Sub(lhs, rhs));
+
+                // Store the generated constraint
+                self.air.constraints.insert_constraint(trace_access.segment, root, domain);
+                Ok(())
+            },
             _ => unreachable!(),
         }
     }
@@ -551,7 +659,14 @@ impl AirBuilder<'_> {
                         bus.borrow_mut().latches.push(latch.clone());
                         bus.borrow_mut().columns.push(child_op.clone());
                     },
-                    _ => unreachable!("Enforced with unexpected operation: {:?}", child_op),
+                    _ => {
+                        let root = self.insert_mir_operation(&child_op)?;
+                        let (trace_segment, domain) = self
+                            .air
+                            .constraint_graph()
+                            .node_details(&root, ConstraintDomain::EveryRow)?;
+                        self.air.constraints.insert_constraint(trace_segment, root, domain);
+                    },
                 }
             },
             Op::Sub(sub) => {
@@ -564,7 +679,7 @@ impl AirBuilder<'_> {
                     self.air.constraint_graph().node_details(&root, ConstraintDomain::EveryRow)?;
                 self.air.constraints.insert_constraint(trace_segment, root, domain);
             },
-            _ => unreachable!(),
+            _ => unreachable!("Unexpected integrity constraint root: {:?}", ic),
         }
         Ok(())
     }
