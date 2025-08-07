@@ -772,32 +772,38 @@ pub struct BinaryExpr {
     pub op: BinaryOp,
     pub lhs: Box<ScalarExpr>,
     pub rhs: Box<ScalarExpr>,
-    pub bin_ty: BinType,
+    pub bin_ty: Option<BinType>,
 }
 impl BinaryExpr {
     pub fn new(span: SourceSpan, op: BinaryOp, lhs: ScalarExpr, rhs: ScalarExpr) -> Self {
-        debug_assert!(
-            lhs.ty().is_none() || rhs.ty().is_none() || (lhs.is_scalar() && rhs.is_scalar()),
-            "binary expression operands must both be scalars, got: {} and {}",
-            lhs.show_ty(),
-            rhs.show_ty(),
-        );
-        let l_ty = lhs.scalar_ty();
-        let r_ty = rhs.scalar_ty();
-        let bin_ty = match op {
-            BinaryOp::Eq => bty!(l_ty = r_ty),
-            BinaryOp::Add => bty!(l_ty + r_ty),
-            BinaryOp::Sub => bty!(l_ty - r_ty),
-            BinaryOp::Mul => bty!(l_ty * r_ty),
-            BinaryOp::Exp => bty!(l_ty ^ r_ty),
-        };
-        Self {
+        let mut res = Self {
             span,
             op,
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
-            bin_ty,
+            bin_ty: None,
+        };
+        res.update_bin_ty();
+        res
+    }
+    pub fn update_bin_ty(&mut self) -> Option<BinType> {
+        let lhs = self.lhs.as_ref();
+        let rhs = self.rhs.as_ref();
+        let op = self.op;
+        if !(lhs.ty().is_some() || rhs.ty().is_some() || (lhs.is_scalar() && rhs.is_scalar())) {
+            return None;
         }
+        let l_ty = lhs.ty();
+        let r_ty = rhs.ty();
+        let bin_ty = Some(match op {
+            BinaryOp::Eq => bty!(any:l_ty = any:r_ty),
+            BinaryOp::Add => bty!(any:l_ty + any:r_ty),
+            BinaryOp::Sub => bty!(any:l_ty - any:r_ty),
+            BinaryOp::Mul => bty!(any:l_ty * any:r_ty),
+            BinaryOp::Exp => bty!(any:l_ty ^ any:r_ty),
+        });
+        self.bin_ty = bin_ty;
+        bin_ty
     }
 
     /// Returns true if this binary expression could expand to a block, e.g. due to a function call
@@ -837,12 +843,12 @@ impl Typing for BinaryExpr {
 }
 impl ScalarTypeMut for BinaryExpr {
     fn scalar_ty_mut(&mut self) -> &mut Option<ScalarType> {
-        self.bin_ty.scalar_ty_mut()
+        self.bin_ty.as_mut().unwrap().scalar_ty_mut()
     }
 }
 impl TypeMut for BinaryExpr {
     fn ty_mut(&mut self) -> &mut Option<Type> {
-        self.bin_ty.ty_mut()
+        self.bin_ty.as_mut().unwrap().ty_mut()
     }
 }
 

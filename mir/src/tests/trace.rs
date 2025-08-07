@@ -151,5 +151,5 @@ fn err_ic_trace_cols_group_used_as_scalar() {
         enf a[0]' = a + clk;
     }";
 
-    expect_diagnostic(source, "type mismatch");
+    expect_diagnostic(source, "invalid binary expression");
 }

@@ -740,7 +740,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
     ) -> ControlFlow<SemanticAnalysisError> {
         self.visit_mut_scalar_expr(expr.lhs.as_mut())?;
         self.visit_mut_scalar_expr(expr.rhs.as_mut())?;
-
+        let _ = expr.update_bin_ty();
         // Validate the operand types
         match expr.bin_ty.infer_ty() {
             Ok(None) => {
