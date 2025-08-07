@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use std::ops::Deref;
 
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
@@ -7,7 +7,6 @@ use super::visitor::Visitor;
 use crate::{
     CompileError,
     ir::{BackLink, ConstantValue, Graph, Link, Mir, MirValue, Node, Op, SpannedMirValue, Value},
-    passes::duplicate_node,
 };
 
 pub struct ConstantPropagation<'a> {
@@ -33,117 +32,6 @@ impl<'a> ConstantPropagation<'a> {
     }
 }
 
-/// Helper function to fold constant binary operations (Add, Sub, Mul, Exp) into their
-/// resulting value if both operands are constant values.
-fn fold_binary_op(
-    lhs: Link<Op>,
-    rhs: Link<Op>,
-    parent: Link<Op>,
-    span: SourceSpan,
-) -> Result<Option<Link<Op>>, CompileError> {
-    let mut updated_binary_op = None;
-
-    let zero_mir_value = MirValue::Constant(ConstantValue::Felt(0));
-    let one_mir_value = MirValue::Constant(ConstantValue::Felt(1));
-
-    let zero_node = Value::create(SpannedMirValue { value: zero_mir_value.clone(), span });
-    let one_node = Value::create(SpannedMirValue { value: one_mir_value.clone(), span });
-
-    match (lhs.borrow().deref(), rhs.borrow().deref()) {
-        (
-            Op::Value(Value {
-                value:
-                    SpannedMirValue {
-                        value: MirValue::Constant(ConstantValue::Felt(lhs_const)),
-                        ..
-                    },
-                ..
-            }),
-            Op::Value(Value {
-                value:
-                    SpannedMirValue {
-                        value: MirValue::Constant(ConstantValue::Felt(rhs_const)),
-                        ..
-                    },
-                ..
-            }),
-        ) => {
-            let folded = match parent.borrow().deref() {
-                Op::Add(_) => lhs_const.checked_add(*rhs_const),
-                Op::Sub(_) => lhs_const.checked_sub(*rhs_const),
-                Op::Mul(_) => lhs_const.checked_mul(*rhs_const),
-                Op::Exp(_) => {
-                    let rhs_const = (*rhs_const).try_into().map_err(|_| CompileError::Failed)?;
-                    lhs_const.checked_pow(rhs_const)
-                },
-                _ => unreachable!("Unexpected parent operation: {:?}", parent),
-            };
-            if let Some(folded) = folded {
-                let new_value = Value::create(SpannedMirValue {
-                    value: MirValue::Constant(crate::ir::ConstantValue::Felt(folded)),
-                    span,
-                });
-                updated_binary_op = Some(new_value);
-            }
-        },
-        (Op::Value(Value { value: SpannedMirValue { value, .. }, .. }), _)
-            if *value == zero_mir_value =>
-        {
-            match parent.borrow().deref() {
-                Op::Add(_) => {
-                    updated_binary_op = Some(duplicate_node(rhs.clone(), &mut HashMap::new()))
-                },
-                Op::Mul(_) | Op::Exp(_) => {
-                    updated_binary_op = Some(zero_node);
-                },
-                Op::Sub(_) => {},
-                _ => unreachable!("Unexpected parent operation: {:?}", parent),
-            }
-        },
-        (_, Op::Value(Value { value: SpannedMirValue { value, .. }, .. }))
-            if *value == zero_mir_value =>
-        {
-            match parent.borrow().deref() {
-                //Op::Add(_) => {
-                //    updated_binary_op = Some(duplicate_node(lhs.clone(), &mut HashMap::new()))
-                //},
-                //Op::Sub(_) => {},
-                // FIXME: Sub with zero is a no-op, but we need it for Enf(Sub(x, 0)) to represent
-                // the constraint x = 0
-                Op::Add(_) | Op::Sub(_) => {
-                    updated_binary_op = Some(duplicate_node(lhs.clone(), &mut HashMap::new()))
-                },
-                Op::Mul(_) => {
-                    updated_binary_op = Some(zero_node);
-                },
-                Op::Exp(_) => {
-                    updated_binary_op = Some(one_node);
-                },
-                _ => unreachable!("Unexpected parent operation: {:?}", parent),
-            }
-        },
-        (other, Op::Value(Value { value: SpannedMirValue { value, .. }, .. }))
-        | (Op::Value(Value { value: SpannedMirValue { value, .. }, .. }), other)
-            if *value == one_mir_value =>
-        {
-            match parent.borrow().deref() {
-                Op::Add(_) | Op::Sub(_) | Op::Exp(_) => {},
-                Op::Mul(_) => {
-                    updated_binary_op =
-                        Some(duplicate_node(other.clone().into(), &mut HashMap::new()));
-                },
-                _ => unreachable!("Unexpected parent operation: {:?}", parent),
-            }
-        },
-        _ => {
-            // If either operand is not a constant, we cannot fold the operation
-            return Ok(None);
-        },
-    }
-
-    Ok(updated_binary_op)
-}
-
 // For the ConstantPropagation, we use a tweaked version of the Visitor trait,
 // each visit_*_bis function returns an Option<Link<Op>> instead of Result<(), CompileError>,
 // to mutate the nodes (e.g. modifying a Add(lhs, rhs) to Value(lhs + rhs)).
@@ -158,7 +46,13 @@ impl ConstantPropagation<'_> {
         let lhs = add_ref.lhs.clone();
         let rhs = add_ref.rhs.clone();
 
-        fold_binary_op(lhs, rhs, add.clone(), add_ref.span())
+        if let Some(0) = get_inner_const(&lhs) {
+            Ok(Some(rhs))
+        } else if let Some(0) = get_inner_const(&rhs) {
+            Ok(Some(lhs))
+        } else {
+            try_fold_const_binary_op(lhs, rhs, add.clone(), add_ref.span())
+        }
     }
 
     fn visit_sub_bis(
@@ -171,7 +65,11 @@ impl ConstantPropagation<'_> {
         let lhs = sub_ref.lhs.clone();
         let rhs = sub_ref.rhs.clone();
 
-        fold_binary_op(lhs, rhs, sub.clone(), sub_ref.span())
+        if let Some(0) = get_inner_const(&rhs) {
+            Ok(Some(lhs))
+        } else {
+            try_fold_const_binary_op(lhs, rhs, sub.clone(), sub_ref.span())
+        }
     }
 
     fn visit_mul_bis(
@@ -184,7 +82,15 @@ impl ConstantPropagation<'_> {
         let lhs = mul_ref.lhs.clone();
         let rhs = mul_ref.rhs.clone();
 
-        fold_binary_op(lhs, rhs, mul.clone(), mul_ref.span())
+        match (get_inner_const(&lhs), get_inner_const(&rhs)) {
+            (Some(0), _) | (_, Some(0)) => Ok(Some(Value::create(SpannedMirValue {
+                value: MirValue::Constant(ConstantValue::Felt(0)),
+                span: mul_ref.span,
+            }))),
+            (Some(1), _) => Ok(Some(rhs)),
+            (_, Some(1)) => Ok(Some(lhs)),
+            _ => try_fold_const_binary_op(lhs, rhs, mul.clone(), mul_ref.span()),
+        }
     }
 
     fn visit_exp_bis(
@@ -197,7 +103,19 @@ impl ConstantPropagation<'_> {
         let lhs = exp_ref.lhs.clone();
         let rhs = exp_ref.rhs.clone();
 
-        fold_binary_op(lhs, rhs, exp.clone(), exp_ref.span())
+        if let Some(0) = get_inner_const(&lhs) {
+            Ok(Some(Value::create(SpannedMirValue {
+                value: MirValue::Constant(ConstantValue::Felt(0)),
+                span: exp_ref.span,
+            })))
+        } else if let Some(0) = get_inner_const(&rhs) {
+            Ok(Some(Value::create(SpannedMirValue {
+                value: MirValue::Constant(ConstantValue::Felt(1)),
+                span: exp_ref.span,
+            })))
+        } else {
+            try_fold_const_binary_op(lhs, rhs, exp.clone(), exp_ref.span())
+        }
     }
 }
 
@@ -289,4 +207,52 @@ where
     } else {
         Ok(None)
     }
+}
+
+/// Helper function to extract the constant felt value from a Link<Op> if it is one.
+fn get_inner_const(value: &Link<Op>) -> Option<u64> {
+    match value.borrow().deref() {
+        Op::Value(Value {
+            value:
+                SpannedMirValue {
+                    value: MirValue::Constant(ConstantValue::Felt(c)),
+                    ..
+                },
+            ..
+        }) => Some(*c),
+        _ => None,
+    }
+}
+
+/// Helper function to fold constant binary operations (Add, Sub, Mul, Exp)
+/// into their resulting value if both operands are constant values.
+fn try_fold_const_binary_op(
+    lhs: Link<Op>,
+    rhs: Link<Op>,
+    parent: Link<Op>,
+    span: SourceSpan,
+) -> Result<Option<Link<Op>>, CompileError> {
+    let mut updated_binary_op = None;
+
+    if let (Some(lhs_const), Some(rhs_const)) = (get_inner_const(&lhs), get_inner_const(&rhs)) {
+        let folded = match parent.borrow().deref() {
+            Op::Add(_) => lhs_const.checked_add(rhs_const),
+            Op::Sub(_) => lhs_const.checked_sub(rhs_const),
+            Op::Mul(_) => lhs_const.checked_mul(rhs_const),
+            Op::Exp(_) => {
+                let rhs_const = rhs_const.try_into().map_err(|_| CompileError::Failed)?;
+                lhs_const.checked_pow(rhs_const)
+            },
+            _ => unreachable!("Unexpected parent operation: {:?}", parent),
+        };
+        if let Some(folded) = folded {
+            let new_value = Value::create(SpannedMirValue {
+                value: MirValue::Constant(crate::ir::ConstantValue::Felt(folded)),
+                span,
+            });
+            updated_binary_op = Some(new_value);
+        }
+    }
+
+    Ok(updated_binary_op)
 }
