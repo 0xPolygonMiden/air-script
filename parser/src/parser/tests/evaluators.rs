@@ -196,7 +196,7 @@ fn ev_fn_def_with_multiple_args() {
         enf clk' = clk + 1
     }";
     ParseTest::new()
-        .expect_module_diagnostic(source, "evaluators cannot have more than one trace segment");
+        .expect_module_diagnostic(source, "evaluators must have exactly one trace segment");
 }
 
 #[test]

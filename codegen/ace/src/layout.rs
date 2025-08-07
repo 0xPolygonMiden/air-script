@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, ops::Range};
 
 use air_ir::{
     Air, Identifier, PublicInput, PublicInputAccess, PublicInputTableAccess, TraceAccess,
-    TraceSegmentId,
 };
 
 use crate::circuit::Node;
@@ -208,11 +207,8 @@ impl Layout {
     /// Input node associated with a trace variable.
     pub fn trace_access_node(&self, trace_access: &TraceAccess) -> Option<Node> {
         let TraceAccess { segment, column, row_offset } = *trace_access;
-        let segment_index = match segment {
-            TraceSegmentId::Main => 0,
-            TraceSegmentId::Aux => 1,
-        };
         let segments_in_row = self.trace_segments.get(row_offset)?;
+        let segment_index = segment.index();
         let segment_region = segments_in_row.get(segment_index)?;
         segment_region.as_node(column)
     }

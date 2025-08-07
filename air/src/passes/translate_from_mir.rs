@@ -34,16 +34,20 @@ impl Pass for MirToAir<'_> {
 
         let buses = mir.constraint_graph().buses.clone();
 
-        if mir.trace_columns.len() != 1 {
-            panic!("Expected one trace segment, but found multiple: {:?}", mir.trace_columns);
-        }
+        assert!(
+            mir.trace_columns.len() == 1,
+            "Expected one trace segment, but found: {:?}",
+            mir.trace_columns
+        );
         let main_trace_segment = mir.trace_columns.first().unwrap();
-        if main_trace_segment.id != TraceSegmentId::Main {
-            panic!(
-                "Expected trace segment to be the main segment, but found: {:?}",
-                main_trace_segment.id
-            );
-        }
+
+        assert_eq!(
+            main_trace_segment.id,
+            TraceSegmentId::Main,
+            "Expected trace segment to be the main segment, but found: {:?}",
+            main_trace_segment.id
+        );
+
         let mut trace_columns = BTreeMap::new();
         trace_columns.insert(main_trace_segment.id, main_trace_segment.clone());
 
@@ -58,7 +62,10 @@ impl Pass for MirToAir<'_> {
             let aux_trace_segment = TraceSegment::new(
                 SourceSpan::default(),
                 TraceSegmentId::Aux,
-                Identifier::new(SourceSpan::default(), Symbol::new(TraceSegmentId::Aux as u32)),
+                Identifier::new(
+                    SourceSpan::default(),
+                    Symbol::new(TraceSegmentId::Aux.index() as u32),
+                ),
                 bus_raw_bindings,
             );
             for binding in aux_trace_segment.bindings.iter() {
@@ -445,7 +452,7 @@ impl AirBuilder<'_> {
                 if let Some(prev) = self
                     .trace_columns
                     .get_mut(&trace_access.segment)
-                    .unwrap()
+                    .expect("Boundary constraint on an unknown trace segment")
                     .mark_constrained(lhs_span, trace_access.column, boundary.kind)
                 {
                     self.diagnostics

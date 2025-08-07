@@ -145,10 +145,7 @@ impl AlgebraicGraph {
                 let (lhs_segment, lhs_domain) = self.node_details(lhs, default_domain)?;
                 let (rhs_segment, rhs_domain) = self.node_details(rhs, default_domain)?;
 
-                let trace_segment = match (lhs_segment, rhs_segment) {
-                    (TraceSegmentId::Aux, _) | (_, TraceSegmentId::Aux) => TraceSegmentId::Aux,
-                    _ => TraceSegmentId::Main,
-                };
+                let trace_segment = lhs_segment.max(rhs_segment);
                 let domain = lhs_domain.merge(rhs_domain)?;
 
                 Ok((trace_segment, domain))
