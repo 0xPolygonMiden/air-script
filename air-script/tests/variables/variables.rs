@@ -88,7 +88,7 @@ impl Air for VariablesAir {
         let main_current = frame.current();
         let main_next = frame.next();
         result[0] = main_current[0] * main_current[0] - main_current[0];
-        result[1] = periodic_values[0] * (main_next[0] - main_current[0]) - E::ZERO;
+        result[1] = periodic_values[0] * (main_next[0] - main_current[0]);
         result[2] = (E::ONE - main_current[0]) * (main_current[3] - main_current[1] - main_current[2]) - (E::from(Felt::new(6_u64)) - (E::from(Felt::new(7_u64)) - main_current[0]));
         result[3] = main_current[0] * (main_current[3] - main_current[1] * main_current[2]) - (E::ONE - main_next[0]);
     }
