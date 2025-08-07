@@ -834,6 +834,12 @@ impl fmt::Display for BinaryExpr {
     }
 }
 impl Typing for BinaryExpr {
+    fn infer_ty(&self) -> Result<Option<Type>, TypeError> {
+        match self.bin_ty {
+            Some(ref bty) => bty.infer_ty(),
+            None => Ok(None),
+        }
+    }
     fn scalar_ty(&self) -> Option<ScalarType> {
         self.bin_ty.scalar_ty()
     }

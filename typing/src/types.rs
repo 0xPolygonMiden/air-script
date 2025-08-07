@@ -620,28 +620,25 @@ impl BinType {
 
     /// Returns the type of the result of an exponentiation based on the types
     /// of the left-hand side and right-hand side operands.
-    /// If lhs or rhs is not a scalar type or `?`, it returns a [TypeError::IncompatibleBinOp].
+    /// If lhs is not a scalar type, or rhs is not `uint`,
+    /// it returns a [TypeError::IncompatibleBinOp].
     ///
     /// based on the scalar types of the operands:
     /// ? ^ ?    || felt | bool | uint |    _ |    ?
     /// =========||======|======|======|======|=====
-    /// felt     ||  err |  err | felt |    _ |    ?
-    /// bool     ||  err |  err | bool |    _ |    ?
-    /// uint     ||  err |  err | uint |    _ |    ?
-    /// _        ||  err |  err |    _ |    _ |    ?
-    /// ?        ||  err |  err |    ? |    ? |    ?
+    /// felt     ||  err |  err | felt |  err |  err
+    /// bool     ||  err |  err | bool |  err |  err
+    /// uint     ||  err |  err | uint |  err |  err
+    /// _        ||  err |  err |    _ |  err |  err
+    /// ?        ||  err |  err |    ? |  err |  err
     ///
     /// So, the result type of an exponentiation is:
-    /// - an error if either lhs or rhs is not a scalar type or `?`,
-    /// - an error if the rhs is not an uint or `?`,
-    /// - any   ^ ?    -> ?,
-    /// - ?     ^ any  -> ?,
-    /// - any   ^ _    -> _,
-    /// - any:x ^ uint -> lhs,
+    /// - an error if either lhs or rhs isn't scalar types,
+    /// - an error if the rhs is not an uint
+    /// - the lhs type otherwise
     ///
     /// Because:
-    /// - it is an error if either lhs or rhs is not a scalar type or `?`,
-    /// - it is an error if rhs is not an uint or `?`,
+    /// - it is an error if rhs is not an uint
     /// - a bool to any power is still a bool:
     ///   - 0^n = 0
     ///   - 1^n = 1
@@ -651,20 +648,22 @@ impl BinType {
     /// - a ? to any power is still a ?
     pub fn infer_bin_ty_exp(&self) -> Result<Option<Type>, TypeError> {
         if let Some(ret) = self.result() {
+            eprintln!("infer_bin_ty_exp: returning cached result {ret:?}");
             return Ok(Some(ret));
         }
         let lhs = self.lhs();
         let rhs = self.rhs();
+        eprintln!("infer_bin_ty_exp: lhs = {lhs:?}, rhs = {rhs:?}");
         if !((lhs.is_scalar() | lhs.is_none()) && (rhs.is_scalar() | rhs.is_none())) {
             return Err(TypeError::IncompatibleBinOp { bin_ty: *self, span: None });
         }
+        eprintln!("  MADE IT PAST THE SHAPE CHECK");
         match self {
-            bty!(any ^ felt) | bty!(any ^ bool) => {
-                Err(TypeError::IncompatibleBinOp { bin_ty: *self, span: None })
+            bty!(any ^ uint) => Ok(lhs),
+            bty!(any ^ felt) | bty!(any ^ bool) | bty!(any ^ _) | bty!(any ^ ?) => {
+                eprintln!("  ERROR: any ^ !uint");
+                Err(TypeError::NonConstantExponent { bin_ty: *self, span: None })
             },
-            bty!(any ^ ?) | bty!(? ^ any) => Ok(ty!(?)),
-            bty!(any ^ _) => Ok(ty!(_)),
-            bty!(any:lhs ^ uint) => Ok(*lhs),
             _ => unreachable!("Undefined case for infer_bin_ty_exp: {self}"),
         }
     }

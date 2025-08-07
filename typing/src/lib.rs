@@ -36,6 +36,10 @@ pub enum TypeError {
         bin_ty: BinType,
         span: Option<SourceSpan>,
     },
+    NonConstantExponent {
+        bin_ty: BinType,
+        span: Option<SourceSpan>,
+    },
 }
 
 impl core::fmt::Display for TypeError {
@@ -63,6 +67,10 @@ impl core::fmt::Display for TypeError {
             },
             TypeError::IncompatibleBinOp { bin_ty, .. } => {
                 write!(f, "incompatible types for binary operation: {}", bin_ty.show_fn_ty())?;
+                Ok(())
+            },
+            TypeError::NonConstantExponent { bin_ty, .. } => {
+                write!(f, "expected exponent to be a constant, got: {}", bin_ty.show_fn_ty())?;
                 Ok(())
             },
         }

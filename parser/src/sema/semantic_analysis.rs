@@ -742,7 +742,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         self.visit_mut_scalar_expr(expr.rhs.as_mut())?;
         let _ = expr.update_bin_ty();
         // Validate the operand types
-        match expr.bin_ty.infer_ty() {
+        match expr.infer_ty() {
             Ok(None) => {
                 self.has_type_errors = true;
                 // Note: We don't break here but at the end of the module's compilation, as we
