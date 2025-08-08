@@ -827,7 +827,7 @@ impl<'a> MirBuilder<'a> {
                             .lhs(x.clone())
                             .rhs(
                                 Exp::builder()
-                                    .lhs(x)
+                                    .lhs(x.clone())
                                     .rhs(self.translate_const(
                                         &ast::ConstantExpr::Scalar(2),
                                         call.span(),
@@ -838,7 +838,11 @@ impl<'a> MirBuilder<'a> {
                             .span(call.span())
                             .build();
                     let node = Enf::builder().span(call.span()).expr(enforced).build();
-                    Ok(node)
+                    let _ = self.insert_enforce(node);
+                    let bool_x = duplicate_node(x, &mut Default::default());
+                    // TODO: cast to a bool
+                    //bool_x.update_ty(ty!(bool));
+                    Ok(bool_x)
                 },
                 other => unimplemented!("unhandled builtin: {}", other),
             }
