@@ -1,0 +1,59 @@
+def SelectorsAir
+
+trace_columns {
+    main: [s[3], a, b, c],
+}
+
+public_inputs {
+    stack_inputs: [1],
+}
+
+boundary_constraints {
+    enf c.first = 0;
+}
+
+# Note: we want the following constraints values to be equivalent:
+# a = c = e
+# g = i
+
+# Then we expect to get three constraints:
+# a * (s0 + s1) + s2 * h = 0
+# g * (s1 + s2) + s0 * b = 0
+# s0 * d + s1 * f = 0
+
+ev ev_s0([a, b, c]) {
+    let vec = [i+i for i in 0..5];
+
+    enf a = vec[0]; #a
+    enf b = vec[1]; #b
+    enf a = vec[1] - 2; #c
+    enf c = vec[2]; #d
+}  
+
+ev ev_s1([a, b, c]) {
+    let vec = [2*i for i in 0..5];
+
+    enf a = vec[2] - 4; #e
+    enf b = vec[3]; #f
+    enf c = vec[4]; #g
+}  
+
+ev ev_s2([a, b, c]) {
+    let vec_3i = [3*i for i in 0..5];
+    let vec_i = [i for i in 0..5];
+    let vec = [i-j for (i,j) in (vec_3i, vec_i)];
+    enf b = vec[4]; #h
+    enf c = vec[4]; #i
+}
+
+integrity_constraints {
+    let s0 = s[0];
+    let s1 = !s[0] & s[1];
+    let s2 = !s[0] & !s[1];
+
+    enf match {
+        case s0: ev_s0([a, b, c]),
+        case s1: ev_s1([a, b, c]),
+        case s2: ev_s2([a, b, c]),
+    };
+}
