@@ -818,6 +818,28 @@ impl<'a> MirBuilder<'a> {
                         .build();
                     Ok(node)
                 },
+                symbols::AssertBool => {
+                    assert_eq!(call.args.len(), 1);
+                    let x = self.translate_expr(call.args.first().unwrap())?;
+                    // enf x^2 = x
+                    let enforced =
+                        Sub::builder()
+                            .lhs(x.clone())
+                            .rhs(
+                                Exp::builder()
+                                    .lhs(x)
+                                    .rhs(self.translate_const(
+                                        &ast::ConstantExpr::Scalar(2),
+                                        call.span(),
+                                    )?)
+                                    .span(call.span())
+                                    .build(),
+                            )
+                            .span(call.span())
+                            .build();
+                    let node = Enf::builder().span(call.span()).expr(enforced).build();
+                    Ok(node)
+                },
                 other => unimplemented!("unhandled builtin: {}", other),
             }
         } else {

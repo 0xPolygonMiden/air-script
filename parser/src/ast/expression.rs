@@ -160,7 +160,7 @@ impl QualifiedIdentifier {
         if self.module.name() == "$builtin" {
             match self.item {
                 NamespacedIdentifier::Function(id) => {
-                    matches!(id.name(), symbols::Sum | symbols::Prod)
+                    matches!(id.name(), symbols::Sum | symbols::Prod | symbols::AssertBool)
                 },
                 _ => false,
             }
@@ -1422,6 +1422,7 @@ impl Call {
         match callee.name() {
             symbols::Sum => Self::sum(span, args),
             symbols::Prod => Self::prod(span, args),
+            symbols::AssertBool => Self::assert_bool(span, args),
             _ => Self {
                 span,
                 callee: ResolvableIdentifier::Unresolved(NamespacedIdentifier::Function(callee)),
@@ -1449,6 +1450,19 @@ impl Call {
     pub fn prod(span: SourceSpan, args: Vec<Expr>) -> Self {
         // TODO: adapt to the new type system and use BinType instead of this type
         Self::new_builtin(span, "prod", args, ty!(felt).unwrap())
+    }
+
+    /// Constructs a function call for `assert_bool`.
+    /// An `assert_bool(x)` is equivalent to an `enf x^2 = x plus a cast from felt to bool`.
+    #[inline]
+    pub fn assert_bool(span: SourceSpan, args: Vec<Expr>) -> Self {
+        //Self::new_builtin(span, "assert_bool", args, ty!(felt).unwrap())
+        let builtin_module = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("$builtin"));
+        let name = Identifier::new(span, Symbol::intern("assert_bool"));
+        let id = QualifiedIdentifier::new(builtin_module, NamespacedIdentifier::Function(name));
+        let callee = ResolvableIdentifier::Resolved(id);
+        let ty = ty!(bool);
+        Self { span, callee, args, ty }
     }
 
     fn new_builtin(span: SourceSpan, name: &str, args: Vec<Expr>, ty: Type) -> Self {

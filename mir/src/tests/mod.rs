@@ -12,6 +12,7 @@ mod pub_inputs;
 mod selectors;
 mod source_sections;
 mod trace;
+mod typing;
 mod variables;
 
 use std::sync::Arc;

@@ -1177,6 +1177,56 @@ impl SemanticAnalysis<'_> {
                     },
                 }
             },
+            // The known built-in cast functions - each takes a single argument, which
+            // must be a subtype of the expected type
+            symbols::AssertBool => {
+                match call.args.as_slice() {
+                    [arg] => {
+                        match self.expr_binding_type(arg) {
+                            Ok(binding_ty) => {
+                                if !binding_ty.ty().map(|t| t.is_scalar()).unwrap_or(false) {
+                                    self.has_type_errors = true;
+                                    self.diagnostics
+                                        .diagnostic(Severity::Error)
+                                        .with_message("invalid call")
+                                        .with_primary_label(
+                                            call.span(),
+                                            "this function expects an argument of scalar type",
+                                        )
+                                        .with_secondary_label(
+                                            arg.span(),
+                                            format!(
+                                                "but this argument is a {}",
+                                                binding_ty.show_kind()
+                                            ),
+                                        )
+                                        .emit();
+                                }
+                            },
+                            Err(e) => {
+                                eprintln!("error: {e}");
+                                // We've already raised a diagnostic for this when visiting the
+                                // access expression
+                                assert!(self.has_undefined_variables || self.has_type_errors);
+                            },
+                        }
+                    },
+                    _ => {
+                        self.has_type_errors = true;
+                        self.diagnostics
+                            .diagnostic(Severity::Error)
+                            .with_message("invalid call")
+                            .with_primary_label(
+                                call.span(),
+                                format!(
+                                    "the callee expects a single argument, but got {}",
+                                    call.args.len()
+                                ),
+                            )
+                            .emit();
+                    },
+                }
+            },
             other => unimplemented!("unrecognized builtin function: {}", other),
         }
         ControlFlow::Continue(())
@@ -1636,6 +1686,7 @@ impl SemanticAnalysis<'_> {
                                     None => {
                                         // If the call was resolved, it must be to an imported function,
                                         // and we will have already validated the reference
+                                        dbg!(&id);
                                         let (import_id, module_id) = self.imported.get_key_value(&id).unwrap();
                                         let module = self.library.get(module_id).unwrap();
                                         if !module.evaluators.contains_key(&id.id()) {
@@ -1935,6 +1986,11 @@ impl SemanticAnalysis<'_> {
                     // list folding builtins
                     let folder_ty = FunctionType::Function(vec![ty!(felt[usize::MAX])], ty!(felt));
                     Ok(Span::new(qid.span(), BindingType::Function(folder_ty)))
+                },
+                symbols::AssertBool => {
+                    // An `assert_bool(x)` is equivalent to an `enf x^2 = x and
+                    // a cast from felt to bool`.
+                    Ok(Span::new(qid.span(), BindingType::Function(fty!(fn(felt) -> bool))))
                 },
                 name => unimplemented!("unsupported builtin: {}", name),
             }

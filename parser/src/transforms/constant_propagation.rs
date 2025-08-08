@@ -402,6 +402,26 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                             }
                         }
                     },
+                    symbols::AssertBool => {
+                        assert_eq!(call.args.len(), 1);
+                        match &call.args[0] {
+                            // If the assertion is a constant 0 or 1, it's valid
+                            // TODO: if we start allowing casts from a uint to a bool, we should
+                            // fold the assertion to a rebind of type bool if it is 0 or 1,
+                            // and raise a diagnostic if it is not
+                            Expr::Const(Span { item: ConstantExpr::Scalar(0 | 1), .. }) => {},
+                            // If the assertion is not 0 or 1, emit an error
+                            Expr::Const(Span { item: ConstantExpr::Scalar(_), .. }) => {
+                                self.diagnostics
+                                    .diagnostic(miden_diagnostics::Severity::Error)
+                                    .with_message("assertion failed")
+                                    .with_primary_label(span, "assertion failed")
+                                    .emit();
+                                return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                            },
+                            _ => {},
+                        }
+                    },
                     invalid => unimplemented!("unknown builtin function: {invalid}"),
                 }
                 ControlFlow::Continue(())
