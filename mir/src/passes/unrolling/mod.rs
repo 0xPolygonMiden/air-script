@@ -7,9 +7,11 @@ use crate::{CompileError, ir::*};
 mod match_optimizer;
 mod unrolling_first_pass;
 mod unrolling_second_pass;
+mod unrolling_third_pass;
 
 use unrolling_first_pass::UnrollingFirstPass;
 use unrolling_second_pass::UnrollingSecondPass;
+use unrolling_third_pass::UnrollingThirdPass;
 
 /// This pass follows a similar approach as the Inlining pass and requires that the latter has
 /// already been done.
@@ -43,17 +45,23 @@ impl Pass for Unrolling<'_> {
     type Error = CompileError;
 
     fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
-        // The first pass unrolls all nodes fully, except for For nodes
+        // The first pass unrolls all nodes fully, except for:
+        // - `For` nodes
+        // - `If` nodes and their parents
         let mut first_pass = UnrollingFirstPass::new(self.diagnostics);
         Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
 
-        // The second pass actually inlines the For nodes
+        // The second pass actually inlines the `For` nodes
         let mut second_pass = UnrollingSecondPass::new(
             self.diagnostics,
             first_pass.bodies_to_inline.clone(),
             first_pass.all_for_nodes.clone(),
         );
         Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
+
+        // The third pass unrolls all the remaining nodes (`If` nodes and their parents)
+        let mut third_pass = UnrollingThirdPass::new(self.diagnostics);
+        Visitor::run(&mut third_pass, ir.constraint_graph_mut())?;
         Ok(ir)
     }
 }
