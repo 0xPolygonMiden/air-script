@@ -6,6 +6,9 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   test:
     name: Test Rust ${{matrix.toolchain}} on ${{matrix.os}}
@@ -16,13 +19,24 @@ jobs:
         toolchain: [stable, nightly]
         os: [ubuntu]
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v4
       - name: Install rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{matrix.toolchain}}
-          override: true
-      - name: Test
-        uses: actions-rs/cargo@v1
+      - name: Run tests
+        run: make test
+
+  check:
+    name: Check
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          command: test
+          toolchain: stable
+      - name: Run check
+        run: make check

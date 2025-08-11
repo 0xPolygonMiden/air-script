@@ -8,6 +8,22 @@ help:
 
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
+# -- building --------------------------------------------------------------------------------------
+
+.PHONY: build
+build: ## Build the project
+	cargo build --workspace
+
+.PHONY: check
+check: ## Run type checker
+	cargo check --workspace --all-targets
+
+# -- testing --------------------------------------------------------------------------------------
+
+.PHONY: test
+test: ## Run all tests
+	cargo test --workspace
+
 # -- linting --------------------------------------------------------------------------------------
 
 .PHONY: clippy
