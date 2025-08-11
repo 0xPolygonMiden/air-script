@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic};
+use super::{compile_from_source, expect_diagnostic};
 
 #[test]
 fn boundary_constraints() {
@@ -18,7 +18,7 @@ fn boundary_constraints() {
         enf clk' = clk + 1;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]

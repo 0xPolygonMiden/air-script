@@ -19,7 +19,7 @@ use miden_diagnostics::{CodeMap, DiagnosticsConfig, DiagnosticsHandler, Verbosit
 pub use crate::CompileError;
 use crate::compile;
 
-pub fn compile(source: &str) -> Result<crate::Air, ()> {
+pub fn compile_from_source(source: &str) -> Result<crate::Air, ()> {
     let compiler = Compiler::default();
     match compiler.compile(source) {
         Ok(air) => Ok(air),

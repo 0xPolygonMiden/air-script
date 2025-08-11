@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic};
+use super::{compile_from_source, expect_diagnostic};
 
 #[test]
 fn boundary_constraint_with_constants() {
@@ -21,7 +21,7 @@ fn boundary_constraint_with_constants() {
         enf clk' = clk - 1;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn integrity_constraint_with_constants() {
         enf clk' = clk + A + B[1] - C[1][2];
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]

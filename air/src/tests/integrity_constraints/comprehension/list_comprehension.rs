@@ -1,4 +1,4 @@
-use super::super::{compile, expect_diagnostic};
+use super::super::{compile_from_source, expect_diagnostic};
 
 #[test]
 fn list_comprehension() {
@@ -18,7 +18,7 @@ fn list_comprehension() {
         enf clk = x[1];
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn lc_with_const_exp() {
         enf clk = y[1] + z[1];
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn lc_with_two_lists() {
         enf clk = diff[0];
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -103,7 +103,7 @@ fn lc_with_two_slices() {
         enf clk = diff[1];
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn lc_with_multiple_lists() {
         enf a = x[0] + x[1] + x[2];
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
