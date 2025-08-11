@@ -10,15 +10,12 @@ mod tests;
 use air_ir::{Air, ConstraintDomain};
 pub use mir::ir::QuadFelt;
 
-use crate::{
-    builder::{CircuitBuilder, LinearCombination},
-    layout::StarkVar,
-};
+use crate::builder::{CircuitBuilder, LinearCombination};
 pub use crate::{
     circuit::{Circuit as AceCircuit, Node as AceNode},
     encoded::EncodedCircuit as EncodedAceCircuit,
     inputs::{AceVars, AirInputs},
-    layout::Layout as AirLayout,
+    layout::{Layout as AirLayout, StarkVar},
 };
 
 /// Air constraints are organized in 3 main groups: integrity roots,
