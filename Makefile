@@ -28,12 +28,12 @@ test: ## Run all tests
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs
-	$(WARNINGS) cargo clippy --workspace --all-targets --all-features
+	$(WARNINGS) cargo +stable clippy --workspace --all-targets --all-features
 
 
 .PHONY: fix
 fix: ## Run Fix with configs
-	cargo fix --allow-staged --allow-dirty --all-targets --all-features
+	cargo +stable fix --allow-staged --allow-dirty --all-targets --all-features
 
 
 .PHONY: format
