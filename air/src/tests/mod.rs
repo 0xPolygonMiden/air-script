@@ -14,11 +14,10 @@ mod variables;
 
 use std::sync::Arc;
 
-use air_pass::Pass;
 use miden_diagnostics::{CodeMap, DiagnosticsConfig, DiagnosticsHandler, Verbosity};
 
 pub use crate::CompileError;
-use crate::ast_to_air_pipeline;
+use crate::compile;
 
 pub fn compile(source: &str) -> Result<crate::Air, ()> {
     let compiler = Compiler::default();
@@ -77,10 +76,7 @@ impl Compiler {
     pub fn compile(&self, source: &str) -> Result<crate::Air, CompileError> {
         air_parser::parse(&self.diagnostics, self.codemap.clone(), source)
             .map_err(CompileError::Parse)
-            .and_then(|ast| {
-                let mut pipeline = ast_to_air_pipeline(&self.diagnostics);
-                pipeline.run(ast)
-            })
+            .and_then(|program| compile(&self.diagnostics, program))
     }
 }
 

@@ -1,7 +1,6 @@
 use std::{fs, path::PathBuf, sync::Arc};
 
-use air_ir::{CodeGenerator, CompileError, ast_to_air_pipeline};
-use air_pass::Pass;
+use air_ir::{CodeGenerator, CompileError, compile};
 use clap::{Args, ValueEnum};
 use miden_diagnostics::{
     CodeMap, DefaultEmitter, DiagnosticsHandler, term::termcolor::ColorChoice,
@@ -48,10 +47,7 @@ impl Transpile {
         // Parse from file to internal representation
         let air = air_parser::parse_file(&diagnostics, codemap, input_path)
             .map_err(CompileError::Parse)
-            .and_then(|ast| {
-                let mut pipeline = ast_to_air_pipeline(&diagnostics);
-                pipeline.run(ast)
-            });
+            .and_then(|program| compile(&diagnostics, program));
 
         match air {
             Ok(air) => {

@@ -16,6 +16,12 @@ pub use self::{
     ir::*,
 };
 
+/// Compiles an AirScript program from the the parsed AST to the AIR
+pub fn compile(diagnostics: &DiagnosticsHandler, program: Program) -> Result<Air, CompileError> {
+    let mut pipeline = ast_to_air_pipeline(diagnostics);
+    pipeline.run(program)
+}
+
 /// Creates a pipeline of passes that transforms an AST into AIR.
 pub fn ast_to_air_pipeline<'a>(
     diagnostics: &DiagnosticsHandler,

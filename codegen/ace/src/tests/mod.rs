@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use air_ir::{Air, ast_to_air_pipeline};
+use air_ir::{Air, compile};
 use miden_diagnostics::{
     CodeMap, DefaultEmitter, DiagnosticsHandler, term::termcolor::ColorChoice,
 };
@@ -16,18 +16,13 @@ mod random;
 
 /// Generates an ACE circuit and its root index from an AirScript program.
 pub fn generate_circuit(source: &str) -> (Air, Circuit, Node) {
-    use air_pass::Pass;
-
     let code_map = Arc::new(CodeMap::new());
     let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
     let diagnostics = DiagnosticsHandler::new(Default::default(), code_map.clone(), emitter);
 
     let air = air_parser::parse(&diagnostics, code_map, source)
         .map_err(air_ir::CompileError::Parse)
-        .and_then(|ast| {
-            let mut pipeline = ast_to_air_pipeline(&diagnostics);
-            pipeline.run(ast)
-        })
+        .and_then(|program| compile(&diagnostics, program))
         .expect("lowering failed");
 
     let (root, circuit) = build_ace_circuit(&air).expect("codegen failed");

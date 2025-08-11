@@ -14,11 +14,8 @@ Example usage:
 // parse the source string to a Result containing the AST or an Error
 let ast = parse(source.as_str()).expect("Parsing failed");
 
-// Create the compilation pipeline needed to translate the AST to the MIR and then the AIR
-let mut pipeline = ast_to_air_pipeline(&diagnostics);
-
-// process the AST and the MIR to get a Result containing the AIR or a CompileError
-let air = pipeline.run(ast)
+// Compile AST into AIR
+let air = compile(&diagnostics, ast).expect("compilation failed");
 ```
 
 ## AirIR
