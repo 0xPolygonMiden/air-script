@@ -46,8 +46,6 @@ pub(super) fn add_fn_get_aux_assertions(impl_ref: &mut Impl, ir: &Air) {
 /// Declares a result vector and adds assertions for boundary constraints to it for the main
 /// trace segment
 fn add_main_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
-    let elem_type = ElemType::Base;
-
     // declare the result vector to be returned.
     func_body.line("let mut result = Vec::new();");
 
@@ -57,7 +55,7 @@ fn add_main_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
             split_boundary_constraint(ir.constraint_graph(), constraint.node_index());
         debug_assert_eq!(trace_access.segment, TraceSegmentId::Main);
 
-        let expr_root_string = expr_root.to_string(ir, elem_type, TraceSegmentId::Main);
+        let expr_root_string = expr_root.to_string(ir, ElemType::Base, TraceSegmentId::Main);
 
         let assertion = format!(
             "result.push(Assertion::single({}, {}, {}));",
@@ -73,8 +71,6 @@ fn add_main_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
 /// Declares a result vector and adds assertions for boundary constraints to it for the aux
 /// trace segment (used for buses boundary constraints for variable length public inputs)
 fn add_aux_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
-    let elem_type = ElemType::Ext;
-
     // declare the result vector to be returned.
     func_body.line("let mut result = Vec::new();");
 
@@ -105,7 +101,7 @@ fn add_aux_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
             split_boundary_constraint(ir.constraint_graph(), constraint.node_index());
         debug_assert_eq!(trace_access.segment, TraceSegmentId::Aux);
 
-        let expr_root_string = expr_root.to_string(ir, elem_type, TraceSegmentId::Aux);
+        let expr_root_string = expr_root.to_string(ir, ElemType::Ext, TraceSegmentId::Aux);
 
         let assertion = format!(
             "result.push(Assertion::single({}, {}, {}));",

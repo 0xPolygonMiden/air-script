@@ -7,8 +7,8 @@ use super::*;
 /// The id of a trace segment is its index in the trace_columns declaration
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum TraceSegmentId {
-    Main,
-    Aux,
+    Main = 0,
+    Aux = 1,
 }
 
 impl fmt::Display for TraceSegmentId {
