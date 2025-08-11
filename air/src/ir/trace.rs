@@ -20,13 +20,4 @@ impl TraceAccess {
     pub const fn new(segment: TraceSegmentId, column: TraceColumnIndex, row_offset: usize) -> Self {
         Self { segment, column, row_offset }
     }
-
-    /// Creates a new [TraceAccess] with a new column index that is updated according to the
-    /// provided offsets. All other data is left unchanged.
-    pub fn clone_with_offsets(&self, offsets: &[Vec<usize>]) -> Self {
-        Self {
-            column: offsets[self.segment][self.column],
-            ..*self
-        }
-    }
 }

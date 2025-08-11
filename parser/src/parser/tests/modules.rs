@@ -40,9 +40,11 @@ fn import_declaration() {
 #[test]
 fn modules_integration_test() {
     let mut expected = Program::new(ident!(import_example));
-    expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1), (fmp, 1), (ctx, 1)]));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(clk, 1), (fmp, 1), (ctx, 1)]
+    ));
     expected.periodic_columns.insert(
         ident!(foo, k0),
         PeriodicColumn::new(SourceSpan::UNKNOWN, ident!(k0), vec![1, 1, 0, 0]),
@@ -65,7 +67,7 @@ fn modules_integration_test() {
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(bar_constraint),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce_if!(match_arm!(
                 eq!(
                     access!(clk, 1, Type::Felt),
@@ -83,7 +85,7 @@ fn modules_integration_test() {
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(foo_constraint),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce_if!(match_arm!(
                 eq!(access!(clk, 1, Type::Felt), add!(access!(clk, Type::Felt), int!(1))),
                 access!(foo, k0, Type::Felt)

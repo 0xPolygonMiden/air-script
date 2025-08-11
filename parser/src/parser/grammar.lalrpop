@@ -114,7 +114,7 @@ MainSegmentId: Identifier = {
 
 MainTraceBindings: TraceSegment = {
     <l:@L> <name:MainSegmentId> ":" <bindings: Vector<TraceBinding>> "," <r:@R> =>
-        TraceSegment::new(span!(l, r), 0, name, bindings),
+        TraceSegment::new(span!(l, r), TraceSegmentId::Main, name, bindings),
 }
 
 TraceBinding: Span<(Identifier, usize)> = {
@@ -195,14 +195,22 @@ EvaluatorFunction: EvaluatorFunction = {
 
 EvaluatorBindings: Vec<TraceSegment> = {
     <l:@L> <trace: Comma<EvaluatorSegmentBindings>> <r:@R> =>? {
-        let mut segments = Vec::with_capacity(trace.len());
+        if trace.len() != 1 {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid evaluator function definition")
+                .with_primary_label(span!(l, r), "evaluators must have exactly one trace segment")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
 
-        for (segment, (span, bindings)) in trace.into_iter().enumerate() {
+        let mut segments = Vec::with_capacity(trace.len());
+        
+        if let Some((span, bindings)) = trace.into_iter().next() {
             // We generate a name for these segments to distinguish them from direct references
             // to the actual main columns. This is useful during the inlining phase
             let segment_name = Identifier::new(span, Symbol::intern(format!("%{}", *next_var)));
             *next_var += 1;
-            segments.push(TraceSegment::new(span, segment, segment_name, bindings));
+            segments.push(TraceSegment::new(span, TraceSegmentId::Main, segment_name, bindings));
         }
 
         // the last segment of trace columns cannot be empty.

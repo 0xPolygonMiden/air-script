@@ -27,9 +27,11 @@ fn trace_columns() {
         enf clk = 0;
     }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
-    expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1), (fmp, 1), (ctx, 1)]));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(clk, 1), (fmp, 1), (ctx, 1)]
+    ));
     expected
         .public_inputs
         .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
@@ -64,9 +66,11 @@ fn trace_columns_groups() {
         enf clk' = clk - 1;
     }"#;
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
-    expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1), (fmp, 1), (ctx, 1), (a, 3)]));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(clk, 1), (fmp, 1), (ctx, 1), (a, 3)]
+    ));
     expected
         .public_inputs
         .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));

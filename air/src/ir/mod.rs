@@ -22,10 +22,6 @@ pub use self::{
     value::{PeriodicColumnAccess, PublicInputAccess, Value},
 };
 
-/// The default segment against which a constraint is applied is the main trace segment.
-pub const DEFAULT_SEGMENT: TraceSegmentId = 0;
-/// The auxiliary trace segment.
-pub const AUX_SEGMENT: TraceSegmentId = 1;
 /// The offset of the "current" row during constraint evaluation.
 pub const CURRENT_ROW: usize = 0;
 /// The minimum cycle length of a periodic column

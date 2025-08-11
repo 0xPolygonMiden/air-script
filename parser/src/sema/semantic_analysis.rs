@@ -1377,13 +1377,13 @@ impl SemanticAnalysis<'_> {
                                     },
                                     Ok(BindingType::Bus(_)) => {
                                         // Buses are valid in boundary constraints
-                                        (ty, 0)
+                                        (ty, TraceSegmentId::Main)
                                     },
                                     Ok(aty) => {
                                         let expected = BindingType::TraceColumn(TraceBinding::new(
                                             constraint_span,
                                             Identifier::new(constraint_span, symbols::Main),
-                                            0,
+                                            TraceSegmentId::Main,
                                             0,
                                             1,
                                             Type::Felt,
@@ -1912,7 +1912,7 @@ impl SemanticAnalysis<'_> {
 
 fn segment_id_to_name(id: TraceSegmentId) -> Symbol {
     match id {
-        0 => symbols::Main,
+        TraceSegmentId::Main => symbols::Main,
         _ => unimplemented!(),
     }
 }

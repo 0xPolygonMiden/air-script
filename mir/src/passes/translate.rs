@@ -1,7 +1,11 @@
 use core::panic;
 use std::ops::Deref;
 
-use air_parser::{LexicalScope, ast, ast::AccessType, symbols};
+use air_parser::{
+    LexicalScope,
+    ast::{self, AccessType, TraceSegmentId},
+    symbols,
+};
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
@@ -1280,40 +1284,44 @@ impl<'a> MirBuilder<'a> {
 
     // Check assumptions, probably this assumed that the inlining pass did some work
     fn trace_access(&self, access: &ast::SymbolAccess) -> Option<TraceAccess> {
+        assert_eq!(
+            self.trace_columns.len(),
+            1,
+            "In MIR, expected exactly one trace segment to be present"
+        );
         let id = access.name.as_ref();
-        for (i, segment) in self.trace_columns.iter().enumerate() {
-            if segment.name == id {
-                if let AccessType::Index(column) = access.access_type {
-                    return Some(TraceAccess::new(i, column, access.offset));
-                } else {
-                    // This should have been caught earlier during compilation
-                    unreachable!(
-                        "unexpected trace access type encountered during lowering: {:#?}",
-                        &access
-                    );
-                }
-            }
+        let segment = self.trace_columns.first().unwrap();
 
-            if let Some(binding) = segment.bindings.iter().find(|tb| tb.name.as_ref() == Some(id)) {
-                return match access.access_type {
-                    AccessType::Default if binding.size == 1 => {
-                        Some(TraceAccess::new(binding.segment, binding.offset, access.offset))
-                    },
-                    AccessType::Index(extra_offset) if binding.size > 1 => Some(TraceAccess::new(
-                        binding.segment,
-                        binding.offset + extra_offset,
-                        access.offset,
-                    )),
-                    // This should have been caught earlier during compilation
-                    /*_ => unreachable!(
-                        "unexpected trace access type encountered during lowering: {:#?}",
-                        access
-                    ),*/
-                    _ => None,
-                };
+        if segment.name == id {
+            // We access $main[i]
+            if let AccessType::Index(column) = access.access_type {
+                Some(TraceAccess::new(TraceSegmentId::Main, column, access.offset))
+            } else {
+                // This should have been caught earlier during compilation
+                unreachable!(
+                    "unexpected trace access type encountered during lowering: {:#?}",
+                    &access
+                );
             }
+        } else if let Some(binding) =
+            segment.bindings.iter().find(|tb| tb.name.as_ref() == Some(id))
+        {
+            // We access a trace binding defined in the main trace.
+            match access.access_type {
+                AccessType::Default if binding.size == 1 => {
+                    Some(TraceAccess::new(binding.segment, binding.offset, access.offset))
+                },
+                AccessType::Index(extra_offset) if binding.size > 1 => Some(TraceAccess::new(
+                    binding.segment,
+                    binding.offset + extra_offset,
+                    access.offset,
+                )),
+                _ => None,
+            }
+        } else {
+            // We do not access a trace
+            None
         }
-        None
     }
 }
 

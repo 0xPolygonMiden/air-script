@@ -103,29 +103,29 @@ impl AlgebraicGraph {
         // recursively walk the subgraph and infer the trace segment and domain
         match self.node(index).op() {
             Operation::Value(value) => match value {
-                Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
-                Value::RandomValue(_) => Ok((AUX_SEGMENT, default_domain)),
+                Value::Constant(_) => Ok((TraceSegmentId::Main, default_domain)),
+                Value::RandomValue(_) => Ok((TraceSegmentId::Aux, default_domain)),
                 Value::PeriodicColumn(_) => {
                     assert!(
                         !default_domain.is_boundary(),
                         "unexpected access to periodic column in boundary constraint"
                     );
                     // the default domain for [IntegrityConstraints] is `EveryRow`
-                    Ok((DEFAULT_SEGMENT, ConstraintDomain::EveryRow))
+                    Ok((TraceSegmentId::Main, ConstraintDomain::EveryRow))
                 },
                 Value::PublicInput(_) => {
                     assert!(
                         !default_domain.is_integrity(),
                         "unexpected access to public input in integrity constraint"
                     );
-                    Ok((DEFAULT_SEGMENT, default_domain))
+                    Ok((TraceSegmentId::Main, default_domain))
                 },
                 Value::PublicInputTable(_) => {
                     assert!(
                         !default_domain.is_integrity(),
                         "unexpected access to public input table in integrity constraint"
                     );
-                    Ok((DEFAULT_SEGMENT, default_domain))
+                    Ok((TraceSegmentId::Main, default_domain))
                 },
                 Value::TraceAccess(trace_access) => {
                     let domain = if default_domain.is_boundary() {

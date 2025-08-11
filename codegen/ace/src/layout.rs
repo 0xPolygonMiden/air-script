@@ -207,12 +207,9 @@ impl Layout {
     /// Input node associated with a trace variable.
     pub fn trace_access_node(&self, trace_access: &TraceAccess) -> Option<Node> {
         let TraceAccess { segment, column, row_offset } = *trace_access;
-        // We should only be able to access the main and aux segments.
-        if segment > 1 {
-            return None;
-        };
         let segments_in_row = self.trace_segments.get(row_offset)?;
-        let segment_region = segments_in_row.get(segment)?;
+        let segment_index = segment.index();
+        let segment_region = segments_in_row.get(segment_index)?;
         segment_region.as_node(column)
     }
 
