@@ -24,6 +24,11 @@ jobs:
         with:
           toolchain: stable
           components: clippy
+      - name: Install nightly rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+          components: rustfmt
       - name: Run clippy
         run: make lint
 
@@ -37,7 +42,7 @@ jobs:
       - name: Install rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: nightly
           components: rustfmt
       - name: Run rustfmt
         run: make format-check
