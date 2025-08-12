@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic};
+use super::{compile_from_source, expect_diagnostic};
 
 #[test]
 fn let_scalar_constant_in_boundary_constraint() {
@@ -18,7 +18,7 @@ fn let_scalar_constant_in_boundary_constraint() {
         enf clk' = clk + 1;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn let_vector_constant_in_boundary_constraint() {
         enf clk' = clk + 1;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn multi_constraint_nested_let_with_expressions_in_boundary_constraint() {
         enf clk' = clk + 1;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn let_scalar_constant_in_boundary_constraint_both_domains() {
         enf clk' = clk + 1;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn nested_let_with_expressions_in_integrity_constraint() {
         enf c[0][0] = 1;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -158,7 +158,7 @@ fn nested_let_with_vector_access_in_integrity_constraint() {
         enf clk' = c[0] + e[2][0] + e[0][1];
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -395,5 +395,5 @@ fn trace_binding_access_in_integrity_constraint() {
         enf clk' = clk + a[0];
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }

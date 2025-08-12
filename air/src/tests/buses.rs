@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic};
+use super::{compile_from_source, expect_diagnostic};
 
 #[test]
 fn buses_in_boundary_constraints() {
@@ -29,7 +29,7 @@ fn buses_in_boundary_constraints() {
         enf a = 0;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn buses_in_integrity_constraints() {
         q.remove(1, 2) with 2;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 // Tests that should return errors

@@ -10,6 +10,7 @@ pub mod transforms;
 
 use std::{path::Path, sync::Arc};
 
+use air_pass::Pass;
 use miden_diagnostics::{CodeMap, DiagnosticsHandler};
 
 pub use self::{
@@ -17,6 +18,29 @@ pub use self::{
     sema::{LexicalScope, SemanticAnalysisError},
     symbols::Symbol,
 };
+use crate::ast::Program;
+
+/// Abstracts the various passes done on the AST representation of the program.
+pub struct AstPasses<'a> {
+    diagnostics: &'a DiagnosticsHandler,
+}
+
+impl<'a> AstPasses<'a> {
+    pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
+        Self { diagnostics }
+    }
+}
+
+impl Pass for AstPasses<'_> {
+    type Input<'a> = Program;
+    type Output<'a> = Program;
+    type Error = SemanticAnalysisError;
+
+    fn run<'a>(&mut self, input: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
+        let mut passes = transforms::ConstantPropagation::new(self.diagnostics);
+        passes.run(input)
+    }
+}
 
 /// Parses the provided source and returns the AST.
 pub fn parse(
