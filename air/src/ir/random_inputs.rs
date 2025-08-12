@@ -6,7 +6,7 @@ use rand::prelude::*;
 use winter_math::fields::f64::BaseElement as Felt;
 
 use crate::{
-    AlgebraicGraph, CompileError, NodeIndex, Operation, PeriodicColumnAccess, PublicInputAccess,
+    AlgebraicGraph, NodeIndex, Operation, PeriodicColumnAccess, PublicInputAccess,
     PublicInputTableAccess, Value,
 };
 
@@ -31,40 +31,36 @@ impl RandomInputs {
     ///
     /// Note that we currently assume this will be called only during the unrolling phase, some
     /// operation types are not handled.
-    pub fn eval(
-        &mut self,
-        graph: &AlgebraicGraph,
-        node_index: &NodeIndex,
-    ) -> Result<QuadFelt, CompileError> {
+    pub fn eval(&mut self, graph: &AlgebraicGraph, node_index: &NodeIndex) -> QuadFelt {
         let op = graph.node(node_index).op();
         match op {
             Operation::Add(lhs, rhs) => {
-                let lhs_eval = self.eval(graph, lhs)?;
-                let rhs_eval = self.eval(graph, rhs)?;
+                let lhs_eval = self.eval(graph, lhs);
+                let rhs_eval = self.eval(graph, rhs);
                 let add_eval = lhs_eval + rhs_eval;
                 self.evals_map.insert(*node_index, add_eval);
-                Ok(add_eval)
+                add_eval
             },
             Operation::Sub(lhs, rhs) => {
-                let lhs_eval = self.eval(graph, lhs)?;
-                let rhs_eval = self.eval(graph, rhs)?;
+                let lhs_eval = self.eval(graph, lhs);
+                let rhs_eval = self.eval(graph, rhs);
                 let sub_eval = lhs_eval - rhs_eval;
                 self.evals_map.insert(*node_index, sub_eval);
-                Ok(sub_eval)
+                sub_eval
             },
             Operation::Mul(lhs, rhs) => {
-                let lhs_eval = self.eval(graph, lhs)?;
-                let rhs_eval = self.eval(graph, rhs)?;
+                let lhs_eval = self.eval(graph, lhs);
+                let rhs_eval = self.eval(graph, rhs);
                 let mul_eval = lhs_eval * rhs_eval;
                 self.evals_map.insert(*node_index, mul_eval);
-                Ok(mul_eval)
+                mul_eval
             },
             Operation::Value(value) => match value {
                 Value::Constant(c) => {
                     let felt = Felt::new(*c);
                     let eval = const_quad_felt(felt);
                     self.evals_map.insert(*node_index, eval);
-                    Ok(eval)
+                    eval
                 },
                 // For each trace segment, we associate a random value to each trace access,
                 // indexed in the following way, each column having two
@@ -79,20 +75,20 @@ impl RandomInputs {
                         let eval =
                             query_indexed_cur_eval(&mut self.rng, &mut self.main_trace, index);
                         self.evals_map.insert(*node_index, eval);
-                        Ok(eval)
+                        eval
                     },
                     TraceSegmentId::Aux => {
                         let index = trace_access.column * 2 + trace_access.row_offset;
                         let eval =
                             query_indexed_cur_eval(&mut self.rng, &mut self.aux_trace, index);
                         self.evals_map.insert(*node_index, eval);
-                        Ok(eval)
+                        eval
                     },
                 },
                 Value::RandomValue(u) => {
                     let eval = query_indexed_cur_eval(&mut self.rng, &mut self.rand_values, *u);
                     self.evals_map.insert(*node_index, eval);
-                    Ok(eval)
+                    eval
                 },
                 // For PublicInput, PeriodicColumn and PublicInputTable, we use the Hash of the
                 // element to associate a unique random value or each public input
@@ -100,12 +96,12 @@ impl RandomInputs {
                 Value::PublicInput(pi) => {
                     let eval = query_hashed_cur_eval(&mut self.rng, &mut self.public_inputs, pi);
                     self.evals_map.insert(*node_index, eval);
-                    Ok(eval)
+                    eval
                 },
                 Value::PeriodicColumn(pc) => {
                     let eval = query_hashed_cur_eval(&mut self.rng, &mut self.periodic_columns, pc);
                     self.evals_map.insert(*node_index, eval);
-                    Ok(eval)
+                    eval
                 },
                 Value::PublicInputTable(public_input_table_access) => {
                     let eval = query_hashed_cur_eval(
@@ -114,7 +110,7 @@ impl RandomInputs {
                         public_input_table_access,
                     );
                     self.evals_map.insert(*node_index, eval);
-                    Ok(eval)
+                    eval
                 },
             },
         }

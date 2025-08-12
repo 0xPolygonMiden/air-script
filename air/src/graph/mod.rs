@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use mir::ir::QuadFelt;
 
-use crate::{CompileError, ir::*};
+use crate::ir::*;
 
 /// A unique identifier for a node in an [AlgebraicGraph]
 ///
@@ -89,12 +89,12 @@ impl AlgebraicGraph {
     pub fn evaluate_all_nodes(
         &mut self,
         random_inputs: &mut RandomInputs,
-    ) -> Result<BTreeMap<NodeIndex, QuadFelt>, CompileError> {
+    ) -> BTreeMap<NodeIndex, QuadFelt> {
         for index in 0..self.num_nodes() {
             let node_index = NodeIndex(index);
-            random_inputs.eval(self, &node_index)?;
+            random_inputs.eval(self, &node_index);
         }
-        Ok(random_inputs.evals_map.clone())
+        random_inputs.evals_map.clone()
     }
 
     /// Given the map of evaluations of all nodes in the graph,

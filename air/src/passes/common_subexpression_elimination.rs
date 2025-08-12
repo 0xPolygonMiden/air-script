@@ -26,7 +26,7 @@ impl Pass for CommonSubexpressionElimination<'_> {
 
     fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
         // 1. Start by going through all the nodes in the Air and evaluating them at random points.
-        let evals = ir.constraint_graph_mut().evaluate_all_nodes(&mut self.random_inputs)?;
+        let evals = ir.constraint_graph_mut().evaluate_all_nodes(&mut self.random_inputs);
 
         // 2. Then, eliminate common subexpressions in the graph based on the evaluations.
         // This will both:
