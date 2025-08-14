@@ -5,12 +5,15 @@ use std::{
     vec,
 };
 
-use air_parser::ast::AccessType;
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
 
 use super::{duplicate_node_or_replace, visitor::Visitor};
-use crate::{CompileError, ir::*, passes::duplicate_node};
+use crate::{
+    CompileError,
+    ir::*,
+    passes::{duplicate_node, get_inner_const},
+};
 
 /// This pass follows a similar approach as the Inlining pass.
 /// It requires that this Inlining pass has already been done.
@@ -128,6 +131,7 @@ impl Pass for Unrolling<'_> {
             first_pass.all_for_nodes.clone(),
         );
         Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
+
         Ok(ir)
     }
 }
@@ -431,7 +435,6 @@ impl UnrollingFirstPass<'_> {
     ) -> Result<Option<Link<Op>>, CompileError> {
         // FIXME: Just check that the parameter is a scalar, raise diag otherwise
         // List comprehension bodies should only be scalar expressions
-
         let owner_ref = parameter
             .as_parameter()
             .unwrap()
@@ -665,12 +668,15 @@ impl UnrollingFirstPass<'_> {
         {
             let accessor_ref = accessor.as_accessor().unwrap();
             let indexable = accessor_ref.indexable.clone();
-            let access_type = accessor_ref.access_type.clone();
+            let mir_access_type = accessor_ref.access_type.clone();
             let offset = accessor_ref.offset;
 
+            // FIXME: Factorize this code with the visit_accessor_bis of ConstrantPropagation pass
+            // We should be able to call a helper, and specify whether we expect the indices to be
+            // constants at this stage
             if indexable.clone().as_parameter().is_none() {
-                match access_type {
-                    AccessType::Default => {
+                match mir_access_type {
+                    MirAccessType::Default => {
                         updated_accessor = Some(indexable.clone());
 
                         if let Some(value) = indexable.clone().as_value() {
@@ -689,16 +695,31 @@ impl UnrollingFirstPass<'_> {
                             }
                         }
                     },
-                    AccessType::Index(index) => {
+                    MirAccessType::Index(index) => {
+                        let index_usize = match get_inner_const(&index) {
+                            Some(value) => value as usize,
+                            None => {
+                                return Ok(None);
+                            },
+                        };
                         // Check that the child node is a vector, raise diag otherwise
                         // Replace the current node by the index-th element of the vector
                         // Raise diag if index is out of bounds
                         if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
                             let indexable_vec =
                                 indexable_vector.children().borrow().deref().clone();
-                            let child_accessed = match indexable_vec.get(index) {
+                            let child_accessed = match indexable_vec.get(index_usize) {
                                 Some(child_accessed) => child_accessed,
-                                None => unreachable!(), // raise diag
+                                None => {
+                                    self.diagnostics
+                                        .diagnostic(miden_diagnostics::Severity::Error)
+                                        .with_message(
+                                            "attempted to access an index which is out of bounds",
+                                        )
+                                        .with_primary_label(index.span(), "index out of bounds")
+                                        .emit();
+                                    return Err(CompileError::Failed);
+                                },
                             };
                             if let Some(value) = child_accessed.clone().as_value() {
                                 let mir_value = value.value.value.clone();
@@ -721,11 +742,45 @@ impl UnrollingFirstPass<'_> {
                             } else {
                                 updated_accessor = Some(child_accessed.clone());
                             }
+                        } else if let Some(value) = indexable.clone().as_value() {
+                            let mir_value = value.value.value.clone();
+                            match mir_value {
+                                MirValue::PublicInput(public_input_access) => {
+                                    let new_node = Value::create(SpannedMirValue {
+                                        span: value.value.span(),
+                                        value: MirValue::PublicInput(PublicInputAccess {
+                                            name: public_input_access.name,
+                                            index: public_input_access.index + index_usize,
+                                        }),
+                                    });
+                                    updated_accessor = Some(new_node);
+                                },
+                                MirValue::TraceAccess(trace_access) => {
+                                    let new_node = Value::create(SpannedMirValue {
+                                        span: value.value.span(),
+                                        value: MirValue::TraceAccess(TraceAccess {
+                                            segment: trace_access.segment,
+                                            column: trace_access.column + index_usize,
+                                            row_offset: trace_access.row_offset,
+                                        }),
+                                    });
+                                    updated_accessor = Some(new_node);
+                                },
+                                _ => {
+                                    unreachable!("indexable is {:?}", indexable); // raise diag
+                                },
+                            }
                         } else {
                             unreachable!("indexable is {:?}", indexable); // raise diag
-                        };
+                        }
                     },
-                    AccessType::Matrix(row, col) => {
+                    MirAccessType::Matrix(row, col) => {
+                        let (row, col) = match (get_inner_const(&row), get_inner_const(&col)) {
+                            (Some(row), Some(col)) => (row as usize, col as usize),
+                            _ => {
+                                return Ok(None);
+                            },
+                        };
                         // Check that the child node is a matrix, raise diag otherwise
                         // Replace the current node by the index-th element of the vector
                         // Raise diag if index is out of bounds
@@ -771,7 +826,7 @@ impl UnrollingFirstPass<'_> {
                         };
                     },
 
-                    AccessType::Slice(_range_expr) => {
+                    MirAccessType::Slice(_start, _end) => {
                         unreachable!(); // Slices are not scalar, raise diag
                     },
                 }
@@ -786,9 +841,17 @@ impl UnrollingFirstPass<'_> {
             Op::Vector(vector) => vector.size,
             Op::Matrix(matrix) => matrix.size,
             Op::Accessor(accessor) => match &accessor.access_type {
-                AccessType::Default => Self::compute_iterator_len(accessor.indexable.clone()),
-                AccessType::Slice(range_expr) => range_expr.to_slice_range().count(),
-                AccessType::Index(_) => match accessor.indexable.borrow().deref() {
+                MirAccessType::Default => Self::compute_iterator_len(accessor.indexable.clone()),
+                MirAccessType::Slice(start, end) => {
+                    let (start, end) = match (get_inner_const(start), get_inner_const(end)) {
+                        (Some(start), Some(end)) => (start as usize, end as usize),
+                        _ => {
+                            unreachable!("Slice indices should be constant values during unrolling")
+                        },
+                    };
+                    end - start
+                },
+                MirAccessType::Index(_) => match accessor.indexable.borrow().deref() {
                     Op::Vector(_) => 1,
                     Op::Matrix(matrix) => {
                         let children = matrix.children().borrow().deref().clone();
@@ -804,7 +867,7 @@ impl UnrollingFirstPass<'_> {
                     },
                     _ => unreachable!(), // Raise diag
                 },
-                AccessType::Matrix(..) => 1,
+                MirAccessType::Matrix(..) => 1,
             },
             Op::Parameter(parameter) => match parameter.ty {
                 MirType::Felt => 1,
@@ -875,12 +938,21 @@ impl UnrollingFirstPass<'_> {
                                     // If we access an outer loop parameter in the body of an inner
                                     // loop, we need to create
                                     // an Accessor for the correct index in this parameter
-                                    Op::Parameter(_parameter) => Accessor::create(
-                                        accessor.indexable.clone(),
-                                        AccessType::Index(i),
-                                        0,
-                                        accessor.span(),
-                                    ),
+                                    Op::Parameter(_parameter) => {
+                                        let mir_access_type =
+                                            MirAccessType::Index(Value::create(SpannedMirValue {
+                                                span: accessor.span(),
+                                                value: MirValue::Constant(ConstantValue::Felt(
+                                                    i as u64,
+                                                )),
+                                            }));
+                                        Accessor::create(
+                                            accessor.indexable.clone(),
+                                            mir_access_type,
+                                            0,
+                                            accessor.span(),
+                                        )
+                                    },
                                     _ => op.clone(),
                                 }
                             },

@@ -6,9 +6,12 @@ use air_parser::{
 };
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
-use mir::ir::{
-    Boundary as MirBoundary, ConstantValue, Link, Mir, MirValue, Op, Parent, SpannedMirValue,
-    TraceAccess as MirTraceAccess,
+use mir::{
+    ir::{
+        Boundary as MirBoundary, ConstantValue, Link, Mir, MirAccessType, MirValue, Op, Parent,
+        SpannedMirValue, TraceAccess as MirTraceAccess,
+    },
+    passes::get_inner_const,
 };
 
 use crate::{CompileError, graph::NodeIndex, ir::*};
@@ -123,7 +126,11 @@ struct AirBuilder<'a> {
 /// so we need to ensure these cases are properly indexed.
 fn indexed_accessor(mir_node: &Link<Op>) -> Link<Op> {
     if let Some(accessor) = mir_node.as_accessor() {
-        if let AccessType::Index(index) = accessor.access_type {
+        if let MirAccessType::Index(index) = accessor.access_type.clone() {
+            let index = match get_inner_const(&index) {
+                Some(value) => value as usize,
+                None => unreachable!("Index should be a constant value after constant propagation"),
+            };
             if let Some(vec) = accessor.indexable.as_vector() {
                 let children = vec.elements.borrow().deref().clone();
                 if index >= children.len() {

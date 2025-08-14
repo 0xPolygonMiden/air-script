@@ -633,7 +633,7 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                         _ => unreachable!("expected trace access binding, got {:?}", value),
                     };
 
-                    args_unpacked.push(indexable.clone());
+                    args_unpacked.push(arg.clone());
                 } else if let Some(parameter) = indexable.as_parameter() {
                     let Parameter { ty, .. } = parameter.deref();
                     let _size = match ty {
@@ -642,7 +642,7 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                         _ => unreachable!("expected felt or vector, got {:?}", ty),
                     };
 
-                    args_unpacked.push(indexable.clone());
+                    args_unpacked.push(arg.clone());
                 } else {
                     unreachable!("expected value or parameter (or accessor on one), got {:?}", arg);
                 }

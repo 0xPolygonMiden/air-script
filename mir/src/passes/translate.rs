@@ -14,8 +14,9 @@ use crate::{
     ir::{
         Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue,
         Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir,
-        MirType, MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess,
-        Root, SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value, Vector,
+        MirAccessType, MirType, MirValue, Mul, Op, Owner, Parameter, PublicInputAccess,
+        PublicInputTableAccess, Root, SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value,
+        Vector,
     },
     passes::duplicate_node,
 };
@@ -662,7 +663,7 @@ impl<'a> MirBuilder<'a> {
 
     fn translate_symbol_access(
         &mut self,
-        access: &ast::SymbolAccess,
+        access: &'a ast::SymbolAccess,
     ) -> Result<Link<Op>, CompileError> {
         match access.name {
             // At this point during compilation, fully-qualified identifiers can only possibly refer
@@ -974,6 +975,7 @@ impl<'a> MirBuilder<'a> {
             .clone_from(&selector_node.borrow());
 
         self.bindings.exit();
+
         Ok(for_node)
     }
 
@@ -1015,7 +1017,7 @@ impl<'a> MirBuilder<'a> {
 
     fn translate_bounded_symbol_access(
         &mut self,
-        access: &ast::BoundedSymbolAccess,
+        access: &'a ast::BoundedSymbolAccess,
     ) -> Result<Link<Op>, CompileError> {
         let access_node = self.translate_symbol_access(&access.column)?;
         let node = Boundary::builder()
@@ -1024,6 +1026,33 @@ impl<'a> MirBuilder<'a> {
             .expr(access_node)
             .build();
         Ok(node)
+    }
+
+    fn translate_access_type(
+        &mut self,
+        access_type: &'a ast::AccessType,
+    ) -> Result<MirAccessType, CompileError> {
+        let mir_access_type = match access_type {
+            AccessType::Default => MirAccessType::Default,
+            AccessType::Index(index) => {
+                let index_node = self.translate_scalar_expr(index)?;
+                MirAccessType::Index(index_node)
+            },
+            AccessType::Slice(range_expr) => {
+                let slice_range = range_expr.to_slice_range();
+                let start_node =
+                    self.translate_scalar_const(slice_range.start as u64, range_expr.span())?;
+                let end_node =
+                    self.translate_scalar_const(slice_range.end as u64, range_expr.span())?;
+                MirAccessType::Slice(start_node, end_node)
+            },
+            AccessType::Matrix(row, col) => {
+                let row_node = self.translate_scalar_expr(row)?;
+                let col_node = self.translate_scalar_expr(col)?;
+                MirAccessType::Matrix(row_node, col_node)
+            },
+        };
+        Ok(mir_access_type)
     }
 
     fn translate_bus_operation(
@@ -1066,7 +1095,7 @@ impl<'a> MirBuilder<'a> {
             let accessor_mut = arg_node.clone();
             if let Some(accessor) = accessor_mut.as_accessor_mut() {
                 match accessor.access_type {
-                    AccessType::Default => {
+                    MirAccessType::Default => {
                         arg_node = accessor.indexable.clone();
                     },
                     _ => {
@@ -1131,28 +1160,18 @@ impl<'a> MirBuilder<'a> {
     fn translate_symbol_access_global_or_local(
         &mut self,
         ident: &ast::Identifier,
-        access: &ast::SymbolAccess,
+        access: &'a ast::SymbolAccess,
     ) -> Result<Link<Op>, CompileError> {
         // Special identifiers are those which are `$`-prefixed, and must refer to the names of
         // trace segments (e.g. `$main`)
         if ident.is_special() {
             // Must be a trace segment name
-            if let Some(trace_access) = self.trace_access(access) {
-                return Ok(Value::builder()
-                    .value(SpannedMirValue {
-                        span: access.span(),
-                        value: MirValue::TraceAccess(trace_access),
-                    })
-                    .build());
+            if let Some(trace_access) = self.trace_access(access)? {
+                return Ok(trace_access);
             }
 
             if let Some(tab) = self.trace_access_binding(access) {
-                return Ok(Value::builder()
-                    .value(SpannedMirValue {
-                        span: access.span(),
-                        value: MirValue::TraceAccessBinding(tab),
-                    })
-                    .build());
+                return Ok(tab);
             }
 
             // It should never be possible to reach this point - semantic analysis
@@ -1163,7 +1182,7 @@ impl<'a> MirBuilder<'a> {
             );
         }
 
-        //    // If we reach here, this must be a let-bound variable
+        // If we reach here, this must be a let-bound variable
         if let Some(let_bound_access_expr) = self.bindings.get(access.name.as_ref()).cloned() {
             // If the let-bound variable is a parameter, we probably already have the type
             //
@@ -1173,53 +1192,27 @@ impl<'a> MirBuilder<'a> {
             {
                 param.ty = self.translate_type(access_ty);
             }
+            let mir_access_type = self.translate_access_type(&access.access_type)?;
             let accessor: Link<Op> = Accessor::create(
                 duplicate_node(let_bound_access_expr, &mut Default::default()),
-                access.access_type.clone(),
+                mir_access_type,
                 access.offset,
                 access.span(),
             );
-
             return Ok(accessor);
         }
 
-        if let Some(trace_access) = self.trace_access(access) {
-            return Ok(Value::builder()
-                .value(SpannedMirValue {
-                    span: access.span(),
-                    value: MirValue::TraceAccess(trace_access),
-                })
-                .build());
+        if let Some(trace_access) = self.trace_access(access)? {
+            return Ok(trace_access);
         }
 
         // Otherwise, we check bindings, trace bindings, and public inputs, in that order
         if let Some(tab) = self.trace_access_binding(access) {
-            return Ok(Value::builder()
-                .value(SpannedMirValue {
-                    span: access.span(),
-                    value: MirValue::TraceAccessBinding(tab),
-                })
-                .build());
+            return Ok(tab);
         }
 
-        match self.public_input_access(access) {
-            (Some(public_input_access), None) => {
-                return Ok(Value::builder()
-                    .value(SpannedMirValue {
-                        span: access.span(),
-                        value: MirValue::PublicInput(public_input_access),
-                    })
-                    .build());
-            },
-            (None, Some(public_input_table_access)) => {
-                return Ok(Value::builder()
-                    .value(SpannedMirValue {
-                        span: access.span(),
-                        value: MirValue::PublicInputTable(public_input_table_access),
-                    })
-                    .build());
-            },
-            _ => {},
+        if let Some(public_input_access) = self.public_input_access(access)? {
+            return Ok(public_input_access);
         }
 
         self.diagnostics
@@ -1233,21 +1226,41 @@ impl<'a> MirBuilder<'a> {
         Err(CompileError::Failed)
     }
 
-    // Check assumptions, probably this assumed that the inlining pass did some work
     fn public_input_access(
-        &self,
-        access: &ast::SymbolAccess,
-    ) -> (Option<PublicInputAccess>, Option<PublicInputTableAccess>) {
+        &mut self,
+        access: &'a ast::SymbolAccess,
+    ) -> Result<Option<Link<Op>>, CompileError> {
         let Some(public_input) = self.mir.public_inputs.get(access.name.as_ref()) else {
-            return (None, None);
+            return Ok(None);
         };
-        match access.access_type {
-            AccessType::Default => (
-                None,
-                Some(PublicInputTableAccess::new(public_input.name(), public_input.size())),
-            ),
-            AccessType::Index(index) => {
-                (Some(PublicInputAccess::new(public_input.name(), index)), None)
+        match access.access_type.clone() {
+            AccessType::Default => {
+                let public_input_table =
+                    PublicInputTableAccess::new(public_input.name(), public_input.size());
+                Ok(Some(
+                    Value::builder()
+                        .value(SpannedMirValue {
+                            span: access.span(),
+                            value: MirValue::PublicInputTable(public_input_table),
+                        })
+                        .build(),
+                ))
+            },
+            AccessType::Index(_index) => {
+                // FIXME: PublicInputAccess probably needs to have a Link<Op> as index. For now we
+                // consider that an Accessor { public_input { index }, Index(index2)) } targets
+                // public input index + index2 (as an offset)
+                let public_input_access = PublicInputAccess::new(public_input.name(), 0);
+                let value = Value::builder()
+                    .value(SpannedMirValue {
+                        span: access.span(),
+                        value: MirValue::PublicInput(public_input_access),
+                    })
+                    .build();
+                let mir_access_type = self.translate_access_type(&access.access_type)?;
+                let accessor =
+                    Accessor::create(value, mir_access_type, access.offset, access.span());
+                Ok(Some(accessor))
             },
             _ => {
                 // This should have been caught earlier during compilation
@@ -1259,22 +1272,42 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
-    // Check assumptions, probably this assumed that the inlining pass did some work
-    fn trace_access_binding(&self, access: &ast::SymbolAccess) -> Option<TraceAccessBinding> {
+    fn trace_access_binding(&self, access: &ast::SymbolAccess) -> Option<Link<Op>> {
         let id = access.name.as_ref();
         for segment in self.trace_columns.iter() {
             if let Some(binding) = segment.bindings.iter().find(|tb| tb.name.as_ref() == Some(id)) {
                 return match &access.access_type {
-                    AccessType::Default => Some(TraceAccessBinding {
-                        segment: binding.segment,
-                        offset: binding.offset,
-                        size: binding.size,
-                    }),
-                    AccessType::Slice(range_expr) => Some(TraceAccessBinding {
-                        segment: binding.segment,
-                        offset: binding.offset + range_expr.to_slice_range().start,
-                        size: range_expr.to_slice_range().count(),
-                    }),
+                    AccessType::Default => {
+                        let tab = TraceAccessBinding {
+                            segment: binding.segment,
+                            offset: binding.offset,
+                            size: binding.size,
+                        };
+                        Some(
+                            Value::builder()
+                                .value(SpannedMirValue {
+                                    span: access.span(),
+                                    value: MirValue::TraceAccessBinding(tab),
+                                })
+                                .build(),
+                        )
+                    },
+                    //FIXME? Convert to MirAccessType and add Accessor wrapper?
+                    AccessType::Slice(range_expr) => {
+                        let tab = TraceAccessBinding {
+                            segment: binding.segment,
+                            offset: binding.offset + range_expr.to_slice_range().start,
+                            size: range_expr.to_slice_range().count(),
+                        };
+                        Some(
+                            Value::builder()
+                                .value(SpannedMirValue {
+                                    span: access.span(),
+                                    value: MirValue::TraceAccessBinding(tab),
+                                })
+                                .build(),
+                        )
+                    },
                     _ => None,
                 };
             }
@@ -1282,8 +1315,10 @@ impl<'a> MirBuilder<'a> {
         None
     }
 
-    // Check assumptions, probably this assumed that the inlining pass did some work
-    fn trace_access(&self, access: &ast::SymbolAccess) -> Option<TraceAccess> {
+    fn trace_access(
+        &mut self,
+        access: &'a ast::SymbolAccess,
+    ) -> Result<Option<Link<Op>>, CompileError> {
         assert_eq!(
             self.trace_columns.len(),
             1,
@@ -1294,8 +1329,18 @@ impl<'a> MirBuilder<'a> {
 
         if segment.name == id {
             // We access $main[i]
-            if let AccessType::Index(column) = access.access_type {
-                Some(TraceAccess::new(TraceSegmentId::Main, column, access.offset))
+            // FIXME: Check is_constant
+            if let AccessType::Index(_column) = access.access_type.clone() {
+                let ta = TraceAccess::new(TraceSegmentId::Main, 0, access.offset);
+                let value = Value::builder()
+                    .value(SpannedMirValue {
+                        span: access.span(),
+                        value: MirValue::TraceAccess(ta),
+                    })
+                    .build();
+                let mir_access_type = self.translate_access_type(&access.access_type)?;
+                let accessor = Accessor::create(value, mir_access_type, 0, access.span());
+                Ok(Some(accessor))
             } else {
                 // This should have been caught earlier during compilation
                 unreachable!(
@@ -1307,20 +1352,43 @@ impl<'a> MirBuilder<'a> {
             segment.bindings.iter().find(|tb| tb.name.as_ref() == Some(id))
         {
             // We access a trace binding defined in the main trace.
-            match access.access_type {
+            match access.access_type.clone() {
                 AccessType::Default if binding.size == 1 => {
-                    Some(TraceAccess::new(binding.segment, binding.offset, access.offset))
+                    let ta = TraceAccess::new(binding.segment, binding.offset, access.offset);
+                    let value = Value::builder()
+                        .value(SpannedMirValue {
+                            span: access.span(),
+                            value: MirValue::TraceAccess(ta),
+                        })
+                        .build();
+                    if let Some(binding_access) = &binding.access {
+                        let mir_binding_access = self.translate_access_type(binding_access)?;
+                        let accessor =
+                            Accessor::create(value, mir_binding_access, 0, access.span());
+                        Ok(Some(accessor))
+                    } else {
+                        Ok(Some(value))
+                    }
                 },
-                AccessType::Index(extra_offset) if binding.size > 1 => Some(TraceAccess::new(
-                    binding.segment,
-                    binding.offset + extra_offset,
-                    access.offset,
-                )),
-                _ => None,
+                AccessType::Index(_extra_offset) if binding.size > 1 => {
+                    // FIXME?
+                    let ta = TraceAccess::new(binding.segment, binding.offset, access.offset);
+                    let value = Value::builder()
+                        .value(SpannedMirValue {
+                            span: access.span(),
+                            value: MirValue::TraceAccess(ta),
+                        })
+                        .build();
+                    let mir_access_type = self.translate_access_type(&access.access_type)?;
+                    let accessor = Accessor::create(value, mir_access_type, 0, access.span());
+
+                    Ok(Some(accessor))
+                },
+                _ => Ok(None),
             }
         } else {
             // We do not access a trace
-            None
+            Ok(None)
         }
     }
 }

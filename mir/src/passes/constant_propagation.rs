@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-use air_parser::ast::AccessType;
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
 
@@ -8,8 +7,8 @@ use super::visitor::Visitor;
 use crate::{
     CompileError,
     ir::{
-        BackLink, ConstantValue, Graph, Link, Mir, MirValue, Node, Op, Parent, SpannedMirValue,
-        Value,
+        BackLink, ConstantValue, Graph, Link, Mir, MirAccessType, MirValue, Node, Op, Parent,
+        PublicInputAccess, SpannedMirValue, TraceAccess, Value,
     },
 };
 
@@ -121,6 +120,189 @@ impl ConstantPropagation<'_> {
             try_fold_const_binary_op(lhs, rhs, exp.clone(), exp_ref.span())
         }
     }
+
+    fn visit_accessor_bis(
+        &mut self,
+        _graph: &mut Graph,
+        accessor: Link<Op>,
+    ) -> Result<Option<Link<Op>>, CompileError> {
+        let mut updated_accessor = None;
+
+        {
+            let accessor_ref = accessor.as_accessor().unwrap();
+            let indexable = accessor_ref.indexable.clone();
+            let mir_access_type = accessor_ref.access_type.clone();
+            let offset = accessor_ref.offset;
+
+            match mir_access_type {
+                MirAccessType::Default => {
+                    updated_accessor = Some(indexable.clone());
+
+                    if let Some(value) = indexable.clone().as_value() {
+                        let mir_value = value.value.value.clone();
+
+                        if let MirValue::TraceAccess(trace_access) = mir_value {
+                            let new_node = Value::create(SpannedMirValue {
+                                span: value.value.span(),
+                                value: MirValue::TraceAccess(TraceAccess {
+                                    segment: trace_access.segment,
+                                    column: trace_access.column,
+                                    row_offset: trace_access.row_offset + offset,
+                                }),
+                            });
+                            updated_accessor = Some(new_node);
+                        }
+                    }
+                },
+                MirAccessType::Index(index) => {
+                    let index_usize = match get_inner_const(&index) {
+                        Some(value) => value as usize,
+                        None => {
+                            self.diagnostics
+                                .diagnostic(miden_diagnostics::Severity::Error)
+                                .with_message(
+                                    "the index is not constant during constant propagation",
+                                )
+                                .with_primary_label(index.span(), "index is not constant")
+                                .emit();
+                            return Err(CompileError::Failed);
+                        },
+                    };
+                    // Check that the child node is a vector, raise diag otherwise
+                    // Replace the current node by the index-th element of the vector
+                    // Raise diag if index is out of bounds
+                    if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
+                        let indexable_vec = indexable_vector.children().borrow().deref().clone();
+                        let child_accessed = match indexable_vec.get(index_usize) {
+                            Some(child_accessed) => child_accessed,
+                            None => {
+                                self.diagnostics
+                                    .diagnostic(miden_diagnostics::Severity::Error)
+                                    .with_message(
+                                        "attempted to access an index which is out of bounds",
+                                    )
+                                    .with_primary_label(index.span(), "index out of bounds")
+                                    .emit();
+                                return Err(CompileError::Failed);
+                            },
+                        };
+                        if let Some(value) = child_accessed.clone().as_value() {
+                            let mir_value = value.value.value.clone();
+                            match mir_value {
+                                MirValue::TraceAccess(trace_access) => {
+                                    let new_node = Value::create(SpannedMirValue {
+                                        span: value.value.span(),
+                                        value: MirValue::TraceAccess(TraceAccess {
+                                            segment: trace_access.segment,
+                                            column: trace_access.column,
+                                            row_offset: trace_access.row_offset + offset,
+                                        }),
+                                    });
+                                    updated_accessor = Some(new_node);
+                                },
+                                _ => {
+                                    updated_accessor = Some(child_accessed.clone());
+                                },
+                            }
+                        } else {
+                            updated_accessor = Some(child_accessed.clone());
+                        }
+                    } else if let Some(value) = indexable.clone().as_value() {
+                        let mir_value = value.value.value.clone();
+                        match mir_value {
+                            MirValue::PublicInput(public_input_access) => {
+                                let new_node = Value::create(SpannedMirValue {
+                                    span: value.value.span(),
+                                    value: MirValue::PublicInput(PublicInputAccess {
+                                        name: public_input_access.name,
+                                        index: public_input_access.index + index_usize,
+                                    }),
+                                });
+                                updated_accessor = Some(new_node);
+                            },
+                            MirValue::TraceAccess(trace_access) => {
+                                let new_node = Value::create(SpannedMirValue {
+                                    span: value.value.span(),
+                                    value: MirValue::TraceAccess(TraceAccess {
+                                        segment: trace_access.segment,
+                                        column: trace_access.column + index_usize,
+                                        row_offset: trace_access.row_offset,
+                                    }),
+                                });
+                                updated_accessor = Some(new_node);
+                            },
+                            _ => {
+                                unreachable!("indexable is {:?}", indexable); // raise diag
+                            },
+                        }
+                    } else {
+                        unreachable!("indexable is {:?}", indexable); // raise diag
+                    }
+                },
+                MirAccessType::Matrix(row, col) => {
+                    let (row, col) = match (get_inner_const(&row), get_inner_const(&col)) {
+                        (Some(row), Some(col)) => (row as usize, col as usize),
+                        _ => {
+                            self.diagnostics
+                                .diagnostic(miden_diagnostics::Severity::Error)
+                                .with_message(
+                                    "matrix indices are not constant during mir's constant propagation",
+                                )
+                                .emit();
+                            return Err(CompileError::Failed);
+                        },
+                    };
+                    // Check that the child node is a matrix, raise diag otherwise
+                    // Replace the current node by the index-th element of the vector
+                    // Raise diag if index is out of bounds
+
+                    if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
+                        let indexable_vec = indexable_vector.children().borrow().deref().clone();
+                        let row_accessed = match indexable_vec.get(row) {
+                            Some(row_accessed) => row_accessed,
+                            None => unreachable!(), // raise diag
+                        };
+
+                        if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
+                            let row_accessed_vec =
+                                row_accessed_vector.children().borrow().deref().clone();
+                            let child_accessed = match row_accessed_vec.get(col) {
+                                Some(child_accessed) => child_accessed,
+                                None => unreachable!(), // raise diag
+                            };
+                            updated_accessor = Some(child_accessed.clone());
+                        } else {
+                            unreachable!(); // raise diag
+                        };
+                    } else if let Op::Matrix(indexable_matrix) = indexable.borrow().deref() {
+                        let indexable_vec = indexable_matrix.children().borrow().deref().clone();
+                        let row_accessed = match indexable_vec.get(row) {
+                            Some(row_accessed) => row_accessed,
+                            None => unreachable!(), // raise diag
+                        };
+
+                        if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
+                            let row_accessed_vec =
+                                row_accessed_vector.children().borrow().deref().clone();
+                            let child_accessed = match row_accessed_vec.get(col) {
+                                Some(child_accessed) => child_accessed,
+                                None => unreachable!(), // raise diag
+                            };
+                            updated_accessor = Some(child_accessed.clone());
+                        } else {
+                            unreachable!(); // raise diag
+                        };
+                    };
+                },
+
+                MirAccessType::Slice(_start, _end) => {
+                    unreachable!(); // Slices are not scalar, raise diag
+                },
+            }
+        }
+
+        Ok(updated_accessor)
+    }
 }
 
 impl Visitor for ConstantPropagation<'_> {
@@ -161,6 +343,9 @@ impl Visitor for ConstantPropagation<'_> {
             Node::Sub(s) => to_link_and(s.clone(), graph, |g, el| self.visit_sub_bis(g, el)),
             Node::Mul(m) => to_link_and(m.clone(), graph, |g, el| self.visit_mul_bis(g, el)),
             Node::Exp(e) => to_link_and(e.clone(), graph, |g, el| self.visit_exp_bis(g, el)),
+            Node::Accessor(a) => {
+                to_link_and(a.clone(), graph, |g, el| self.visit_accessor_bis(g, el))
+            },
             // For all the following cases, there is nothing to fold
             Node::Vector(_)
             | Node::Matrix(_)
@@ -168,7 +353,6 @@ impl Visitor for ConstantPropagation<'_> {
             | Node::Boundary(_)
             | Node::BusOp(_)
             | Node::Value(_)
-            | Node::Accessor(_)
             | Node::None(_) => Ok(None),
             Node::Function(_) | Node::Evaluator(_) | Node::Call(_) => {
                 unreachable!(
@@ -226,13 +410,18 @@ fn get_inner_const(value: &Link<Op>) -> Option<u64> {
         }) => Some(*c),
         Op::Accessor(accessor) => {
             match (accessor.access_type.clone(), accessor.indexable.borrow().deref()) {
-                (AccessType::Default, _) => get_inner_const(&accessor.indexable),
-                (AccessType::Index(index), Op::Vector(vector)) => {
+                (MirAccessType::Default, _) => get_inner_const(&accessor.indexable),
+                (MirAccessType::Index(index), Op::Vector(vector)) => {
+                    let index = get_inner_const(&index).expect("Expected constant index") as usize;
+
                     let vec_children = vector.children();
                     let vec_ref = vec_children.borrow();
                     vec_ref.get(index).and_then(get_inner_const)
                 },
-                (AccessType::Matrix(row, col), Op::Matrix(matrix)) => {
+                (MirAccessType::Matrix(row, col), Op::Matrix(matrix)) => {
+                    let row = get_inner_const(&row).expect("Expected constant row") as usize;
+                    let col = get_inner_const(&col).expect("Expected constant column") as usize;
+
                     let mat_children = matrix.children();
                     let mat_ref = mat_children.borrow();
                     mat_ref.get(row).and_then(|row| {

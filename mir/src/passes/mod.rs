@@ -13,8 +13,9 @@ pub use unrolling::Unrolling;
 pub use visitor::Visitor;
 
 use crate::ir::{
-    Accessor, Add, Boundary, BusOp, Call, Enf, Exp, Fold, For, If, Link, MatchArm, Matrix, Mul,
-    Node, Op, Owner, Parameter, Parent, Sub, Value, Vector,
+    Accessor, Add, Boundary, BusOp, Call, ConstantValue, Enf, Exp, Fold, For, If, Link, MatchArm,
+    Matrix, MirAccessType, MirValue, Mul, Node, Op, Owner, Parameter, Parent, SpannedMirValue, Sub,
+    Value, Vector,
 };
 
 /// Helper to duplicate a MIR node and its children recursively
@@ -162,10 +163,23 @@ pub fn duplicate_node(
         },
         Op::Accessor(accessor) => {
             let indexable = accessor.indexable.clone();
-            let access_type = accessor.access_type.clone();
+            let new_access_type = match accessor.access_type.clone() {
+                MirAccessType::Default => MirAccessType::Default,
+                MirAccessType::Index(index) => {
+                    MirAccessType::Index(duplicate_node(index, current_replace_map))
+                },
+                MirAccessType::Matrix(row, col) => MirAccessType::Matrix(
+                    duplicate_node(row, current_replace_map),
+                    duplicate_node(col, current_replace_map),
+                ),
+                MirAccessType::Slice(start, end) => MirAccessType::Slice(
+                    duplicate_node(start, current_replace_map),
+                    duplicate_node(end, current_replace_map),
+                ),
+            };
             let offset = accessor.offset;
             let new_indexable = duplicate_node(indexable, current_replace_map);
-            Accessor::create(new_indexable, access_type, offset, accessor.span())
+            Accessor::create(new_indexable, new_access_type, offset, accessor.span())
         },
         Op::BusOp(bus_op) => {
             let bus = bus_op.bus.clone();
@@ -382,10 +396,24 @@ pub fn duplicate_node_or_replace(
         },
         Op::Accessor(accessor) => {
             let indexable = accessor.indexable.clone();
-            let access_type = accessor.access_type.clone();
+            let new_access_type = match accessor.access_type.clone() {
+                MirAccessType::Default => MirAccessType::Default,
+                MirAccessType::Index(index) => MirAccessType::Index(
+                    current_replace_map.get(&index.get_ptr()).unwrap().1.clone(),
+                ),
+                MirAccessType::Matrix(row, col) => MirAccessType::Matrix(
+                    current_replace_map.get(&row.get_ptr()).unwrap().1.clone(),
+                    current_replace_map.get(&col.get_ptr()).unwrap().1.clone(),
+                ),
+                MirAccessType::Slice(start, end) => MirAccessType::Slice(
+                    current_replace_map.get(&start.get_ptr()).unwrap().1.clone(),
+                    current_replace_map.get(&end.get_ptr()).unwrap().1.clone(),
+                ),
+            };
             let offset = accessor.offset;
             let new_indexable = current_replace_map.get(&indexable.get_ptr()).unwrap().1.clone();
-            let new_node = Accessor::create(new_indexable, access_type, offset, accessor.span());
+            let new_node =
+                Accessor::create(new_indexable, new_access_type, offset, accessor.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::BusOp(bus_op) => {
@@ -448,5 +476,20 @@ pub fn duplicate_node_or_replace(
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::None(_) => {},
+    }
+}
+
+/// Helper function to extract the constant felt value from a Link<Op> if it is one.
+pub fn get_inner_const(value: &Link<Op>) -> Option<u64> {
+    match value.borrow().deref() {
+        Op::Value(Value {
+            value:
+                SpannedMirValue {
+                    value: MirValue::Constant(ConstantValue::Felt(c)),
+                    ..
+                },
+            ..
+        }) => Some(*c),
+        _ => None,
     }
 }
