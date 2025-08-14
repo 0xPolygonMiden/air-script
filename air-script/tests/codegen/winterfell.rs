@@ -115,6 +115,16 @@ fn bitwise() {
 }
 
 #[test]
+fn computed_indices() {
+    let generated_air = Test::new("tests/computed_indices/computed_indices.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../computed_indices/computed_indices.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
 fn constants() {
     let generated_air = Test::new("tests/constants/constants.air".to_string())
         .transpile(Target::Winterfell)
