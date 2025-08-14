@@ -69,7 +69,9 @@ impl BindingType {
                             Ok(elems[idx.item as usize].clone())
                         }
                     } else {
-                        todo!()
+                        // Items are all of the same type, we can just return the first one for now,
+                        // as we cannot determine its value for now.
+                        Ok(elems[0].clone())
                     }
                 },
                 AccessType::Slice(range) => {
@@ -88,7 +90,9 @@ impl BindingType {
                             elems[row.item as usize].access(AccessType::Index(col))
                         }
                     } else {
-                        todo!()
+                        // Items are all of the same type, we can just return the first one for now,
+                        // as we cannot determine its value for now.
+                        elems[0].access(AccessType::Index(col))
                     }
                 },
             },
