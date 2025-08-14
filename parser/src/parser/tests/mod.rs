@@ -752,6 +752,7 @@ mod arithmetic_ops;
 mod boundary_constraints;
 mod buses;
 mod calls;
+mod computed_indices;
 mod constant_propagation;
 mod constants;
 mod evaluators;
