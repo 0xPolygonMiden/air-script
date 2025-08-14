@@ -1,6 +1,8 @@
 use std::fmt;
 
-use crate::ast::{AccessType, BusType, FunctionType, InvalidAccessError, TraceBinding, Type};
+use crate::ast::{
+    AccessType, BusType, FunctionType, InvalidAccessError, ScalarExpr, TraceBinding, Type,
+};
 
 /// This type provides type and contextual information about a binding,
 /// i.e. not only does it tell us the type of a binding, but what type
@@ -59,10 +61,17 @@ impl BindingType {
             Self::TraceParam(tb) => tb.access(access_type).map(Self::TraceParam),
             Self::Vector(elems) => match access_type {
                 AccessType::Default => Ok(Self::Vector(elems.clone())),
-                AccessType::Index(idx) if idx >= elems.len() => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
+                AccessType::Index(idx) => {
+                    if let ScalarExpr::Const(idx) = *idx {
+                        if idx.item as usize >= elems.len() {
+                            Err(InvalidAccessError::IndexOutOfBounds)
+                        } else {
+                            Ok(elems[idx.item as usize].clone())
+                        }
+                    } else {
+                        todo!()
+                    }
                 },
-                AccessType::Index(idx) => Ok(elems[idx].clone()),
                 AccessType::Slice(range) => {
                     let slice_range = range.to_slice_range();
                     if slice_range.end > elems.len() {
@@ -71,10 +80,17 @@ impl BindingType {
                         Ok(Self::Vector(elems[slice_range].to_vec()))
                     }
                 },
-                AccessType::Matrix(row, _) if row >= elems.len() => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
+                AccessType::Matrix(row, col) => {
+                    if let ScalarExpr::Const(row) = *row {
+                        if row.item as usize >= elems.len() {
+                            Err(InvalidAccessError::IndexOutOfBounds)
+                        } else {
+                            elems[row.item as usize].access(AccessType::Index(col))
+                        }
+                    } else {
+                        todo!()
+                    }
                 },
-                AccessType::Matrix(row, col) => elems[row].access(AccessType::Index(col)),
             },
             Self::PublicInput(ty) => ty.access(access_type).map(Self::PublicInput),
             Self::PeriodicColumn(period) => match access_type {

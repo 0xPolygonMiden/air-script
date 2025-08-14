@@ -216,7 +216,7 @@ impl fmt::Debug for FormatConstrainedFlags<'_> {
 /// [TraceBinding] is used to represent one or more columns in the execution trace that are bound to
 /// a name. For single columns, the size is 1. For groups, the size is the number of columns in the
 /// group. The offset is the column index in the trace where the first column of the binding starts.
-#[derive(Copy, Clone, Spanned)]
+#[derive(Clone, Spanned)]
 pub struct TraceBinding {
     #[span]
     pub span: SourceSpan,
@@ -230,6 +230,8 @@ pub struct TraceBinding {
     pub size: usize,
     /// The effective type of this binding
     pub ty: Type,
+    /// The access type associated to this TraceBinding
+    pub access: Option<AccessType>,
 }
 impl TraceBinding {
     /// Creates a new trace binding.
@@ -248,48 +250,73 @@ impl TraceBinding {
             offset,
             size,
             ty,
+            access: None,
         }
     }
 
     /// Returns a [Type] that describes what type of value this binding represents
     #[inline]
     pub fn ty(&self) -> Type {
-        self.ty
+        match self.access.clone() {
+            Some(AccessType::Default) => self.ty,
+            Some(AccessType::Slice(range_expr)) => Type::Vector(range_expr.to_slice_range().len()),
+            Some(AccessType::Index(_)) => Type::Felt,
+            Some(AccessType::Matrix(..)) => Type::Felt,
+            None => self.ty,
+        }
     }
 
     #[inline]
     pub fn is_scalar(&self) -> bool {
-        self.ty.is_scalar()
+        self.ty().is_scalar()
     }
 
     /// Derive a new [TraceBinding] derived from the current one given an [AccessType]
     pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
-        match access_type {
-            AccessType::Default => Ok(*self),
-            AccessType::Slice(_) if self.is_scalar() => Err(InvalidAccessError::SliceOfScalar),
-            AccessType::Slice(range) => {
-                let slice_range = range.to_slice_range();
-                if slice_range.end > self.size {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                } else {
-                    let offset = self.offset + slice_range.start;
-                    let size = slice_range.len();
-                    Ok(Self {
-                        offset,
-                        size,
-                        ty: Type::Vector(size),
-                        ..*self
-                    })
+        let combined_access = match (self.access.clone(), access_type.clone()) {
+            (None, _) => access_type,
+            (Some(AccessType::Default), _) => access_type,
+            (Some(_), AccessType::Default) => self.access.clone().unwrap(),
+            (Some(AccessType::Slice(range_expr)), AccessType::Slice(range_expr1)) => {
+                let range_expr = range_expr.to_slice_range();
+                let range_expr1 = range_expr1.to_slice_range();
+                let combined_range =
+                    (range_expr.start + range_expr1.start)..(range_expr.end + range_expr1.end);
+                AccessType::Slice(combined_range.into())
+            },
+            (Some(AccessType::Slice(range_expr)), AccessType::Index(index_expr)) => {
+                let range_expr_usize = range_expr.to_slice_range();
+                let new_expr = ScalarExpr::Binary(BinaryExpr::new(
+                    self.span(),
+                    BinaryOp::Add,
+                    ScalarExpr::Const(Span::new(range_expr.span(), range_expr_usize.start as u64)),
+                    *index_expr,
+                ));
+                AccessType::Index(Box::new(new_expr))
+            },
+            (Some(AccessType::Slice(_)), AccessType::Matrix(..)) => {
+                return Err(InvalidAccessError::SliceOfMatrix);
+            },
+            (Some(AccessType::Index(_)), AccessType::Index(_)) => {
+                return Err(InvalidAccessError::IndexIntoScalar);
+            },
+            (Some(AccessType::Matrix(..)), AccessType::Matrix(..)) => {
+                return Err(InvalidAccessError::SliceOfMatrix);
+            },
+            (Some(AccessType::Matrix(..)), AccessType::Slice(..)) => {
+                return Err(InvalidAccessError::SliceOfMatrix);
+            },
+            _ => todo!(),
+        };
+
+        if let AccessType::Index(idx) = combined_access.clone() {
+            if let ScalarExpr::Const(value) = *idx {
+                if value.item as usize >= self.size {
+                    return Err(InvalidAccessError::IndexOutOfBounds);
                 }
-            },
-            AccessType::Index(_) if self.is_scalar() => Err(InvalidAccessError::IndexIntoScalar),
-            AccessType::Index(idx) if idx >= self.size => Err(InvalidAccessError::IndexOutOfBounds),
-            AccessType::Index(idx) => {
-                let offset = self.offset + idx;
-                Ok(Self { offset, size: 1, ty: Type::Felt, ..*self })
-            },
-            AccessType::Matrix(..) => Err(InvalidAccessError::IndexIntoScalar),
+            }
         }
+        Ok(Self { access: Some(combined_access), ..*self })
     }
 }
 impl Eq for TraceBinding {}
