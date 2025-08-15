@@ -1,15 +1,14 @@
 use std::{collections::BTreeMap, ops::Deref};
 
 use air_parser::{
-    ast::{self, TraceSegment},
     SemanticAnalysisError,
+    ast::{self, TraceSegment},
 };
 use air_pass::Pass;
-
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 use mir::ir::{ConstantValue, Link, Mir, MirValue, Op, Parent, SpannedMirValue};
 
-use crate::{graph::NodeIndex, ir::*, CompileError};
+use crate::{CompileError, graph::NodeIndex, ir::*};
 
 /// This pass creates the [Air] from the [Mir].
 ///  
@@ -57,10 +56,7 @@ impl Pass for MirToAir<'_> {
             if trace_columns.len() == 1 {
                 trace_columns.push(aux_trace_segment);
             } else {
-                panic!(
-                    "Expected only one trace segment, but found multiple: {:?}",
-                    trace_columns
-                );
+                panic!("Expected only one trace segment, but found multiple: {trace_columns:?}",);
             }
         }
 
@@ -78,10 +74,7 @@ impl Pass for MirToAir<'_> {
 
         let graph = mir.constraint_graph();
 
-        for bus in buses.values() {
-            builder.build_bus(bus)?;
-        }
-
+        // We insert all the constraints into the AIR graph.
         for bc in graph.boundary_constraints_roots.borrow().deref().iter() {
             builder.build_boundary_constraint(bc)?;
         }
@@ -89,6 +82,15 @@ impl Pass for MirToAir<'_> {
         for ic in graph.integrity_constraints_roots.borrow().deref().iter() {
             builder.build_integrity_constraint(ic)?;
         }
+
+        // Note: In the MIR, buses operations are kept in integrity constraints to
+        // allow them to be handled in the graph (e.g. inlined via evaluators). This is why
+        // we need to first visit the integrity constraints, update the corresponding bus
+        // when encountering a BusOp, and then visit the buses to build them.
+        for bus in buses.values() {
+            builder.build_bus(bus)?;
+        }
+
         Ok(air)
     }
 }
@@ -108,7 +110,9 @@ fn indexed_accessor(mir_node: &Link<Op>) -> Link<Op> {
             if let Some(vec) = accessor.indexable.as_vector() {
                 let children = vec.elements.borrow().deref().clone();
                 if index >= children.len() {
-                    panic!("Index out of bounds during indexed accessor translation from MIR to AIR: {}", index);
+                    panic!(
+                        "Index out of bounds during indexed accessor translation from MIR to AIR: {index}",
+                    );
                 }
                 children[index].clone()
             } else {
@@ -129,7 +133,7 @@ fn vec_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
         let size = vector.size;
         let children = vector.elements.borrow().deref().clone();
         if size != 1 {
-            panic!("Vector of len >1 after unrolling: {:?}", mir_node);
+            panic!("Vector of len >1 after unrolling: {mir_node:?}");
         }
         let child = children.first().unwrap();
         let child = indexed_accessor(child);
@@ -157,15 +161,15 @@ impl AirBuilder<'_> {
         match rhs {
             0 => self.insert_op(Operation::Value(Value::Constant(1))),
             1 => lhs,
-            n if n % 2 == 0 => {
+            n if n.is_multiple_of(2) => {
                 let square = self.insert_op(Operation::Mul(lhs, lhs));
                 self.expand_exp(square, n / 2)
-            }
+            },
             n => {
                 let square = self.insert_op(Operation::Mul(lhs, lhs));
                 let rec = self.expand_exp(square, (n - 1) / 2);
                 self.insert_op(Operation::Mul(lhs, rec))
-            }
+            },
         }
     }
 
@@ -183,21 +187,21 @@ impl AirBuilder<'_> {
                 let lhs_node_index = self.insert_mir_operation(&lhs)?;
                 let rhs_node_index = self.insert_mir_operation(&rhs)?;
                 Ok(self.insert_op(Operation::Add(lhs_node_index, rhs_node_index)))
-            }
+            },
             Op::Sub(sub) => {
                 let lhs = sub.lhs.clone();
                 let rhs = sub.rhs.clone();
                 let lhs_node_index = self.insert_mir_operation(&lhs)?;
                 let rhs_node_index = self.insert_mir_operation(&rhs)?;
                 Ok(self.insert_op(Operation::Sub(lhs_node_index, rhs_node_index)))
-            }
+            },
             Op::Mul(mul) => {
                 let lhs = mul.lhs.clone();
                 let rhs = mul.rhs.clone();
                 let lhs_node_index = self.insert_mir_operation(&lhs)?;
                 let rhs_node_index = self.insert_mir_operation(&rhs)?;
                 Ok(self.insert_op(Operation::Mul(lhs_node_index, rhs_node_index)))
-            }
+            },
             Op::Exp(exp) => {
                 let lhs = exp.lhs.clone();
                 let rhs = exp.rhs.clone();
@@ -237,7 +241,7 @@ impl AirBuilder<'_> {
                 };
 
                 Ok(self.expand_exp(lhs_node_index, rhs_value))
-            }
+            },
             Op::Value(value) => {
                 let mir_value = &value.value.value;
 
@@ -248,14 +252,14 @@ impl AirBuilder<'_> {
                         } else {
                             unreachable!()
                         }
-                    }
+                    },
                     MirValue::TraceAccess(trace_access) => {
                         crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
                             segment: trace_access.segment,
                             column: trace_access.column,
                             row_offset: trace_access.row_offset,
                         })
-                    }
+                    },
                     MirValue::BusAccess(bus_access) => {
                         let name = bus_access.bus.borrow().deref().name();
                         let column = self.bus_bindings_map.get(&name).unwrap();
@@ -264,28 +268,28 @@ impl AirBuilder<'_> {
                             column: *column,
                             row_offset: bus_access.row_offset,
                         })
-                    }
+                    },
                     MirValue::PeriodicColumn(periodic_column_access) => {
                         crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
                             name: periodic_column_access.name,
                             cycle: periodic_column_access.cycle,
                         })
-                    }
+                    },
                     MirValue::PublicInput(public_input_access) => {
                         crate::ir::Value::PublicInput(crate::ir::PublicInputAccess {
                             name: public_input_access.name,
                             index: public_input_access.index,
                         })
-                    }
+                    },
                     _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
                 };
 
                 Ok(self.insert_op(Operation::Value(value)))
-            }
+            },
             Op::Enf(enf) => {
                 let child = enf.expr.clone();
                 self.insert_mir_operation(&child)
-            }
+            },
             Op::Accessor(accessor) => {
                 let offset = accessor.offset;
                 let child = accessor.indexable.clone();
@@ -304,14 +308,14 @@ impl AirBuilder<'_> {
                         } else {
                             unreachable!()
                         }
-                    }
+                    },
                     MirValue::TraceAccess(trace_access) => {
                         crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
                             segment: trace_access.segment,
                             column: trace_access.column,
                             row_offset: offset,
                         })
-                    }
+                    },
                     MirValue::BusAccess(bus_access) => {
                         let name = bus_access.bus.borrow().deref().name();
                         let column = self.bus_bindings_map.get(&name).unwrap();
@@ -320,25 +324,25 @@ impl AirBuilder<'_> {
                             column: *column,
                             row_offset: offset,
                         })
-                    }
+                    },
                     MirValue::PeriodicColumn(periodic_column_access) => {
                         crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
                             name: periodic_column_access.name,
                             cycle: periodic_column_access.cycle,
                         })
-                    }
+                    },
                     MirValue::PublicInput(public_input_access) => {
                         crate::ir::Value::PublicInput(crate::ir::PublicInputAccess {
                             name: public_input_access.name,
                             index: public_input_access.index,
                         })
-                    }
+                    },
                     _ => unreachable!(),
                 };
 
                 Ok(self.insert_op(Operation::Value(value)))
-            }
-            _ => panic!("Should not have Mir op in graph: {:?}", mir_node),
+            },
+            _ => panic!("Should not have Mir op in graph: {mir_node:?}"),
         }
     }
 
@@ -350,7 +354,7 @@ impl AirBuilder<'_> {
                     self.build_boundary_constraint(node)?;
                 }
                 Ok(())
-            }
+            },
             Op::Matrix(matrix) => {
                 let rows = matrix.elements.borrow().deref().clone();
                 for row in rows.iter() {
@@ -360,7 +364,7 @@ impl AirBuilder<'_> {
                     }
                 }
                 Ok(())
-            }
+            },
             Op::Enf(enf) => {
                 let child_op = enf.expr.clone();
                 let child_op = indexed_accessor(&child_op);
@@ -368,7 +372,7 @@ impl AirBuilder<'_> {
 
                 self.build_boundary_constraint(&child_op)?;
                 Ok(())
-            }
+            },
             Op::Sub(sub) => {
                 // Check that lhs is a Bounded trace access
                 let lhs = sub.lhs.clone();
@@ -410,7 +414,7 @@ impl AirBuilder<'_> {
                             row_offset: 0,
                         };
                         (trace_access, lhs_span)
-                    }
+                    },
                     SpannedMirValue {
                         value: MirValue::BusAccess(bus_access),
                         span: lhs_span,
@@ -421,7 +425,7 @@ impl AirBuilder<'_> {
                         let trace_access =
                             mir::ir::TraceAccess::new(AUX_SEGMENT, *column, bus_access.row_offset);
                         (trace_access, lhs_span)
-                    }
+                    },
                     _ => unreachable!(
                         "Expected TraceAccess or BusAccess, received {:?}",
                         value.value
@@ -445,16 +449,13 @@ impl AirBuilder<'_> {
                     return Err(CompileError::Failed);
                 }
 
-                let lhs = self
-                    .air
-                    .constraint_graph_mut()
-                    .insert_node(Operation::Value(crate::ir::Value::TraceAccess(
-                        crate::ir::TraceAccess {
-                            segment: trace_access.segment,
-                            column: trace_access.column,
-                            row_offset: trace_access.row_offset,
-                        },
-                    )));
+                let lhs = self.air.constraint_graph_mut().insert_node(Operation::Value(
+                    crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+                        segment: trace_access.segment,
+                        column: trace_access.column,
+                        row_offset: trace_access.row_offset,
+                    }),
+                ));
                 let rhs = self.insert_mir_operation(&rhs)?;
 
                 // Compare the inferred trace segment and domain of the operands
@@ -464,8 +465,9 @@ impl AirBuilder<'_> {
                     let (lhs_segment, lhs_domain) = graph.node_details(&lhs, domain)?;
                     let (rhs_segment, rhs_domain) = graph.node_details(&rhs, domain)?;
                     if lhs_segment < rhs_segment {
-                        // trace segment inference defaults to the lowest segment (the main trace) and is
-                        // adjusted according to the use of random values and trace columns.
+                        // trace segment inference defaults to the lowest segment (the main trace)
+                        // and is adjusted according to the use of random
+                        // values and trace columns.
                         let lhs_segment_name = self.trace_columns[lhs_segment].name;
                         let rhs_segment_name = self.trace_columns[rhs_segment].name;
                         self.diagnostics.diagnostic(Severity::Error)
@@ -491,11 +493,9 @@ impl AirBuilder<'_> {
                 let root = self.insert_op(Operation::Sub(lhs, rhs));
 
                 // Store the generated constraint
-                self.air
-                    .constraints
-                    .insert_constraint(trace_access.segment, root, domain);
+                self.air.constraints.insert_constraint(trace_access.segment, root, domain);
                 Ok(())
-            }
+            },
             _ => unreachable!(),
         }
     }
@@ -507,7 +507,7 @@ impl AirBuilder<'_> {
                 for node in vec.iter() {
                     self.build_integrity_constraint(node)?;
                 }
-            }
+            },
             Op::Matrix(matrix) => {
                 let rows = matrix.elements.borrow().deref().clone();
                 for row in rows.iter() {
@@ -516,7 +516,7 @@ impl AirBuilder<'_> {
                         self.build_integrity_constraint(node)?;
                     }
                 }
-            }
+            },
             Op::Enf(enf) => {
                 let child_op = enf.expr.clone();
                 let child_op = indexed_accessor(&child_op);
@@ -525,24 +525,27 @@ impl AirBuilder<'_> {
                 match child_op.clone().borrow().deref() {
                     Op::Sub(_sub) => {
                         self.build_integrity_constraint(&child_op)?;
-                    }
+                    },
+                    Op::BusOp(bus_op) => {
+                        let bus = bus_op.bus.to_link().unwrap();
+                        let latch = bus_op.latch.clone();
+
+                        bus.borrow_mut().latches.push(latch.clone());
+                        bus.borrow_mut().columns.push(child_op.clone());
+                    },
                     _ => unreachable!("Enforced with unexpected operation: {:?}", child_op),
                 }
-            }
+            },
             Op::Sub(sub) => {
                 let lhs = sub.lhs.clone();
                 let rhs = sub.rhs.clone();
                 let lhs_node_index = self.insert_mir_operation(&lhs)?;
                 let rhs_node_index = self.insert_mir_operation(&rhs)?;
                 let root = self.insert_op(Operation::Sub(lhs_node_index, rhs_node_index));
-                let (trace_segment, domain) = self
-                    .air
-                    .constraint_graph()
-                    .node_details(&root, ConstraintDomain::EveryRow)?;
-                self.air
-                    .constraints
-                    .insert_constraint(trace_segment, root, domain);
-            }
+                let (trace_segment, domain) =
+                    self.air.constraint_graph().node_details(&root, ConstraintDomain::EveryRow)?;
+                self.air.constraints.insert_constraint(trace_segment, root, domain);
+            },
             _ => unreachable!(),
         }
         Ok(())
@@ -552,17 +555,15 @@ impl AirBuilder<'_> {
     fn build_bus(&mut self, mir_bus: &Link<mir::ir::Bus>) -> Result<(), CompileError> {
         let mir_bus = mir_bus.borrow();
 
-        let first = build_bus_boundary(&mir_bus.get_first())?;
-        let last = build_bus_boundary(&mir_bus.get_last())?;
+        let first = build_bus_boundary(self.diagnostics, mir_bus.span(), &mir_bus.get_first())?;
+        let last = build_bus_boundary(self.diagnostics, mir_bus.span(), &mir_bus.get_last())?;
 
         let mut bus_ops = vec![];
         for (mir_column, mir_latch) in mir_bus.columns.iter().zip(mir_bus.latches.iter()) {
             let mut column = vec![];
 
             // Note: we have checked this will not panic in the MIR pass
-            let mir_bus_op = mir_column
-                .as_bus_op()
-                .expect("Bus column should be a bus operation");
+            let mir_bus_op = mir_column.as_bus_op().expect("Bus column should be a bus operation");
             let mir_bus_op_args = mir_bus_op.args.clone();
             for arg in mir_bus_op_args.iter() {
                 let arg = self.insert_mir_operation(arg)?;
@@ -591,7 +592,11 @@ impl AirBuilder<'_> {
 // ================================================================================================
 
 /// Helper function to convert a MIR bus boundary node into an AIR bus boundary.
-fn build_bus_boundary(mir_bus_boundary_node: &Link<Op>) -> Result<BusBoundary, CompileError> {
+fn build_bus_boundary(
+    diagnostics: &DiagnosticsHandler,
+    bus_span: SourceSpan,
+    mir_bus_boundary_node: &Link<Op>,
+) -> Result<BusBoundary, CompileError> {
     let mir_node = vec_to_scalar(mir_bus_boundary_node);
     let mir_node_ref = mir_node.borrow();
     match mir_node_ref.deref() {
@@ -600,13 +605,25 @@ fn build_bus_boundary(mir_bus_boundary_node: &Link<Op>) -> Result<BusBoundary, C
             MirValue::PublicInputTable(public_input_table) => Ok(
                 crate::ir::BusBoundary::PublicInputTable(crate::ir::PublicInputTableAccess::new(
                     public_input_table.table_name,
-                    public_input_table.bus_name(),
                     public_input_table.num_cols,
+                    public_input_table.bus_type(),
                 )),
             ),
             // This represents an empty bus
             MirValue::Null => Ok(crate::ir::BusBoundary::Null),
+            MirValue::Unconstrained => Ok(crate::ir::BusBoundary::Unconstrained),
             _ => Err(CompileError::Failed),
+        },
+        Op::None(_) => {
+            diagnostics
+                .diagnostic(Severity::Error)
+                .with_message("invalid bus boundary")
+                .with_primary_label(bus_span, "this bus has unconstrained boundaries")
+                .with_note(
+                    "Bus boundaries must be either a public input table or null for empty buses.",
+                )
+                .emit();
+            Err(CompileError::Failed)
         },
         _ => unreachable!("Unexpected Mir Op in bus boundary: {:#?}", mir_node_ref),
     }

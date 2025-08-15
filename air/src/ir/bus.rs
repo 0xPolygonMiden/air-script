@@ -20,33 +20,31 @@ pub struct Bus {
 }
 
 /// Represents the boundaries of a bus, which can be either a public input table or an empty bus.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum BusBoundary {
     /// A reference to a public input table.
     PublicInputTable(PublicInputTableAccess),
     /// A reference to an empty bus
     Null,
+    /// An unconstrained bus boundary
+    Unconstrained,
 }
 
-/// Represents an access of a public input table, similar in nature to [TraceAccess].
+/// Represents an access of a public input table.
 ///
 /// It can only be bound to a [Bus]'s .first or .last boundary constraints.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PublicInputTableAccess {
     /// The name of the public input to bind
     pub table_name: Identifier,
-    /// The name of the bus
-    pub bus_name: Identifier,
     /// The number of columns in the public input table
     pub num_cols: usize,
+    /// The type of the bus
+    pub bus_type: BusType,
 }
 impl PublicInputTableAccess {
-    pub const fn new(table_name: Identifier, bus_name: Identifier, num_cols: usize) -> Self {
-        Self {
-            table_name,
-            num_cols,
-            bus_name,
-        }
+    pub const fn new(table_name: Identifier, num_cols: usize, bus_type: BusType) -> Self {
+        Self { table_name, num_cols, bus_type }
     }
 }
 
@@ -63,11 +61,7 @@ pub struct BusOp {
 
 impl BusOp {
     pub fn new(columns: Vec<NodeIndex>, latch: NodeIndex, op_kind: BusOpKind) -> Self {
-        Self {
-            columns,
-            latch,
-            op_kind,
-        }
+        Self { columns, latch, op_kind }
     }
 }
 
@@ -79,12 +73,6 @@ impl Bus {
         last: BusBoundary,
         bus_ops: Vec<BusOp>,
     ) -> Self {
-        Self {
-            name,
-            bus_type,
-            first,
-            last,
-            bus_ops,
-        }
+        Self { name, bus_type, first, last, bus_ops }
     }
 }

@@ -1,10 +1,13 @@
-use air_parser::ast::{self, Identifier, QualifiedIdentifier, TraceColumnIndex, TraceSegmentId};
+use air_parser::ast::{
+    self, BusType, Identifier, QualifiedIdentifier, TraceColumnIndex, TraceSegmentId,
+};
 use miden_diagnostics::{SourceSpan, Spanned};
 
 use crate::ir::{BackLink, Builder, Bus, Child, Link, Node, Op, Owner, Singleton};
 
 /// A MIR operation to represent a known value, [Value].
-/// Wraps a [SpannedMirValue] to represent a known value in the [MIR].
+///
+/// Wraps a [SpannedMirValue] to represent a known value in the MIR.
 #[derive(Default, Clone, PartialEq, Eq, Debug, Hash, Builder, Spanned)]
 #[enum_wrapper(Op)]
 pub struct Value {
@@ -16,11 +19,7 @@ pub struct Value {
 
 impl Value {
     pub fn create(value: SpannedMirValue) -> Link<Op> {
-        Op::Value(Self {
-            value,
-            ..Default::default()
-        })
-        .into()
+        Op::Value(Self { value, ..Default::default() }).into()
     }
 }
 
@@ -49,7 +48,7 @@ impl Child for Value {
     }
 }
 
-/// Represents a known value in the [MIR].
+/// Represents a known value in the MIR.
 ///
 /// Values are either constant, or evaluated at runtime using the context
 /// provided to an AirScript program (i.e. public inputs, etc.).
@@ -69,16 +68,20 @@ pub enum MirValue {
     PublicInputTable(PublicInputTableAccess),
     /// A reference to a specific index in the random values array.
     ///
-    /// Random values are not provided by the user in the AirScript program, but are used to expand Bus constraints.
+    /// Random values are not provided by the user in the AirScript program, but are used to expand
+    /// Bus constraints.
     RandomValue(usize),
     /// A binding to a set of consecutive trace columns of a given size.
     TraceAccessBinding(TraceAccessBinding),
     /// A binding to a [Bus].
     BusAccess(BusAccess),
+    /// An empty bus
     Null,
+    /// An unconstrained bus
+    Unconstrained,
 }
 
-/// [BusAccess] is like [SymbolAccess], but is used to describe an access to a specific bus.
+/// [BusAccess] is like SymbolAccess, but is used to describe an access to a specific bus.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BusAccess {
     /// The trace segment being accessed
@@ -106,7 +109,8 @@ pub enum ConstantValue {
     Matrix(Vec<Vec<u64>>),
 }
 
-/// [TraceAccess] is like [SymbolAccess], but is used to describe an access to a specific trace column or columns.
+/// [TraceAccess] is like SymbolAccess, but is used to describe an access to a specific trace
+/// column or columns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TraceAccess {
     /// The trace segment being accessed
@@ -124,11 +128,7 @@ pub struct TraceAccess {
 impl TraceAccess {
     /// Creates a new [TraceAccess].
     pub const fn new(segment: TraceSegmentId, column: TraceColumnIndex, row_offset: usize) -> Self {
-        Self {
-            segment,
-            column,
-            row_offset,
-        }
+        Self { segment, column, row_offset }
     }
 }
 
@@ -141,7 +141,7 @@ pub struct TraceAccessBinding {
     pub size: usize,
 }
 
-/// Represents a typed value in the [MIR]
+/// Represents a typed value in the MIR.
 #[derive(Debug, Eq, PartialEq, Clone, Hash, Spanned)]
 pub struct SpannedMirValue {
     #[span]
@@ -167,7 +167,7 @@ impl From<ast::Type> for MirType {
     }
 }
 
-/// Represents an access of a [PeriodicColumn], similar in nature to [TraceAccess].
+/// Represents an access of a PeriodicColumn, similar in nature to [TraceAccess].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PeriodicColumnAccess {
     pub name: QualifiedIdentifier,
@@ -179,7 +179,7 @@ impl PeriodicColumnAccess {
     }
 }
 
-/// Represents an access of a [PublicInput], similar in nature to [TraceAccess].
+/// Represents an access of a PublicInput, similar in nature to [TraceAccess].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PublicInputAccess {
     /// The name of the public input to access
@@ -200,28 +200,23 @@ impl PublicInputAccess {
 pub struct PublicInputTableAccess {
     /// The name of the public input to bind
     pub table_name: Identifier,
-    /// The name of the bus to bind
-    /// The bus name is not always known at the time of instantiation,
-    /// making it an Option allows setting it later.
-    bus_name: Option<Identifier>,
     /// The number of columns in the table
     pub num_cols: usize,
+    /// The type of bus to bind (multiset or logUp).
+    /// The bus type is not always known at the time of instantiation,
+    /// making it an Option allows setting it later.
+    bus_type: Option<BusType>,
 }
 
 impl PublicInputTableAccess {
     pub const fn new(table_name: Identifier, num_cols: usize) -> Self {
-        Self {
-            table_name,
-            bus_name: None,
-            num_cols,
-        }
+        Self { table_name, num_cols, bus_type: None }
     }
-    pub fn set_bus_name(&mut self, bus_name: Identifier) {
-        self.bus_name = Some(bus_name);
+    pub fn set_bus_type(&mut self, bus_type: BusType) {
+        self.bus_type = Some(bus_type);
     }
-    pub fn bus_name(&self) -> Identifier {
-        self.bus_name
-            .expect("Bus name should have already been set")
+    pub fn bus_type(&self) -> BusType {
+        self.bus_type.expect("Bus type should have already been set")
     }
 }
 

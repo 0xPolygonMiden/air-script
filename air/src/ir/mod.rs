@@ -5,19 +5,21 @@ mod operation;
 mod trace;
 mod value;
 
-pub use self::bus::{Bus, BusBoundary, BusOp, BusOpKind, BusType, PublicInputTableAccess};
-pub use self::constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints};
-pub use self::degree::IntegrityConstraintDegree;
-pub use self::operation::Operation;
-pub use self::trace::TraceAccess;
-pub use self::value::{PeriodicColumnAccess, PublicInputAccess, Value};
-
 pub use air_parser::{
+    Symbol,
     ast::{
         AccessType, Boundary, Identifier, PeriodicColumn, PublicInput, QualifiedIdentifier,
         TraceSegmentId,
     },
-    Symbol,
+};
+
+pub use self::{
+    bus::{Bus, BusBoundary, BusOp, BusOpKind, BusType, PublicInputTableAccess},
+    constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints},
+    degree::IntegrityConstraintDegree,
+    operation::Operation,
+    trace::TraceAccess,
+    value::{PeriodicColumnAccess, PublicInputAccess, Value},
 };
 
 /// The default segment against which a constraint is applied is the main trace segment.
@@ -69,10 +71,7 @@ pub struct Air {
 }
 impl Default for Air {
     fn default() -> Self {
-        Self::new(Identifier::new(
-            SourceSpan::UNKNOWN,
-            Symbol::intern("unnamed"),
-        ))
+        Self::new(Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("unnamed")))
     }
 }
 impl Air {
@@ -102,6 +101,29 @@ impl Air {
 
     pub fn public_inputs(&self) -> impl Iterator<Item = &PublicInput> + '_ {
         self.public_inputs.values()
+    }
+
+    /// Returns a list of all accesses to reduced public input tables in canonical order.
+    pub fn reduced_public_input_table_accesses(&self) -> Vec<PublicInputTableAccess> {
+        let mut accesses: Vec<_> = self
+            .buses
+            .values()
+            .flat_map(|bus| {
+                [bus.first, bus.last]
+                    .iter()
+                    .filter_map(|boundary| {
+                        if let BusBoundary::PublicInputTable(access) = boundary {
+                            Some(*access)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        accesses.sort();
+        accesses.dedup();
+        accesses
     }
 
     pub fn periodic_columns(&self) -> impl Iterator<Item = &PeriodicColumn> + '_ {

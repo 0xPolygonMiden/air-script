@@ -36,17 +36,11 @@ macro_rules! ident {
     };
 
     ($name:literal) => {
-        Identifier::new(
-            miden_diagnostics::SourceSpan::UNKNOWN,
-            crate::Symbol::intern($name),
-        )
+        Identifier::new(miden_diagnostics::SourceSpan::UNKNOWN, crate::Symbol::intern($name))
     };
 
     ($module:ident, $name:ident) => {
-        QualifiedIdentifier::new(
-            ident!($module),
-            NamespacedIdentifier::Binding(ident!($name)),
-        )
+        QualifiedIdentifier::new(ident!($module), NamespacedIdentifier::Binding(ident!($name)))
     };
 }
 
@@ -56,10 +50,7 @@ macro_rules! function_ident {
     };
 
     ($module:ident, $name:ident) => {
-        QualifiedIdentifier::new(
-            ident!($module),
-            NamespacedIdentifier::Function(ident!($name)),
-        )
+        QualifiedIdentifier::new(ident!($module), NamespacedIdentifier::Function(ident!($name)))
     };
 }
 
@@ -383,10 +374,7 @@ macro_rules! int {
 
 macro_rules! null {
     () => {
-        ScalarExpr::Null(miden_diagnostics::Span::new(
-            miden_diagnostics::SourceSpan::UNKNOWN,
-            (),
-        ))
+        ScalarExpr::Null(miden_diagnostics::Span::new(miden_diagnostics::SourceSpan::UNKNOWN, ()))
     };
 }
 
@@ -562,9 +550,7 @@ macro_rules! and {
 }
 
 macro_rules! or {
-    ($lhs:expr, $rhs:expr) => {{
-        sub!(add!($lhs, $rhs), mul!($lhs, $rhs))
-    }};
+    ($lhs:expr, $rhs:expr) => {{ sub!(add!($lhs, $rhs), mul!($lhs, $rhs)) }};
 }
 
 macro_rules! not {
@@ -652,9 +638,7 @@ macro_rules! exp {
 
 macro_rules! import_all {
     ($module:ident) => {
-        Import::All {
-            module: ident!($module),
-        }
+        Import::All { module: ident!($module) }
     };
 }
 
@@ -662,10 +646,7 @@ macro_rules! import {
     ($module:ident, $item:ident) => {{
         let mut items: std::collections::HashSet<Identifier> = std::collections::HashSet::default();
         items.insert(ident!($item));
-        Import::Partial {
-            module: ident!($module),
-            items,
-        }
+        Import::Partial { module: ident!($module), items }
     }};
 }
 
@@ -719,10 +700,9 @@ fn full_air_file() {
     // boundary_constraints {
     //     enf clk.first = 0
     // }
-    expected.boundary_constraints.push(enforce!(eq!(
-        bounded_access!(clk, Boundary::First, Type::Felt),
-        int!(0)
-    )));
+    expected
+        .boundary_constraints
+        .push(enforce!(eq!(bounded_access!(clk, Boundary::First, Type::Felt), int!(0))));
 
     ParseTest::new().expect_program_ast_from_file("src/parser/tests/input/system.air", expected);
 }

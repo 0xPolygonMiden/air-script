@@ -13,7 +13,9 @@ pub enum InvalidExprError {
     BoundedSymbolAccess(SourceSpan),
     #[error("expected scalar expression")]
     InvalidScalarExpr(SourceSpan),
-    #[error("invalid let in expression position: body produces no value, or the type of that value is unknown")]
+    #[error(
+        "invalid let in expression position: body produces no value, or the type of that value is unknown"
+    )]
     InvalidLetExpr(SourceSpan),
     #[error("syntax does not represent a valid expression")]
     NotAnExpr(SourceSpan),
@@ -30,18 +32,14 @@ impl ToDiagnostic for InvalidExprError {
         match self {
             Self::NonConstantExponent(span) => Diagnostic::error()
                 .with_message("invalid expression")
-                .with_labels(vec![
-                    Label::primary(span.source_id(), span).with_message(message)
-                ])
+                .with_labels(vec![Label::primary(span.source_id(), span).with_message(message)])
                 .with_notes(vec![
                     "Only constant powers are supported with the exponentiation operator currently"
                         .to_string(),
                 ]),
             Self::NonConstantRangeExpr(span) => Diagnostic::error()
                 .with_message("invalid expression")
-                .with_labels(vec![
-                    Label::primary(span.source_id(), span).with_message(message)
-                ])
+                .with_labels(vec![Label::primary(span.source_id(), span).with_message(message)])
                 .with_notes(vec![
                     "Range expression must be a constant to do this operation".to_string(),
                 ]),
@@ -51,9 +49,7 @@ impl ToDiagnostic for InvalidExprError {
             | Self::InvalidLetExpr(span)
             | Self::NotAnExpr(span) => Diagnostic::error()
                 .with_message("invalid expression")
-                .with_labels(vec![
-                    Label::primary(span.source_id(), span).with_message(message)
-                ]),
+                .with_labels(vec![Label::primary(span.source_id(), span).with_message(message)]),
         }
     }
 }
@@ -76,9 +72,7 @@ impl ToDiagnostic for InvalidTypeError {
         match self {
             Self::NonVectorIterable(span) => Diagnostic::error()
                 .with_message("invalid type")
-                .with_labels(vec![
-                    Label::primary(span.source_id(), span).with_message(message)
-                ])
+                .with_labels(vec![Label::primary(span.source_id(), span).with_message(message)])
                 .with_notes(vec!["Only vectors can be used as iterables".to_string()]),
         }
     }

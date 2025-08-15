@@ -26,7 +26,8 @@ type QuadFelt = QuadExtension<Felt>;
 /// The roots in each group are linearly combined with powers of a random challenge `α`:
 ///   - `int = ∑ᵢ int_roots[i]⋅αⁱ` for `i` from 0 to `|int_roots|`
 ///   - `bf = ∑ᵢ bf_roots[i]⋅αⁱ⁺ᵒ` for `i` from 0 to `|int_roots|`, and `o = |int_roots|`
-///   - `bl = ∑ᵢ_i bl_roots[i]⋅αⁱ⁺ᵒ` for `i` from 0 to `|bf_roots|` and `o = |int_roots| + |bf_roots|`
+///   - `bl = ∑ᵢ_i bl_roots[i]⋅αⁱ⁺ᵒ` for `i` from 0 to `|bf_roots|` and `o = |int_roots| +
+///     |bf_roots|`
 ///
 /// This function builds a circuit that computes the following formula which must evaluate to zero:
 /// `z₋₂²⋅z₋₁⋅z₀⋅int + zₙ⋅z₋₂⋅bf + zₙ⋅z₀⋅bl - Q(z)⋅zₙ⋅z₀⋅z₋₂`. The variables are given by:
@@ -38,12 +39,12 @@ type QuadFelt = QuadExtension<Felt>;
 ///   - `n` is the length of the trace.
 ///
 /// This is equivalent to the check
-/// ```ignore
+/// ```text
 ///     num₀/[(zⁿ - 1)/[(z - g⁻¹)(z - g⁻²)]] + num₁/(z - 1) + num₂/(z - g⁻²) = Q(z)
 /// ```
 ///
 /// The ACE chiplet expects the inputs of the original AirScript, with the order defined by
-/// [`AceLayout`]:
+/// `AceLayout`:
 /// - the public inputs of the AirScript e.g. `public_inputs { stack_inputs[16] }`,
 /// - auxiliary randomness of the AirScript e.g. `random_values { rand: [2] }`,
 /// - the main segment of trace inputs of the AirScript e.g. `trace_columns { main: [a b] }`,
@@ -54,9 +55,10 @@ type QuadFelt = QuadExtension<Felt>;
 /// - a dummy section of 8 quotient evaluation for the next row, unused by the ACE circuit.
 ///
 /// Additionally, the ACE chiplet expects the following 5 auxiliary "STARK" inputs, whose order
-/// is defined by [`StarkVar`], given by `[g⁻¹, g⁻¹, α, z, zⁿ, zᵐᵃˣ`].
+/// is defined by `StarkVar`, given by `[α, z, zⁿ, g⁻¹, zᵐᵃˣ, g⁻²]`.
 pub fn build_ace_circuit(air: &Air) -> anyhow::Result<(AceNode, AceCircuit)> {
-    // A circuit builder is instantiated with the inputs of the circuits plus the 13 needed by the ACE chiplet
+    // A circuit builder is instantiated with the inputs of the circuits plus the 13 needed by the
+    // ACE chiplet
     let mut cb = CircuitBuilder::new(air);
 
     let segments = [0, 1];
@@ -68,11 +70,11 @@ pub fn build_ace_circuit(air: &Air) -> anyhow::Result<(AceNode, AceCircuit)> {
             //                   all-row constraints
             ConstraintDomain::EveryRow | ConstraintDomain::EveryFrame(2) => {
                 Some(cb.node_from_index(air, constraint.node_index()))
-            }
+            },
             ConstraintDomain::FirstRow | ConstraintDomain::LastRow => None,
             ConstraintDomain::EveryFrame(_) => {
                 panic!("invalid integrity constraint domain")
-            }
+            },
         })
         .collect();
 
@@ -115,13 +117,7 @@ pub fn build_ace_circuit(air: &Air) -> anyhow::Result<(AceNode, AceCircuit)> {
     // z₋₂²⋅z₋₁⋅z₀⋅int
     {
         let int = lc.next_linear_combination(&mut cb, integrity_roots);
-        let res = cb.prod([
-            vanish_first,
-            vanish_penultimate,
-            vanish_last,
-            vanish_penultimate,
-            int,
-        ]);
+        let res = cb.prod([vanish_first, vanish_penultimate, vanish_last, vanish_penultimate, int]);
         lhs = cb.add(lhs, res);
     };
 

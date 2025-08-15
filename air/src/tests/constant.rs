@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic, Pipeline};
+use super::{Pipeline, compile, expect_diagnostic};
 
 #[test]
 fn boundary_constraint_with_constants() {
@@ -73,9 +73,5 @@ fn invalid_matrix_constant() {
         "invalid matrix literal: mismatched dimensions",
         Pipeline::WithoutMIR,
     );
-    expect_diagnostic(
-        source,
-        "invalid matrix literal: mismatched dimensions",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "invalid matrix literal: mismatched dimensions", Pipeline::WithMIR);
 }

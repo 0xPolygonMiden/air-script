@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic, Pipeline};
+use super::{Pipeline, compile, expect_diagnostic};
 
 #[test]
 fn trace_columns_index_access() {
@@ -64,16 +64,8 @@ fn err_bc_column_undeclared() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithoutMIR);
+    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithMIR);
 }
 
 #[test]
@@ -93,16 +85,8 @@ fn err_ic_column_undeclared() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithoutMIR);
+    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithMIR);
 }
 
 #[test]

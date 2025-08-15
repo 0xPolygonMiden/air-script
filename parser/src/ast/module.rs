@@ -12,7 +12,8 @@ pub enum ModuleType {
     /// Only one root module may be defined in an AirScript program, using `def`.
     ///
     /// The root module has no restrictions on what sections it can contain, and in a
-    /// sense "provides" restricted sections to other modules in the program, e.g. the trace columns.
+    /// sense "provides" restricted sections to other modules in the program, e.g. the trace
+    /// columns.
     Root,
     /// Any number of library modules are permitted in an AirScript program, using `module`.
     ///
@@ -114,21 +115,21 @@ impl Module {
             match declaration {
                 Declaration::Import(import) => {
                     module.declare_import(diagnostics, &mut names, import)?;
-                }
+                },
                 Declaration::Constant(constant) => {
                     module.declare_constant(diagnostics, &mut names, constant)?;
-                }
+                },
                 Declaration::EvaluatorFunction(evaluator) => {
                     module.declare_evaluator(diagnostics, &mut names, evaluator)?;
-                }
+                },
                 Declaration::Function(function) => {
                     module.declare_function(diagnostics, &mut names, function)?;
-                }
+                },
                 Declaration::PeriodicColumns(mut columns) => {
                     for column in columns.drain(..) {
                         module.declare_periodic_column(diagnostics, &mut names, column)?;
                     }
-                }
+                },
                 Declaration::PublicInputs(mut inputs) => {
                     if module.is_library() {
                         invalid_section_in_library(diagnostics, "public_inputs", span);
@@ -137,21 +138,25 @@ impl Module {
                     for input in inputs.item.drain(..) {
                         module.declare_public_input(diagnostics, &mut names, input)?;
                     }
-                }
+                },
                 Declaration::Trace(segments) => {
                     module.declare_trace_segments(diagnostics, &mut names, segments)?;
-                }
+                },
                 Declaration::BoundaryConstraints(statements) => {
                     module.declare_boundary_constraints(diagnostics, statements)?;
-                }
+                },
                 Declaration::IntegrityConstraints(statements) => {
                     module.declare_integrity_constraints(diagnostics, statements)?;
-                }
+                },
                 Declaration::Buses(mut buses) => {
+                    if module.is_library() {
+                        invalid_section_in_library(diagnostics, "buses", span);
+                        return Err(SemanticAnalysisError::RootSectionInLibrary(span));
+                    }
                     for bus in buses.drain(..) {
                         module.declare_bus(diagnostics, &mut names, bus)?;
                     }
-                }
+                },
             }
         }
 
@@ -209,7 +214,7 @@ impl Module {
                                     .with_primary_label(span, "duplicate import occurs here")
                                     .with_secondary_label(first, "original import was here")
                                     .emit();
-                            }
+                            },
                             Import::Partial { items, .. } => {
                                 for item in items.iter() {
                                     diagnostics
@@ -223,20 +228,17 @@ impl Module {
                                         .emit();
                                 }
                                 entry.insert(import.item);
-                            }
+                            },
                         }
-                    }
+                    },
                     Entry::Vacant(entry) => {
                         entry.insert(import.item);
-                    }
+                    },
                 }
 
                 Ok(())
-            }
-            Import::Partial {
-                module: name,
-                mut items,
-            } => {
+            },
+            Import::Partial { module: name, mut items } => {
                 if name == self.name {
                     return Err(SemanticAnalysisError::ImportSelf(name.span()));
                 }
@@ -252,11 +254,8 @@ impl Module {
                                     "because this import includes all items already",
                                 )
                                 .emit();
-                        }
-                        Import::Partial {
-                            items: ref mut prev_items,
-                            ..
-                        } => {
+                        },
+                        Import::Partial { items: prev_items, .. } => {
                             for item in items.drain() {
                                 if let Some(prev) = prev_items.get(&item) {
                                     diagnostics
@@ -286,7 +285,7 @@ impl Module {
                                     return Err(SemanticAnalysisError::NameConflict(item.span()));
                                 }
                             }
-                        }
+                        },
                     },
                     Entry::Vacant(entry) => {
                         for item in items.iter().copied() {
@@ -305,15 +304,12 @@ impl Module {
                                 return Err(SemanticAnalysisError::NameConflict(item.span()));
                             }
                         }
-                        entry.insert(Import::Partial {
-                            module: name,
-                            items,
-                        });
-                    }
+                        entry.insert(Import::Partial { module: name, items });
+                    },
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 
@@ -327,10 +323,7 @@ impl Module {
             diagnostics
                 .diagnostic(Severity::Error)
                 .with_message("constant identifiers must be uppercase ASCII characters, e.g. FOO")
-                .with_primary_label(
-                    constant.name.span(),
-                    "this is an invalid constant identifier",
-                )
+                .with_primary_label(constant.name.span(), "this is an invalid constant identifier")
                 .emit();
             return Err(SemanticAnalysisError::Invalid);
         }
@@ -341,11 +334,9 @@ impl Module {
         }
 
         // Validate constant expression
-        if let ConstantExpr::Matrix(ref matrix) = &constant.value {
-            let expected_len = matrix
-                .first()
-                .expect("expected matrix to have at least one row")
-                .len();
+        if let ConstantExpr::Matrix(matrix) = &constant.value {
+            let expected_len =
+                matrix.first().expect("expected matrix to have at least one row").len();
             for vector in matrix.iter().skip(1) {
                 if expected_len != vector.len() {
                     diagnostics
@@ -437,14 +428,14 @@ impl Module {
                 assert_eq!(self.periodic_columns.insert(column.name, column), None);
 
                 Ok(())
-            }
+            },
             _ => {
                 diagnostics.diagnostic(Severity::Error)
                     .with_message("invalid periodic column declaration")
                     .with_primary_label(column.span(), "periodic columns must have a non-zero cycle length which is a power of two")
                     .emit();
                 Err(SemanticAnalysisError::Invalid)
-            }
+            },
         }
     }
 
@@ -459,12 +450,7 @@ impl Module {
         }
 
         if let Some(prev) = names.replace(NamespacedIdentifier::Binding(input.name())) {
-            conflicting_declaration(
-                diagnostics,
-                "public input",
-                prev.span(),
-                input.name().span(),
-            );
+            conflicting_declaration(diagnostics, "public input", prev.span(), input.name().span());
             Err(SemanticAnalysisError::NameConflict(input.name().span()))
         } else {
             assert_eq!(self.public_inputs.insert(input.name(), input), None);
@@ -620,7 +606,7 @@ impl PartialEq for Module {
 fn invalid_section_in_library(diagnostics: &DiagnosticsHandler, ty: &str, span: SourceSpan) {
     diagnostics
         .diagnostic(Severity::Error)
-        .with_message(format!("invalid {} declaration", ty))
+        .with_message(format!("invalid {ty} declaration"))
         .with_primary_label(span, "this section is not permitted in a library module")
         .emit();
 }
@@ -633,7 +619,7 @@ fn conflicting_declaration(
 ) {
     diagnostics
         .diagnostic(Severity::Error)
-        .with_message(format!("invalid {} declaration", ty))
+        .with_message(format!("invalid {ty} declaration"))
         .with_primary_label(current, "this conflicts with a previous declaration")
         .with_secondary_label(prev, "previously defined here")
         .emit();

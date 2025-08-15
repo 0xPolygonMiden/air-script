@@ -1,9 +1,13 @@
-use crate::layout::{InputRegion, Layout};
-use crate::QuadFelt;
+use std::iter::zip;
+
 use air_ir::Air;
 use miden_core::Felt;
-use std::iter::zip;
 use winter_math::{FieldElement, StarkField};
+
+use crate::{
+    QuadFelt,
+    layout::{InputRegion, Layout},
+};
 
 /// Set of all inputs required to perform the DEEP-ALI constraint evaluations check.
 /// Note that these should correspond to all values included in the proof transcript,
@@ -14,10 +18,14 @@ pub struct AirInputs {
     pub log_trace_len: u32,
     /// Public inputs in the same order as [`Air::public_inputs`].
     pub public: Vec<Vec<QuadFelt>>,
+    /// Reduced public input table values used as boundaries for buses.
+    pub reduced_tables: Vec<QuadFelt>,
     /// Evaluations of the *main* trace.
     pub main: [Vec<QuadFelt>; 2],
-    /// Verifier challenges used to derive the *aux* trace.
-    pub rand: Vec<QuadFelt>,
+    /// Verifier challenge α used to randomize the multi-set/logUp polynomials in the *aux* trace.
+    pub random_alpha: QuadFelt,
+    /// Verifier challenge β used to fingerprint bus messages for the *aux* trace.
+    pub random_beta: QuadFelt,
     /// Evaluations of the *aux* trace.
     pub aux: [Vec<QuadFelt>; 2],
     /// Evaluations of the *quotient* parts, including in the next row.
@@ -33,8 +41,10 @@ pub struct AirInputs {
 #[derive(Clone, Debug)]
 pub struct AceVars {
     pub(crate) public: Vec<Vec<QuadFelt>>,
+    pub(crate) reduced_tables: Vec<QuadFelt>,
     pub(crate) segments: [[Vec<QuadFelt>; 3]; 2],
-    pub(crate) rand: Vec<QuadFelt>,
+    pub(crate) random_alpha: QuadFelt,
+    pub(crate) random_beta: QuadFelt,
     pub(crate) stark: StarkInputs,
 }
 
@@ -46,14 +56,13 @@ impl AirInputs {
         let [main_curr, main_next] = self.main;
         let [aux_curr, aux_next] = self.aux;
         let [quotient_curr, quotient_next] = self.quotient;
-        let segments = [
-            [main_curr, aux_curr, quotient_curr],
-            [main_next, aux_next, quotient_next],
-        ];
+        let segments = [[main_curr, aux_curr, quotient_curr], [main_next, aux_next, quotient_next]];
         AceVars {
             public: self.public,
+            reduced_tables: self.reduced_tables,
             segments,
-            rand: self.rand,
+            random_alpha: self.random_alpha,
+            random_beta: self.random_beta,
             stark,
         }
     }
@@ -88,20 +97,16 @@ impl StarkInputs {
     /// The [`Air`] is required to compute `zᵐᵃˣ`, the power of `z` at which we evaluate the longest
     /// periodic column, and from which we derive the evaluation points of all other columns.
     pub(crate) fn new(air: &Air, log_trace_len: u32, alpha: QuadFelt, z: QuadFelt) -> Self {
-        let gen = Felt::get_root_of_unity(log_trace_len);
-        let gen_next = gen.square();
+        let generator = Felt::get_root_of_unity(log_trace_len);
+        let gen_next = generator.square();
         let gen_penultimate = gen_next.inv().into();
 
-        let gen_last = gen.inv().into();
+        let gen_last = generator.inv().into();
 
         let n = 1 << log_trace_len;
         let z_pow_n = z.exp_vartime(n);
 
-        let max_cycle_len = air
-            .periodic_columns
-            .values()
-            .map(|col| col.values.len() as u64)
-            .max();
+        let max_cycle_len = air.periodic_columns.values().map(|col| col.values.len() as u64).max();
         let z_max_cycle_pow = max_cycle_len.map(|cycle_len| n / cycle_len).unwrap_or(0);
         let z_max_cycle = z.exp_vartime(z_max_cycle_pow);
 
@@ -118,12 +123,12 @@ impl StarkInputs {
     /// Returns all values as a `Vec` in the same order as [`crate::StarkVar`].
     pub(crate) fn to_vec(&self) -> Vec<QuadFelt> {
         vec![
-            self.gen_penultimate,
-            self.gen_last,
             self.alpha,
             self.z,
             self.z_pow_n,
+            self.gen_last,
             self.z_max_cycle,
+            self.gen_penultimate,
         ]
     }
 }
@@ -145,15 +150,23 @@ impl AceVars {
             store(&mut mem, pi_region, inputs)
         }
 
+        // Reduced public input table values, ordered by accesses
+        for (index, reduced_table_value) in
+            zip(layout.reduced_tables.values(), &self.reduced_tables)
+        {
+            let mem_index = layout.reduced_tables_region.index(*index).unwrap();
+            mem[mem_index] = *reduced_table_value;
+        }
+
         // Random values
-        store(&mut mem, &layout.random_values, &self.rand);
+        mem[layout.random_alpha] = self.random_alpha;
+        mem[layout.random_beta] = self.random_beta;
 
         // Trace values
         for row_offset in [0, 1] {
-            for (segment_row, region) in zip(
-                &self.segments[row_offset],
-                &layout.trace_segments[row_offset],
-            ) {
+            for (segment_row, region) in
+                zip(&self.segments[row_offset], &layout.trace_segments[row_offset])
+            {
                 store(&mut mem, region, segment_row.as_slice());
             }
         }

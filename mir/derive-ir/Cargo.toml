@@ -1,7 +1,14 @@
 [package]
-name = "derive-ir"
-version = "0.1.0"
-edition = "2021"
+name = "air-derive-ir"
+description = "Macros for MIR representation of the AirScript language"
+version = "0.5.0"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+categories = ["compilers", "cryptography"]
+keywords = ["air", "stark", "zero-knowledge", "zkp"]
+rust-version.workspace = true
+edition.workspace = true
 
 [dependencies]
 syn = { version = "2.0", features = ["extra-traits"] }

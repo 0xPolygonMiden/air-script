@@ -6,7 +6,7 @@ use core::{fmt, mem, num::IntErrorKind};
 use miden_diagnostics::{Diagnostic, SourceIndex, SourceSpan, ToDiagnostic};
 use miden_parsing::{Scanner, Source};
 
-use crate::{parser::ParseError, Symbol};
+use crate::{Symbol, parser::ParseError};
 
 /// The value produced by the Lexer when iterated
 pub type Lexed = Result<(SourceIndex, Token, SourceIndex), ParseError>;
@@ -15,10 +15,7 @@ pub type Lexed = Result<(SourceIndex, Token, SourceIndex), ParseError>;
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum LexicalError {
     #[error("invalid integer value: {}", DisplayIntErrorKind(reason))]
-    InvalidInt {
-        span: SourceSpan,
-        reason: IntErrorKind,
-    },
+    InvalidInt { span: SourceSpan, reason: IntErrorKind },
     #[error("encountered unexpected character '{found}'")]
     UnexpectedCharacter { start: SourceIndex, found: char },
 }
@@ -27,7 +24,7 @@ impl PartialEq for LexicalError {
         match (self, other) {
             (Self::InvalidInt { reason: lhs, .. }, Self::InvalidInt { reason: rhs, .. }) => {
                 lhs == rhs
-            }
+            },
             (
                 Self::UnexpectedCharacter { found: lhs, .. },
                 Self::UnexpectedCharacter { found: rhs, .. },
@@ -41,16 +38,17 @@ impl ToDiagnostic for LexicalError {
         use miden_diagnostics::Label;
 
         match self {
-            Self::InvalidInt { span, ref reason } => Diagnostic::error()
-                .with_message("invalid integer literal")
-                .with_labels(vec![Label::primary(span.source_id(), span)
-                    .with_message(format!("{}", DisplayIntErrorKind(reason)))]),
-            Self::UnexpectedCharacter { start, .. } => Diagnostic::error()
-                .with_message("unexpected character")
-                .with_labels(vec![Label::primary(
-                    start.source_id(),
-                    SourceSpan::new(start, start),
-                )]),
+            Self::InvalidInt { span, ref reason } => {
+                Diagnostic::error().with_message("invalid integer literal").with_labels(vec![
+                    Label::primary(span.source_id(), span)
+                        .with_message(format!("{}", DisplayIntErrorKind(reason))),
+                ])
+            },
+            Self::UnexpectedCharacter { start, .. } => {
+                Diagnostic::error().with_message("unexpected character").with_labels(vec![
+                    Label::primary(start.source_id(), SourceSpan::new(start, start)),
+                ])
+            },
         }
     }
 }
@@ -64,7 +62,7 @@ impl fmt::Display for DisplayIntErrorKind<'_> {
             IntErrorKind::PosOverflow => write!(f, "value is too big"),
             IntErrorKind::NegOverflow => write!(f, "value is too big"),
             IntErrorKind::Zero => write!(f, "zero is not a valid value here"),
-            other => write!(f, "unable to parse integer value: {:?}", other),
+            other => write!(f, "unable to parse integer value: {other:?}"),
         }
     }
 }
@@ -121,6 +119,8 @@ pub enum Token {
     Logup,
     /// Used to represent an empty bus
     Null,
+    /// Used to represent an unconstrained bus
+    Unconstrained,
     /// Used to represent the insertion of a given tuple into a bus
     Insert,
     /// Used to represent the removal of a given tuple from a bus
@@ -200,6 +200,7 @@ impl Token {
             "multiset" => Self::Multiset,
             "logup" => Self::Logup,
             "null" => Self::Null,
+            "unconstrained" => Self::Unconstrained,
             "insert" => Self::Insert,
             "remove" => Self::Remove,
             "boundary_constraints" => Self::BoundaryConstraints,
@@ -226,27 +227,27 @@ impl PartialEq for Token {
                 if let Self::Num(i2) = other {
                     return *i == *i2;
                 }
-            }
+            },
             Self::Error(_) => {
                 if let Self::Error(_) = other {
                     return true;
                 }
-            }
+            },
             Self::Ident(i) => {
                 if let Self::Ident(i2) = other {
                     return i == i2;
                 }
-            }
+            },
             Self::DeclIdentRef(i) => {
                 if let Self::DeclIdentRef(i2) = other {
                     return i == i2;
                 }
-            }
+            },
             Self::FunctionIdent(i) => {
                 if let Self::FunctionIdent(i2) = other {
                     return i == i2;
                 }
-            }
+            },
             _ => return mem::discriminant(self) == mem::discriminant(other),
         }
         false
@@ -258,10 +259,10 @@ impl fmt::Display for Token {
             Self::Eof => write!(f, "EOF"),
             Self::Error(_) => write!(f, "ERROR"),
             Self::Comment => write!(f, "COMMENT"),
-            Self::Ident(ref id) => write!(f, "{}", id),
-            Self::DeclIdentRef(ref id) => write!(f, "{}", id),
-            Self::FunctionIdent(ref id) => write!(f, "{}", id),
-            Self::Num(ref i) => write!(f, "{}", i),
+            Self::Ident(id) => write!(f, "{id}"),
+            Self::DeclIdentRef(id) => write!(f, "{id}"),
+            Self::FunctionIdent(id) => write!(f, "{id}"),
+            Self::Num(i) => write!(f, "{i}"),
             Self::Def => write!(f, "def"),
             Self::Mod => write!(f, "mod"),
             Self::Use => write!(f, "use"),
@@ -278,6 +279,7 @@ impl fmt::Display for Token {
             Self::Multiset => write!(f, "multiset"),
             Self::Logup => write!(f, "logup"),
             Self::Null => write!(f, "null"),
+            Self::Unconstrained => write!(f, "unconstrained"),
             Self::Insert => write!(f, "insert"),
             Self::Remove => write!(f, "remove"),
             Self::BoundaryConstraints => write!(f, "boundary_constraints"),
@@ -340,8 +342,9 @@ macro_rules! pop2 {
     }};
 }
 
-/// The lexer that is used to perform lexical analysis on the AirScript grammar. The lexer implements
-/// the `Iterator` trait, so in order to retrieve the tokens, you simply have to iterate over it.
+/// The lexer that is used to perform lexical analysis on the AirScript grammar. The lexer
+/// implements the `Iterator` trait, so in order to retrieve the tokens, you simply have to iterate
+/// over it.
 ///
 /// # Errors
 ///
@@ -580,8 +583,8 @@ where
                 return Token::Error(LexicalError::UnexpectedCharacter {
                     start: self.span().start(),
                     found: c,
-                })
-            }
+                });
+            },
         }
 
         self.skip_ident();

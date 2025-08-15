@@ -1,14 +1,12 @@
-use air_parser::{ast, LexicalScope};
+use air_parser::{LexicalScope, ast};
 use air_pass::Pass;
-
 use miden_diagnostics::{DiagnosticsHandler, Severity, Span, Spanned};
 
-use crate::{graph::NodeIndex, ir::*, CompileError};
+use crate::{CompileError, graph::NodeIndex, ir::*};
 
 /// This pass creates the [Air] from the [ast::Program].
 ///  
-/// It should be deprecated once the compilation pipeline uses the [Mir] construct.
-///
+/// It should be deprecated once the compilation pipeline uses the Mir construct.
 pub struct AstToAir<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
@@ -75,13 +73,13 @@ impl AirBuilder<'_> {
         match bc {
             ast::Statement::Enforce(ast::ScalarExpr::Binary(ast::BinaryExpr {
                 op: ast::BinaryOp::Eq,
-                ref lhs,
-                ref rhs,
+                lhs,
+                rhs,
                 ..
             })) => self.build_boundary_equality(lhs, rhs),
             ast::Statement::Let(expr) => {
                 self.build_let(expr, |bldr, stmt| bldr.build_boundary_constraint(stmt))
-            }
+            },
             invalid => {
                 self.diagnostics
                     .diagnostic(Severity::Bug)
@@ -92,7 +90,7 @@ impl AirBuilder<'_> {
                     )
                     .emit();
                 Err(CompileError::Failed)
-            }
+            },
         }
     }
 
@@ -100,22 +98,19 @@ impl AirBuilder<'_> {
         match ic {
             ast::Statement::Enforce(ast::ScalarExpr::Binary(ast::BinaryExpr {
                 op: ast::BinaryOp::Eq,
-                ref lhs,
-                ref rhs,
+                lhs,
+                rhs,
                 ..
             })) => self.build_integrity_equality(lhs, rhs, None),
             ast::Statement::EnforceIf(
                 ast::ScalarExpr::Binary(ast::BinaryExpr {
-                    op: ast::BinaryOp::Eq,
-                    ref lhs,
-                    ref rhs,
-                    ..
+                    op: ast::BinaryOp::Eq, lhs, rhs, ..
                 }),
-                ref condition,
+                condition,
             ) => self.build_integrity_equality(lhs, rhs, Some(condition)),
             ast::Statement::Let(expr) => {
                 self.build_let(expr, |bldr, stmt| bldr.build_integrity_constraint(stmt))
-            }
+            },
             invalid => {
                 self.diagnostics
                     .diagnostic(Severity::Bug)
@@ -126,7 +121,7 @@ impl AirBuilder<'_> {
                     )
                     .emit();
                 Err(CompileError::Failed)
-            }
+            },
         }
     }
 
@@ -156,9 +151,10 @@ impl AirBuilder<'_> {
         let lhs_span = lhs.span();
         let rhs_span = rhs.span();
 
-        // The left-hand side of a boundary constraint equality expression is always a bounded symbol access
-        // against a trace column. It is fine to panic here if that is ever violated.
-        let ast::ScalarExpr::BoundedSymbolAccess(ref access) = lhs else {
+        // The left-hand side of a boundary constraint equality expression is always a bounded
+        // symbol access against a trace column. It is fine to panic here if that is ever
+        // violated.
+        let ast::ScalarExpr::BoundedSymbolAccess(access) = lhs else {
             self.diagnostics
                 .diagnostic(Severity::Bug)
                 .with_message("invalid boundary constraint")
@@ -225,9 +221,7 @@ impl AirBuilder<'_> {
         // Merge the expressions into a single constraint
         let root = self.merge_equal_exprs(lhs, rhs, None);
         // Store the generated constraint
-        self.air
-            .constraints
-            .insert_constraint(trace_access.segment, root, domain);
+        self.air.constraints.insert_constraint(trace_access.segment, root, domain);
 
         Ok(())
     }
@@ -248,14 +242,10 @@ impl AirBuilder<'_> {
         // Get the trace segment and domain of the constraint.
         //
         // The default domain for integrity constraints is `EveryRow`
-        let (trace_segment, domain) = self
-            .air
-            .constraint_graph()
-            .node_details(&root, ConstraintDomain::EveryRow)?;
+        let (trace_segment, domain) =
+            self.air.constraint_graph().node_details(&root, ConstraintDomain::EveryRow)?;
         // Save the constraint information
-        self.air
-            .constraints
-            .insert_constraint(trace_segment, root, domain);
+        self.air.constraints.insert_constraint(trace_segment, root, domain);
 
         Ok(())
     }
@@ -283,51 +273,47 @@ impl AirBuilder<'_> {
             self.bindings.enter();
             self.bindings.insert(let_expr.name, bound);
             match let_expr.body.last().unwrap() {
-                ast::Statement::Let(ref inner_let) => {
+                ast::Statement::Let(inner_let) => {
                     next_let = Some(inner_let);
-                }
-                ast::Statement::Expr(ref expr) => {
+                },
+                ast::Statement::Expr(expr) => {
                     let value = self.eval_expr(expr);
                     self.bindings = snapshot;
                     break value;
-                }
+                },
                 ast::Statement::Enforce(_)
-                | ast::Statement::EnforceIf(_, _)
+                | ast::Statement::EnforceIf(..)
                 | ast::Statement::EnforceAll(_)
                 | ast::Statement::BusEnforce(_) => {
                     unreachable!()
-                }
+                },
             }
         }
     }
 
     fn eval_expr(&mut self, expr: &ast::Expr) -> Result<MemoizedBinding, CompileError> {
         match expr {
-            ast::Expr::Const(ref constant) => match &constant.item {
+            ast::Expr::Const(constant) => match &constant.item {
                 ast::ConstantExpr::Scalar(value) => {
                     let value = self.insert_constant(*value);
                     Ok(MemoizedBinding::Scalar(value))
-                }
+                },
                 ast::ConstantExpr::Vector(values) => {
                     let values = self.insert_constants(values.as_slice());
                     Ok(MemoizedBinding::Vector(values))
-                }
+                },
                 ast::ConstantExpr::Matrix(values) => {
-                    let values = values
-                        .iter()
-                        .map(|vs| self.insert_constants(vs.as_slice()))
-                        .collect();
+                    let values =
+                        values.iter().map(|vs| self.insert_constants(vs.as_slice())).collect();
                     Ok(MemoizedBinding::Matrix(values))
-                }
+                },
             },
-            ast::Expr::Range(ref values) => {
-                let values = values
-                    .to_slice_range()
-                    .map(|v| self.insert_constant(v as u64))
-                    .collect();
+            ast::Expr::Range(values) => {
+                let values =
+                    values.to_slice_range().map(|v| self.insert_constant(v as u64)).collect();
                 Ok(MemoizedBinding::Vector(values))
-            }
-            ast::Expr::Vector(ref values) => match values[0].ty().unwrap() {
+            },
+            ast::Expr::Vector(values) => match values[0].ty().unwrap() {
                 ast::Type::Felt => {
                     let mut nodes = vec![];
                     for value in values.iter().cloned() {
@@ -335,17 +321,16 @@ impl AirBuilder<'_> {
                         nodes.push(self.insert_scalar_expr(&value)?);
                     }
                     Ok(MemoizedBinding::Vector(nodes))
-                }
+                },
                 ast::Type::Vector(n) => {
                     let mut nodes = vec![];
                     for row in values.iter().cloned() {
                         match row {
                             ast::Expr::Const(Span {
-                                item: ast::ConstantExpr::Vector(vs),
-                                ..
+                                item: ast::ConstantExpr::Vector(vs), ..
                             }) => {
                                 nodes.push(self.insert_constants(vs.as_slice()));
-                            }
+                            },
                             ast::Expr::SymbolAccess(access) => {
                                 let mut cols = vec![];
                                 for i in 0..n {
@@ -356,8 +341,8 @@ impl AirBuilder<'_> {
                                     cols.push(node);
                                 }
                                 nodes.push(cols);
-                            }
-                            ast::Expr::Vector(ref elems) => {
+                            },
+                            ast::Expr::Vector(elems) => {
                                 let mut cols = vec![];
                                 for elem in elems.iter().cloned() {
                                     let elem: ast::ScalarExpr = elem.try_into().unwrap();
@@ -365,15 +350,15 @@ impl AirBuilder<'_> {
                                     cols.push(node);
                                 }
                                 nodes.push(cols);
-                            }
+                            },
                             _ => unreachable!(),
                         }
                     }
                     Ok(MemoizedBinding::Matrix(nodes))
-                }
+                },
                 _ => unreachable!(),
             },
-            ast::Expr::Matrix(ref values) => {
+            ast::Expr::Matrix(values) => {
                 let mut rows = Vec::with_capacity(values.len());
                 for vs in values.iter() {
                     let mut cols = Vec::with_capacity(vs.len());
@@ -383,58 +368,58 @@ impl AirBuilder<'_> {
                     rows.push(cols);
                 }
                 Ok(MemoizedBinding::Matrix(rows))
-            }
-            ast::Expr::Binary(ref bexpr) => {
+            },
+            ast::Expr::Binary(bexpr) => {
                 let value = self.insert_binary_expr(bexpr)?;
                 Ok(MemoizedBinding::Scalar(value))
-            }
-            ast::Expr::SymbolAccess(ref access) => {
+            },
+            ast::Expr::SymbolAccess(access) => {
                 match self.bindings.get(access.name.as_ref()) {
                     None => {
                         // Must be a reference to a declaration
                         let value = self.insert_symbol_access(access);
                         Ok(MemoizedBinding::Scalar(value))
-                    }
+                    },
                     Some(MemoizedBinding::Scalar(node)) => {
                         assert_eq!(access.access_type, AccessType::Default);
                         Ok(MemoizedBinding::Scalar(*node))
-                    }
+                    },
                     Some(MemoizedBinding::Vector(nodes)) => {
                         let value = match &access.access_type {
                             AccessType::Default => MemoizedBinding::Vector(nodes.clone()),
                             AccessType::Index(idx) => MemoizedBinding::Scalar(nodes[*idx]),
                             AccessType::Slice(range) => {
                                 MemoizedBinding::Vector(nodes[range.to_slice_range()].to_vec())
-                            }
-                            AccessType::Matrix(_, _) => unreachable!(),
+                            },
+                            AccessType::Matrix(..) => unreachable!(),
                         };
                         Ok(value)
-                    }
+                    },
                     Some(MemoizedBinding::Matrix(nodes)) => {
                         let value = match &access.access_type {
                             AccessType::Default => MemoizedBinding::Matrix(nodes.clone()),
                             AccessType::Index(idx) => MemoizedBinding::Vector(nodes[*idx].clone()),
                             AccessType::Slice(range) => {
                                 MemoizedBinding::Matrix(nodes[range.to_slice_range()].to_vec())
-                            }
+                            },
                             AccessType::Matrix(row, col) => {
                                 MemoizedBinding::Scalar(nodes[*row][*col])
-                            }
+                            },
                         };
                         Ok(value)
-                    }
+                    },
                 }
-            }
-            ast::Expr::Let(ref let_expr) => self.eval_let_expr(let_expr),
+            },
+            ast::Expr::Let(let_expr) => self.eval_let_expr(let_expr),
             // These node types should not exist at this point
             ast::Expr::Call(_) | ast::Expr::ListComprehension(_) => unreachable!(),
-            ast::Expr::BusOperation(_) | ast::Expr::Null(_) => {
+            ast::Expr::BusOperation(_) | ast::Expr::Null(_) | ast::Expr::Unconstrained(_) => {
                 self.diagnostics
                     .diagnostic(Severity::Error)
                     .with_message("buses are not implemented for this Pipeline")
                     .emit();
                 Err(CompileError::Failed)
-            }
+            },
         }
     }
 
@@ -442,19 +427,20 @@ impl AirBuilder<'_> {
         match expr {
             ast::ScalarExpr::Const(value) => {
                 Ok(self.insert_op(Operation::Value(Value::Constant(value.item))))
-            }
+            },
             ast::ScalarExpr::SymbolAccess(access) => Ok(self.insert_symbol_access(access)),
             ast::ScalarExpr::Binary(expr) => self.insert_binary_expr(expr),
-            ast::ScalarExpr::Let(ref let_expr) => match self.eval_let_expr(let_expr)? {
+            ast::ScalarExpr::Let(let_expr) => match self.eval_let_expr(let_expr)? {
                 MemoizedBinding::Scalar(node) => Ok(node),
                 invalid => {
                     panic!("expected scalar expression to produce scalar value, got: {invalid:?}")
-                }
+                },
             },
             ast::ScalarExpr::Call(_)
             | ast::ScalarExpr::BoundedSymbolAccess(_)
             | ast::ScalarExpr::BusOperation(_)
-            | ast::ScalarExpr::Null(_) => unreachable!(),
+            | ast::ScalarExpr::Null(_)
+            | ast::ScalarExpr::Unconstrained(_) => unreachable!(),
         }
     }
 
@@ -463,15 +449,15 @@ impl AirBuilder<'_> {
         match rhs {
             0 => self.insert_constant(1),
             1 => lhs,
-            n if n % 2 == 0 => {
+            n if n.is_multiple_of(2) => {
                 let square = self.insert_op(Operation::Mul(lhs, lhs));
                 self.expand_exp(square, n / 2)
-            }
+            },
             n => {
                 let square = self.insert_op(Operation::Mul(lhs, lhs));
                 let rec = self.expand_exp(square, (n - 1) / 2);
                 self.insert_op(Operation::Mul(lhs, rec))
-            }
+            },
         }
     }
 
@@ -507,15 +493,13 @@ impl AirBuilder<'_> {
                 } else {
                     // This is a qualified reference that should have been eliminated
                     // during inlining or constant propagation, but somehow slipped through.
-                    unreachable!(
-                        "expected reference to periodic column, got `{:?}` instead",
-                        qid
-                    );
+                    unreachable!("expected reference to periodic column, got `{:?}` instead", qid);
                 }
-            }
+            },
             // This must be one of public inputs, random values, or trace columns
             ResolvableIdentifier::Global(id) | ResolvableIdentifier::Local(id) => {
-                // Special identifiers are those which are `$`-prefixed, and must refer to the names of trace segments (e.g. `$main`)
+                // Special identifiers are those which are `$`-prefixed, and must refer to the names
+                // of trace segments (e.g. `$main`)
                 if id.is_special() {
                     // Must be a trace segment name
                     if let Some(ta) = self.trace_access(access) {
@@ -540,36 +524,32 @@ impl AirBuilder<'_> {
                 }
 
                 // If we reach here, this must be a let-bound variable
-                match self
-                    .bindings
-                    .get(access.name.as_ref())
-                    .expect("undefined variable")
-                {
+                match self.bindings.get(access.name.as_ref()).expect("undefined variable") {
                     MemoizedBinding::Scalar(node) => {
                         assert_eq!(access.access_type, AccessType::Default);
                         *node
-                    }
+                    },
                     MemoizedBinding::Vector(nodes) => {
                         if let AccessType::Index(idx) = &access.access_type {
                             return nodes[*idx];
                         }
                         unreachable!("impossible vector access: {:?}", access)
-                    }
+                    },
                     MemoizedBinding::Matrix(nodes) => {
                         if let AccessType::Matrix(row, col) = &access.access_type {
                             return nodes[*row][*col];
                         }
                         unreachable!("impossible matrix access: {:?}", access)
-                    }
+                    },
                 }
-            }
+            },
             // These should have been eliminated by previous compiler passes
             ResolvableIdentifier::Unresolved(_) => {
                 unreachable!(
                     "expected fully-qualified or global reference, got `{:?}` instead",
                     &access.name
                 );
-            }
+            },
         }
     }
 
@@ -601,17 +581,11 @@ impl AirBuilder<'_> {
                 }
             }
 
-            if let Some(binding) = segment
-                .bindings
-                .iter()
-                .find(|tb| tb.name.as_ref() == Some(id))
-            {
+            if let Some(binding) = segment.bindings.iter().find(|tb| tb.name.as_ref() == Some(id)) {
                 return match access.access_type {
-                    AccessType::Default if binding.size == 1 => Some(TraceAccess::new(
-                        binding.segment,
-                        binding.offset,
-                        access.offset,
-                    )),
+                    AccessType::Default if binding.size == 1 => {
+                        Some(TraceAccess::new(binding.segment, binding.offset, access.offset))
+                    },
                     AccessType::Index(extra_offset) if binding.size > 1 => Some(TraceAccess::new(
                         binding.segment,
                         binding.offset + extra_offset,
@@ -640,10 +614,6 @@ impl AirBuilder<'_> {
     }
 
     fn insert_constants(&mut self, values: &[u64]) -> Vec<NodeIndex> {
-        values
-            .iter()
-            .copied()
-            .map(|v| self.insert_constant(v))
-            .collect()
+        values.iter().copied().map(|v| self.insert_constant(v)).collect()
     }
 }

@@ -183,7 +183,10 @@ fn invalid_matrix_literal_with_leading_vector_binding() {
         enf clk' = d[0][0];
     }";
 
-    expect_diagnostic(source, "expected one of: '\"!\"', '\"(\"', '\"null\"', 'decl_ident_ref', 'function_identifier', 'identifier', 'int'");
+    expect_diagnostic(
+        source,
+        "expected one of: '\"!\"', '\"(\"', '\"null\"', '\"unconstrained\"', 'decl_ident_ref', 'function_identifier', 'identifier', 'int'",
+    );
 }
 
 #[test]
@@ -300,10 +303,7 @@ fn invalid_vector_variable_access_out_of_bounds() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -325,10 +325,7 @@ fn invalid_matrix_column_variable_access_out_of_bounds() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -350,10 +347,7 @@ fn invalid_matrix_row_variable_access_out_of_bounds() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]

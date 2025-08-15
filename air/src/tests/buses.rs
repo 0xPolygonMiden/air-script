@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic, Pipeline};
+use super::{Pipeline, compile, expect_diagnostic};
 
 #[test]
 fn buses_in_boundary_constraints() {
@@ -29,11 +29,7 @@ fn buses_in_boundary_constraints() {
         enf a = 0;
     }";
 
-    expect_diagnostic(
-        source,
-        "buses are not implemented for this Pipeline",
-        Pipeline::WithoutMIR,
-    );
+    expect_diagnostic(source, "buses are not implemented for this Pipeline", Pipeline::WithoutMIR);
     assert!(compile(source, Pipeline::WithMIR).is_ok());
 }
 
@@ -60,7 +56,7 @@ fn buses_in_integrity_constraints() {
     }
 
     boundary_constraints {
-        enf p.first = null;
+        enf p.first = unconstrained;
         enf q.first = null;
         enf p.last = inputs;
         enf q.last = inputs;
@@ -74,11 +70,7 @@ fn buses_in_integrity_constraints() {
         q.remove(1, 2) with 2;
     }";
 
-    expect_diagnostic(
-        source,
-        "buses are not implemented for this Pipeline",
-        Pipeline::WithoutMIR,
-    );
+    expect_diagnostic(source, "buses are not implemented for this Pipeline", Pipeline::WithoutMIR);
     assert!(compile(source, Pipeline::WithMIR).is_ok());
 }
 
@@ -142,4 +134,40 @@ fn err_trace_columns_constrained_with_null() {
 
     expect_diagnostic(source, "error: invalid constraint", Pipeline::WithoutMIR);
     expect_diagnostic(source, "error: invalid constraint", Pipeline::WithMIR);
+}
+
+#[test]
+fn err_buses_unconstrained() {
+    let source = "
+        def test
+
+    trace_columns {
+        main: [a],
+    }
+
+    buses {
+        multiset p,
+        logup q,
+    }
+
+    public_inputs {
+        inputs: [2],
+    }
+
+    boundary_constraints {
+        enf p.first = null;
+        enf p.last = null;
+        enf q.first = null;
+    }
+
+    integrity_constraints {
+        enf a = 0;
+    }";
+
+    expect_diagnostic(
+        source,
+        "error: buses are not implemented for this Pipeline",
+        Pipeline::WithoutMIR,
+    );
+    expect_diagnostic(source, "error: invalid bus boundary", Pipeline::WithMIR);
 }

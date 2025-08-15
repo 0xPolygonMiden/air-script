@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic, Pipeline};
+use super::{Pipeline, compile, expect_diagnostic};
 
 #[test]
 fn let_scalar_constant_in_boundary_constraint() {
@@ -112,16 +112,8 @@ fn invalid_column_offset_in_boundary_constraint() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "invalid access of a trace column with offset",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "invalid access of a trace column with offset",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "invalid access of a trace column with offset", Pipeline::WithoutMIR);
+    expect_diagnostic(source, "invalid access of a trace column with offset", Pipeline::WithMIR);
 }
 
 #[test]
@@ -198,8 +190,16 @@ fn invalid_matrix_literal_with_leading_vector_binding() {
         enf clk' = d[0][0];
     }";
 
-    expect_diagnostic(source, "expected one of: '\"!\"', '\"(\"', '\"null\"', 'decl_ident_ref', 'function_identifier', 'identifier', 'int'", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "expected one of: '\"!\"', '\"(\"', '\"null\"', 'decl_ident_ref', 'function_identifier', 'identifier', 'int'", Pipeline::WithMIR);
+    expect_diagnostic(
+        source,
+        "expected one of: '\"!\"', '\"(\"', '\"null\"', '\"unconstrained\"', 'decl_ident_ref', 'function_identifier', 'identifier', 'int'",
+        Pipeline::WithoutMIR,
+    );
+    expect_diagnostic(
+        source,
+        "expected one of: '\"!\"', '\"(\"', '\"null\"', '\"unconstrained\"', 'decl_ident_ref', 'function_identifier', 'identifier', 'int'",
+        Pipeline::WithMIR,
+    );
 }
 
 #[test]
@@ -248,16 +248,8 @@ fn invalid_variable_access_before_declaration() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithoutMIR);
+    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithMIR);
 }
 
 #[test]
@@ -280,16 +272,8 @@ fn invalid_trailing_let() {
         let a = 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "expected one of: '\"enf\"', '\"let\"'",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "expected one of: '\"enf\"', '\"let\"'",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'", Pipeline::WithoutMIR);
+    expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'", Pipeline::WithMIR);
 }
 
 #[test]
@@ -312,16 +296,8 @@ fn invalid_reference_to_variable_defined_in_other_section() {
         enf clk' = clk + a;
     }";
 
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithoutMIR);
+    expect_diagnostic(source, "this variable / bus is not defined", Pipeline::WithMIR);
 }
 
 #[test]
@@ -439,16 +415,8 @@ fn invalid_index_into_scalar_variable() {
         enf clk' = clk + a[0];
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to index into a scalar value",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "attempted to index into a scalar value",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "attempted to index into a scalar value", Pipeline::WithoutMIR);
+    expect_diagnostic(source, "attempted to index into a scalar value", Pipeline::WithMIR);
 }
 
 #[test]

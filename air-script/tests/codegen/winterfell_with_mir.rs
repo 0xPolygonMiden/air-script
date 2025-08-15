@@ -1,5 +1,6 @@
-use super::helpers::{Pipeline, Target, Test};
 use expect_test::expect_file;
+
+use super::helpers::{Pipeline, Target, Test};
 
 // tests_wo_mir
 // ================================================================================================
@@ -17,6 +18,15 @@ fn binary() {
 #[test]
 fn buses_simple() {
     let generated_air = Test::new("tests/buses/buses_simple.air".to_string())
+        .transpile(Target::Winterfell, Pipeline::WithMIR)
+        .unwrap();
+
+    let expected = expect_file!["../buses/buses_simple.rs"];
+    expected.assert_eq(&generated_air);
+}
+#[test]
+fn buses_simple_with_evaluators() {
+    let generated_air = Test::new("tests/buses/buses_simple_with_evaluators.air".to_string())
         .transpile(Target::Winterfell, Pipeline::WithMIR)
         .unwrap();
 
