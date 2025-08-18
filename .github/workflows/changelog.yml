@@ -7,12 +7,15 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled]
 
+permissions:
+  contents: read
+
 jobs:
   changelog:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@main
         with:
           fetch-depth: 0
       - name: Check for changes in changelog
