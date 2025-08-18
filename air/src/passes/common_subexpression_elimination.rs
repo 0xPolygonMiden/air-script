@@ -33,7 +33,7 @@ impl Pass for CommonSubexpressionElimination<'_> {
         let renumbering_map = ir.constraint_graph_mut().eliminate_common_subexpressions(&evals);
 
         // Update constraints with the new node indices
-        ir.constraints.renumber_constraints(&renumbering_map);
+        ir.constraints.renumber_and_deduplicate_constraints(&renumbering_map);
 
         Ok(ir)
     }

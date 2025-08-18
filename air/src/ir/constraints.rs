@@ -1,4 +1,5 @@
 use core::fmt;
+use std::collections::HashSet;
 
 use super::*;
 use crate::graph::{AlgebraicGraph, NodeIndex};
@@ -50,29 +51,32 @@ impl Constraints {
 
     /// Updates the root boundary and integrity constraints to use the new node indices
     /// values, given in the `renumbering_map`.
+    /// This functions also removes duplicate constraints (that share the same root and domain).
     ///
     /// Panics if a constraint's node index is not found in the renumbering map.
-    pub fn renumber_constraints(&mut self, renumbering_map: &HashMap<NodeIndex, NodeIndex>) {
-        // Renumber the boundary constraints
-        for (_, segment_constraints) in self.boundary_constraints.iter_mut() {
-            for constraint in segment_constraints.iter_mut() {
-                constraint.update_node_index(
-                    *renumbering_map
-                        .get(constraint.node_index())
-                        .expect("Error: cannot find boundary constraint index in renumbering map"),
-                );
-            }
-        }
-
-        // Renumber the integrity constraints
-        for (_, segment_constraints) in self.integrity_constraints.iter_mut() {
-            for constraint in segment_constraints.iter_mut() {
-                constraint.update_node_index(
-                    *renumbering_map
-                        .get(constraint.node_index())
-                        .expect("Error: cannot find integrity constraint index in renumbering map"),
-                );
-            }
+    pub fn renumber_and_deduplicate_constraints(
+        &mut self,
+        renumbering_map: &HashMap<NodeIndex, NodeIndex>,
+    ) {
+        // Iterate over all boundary and integrity constraints
+        for (_, segment_constraints) in self
+            .boundary_constraints
+            .iter_mut()
+            .chain(self.integrity_constraints.iter_mut())
+        {
+            let mut added_indices = HashSet::new();
+            segment_constraints.retain_mut(|constraint| {
+                let new_index = *renumbering_map
+                    .get(constraint.node_index())
+                    .expect("Error: cannot find constraint index in renumbering map");
+                // Don't keep duplicate constraints
+                if !added_indices.insert((new_index, constraint.domain)) {
+                    return false;
+                }
+                // If this constraint is new, we update its node index and keep it
+                constraint.update_node_index(new_index);
+                true
+            });
         }
     }
 
@@ -173,7 +177,7 @@ impl ConstraintRoot {
 /// [ConstraintDomain] corresponds to the domain over which a constraint is applied.
 ///
 /// See the docs on each variant for more details.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ConstraintDomain {
     /// For boundary constraints which apply to the first row
     FirstRow,
