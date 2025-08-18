@@ -1,0 +1,52 @@
+def ComputedIndicesAir
+
+const MDS = [
+  [1, 2],
+  [2, 3],
+  [3, 4]
+];
+
+trace_columns {
+    main: [a[2]],
+}
+
+public_inputs {
+    input: [1],
+}
+
+fn double(a: felt) -> felt {
+    let x = 3 * a;
+    let y = a;
+    return x - y;
+}
+
+boundary_constraints {
+    enf a[0].first = 0;
+}
+
+integrity_constraints {
+    let state_1 = [1, 1];
+    let state_2 = [2, 0];
+    
+    # [1+2, 2+3, 3+4]
+    # [3, 5, 7]
+    let vec_1 = apply_mds(state_1);
+    
+    # [2, 4, 6]
+    let vec_2 = apply_mds(state_2);
+
+    # 2 * 2 - 4
+    let x = double(2) - vec_2[1];
+
+    # vec_2[0] = 2
+    let y = vec_2[x];
+
+    # vec_1[2] = 7
+    let z = vec_1[y];
+
+    enf a[1] = double(z);
+}
+
+fn apply_mds(state: felt[2]) -> felt[3] {
+    return [sum([s * m for (s, m) in (state, mds_row)]) for mds_row in MDS];
+}

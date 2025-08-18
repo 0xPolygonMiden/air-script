@@ -3,7 +3,7 @@ use winter_math::fields::f64::BaseElement as Felt;
 use winterfell::{Trace, TraceTable};
 
 use crate::{
-    computed_indices::computed_indices::{ComputedIndicesAir, PublicInputs},
+    computed_indices::computed_indices_simple::{ComputedIndicesAir, PublicInputs},
     helpers::{AirTester, MyTraceTable},
 };
 
