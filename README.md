@@ -1,7 +1,8 @@
 # AirScript
 
 [![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/0xMiden/air-script/blob/main/LICENSE)
-[![CI](https://github.com/0xMiden/air-script/actions/workflows/ci.yml/badge.svg)](https://github.com/0xMiden/air-script/actions/workflows/test.yml)
+[![test](https://github.com/0xMiden/air-script/actions/workflows/test.yml/badge.svg)](https://github.com/0xMiden/air-script/actions/workflows/test.yml)
+[![build](https://github.com/0xMiden/air-script/actions/workflows/build.yml/badge.svg)](https://github.com/0xMiden/air-script/actions/workflows/build.yml)
 [![RUST_VERSION](https://img.shields.io/badge/rustc-1.89+-lightgray.svg)](https://www.rust-lang.org/tools/install)
 [![Crates.io](https://img.shields.io/crates/v/air-script)](https://crates.io/crates/air-script)
 
