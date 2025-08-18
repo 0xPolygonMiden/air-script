@@ -50,20 +50,28 @@ impl Constraints {
 
     /// Updates the root boundary and integrity constraints to use the new node indices
     /// values, given in the `renumbering_map`.
+    ///
+    /// Panics if a constraint's node index is not found in the renumbering map.
     pub fn renumber_constraints(&mut self, renumbering_map: &HashMap<NodeIndex, NodeIndex>) {
         // Renumber the boundary constraints
         for (_, segment_constraints) in self.boundary_constraints.iter_mut() {
             for constraint in segment_constraints.iter_mut() {
-                constraint
-                    .update_node_index(*renumbering_map.get(constraint.node_index()).unwrap());
+                constraint.update_node_index(
+                    *renumbering_map
+                        .get(constraint.node_index())
+                        .expect("Error: cannot find boundary constraint index in renumbering map"),
+                );
             }
         }
 
         // Renumber the integrity constraints
         for (_, segment_constraints) in self.integrity_constraints.iter_mut() {
             for constraint in segment_constraints.iter_mut() {
-                constraint
-                    .update_node_index(*renumbering_map.get(constraint.node_index()).unwrap());
+                constraint.update_node_index(
+                    *renumbering_map
+                        .get(constraint.node_index())
+                        .expect("Error: cannot find integrity constraint index in renumbering map"),
+                );
             }
         }
     }
