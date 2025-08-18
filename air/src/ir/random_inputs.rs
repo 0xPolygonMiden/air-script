@@ -27,10 +27,7 @@ pub struct RandomInputs {
 }
 
 impl RandomInputs {
-    /// Evaluates a given MIR node at random points.
-    ///
-    /// Note that we currently assume this will be called only during the unrolling phase, some
-    /// operation types are not handled.
+    /// Evaluates a given algebraic graph node at random points.
     pub fn eval(&mut self, graph: &AlgebraicGraph, node_index: &NodeIndex) -> QuadFelt {
         let op = graph.node(node_index).op();
         match op {
