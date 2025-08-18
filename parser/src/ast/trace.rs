@@ -309,12 +309,11 @@ impl TraceBinding {
             _ => todo!(),
         };
 
-        if let AccessType::Index(idx) = combined_access.clone() {
-            if let ScalarExpr::Const(value) = *idx {
-                if value.item as usize >= self.size {
-                    return Err(InvalidAccessError::IndexOutOfBounds);
-                }
-            }
+        if let AccessType::Index(idx) = combined_access.clone()
+            && let ScalarExpr::Const(value) = *idx
+            && value.item as usize >= self.size
+        {
+            return Err(InvalidAccessError::IndexOutOfBounds);
         }
         Ok(Self { access: Some(combined_access), ..*self })
     }
