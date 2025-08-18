@@ -1,5 +1,3 @@
-# Runs linting related jobs.
-
 name: lint
 
 # Limits workflow concurrency to only the latest commit in the PR.
@@ -15,17 +13,24 @@ on:
 
 jobs:
   clippy:
-    name: clippy
+    name: Clippy
     permissions:
       contents: read
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@main
-      - name: Clippy
-        run: |
-          rustup update --no-self-update
-          rustup component add clippy
-          make clippy
+      - uses: actions/checkout@v4
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: clippy
+      - name: Install nightly rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+          components: rustfmt
+      - name: Run clippy
+        run: make lint
 
   rustfmt:
     name: rustfmt
@@ -33,12 +38,14 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@main
-      - name: Rustfmt
-        run: |
-          rustup update --no-self-update nightly
-          rustup +nightly component add rustfmt
-          make format-check
+      - uses: actions/checkout@v4
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+          components: rustfmt
+      - name: Run rustfmt
+        run: make format-check
 
   doc:
     name: doc
@@ -46,8 +53,10 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v4
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
       - name: Build docs
-        run: |
-          rustup update --no-self-update
-          make doc
+        run: make doc

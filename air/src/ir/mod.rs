@@ -75,7 +75,7 @@ impl Air {
     ///
     /// An empty [Air] is meaningless until it has been populated with
     /// constraints and associated metadata. This is typically done by converting
-    /// an [air_parser::ast::Program] to this struct using the [crate::passes::AstToAir]
+    /// an [air_parser::ast::Program] to this struct using the [crate::passes::MirToAir]
     /// translation pass.
     pub fn new(name: Identifier) -> Self {
         Self {
