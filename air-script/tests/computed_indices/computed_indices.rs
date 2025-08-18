@@ -4,44 +4,32 @@ use winter_math::{ExtensionOf, FieldElement, ToElements};
 use winter_utils::{ByteWriter, Serializable};
 
 pub struct PublicInputs {
-    overflow_addrs: [Felt; 4],
-    program_hash: [Felt; 4],
-    stack_inputs: [Felt; 4],
-    stack_outputs: [Felt; 20],
+    stack_inputs: [Felt; 16],
 }
 
 impl PublicInputs {
-    pub fn new(overflow_addrs: [Felt; 4], program_hash: [Felt; 4], stack_inputs: [Felt; 4], stack_outputs: [Felt; 20]) -> Self {
-        Self { overflow_addrs, program_hash, stack_inputs, stack_outputs }
+    pub fn new(stack_inputs: [Felt; 16]) -> Self {
+        Self { stack_inputs }
     }
 }
 
 impl Serializable for PublicInputs {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        self.overflow_addrs.write_into(target);
-        self.program_hash.write_into(target);
         self.stack_inputs.write_into(target);
-        self.stack_outputs.write_into(target);
     }
 }
 
 impl ToElements<Felt> for PublicInputs {
     fn to_elements(&self) -> Vec<Felt> {
         let mut elements = Vec::new();
-        elements.extend_from_slice(&self.overflow_addrs);
-        elements.extend_from_slice(&self.program_hash);
         elements.extend_from_slice(&self.stack_inputs);
-        elements.extend_from_slice(&self.stack_outputs);
         elements
     }
 }
 
 pub struct ComputedIndicesAir {
     context: AirContext<Felt>,
-    overflow_addrs: [Felt; 4],
-    program_hash: [Felt; 4],
-    stack_inputs: [Felt; 4],
-    stack_outputs: [Felt; 20],
+    stack_inputs: [Felt; 16],
 }
 
 impl ComputedIndicesAir {
@@ -73,7 +61,7 @@ impl Air for ComputedIndicesAir {
             options,
         )
         .set_num_transition_exemptions(2);
-        Self { context, overflow_addrs: public_inputs.overflow_addrs, program_hash: public_inputs.program_hash, stack_inputs: public_inputs.stack_inputs, stack_outputs: public_inputs.stack_outputs }
+        Self { context, stack_inputs: public_inputs.stack_inputs }
     }
 
     fn get_periodic_column_values(&self) -> Vec<Vec<Felt>> {
@@ -98,10 +86,10 @@ impl Air for ComputedIndicesAir {
         result[1] = main_current[1] - E::from(Felt::new(2_u64));
         result[2] = main_current[2] - E::from(Felt::new(4_u64));
         result[3] = main_current[3] - E::from(Felt::new(6_u64));
-        result[4] = main_next[0];
-        result[5] = main_next[1] - E::from(Felt::new(2_u64));
-        result[6] = main_next[2] - E::from(Felt::new(6_u64));
-        result[7] = main_next[3] - E::from(Felt::new(12_u64));
+        result[4] = main_next[4];
+        result[5] = main_next[5] - E::from(Felt::new(2_u64)) * main_current[5];
+        result[6] = main_next[6] - E::from(Felt::new(6_u64)) * main_current[6];
+        result[7] = main_next[7] - E::from(Felt::new(12_u64)) * main_current[7];
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxRandElements<E>, result: &mut [E])

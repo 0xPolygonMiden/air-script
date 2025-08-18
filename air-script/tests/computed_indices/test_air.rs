@@ -14,23 +14,25 @@ impl AirTester for ComputedIndicesAirTester {
     type PubInputs = PublicInputs;
 
     fn build_main_trace(&self, length: usize) -> MyTraceTable {
-        let trace_width = 7;
+        let trace_width = 8;
         let mut trace = TraceTable::new(trace_width, length);
 
         trace.fill(
             |state| {
-                state[0] = Felt::new(1);
-                state[1] = Felt::new(1);
-                state[2] = Felt::new(0);
-                state[3] = Felt::new(1);
-                state[4] = Felt::new(1);
+                state[0] = Felt::new(0);
+                state[1] = Felt::new(2);
+                state[2] = Felt::new(4);
+                state[3] = Felt::new(6);
+                state[4] = Felt::new(0);
                 state[5] = Felt::new(0);
                 state[6] = Felt::new(0);
+                state[7] = Felt::new(0);
             },
             |_, state| {
-                state[0] += Felt::new(1);
-                state[1] = Felt::new(0);
-                state[5] += Felt::new(1);
+                state[4] *= Felt::new(0);
+                state[5] *= Felt::new(2);
+                state[6] *= Felt::new(6);
+                state[7] *= Felt::new(12);
             },
         );
 
@@ -39,7 +41,7 @@ impl AirTester for ComputedIndicesAirTester {
 
     fn public_inputs(&self) -> PublicInputs {
         let zero = Felt::new(0);
-        PublicInputs::new([zero; 4], [zero; 4], [zero; 4], [zero; 20])
+        PublicInputs::new([zero; 16])
     }
 }
 
