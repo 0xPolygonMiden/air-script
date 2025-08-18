@@ -1,12 +1,16 @@
 use std::ops::Deref;
 
+use air_parser::ast::AccessType;
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
 
 use super::visitor::Visitor;
 use crate::{
     CompileError,
-    ir::{BackLink, ConstantValue, Graph, Link, Mir, MirValue, Node, Op, SpannedMirValue, Value},
+    ir::{
+        BackLink, ConstantValue, Graph, Link, Mir, MirValue, Node, Op, Parent, SpannedMirValue,
+        Value,
+    },
 };
 
 pub struct ConstantPropagation<'a> {
@@ -220,6 +224,30 @@ fn get_inner_const(value: &Link<Op>) -> Option<u64> {
                 },
             ..
         }) => Some(*c),
+        Op::Accessor(accessor) => {
+            match (accessor.access_type.clone(), accessor.indexable.borrow().deref()) {
+                (AccessType::Default, _) => get_inner_const(&accessor.indexable),
+                (AccessType::Index(index), Op::Vector(vector)) => {
+                    let vec_children = vector.children();
+                    let vec_ref = vec_children.borrow();
+                    vec_ref.get(index).and_then(get_inner_const)
+                },
+                (AccessType::Matrix(row, col), Op::Matrix(matrix)) => {
+                    let mat_children = matrix.children();
+                    let mat_ref = mat_children.borrow();
+                    mat_ref.get(row).and_then(|row| {
+                        if let Op::Vector(row_vector) = row.borrow().deref() {
+                            let row_children = row_vector.children();
+                            let row_ref = row_children.borrow();
+                            row_ref.get(col).and_then(get_inner_const)
+                        } else {
+                            None
+                        }
+                    })
+                },
+                _ => None,
+            }
+        },
         _ => None,
     }
 }

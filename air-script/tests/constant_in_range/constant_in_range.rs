@@ -82,7 +82,7 @@ impl Air for ConstantInRangeAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = main_current[0] - (E::ZERO + main_current[1] - main_current[4] - main_current[8] + E::ONE + main_current[2] - main_current[5] - main_current[9] + E::from(Felt::new(2_u64)) + main_current[3] - main_current[6] - main_current[10]);
+        result[0] = main_current[0] - (main_current[1] - main_current[4] - main_current[8] + E::ONE + main_current[2] - main_current[5] - main_current[9] + E::from(Felt::new(2_u64)) + main_current[3] - main_current[6] - main_current[10]);
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxRandElements<E>, result: &mut [E])
