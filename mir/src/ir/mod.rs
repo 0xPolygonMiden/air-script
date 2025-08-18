@@ -18,7 +18,7 @@ pub use node::Node;
 pub use nodes::*;
 pub use owner::Owner;
 pub use quad_eval::{
-    QuadFelt, RandomInputs, const_quad_felt, query_hashed_cur_eval, query_indexed_cur_eval,
+    QuadFelt, RandomInputs, const_quad_felt, query_hashed_eval, query_indexed_eval,
 };
 pub use utils::*;
 /// A trait for nodes that can have children

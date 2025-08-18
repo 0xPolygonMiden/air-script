@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use air_parser::ast::TraceSegmentId;
-use mir::ir::{QuadFelt, const_quad_felt, query_hashed_cur_eval, query_indexed_cur_eval};
+use mir::ir::{QuadFelt, const_quad_felt, query_hashed_eval, query_indexed_eval};
 use rand::prelude::*;
 use winter_math::fields::f64::BaseElement as Felt;
 
@@ -69,21 +69,19 @@ impl RandomInputs {
                 Value::TraceAccess(trace_access) => match trace_access.segment {
                     TraceSegmentId::Main => {
                         let index = trace_access.column * 2 + trace_access.row_offset;
-                        let eval =
-                            query_indexed_cur_eval(&mut self.rng, &mut self.main_trace, index);
+                        let eval = query_indexed_eval(&mut self.rng, &mut self.main_trace, index);
                         self.evals_map.insert(*node_index, eval);
                         eval
                     },
                     TraceSegmentId::Aux => {
                         let index = trace_access.column * 2 + trace_access.row_offset;
-                        let eval =
-                            query_indexed_cur_eval(&mut self.rng, &mut self.aux_trace, index);
+                        let eval = query_indexed_eval(&mut self.rng, &mut self.aux_trace, index);
                         self.evals_map.insert(*node_index, eval);
                         eval
                     },
                 },
                 Value::RandomValue(u) => {
-                    let eval = query_indexed_cur_eval(&mut self.rng, &mut self.rand_values, *u);
+                    let eval = query_indexed_eval(&mut self.rng, &mut self.rand_values, *u);
                     self.evals_map.insert(*node_index, eval);
                     eval
                 },
@@ -91,17 +89,17 @@ impl RandomInputs {
                 // element to associate a unique random value or each public input
                 // and each periodic column access
                 Value::PublicInput(pi) => {
-                    let eval = query_hashed_cur_eval(&mut self.rng, &mut self.public_inputs, pi);
+                    let eval = query_hashed_eval(&mut self.rng, &mut self.public_inputs, pi);
                     self.evals_map.insert(*node_index, eval);
                     eval
                 },
                 Value::PeriodicColumn(pc) => {
-                    let eval = query_hashed_cur_eval(&mut self.rng, &mut self.periodic_columns, pc);
+                    let eval = query_hashed_eval(&mut self.rng, &mut self.periodic_columns, pc);
                     self.evals_map.insert(*node_index, eval);
                     eval
                 },
                 Value::PublicInputTable(public_input_table_access) => {
-                    let eval = query_hashed_cur_eval(
+                    let eval = query_hashed_eval(
                         &mut self.rng,
                         &mut self.public_inputs_tables,
                         public_input_table_access,
@@ -111,5 +109,10 @@ impl RandomInputs {
                 },
             },
         }
+    }
+
+    /// Returns all the evaluations, ordered by `NodeIndex`.
+    pub fn into_evaluations(&self) -> Vec<QuadFelt> {
+        self.evals_map.values().cloned().collect()
     }
 }

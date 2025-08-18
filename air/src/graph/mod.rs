@@ -84,17 +84,15 @@ impl AlgebraicGraph {
         self.nodes.len()
     }
 
-    pub fn evaluate_all_nodes(
-        &mut self,
-        random_inputs: &mut RandomInputs,
-    ) -> BTreeMap<NodeIndex, QuadFelt> {
     /// Evaluates all the nodes in the graph at random points and returns a map of node indices to
     /// their evaluations.
+    pub fn evaluate_on_random_inputs(&self) -> Vec<QuadFelt> {
+        let mut random_inputs = RandomInputs::default();
         for index in 0..self.num_nodes() {
             let node_index = NodeIndex(index);
             random_inputs.eval(self, &node_index);
         }
-        random_inputs.evals_map.clone()
+        random_inputs.into_evaluations()
     }
 
     /// Given the evaluations of all nodes in the graph, ordered by their node indices, eliminates
@@ -105,7 +103,7 @@ impl AlgebraicGraph {
     /// This function returns the node indices remapping map.
     pub fn eliminate_common_subexpressions(
         &mut self,
-        evals: &BTreeMap<NodeIndex, QuadFelt>,
+        evals: &[QuadFelt],
     ) -> HashMap<NodeIndex, NodeIndex> {
         let mut new_nodes = Vec::new();
 
@@ -113,17 +111,19 @@ impl AlgebraicGraph {
         let mut evals_vec: Vec<QuadFelt> = Vec::with_capacity(evals.len());
         let mut renumbering_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
 
-        for (node_index, eval) in evals.iter() {
+        for (index, eval) in evals.iter().enumerate() {
+            let node_index = NodeIndex(index);
+
             // 2. For each node, check if its evaluation already exists in the map.
             if let Some(existing_index) = evals_vec.iter().position(|e| e == eval) {
                 // 3. If it does, we will replace the node with the existing one
-                renumbering_map.insert(*node_index, NodeIndex(existing_index));
+                renumbering_map.insert(node_index, NodeIndex(existing_index));
             } else {
                 // 4. If it doesn't, rewrite the node indices if needed and add the node to the new
                 //    graph
                 evals_vec.push(*eval);
 
-                let op = self.node(node_index).op();
+                let op = self.node(&node_index).op();
                 let new_op = match op {
                     Operation::Value(_) => {
                         // Values do not need renumbering, they are leaf nodes
@@ -152,7 +152,7 @@ impl AlgebraicGraph {
                 let new_node = Node { op: new_op };
                 let new_index = new_nodes.len();
                 new_nodes.push(new_node);
-                renumbering_map.insert(*node_index, NodeIndex(new_index));
+                renumbering_map.insert(node_index, NodeIndex(new_index));
             }
         }
 
