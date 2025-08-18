@@ -119,15 +119,15 @@ impl<'a> MirBuilder<'a> {
 
         for bus in self.mir.constraint_graph().buses.values() {
             let bus_type = bus.borrow().bus_type;
-            if let Some(ref mut mirvalue) = bus.borrow().get_first().as_value_mut() {
-                if let MirValue::PublicInputTable(ref mut first) = mirvalue.value.value {
-                    first.set_bus_type(bus_type);
-                }
+            if let Some(ref mut mirvalue) = bus.borrow().get_first().as_value_mut()
+                && let MirValue::PublicInputTable(ref mut first) = mirvalue.value.value
+            {
+                first.set_bus_type(bus_type);
             }
-            if let Some(ref mut mirvalue) = bus.borrow().get_last().as_value_mut() {
-                if let MirValue::PublicInputTable(ref mut last) = mirvalue.value.value {
-                    last.set_bus_type(bus_type);
-                }
+            if let Some(ref mut mirvalue) = bus.borrow().get_last().as_value_mut()
+                && let MirValue::PublicInputTable(ref mut last) = mirvalue.value.value
+            {
+                last.set_bus_type(bus_type);
             }
         }
         Ok(())
@@ -1168,10 +1168,10 @@ impl<'a> MirBuilder<'a> {
             // If the let-bound variable is a parameter, we probably already have the type
             //
             // In that case, replacing the default type (Felt) with the one from the access
-            if let Some(mut param) = let_bound_access_expr.as_parameter_mut() {
-                if let Some(access_ty) = &access.ty {
-                    param.ty = self.translate_type(access_ty);
-                }
+            if let Some(mut param) = let_bound_access_expr.as_parameter_mut()
+                && let Some(access_ty) = &access.ty
+            {
+                param.ty = self.translate_type(access_ty);
             }
             let accessor: Link<Op> = Accessor::create(
                 duplicate_node(let_bound_access_expr, &mut Default::default()),

@@ -305,16 +305,16 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
             self.visit_mut_bus(bus)?;
         }
 
-        if let Some(boundary_constraints) = module.boundary_constraints.as_mut() {
-            if !boundary_constraints.is_empty() {
-                self.visit_mut_boundary_constraints(boundary_constraints)?;
-            }
+        if let Some(boundary_constraints) = module.boundary_constraints.as_mut()
+            && !boundary_constraints.is_empty()
+        {
+            self.visit_mut_boundary_constraints(boundary_constraints)?;
         }
 
-        if let Some(integrity_constraints) = module.integrity_constraints.as_mut() {
-            if !integrity_constraints.is_empty() {
-                self.visit_mut_integrity_constraints(integrity_constraints)?;
-            }
+        if let Some(integrity_constraints) = module.integrity_constraints.as_mut()
+            && !integrity_constraints.is_empty()
+        {
+            self.visit_mut_integrity_constraints(integrity_constraints)?;
         }
 
         self.current_module = None;
@@ -569,19 +569,19 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
 
             let iterable = &expr.iterables[i];
             let iterable_ty = iterable.ty().unwrap();
-            if let Some(expected_ty) = result_ty.replace(iterable_ty) {
-                if expected_ty != iterable_ty {
-                    self.has_type_errors = true;
-                    // Note: We don't break here but at the end of the module's compilation, as we
-                    // want to continue to gather as many errors as possible
-                    let _ = self.type_mismatch(
-                        Some(&iterable_ty),
-                        iterable.span(),
-                        &expected_ty,
-                        expr.iterables[0].span(),
-                        expr.span(),
-                    );
-                }
+            if let Some(expected_ty) = result_ty.replace(iterable_ty)
+                && expected_ty != iterable_ty
+            {
+                self.has_type_errors = true;
+                // Note: We don't break here but at the end of the module's compilation, as we
+                // want to continue to gather as many errors as possible
+                let _ = self.type_mismatch(
+                    Some(&iterable_ty),
+                    iterable.span(),
+                    &expected_ty,
+                    expr.iterables[0].span(),
+                    expr.span(),
+                );
             }
             match self.expr_binding_type(iterable) {
                 Ok(iterable_binding_ty) => {
@@ -718,11 +718,11 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         //
         // * Must be trace bindings or aliases of same
         // * Must match the type signature of the callee
-        if let Ok(ty) = callee_binding_ty {
-            if let BindingType::Function(FunctionType::Evaluator(ref params)) = ty.item {
-                for (arg, param) in expr.args.iter().zip(params.iter()) {
-                    self.validate_evaluator_argument(expr.span(), arg, param)?;
-                }
+        if let Ok(ty) = callee_binding_ty
+            && let BindingType::Function(FunctionType::Evaluator(ref params)) = ty.item
+        {
+            for (arg, param) in expr.args.iter().zip(params.iter()) {
+                self.validate_evaluator_argument(expr.span(), arg, param)?;
             }
         }
 
@@ -1477,17 +1477,17 @@ impl SemanticAnalysis<'_> {
                                 //
                                 // If no type is known, a diagnostic is already emitted, so proceed
                                 // as if it is valid
-                                if let Some(ty) = access.column.ty.as_ref() {
-                                    if !ty.is_scalar() {
-                                        // Invalid constraint, only scalar values are allowed
-                                        self.type_mismatch(
-                                            Some(ty),
-                                            access.span(),
-                                            &Type::Felt,
-                                            found.span(),
-                                            constraint_span,
-                                        )?;
-                                    }
+                                if let Some(ty) = access.column.ty.as_ref()
+                                    && !ty.is_scalar()
+                                {
+                                    // Invalid constraint, only scalar values are allowed
+                                    self.type_mismatch(
+                                        Some(ty),
+                                        access.span(),
+                                        &Type::Felt,
+                                        found.span(),
+                                        constraint_span,
+                                    )?;
                                 }
 
                                 // Verify that the right-hand expression evaluates to a scalar

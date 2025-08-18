@@ -16,7 +16,7 @@ authors = ["miden contributors"]
 license = "MIT"
 repository = "https://github.com/0xMiden/air-script"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 
 [workspace.dependencies]
 anyhow = "1.0"

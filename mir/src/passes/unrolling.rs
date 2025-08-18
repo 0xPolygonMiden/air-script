@@ -988,12 +988,11 @@ impl Visitor for UnrollingFirstPass<'_> {
 
     fn visit_node(&mut self, graph: &mut Graph, node: Link<Node>) -> Result<(), CompileError> {
         // We keep a reference to all For nodes to avoid dropping the backlinks stored in Parameters
-        if let Some(owner) = node.clone().as_owner() {
-            if let Some(op) = owner.clone().as_op() {
-                if let Some(_for_node) = op.as_for() {
-                    self.all_for_nodes.insert(op.get_ptr(), (op.clone(), owner.clone()));
-                }
-            }
+        if let Some(owner) = node.clone().as_owner()
+            && let Some(op) = owner.clone().as_op()
+            && let Some(_for_node) = op.as_for()
+        {
+            self.all_for_nodes.insert(op.get_ptr(), (op.clone(), owner.clone()));
         }
 
         let updated_op: Result<Option<Link<Op>>, CompileError> = match node.borrow().deref() {

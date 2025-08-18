@@ -143,26 +143,26 @@ impl RandomInputs {
                 }
             },
             Op::Accessor(a) => {
-                if let Op::Value(v) = a.indexable.borrow().deref() {
-                    if let MirValue::TraceAccess(trace_access) = v.value.value {
-                        // Use accessor offset instead of the trace_access row_offset
-                        let index = trace_access.column * 2 + a.offset;
-                        match trace_access.segment {
-                            TraceSegmentId::Main => {
-                                return Ok(query_indexed_cur_eval(
-                                    &mut self.rng,
-                                    &mut self.main_trace,
-                                    index,
-                                ));
-                            },
-                            _ => {
-                                println!(
-                                    "Unexpected trace_access segment in RandomInputs::eval: {}. This segment should only be used for buses and should be handled separately.",
-                                    trace_access.segment
-                                );
-                                return Err(CompileError::Failed);
-                            },
-                        }
+                if let Op::Value(v) = a.indexable.borrow().deref()
+                    && let MirValue::TraceAccess(trace_access) = v.value.value
+                {
+                    // Use accessor offset instead of the trace_access row_offset
+                    let index = trace_access.column * 2 + a.offset;
+                    match trace_access.segment {
+                        TraceSegmentId::Main => {
+                            return Ok(query_indexed_cur_eval(
+                                &mut self.rng,
+                                &mut self.main_trace,
+                                index,
+                            ));
+                        },
+                        _ => {
+                            println!(
+                                "Unexpected trace_access segment in RandomInputs::eval: {}. This segment should only be used for buses and should be handled separately.",
+                                trace_access.segment
+                            );
+                            return Err(CompileError::Failed);
+                        },
                     }
                 }
                 let indexable = self.eval(a.indexable.clone())?;

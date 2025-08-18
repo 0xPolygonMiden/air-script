@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 (TBD)
+
+- Incremented MSRV to 1.89.
+
 ## 0.4.0 (2025-06-20)
 
 ### Language

@@ -167,11 +167,11 @@ impl Link<Op> {
         other_node.update(&self_node);
         other.update_inner_node(&self_node);
 
-        if let Some(other_owner) = other.as_owner() {
-            if let Some(self_owner) = self.as_owner() {
-                other_owner.update(&self_owner);
-                other.update_inner_owner(&self_owner);
-            }
+        if let Some(other_owner) = other.as_owner()
+            && let Some(self_owner) = self.as_owner()
+        {
+            other_owner.update(&self_owner);
+            other.update_inner_owner(&self_owner);
         }
         self.update(other);
 
