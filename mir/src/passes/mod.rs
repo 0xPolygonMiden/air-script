@@ -1,9 +1,9 @@
+mod constant_propagation;
 mod inlining;
 mod translate;
 mod unrolling;
 mod visitor;
-// Note: ConstantPropagation and ValueNumbering are not implemented yet in the MIR
-mod constant_propagation;
+// Note: ValueNumbering is not implemented yet in the MIR
 //mod value_numbering;
 //pub use value_numbering::ValueNumbering;
 use std::{collections::HashMap, ops::Deref};
