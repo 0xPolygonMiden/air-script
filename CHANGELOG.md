@@ -5,6 +5,7 @@
 - Incremented MSRV to 1.89.
 - Add a constant propagation pass after other mir passes (#439).
 - Refactored the unrolling pass in MIR (#434).
+- Reorder unrolling passes to unroll list comprehensions before match statements (#431).
 
 ## 0.4.0 (2025-06-20)
 
