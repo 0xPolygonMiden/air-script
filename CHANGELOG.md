@@ -4,6 +4,7 @@
 
 - Incremented MSRV to 1.89.
 - Add a constant propagation pass after other mir passes (#439).
+- Allow computed indices (#444).
 
 ## 0.4.0 (2025-06-20)
 
