@@ -3,6 +3,7 @@
 ## 0.5.0 (TBD)
 
 - Incremented MSRV to 1.89.
+- Add a constant propagation pass after other mir passes (#439).
 
 ## 0.4.0 (2025-06-20)
 
