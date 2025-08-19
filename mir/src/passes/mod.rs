@@ -3,9 +3,6 @@ mod inlining;
 mod translate;
 mod unrolling;
 mod visitor;
-// Note: ValueNumbering is not implemented yet in the MIR
-//mod value_numbering;
-//pub use value_numbering::ValueNumbering;
 use std::{collections::HashMap, ops::Deref};
 
 pub use constant_propagation::ConstantPropagation;
