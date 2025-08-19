@@ -573,10 +573,15 @@ impl AirBuilder<'_> {
 
     /// Extracts the trace access information from a given [Mir] `Boundary`.
     /// Returns a [Mir] `TraceAccess` with the corresponding segment id and column if the boundary
-    /// wraps a valid trace access column. It otherwise either panics or emits a diagnostic.
+    /// wraps a valid trace access column, or raises a diagnostic if the trace access has a size
+    /// greater than 1.
     ///
     /// Note: the boundary expression must only reference the constrained trace access, not the
     /// whole boundary constraint expression.
+    ///
+    /// # Panics
+    /// Panics if the boundary does not wrap a trace access column, which should have been caught
+    /// during semantic analysis.
     fn extract_trace_from_boundary(
         &self,
         boundary: MirBoundary,
