@@ -50,10 +50,12 @@ impl Constraints {
         }
     }
 
-    /// Updates the root boundary and integrity constraints to use the new node indices
-    /// values, given in the `renumbering_map`.
-    /// This functions also removes duplicate constraints (that share the same root and domain).
-    ///
+    /// Updates the root boundary and integrity constraints to use the new node indices  
+    /// values, given in the `renumbering_map`.  
+    ///  
+    /// This functions also removes duplicate constraints (that share the same root and domain).  
+    ///  
+    /// # Panics  
     /// Panics if a constraint's node index is not found in the renumbering map.
     pub fn renumber_and_deduplicate_constraints(
         &mut self,
@@ -164,6 +166,8 @@ impl ConstraintRoot {
         &self.index
     }
 
+    /// Updates the node index this constraint refers to. This should be called if the graph is
+    /// updated after its initial construction, such as during common subexpression elimination.
     pub fn update_node_index(&mut self, new_index: NodeIndex) {
         self.index = new_index;
     }

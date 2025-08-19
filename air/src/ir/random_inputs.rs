@@ -11,7 +11,10 @@ use crate::{
     PublicInputTableAccess, Value,
 };
 
-/// Represents the current existing evaluations to persist random values taken by the same values.
+/// Holds both:
+/// - the random inputs taken by leaf nodes, in order to persist them across different node
+///   evaluations.
+/// - the evaluations of all the nodes in the graph
 #[derive(Debug, Clone, Default)]
 pub struct RandomInputs {
     rng: ThreadRng,
@@ -112,8 +115,8 @@ impl RandomInputs {
         }
     }
 
-    /// Returns all the evaluations, ordered by `NodeIndex`.
-    pub fn into_evaluations(&self) -> Vec<QuadFelt> {
-        self.evals_map.values().cloned().collect()
+    /// Consumes self and returns all the evaluations, ordered by `NodeIndex`.
+    pub fn into_evaluations(self) -> Vec<QuadFelt> {
+        self.evals_map.into_values().collect()
     }
 }

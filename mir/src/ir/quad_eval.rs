@@ -51,7 +51,8 @@ pub fn query_mapped_eval<R: Rng + ?Sized, K: Ord + Eq + Clone>(
     *evaluation_map.entry(element.clone()).or_insert_with(|| rand_quad_felt(rng))
 }
 
-/// Represents the current existing evaluations to persist random values taken by the same values.
+/// Holds the random inputs taken by leaf nodes, in order to persist them across different node
+/// evaluations.
 #[derive(Debug, Clone, Default)]
 pub struct RandomInputs {
     rng: ThreadRng,
