@@ -571,13 +571,17 @@ impl AirBuilder<'_> {
         self.air.constraint_graph_mut().insert_node(op)
     }
 
-    /// Extracts the trace access information from a given [Mir] `Boundary``.
+    /// Extracts the trace access information from a given [Mir] `Boundary`.
+    /// Returns a [Mir] `TraceAccess` with the corresponding segment id and column if the boundary
+    /// wraps a valid trace access column. It otherwise either panics or emits a diagnostic.
+    ///
+    /// Note: the boundary expression must only reference the constrained trace access, not the
+    /// whole boundary constraint expression.
     fn extract_trace_from_boundary(
         &self,
         boundary: MirBoundary,
     ) -> Result<MirTraceAccess, CompileError> {
-        let expected_trace_access_expr = boundary.expr.clone();
-        let Op::Value(value) = expected_trace_access_expr.borrow().deref().clone() else {
+        let Op::Value(value) = boundary.expr.borrow().deref().clone() else {
             unreachable!(); // Raise diag
         };
 
@@ -619,6 +623,7 @@ impl AirBuilder<'_> {
     }
 
     /// Marks a boundary as constrained by the given trace access information.
+    /// This is used to ensure that we do not insert duplicate boundary constraints in the graph.
     fn mark_constrained_boundary(
         &mut self,
         trace_access: MirTraceAccess,
