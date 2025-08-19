@@ -29,6 +29,59 @@ impl<'a> Inlining<'a> {
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self { diagnostics }
     }
+
+    /// Runs the Inlining pass once (with both InliningFirstPass and InliningSecondPass)
+    ///
+    /// Returns true if any calls were inlined, false otherwise, to let the caller know if any
+    /// changes were made or if we reached a fixed point.
+    fn run_once(&mut self, ir: &mut Mir) -> Result<bool, CompileError> {
+        // The first pass only identifies the call graph dependencies and the needed calls to inline
+        let mut first_pass = InliningFirstPass::new(self.diagnostics);
+        Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
+
+        // We then create the inlining order (inlining first the functions and evaluators that do
+        // not call other functions or evaluators)
+        let func_eval_inlining_order =
+            create_inlining_order(self.diagnostics, first_pass.func_eval_dependency_graph.clone())?;
+
+        // The second pass actually inlines the calls
+        let mut second_pass = InliningSecondPass::new(
+            self.diagnostics,
+            func_eval_inlining_order.clone(),
+            first_pass.func_eval_nodes_where_called.clone(),
+        );
+        Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
+
+        Ok(second_pass.had_calls)
+    }
+}
+
+// If we have to run the inlining algorithm `INLINING_LIMIT`, we return an error
+const INLINING_LIMIT: usize = 10;
+
+impl Pass for Inlining<'_> {
+    type Input<'a> = Mir;
+    type Output<'a> = Mir;
+    type Error = CompileError;
+
+    fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
+        let mut had_calls = true;
+        let mut iterations = 0;
+
+        while had_calls && iterations < INLINING_LIMIT {
+            had_calls = self.run_once(&mut ir)?;
+            iterations += 1;
+        }
+
+        if had_calls {
+            self.diagnostics.error(
+                "Inlining call depth limit reached, some calls may not have been inlined. Aborting.".to_string(),
+            );
+            return Err(CompileError::Failed);
+        }
+
+        Ok(ir)
+    }
 }
 
 pub struct InliningFirstPass<'a> {
@@ -68,7 +121,6 @@ pub struct CallInliningContext {
     pure_function: bool,
     ref_node: Link<Node>,
 }
-impl CallInliningContext {}
 
 pub struct InliningSecondPass<'a> {
     diagnostics: &'a DiagnosticsHandler,
@@ -85,6 +137,7 @@ pub struct InliningSecondPass<'a> {
 
     // HashMap<CaleePtr, (Callee, Vec<Call nodes where called>)>
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
+    had_calls: bool,
 }
 impl<'a> InliningSecondPass<'a> {
     pub fn new(
@@ -100,34 +153,8 @@ impl<'a> InliningSecondPass<'a> {
             params_for_ref_node: HashMap::new(),
             func_eval_nodes_where_called,
             func_eval_inlining_order,
+            had_calls: false,
         }
-    }
-}
-
-impl Pass for Inlining<'_> {
-    type Input<'a> = Mir;
-    type Output<'a> = Mir;
-    type Error = CompileError;
-
-    fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
-        // The first pass only identifies the call graph dependencies and the needed calls to inline
-        let mut first_pass = InliningFirstPass::new(self.diagnostics);
-        Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
-
-        // We then create the inlining order (inlining first the functions and evaluators that do
-        // not call other functions or evaluators)
-        let func_eval_inlining_order =
-            create_inlining_order(self.diagnostics, first_pass.func_eval_dependency_graph.clone())?;
-
-        // The second pass actually inlines the calls
-        let mut second_pass = InliningSecondPass::new(
-            self.diagnostics,
-            func_eval_inlining_order.clone(),
-            first_pass.func_eval_nodes_where_called.clone(),
-        );
-        Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
-
-        Ok(ir)
     }
 }
 
@@ -281,7 +308,10 @@ impl Visitor for InliningSecondPass<'_> {
         call_nodes_to_inline_in_order
     }
     fn run(&mut self, graph: &mut Graph) -> Result<(), CompileError> {
-        for root_node in self.root_nodes_to_visit(graph).iter() {
+        let root_nodes_to_visit = self.root_nodes_to_visit(graph);
+        self.had_calls = !root_nodes_to_visit.is_empty();
+
+        for root_node in root_nodes_to_visit {
             let mut updated_op = None;
 
             if let Some(op) = root_node.as_op() {
