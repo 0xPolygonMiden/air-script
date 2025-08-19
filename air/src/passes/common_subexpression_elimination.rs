@@ -23,14 +23,11 @@ impl Pass for CommonSubexpressionElimination<'_> {
     type Error = CompileError;
 
     fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
-        // 1. Start by going through all the nodes in the Air and evaluating them at random points.
-        let evals = ir.constraint_graph_mut().evaluate_on_random_inputs();
-
-        // 2. Then, eliminate common subexpressions in the graph based on the evaluations.
-        // This will both:
+        // Evaluate the nodes at random points, and eliminate common subexpressions in the graph
+        // based on the evaluations. This will both:
         // - Remove nodes that have the same evaluation, keeping only one instance.
         // - Update the indices of the nodes to reflect the changes in the graph.
-        let renumbering_map = ir.constraint_graph_mut().eliminate_common_subexpressions(&evals);
+        let renumbering_map = ir.constraint_graph_mut().eliminate_common_subexpressions();
 
         // Update constraints with the new node indices
         ir.constraints.renumber_and_deduplicate_constraints(&renumbering_map);
