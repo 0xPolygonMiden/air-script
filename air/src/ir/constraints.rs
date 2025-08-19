@@ -1,5 +1,6 @@
+extern crate alloc;
+use alloc::collections::BTreeSet;
 use core::fmt;
-use std::collections::HashSet;
 
 use super::*;
 use crate::graph::{AlgebraicGraph, NodeIndex};
@@ -56,7 +57,7 @@ impl Constraints {
     /// Panics if a constraint's node index is not found in the renumbering map.
     pub fn renumber_and_deduplicate_constraints(
         &mut self,
-        renumbering_map: &HashMap<NodeIndex, NodeIndex>,
+        renumbering_map: &BTreeMap<NodeIndex, NodeIndex>,
     ) {
         // Iterate over all boundary and integrity constraints
         for (_, segment_constraints) in self
@@ -64,7 +65,7 @@ impl Constraints {
             .iter_mut()
             .chain(self.integrity_constraints.iter_mut())
         {
-            let mut added_indices = HashSet::new();
+            let mut added_indices = BTreeSet::new();
             segment_constraints.retain_mut(|constraint| {
                 let new_index = *renumbering_map
                     .get(constraint.node_index())

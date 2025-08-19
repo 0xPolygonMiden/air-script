@@ -29,7 +29,8 @@ pub const CURRENT_ROW: usize = 0;
 /// The minimum cycle length of a periodic column
 pub const MIN_CYCLE_LENGTH: usize = 2;
 
-use std::collections::{BTreeMap, HashMap};
+extern crate alloc;
+use alloc::collections::BTreeMap;
 
 use miden_diagnostics::{SourceSpan, Spanned};
 

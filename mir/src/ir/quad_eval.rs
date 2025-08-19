@@ -1,4 +1,6 @@
-use std::{collections::HashMap, hash::Hash, ops::Deref};
+extern crate alloc;
+use alloc::collections::BTreeMap;
+use std::ops::Deref;
 
 use air_parser::ast::TraceSegmentId;
 use miden_core::{Felt, QuadExtension};
@@ -41,10 +43,10 @@ pub fn query_indexed_eval<R: Rng + ?Sized>(
 
 /// Helper function to either query an existing evaluation or create a new random one if the element
 /// is not present in the map.
-pub fn query_hashed_eval<R: Rng + ?Sized, H: Hash + Eq + Clone>(
+pub fn query_mapped_eval<R: Rng + ?Sized, K: Ord + Eq + Clone>(
     rng: &mut R,
-    evaluation_map: &mut HashMap<H, QuadFelt>,
-    element: &H,
+    evaluation_map: &mut BTreeMap<K, QuadFelt>,
+    element: &K,
 ) -> QuadFelt {
     *evaluation_map.entry(element.clone()).or_insert_with(|| rand_quad_felt(rng))
 }
@@ -57,8 +59,8 @@ pub struct RandomInputs {
     // $main[0], $main[0]', $main[1], $main[1]', $main[2], ...
     main_trace: Vec<QuadFelt>,
     rand_values: Vec<QuadFelt>,
-    public_inputs: HashMap<PublicInputAccess, QuadFelt>,
-    periodic_columns: HashMap<PeriodicColumnAccess, QuadFelt>,
+    public_inputs: BTreeMap<PublicInputAccess, QuadFelt>,
+    periodic_columns: BTreeMap<PeriodicColumnAccess, QuadFelt>,
 }
 
 impl RandomInputs {
@@ -141,10 +143,10 @@ impl RandomInputs {
                     // associate a unique random value or each public input and
                     // each periodic column access
                     MirValue::PublicInput(pi) => {
-                        Ok(query_hashed_eval(&mut self.rng, &mut self.public_inputs, pi))
+                        Ok(query_mapped_eval(&mut self.rng, &mut self.public_inputs, pi))
                     },
                     MirValue::PeriodicColumn(pc) => {
-                        Ok(query_hashed_eval(&mut self.rng, &mut self.periodic_columns, pc))
+                        Ok(query_mapped_eval(&mut self.rng, &mut self.periodic_columns, pc))
                     },
                     MirValue::Null
                     | MirValue::BusAccess(_)

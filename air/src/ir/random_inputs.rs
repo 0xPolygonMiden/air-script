@@ -1,7 +1,8 @@
-use std::collections::{BTreeMap, HashMap};
+extern crate alloc;
+use alloc::collections::BTreeMap;
 
 use air_parser::ast::TraceSegmentId;
-use mir::ir::{QuadFelt, const_quad_felt, query_hashed_eval, query_indexed_eval};
+use mir::ir::{QuadFelt, const_quad_felt, query_indexed_eval, query_mapped_eval};
 use rand::prelude::*;
 use winter_math::fields::f64::BaseElement as Felt;
 
@@ -19,11 +20,11 @@ pub struct RandomInputs {
     main_trace: Vec<QuadFelt>,
     aux_trace: Vec<QuadFelt>,
     rand_values: Vec<QuadFelt>,
-    public_inputs: HashMap<PublicInputAccess, QuadFelt>,
-    periodic_columns: HashMap<PeriodicColumnAccess, QuadFelt>,
-    public_inputs_tables: HashMap<PublicInputTableAccess, QuadFelt>,
+    public_inputs: BTreeMap<PublicInputAccess, QuadFelt>,
+    periodic_columns: BTreeMap<PeriodicColumnAccess, QuadFelt>,
+    public_inputs_tables: BTreeMap<PublicInputTableAccess, QuadFelt>,
     // A map to hold the the current evaluations of nodes at random points
-    pub evals_map: BTreeMap<NodeIndex, QuadFelt>,
+    evals_map: BTreeMap<NodeIndex, QuadFelt>,
 }
 
 impl RandomInputs {
@@ -89,17 +90,17 @@ impl RandomInputs {
                 // element to associate a unique random value or each public input
                 // and each periodic column access
                 Value::PublicInput(pi) => {
-                    let eval = query_hashed_eval(&mut self.rng, &mut self.public_inputs, pi);
+                    let eval = query_mapped_eval(&mut self.rng, &mut self.public_inputs, pi);
                     self.evals_map.insert(*node_index, eval);
                     eval
                 },
                 Value::PeriodicColumn(pc) => {
-                    let eval = query_hashed_eval(&mut self.rng, &mut self.periodic_columns, pc);
+                    let eval = query_mapped_eval(&mut self.rng, &mut self.periodic_columns, pc);
                     self.evals_map.insert(*node_index, eval);
                     eval
                 },
                 Value::PublicInputTable(public_input_table_access) => {
-                    let eval = query_hashed_eval(
+                    let eval = query_mapped_eval(
                         &mut self.rng,
                         &mut self.public_inputs_tables,
                         public_input_table_access,
