@@ -201,8 +201,9 @@ pub fn duplicate_node(
 
             if let Some(_root_ref) = owner_ref.as_root() {
                 new_param.as_parameter_mut().unwrap().set_ref_node(owner_ref);
-            } else if let Some((_replaced_node, replaced_by)) =
-                current_replace_map.get(&owner_ref.as_op().unwrap().get_ptr())
+            } else if let Some(op_ref) = owner_ref.as_op()
+                && let Some((_replaced_node, replaced_by)) =
+                    current_replace_map.get(&op_ref.get_ptr())
             {
                 new_param
                     .as_parameter_mut()
@@ -452,7 +453,8 @@ pub fn duplicate_node_or_replace(
             };
 
             if owner_ref == ref_owner {
-                let new_node = replace_parameter_list[parameter.position].clone();
+                let replace_by_node = replace_parameter_list[parameter.position].clone();
+                let new_node = duplicate_node(replace_by_node, &mut Default::default());
                 current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
             } else {
                 let new_param =
