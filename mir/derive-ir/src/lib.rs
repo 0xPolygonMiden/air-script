@@ -71,8 +71,8 @@ use syn::{DeriveInput, parse_macro_input};
 /// ```
 ///
 /// We then generate an implementation for each state, with a method for each field., which
-/// transitions to the next state. The `enum_wrapper`` attribute is used to automatically wrap the
-/// struct in a `Link<enum_wrapper>`` to reduce boilerplate. The only supported `enum_wrapper`s are
+/// transitions to the next state. The `enum_wrapper` attribute is used to automatically wrap the
+/// struct in a `Link<enum_wrapper>` to reduce boilerplate. The only supported `enum_wrapper`s are
 /// `Op` and `Root`.
 ///
 /// The following API is generated:
