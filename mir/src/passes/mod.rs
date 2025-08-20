@@ -1,14 +1,11 @@
+mod constant_propagation;
 mod inlining;
 mod translate;
 mod unrolling;
 mod visitor;
-// Note: ConstantPropagation and ValueNumbering are not implemented yet in the MIR
-//mod constant_propagation;
-//mod value_numbering;
-//pub use constant_propagation::ConstantPropagation;
-//pub use value_numbering::ValueNumbering;
 use std::{collections::HashMap, ops::Deref};
 
+pub use constant_propagation::ConstantPropagation;
 pub use inlining::Inlining;
 use miden_diagnostics::Spanned;
 pub use translate::AstToMir;

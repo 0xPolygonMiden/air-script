@@ -229,7 +229,8 @@ impl Link<Node> {
                 Root::None(span) => Node::None(*span),
             };
         } else {
-            unreachable!();
+            // If the [Node] is stale, we set it to None
+            to_update = Node::None(self.span());
         }
 
         *self.borrow_mut() = to_update;
