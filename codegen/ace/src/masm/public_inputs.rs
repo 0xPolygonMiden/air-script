@@ -1,6 +1,7 @@
-use super::MasmVerifierParameters;
-use crate::masm::{generate_with_map_sections, DOUBLE_WORD_SIZE};
 use std::collections::HashMap;
+
+use super::MasmVerifierParameters;
+use crate::masm::{DOUBLE_WORD_SIZE, generate_with_map_sections};
 
 /// Generates the MASM module of the STARK verifier for handling public inputs.
 ///
@@ -8,76 +9,144 @@ use std::collections::HashMap;
 ///
 /// 1. Fixed length public inputs processing: this takes as input the total number of fixed length
 ///    public inputs (as base field elements) which is used in order to determine the number of
-///    iterations of the loop loading-storing-hashing the fixed length public inputs,
+///    iterations of the loop responsible for loading-storing-hashing the fixed length public
+///    inputs,
 /// 2. Variable length public inputs processing: this takes as input the map from identifiers to
-///    sizes/width of the so-called variable length tables, also called messages widths. This
-///    is used in order to generate procedures, one per variable length table, in order to
-///    reduce each table, using auxiliary randomness, to an element in the extension field.
-///    Currently, only `multiset` buses are supported.
+///    (width, bus_type) of the so-called variable length tables, also called messages widths, and
+///    the type of the bus corresponding to each table. This is used in order to generate
+///    procedures, one per variable length table, in order to reduce each table, using auxiliary
+///    randomness, to an element in the extension field.
 pub fn generate_public_inputs(masm_verifier_parameters: &MasmVerifierParameters) -> String {
     let num_iter_load_fixed_len_pub_inputs =
         (masm_verifier_parameters.fixed_len_pub_inputs_total_size()).div_ceil(DOUBLE_WORD_SIZE);
 
-    // procedures to reduce variable length inputs tables
+    // procedures to reduce variable length inputs tables, one per table/group
     let mut var_len_pi_reduction_procedures = String::new();
     // code section for calling the above procedures
-    let mut calls_var_len_pi_section = String::new();
+    let mut reduce_var_len_pi_groups_call = String::new();
 
     // for each variable length public input group, we create a procedure to reduce the variable
     // length inputs and add a call to the said procedure
-    for (identifier, message_width) in masm_verifier_parameters
-        .variable_len_pub_inputs_sizes()
-        .iter()
+    // For each table/group, we associate an label in order to domain separate messages
+    // TODO: this will probably be the responsibility of the backend in the near term
+    let mut op_batch_section = String::new();
+    let mut op_group_label = 0;
+    for (identifier, (message_width, bus_type)) in
+        masm_verifier_parameters.variable_len_pub_inputs_sizes().iter()
     {
-        let procedure = REDUCE_VARIABLE_LEN_PUB_INPUTS_PROCEDURE
+        // create the label for the current group
+        op_batch_section += &VAR_LEN_PI_GROUP_OP_LABELS
             .to_string()
-            .replace("INDEX_VAR_LEN_PUB_INPUTS", &identifier.to_string())
-            .replace(
-                "NUM_ITER_REDUCE_MSG",
-                &((*message_width).div_ceil(DOUBLE_WORD_SIZE)).to_string(),
-            );
+            .replace("{GROUP_ID}", &identifier.to_string().to_uppercase())
+            .replace("OP_LABEL_VALUE", &op_group_label.to_string().to_uppercase());
+        op_group_label += 1;
 
+        // add a call to the procedure for this group
+        reduce_var_len_pi_groups_call += &REDUCE_VAR_LEN_PI_GROUP_ID
+            .to_string()
+            .replace("{group_id}", &identifier.to_string());
+
+        // depending on the type of bus, generate the appropriate procedure for reducing
+        // the variable length public inputs
+        let procedure = match bus_type {
+            air_ir::BusType::Multiset => REDUCE_VAR_LEN_PI_MULTISET_PROCEDURE
+                .to_string()
+                .replace("{group_id}", &identifier.to_string())
+                .replace("{GROUP_ID}", &identifier.to_string().to_uppercase())
+                .replace(
+                    "{WIDTH_INTERACTION_GROUP_ID_IN_DOUBLE_WORD}",
+                    &((*message_width).div_ceil(DOUBLE_WORD_SIZE)).to_string(),
+                ),
+            air_ir::BusType::Logup => REDUCE_VAR_LEN_PI_LOGUP_PROCEDURE
+                .to_string()
+                .replace("{group_id}", &identifier.to_string())
+                .replace("{GROUP_ID}", &identifier.to_string().to_uppercase())
+                .replace(
+                    "{WIDTH_INTERACTION_GROUP_ID_IN_DOUBLE_WORD}",
+                    &((*message_width).div_ceil(DOUBLE_WORD_SIZE)).to_string(),
+                ),
+        };
         var_len_pi_reduction_procedures.push_str(&procedure);
-
-        calls_var_len_pi_section += &format!("\t\nexec.{identifier}_th_var_len_pub_inputs_reduce",);
     }
 
+    // generate the map for filling the sections
     let mut sections_map = HashMap::new();
-    sections_map.insert("REDUCE_VARIABLE_LEN_PUB_INPUTS", calls_var_len_pi_section);
+    sections_map.insert("DEFINE_VAR_LEN_PI_GROUP_OP_LABELS", op_batch_section);
+    sections_map.insert("REDUCE_VAR_LEN_PI_GROUP_ID_CALL", reduce_var_len_pi_groups_call);
     sections_map.insert(
-        "DEFINITION_PROCEDURES_REDUCE_VARIABLE_LEN_PUB_INPUTS",
+        "REDUCE_VAR_LEN_PI_GROUP_ID_PROCEDURES_DEFINITIONS",
         var_len_pi_reduction_procedures,
     );
 
-    let mut file = PUBLIC_INPUTS.to_string().replace(
-        "NUM_ITER_LOAD_FIXED_LEN_PUB_INPUTS",
-        &num_iter_load_fixed_len_pub_inputs.to_string(),
-    );
+    // fill the constants first
+    let mut file = PUBLIC_INPUTS_MASM
+        .to_string()
+        .replace(
+            "NUM_FIXED_LEN_PUBLIC_INPUTS_VALUE",
+            &masm_verifier_parameters
+                .fixed_len_pub_inputs_total_size()
+                .next_multiple_of(DOUBLE_WORD_SIZE)
+                .to_string(),
+        )
+        .replace("NUM_VAR_LEN_PI_GROUPS_VALUE", &op_group_label.to_string())
+        .replace(
+            "NUM_ITER_LOAD_FIXED_LEN_PUB_INPUTS",
+            &num_iter_load_fixed_len_pub_inputs.to_string(),
+        );
 
+    // then we fill the sections
     generate_with_map_sections(&mut file, sections_map);
 
     file
 }
 
-const PUBLIC_INPUTS: &str = r#"
-use.std::crypto::stark::constants
-use.std::crypto::hashes::rpo
-use.std::crypto::stark::random_coin
+// TEMPLATES
+// ================================================================================================
 
+const PUBLIC_INPUTS_MASM: &str = r#"
+use.std::crypto::stark::constants
+use.std::crypto::stark::random_coin
+use.std::crypto::stark::public_inputs
+
+use.std::crypto::hashes::rpo
+
+# CONSTANTS
+# =================================================================================================
+
+# Number of fixed length public inputs with padding (in field elements)
+const.NUM_FIXED_LEN_PUBLIC_INPUTS=NUM_FIXED_LEN_PUBLIC_INPUTS_VALUE
+
+# Number of variable length public input groups
+const.NUM_VAR_LEN_PI_GROUPS=NUM_VAR_LEN_PI_GROUPS_VALUE
+
+# Op label for variable length public input groups
+# BEGIN_SECTION:DEFINE_VAR_LEN_PI_GROUP_OP_LABELS
+# END_SECTION:DEFINE_VAR_LEN_PI_GROUP_OP_LABELS
+
+# CONSTANTS GETTERS
+# =================================================================================================
+
+export.get_num_fixed_len_public_inputs
+    push.NUM_FIXED_LEN_PUBLIC_INPUTS
+end
+
+# MAIN PROCEDURE
+# =================================================================================================
 
 #! Processes the public inputs.
 #! 
 #! This involves:
 #!
 #! 1. Loading from the advice stack the fixed-length public inputs and storing them in memory
-#! starting from the address pointed to by `public_inputs_address_ptr`.
+#!    starting from the address pointed to by `public_inputs_address_ptr`.
 #! 2. Loading from the advice stack the variable-length public inputs, storing them temporarily
-#! in memory, and then reducing them to an element in the challenge field using the auxiliary
-#! randomness. This reduced value is then used to impose a boundary condition on the relevant
-#! auxiliary column. 
+#!    in memory, and then reducing them to an element in the challenge field using the auxiliary
+#!    randomness. This reduced value is then used to impose a boundary condition on the relevant
+#!    auxiliary column. 
 #!
 #! Note that the fixed length public inputs are stored as extension field elements while
 #! the variable length ones are stored as base field elements.
+#!
 #! Note also that, while loading the above, we compute the hash of the public inputs. The hashing
 #! starts with capacity registers of the hash function set to `C` that is the result of hashing
 #! the proof context.
@@ -117,7 +186,8 @@ use.std::crypto::stark::random_coin
 export.process_public_inputs
     # 1) Compute the address where the public inputs will be stored and store it.
     #    This also computes the address where the reduced variable-length public inputs will be stored.
-    exec.compute_and_store_public_inputs_address
+    exec.get_num_fixed_len_public_inputs push.NUM_VAR_LEN_PI_GROUPS
+    exec.public_inputs::compute_and_store_public_inputs_address
     # => [C, ...]
 
     # 2) Load the public inputs.
@@ -133,30 +203,36 @@ export.process_public_inputs
     exec.reduce_variable_length_public_inputs
 end
 
+# HELPER PROCEDURES
+# =================================================================================================
+
 #! Loads from the advice stack the public inputs and stores them in memory starting from address
 #! pointed to by `public_inputs_address_ptr`.
+#!
 #! Note that the public inputs are stored as extension field elements.
+#!
 #! In parallel, it computes the hash of the public inputs being loaded. The hashing starts with
 #! capacity registers of the hash function set to `C` resulting from hashing the proof context.
 #! The output D is the digest of the hashing of the public inputs.
 #!
-#! Input: [C, ...]
-#! Output: [D, ...]
-export.load_public_inputs
+#! Inputs:  [C, ...]
+#! Outputs: [D, ...]
+proc.load_public_inputs
     # 1) Load and hash the fixed length public inputs
+    
     exec.constants::public_inputs_address_ptr mem_load
     movdn.4
     padw padw
     repeat.NUM_ITER_LOAD_FIXED_LEN_PUB_INPUTS
-        exec.load_base_store_extension_double_word
+        exec.public_inputs::load_base_store_extension_double_word
         hperm
     end
- 
+
     # 2) Load and hash the variable length public inputs
 
     ## a) Compute the number of base field elements in total in the variable length public inputs
     exec.constants::num_public_inputs_ptr mem_load
-    exec.constants::get_num_fixed_len_public_inputs
+    exec.get_num_fixed_len_public_inputs
     sub
     # => [num_var_len_pi, R2, R1, C, ptr, ...]
 
@@ -200,8 +276,6 @@ end
 #! inputs to a single element in the challenge field. The resulting values are then stored
 #! contiguously after the fixed-length public inputs.
 #!
-#! Currently, the only variable-length public inputs are the kernel procedure digests.
-#!
 #! Input: 
 #!      - Operand stack: [...]
 #!      - Advice stack: [beta0, beta1, alpha0, alpha1, var_len_pi_1_len, ..., var_len_pi_k_len, ...]
@@ -227,155 +301,49 @@ proc.reduce_variable_length_public_inputs
     # of the reduction can be stored.
     # Note that, as mentioned in the top of this module, the variable-length public inputs are only
     # stored temporarily and they will be over-written by, among other data, the result of reducing
-    # the variable public inputs. 
+    # the variable public inputs.
 
-    # 3) Reduce and store the variable-length public inputs.
-    # BEGIN_SECTION:REDUCE_VARIABLE_LEN_PUB_INPUTS
-    # END_SECTION:REDUCE_VARIABLE_LEN_PUB_INPUTS
-    
-    # 4) Clean up the stack.
+    # BEGIN_SECTION:REDUCE_VAR_LEN_PI_GROUP_ID_CALL
+    # END_SECTION:REDUCE_VAR_LEN_PI_GROUP_ID_CALL
+
+    # 3) Clean up the stack.
     drop drop
     # => [...]
 end
 
-#! Computes the address where the public inputs are to be stored and returns it.
-#!
-#! In order to be able to call `arithmetic_circuit_eval`, we need to layout the inputs to
-#! the constraint evaluation circuit in a contiguous region of memory (called `READ` section
-#! in the ACE chiplet documentation) right before the region of memory storing the circuit
-#! description (called `EVAL` section in the ACE chiplet documentation).
-#! As the number of public inputs is a per-instance parameter, while the sizes of the OOD
-#! evaluation frames and the number of auxiliary random values are fixed, we can lay out
-#! the public inputs right before the auxiliary random values and OOD evaluations.
-#! Hence the address where public inputs are stored is computed using a negative offset
-#! from the address where the OOD are stored.
-#! We compute two pointers, one to the public inputs and the other is for the portion
-#! within the public inputs region storing the variable length public inputs. This will be
-#! the region storing, temporarily, the variable length public inputs that are to be reduced
-#! by the auxiliary randomness and, permanently, the results of the aforementioned reductions.
-#!
-#! Input: [...]
-#! Output: [...]
-proc.compute_and_store_public_inputs_address
-    # 1) Get a pointer to where OOD evaluations are stored
-    exec.constants::ood_evaluations_ptr
-    # => [ood_evals_ptr, ...]
+# BEGIN_SECTION:REDUCE_VAR_LEN_PI_GROUP_ID_PROCEDURES_DEFINITIONS
+# END_SECTION:REDUCE_VAR_LEN_PI_GROUP_ID_PROCEDURES_DEFINITIONS
 
-    # 2) Compute the pointer to the reductions of the variable length public inputs
-    #
-    # We need to account for the number of variable-length
-    # public inputs groups. For each group we allocate 2 slots and we pad with zeros so that
-    # things are word aligned. As of now, we only have one group.
-    # We also need to account for the auxiliary randomness i.e., 4 base field elements.
-    sub.4       # 2 auxiliary random values
-    sub.4       # 1 variable length public input reduced value, with padding for word-alignment
-    # => [res_var_len_pi_reductions_ptr, ...]
-
-    # 3) Compute the pointer to the public inputs
-    #
-    # We need to account for the fact that fixed-length public inputs are stored as extension field
-    # elements. 
-    dup
-    exec.constants::get_num_fixed_len_public_inputs
-    mul.2
-    sub
-    # => [public_inputs_ptr, res_var_len_pi_reductions_ptr, ...]
-
-    # 4) Store both pointers
-    exec.constants::public_inputs_address_ptr mem_store
-    exec.constants::variable_length_public_inputs_address_ptr mem_store
-end
-
-#! Loads 8 base field elements from the advice stack and saves them as extension field elements.
-#!
-#!
-#! Input: [Y, Y, C, ptr, ...]
-#! Output: [A1, A0, C, ptr + 16, ..]
-proc.load_base_store_extension_double_word
-    # 1) Load the first 4 base elements from the advice stack and save them temporarily 
-    adv_loadw
-    exec.constants::tmp1 mem_storew
-
-    # 2) Represent the first 4 base field elements as elements in the quadratic extension field
-    swapw
-    exec.constants::zeroize_stack_word
-    # => [0, 0, 0, 0, a3, a2, a1, a0, C, ptr, ...]
-    movdn.6
-    # => [0, 0, 0, a3, a2, a1, 0, a0, C, ptr, ...]
-    movdn.4
-    # => [0, 0, a3, a2, 0, a1, 0, a0, C, ptr, ...]
-    movdn.2
-    # => [0, a3, 0, a2, 0, a1, 0, a0, C, ptr, ...]
-
-    # 3) Save the first 2 extension field elements
-    swapw
-    dup.12
-    mem_storew
-
-    # 4) Load the second 4 base elements from the advice stack and save them temporarily
-    adv_loadw
-    exec.constants::tmp2 mem_storew
-    swapw
-    # => [0, a3, 0, a2, a7, a6, a5, a4, C, ptr, ...]
-
-    # 5) Save the second 2 extension field elements
-    dup.12 add.4
-    mem_storew
-
-    
-    # 6) Represent the second 4 base field elements as elements in the quadratic extension field
-    exec.constants::zeroize_stack_word
-    # => [0, 0, 0, 0, a7, a6, a5, a4, C, ptr, ...]
-    movdn.6
-    movdn.4
-    movdn.2
-    # => [0, a7, 0, a6, 0, a5, 0, a4, C, ptr, ...]
-
-    # 7) Save the third 2 extension field elements
-    #    We also load the first 4 base elements as a word for use by `hperm`
-    swapw
-    dup.12
-    add.8
-    mem_storew
-    exec.constants::tmp1 mem_loadw
-    swapw
-
-    # 8) Save the fourth 2 extension field elements
-    #    We also load the second 4 base elements as a word for use by `hperm` and update the pointer
-    dup.12
-    add.16 swap.13
-    add.12
-    mem_storew
-    exec.constants::tmp2 mem_loadw
-    # => [a7, a6, a5, a4, a3, a2, a1, a0, C, ptr, ...]
-end
-
-
-# BEGIN_SECTION:DEFINITION_PROCEDURES_REDUCE_VARIABLE_LEN_PUB_INPUTS
-# END_SECTION:DEFINITION_PROCEDURES_REDUCE_VARIABLE_LEN_PUB_INPUTS
 "#;
 
-const REDUCE_VARIABLE_LEN_PUB_INPUTS_PROCEDURE: &str = r#"
-#! Reduces the INDEX_VAR_LEN_PUB_INPUTS-th variable length public inputs using auxiliary randomness.
+const VAR_LEN_PI_GROUP_OP_LABELS: &str = r#" 
+const.VAR_LEN_PI_GROUP_{GROUP_ID}_OP_LABEL=OP_LABEL_VALUE
+"#;
+
+const REDUCE_VAR_LEN_PI_GROUP_ID: &str = r#"adv_push.1 exec.reduce_var_len_pi_group_{group_id}
+# => [next_var_len_pub_inputs_ptr, var_len_pub_inputs_res_ptr, ...]
+"#;
+
+const REDUCE_VAR_LEN_PI_MULTISET_PROCEDURE: &str = r#" 
+
+#! Reduces the variable length public inputs for this group using auxiliary randomness.
 #!
-#! Input: [num_messages, msg_ptr, var_len_pub_inputs_res_ptr, ...]
-#! Output: [res1, res0, nxt_msg_ptr, nxt_var_len_pub_inputs_res_ptr, ...]
+#! Inputs:  [num_interaction, interaction_ptr]
+#! Outputs: [next_ptr]
 #!
-#! where:
-#!  1. `msg_ptr` is a pointer to the kernel procedures digests, and
-#!  2. `res = (res0, res1)` is the resulting reduced value.
-proc.INDEX_VAR_LEN_PUB_INPUTS_th_var_len_pub_inputs_reduce
-    # Assert that the number of messages is at most 1023
+#! where `interaction_ptr` is a pointer to the messages in this group.
+proc.reduce_var_len_pi_group_{group_id}
+    # Assert that the number of interactions is at most 1023
     dup u32lt.1024 assert
 
-    # Store number of messages to reduce
+    # Store number of interactions
     push.0.0 dup.2
     exec.constants::tmp1 mem_storew
-    # => [num_messages, 0, 0, num_messages, msg_ptr, var_len_pub_inputs_res_ptr, ...]
+    # => [num_interaction, 0, 0, num_interaction, interaction_ptr, ...]
 
     # Load alpha
     exec.constants::aux_rand_nd_ptr mem_loadw
-    # => [alpha1, alpha0, beta1, beta0, msg_ptr, var_len_pub_inputs_res_ptr, ...]
+    # => [alpha1, alpha0, beta1, beta0, interaction_ptr, ...]
 
     # We will keep [beta0, beta1, alpha0 + op_label, alpha1] on the stack so that we can compute
     # the final result, where op_label is a unique label to domain separate the interaction with
@@ -384,27 +352,27 @@ proc.INDEX_VAR_LEN_PUB_INPUTS_th_var_len_pub_inputs_reduce
     #
     #   alpha + op_label * beta^0 + beta * (r_0 * beta^0 + r_1 * beta^1 + r_2 * beta^2 + r_3 * beta^3)
     swap
-    exec.constants::INDEX_VAR_LEN_PUB_INPUTS_th_var_len_pub_inputs_op_label
+    push.VAR_LEN_PI_GROUP_{GROUP_ID}_OP_LABEL
     add
     swap
-    # => [alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, var_len_pub_inputs_res_ptr, ...]
+    # => [alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, ...]
 
     # Push the `horner_eval_ext` accumulator
     push.0.0
-    # => [acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, var_len_pub_inputs_res_ptr, ...]
+    # => [acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, ...]
 
     # Push the pointer to the evaluation point beta
     exec.constants::aux_rand_nd_ptr
-    # => [beta_ptr, acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0,  msg_ptr, var_len_pub_inputs_res_ptr, ...]
+    # => [beta_ptr, acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0,  interaction_ptr, ...]
 
-    # Get the pointer to the messages
+    # Get the pointer to interactions
     movup.7
-    # => [msg_ptr, beta_ptr, acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0, var_len_pub_inputs_res_ptr, ...]
+    # => [interaction_ptr, beta_ptr, acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0,  ...]
 
     # Set up the stack for `mem_stream` + `horner_eval_ext`
     swapw
     padw padw
-    # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0,  msg_ptr, beta_ptr, acc1, acc0, var_len_pub_inputs_res_ptr, ...]
+    # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0,  interaction_ptr, beta_ptr, acc1, acc0, ...]
     # where `Y` is a garbage word.
 
     exec.constants::tmp1 mem_loadw dup
@@ -412,37 +380,37 @@ proc.INDEX_VAR_LEN_PUB_INPUTS_th_var_len_pub_inputs_reduce
     neq
 
     while.true
-        repeat.NUM_ITER_REDUCE_MSG
+        repeat.{WIDTH_INTERACTION_GROUP_ID_IN_DOUBLE_WORD}
             mem_stream
             horner_eval_base
         end
-        # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, beta_ptr, acc1, acc0, var_len_pub_inputs_res_ptr, ...]
+        # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, acc1, acc0, ...]
 
         swapdw
-        # => [alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, beta_ptr, acc1, acc0, Y, Y, var_len_pub_inputs_res_ptr, ...]
+        # => [alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, acc1, acc0, Y, Y, ...]
 
         movup.7 movup.7
-        # => [acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, beta_ptr, Y, Y, var_len_pub_inputs_res_ptr, ...]
+        # => [acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, Y, Y, ...]
         
         dup.5 dup.5
-        # => [beta1, beta0, acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, beta_ptr, Y, Y, var_len_pub_inputs_res_ptr, ...]
+        # => [beta1, beta0, acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, Y, Y, ...]
         ext2mul
-        # => [tmp1', tmp0', alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, beta_ptr, Y, Y, var_len_pub_inputs_res_ptr, ...]
+        # => [tmp1', tmp0', alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, Y, Y, ...]
 
         dup.3 dup.3
         ext2add
-        # => [term1', term0', alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, beta_ptr, Y, Y, var_len_pub_inputs_res_ptr, ...]
+        # => [term1', term0', alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, Y, Y, ...]
   
         movdn.15
         movdn.15
-        # => [alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, beta_ptr, Y, Y, term1', term0', var_len_pub_inputs_res_ptr, ...]
+        # => [alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, Y, Y, term1', term0', ...]
 
         push.0 movdn.6
         push.0 movdn.6
-        # => [alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, beta_ptr, 0, 0, Y, Y, term1', term0', var_len_pub_inputs_res_ptr, ...]
+        # => [alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, 0, 0, Y, Y, term1', term0', ...]
  
         swapdw
-        # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0, msg_ptr, beta_ptr, 0, 0, term1', term0', var_len_pub_inputs_res_ptr, ...]
+        # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, 0, 0, term1', term0', ...]
 
         exec.constants::tmp1 mem_loadw sub.1
         exec.constants::tmp1 mem_storew
@@ -451,9 +419,10 @@ proc.INDEX_VAR_LEN_PUB_INPUTS_th_var_len_pub_inputs_reduce
         push.0
         neq
     end
-    # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0, nxt_msg_ptr, beta_ptr, 0, 0, term1', term0', var_len_pub_inputs_res_ptr, ...]
+    # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, 0, 0, term1', term0', ...]
+
     dropw dropw dropw
-    # => [nxt_msg_ptr, beta_ptr, 0, 0, term1', term0', var_len_pub_inputs_res_ptr, ...]
+    # => [interaction_ptr, beta_ptr, 0, 0, term1', term0', ...]
     dup exec.constants::tmp2 mem_store
     exec.constants::tmp1 mem_loadw drop drop drop
 
@@ -462,32 +431,169 @@ proc.INDEX_VAR_LEN_PUB_INPUTS_th_var_len_pub_inputs_reduce
     dup
     push.0
     neq
-    # => [loop, n, acc1, acc0, term1_1, term1_0, ..., termn_1, termn_0, var_len_pub_inputs_res_ptr, ...]
+    # => [loop, n, acc1, acc0, term1_1, term1_0, ..., termn_1, termn_0, ...]
 
     while.true
         sub.1 movdn.4
-        # => [acc1, acc0, term1_1, term1_0, n - 1, ..., termn_1, termn_0, var_len_pub_inputs_res_ptr, ...]
+        # => [acc1, acc0, term1_1, term1_0, n - 1, ..., termn_1, termn_0, ...]
         ext2mul
-        # => [acc1', acc0', n - 1, ..., termn_1, termn_0, var_len_pub_inputs_res_ptr, ...]
+        # => [acc1', acc0', n - 1, ..., termn_1, termn_0, ...]
         movup.2
         dup
         push.0
         neq
-        # => [loop, n - 1, acc1', acc0', term1_1, term1_0, ..., termn_1, termn_0, var_len_pub_inputs_res_ptr, ...]
+        # => [loop, n - 1, acc1', acc0', term1_1, term1_0, ..., termn_1, termn_0, ...]
     end
 
     drop
     exec.constants::tmp2 mem_load movdn.2
-    # => [prod_acc1, prod_acc0, nxt_msg_ptr, var_len_pub_inputs_res_ptr, ...]
+    # since we are initializing the bus with "requests", we should invert the reduced result
+    ext2inv
+    # => [prod_acc1, prod_acc0, interaction_ptr, ...]
 
-
-    # Store the results of the reductions.
-    # This is stored in a word-aligned manner with zero padding if needed.
+    # Store the result
     push.0.0
-    # => [0, 0, prod_acc1, prod_acc0, nxt_msg_ptr, var_len_pub_inputs_res_ptr, ...]
+    # => [0, 0, prod_acc1, prod_acc0, interaction_ptr, var_len_pub_inputs_res_ptr, ...]
     dup.5 add.4 swap.6
     mem_storew
     dropw
-    # => [nxt_msg_ptr, nxt_var_len_pub_inputs_res_ptr, ...]
+    # => [interaction_ptr, var_len_pub_inputs_res_ptr, ...]
+end
+"#;
+
+const REDUCE_VAR_LEN_PI_LOGUP_PROCEDURE: &str = r#" 
+#! Reduces the variable length public inputs for this group using auxiliary randomness.
+#!
+#! Inputs:  [num_interaction, interaction_ptr]
+#! Outputs: [next_ptr]
+#!
+#! where `interaction_ptr` is a pointer to the messages in this group.
+proc.reduce_var_len_pi_group_{group_id}
+    # Assert that the number of interactions is at most 1023
+    dup u32lt.1024 assert
+
+    # Store number of interactions
+    push.0.0 dup.2
+    exec.constants::tmp1 mem_storew
+    # => [num_interaction, 0, 0, num_interaction, interaction_ptr, ...]
+
+    # Load alpha
+    exec.constants::aux_rand_nd_ptr mem_loadw
+    # => [alpha1, alpha0, beta1, beta0, interaction_ptr, ...]
+
+    # We will keep [beta0, beta1, alpha0 + op_label, alpha1] on the stack so that we can compute
+    # the final result, where op_label is a unique label to domain separate the interaction with
+    # the chiplets` bus.
+    # The final result is then computed as:
+    #
+    #   alpha + op_label * beta^0 + beta * (r_0 * beta^0 + r_1 * beta^1 + r_2 * beta^2 + r_3 * beta^3)
+    swap
+    push.VAR_LEN_PI_GROUP_{GROUP_ID}_OP_LABEL
+    add
+    swap
+    # => [alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, ...]
+
+    # Push the `horner_eval_ext` accumulator
+    push.0.0
+    # => [acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, ...]
+
+    # Push the pointer to the evaluation point beta
+    exec.constants::aux_rand_nd_ptr
+    # => [beta_ptr, acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0,  interaction_ptr, ...]
+
+    # Get the pointer to interactions
+    movup.7
+    # => [interaction_ptr, beta_ptr, acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0,  ...]
+
+    # Set up the stack for `mem_stream` + `horner_eval_ext`
+    swapw
+    padw padw
+    # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0,  interaction_ptr, beta_ptr, acc1, acc0, ...]
+    # where `Y` is a garbage word.
+
+    exec.constants::tmp1 mem_loadw dup
+    push.0
+    neq
+
+    while.true
+        repeat.{WIDTH_INTERACTION_GROUP_ID_IN_DOUBLE_WORD}
+            mem_stream
+            horner_eval_base
+        end
+        # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, acc1, acc0, ...]
+
+        swapdw
+        # => [alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, acc1, acc0, Y, Y, ...]
+
+        movup.7 movup.7
+        # => [acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, Y, Y, ...]
+        
+        dup.5 dup.5
+        # => [beta1, beta0, acc1, acc0, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, Y, Y, ...]
+        ext2mul
+        # => [tmp1', tmp0', alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, Y, Y, ...]
+
+        dup.3 dup.3
+        ext2add
+        ext2inv
+        # => [term1', term0', alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, Y, Y, ...]
+  
+        movdn.15
+        movdn.15
+        # => [alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, Y, Y, term1', term0', ...]
+
+        push.0 movdn.6
+        push.0 movdn.6
+        # => [alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, 0, 0, Y, Y, term1', term0', ...]
+ 
+        swapdw
+        # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, 0, 0, term1', term0', ...]
+
+        exec.constants::tmp1 mem_loadw sub.1
+        exec.constants::tmp1 mem_storew
+ 
+        dup
+        push.0
+        neq
+    end
+    # => [Y, Y, alpha1, alpha0 + op_label, beta1, beta0, interaction_ptr, beta_ptr, 0, 0, term1', term0', ...]
+
+    dropw dropw dropw
+    # => [interaction_ptr, beta_ptr, 0, 0, term1', term0', ...]
+    dup exec.constants::tmp2 mem_store
+    exec.constants::tmp1 mem_loadw drop drop drop
+
+    push.0.0
+    movup.2
+    dup
+    push.0
+    neq
+    # => [loop, n, acc1, acc0, term1_1, term1_0, ..., termn_1, termn_0, ...]
+
+    while.true
+        sub.1 movdn.4
+        # => [acc1, acc0, term1_1, term1_0, n - 1, ..., termn_1, termn_0, ...]
+        ext2add
+        # => [acc1', acc0', n - 1, ..., termn_1, termn_0, ...]
+        movup.2
+        dup
+        push.0
+        neq
+        # => [loop, n - 1, acc1', acc0', term1_1, term1_0, ..., termn_1, termn_0, ...]
+    end
+
+    drop
+    exec.constants::tmp2 mem_load movdn.2
+    # since we are initializing the bus with "requests", we should negate the reduced result
+    ext2neg
+    # => [sum_acc1, sum_acc0, interaction_ptr, ...]
+
+    # Store the result
+    push.0.0
+    # => [0, 0, sum_acc1, sum_acc0, interaction_ptr, var_len_pub_inputs_res_ptr, ...]
+    dup.5 add.4 swap.6
+    mem_storew
+    dropw
+    # => [interaction_ptr, var_len_pub_inputs_res_ptr, ...]
 end
 "#;

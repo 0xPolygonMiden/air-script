@@ -8,16 +8,20 @@ mod masm;
 #[cfg(test)]
 mod tests;
 
-pub use crate::circuit::{Circuit as AceCircuit, Node as AceNode};
-pub use crate::encoded::EncodedCircuit as EncodedAceCircuit;
-pub use crate::inputs::{AceVars, AirInputs};
-pub use crate::layout::Layout as AirLayout;
-pub use crate::masm::{generate_masm_verifier, MasmVerifier, ProofOptions};
-
-use crate::builder::{CircuitBuilder, LinearCombination};
-use crate::layout::StarkVar;
 use air_ir::{Air, ConstraintDomain};
 use miden_core::{Felt, QuadExtension};
+
+use crate::{
+    builder::{CircuitBuilder, LinearCombination},
+    layout::StarkVar,
+};
+pub use crate::{
+    circuit::{Circuit as AceCircuit, Node as AceNode},
+    encoded::EncodedCircuit as EncodedAceCircuit,
+    inputs::{AceVars, AirInputs},
+    layout::Layout as AirLayout,
+    masm::{MasmVerifier, generate_masm_verifier},
+};
 
 type QuadFelt = QuadExtension<Felt>;
 
