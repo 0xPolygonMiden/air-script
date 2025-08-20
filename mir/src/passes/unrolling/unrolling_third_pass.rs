@@ -9,7 +9,7 @@ use crate::{
         MirValue, Mul, Node, Op, Parent, RandomInputs, SpannedMirValue, Sub, TraceAccess,
         TraceAccessBinding, Value, Vector,
     },
-    passes::{Visitor, unrolling::match_optimizer::MatchOptimizer},
+    passes::{Visitor, duplicate_node, unrolling::match_optimizer::MatchOptimizer},
 };
 
 pub struct UnrollingThirdPass<'a> {
@@ -102,8 +102,6 @@ fn unroll_binary_op(
     parent: Link<Op>,
     span: SourceSpan,
 ) -> Result<Option<Link<Op>>, CompileError> {
-    let mut updated_binary_op = None;
-
     if let (Op::Vector(lhs_vector), Op::Vector(rhs_vector)) =
         (lhs.borrow().deref(), rhs.borrow().deref())
     {
@@ -124,11 +122,10 @@ fn unroll_binary_op(
                 };
                 new_vec.push(new_node);
             }
-            updated_binary_op = Some(Vector::create(new_vec, parent.span()));
+            return Ok(Some(Vector::create(new_vec, parent.span())));
         }
     }
-
-    Ok(updated_binary_op)
+    Ok(None)
 }
 
 // For the first pass of Unrolling, we use a tweaked version of the Visitor trait,
@@ -141,37 +138,26 @@ impl UnrollingThirdPass<'_> {
         value: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
         // safe to unwrap because we just dispatched on it
-        let mut updated_value = None;
-
-        {
-            let value_ref = value.as_value().unwrap();
-            let mir_value = value_ref.value.value.clone();
-            match &mir_value {
-                MirValue::Constant(c) => match c {
-                    ConstantValue::Felt(_) => {},
-                    ConstantValue::Vector(v) => {
-                        updated_value = Some(unroll_constant_vector(v, value_ref.span()));
-                    },
-                    ConstantValue::Matrix(m) => {
-                        updated_value = Some(unroll_constant_matrix(m, value_ref.span()));
-                    },
-                },
-                MirValue::TraceAccessBinding(trace_access_binding) => {
-                    updated_value =
-                        Some(unroll_trace_access_binding(trace_access_binding, value_ref.span()));
-                },
-                MirValue::TraceAccess(_)
-                | MirValue::PeriodicColumn(_)
-                | MirValue::PublicInput(_)
-                | MirValue::PublicInputTable(_)
-                | MirValue::RandomValue(_)
-                | MirValue::BusAccess(_)
-                | MirValue::Null
-                | MirValue::Unconstrained => {},
-            }
+        let value_ref = value.as_value().unwrap();
+        let mir_value = value_ref.value.value.clone();
+        match &mir_value {
+            MirValue::Constant(c) => match c {
+                ConstantValue::Felt(_) => Ok(None),
+                ConstantValue::Vector(v) => Ok(Some(unroll_constant_vector(v, value_ref.span()))),
+                ConstantValue::Matrix(m) => Ok(Some(unroll_constant_matrix(m, value_ref.span()))),
+            },
+            MirValue::TraceAccessBinding(trace_access_binding) => {
+                Ok(Some(unroll_trace_access_binding(trace_access_binding, value_ref.span())))
+            },
+            MirValue::TraceAccess(_)
+            | MirValue::PeriodicColumn(_)
+            | MirValue::PublicInput(_)
+            | MirValue::PublicInputTable(_)
+            | MirValue::RandomValue(_)
+            | MirValue::BusAccess(_)
+            | MirValue::Null
+            | MirValue::Unconstrained => Ok(None),
         }
-
-        Ok(updated_value)
     }
 
     fn visit_add_bis(
@@ -235,11 +221,8 @@ impl UnrollingThirdPass<'_> {
             let expr = enf_ref.expr.clone();
             if let Op::Vector(vec) = expr.borrow().deref() {
                 let ops = vec.children().borrow().deref().clone();
-                let mut new_vec = vec![];
-                for op in ops.iter() {
-                    let new_node = Enf::create(op.clone(), enf_ref.span());
-                    new_vec.push(new_node);
-                }
+                let new_vec =
+                    ops.iter().map(|op| Enf::create(op.clone(), enf_ref.span())).collect();
                 updated_enf = Some(Vector::create(new_vec, enf_ref.span()));
             };
         }
@@ -252,26 +235,21 @@ impl UnrollingThirdPass<'_> {
         _graph: &mut Graph,
         boundary: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let mut updated_boundary = None;
+        // safe to unwrap because we just dispatched on it
+        let boundary_ref = boundary.as_boundary().unwrap();
+        let expr = boundary_ref.expr.clone();
+        let kind = boundary_ref.kind;
 
-        {
-            // safe to unwrap because we just dispatched on it
-            let boundary_ref = boundary.as_boundary().unwrap();
-            let expr = boundary_ref.expr.clone();
-            let kind = boundary_ref.kind;
+        if let Op::Vector(vec) = expr.borrow().deref() {
+            let expr_vec = vec.children().borrow().deref().clone();
+            let new_vec = expr_vec
+                .iter()
+                .map(|expr| Boundary::create(expr.clone(), kind, boundary_ref.span()))
+                .collect::<Vec<_>>();
+            return Ok(Some(Vector::create(new_vec, boundary_ref.span())));
+        };
 
-            if let Op::Vector(vec) = expr.borrow().deref() {
-                let expr_vec = vec.children().borrow().deref().clone();
-                let mut new_vec = vec![];
-                for expr in expr_vec.iter() {
-                    let new_node = Boundary::create(expr.clone(), kind, boundary_ref.span());
-                    new_vec.push(new_node);
-                }
-                updated_boundary = Some(Vector::create(new_vec, boundary_ref.span()));
-            };
-        }
-
-        Ok(updated_boundary)
+        Ok(None)
     }
 
     fn visit_fold_bis(
@@ -279,35 +257,35 @@ impl UnrollingThirdPass<'_> {
         _graph: &mut Graph,
         fold: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let updated_fold;
+        let fold_ref = fold.as_fold().unwrap();
+        let iterator = fold_ref.iterator.clone();
+        let operator = fold_ref.operator.clone();
+        let initial_value = fold_ref.initial_value.clone();
 
-        {
-            let fold_ref = fold.as_fold().unwrap();
-            let iterator = fold_ref.iterator.clone();
-            let operator = fold_ref.operator.clone();
-            let initial_value = fold_ref.initial_value.clone();
+        let iterator_ref = iterator.borrow();
+        let Op::Vector(iterator_vector) = iterator_ref.deref() else {
+            unreachable!("Expected vector iterator in fold, found: {:?}", iterator_ref);
+        };
+        let iterator_nodes = iterator_vector.children().borrow().deref().clone();
 
-            let iterator_ref = iterator.borrow();
-            let Op::Vector(iterator_vector) = iterator_ref.deref() else {
-                unreachable!("Expected vector iterator in fold, found: {:?}", iterator_ref);
-            };
-            let iterator_nodes = iterator_vector.children().borrow().deref().clone();
+        let resulting_node =
+            iterator_nodes.iter().fold(initial_value, |acc_node, node| match operator {
+                FoldOperator::Add => Add::create(
+                    acc_node,
+                    duplicate_node(node.clone(), &mut Default::default()),
+                    fold_ref.span(),
+                ),
+                FoldOperator::Mul => Mul::create(
+                    acc_node,
+                    duplicate_node(node.clone(), &mut Default::default()),
+                    fold_ref.span(),
+                ),
+                FoldOperator::None => {
+                    unreachable!("Unexpected unrolling of Fold with None FoldOperator")
+                },
+            });
 
-            let mut acc_node = initial_value;
-            for iterator_node in iterator_nodes {
-                let new_acc_node = match operator {
-                    FoldOperator::Add => Add::create(acc_node, iterator_node, fold_ref.span()),
-                    FoldOperator::Mul => Mul::create(acc_node, iterator_node, fold_ref.span()),
-                    FoldOperator::None => {
-                        unreachable!("Unexpected unrolling of Fold with None FoldOperator")
-                    },
-                };
-                acc_node = new_acc_node;
-            }
-            updated_fold = Some(acc_node);
-        }
-
-        Ok(updated_fold)
+        Ok(Some(resulting_node))
     }
 
     /// Visiting an `If` node consists of evaluating all the main trace constraints contained in
@@ -354,21 +332,16 @@ impl UnrollingThirdPass<'_> {
         _graph: &mut Graph,
         vector: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let mut updated_vector = None;
+        // safe to unwrap because we just dispatched on it
+        let vector_ref = vector.as_vector().unwrap();
+        let children = vector_ref.elements.borrow().deref().clone();
+        let size = vector_ref.size;
 
-        {
-            // safe to unwrap because we just dispatched on it
-            let vector_ref = vector.as_vector().unwrap();
-            let children = vector_ref.elements.borrow().deref().clone();
-            let size = vector_ref.size;
-
-            if size == 1 {
-                let child = children.first().unwrap();
-                updated_vector = Some(child.clone());
-            }
+        if size == 1 {
+            let child = children.first().unwrap();
+            return Ok(Some(child.clone()));
         }
-
-        Ok(updated_vector)
+        Ok(None)
     }
 
     fn visit_matrix_bis(
