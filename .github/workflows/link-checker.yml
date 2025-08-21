@@ -1,0 +1,42 @@
+name: Check documentation links
+
+on:
+  workflow_call:
+    inputs:
+      # Whether or not to error on failure
+      # If false, opens an issue instead
+      fail-fast:
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  linkChecker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Link Checker
+        uses: lycheeverse/lychee-action@v2.0.2
+        with:
+          fail: ${{ inputs.fail-fast }}
+          args: |
+            --verbose
+            --exclude-mail
+            --exclude "localhost"
+            --exclude "127.0.0.1"
+            --exclude "^file://"
+            --exclude "github.com/0xMiden/.*"
+            docs/src/**/*.md
+            **/*.md
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Open issue on failure if `fail-fast` input is false
+        if: env.lychee_exit_code != 0 && inputs.fail-fast != true
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: Link Checker Report
+          content-filepath: ./lychee/out.md
+          labels: report, automated issue

@@ -216,7 +216,9 @@ buses {
 }
 
 boundary_constraints {
-    <omitted for brevity>
+    # set the p bus to be empty at the beginning and end
+    enf p.first = null;
+    enf p.last = null;
 }
 
 integrity_constraints {

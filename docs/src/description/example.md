@@ -19,7 +19,7 @@ periodic_columns {
 }
 
 buses {
-    logup: q,
+    logup q,
 }
 
 boundary_constraints {
@@ -33,8 +33,9 @@ boundary_constraints {
     enf b.last = stack_outputs[1];
     enf c.last = stack_outputs[2];
 
-    # set the bus q to be initially empty
+    # set the bus q to be empty at the beginning and end
     enf q.first = null;
+    enf q.last = null;
 }
 
 integrity_constraints {
@@ -50,7 +51,7 @@ integrity_constraints {
     # c = a * b when s = 1.
     enf s * (c - a * b) = 0;
 
-    # insert p to the q bus when s = 1
-    q.insert(p) when s;
+    # insert c to the q bus when s = 1
+    q.insert(c) when s;
 }
 ```

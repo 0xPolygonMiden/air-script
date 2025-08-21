@@ -30,8 +30,9 @@ boundary_constraints {
     enf b.last = stack_outputs[1];
     enf c.last = stack_outputs[2];
 
-    # set the p bus to be initially empty
+    # set the p bus to be empty at the beginning and end
     enf p.first = null;
+    enf p.last = null;
 }
 
 integrity_constraints {
