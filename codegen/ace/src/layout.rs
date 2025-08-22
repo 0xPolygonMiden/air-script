@@ -208,8 +208,10 @@ impl Layout {
     pub fn trace_access_node(&self, trace_access: &TraceAccess) -> Option<Node> {
         let TraceAccess { segment, column, row_offset } = *trace_access;
         let segments_in_row = self.trace_segments.get(row_offset)?;
-        let segment_index = segment.index();
-        let segment_region = segments_in_row.get(segment_index)?;
+        let segment_region = match segment {
+            air_ir::TraceSegmentId::Main => &segments_in_row[0],
+            air_ir::TraceSegmentId::Aux => &segments_in_row[1],
+        };
         segment_region.as_node(column)
     }
 
