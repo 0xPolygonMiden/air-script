@@ -2,6 +2,7 @@ mod bus;
 mod constraints;
 mod degree;
 mod operation;
+mod random_inputs;
 mod trace;
 mod value;
 
@@ -18,6 +19,7 @@ pub use self::{
     constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints},
     degree::IntegrityConstraintDegree,
     operation::Operation,
+    random_inputs::RandomInputs,
     trace::TraceAccess,
     value::{PeriodicColumnAccess, PublicInputAccess, Value},
 };
@@ -27,7 +29,8 @@ pub const CURRENT_ROW: usize = 0;
 /// The minimum cycle length of a periodic column
 pub const MIN_CYCLE_LENGTH: usize = 2;
 
-use std::collections::BTreeMap;
+extern crate alloc;
+use alloc::collections::BTreeMap;
 
 use miden_diagnostics::{SourceSpan, Spanned};
 

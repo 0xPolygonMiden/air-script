@@ -92,6 +92,9 @@ impl Pass for MirToAir<'_> {
         let graph = mir.constraint_graph();
 
         // We insert all the constraints into the AIR graph.
+        // Note: We need to insert the boundary constraints before the integrity constraints
+        // as it's a requirement for the CommonSubexpressionElimination pass to work with the
+        // winterfell codegen.
         for bc in graph.boundary_constraints_roots.borrow().deref().iter() {
             builder.build_boundary_constraint(bc)?;
         }
