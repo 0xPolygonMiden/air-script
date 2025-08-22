@@ -7,13 +7,10 @@ use crate::{
     CompileError,
     ir::{
         Accessor, Add, BackLink, Boundary, ConstantValue, Enf, Exp, FoldOperator, Graph, Link,
-        Matrix, MirType, MirValue, Mul, Node, Op, Owner, Parameter, Parent, RandomInputs,
-        SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value, Vector,
+        Matrix, MirType, MirValue, Mul, Node, Op, Owner, Parameter, Parent, SpannedMirValue, Sub,
+        TraceAccess, TraceAccessBinding, Value, Vector,
     },
-    passes::{
-        Visitor,
-        unrolling::{ForInliningContext, match_optimizer::MatchOptimizer},
-    },
+    passes::{Visitor, unrolling::ForInliningContext},
 };
 
 pub struct UnrollingFirstPass<'a> {
@@ -22,8 +19,6 @@ pub struct UnrollingFirstPass<'a> {
 
     // general context
     work_stack: Vec<Link<Node>>,
-    // current evaluations of nodes at random points
-    random_inputs: RandomInputs,
     // For each child of a For node encountered, we store the context to inline it in the second
     // pass
     pub bodies_to_inline: Vec<(Link<Op>, ForInliningContext)>,
@@ -39,7 +34,6 @@ impl<'a> UnrollingFirstPass<'a> {
         Self {
             diagnostics,
             work_stack: vec![],
-            random_inputs: RandomInputs::default(),
             bodies_to_inline: vec![],
             params_for_ref_node: HashMap::new(),
             all_for_nodes: HashMap::new(),
@@ -460,45 +454,6 @@ impl UnrollingFirstPass<'_> {
         Ok(Some(resulting_node))
     }
 
-    /// Visiting an `If` node consists of evaluating all the main trace constraints contained in
-    /// the match arms, and combining them to optimize the resulting vector of constraints if
-    /// possible. We handle bus related constraints separately, as they cannot be combined with
-    /// main trace constraints.
-    fn visit_if_bis(
-        &mut self,
-        _graph: &mut Graph,
-        if_node: Link<Op>,
-    ) -> Result<Option<Link<Op>>, CompileError> {
-        let if_ref = if_node.as_if().unwrap();
-        let match_arms = if_ref.match_arms.borrow();
-
-        // 1. Instantiate a new MatchOptimizer to handle the constraints of this node
-        let mut match_optimizer = MatchOptimizer::new(&mut self.random_inputs);
-
-        let mut bus_related_constraints = Vec::new();
-
-        // 2. For each match arm, gather bus-related constraints
-        // to be handled separately and evaluate the main constraints
-        for match_arm in match_arms.iter() {
-            let bus_related_constraints_for_match_arm =
-                match_optimizer.evaluate_match_arm(match_arm)?;
-            bus_related_constraints
-                .push((match_arm.condition.clone(), bus_related_constraints_for_match_arm));
-        }
-
-        // 3. Construct the new vector of combined main constraints
-        let combined_main_constraints = match_optimizer.reduce_main_constraints(if_ref.span);
-
-        // 4. Add all the constraints that are bus-related
-        let new_vec = MatchOptimizer::gather_all_constraints(
-            &mut bus_related_constraints,
-            combined_main_constraints,
-            if_ref.span,
-        );
-
-        Ok(Some(Vector::create(new_vec, if_ref.span())))
-    }
-
     fn visit_for_bis(
         &mut self,
         _graph: &mut Graph,
@@ -626,7 +581,6 @@ impl Visitor for UnrollingFirstPass<'_> {
             Node::Sub(s) => to_link_and(s.clone(), graph, |g, el| self.visit_sub_bis(g, el)),
             Node::Mul(m) => to_link_and(m.clone(), graph, |g, el| self.visit_mul_bis(g, el)),
             Node::Exp(e) => to_link_and(e.clone(), graph, |g, el| self.visit_exp_bis(g, el)),
-            Node::If(i) => to_link_and(i.clone(), graph, |g, el| self.visit_if_bis(g, el)),
             Node::For(f) => to_link_and(f.clone(), graph, |g, el| self.visit_for_bis(g, el)),
             Node::Fold(f) => to_link_and(f.clone(), graph, |g, el| self.visit_fold_bis(g, el)),
             Node::Vector(v) => to_link_and(v.clone(), graph, |g, el| self.visit_vector_bis(g, el)),
@@ -639,6 +593,7 @@ impl Visitor for UnrollingFirstPass<'_> {
                 to_link_and(p.clone(), graph, |g, el| self.visit_parameter_bis(g, el))
             },
             Node::Value(v) => to_link_and(v.clone(), graph, |g, el| self.visit_value_bis(g, el)),
+            Node::If(_i) => Ok(None),
             Node::None(_) => Ok(None),
             Node::Function(_) | Node::Evaluator(_) | Node::Call(_) => {
                 unreachable!(
