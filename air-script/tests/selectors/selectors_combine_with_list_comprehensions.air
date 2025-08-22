@@ -12,6 +12,18 @@ boundary_constraints {
     enf c.first = 0;
 }
 
+fn double_mul(a: felt) -> felt {
+    return 2*a;
+}
+
+fn double_add(a: felt) -> felt {
+    return a+a;
+}
+
+fn triple(a: felt) -> felt {
+    return 3*a;
+}
+
 # Note: If the constraints `a, b, ..., i` verify the following equivalency:
 #   a = c = e
 #   g = i
@@ -27,26 +39,26 @@ boundary_constraints {
 #   s0 * d + s1 * f = 0
 
 ev ev_s0([a, b, c]) {
-    let vec = [i+i for i in 0..5];
+    let vec1 = [double_add(i) for i in 0..5];
 
-    enf a = vec[0]; #a
-    enf b = vec[1]; #b
-    enf a = vec[1] - 2; #c
-    enf c = vec[2]; #d
+    enf a = vec1[0]; #a
+    enf b = vec1[1]; #b
+    enf a = vec1[1] - 2; #c
+    enf c = vec1[2]; #d
 }  
 
 ev ev_s1([a, b, c]) {
-    let vec = [2*i for i in 0..5];
+    let vec2 = [double_mul(i) for i in 0..5];
 
-    enf a = vec[2] - 4; #e
-    enf b = vec[3]; #f
-    enf c = vec[4]; #g
+    enf a = vec2[2] - 4; #e
+    enf b = vec2[3]; #f
+    enf c = vec2[4]; #g
 }  
 
 ev ev_s2([a, b, c]) {
-    let vec_3i = [3*i for i in 0..5];
+    let vec_3i = [triple(i) for i in 0..5];
     let vec_i = [i for i in 0..5];
-    let vec = [i-j for (i,j) in (vec_3i, vec_i)];
+    let vec = [m-n for (m,n) in (vec_3i, vec_i)];
     enf b = vec[4]; #h
     enf c = vec[4]; #i
 }
