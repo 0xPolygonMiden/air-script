@@ -24,6 +24,94 @@ pub use self::{
     value::{PeriodicColumnAccess, PublicInputAccess, Value},
 };
 
+/// A fixed two segment trace shape containing values for the main and aux segments.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct TraceShape<T> {
+    main: T,
+    aux: T,
+}
+
+impl<T> TraceShape<T> {
+    pub fn new(main: T, aux: T) -> Self {
+        Self { main, aux }
+    }
+
+    #[inline]
+    pub fn get(&self, id: TraceSegmentId) -> &T {
+        match id {
+            TraceSegmentId::Main => &self.main,
+            TraceSegmentId::Aux => &self.aux,
+        }
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, id: TraceSegmentId) -> &mut T {
+        match id {
+            TraceSegmentId::Main => &mut self.main,
+            TraceSegmentId::Aux => &mut self.aux,
+        }
+    }
+
+    pub fn map<U, F: FnMut(&T) -> U>(&self, mut f: F) -> TraceShape<U> {
+        TraceShape { main: f(&self.main), aux: f(&self.aux) }
+    }
+}
+
+impl<T> core::ops::Index<TraceSegmentId> for TraceShape<T> {
+    type Output = T;
+    fn index(&self, index: TraceSegmentId) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl<T> core::ops::IndexMut<TraceSegmentId> for TraceShape<T> {
+    fn index_mut(&mut self, index: TraceSegmentId) -> &mut Self::Output {
+        self.get_mut(index)
+    }
+}
+
+/// A fixed three segment trace shape containing values for the main, aux, and quotient segments.
+///
+/// This wraps a two segment `TraceShape<T>` for the witness traces, and adds a separate
+/// `quotient` segment which is not addressable via `TraceSegmentId`.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct FullTraceShape<T> {
+    pub segments: TraceShape<T>,
+    pub quotient: T,
+}
+
+impl<T> FullTraceShape<T> {
+    pub fn new(main: T, aux: T, quotient: T) -> Self {
+        Self {
+            segments: TraceShape::new(main, aux),
+            quotient,
+        }
+    }
+
+    #[inline]
+    pub fn segments(&self) -> &TraceShape<T> {
+        &self.segments
+    }
+
+    #[inline]
+    pub fn segments_mut(&mut self) -> &mut TraceShape<T> {
+        &mut self.segments
+    }
+}
+
+impl<T> core::ops::Index<TraceSegmentId> for FullTraceShape<T> {
+    type Output = T;
+    fn index(&self, index: TraceSegmentId) -> &Self::Output {
+        &self.segments[index]
+    }
+}
+
+impl<T> core::ops::IndexMut<TraceSegmentId> for FullTraceShape<T> {
+    fn index_mut(&mut self, index: TraceSegmentId) -> &mut Self::Output {
+        &mut self.segments[index]
+    }
+}
+
 /// The offset of the "current" row during constraint evaluation.
 pub const CURRENT_ROW: usize = 0;
 /// The minimum cycle length of a periodic column

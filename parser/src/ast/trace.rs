@@ -20,16 +20,6 @@ impl fmt::Display for TraceSegmentId {
     }
 }
 
-impl TraceSegmentId {
-    /// Returns the index of this segment
-    pub const fn index(&self) -> usize {
-        match self {
-            TraceSegmentId::Main => 0,
-            TraceSegmentId::Aux => 1,
-        }
-    }
-}
-
 /// The index of a column in a particular trace segment
 pub type TraceColumnIndex = usize;
 
