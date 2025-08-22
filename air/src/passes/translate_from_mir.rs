@@ -51,8 +51,14 @@ impl Pass for MirToAir<'_> {
             main_trace_segment.id
         );
 
-        let mut trace_columns = BTreeMap::new();
-        trace_columns.insert(main_trace_segment.id, main_trace_segment.clone());
+        // Build trace segments shape: always include main; aux may be empty
+        let trace_columns_main = main_trace_segment.clone();
+        let mut trace_columns_aux = TraceSegment::new(
+            SourceSpan::default(),
+            TraceSegmentId::Aux,
+            Identifier::new(SourceSpan::default(), Symbol::intern("$aux")),
+            vec![],
+        );
 
         let mut bus_bindings_map = BTreeMap::new();
         if !buses.is_empty() {
@@ -65,19 +71,21 @@ impl Pass for MirToAir<'_> {
             let aux_trace_segment = TraceSegment::new(
                 SourceSpan::default(),
                 TraceSegmentId::Aux,
-                Identifier::new(
-                    SourceSpan::default(),
-                    Symbol::new(TraceSegmentId::Aux.index() as u32),
-                ),
+                Identifier::new(SourceSpan::default(), Symbol::intern("$aux")),
                 bus_raw_bindings,
             );
             for binding in aux_trace_segment.bindings.iter() {
                 bus_bindings_map.insert(binding.name.unwrap(), binding.offset);
             }
-            trace_columns.insert(aux_trace_segment.id, aux_trace_segment);
+            trace_columns_aux = aux_trace_segment;
         }
 
-        air.trace_segment_widths = trace_columns.values().map(|ts| ts.size as u16).collect();
+        let trace_columns = TraceShape::new(trace_columns_main, trace_columns_aux);
+
+        air.trace_segment_widths = vec![
+            trace_columns[TraceSegmentId::Main].size as u16,
+            trace_columns[TraceSegmentId::Aux].size as u16,
+        ];
         air.num_random_values = mir.num_random_values;
         air.periodic_columns = mir.periodic_columns.clone();
         air.public_inputs = mir.public_inputs.clone();
@@ -118,7 +126,7 @@ impl Pass for MirToAir<'_> {
 struct AirBuilder<'a> {
     diagnostics: &'a DiagnosticsHandler,
     air: &'a mut Air,
-    trace_columns: BTreeMap<TraceSegmentId, TraceSegment>,
+    trace_columns: TraceShape<TraceSegment>,
     bus_bindings_map: BTreeMap<Identifier, usize>,
 }
 
@@ -426,8 +434,8 @@ impl AirBuilder<'_> {
                         // trace segment inference defaults to the lowest segment (the main trace)
                         // and is adjusted according to the use of random
                         // values and trace columns.
-                        let lhs_segment_name = self.trace_columns[&lhs_segment].name;
-                        let rhs_segment_name = self.trace_columns[&rhs_segment].name;
+                        let lhs_segment_name = self.trace_columns[lhs_segment].name;
+                        let rhs_segment_name = self.trace_columns[rhs_segment].name;
                         self.diagnostics.diagnostic(Severity::Error)
                                     .with_message("invalid boundary constraint")
                                     .with_primary_label(lhs_span, format!("this constrains a column in the '{lhs_segment_name}' trace segment"))
@@ -634,12 +642,11 @@ impl AirBuilder<'_> {
         trace_access: MirTraceAccess,
         boundary: &MirBoundary,
     ) -> Result<(), CompileError> {
-        if let Some(prev) = self
-            .trace_columns
-            .get_mut(&trace_access.segment)
-            .expect("Boundary constraint on an unknown trace segment")
-            .mark_constrained(boundary.span(), trace_access.column, boundary.kind)
-        {
+        if let Some(prev) = self.trace_columns.get_mut(trace_access.segment).mark_constrained(
+            boundary.span(),
+            trace_access.column,
+            boundary.kind,
+        ) {
             self.diagnostics
                 .diagnostic(Severity::Error)
                 .with_message("overlapping boundary constraints")
