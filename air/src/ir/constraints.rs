@@ -1,3 +1,5 @@
+extern crate alloc;
+use alloc::collections::BTreeSet;
 use core::fmt;
 
 use super::*;
@@ -45,6 +47,39 @@ impl Constraints {
             graph,
             boundary_constraints,
             integrity_constraints,
+        }
+    }
+
+    /// Updates the root boundary and integrity constraints to use the new node indices  
+    /// values, given in the `renumbering_map`.  
+    ///  
+    /// This functions also removes duplicate constraints (that share the same root and domain).  
+    ///  
+    /// # Panics  
+    /// Panics if a constraint's node index is not found in the renumbering map.
+    pub fn renumber_and_deduplicate_constraints(
+        &mut self,
+        renumbering_map: &BTreeMap<NodeIndex, NodeIndex>,
+    ) {
+        // Iterate over all boundary and integrity constraints
+        for (_, segment_constraints) in self
+            .boundary_constraints
+            .iter_mut()
+            .chain(self.integrity_constraints.iter_mut())
+        {
+            let mut added_indices = BTreeSet::new();
+            segment_constraints.retain_mut(|constraint| {
+                let new_index = *renumbering_map
+                    .get(constraint.node_index())
+                    .expect("Error: cannot find constraint index in renumbering map");
+                // Don't keep duplicate constraints
+                if !added_indices.insert((new_index, constraint.domain)) {
+                    return false;
+                }
+                // If this constraint is new, we update its node index and keep it
+                constraint.update_node_index(new_index);
+                true
+            });
         }
     }
 
@@ -131,6 +166,12 @@ impl ConstraintRoot {
         &self.index
     }
 
+    /// Updates the node index this constraint refers to. This should be called if the graph is
+    /// updated after its initial construction, such as during common subexpression elimination.
+    pub fn update_node_index(&mut self, new_index: NodeIndex) {
+        self.index = new_index;
+    }
+
     /// Returns the [ConstraintDomain] for this constraint, which specifies the rows against which
     /// the constraint should be applied.
     pub const fn domain(&self) -> ConstraintDomain {
@@ -141,7 +182,7 @@ impl ConstraintRoot {
 /// [ConstraintDomain] corresponds to the domain over which a constraint is applied.
 ///
 /// See the docs on each variant for more details.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ConstraintDomain {
     /// For boundary constraints which apply to the first row
     FirstRow,
