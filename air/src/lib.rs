@@ -51,7 +51,8 @@ impl Pass for AirPasses<'_> {
 
     fn run<'a>(&mut self, input: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
         let mut passes = passes::MirToAir::new(self.diagnostics)
-            .chain(passes::BusOpExpand::new(self.diagnostics));
+            .chain(passes::BusOpExpand::new(self.diagnostics))
+            .chain(passes::CommonSubexpressionElimination::new(self.diagnostics));
         passes.run(input)
     }
 }

@@ -2,11 +2,13 @@ use std::collections::BTreeMap;
 
 use crate::ir::*;
 
+mod cse;
+
 /// A unique identifier for a node in an [AlgebraicGraph]
 ///
 /// The raw value of this identifier is an index in the `nodes` vector
 /// of the [AlgebraicGraph] struct.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeIndex(usize);
 impl core::ops::Add<usize> for NodeIndex {
     type Output = NodeIndex;
