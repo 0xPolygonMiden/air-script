@@ -117,13 +117,11 @@ fn unroll_binary_op(
     parent: Link<Op>,
     span: SourceSpan,
 ) -> Result<Option<Link<Op>>, CompileError> {
-    let mut updated_binary_op = None;
-
     if let (Op::Vector(lhs_vector), Op::Vector(rhs_vector)) =
         (lhs.borrow().deref(), rhs.borrow().deref())
     {
-        let lhs_vec = lhs_vector.children().borrow().deref().clone();
-        let rhs_vec = rhs_vector.children().borrow().deref().clone();
+        let lhs_vec = lhs_vector.children().borrow().clone();
+        let rhs_vec = rhs_vector.children().borrow().clone();
 
         if lhs_vec.len() != rhs_vec.len() {
             unreachable!("Binary operation children type mismatch: {:?}", parent);
@@ -139,19 +137,17 @@ fn unroll_binary_op(
                 };
                 new_vec.push(new_node);
             }
-            updated_binary_op = Some(Vector::create(new_vec, parent.span()));
+            return Ok(Some(Vector::create(new_vec, parent.span())));
         }
     }
 
-    Ok(updated_binary_op)
+    Ok(None)
 }
 
 fn unroll_accessor_default_access_type(
     indexable: Link<Op>,
     accessor_offset: usize,
 ) -> Option<Link<Op>> {
-    let mut updated_accessor = Some(indexable.clone());
-
     if let Some(value) = indexable.clone().as_value() {
         let mir_value = value.value.value.clone();
 
@@ -164,10 +160,10 @@ fn unroll_accessor_default_access_type(
                     row_offset: trace_access.row_offset + accessor_offset,
                 }),
             });
-            updated_accessor = Some(new_node);
+            return Some(new_node);
         }
     }
-    updated_accessor
+    Some(indexable.clone())
 }
 
 fn unroll_accessor_index_access_type(
@@ -175,13 +171,11 @@ fn unroll_accessor_index_access_type(
     index: usize,
     accessor_offset: usize,
 ) -> Option<Link<Op>> {
-    let updated_accessor;
-
     // Check that the child node is a vector, raise diag otherwise
     // Replace the current node by the index-th element of the vector
     // Raise diag if index is out of bounds
     if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
-        let indexable_vec = indexable_vector.children().borrow().deref().clone();
+        let indexable_vec = indexable_vector.children().borrow().clone();
         let child_accessed = match indexable_vec.get(index) {
             Some(child_accessed) => child_accessed,
             None => unreachable!(), // raise diag
@@ -198,19 +192,16 @@ fn unroll_accessor_index_access_type(
                             row_offset: trace_access.row_offset + accessor_offset,
                         }),
                     });
-                    updated_accessor = Some(new_node);
+                    Some(new_node)
                 },
-                _ => {
-                    updated_accessor = Some(child_accessed.clone());
-                },
+                _ => Some(child_accessed.clone()),
             }
         } else {
-            updated_accessor = Some(child_accessed.clone());
+            Some(child_accessed.clone())
         }
     } else {
         unreachable!("indexable is {:?}", indexable); // raise diag
-    };
-    updated_accessor
+    }
 }
 
 fn unroll_accessor_matrix_access_type(
@@ -222,13 +213,13 @@ fn unroll_accessor_matrix_access_type(
     // Replace the current node by the index-th element of the vector
     // Raise diag if index is out of bounds
     if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
-        let indexable_vec = indexable_vector.children().borrow().deref().clone();
+        let indexable_vec = indexable_vector.children().borrow().clone();
         let row_accessed = match indexable_vec.get(row) {
             Some(row_accessed) => row_accessed,
             None => unreachable!("Matrix access out of bounds for indexable: {:?}", indexable),
         };
         if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
-            let row_accessed_vec = row_accessed_vector.children().borrow().deref().clone();
+            let row_accessed_vec = row_accessed_vector.children().borrow().clone();
             let child_accessed = match row_accessed_vec.get(col) {
                 Some(child_accessed) => child_accessed,
                 None => unreachable!("Matrix access out of bounds for indexable: {:?}", indexable),
@@ -238,13 +229,13 @@ fn unroll_accessor_matrix_access_type(
             unreachable!("unexpected non-vector child of a Matrix: {:?}", row_accessed);
         }
     } else if let Op::Matrix(indexable_matrix) = indexable.borrow().deref() {
-        let indexable_vec = indexable_matrix.children().borrow().deref().clone();
+        let indexable_vec = indexable_matrix.children().borrow().clone();
         let row_accessed = match indexable_vec.get(row) {
             Some(row_accessed) => row_accessed,
             None => unreachable!("Matrix access out of bounds for indexable: {:?}", indexable),
         };
         if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
-            let row_accessed_vec = row_accessed_vector.children().borrow().deref().clone();
+            let row_accessed_vec = row_accessed_vector.children().borrow().clone();
             let child_accessed = match row_accessed_vec.get(col) {
                 Some(child_accessed) => child_accessed,
                 None => unreachable!("Matrix access out of bounds for indexable: {:?}", indexable),
@@ -268,37 +259,34 @@ impl UnrollingFirstPass<'_> {
         value: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
         // safe to unwrap because we just dispatched on it
-        let mut updated_value = None;
-
-        {
-            let value_ref = value.as_value().unwrap();
-            let mir_value = value_ref.value.value.clone();
-            match &mir_value {
-                MirValue::Constant(c) => match c {
-                    ConstantValue::Felt(_) => {},
-                    ConstantValue::Vector(v) => {
-                        updated_value = Some(unroll_constant_vector(v, value_ref.span()));
-                    },
-                    ConstantValue::Matrix(m) => {
-                        updated_value = Some(unroll_constant_matrix(m, value_ref.span()));
-                    },
+        let value_ref = value.as_value().unwrap();
+        let mir_value = value_ref.value.value.clone();
+        match &mir_value {
+            MirValue::Constant(c) => match c {
+                ConstantValue::Felt(_) => {},
+                ConstantValue::Vector(v) => {
+                    return Ok(Some(unroll_constant_vector(v, value_ref.span())));
                 },
-                MirValue::TraceAccessBinding(trace_access_binding) => {
-                    updated_value =
-                        Some(unroll_trace_access_binding(trace_access_binding, value_ref.span()));
+                ConstantValue::Matrix(m) => {
+                    return Ok(Some(unroll_constant_matrix(m, value_ref.span())));
                 },
-                MirValue::TraceAccess(_)
-                | MirValue::PeriodicColumn(_)
-                | MirValue::PublicInput(_)
-                | MirValue::PublicInputTable(_)
-                | MirValue::RandomValue(_)
-                | MirValue::BusAccess(_)
-                | MirValue::Null
-                | MirValue::Unconstrained => {},
-            }
+            },
+            MirValue::TraceAccessBinding(trace_access_binding) => {
+                return Ok(Some(unroll_trace_access_binding(
+                    trace_access_binding,
+                    value_ref.span(),
+                )));
+            },
+            MirValue::TraceAccess(_)
+            | MirValue::PeriodicColumn(_)
+            | MirValue::PublicInput(_)
+            | MirValue::PublicInputTable(_)
+            | MirValue::RandomValue(_)
+            | MirValue::BusAccess(_)
+            | MirValue::Null
+            | MirValue::Unconstrained => {},
         }
-
-        Ok(updated_value)
+        Ok(None)
     }
 
     fn visit_add_bis(
@@ -313,6 +301,7 @@ impl UnrollingFirstPass<'_> {
 
         unroll_binary_op(lhs, rhs, add.clone(), add_ref.span())
     }
+
     fn visit_sub_bis(
         &mut self,
         _graph: &mut Graph,
@@ -325,6 +314,7 @@ impl UnrollingFirstPass<'_> {
 
         unroll_binary_op(lhs, rhs, sub.clone(), sub_ref.span())
     }
+
     fn visit_mul_bis(
         &mut self,
         _graph: &mut Graph,
@@ -337,6 +327,7 @@ impl UnrollingFirstPass<'_> {
 
         unroll_binary_op(lhs, rhs, mul.clone(), mul_ref.span())
     }
+
     fn visit_exp_bis(
         &mut self,
         _graph: &mut Graph,
@@ -377,23 +368,14 @@ impl UnrollingFirstPass<'_> {
         _graph: &mut Graph,
         enf: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let mut updated_enf = None;
-
-        {
-            let enf_ref = enf.as_enf().unwrap();
-            let expr = enf_ref.expr.clone();
-            if let Op::Vector(vec) = expr.borrow().deref() {
-                let ops = vec.children().borrow().deref().clone();
-                let mut new_vec = vec![];
-                for op in ops.iter() {
-                    let new_node = Enf::create(op.clone(), enf_ref.span());
-                    new_vec.push(new_node);
-                }
-                updated_enf = Some(Vector::create(new_vec, enf_ref.span()));
-            };
+        let enf_ref = enf.as_enf().unwrap();
+        let expr = enf_ref.expr.clone();
+        if let Op::Vector(vec) = expr.borrow().deref() {
+            let ops = vec.children().borrow().clone();
+            let new_vec = ops.iter().map(|op| Enf::create(op.clone(), enf_ref.span())).collect();
+            return Ok(Some(Vector::create(new_vec, enf_ref.span())));
         }
-
-        Ok(updated_enf)
+        Ok(None)
     }
 
     fn visit_boundary_bis(
@@ -401,26 +383,21 @@ impl UnrollingFirstPass<'_> {
         _graph: &mut Graph,
         boundary: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let mut updated_boundary = None;
+        // safe to unwrap because we just dispatched on it
+        let boundary_ref = boundary.as_boundary().unwrap();
+        let expr = boundary_ref.expr.clone();
+        let kind = boundary_ref.kind;
 
-        {
-            // safe to unwrap because we just dispatched on it
-            let boundary_ref = boundary.as_boundary().unwrap();
-            let expr = boundary_ref.expr.clone();
-            let kind = boundary_ref.kind;
-
-            if let Op::Vector(vec) = expr.borrow().deref() {
-                let expr_vec = vec.children().borrow().deref().clone();
-                let mut new_vec = vec![];
-                for expr in expr_vec.iter() {
-                    let new_node = Boundary::create(expr.clone(), kind, boundary_ref.span());
-                    new_vec.push(new_node);
-                }
-                updated_boundary = Some(Vector::create(new_vec, boundary_ref.span()));
-            };
-        }
-
-        Ok(updated_boundary)
+        if let Op::Vector(vec) = expr.borrow().deref() {
+            let expr_vec = vec.children().borrow().clone();
+            let mut new_vec = vec![];
+            for expr in expr_vec.iter() {
+                let new_node = Boundary::create(expr.clone(), kind, boundary_ref.span());
+                new_vec.push(new_node);
+            }
+            return Ok(Some(Vector::create(new_vec, boundary_ref.span())));
+        };
+        Ok(None)
     }
 
     fn visit_accessor_bis(
@@ -428,36 +405,31 @@ impl UnrollingFirstPass<'_> {
         _graph: &mut Graph,
         accessor: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let mut updated_accessor = None;
+        let accessor_ref = accessor.as_accessor().unwrap();
+        let indexable = accessor_ref.indexable.clone();
+        let access_type = accessor_ref.access_type.clone();
+        let offset = accessor_ref.offset;
 
-        {
-            let accessor_ref = accessor.as_accessor().unwrap();
-            let indexable = accessor_ref.indexable.clone();
-            let access_type = accessor_ref.access_type.clone();
-            let offset = accessor_ref.offset;
-
-            // If the indexable is a parameter, we keep the accessor as is, in
-            // order to handle nested For nodes
-            if indexable.clone().as_parameter().is_none() {
-                match access_type {
-                    AccessType::Default => {
-                        updated_accessor = unroll_accessor_default_access_type(indexable, offset);
-                    },
-                    AccessType::Index(index) => {
-                        updated_accessor =
-                            unroll_accessor_index_access_type(indexable, index, offset);
-                    },
-                    AccessType::Matrix(row, col) => {
-                        updated_accessor = unroll_accessor_matrix_access_type(indexable, row, col);
-                    },
-                    AccessType::Slice(_range_expr) => {
-                        unreachable!(); // Slices are not scalar, raise diag
-                    },
-                }
+        // If the indexable is a parameter, we keep the accessor as is, in
+        // order to handle nested For nodes
+        if indexable.clone().as_parameter().is_none() {
+            match access_type {
+                AccessType::Default => {
+                    return Ok(unroll_accessor_default_access_type(indexable, offset));
+                },
+                AccessType::Index(index) => {
+                    return Ok(unroll_accessor_index_access_type(indexable, index, offset));
+                },
+                AccessType::Matrix(row, col) => {
+                    return Ok(unroll_accessor_matrix_access_type(indexable, row, col));
+                },
+                AccessType::Slice(_range_expr) => {
+                    unreachable!(); // Slices are not scalar, raise diag
+                },
             }
         }
 
-        Ok(updated_accessor)
+        Ok(None)
     }
 
     fn visit_fold_bis(
@@ -465,35 +437,27 @@ impl UnrollingFirstPass<'_> {
         _graph: &mut Graph,
         fold: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let updated_fold;
+        let fold_ref = fold.as_fold().unwrap();
+        let iterator = fold_ref.iterator.clone();
+        let operator = fold_ref.operator.clone();
+        let initial_value = fold_ref.initial_value.clone();
 
-        {
-            let fold_ref = fold.as_fold().unwrap();
-            let iterator = fold_ref.iterator.clone();
-            let operator = fold_ref.operator.clone();
-            let initial_value = fold_ref.initial_value.clone();
+        let iterator_ref = iterator.borrow();
+        let Op::Vector(iterator_vector) = iterator_ref.deref() else {
+            unreachable!("Expected vector iterator in fold, found: {:?}", iterator_ref);
+        };
+        let iterator_nodes = iterator_vector.children().borrow().clone();
 
-            let iterator_ref = iterator.borrow();
-            let Op::Vector(iterator_vector) = iterator_ref.deref() else {
-                unreachable!("Expected vector iterator in fold, found: {:?}", iterator_ref);
-            };
-            let iterator_nodes = iterator_vector.children().borrow().deref().clone();
+        let resulting_node =
+            iterator_nodes.iter().fold(initial_value, |acc_node, node| match operator {
+                FoldOperator::Add => Add::create(acc_node, node.clone(), fold_ref.span()),
+                FoldOperator::Mul => Mul::create(acc_node, node.clone(), fold_ref.span()),
+                FoldOperator::None => {
+                    unreachable!("Unexpected unrolling of Fold with None FoldOperator")
+                },
+            });
 
-            let mut acc_node = initial_value;
-            for iterator_node in iterator_nodes {
-                let new_acc_node = match operator {
-                    FoldOperator::Add => Add::create(acc_node, iterator_node, fold_ref.span()),
-                    FoldOperator::Mul => Mul::create(acc_node, iterator_node, fold_ref.span()),
-                    FoldOperator::None => {
-                        unreachable!("Unexpected unrolling of Fold with None FoldOperator")
-                    },
-                };
-                acc_node = new_acc_node;
-            }
-            updated_fold = Some(acc_node);
-        }
-
-        Ok(updated_fold)
+        Ok(Some(resulting_node))
     }
 
     /// Visiting an `If` node consists of evaluating all the main trace constraints contained in
@@ -540,59 +504,53 @@ impl UnrollingFirstPass<'_> {
         _graph: &mut Graph,
         for_node: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let updated_for;
+        // For each value produced by the iterators, we need to:
+        // - Duplicate the body
+        // - Visit the body and replace the Variables with the value (with the correct index
+        //   depending on the binding)
+        // If there is a selector, we need to enforce the selector on the body
 
-        {
-            // For each value produced by the iterators, we need to:
-            // - Duplicate the body
-            // - Visit the body and replace the Variables with the value (with the correct index
-            //   depending on the binding)
-            // If there is a selector, we need to enforce the selector on the body
+        let for_node_clone = for_node.clone();
+        let for_ref = for_node_clone.as_for().unwrap();
+        let iterators_ref = for_ref.iterators.borrow();
+        let iterators = iterators_ref.deref();
+        let expr = for_ref.expr.clone();
+        let selector = for_ref.selector.clone();
 
-            let for_node_clone = for_node.clone();
-            let for_ref = for_node_clone.as_for().unwrap();
-            let iterators_ref = for_ref.iterators.borrow();
-            let iterators = iterators_ref.deref();
-            let expr = for_ref.expr.clone();
-            let selector = for_ref.selector.clone();
+        let iterator_expected_len = validate_iterators_and_get_expected_len(iterators);
 
-            let iterator_expected_len = validate_iterators_and_get_expected_len(iterators);
+        let mut new_vec = vec![];
+        for i in 0..iterator_expected_len {
+            let new_node =
+                Parameter::create(i, MirType::Felt, for_node.as_for().unwrap().deref().span());
+            new_vec.push(new_node.clone());
 
-            let mut new_vec = vec![];
-            for i in 0..iterator_expected_len {
-                let new_node =
-                    Parameter::create(i, MirType::Felt, for_node.as_for().unwrap().deref().span());
-                new_vec.push(new_node.clone());
+            let iterators_i = iterators
+                .iter()
+                .map(|iterator| get_iterator_child(iterator.clone(), i))
+                .collect::<Vec<_>>();
+            let selector = if let Op::None(_) = selector.borrow().deref() {
+                None
+            } else {
+                Some(selector.clone())
+            };
 
-                let iterators_i = iterators
-                    .iter()
-                    .map(|iterator| get_iterator_child(iterator.clone(), i))
-                    .collect::<Vec<_>>();
-                let selector = if let Op::None(_) = selector.borrow().deref() {
-                    None
-                } else {
-                    Some(selector.clone())
-                };
-
-                self.bodies_to_inline.push((
-                    new_node.clone(),
-                    ForInliningContext {
-                        body: expr.clone(),
-                        iterators: iterators_i,
-                        selector,
-                        ref_node: for_node.clone(),
-                    },
-                ));
-            }
-
-            let new_vec_op = Vector::create(new_vec.clone(), for_node.span());
-            for param in new_vec {
-                param.as_parameter_mut().unwrap().set_ref_node(new_vec_op.as_owner().unwrap());
-            }
-            updated_for = Some(new_vec_op);
+            self.bodies_to_inline.push((
+                new_node.clone(),
+                ForInliningContext {
+                    body: expr.clone(),
+                    iterators: iterators_i,
+                    selector,
+                    ref_node: for_node.clone(),
+                },
+            ));
         }
 
-        Ok(updated_for)
+        let new_vec_op = Vector::create(new_vec.clone(), for_node.span());
+        for param in new_vec {
+            param.as_parameter_mut().unwrap().set_ref_node(new_vec_op.as_owner().unwrap());
+        }
+        Ok(Some(new_vec_op))
     }
 
     fn visit_vector_bis(
@@ -600,21 +558,16 @@ impl UnrollingFirstPass<'_> {
         _graph: &mut Graph,
         vector: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let mut updated_vector = None;
+        // safe to unwrap because we just dispatched on it
+        let vector_ref = vector.as_vector().unwrap();
+        let children = vector_ref.elements.borrow().clone();
+        let size = vector_ref.size;
 
-        {
-            // safe to unwrap because we just dispatched on it
-            let vector_ref = vector.as_vector().unwrap();
-            let children = vector_ref.elements.borrow().deref().clone();
-            let size = vector_ref.size;
-
-            if size == 1 {
-                let child = children.first().unwrap();
-                updated_vector = Some(child.clone());
-            }
+        if size == 1 {
+            let child = children.first().unwrap();
+            return Ok(Some(child.clone()));
         }
-
-        Ok(updated_vector)
+        Ok(None)
     }
 
     fn visit_matrix_bis(
@@ -751,7 +704,7 @@ fn compute_iterator_len(iterator: Link<Op>) -> usize {
             AccessType::Index(_) => match accessor.indexable.borrow().deref() {
                 Op::Vector(_) => 1,
                 Op::Matrix(matrix) => {
-                    let children = matrix.children().borrow().deref().clone();
+                    let children = matrix.children().borrow().clone();
                     match children.first() {
                         Some(first_row) => match first_row.as_vector() {
                             Some(row_vector) => row_vector.size,
@@ -779,11 +732,11 @@ fn compute_iterator_len(iterator: Link<Op>) -> usize {
 fn get_iterator_child(op: Link<Op>, i: usize) -> Link<Op> {
     match op.borrow().deref() {
         Op::Vector(vector) => {
-            let children = vector.children().borrow().deref().clone();
+            let children = vector.children().borrow().clone();
             children[i].clone()
         },
         Op::Matrix(matrix) => {
-            let children = matrix.children().borrow().deref().clone();
+            let children = matrix.children().borrow().clone();
             children[i].clone()
         },
         Op::Accessor(accessor) => {
