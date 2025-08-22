@@ -351,7 +351,6 @@ impl<'a> MirBuilder<'a> {
         body: &'a Vec<ast::Statement>,
     ) -> Result<Link<Root>, CompileError> {
         self.root = func.clone();
-        self.bindings.enter();
         let func = func;
         for stmt in body {
             let op = self.translate_statement(stmt)?;
@@ -364,7 +363,6 @@ impl<'a> MirBuilder<'a> {
             };
             self.root = func.clone();
         }
-        self.bindings.exit();
         Ok(func)
     }
 
@@ -392,8 +390,16 @@ impl<'a> MirBuilder<'a> {
         let mut ret_value = value.clone();
         self.bindings.enter();
         self.bindings.insert(name, value.clone());
-        for stmt in let_stmt.body.iter() {
-            ret_value = self.translate_statement(stmt)?;
+        for (i, stmt) in let_stmt.body.iter().enumerate() {
+            let new_stmt = self.translate_statement(stmt)?;
+            if i < let_stmt.body.len() - 1 {
+                match self.root.borrow().deref() {
+                    Root::Function(f) => f.body.borrow_mut().push(new_stmt.clone()),
+                    Root::Evaluator(e) => e.body.borrow_mut().push(new_stmt.clone()),
+                    Root::None(_span) => {},
+                }
+            }
+            ret_value = new_stmt;
         }
         self.bindings.exit();
         Ok(ret_value)
