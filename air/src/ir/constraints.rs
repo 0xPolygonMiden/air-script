@@ -28,11 +28,11 @@ pub struct Constraints {
     /// Constraint roots for all boundary constraints against the execution trace, by trace
     /// segment, where boundary constraints are any constraints that apply to either the first
     /// or the last row of the trace.
-    boundary_constraints: BTreeMap<TraceSegmentId, Vec<ConstraintRoot>>,
+    boundary_constraints: TraceShape<Vec<ConstraintRoot>>,
     /// Constraint roots for all integrity constraints against the execution trace, by trace
     /// segment, where integrity constraints are any constraints that apply to every row or
     /// every frame.
-    integrity_constraints: BTreeMap<TraceSegmentId, Vec<ConstraintRoot>>,
+    integrity_constraints: TraceShape<Vec<ConstraintRoot>>,
     /// A directed acyclic graph which represents all of the constraints and their subexpressions.
     graph: AlgebraicGraph,
 }
@@ -40,8 +40,8 @@ impl Constraints {
     /// Constructs a new [Constraints] graph from the given parts
     pub const fn new(
         graph: AlgebraicGraph,
-        boundary_constraints: BTreeMap<TraceSegmentId, Vec<ConstraintRoot>>,
-        integrity_constraints: BTreeMap<TraceSegmentId, Vec<ConstraintRoot>>,
+        boundary_constraints: TraceShape<Vec<ConstraintRoot>>,
+        integrity_constraints: TraceShape<Vec<ConstraintRoot>>,
     ) -> Self {
         Self {
             graph,
@@ -85,7 +85,7 @@ impl Constraints {
 
     /// Returns the number of boundary constraints applied against the specified trace segment.
     pub fn num_boundary_constraints(&self, trace_segment: TraceSegmentId) -> usize {
-        self.boundary_constraints.get(&trace_segment).map_or(0, |v| v.len())
+        self.boundary_constraints.get(trace_segment).len()
     }
 
     /// Returns the set of boundary constraints for the given trace segment.
@@ -93,7 +93,7 @@ impl Constraints {
     /// Each boundary constraint is represented by a [ConstraintRoot] which is
     /// the root of the subgraph representing the constraint within the [AlgebraicGraph]
     pub fn boundary_constraints(&self, trace_segment: TraceSegmentId) -> &[ConstraintRoot] {
-        self.boundary_constraints.get(&trace_segment).map_or(&[], |v| v.as_slice())
+        self.boundary_constraints.get(trace_segment).as_slice()
     }
 
     /// Returns a vector of the degrees of the integrity constraints for the specified trace
@@ -102,11 +102,11 @@ impl Constraints {
         &self,
         trace_segment: TraceSegmentId,
     ) -> Vec<IntegrityConstraintDegree> {
-        self.integrity_constraints.get(&trace_segment).map_or(vec![], |v| {
-            v.iter()
-                .map(|entry_index| self.graph.degree(entry_index.node_index()))
-                .collect()
-        })
+        self.integrity_constraints
+            .get(trace_segment)
+            .iter()
+            .map(|entry_index| self.graph.degree(entry_index.node_index()))
+            .collect()
     }
 
     /// Returns the set of integrity constraints for the given trace segment.
@@ -114,7 +114,7 @@ impl Constraints {
     /// Each integrity constraint is represented by a [ConstraintRoot] which is
     /// the root of the subgraph representing the constraint within the [AlgebraicGraph]
     pub fn integrity_constraints(&self, trace_segment: TraceSegmentId) -> &[ConstraintRoot] {
-        self.integrity_constraints.get(&trace_segment).map_or(&[], |v| v.as_slice())
+        self.integrity_constraints.get(trace_segment).as_slice()
     }
 
     /// Inserts a new constraint against `trace_segment`, using the provided `root` and `domain`
@@ -126,9 +126,9 @@ impl Constraints {
     ) {
         let root = ConstraintRoot::new(root, domain);
         if domain.is_boundary() {
-            self.boundary_constraints.entry(trace_segment).or_default().push(root);
+            self.boundary_constraints.get_mut(trace_segment).push(root);
         } else {
-            self.integrity_constraints.entry(trace_segment).or_default().push(root);
+            self.integrity_constraints.get_mut(trace_segment).push(root);
         }
     }
 
