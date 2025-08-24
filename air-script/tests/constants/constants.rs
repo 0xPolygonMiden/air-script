@@ -85,7 +85,7 @@ impl Air for ConstantsAir {
         result.push(Assertion::single(0, 0, Felt::ONE));
         result.push(Assertion::single(1, 0, Felt::ONE));
         result.push(Assertion::single(2, 0, Felt::ZERO));
-        result.push(Assertion::single(3, 0, Felt::ONE - Felt::new(2) + Felt::new(2)));
+        result.push(Assertion::single(3, 0, Felt::ONE));
         result.push(Assertion::single(4, 0, Felt::ONE));
         result.push(Assertion::single(6, self.last_step(), Felt::ZERO));
         result

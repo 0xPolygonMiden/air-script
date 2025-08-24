@@ -104,9 +104,13 @@ fn add_aux_trace_assertions(func_body: &mut codegen::Function, ir: &Air) {
             split_boundary_constraint(ir.constraint_graph(), constraint.node_index());
         debug_assert_eq!(trace_access.segment, TraceSegmentId::Aux);
 
+        // In the graph, empty buses are either constrained by 0 (for logup buses) or 1 (for
+        // multiset buses). However, because of Common Subexpression Elimination, the `0`
+        // constant will not be inserted into the graph and the `split_boundary_constraint` function
+        // will return a `None` value, so we should handle this case separately.
         let expr_root_string = match expr_root {
             Some(node_index) => node_index.to_string(ir, ElemType::Ext, TraceSegmentId::Aux),
-            None => "E::ZERO".to_string(), // If no root, the expression is zero
+            None => "E::ZERO".to_string(),
         };
 
         let assertion = format!(
