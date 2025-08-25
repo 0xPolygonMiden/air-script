@@ -27,7 +27,6 @@ pub enum MirAccessType {
     Default,
     Index(Link<Op>),
     Matrix(Link<Op>, Link<Op>),
-    Slice(Link<Op>, Link<Op>),
 }
 
 impl Accessor {
@@ -56,9 +55,6 @@ impl Parent for Accessor {
             MirAccessType::Index(ref idx) => vec![self.indexable.clone(), idx.clone()],
             MirAccessType::Matrix(ref row, ref col) => {
                 vec![self.indexable.clone(), row.clone(), col.clone()]
-            },
-            MirAccessType::Slice(ref start, ref end) => {
-                vec![self.indexable.clone(), start.clone(), end.clone()]
             },
         };
         Link::new(vec)

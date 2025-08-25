@@ -294,10 +294,6 @@ impl ConstantPropagation<'_> {
                         };
                     };
                 },
-
-                MirAccessType::Slice(_start, _end) => {
-                    unreachable!(); // Slices are not scalar, raise diag
-                },
             }
         }
 

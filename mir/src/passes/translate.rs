@@ -1038,19 +1038,14 @@ impl<'a> MirBuilder<'a> {
                 let index_node = self.translate_scalar_expr(index)?;
                 MirAccessType::Index(index_node)
             },
-            AccessType::Slice(range_expr) => {
-                let slice_range = range_expr.to_slice_range();
-                let start_node =
-                    self.translate_scalar_const(slice_range.start as u64, range_expr.span())?;
-                let end_node =
-                    self.translate_scalar_const(slice_range.end as u64, range_expr.span())?;
-                MirAccessType::Slice(start_node, end_node)
-            },
             AccessType::Matrix(row, col) => {
                 let row_node = self.translate_scalar_expr(row)?;
                 let col_node = self.translate_scalar_expr(col)?;
                 MirAccessType::Matrix(row_node, col_node)
             },
+            AccessType::Slice(_range_expr) => unreachable!(
+                "Slices should have been transformed into vector operations during constant propagation"
+            ),
         };
         Ok(mir_access_type)
     }

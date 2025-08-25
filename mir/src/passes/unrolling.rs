@@ -671,7 +671,7 @@ impl UnrollingFirstPass<'_> {
             let mir_access_type = accessor_ref.access_type.clone();
             let offset = accessor_ref.offset;
 
-            // FIXME: Factorize this code with the visit_accessor_bis of ConstrantPropagation pass
+            // FIXME: Factorize this code with the visit_accessor_bis of ConstantPropagation pass
             // We should be able to call a helper, and specify whether we expect the indices to be
             // constants at this stage
             if indexable.clone().as_parameter().is_none() {
@@ -825,10 +825,6 @@ impl UnrollingFirstPass<'_> {
                             };
                         };
                     },
-
-                    MirAccessType::Slice(_start, _end) => {
-                        unreachable!(); // Slices are not scalar, raise diag
-                    },
                 }
             }
         }
@@ -842,15 +838,6 @@ impl UnrollingFirstPass<'_> {
             Op::Matrix(matrix) => matrix.size,
             Op::Accessor(accessor) => match &accessor.access_type {
                 MirAccessType::Default => Self::compute_iterator_len(accessor.indexable.clone()),
-                MirAccessType::Slice(start, end) => {
-                    let (start, end) = match (get_inner_const(start), get_inner_const(end)) {
-                        (Some(start), Some(end)) => (start as usize, end as usize),
-                        _ => {
-                            unreachable!("Slice indices should be constant values during unrolling")
-                        },
-                    };
-                    end - start
-                },
                 MirAccessType::Index(_) => match accessor.indexable.borrow().deref() {
                     Op::Vector(_) => 1,
                     Op::Matrix(matrix) => {

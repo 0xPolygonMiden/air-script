@@ -172,10 +172,6 @@ pub fn duplicate_node(
                     duplicate_node(row, current_replace_map),
                     duplicate_node(col, current_replace_map),
                 ),
-                MirAccessType::Slice(start, end) => MirAccessType::Slice(
-                    duplicate_node(start, current_replace_map),
-                    duplicate_node(end, current_replace_map),
-                ),
             };
             let offset = accessor.offset;
             let new_indexable = duplicate_node(indexable, current_replace_map);
@@ -405,10 +401,6 @@ pub fn duplicate_node_or_replace(
                 MirAccessType::Matrix(row, col) => MirAccessType::Matrix(
                     current_replace_map.get(&row.get_ptr()).unwrap().1.clone(),
                     current_replace_map.get(&col.get_ptr()).unwrap().1.clone(),
-                ),
-                MirAccessType::Slice(start, end) => MirAccessType::Slice(
-                    current_replace_map.get(&start.get_ptr()).unwrap().1.clone(),
-                    current_replace_map.get(&end.get_ptr()).unwrap().1.clone(),
                 ),
             };
             let offset = accessor.offset;
