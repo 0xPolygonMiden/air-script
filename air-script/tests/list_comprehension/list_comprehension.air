@@ -12,6 +12,10 @@ boundary_constraints {
     enf c[2].first = 0;
 }
 
+fn double(a: felt) -> felt {
+    return 2*a;
+}
+
 integrity_constraints {
     let x = [fmp for fmp in fmp];
     enf clk = x[1];
@@ -27,4 +31,8 @@ integrity_constraints {
     
     let m = [w + x - y - z for (w, x, y, z) in (0..3, b, c[0..3], d[0..3])];
     enf fmp[0] = m[0] + m[1] + m[2];
+
+    let alpha = [double(i) for i in 0..3];
+    let beta = [double(i) for i in 0..4];
+    enf d[2] = alpha[2] + beta[3]; 
 }
