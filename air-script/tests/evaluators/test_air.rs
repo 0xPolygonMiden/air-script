@@ -24,8 +24,8 @@ impl AirTester for EvaluatorsAirTester {
                 state[1] = start;
                 state[3] = start;
                 state[4] = start;
-                state[5] = start;
-                state[6] = start;
+                state[5] = Felt::new(1);
+                state[6] = Felt::new(4);
             },
             |_, state| {},
         );
