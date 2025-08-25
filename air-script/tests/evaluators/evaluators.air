@@ -14,6 +14,18 @@ ev are_all_binary([c[3]]) {
     enf is_binary([c]) for c in c;
 }
 
+fn square_all(x: felt[3]) -> felt[3] {
+    return [x^2 for x in x];
+}
+
+ev are_squares_in_order([d[3]]) {
+    let base = [i for i in 0..3];
+    let squares = square_all(base);
+    enf d[0] = squares[0];
+    enf d[1] = squares[1];
+    enf d[2] = squares[2];
+}
+
 trace_columns {
     main: [b, c[3], d[3]],
 }
@@ -30,4 +42,5 @@ integrity_constraints {
     enf are_unchanged([b, c[1], d[2]]);
     enf is_binary([b]);
     enf are_all_binary([c]);
+    enf are_squares_in_order([d]);
 }
