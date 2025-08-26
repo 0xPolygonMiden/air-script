@@ -1,6 +1,6 @@
 use std::fmt;
 
-use typing::*;
+use air_types::*;
 
 use crate::ast::{
     Access, AccessType, BusType, FunctionType, InvalidAccessError, TraceBinding, TraceSegment, Type,

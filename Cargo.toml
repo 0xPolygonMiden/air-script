@@ -8,7 +8,7 @@ members = [
     "air",
     "codegen/winterfell",
     "codegen/ace",
-    "typing",
+    "types",
 ]
 resolver = "2"
 
@@ -23,3 +23,4 @@ rust-version = "1.87"
 anyhow = "1.0"
 miden-diagnostics = "0.1"
 thiserror = "2.0"
+air-types = { version = "1.0", path = "types" }

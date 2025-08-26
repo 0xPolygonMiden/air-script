@@ -17,6 +17,7 @@ mod vector;
 
 pub use accessor::Accessor;
 pub use add::Add;
+pub use air_types::*;
 pub use boundary::Boundary;
 pub use bus_op::{BusOp, BusOpKind};
 pub use call::Call;
@@ -29,7 +30,6 @@ pub use matrix::Matrix;
 pub use mul::Mul;
 pub use parameter::Parameter;
 pub use sub::Sub;
-pub use typing::*;
 pub use value::{
     BusAccess, ConstantValue, MirValue, PeriodicColumnAccess, PublicInputAccess,
     PublicInputTableAccess, SpannedMirValue, TraceAccess, TraceAccessBinding, Value,

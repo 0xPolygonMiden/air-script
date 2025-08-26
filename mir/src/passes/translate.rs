@@ -3,8 +3,8 @@ use std::ops::Deref;
 
 use air_parser::{LexicalScope, ast, ast::AccessType, symbols};
 use air_pass::Pass;
+use air_types::*;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
-use typing::*;
 
 use crate::{
     CompileError,

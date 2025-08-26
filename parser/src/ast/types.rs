@@ -1,4 +1,4 @@
-pub use typing::{bty, fty, kind, sty, tty, ty, tys, *};
+pub use air_types::{bty, fty, kind, sty, tty, ty, tys, *};
 
 use super::*;
 

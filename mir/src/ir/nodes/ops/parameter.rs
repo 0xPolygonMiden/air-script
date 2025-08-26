@@ -1,7 +1,7 @@
 use std::hash::{Hash, Hasher};
 
+use air_types::*;
 use miden_diagnostics::{SourceSpan, Spanned};
-use typing::*;
 
 use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Singleton};
 

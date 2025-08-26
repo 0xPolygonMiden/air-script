@@ -1,7 +1,7 @@
 use std::fmt;
 
+use air_types::{Kind, Typing, tty, ty};
 use miden_diagnostics::{SourceSpan, Spanned};
-use typing::{Kind, Typing, tty, ty};
 
 use super::*;
 

@@ -1,6 +1,6 @@
 [package]
-name = "typing"
-version = "0.1.0"
+name = "air-types"
+version = "1.0.0"
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
