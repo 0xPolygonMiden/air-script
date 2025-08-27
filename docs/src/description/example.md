@@ -4,7 +4,7 @@ This is an example AIR definition in AirScript that includes all existing AirScr
 
 ## Complete Example
 
-```
+```air
 def ExampleAir
 
 trace_columns {

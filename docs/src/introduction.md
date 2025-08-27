@@ -46,20 +46,20 @@ There is a command-line interface available for emitting constraint evaluation c
 
 To use the CLI, first run:
 
-```
+```ignore
 cargo build --release
 ```
 
 Then, run the `airc` target with the `transpile` option. For example:
 
-```
+```ignore
 ./target/release/airc transpile examples/example.air
 ```
 This will output constraint evaluation code targeted for the Winterfell prover.
 
 You can use the `help` option to see other available options.
 
-```
+```ignore
 ./target/release/airc transpile --help
 ```
 

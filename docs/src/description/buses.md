@@ -16,7 +16,7 @@ A bus is a construct which aims to simplify description of non-local constraints
 
 See the [declaring buses](./declarations.md#buses) for more details.
 
-```
+```air
 buses {
     multiset p,
     logup q,
@@ -27,7 +27,7 @@ buses {
 
 In the boundary constraints section, we can constrain the initial and final state of the bus. Currently, only constraining a bus to be empty (with the  `null` keyword) is supported.
 
-```
+```air
 boundary_constraints {
     enf p.first = null;
     enf p.last = null;
@@ -40,7 +40,7 @@ The above example states that the bus `p` should be empty at the beginning and e
 
 In the integrity constraints section or in evaluators, we can insert and remove elements (as tuples of felts) into and from a bus. In the following examples, `p` and `q` are respectively multiset and LogUp based buses.
 
-```
+```air
 integrity_constraints {
     p.insert(a) when s1;
     p.remove(a, b) when 1 - s2;
@@ -55,7 +55,7 @@ $$
 p ′ \cdot ( ( \alpha_0 + \alpha_1 \cdot a + \alpha_2 \cdot b ) \cdot ( 1 − s2 ) + s2 ) = p \cdot ( ( \alpha_0 + \alpha_1 \cdot a ) \cdot s1 + 1 − s1 ))
 $$
 
-```
+```air
 integrity_constraints {
     q.remove(e, f, g) when s;
     q.insert(a, b, c) with d;

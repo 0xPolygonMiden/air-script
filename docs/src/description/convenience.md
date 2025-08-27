@@ -6,37 +6,38 @@ To make writing constraints easier, AirScript provides a number of syntactic con
 
 List comprehension provides a simple way to create new vectors. It is similar to the list comprehension syntax in Python. The following examples show how to use list comprehension in AirScript.
 
-```
+```air
 let x = [a * 2 for a in b];
 ```
 This will create a new vector with the same length as `b` and the value of each element will be twice that of the corresponding element in `b`.
 
-```
+```air
 let x = [a + b for (a, b) in (c, d)];
 ```
 This will create a new vector with the same length as `c` and `d` and the value of each element will be the sum of the corresponding elements in `c` and `d`. This will throw an error if `c` and `d` vectors are of unequal lengths.
 
-```
+```air
 let x = [2^i * a for (i, a) in (0..5, b)];
 ```
 Ranges can also be used as iterables, which makes it easy to refer to an element and its index at the same time. This will create a new vector with length 5 and each element will be the corresponding element in `b` multiplied by 2 raised to the power of the element's index. This will throw an error if `b` is not of length 5.
 
-```
+```air
 const MAX = 5;
 let x = [2^i * a for (i, a) in (0..MAX, b)];
 ```
 Ranges are defined with each bound being either an integer literal, or a [named constant](./declarations.md#constants-const) of type scalar.
 
-```
+```air
 let x = [m + n + o for (m, n, o) in (a, 0..5, c[0..5])];
 ```
 Slices can also be used as iterables. This will create a new vector with length 5 and each element will be the sum of the corresponding elements in `a`, the range 0 to 5, and the first 5 elements of `c`. This will throw an error if `a` is not of length 5 or if `c` is of length less than 5.
 
-```{{#include ../../examples/list_comprehension_example.air}}
+```air
+{{#include ../../examples/list_comprehension_example.air}}
 ```
 List comprehensions can be nested. The above example creates a new vector `c` where each element is the sum of the products of corresponding elements in `X` and each row of `Y`. The outer list comprehension iterates over each row of `Y`, while the inner list comprehension iterates over each element in `X` and the current row of `Y`.
 
-```
+```ignore
 # The following will result in a parsing error:
 let c = [[x * y for (x, y) in (X, row_y)] for row_y in Y];
 ```
@@ -46,7 +47,7 @@ List comprehensions can only have a scalar expression as their body. This means 
 
 List folding provides syntactic convenience for folding vectors into expressions. It is similar to the list folding syntax in Python. List folding can be applied to vectors, list comprehension or identifiers referring to vectors and list comprehension. The following examples show how to use list folding in AirScript.
 
-```
+```air
 trace_columns {
     main: [a[5], b, c],
 }
@@ -60,7 +61,7 @@ integrity_constraints {
 
 In the above, `x` and `y` both represent the sum of all trace column values in the trace column group `a`. `z` represents the sum of all trace column values in the trace column group `a` multiplied by `2`.
 
-```
+```air
 trace_columns {
     main: [a[5], b, c],
 }
@@ -77,7 +78,7 @@ In the above, `x` and `y` both represent the product of all trace column values 
 ## Constraint comprehension
 
 Constraint comprehension provides a way to enforce the same constraint on multiple values. Conceptually, it is very similar to the list comprehension described above. For example:
-```
+```air
 trace_columns {
     main: [a[5], b, c],
 }
@@ -87,7 +88,7 @@ integrity_constraints {
 }
 ```
 The above will enforce $a_i^2 = a_i$ constraint for all columns in the trace column group `a`. Semantically, this is equivalent to:
-```
+```air
 trace_columns {
     main: [a[5], b, c],
 }
@@ -102,7 +103,7 @@ integrity_constraints {
 ```
 
 Similar to list comprehension, constraints in constraint comprehension can involve values from multiple lists. For example:
-```
+```air
 trace_columns {
     main: [a[5], b[5]],
 }
@@ -116,7 +117,7 @@ The above will enforce that $a_i' = i \cdot b_i$ for $i \in [0, 5)$. If the leng
 ## Conditional constraints
 
 Frequently, we may want to enforce constraints based on some selectors. For example, let's say our trace has 4 columns: `a`, `b`, `c`, and `s`, and we want to enforce that $c' = a + b$ when $s = 1$ and $c' = a \cdot c$ when $s = 0$. We can write these constraints directly like so:
-```
+```air
 trace_columns {
     main: [a, b, c, s],
 }
@@ -129,7 +130,7 @@ integrity_constraints {
 Notice that we also need to enforce $s^2 = s$ to ensure that column $s$ can contain only binary values.
 
 While the above approach works, it gets more and more difficult to manage as selectors and constraints get more complicated. To simplify describing constraints for this use case, AirScript introduces `enf match` statement. The above constraints can be described using `enf match` statement as follows:
-```
+```air
 trace_columns {
     main: [a, b, c, s],
 }
@@ -149,7 +150,7 @@ In the above, the syntax of each "option" is `case <selector expression>: <const
 - `a | b` reduces to $a + b - a \cdot b$.
 
 The example below illustrates how these operators can be used to build more complex selectors:
-```
+```air
 trace_columns {
     main: [a, b, c, s0, s1],
 }
@@ -173,7 +174,7 @@ AirScript makes the following assumptions about selector expressions, which are 
 
 ### Conditional evaluators
 In addition to applying selectors to individual constraints, we can apply them to [evaluators](./evaluators.md). For example:
-```
+```air
 trace_columns {
     main: [a, b, c, s],
 }
@@ -199,9 +200,9 @@ The above is equivalent to the first example in this section. However, the real 
 1. Evaluators can be [imported](./organization.md#importing-evaluators) from other modules. Thus, the logic of defining constraints, and then selecting which one is applied in a given case can be cleanly separated.
 2. Evaluators can contain multiple constraints. In such cases, selector expressions would be applied to all constraints of an evaluator.
 
-The example below illustrates the latter point.
+The example below illustrates the later point.
 
-```
+```air
 trace_columns {
     main: [a, b, c, s],
 }
@@ -234,7 +235,7 @@ The `when` keyword can be used to apply a binary selector to constraints where o
 Its usage in the case of bus operations is handled separately, as defined in [buses.md](./buses.md#bus-integrity-constraints).
 
 In the case of [conditional constraints](./convenience.md#conditional-constraints) and [conditional evaluators](./evaluators.md#conditional-evaluators), `constraint when selector` is equivalent to:
-```
+```text
 enf match {
     case selector: constraint
     case !selector: 1 // this is a no_op
@@ -244,7 +245,7 @@ enf match {
 Examples:
 
 A bus operation with a binary selector:
-```
+```air
 trace_columns {
     main: [a, b, s],
 }
@@ -260,7 +261,7 @@ integrity_constraints {
 ```
 
 A conditional constraint:
-```
+```air
 trace_columns {
     main: [a, b, c, s],
 }
@@ -272,7 +273,7 @@ integrity_constraints {
 ```
 
 A conditional evaluator:
-```
+```air
 trace_columns {
     main: [a, b, c, s],
 }
