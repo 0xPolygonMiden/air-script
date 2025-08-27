@@ -63,6 +63,16 @@ This test automatically:
 
 The `docs_sync` test runs as part of the CI pipeline to ensure documentation examples remain valid and up-to-date.
 
+### Documentation Build Test
+
+The project also includes a documentation build test that runs as part of CI:
+
+```bash
+make test-docs
+```
+
+This test ensures that the documentation builds correctly and validates that `docs/build.rs` runs properly when the `DOCS_TEST` environment variable is set.
+
 ## Contributing to AirScript
 
 AirScript is an open project and we welcome everyone to contribute! If you are interested in contributing to AirScript, please have a look at our [Contribution guidelines](https://github.com/0xMiden/air-script/blob/main/CONTRIBUTING.md). If you want to work on a specific issue, please add a comment on the GitHub issue indicating you are interested before submitting a PR. This will help avoid duplicated effort. If you have thoughts on how to improve AirScript, we'd love to know them. So, please don't hesitate to open issues.

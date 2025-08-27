@@ -24,6 +24,10 @@ check: ## Run type checker
 test: ## Run all tests
 	cargo test --workspace
 
+.PHONY: test-docs
+test-docs: ## Test documentation examples and build
+	mdbook test docs
+
 # -- linting --------------------------------------------------------------------------------------
 
 .PHONY: clippy

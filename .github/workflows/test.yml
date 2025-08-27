@@ -34,3 +34,5 @@ jobs:
         run: rustup update --no-self-update 
       - name: Run tests
         run: make test
+      - name: Test documentation examples
+        run: make test-docs
