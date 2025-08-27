@@ -4,7 +4,7 @@ This crate aggregates all components of the AirScript compiler into a single pla
 
 ## Basic Usage
 
-An in-depth description of AirScript is available in the full AirScript [documentation](https://0xmiden.github.io/air-script/).
+An in-depth description of AirScript is available in the full AirScript [documentation](https://0xpolygonmiden.github.io/air-script/).
 
 The compiler has four stages, which can be imported and used independently or together.
 

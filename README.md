@@ -28,6 +28,41 @@ The project is organized into several crates as follows:
 | [ACE code generator](codegen/ace/) | Contains a code generator targeting Miden VM's ACE (Arithmetic Circuit Evaluation) chiplet. Converts AirScript constraints into arithmetic circuits optimized for recursive STARK proof verification within Miden assembly programs. |
 | [AirScript](air-script) | Aggregates all components of the AirScript compiler into a single place and provides a CLI as an executable to transpile AIRs defined in AirScript to the specified target language. Also contains integration tests for AirScript. |
 
+## Documentation and Examples
+
+AirScript documentation uses mdBook and is located in the `docs/` directory. Examples are stored in `docs/examples/` and are included in the documentation using mdBook's include syntax.
+
+### Adding New Examples
+
+To add a new example to the documentation:
+
+1. **Create the example file**: Add your `.air` file to `docs/examples/`
+2. **Test compilation**: Ensure the example compiles using the CLI:
+   ```bash
+   cargo build --release
+   target/release/airc transpile docs/examples/your_example.air -o /tmp/test.rs
+   ```
+3. **Include in documentation**: Add the example to the relevant markdown file in `docs/src/` using:
+   ```markdown
+   ```{{#include ../../examples/your_example.air}}
+   ```
+
+### Testing Documentation Examples
+
+The project includes an integration test that ensures all documentation examples compile successfully:
+
+```bash
+cargo test -p air-script --test docs_sync
+```
+
+This test automatically:
+- Builds the AirScript CLI tool
+- Finds all `.air` files in `docs/examples/`
+- Transpiles each example to verify compilation
+- Cleans up generated files
+
+The `docs_sync` test runs as part of the CI pipeline to ensure documentation examples remain valid and up-to-date.
+
 ## Contributing to AirScript
 
 AirScript is an open project and we welcome everyone to contribute! If you are interested in contributing to AirScript, please have a look at our [Contribution guidelines](https://github.com/0xMiden/air-script/blob/main/CONTRIBUTING.md). If you want to work on a specific issue, please add a comment on the GitHub issue indicating you are interested before submitting a PR. This will help avoid duplicated effort. If you have thoughts on how to improve AirScript, we'd love to know them. So, please don't hesitate to open issues.

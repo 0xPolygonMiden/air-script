@@ -1,0 +1,26 @@
+def VariablesExample
+
+const A = 1;
+const B = 2;
+
+trace_columns {
+    main: [a, b, c, d],
+}
+
+public_inputs {
+    stack_inputs: [16],
+}
+
+boundary_constraints {
+    let x = stack_inputs[0] + stack_inputs[1];
+    let y = [stack_inputs[2], stack_inputs[3]];
+    enf a.first = x + y[0] + y[1];
+}
+
+integrity_constraints {
+    let z = [
+        [a + b, c + d],
+        [A * a, B * b]
+    ];
+    enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1];
+}

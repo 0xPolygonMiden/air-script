@@ -38,3 +38,6 @@ mod system;
 mod trace_col_groups;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod variables;
+
+#[allow(unused_variables, dead_code, unused_mut)]
+mod docs_sync;

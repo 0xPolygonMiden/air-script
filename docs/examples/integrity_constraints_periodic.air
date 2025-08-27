@@ -1,0 +1,22 @@
+def IntegrityConstraintsExample_Periodic
+
+trace_columns {
+    main: [a, b],
+}
+
+public_inputs {
+    stack_inputs: [16],
+}
+
+periodic_columns {
+    k: [1, 1, 1, 0],
+}
+
+boundary_constraints {
+    enf a.first = stack_inputs[0];
+    enf b.first = 0;
+}
+
+integrity_constraints {
+    enf a' = k * a;
+}

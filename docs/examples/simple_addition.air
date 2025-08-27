@@ -1,0 +1,31 @@
+def SimpleAddition
+
+trace_columns {
+    main: [a, b, c],
+}
+
+public_inputs {
+    inputs: [2],
+    outputs: [1],
+}
+
+periodic_columns {
+    k0: [1, 1, 1, 1, 1, 1, 1, 0],
+}
+
+boundary_constraints {
+    enf a.first = inputs[0];
+    enf b.first = inputs[1];
+    enf c.first = 0;
+
+    enf a.last = outputs[0];
+    enf b.last = outputs[0];
+    enf c.last = 0;
+}
+
+integrity_constraints {
+    enf k0 * (a' - a) = 0;
+    enf k0 * (b' - b) = 0;
+    
+    enf c' = c + a + b;
+}

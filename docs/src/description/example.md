@@ -2,6 +2,8 @@
 
 This is an example AIR definition in AirScript that includes all existing AirScript syntax. It is intended to be syntactically demonstrative rather than meaningful.
 
+## Complete Example
+
 ```
 def ExampleAir
 
@@ -54,4 +56,18 @@ integrity_constraints {
     # insert c to the q bus when s = 1
     q.insert(c) when s;
 }
+```
+
+## Additional Examples
+
+For more practical examples, see the included examples in the `docs/examples/` directory:
+
+### Simple Addition
+
+```{{#include ../../examples/simple_addition.air}}
+```
+
+### Fibonacci Sequence
+
+```{{#include ../../examples/fibonacci.air}}
 ```

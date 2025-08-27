@@ -1,0 +1,22 @@
+def IntegrityConstraintsExample_Buses
+
+trace_columns {
+    main: [a, s],
+}
+
+public_inputs {
+    stack_inputs: [16],
+}
+
+buses {
+    multiset p,
+}
+
+boundary_constraints {
+    enf p.first = null;
+    enf p.last = null;
+}
+
+integrity_constraints {
+    p.insert(a) when s;
+}

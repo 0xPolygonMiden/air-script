@@ -32,14 +32,7 @@ let x = [m + n + o for (m, n, o) in (a, 0..5, c[0..5])];
 ```
 Slices can also be used as iterables. This will create a new vector with length 5 and each element will be the sum of the corresponding elements in `a`, the range 0 to 5, and the first 5 elements of `c`. This will throw an error if `a` is not of length 5 or if `c` is of length less than 5.
 
-```
-const Y = [
-    [1, 2],
-    [3, 4],
-    [5, 6]
-];
-const X = [1, 2];
-let c = [sum([x * y for (x, y) in (X, row_y)]) for row_y in Y];
+```{{#include ../../examples/list_comprehension_example.air}}
 ```
 List comprehensions can be nested. The above example creates a new vector `c` where each element is the sum of the products of corresponding elements in `X` and each row of `Y`. The outer list comprehension iterates over each row of `Y`, while the inner list comprehension iterates over each element in `X` and the current row of `Y`.
 

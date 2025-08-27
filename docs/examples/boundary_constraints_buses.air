@@ -1,0 +1,29 @@
+def BoundaryConstraintsExample_WithBuses
+
+trace_columns {
+    main: [a, b],
+}
+
+public_inputs {
+    stack_inputs: [16],
+    stack_outputs: [16],
+}
+
+buses {
+    multiset p,
+    logup q,
+}
+
+boundary_constraints {
+    enf a.first = stack_inputs[0];
+    enf a.last = stack_outputs[0];
+
+    enf p.first = null;
+    enf p.last = null;
+    enf q.first = null;
+    enf q.last = null;
+}
+
+integrity_constraints {
+    enf b' = b + 1;
+}

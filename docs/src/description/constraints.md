@@ -18,26 +18,7 @@ A boundary constraint definition must:
 
 The following is a simple example of a valid `boundary_constraints` source section:
 
-```
-def BoundaryConstraintsExample
-
-trace_columns {
-    main: [a],
-}
-
-public_inputs {
-    <omitted for brevity>
-}
-
-boundary_constraints {
-    # these are main constraints.
-    enf a.first = 0;
-    enf a.last = 10;
-}
-
-integrity_constraints {
-    <omitted for brevity>
-}
+```{{#include ../../examples/boundary_constraints_simple.air}}
 ```
 
 ### Public inputs
@@ -50,38 +31,7 @@ To use public inputs, the public input must be declared in the `public_inputs` s
 
 The following is an example of a valid bus `boundary_constraints` source section that uses public inputs:
 
-```
-def BoundaryConstraintsExample
-
-trace_columns {
-    main: [a, b],
-}
-
-public_inputs {
-    stack_inputs: [16],
-    stack_outputs: [16],
-}
-
-buses {
-    multiset p,
-    logup q,
-}
-
-boundary_constraints {
-    # these are main constraints that use public input values.
-    enf a.first = stack_inputs[0];
-    enf a.last = stack_outputs[0];
-
-    # these are bus constraints that specify that buses must be empty at the beginning and the end of the execution trace
-    enf p.first = null;
-    enf p.last = null;
-    enf q.first = null;
-    enf q.last = null;
-}
-
-integrity_constraints {
-    <omitted for brevity>
-}
+```{{#include ../../examples/boundary_constraints_buses.air}}
 ```
 
 ### Intermediate variables
@@ -92,27 +42,7 @@ Boundary constraints can use intermediate variables to express more complex cons
 
 The following is an example of a valid `boundary_constraints` source section that uses intermediate variables:
 
-```
-def BoundaryConstraintsExample
-
-trace_columns {
-    main: [a, b],
-}
-
-public_inputs {
-    <omitted for brevity>
-}
-
-boundary_constraints {
-    # this is a constraint that uses intermediate variables.
-    let x = 3
-    let y = 4
-    enf p1.first = x * y
-}
-
-integrity_constraints {
-    <omitted for brevity>
-}
+```{{#include ../../examples/boundary_constraints_variables.air}}
 ```
 
 ## Integrity constraints (`integrity_constraints`)
@@ -135,26 +65,7 @@ Integrity constraints have access to values in the "current" row of the trace to
 
 The following is a simple example of a valid `integrity_constraints` source section using values from the current and next rows of the main trace:
 
-```
-def IntegrityConstraintsExample
-
-trace_columns {
-    main: [a, b],
-}
-
-public_inputs {
-    <omitted for brevity>
-}
-
-boundary_constraints {
-    <omitted for brevity>
-}
-
-integrity_constraints {
-    # these are main constraints. they both express the same constraint.
-    enf a' = a + 1;
-    enf b' - b - 1 = 0;
-}
+```{{#include ../../examples/integrity_constraints_simple.air}}
 ```
 
 ### Periodic columns
@@ -167,29 +78,7 @@ To use periodic column values, the periodic column must be declared in the `peri
 
 The following is an example of a valid `integrity_constraints` source section that uses periodic columns:
 
-```
-def IntegrityConstraintsExample
-
-trace_columns {
-    main: [a, b],
-}
-
-public_inputs {
-    <omitted for brevity>
-}
-
-periodic_columns {
-    k: [1, 1, 1, 0],
-}
-
-boundary_constraints {
-    <omitted for brevity>
-}
-
-integrity_constraints {
-    # this is a main constraint that uses a periodic column.
-    enf a' = k * a;
-}
+```{{#include ../../examples/integrity_constraints_periodic.air}}
 ```
 
 ### Buses
@@ -200,31 +89,7 @@ Integrity constraints can constrain insertions and removal of elements into / fr
 
 The following is an example of a valid `integrity_constraints` source section that uses buses:
 
-```
-def IntegrityConstraintsExample
-
-trace_columns {
-    main: [a, s],
-}
-
-public_inputs {
-    <omitted for brevity>
-}
-
-buses {
-    multiset p,
-}
-
-boundary_constraints {
-    # set the p bus to be empty at the beginning and end
-    enf p.first = null;
-    enf p.last = null;
-}
-
-integrity_constraints {
-    # this is a bus constraint, inserting a into the bus p while s = 1
-    p.insert(a) when s;
-}
+```{{#include ../../examples/integrity_constraints_buses.air}}
 ```
 
 ### Intermediate variables
@@ -235,29 +100,5 @@ Integrity constraints can use intermediate variables to express more complex con
 
 The following is an example of a valid `integrity_constraints` source section that uses intermediate variables:
 
-```
-def IntegrityConstraintsExample
-
-trace_columns {
-    main: [a, b],
-}
-
-public_inputs {
-    <omitted for brevity>
-}
-
-periodic_columns {
-    k: [1, 1, 1, 0]
-}
-
-boundary_constraints {
-    <omitted for brevity>
-}
-
-integrity_constraints {
-    # this is a main constraint that uses intermediate variables.
-    let x = a + 2
-    let y = b + 5
-    enf b' = k * x * y
-}
+```{{#include ../../examples/integrity_constraints_variables.air}}
 ```
