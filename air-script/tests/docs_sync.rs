@@ -23,10 +23,7 @@ fn docs_sync() {
         .expect("Failed to read examples directory")
         .filter_map(|entry| {
             let path = entry.expect("Failed to read directory entry").path();
-            if path.extension().and_then(|ext| ext.to_str()) == Some("air")
-                && path.file_name().unwrap() != "integration_test.air"
-                && path.file_name().unwrap() != "test_air.air"
-            {
+            if path.extension().and_then(|ext| ext.to_str()) == Some("air") {
                 Some(path)
             } else {
                 None

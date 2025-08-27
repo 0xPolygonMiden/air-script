@@ -43,10 +43,11 @@ To add a new example to the documentation:
    target/release/airc transpile docs/examples/your_example.air -o /tmp/test.rs
    ```
 3. **Include in documentation**: Add the example to the relevant markdown file in `docs/src/` using:
-   ```markdown
-   ```{{#include ../../examples/your_example.air}}
-   ```
-
+   
+      ```air
+      {{#include ../../examples/your_example.air}}
+      ```
+      
 ### Testing Documentation Examples
 
 The project includes an integration test that ensures all documentation examples compile successfully:

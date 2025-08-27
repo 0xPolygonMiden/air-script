@@ -235,7 +235,7 @@ The `when` keyword can be used to apply a binary selector to constraints where o
 Its usage in the case of bus operations is handled separately, as defined in [buses.md](./buses.md#bus-integrity-constraints).
 
 In the case of [conditional constraints](./convenience.md#conditional-constraints) and [conditional evaluators](./evaluators.md#conditional-evaluators), `constraint when selector` is equivalent to:
-```text
+```air
 enf match {
     case selector: constraint
     case !selector: 1 // this is a no_op

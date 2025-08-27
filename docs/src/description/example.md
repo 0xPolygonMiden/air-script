@@ -64,10 +64,12 @@ For more practical examples, see the included examples in the `docs/examples/` d
 
 ### Simple Addition
 
-```{{#include ../../examples/simple_addition.air}}
+```air
+{{#include ../../examples/simple_addition.air}}
 ```
 
 ### Fibonacci Sequence
 
-```{{#include ../../examples/fibonacci.air}}
+```air
+{{#include ../../examples/fibonacci.air}}
 ```
