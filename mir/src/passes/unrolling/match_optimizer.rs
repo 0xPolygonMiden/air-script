@@ -41,6 +41,12 @@ use crate::{
 /// The key is an index for the evaluation
 /// The value is a vector of each pair `(condition, constraint)` where the constraint evaluates to
 /// the given evaluation.
+///
+/// For example, for an `If` node with two match arms `(s0, [A, B])` and `(s1, C)`, if A and C are
+/// two constraints evaluating to the same value, we will construct the map {
+///     0: [(s0, A), (s1, C)],
+///     1: [(s0, B)]
+/// }
 type ConstraintEvaluationMap = BTreeMap<usize, Vec<(Link<Op>, Link<Op>)>>;
 
 /// This struct provides methods used to combine and optimize constraints contained in match
