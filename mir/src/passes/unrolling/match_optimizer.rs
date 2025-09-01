@@ -1,19 +1,46 @@
+//! This module provides functionality for optimizing match expressions (`If` nodes in the MIR)
+//!
+//! A given `If` node contains match arms in the form of `(condition, expr)` pairs, where `expr` can
+//! be one or more constraints that should be enforced on the associated condition. The goal of this
+//! module is to optimize the node by:
+//! - Removing duplicate constraints on the same condition,
+//! - Combining `(condition, expr)` and `(condition2, expr2)` with disjoint conditions into a single
+//!   constraint `condition * expr + condition2 * expr2`
+//! - Factorizing equivalent constraints (e.g. `(condition, expr)` and `(condition2, expr)`) in two
+//!   separate match arms into a single constraint `(condition1 + condition2) * expr1`
+//!
+//! The methodology to achieve these three goals is to rely on random evaluation of nodes to
+//! identify equivalent constraints:
+//! 1. We evaluate each constraint in the node at random points
+//! 2. We group main constraints that evaluate to the same value
+//! 3. We iterate over these groups (from biggest to smallest), and build a constraint by combining
+//!    groups that have disjoint conditions. For instance, if we have the evaluations `eval_1 = [
+//!    (s0, A), (s1, B) ]` and `eval_2 = [ (s2, C) ]`, we can combine them into a single constraint
+//!    `(s0 + s1) * A + s2 * C` because the sets {s0, s1} and {s2} are disjoint.   Note that `B` is
+//!    not included because it is equivalent to `A`, so we can remove the redundancy.
+//! 4. We add bus-related constraints to the produced constraints, as they cannot be handled in the
+//!    same way as main constraints.
+
 use std::{
     collections::{BTreeMap, HashMap},
     ops::Deref,
 };
 
-use miden_diagnostics::SourceSpan;
+use miden_diagnostics::{SourceSpan, Spanned};
 
 use crate::{
     CompileError,
     ir::{
-        Add, ConstantValue, Link, MatchArm, MirValue, Mul, Op, Parent, QuadFelt, RandomInputs,
+        Add, ConstantValue, Enf, Link, MatchArm, MirValue, Mul, Op, Parent, QuadFelt, RandomInputs,
         SpannedMirValue, Sub, Value,
     },
     passes::duplicate_node,
 };
 
+/// A map used to keep track of the evaluation of each constraint:
+/// The key is an index for the evaluation
+/// The value is a vector of each pair `(condition, constraint)` where the constraint evaluates to
+/// the given evaluation.
 type ConstraintEvaluationMap = BTreeMap<usize, Vec<(Link<Op>, Link<Op>)>>;
 
 /// This struct provides methods used to combine and optimize constraints contained in match
@@ -42,8 +69,11 @@ impl<'a> MatchOptimizer<'a> {
         }
     }
 
-    /// For a given match arm, splits main and bus-related constraints, and evaluates the main
-    /// constraints
+    /// For a given match arm:
+    /// - splits main and bus-related constraints
+    /// - returns bus-related constraints (without the wrapping `Op:Enf` for simplicity)
+    /// - evaluates the main constraints at random points, and groups constraints that evaluate to
+    ///   the same value in `constraints_evaluation_indices`
     pub fn evaluate_match_arm(
         &mut self,
         match_arm: &MatchArm,
@@ -61,12 +91,16 @@ impl<'a> MatchOptimizer<'a> {
         let mut bus_related_constraints_for_match_arm = Vec::new();
 
         // 1.2. Filter out all BusOp nodes from the constraints, we will handle them separately
+        // Bus operations can only be found as an `Op::BusOp` wrapped in an `Op::Enf`, for
+        // simplicity we unwrap it here and re-wrap it in `gather_all_constraints`.
         for constraint in all_constraints {
             match constraint.borrow().deref() {
-                Op::BusOp(_) => bus_related_constraints_for_match_arm.push(constraint.clone()),
                 Op::Enf(enf) => match enf.expr.borrow().deref() {
                     Op::BusOp(_) => bus_related_constraints_for_match_arm.push(enf.expr.clone()),
                     _ => constraints_to_eval.push(constraint.clone()),
+                },
+                Op::BusOp(_) => {
+                    unreachable!("Error: A BusOp was found outside of an Enf node in a match arm")
                 },
                 _ => constraints_to_eval.push(constraint.clone()),
             }
@@ -114,8 +148,8 @@ impl<'a> MatchOptimizer<'a> {
 
     /// For each evaluation, computes the number of constraints (with different selectors)
     /// evaluating to it.
-    // Returns eval_lens: BTreeMap<len, Vec<evaluation_index>>
-    pub fn compute_eval_lens(&self) -> BTreeMap<usize, Vec<usize>> {
+    /// Returns eval_lens: BTreeMap<len, Vec<evaluation_index>>
+    fn compute_eval_lens(&self) -> BTreeMap<usize, Vec<usize>> {
         let mut eval_lens = BTreeMap::new();
         for (eval_index, constraints_vec) in self.constraints_evaluation_indices.iter() {
             eval_lens
@@ -198,6 +232,10 @@ impl<'a> MatchOptimizer<'a> {
     }
 
     /// Adds bus-related constraints to the resulting constraints vector.
+    ///
+    /// Note: Given a slice of bus-related constraints in the form of `(condition, constraints)`, we
+    /// update the latch of each constraint to take into account the condition before adding the
+    /// resulting constraint into the final vector.
     pub fn gather_all_constraints(
         bus_related_constraints: &mut [(Link<Op>, Vec<Link<Op>>)],
         combined_main_constraints: Vec<Link<Op>>,
@@ -218,7 +256,8 @@ impl<'a> MatchOptimizer<'a> {
                     .latch
                     .borrow_mut()
                     .clone_from(&new_latch.borrow());
-                all_constraints.push(constraint.clone());
+                let enf_constraint = Enf::create(constraint.clone(), constraint.span());
+                all_constraints.push(enf_constraint);
             }
         }
         all_constraints
