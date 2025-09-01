@@ -347,14 +347,17 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
+    /// Translates each statement in the body of a function or evaluator `func`
     fn translate_body(
         &mut self,
         _ident: &ast::QualifiedIdentifier,
         func: Link<Root>,
         body: &'a Vec<ast::Statement>,
-    ) -> Result<Link<Root>, CompileError> {
+    ) -> Result<(), CompileError> {
+        // First, the root field sets the context that we are currently translating the body of
+        // `func`. It is for instance needed to correctly translate let statements and
+        // attach the statements of their bodies to the body of `func`.
         self.root = func.clone();
-        let func = func;
         for stmt in body {
             let op = self.translate_statement(stmt)?;
             match func.clone().borrow().deref() {
@@ -364,9 +367,8 @@ impl<'a> MirBuilder<'a> {
                     unreachable!("expected function or evaluator, got None")
                 },
             };
-            self.root = func.clone();
         }
-        Ok(func)
+        Ok(())
     }
 
     fn translate_type(&mut self, ty: &ast::Type) -> MirType {
