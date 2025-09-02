@@ -271,6 +271,15 @@ impl TraceBinding {
         self.ty().is_scalar()
     }
 
+    /// Returns the size of the trace binding, taking into account how it is accessed
+    pub fn tb_size(&self) -> usize {
+        match self.ty() {
+            Type::Vector(len) => len,
+            Type::Felt => 1,
+            _ => self.size,
+        }
+    }
+
     /// Derive a new [TraceBinding] derived from the current one given an [AccessType]
     pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
         let combined_access = match (self.access.clone(), access_type.clone()) {
@@ -294,19 +303,15 @@ impl TraceBinding {
                 ));
                 AccessType::Index(Box::new(new_expr))
             },
-            (Some(AccessType::Slice(_)), AccessType::Matrix(..)) => {
-                return Err(InvalidAccessError::SliceOfMatrix);
-            },
             (Some(AccessType::Index(_)), AccessType::Index(_)) => {
                 return Err(InvalidAccessError::IndexIntoScalar);
             },
-            (Some(AccessType::Matrix(..)), AccessType::Matrix(..)) => {
-                return Err(InvalidAccessError::SliceOfMatrix);
+            (Some(AccessType::Matrix(..)), _) | (Some(_), AccessType::Matrix(..)) => {
+                return Err(InvalidAccessError::IndexIntoScalar);
             },
-            (Some(AccessType::Matrix(..)), AccessType::Slice(..)) => {
-                return Err(InvalidAccessError::SliceOfMatrix);
+            (Some(expression::AccessType::Index(_)), expression::AccessType::Slice(_)) => {
+                return Err(InvalidAccessError::SliceOfScalar);
             },
-            _ => todo!(),
         };
 
         if let AccessType::Index(idx) = combined_access.clone()

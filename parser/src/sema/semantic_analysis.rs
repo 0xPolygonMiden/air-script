@@ -185,7 +185,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                                 offset: binding.offset,
                                 size: binding.size,
                                 ty: binding.ty,
-                                access: binding.access.clone(),
+                                access: binding.access,
                             })
                         ),
                         None
@@ -1149,12 +1149,7 @@ impl SemanticAnalysis<'_> {
             Expr::SymbolAccess(access) => {
                 match self.access_binding_type(access) {
                     Ok(BindingType::TraceColumn(tr) | BindingType::TraceParam(tr)) => {
-                        let tr_size = match tr.ty() {
-                            Type::Vector(len) => len,
-                            Type::Felt => 1,
-                            _ => tr.size,
-                        };
-                        if tr_size == param.size {
+                        if tr.tb_size() == param.size {
                             // Success, the argument and parameter types match up, but
                             // we must make sure the segments also match
                             let same_segment = tr.segment == param.id;
@@ -1182,7 +1177,7 @@ impl SemanticAnalysis<'_> {
                             self.diagnostics.diagnostic(Severity::Error)
                                     .with_message("invalid call")
                                     .with_primary_label(span, "type mismatch in function argument")
-                                    .with_secondary_label(arg.span(), format!("callee expects {} trace columns here, but this binding provides {}", param.size, tr_size))
+                                    .with_secondary_label(arg.span(), format!("callee expects {} trace columns here, but this binding provides {}", param.size, tr.tb_size()))
                                     .emit();
                         }
                     },
@@ -1191,13 +1186,8 @@ impl SemanticAnalysis<'_> {
                         for elem in elems.iter() {
                             match elem {
                                 BindingType::TraceColumn(tr) | BindingType::TraceParam(tr) => {
-                                    let tr_size = match tr.ty() {
-                                        Type::Vector(len) => len,
-                                        Type::Felt => 1,
-                                        _ => tr.size,
-                                    };
                                     if tr.segment == param.id {
-                                        size += tr_size;
+                                        size += tr.tb_size();
                                     } else {
                                         let expected_segment = segment_id_to_name(param.id);
                                         let segment_name = segment_id_to_name(tr.segment);
@@ -1288,12 +1278,7 @@ impl SemanticAnalysis<'_> {
                     match self.expr_binding_type(elem) {
                         Ok(BindingType::TraceColumn(tr) | BindingType::TraceParam(tr)) => {
                             if tr.segment == param.id {
-                                let tr_size = match tr.ty() {
-                                    Type::Vector(len) => len,
-                                    Type::Felt => 1,
-                                    _ => tr.size,
-                                };
-                                size += tr_size;
+                                size += tr.tb_size();
                             } else {
                                 let expected_segment = segment_id_to_name(param.id);
                                 let segment_name = segment_id_to_name(tr.segment);

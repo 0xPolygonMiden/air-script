@@ -1,7 +1,5 @@
 def ComputedIndicesAir
 
-const VEC = [0, 1, 2, 3, 4];
-
 trace_columns {
     main: [a, b, c, d, e, f, g, h],
 }

@@ -130,10 +130,9 @@ struct AirBuilder<'a> {
 fn indexed_accessor(mir_node: &Link<Op>) -> Link<Op> {
     if let Some(accessor) = mir_node.as_accessor() {
         if let MirAccessType::Index(index) = accessor.access_type.clone() {
-            let index = match get_inner_const(&index) {
-                Some(value) => value as usize,
-                None => unreachable!("Index should be a constant value after constant propagation"),
-            };
+            let index = get_inner_const(&index)
+                .expect("Index should be a constant value after constant propagation")
+                as usize;
             if let Some(vec) = accessor.indexable.as_vector() {
                 let children = vec.elements.borrow().deref().clone();
                 if index >= children.len() {
