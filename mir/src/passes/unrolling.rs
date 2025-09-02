@@ -663,173 +663,14 @@ impl UnrollingFirstPass<'_> {
         _graph: &mut Graph,
         accessor: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        let mut updated_accessor = None;
-
-        {
-            let accessor_ref = accessor.as_accessor().unwrap();
-            let indexable = accessor_ref.indexable.clone();
-            let mir_access_type = accessor_ref.access_type.clone();
-            let offset = accessor_ref.offset;
-
-            // FIXME: Factorize this code with the visit_accessor_bis of ConstantPropagation pass
-            // We should be able to call a helper, and specify whether we expect the indices to be
-            // constants at this stage
-            if indexable.clone().as_parameter().is_none() {
-                match mir_access_type {
-                    MirAccessType::Default => {
-                        updated_accessor = Some(indexable.clone());
-
-                        if let Some(value) = indexable.clone().as_value() {
-                            let mir_value = value.value.value.clone();
-
-                            if let MirValue::TraceAccess(trace_access) = mir_value {
-                                let new_node = Value::create(SpannedMirValue {
-                                    span: value.value.span(),
-                                    value: MirValue::TraceAccess(TraceAccess {
-                                        segment: trace_access.segment,
-                                        column: trace_access.column,
-                                        row_offset: trace_access.row_offset + offset,
-                                    }),
-                                });
-                                updated_accessor = Some(new_node);
-                            }
-                        }
-                    },
-                    MirAccessType::Index(index) => {
-                        let index_usize = match get_inner_const(&index) {
-                            Some(value) => value as usize,
-                            None => {
-                                return Ok(None);
-                            },
-                        };
-                        // Check that the child node is a vector, raise diag otherwise
-                        // Replace the current node by the index-th element of the vector
-                        // Raise diag if index is out of bounds
-                        if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
-                            let indexable_vec =
-                                indexable_vector.children().borrow().deref().clone();
-                            let child_accessed = match indexable_vec.get(index_usize) {
-                                Some(child_accessed) => child_accessed,
-                                None => {
-                                    self.diagnostics
-                                        .diagnostic(miden_diagnostics::Severity::Error)
-                                        .with_message(
-                                            "attempted to access an index which is out of bounds",
-                                        )
-                                        .with_primary_label(index.span(), "index out of bounds")
-                                        .emit();
-                                    return Err(CompileError::Failed);
-                                },
-                            };
-                            if let Some(value) = child_accessed.clone().as_value() {
-                                let mir_value = value.value.value.clone();
-                                match mir_value {
-                                    MirValue::TraceAccess(trace_access) => {
-                                        let new_node = Value::create(SpannedMirValue {
-                                            span: value.value.span(),
-                                            value: MirValue::TraceAccess(TraceAccess {
-                                                segment: trace_access.segment,
-                                                column: trace_access.column,
-                                                row_offset: trace_access.row_offset + offset,
-                                            }),
-                                        });
-                                        updated_accessor = Some(new_node);
-                                    },
-                                    _ => {
-                                        updated_accessor = Some(child_accessed.clone());
-                                    },
-                                }
-                            } else {
-                                updated_accessor = Some(child_accessed.clone());
-                            }
-                        } else if let Some(value) = indexable.clone().as_value() {
-                            let mir_value = value.value.value.clone();
-                            match mir_value {
-                                MirValue::PublicInput(public_input_access) => {
-                                    let new_node = Value::create(SpannedMirValue {
-                                        span: value.value.span(),
-                                        value: MirValue::PublicInput(PublicInputAccess {
-                                            name: public_input_access.name,
-                                            index: public_input_access.index + index_usize,
-                                        }),
-                                    });
-                                    updated_accessor = Some(new_node);
-                                },
-                                MirValue::TraceAccess(trace_access) => {
-                                    let new_node = Value::create(SpannedMirValue {
-                                        span: value.value.span(),
-                                        value: MirValue::TraceAccess(TraceAccess {
-                                            segment: trace_access.segment,
-                                            column: trace_access.column + index_usize,
-                                            row_offset: trace_access.row_offset,
-                                        }),
-                                    });
-                                    updated_accessor = Some(new_node);
-                                },
-                                _ => {
-                                    unreachable!("indexable is {:?}", indexable); // raise diag
-                                },
-                            }
-                        } else {
-                            unreachable!("indexable is {:?}", indexable); // raise diag
-                        }
-                    },
-                    MirAccessType::Matrix(row, col) => {
-                        let (row, col) = match (get_inner_const(&row), get_inner_const(&col)) {
-                            (Some(row), Some(col)) => (row as usize, col as usize),
-                            _ => {
-                                return Ok(None);
-                            },
-                        };
-                        // Check that the child node is a matrix, raise diag otherwise
-                        // Replace the current node by the index-th element of the vector
-                        // Raise diag if index is out of bounds
-
-                        if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
-                            let indexable_vec =
-                                indexable_vector.children().borrow().deref().clone();
-                            let row_accessed = match indexable_vec.get(row) {
-                                Some(row_accessed) => row_accessed,
-                                None => unreachable!(), // raise diag
-                            };
-
-                            if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
-                                let row_accessed_vec =
-                                    row_accessed_vector.children().borrow().deref().clone();
-                                let child_accessed = match row_accessed_vec.get(col) {
-                                    Some(child_accessed) => child_accessed,
-                                    None => unreachable!(), // raise diag
-                                };
-                                updated_accessor = Some(child_accessed.clone());
-                            } else {
-                                unreachable!(); // raise diag
-                            };
-                        } else if let Op::Matrix(indexable_matrix) = indexable.borrow().deref() {
-                            let indexable_vec =
-                                indexable_matrix.children().borrow().deref().clone();
-                            let row_accessed = match indexable_vec.get(row) {
-                                Some(row_accessed) => row_accessed,
-                                None => unreachable!(), // raise diag
-                            };
-
-                            if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
-                                let row_accessed_vec =
-                                    row_accessed_vector.children().borrow().deref().clone();
-                                let child_accessed = match row_accessed_vec.get(col) {
-                                    Some(child_accessed) => child_accessed,
-                                    None => unreachable!(), // raise diag
-                                };
-                                updated_accessor = Some(child_accessed.clone());
-                            } else {
-                                unreachable!(); // raise diag
-                            };
-                        };
-                    },
-                }
-            }
+        let accessor_ref = accessor.as_accessor().unwrap();
+        let indexable = accessor_ref.indexable.clone();
+        if indexable.clone().as_parameter().is_none() {
+            handle_accessory_visit(accessor.clone(), false, self.diagnostics)
+        } else {
+            // We keep accessors wrapping parameters to allow for nested list comprehensions.
+            Ok(None)
         }
-
-        Ok(updated_accessor)
     }
 
     fn compute_iterator_len(iterator: Link<Op>) -> usize {
@@ -1210,4 +1051,222 @@ fn have_disjoint_conditions(
         }
     }
     true
+}
+
+/// Handle the visit of an accessor node, used for both Unrolling and ConstantPropagation passes
+/// The `compute_indices` bool indicates whether to compute the indices of the accessor (for C)
+pub fn handle_accessory_visit(
+    accessor: Link<Op>,
+    compute_indices: bool,
+    diagnostics: &DiagnosticsHandler,
+) -> Result<Option<Link<Op>>, CompileError> {
+    let accessor_ref = accessor.as_accessor().unwrap();
+    let indexable = accessor_ref.indexable.clone();
+    let mir_access_type = accessor_ref.access_type.clone();
+    let offset = accessor_ref.offset;
+
+    match mir_access_type {
+        // If we have a Default accessor, we add the row offset if needed, otherwise we just return
+        // the indexable
+        MirAccessType::Default => Ok(Some(add_row_offset_if_trace_access(&indexable, offset))),
+        // If we have an Index accessor, we compute the index and query the index-th element of the
+        // indexable. If the index is not a constant and computed_indices is true, we raise
+        // a diagnostic. If the index is not a constant and computed_indices is false, we
+        // keep the node as is. If the index is an out-of-bound constant, we raise a
+        // diagnostic.
+        MirAccessType::Index(index) => {
+            let Some(index_usize) = extract_index_value(&index, compute_indices, diagnostics)?
+            else {
+                return Ok(None);
+            };
+            if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
+                let indexable_vec = indexable_vector.children().borrow().deref().clone();
+                let child_accessed = match indexable_vec.get(index_usize) {
+                    Some(child_accessed) => child_accessed,
+                    None => {
+                        diagnostics
+                            .diagnostic(miden_diagnostics::Severity::Error)
+                            .with_message("attempted to access an index which is out of bounds")
+                            .with_primary_label(index.span(), "index out of bounds")
+                            .emit();
+                        return Err(CompileError::Failed);
+                    },
+                };
+                Ok(Some(add_row_offset_if_trace_access(child_accessed, offset)))
+            } else if let Some(value) = indexable.clone().as_value() {
+                // If the indexable is either a PublicInput or a TraceAccess, we treat the index as
+                // an offset
+                let mir_value = value.value.value.clone();
+                match mir_value {
+                    MirValue::PublicInput(public_input_access) => {
+                        let new_node = Value::create(SpannedMirValue {
+                            span: value.value.span(),
+                            value: MirValue::PublicInput(PublicInputAccess {
+                                name: public_input_access.name,
+                                index: public_input_access.index + index_usize,
+                            }),
+                        });
+                        Ok(Some(new_node))
+                    },
+                    MirValue::TraceAccess(trace_access) => {
+                        // We also need to account for the row offset
+                        let new_node = Value::create(SpannedMirValue {
+                            span: value.value.span(),
+                            value: MirValue::TraceAccess(TraceAccess {
+                                segment: trace_access.segment,
+                                column: trace_access.column + index_usize,
+                                row_offset: trace_access.row_offset,
+                            }),
+                        });
+                        Ok(Some(new_node))
+                    },
+                    _ => {
+                        unreachable!(
+                            "Unexpected accessor, cannot have MirAccessType::Index with indexable {:?}",
+                            indexable
+                        );
+                    },
+                }
+            } else {
+                unreachable!(
+                    "Unexpected accessor, cannot have MirAccessType::Index with indexable {:?}",
+                    indexable
+                );
+            }
+        },
+        // If we have an Matrix accessor, we compute both the corresponding row and column, and
+        // query the indexable accordingly. If either of row or col is not a constant and
+        // computed_indices is true, we raise a diagnostic. If either of row or col is not a
+        // constant and computed_indices is false, we keep the node as is. If either of row
+        // or col is an out-of-bound constant, we raise a diagnostic.
+        MirAccessType::Matrix(row, col) => {
+            let Some(row_usize) = extract_index_value(&row, compute_indices, diagnostics)? else {
+                return Ok(None);
+            };
+            let Some(col_usize) = extract_index_value(&col, compute_indices, diagnostics)? else {
+                return Ok(None);
+            };
+            // Replace the current node by the index-th element of the vector
+            // Raise diag if index is out of bounds
+            if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
+                let indexable_vec = indexable_vector.children().borrow().deref().clone();
+                let row_accessed = match indexable_vec.get(row_usize) {
+                    Some(row_accessed) => row_accessed,
+                    None => {
+                        diagnostics
+                            .diagnostic(miden_diagnostics::Severity::Error)
+                            .with_message("attempted to access a row which is out of bounds")
+                            .with_primary_label(row.span(), "row out of bounds")
+                            .emit();
+                        return Err(CompileError::Failed);
+                    },
+                };
+                if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
+                    let row_accessed_vec = row_accessed_vector.children().borrow().deref().clone();
+                    let child_accessed = match row_accessed_vec.get(col_usize) {
+                        Some(child_accessed) => child_accessed,
+                        None => {
+                            diagnostics
+                                .diagnostic(miden_diagnostics::Severity::Error)
+                                .with_message("attempted to access a col which is out of bounds")
+                                .with_primary_label(col.span(), "col out of bounds")
+                                .emit();
+                            return Err(CompileError::Failed);
+                        },
+                    };
+                    Ok(Some(child_accessed.clone()))
+                } else {
+                    unreachable!(
+                        "Unexpected accessor, cannot have MirAccessType::Matrix with indexable {:?}",
+                        indexable
+                    );
+                }
+            } else if let Op::Matrix(indexable_matrix) = indexable.borrow().deref() {
+                let indexable_vec = indexable_matrix.children().borrow().deref().clone();
+                let row_accessed = match indexable_vec.get(row_usize) {
+                    Some(row_accessed) => row_accessed,
+                    None => {
+                        diagnostics
+                            .diagnostic(miden_diagnostics::Severity::Error)
+                            .with_message("attempted to access a row which is out of bounds")
+                            .with_primary_label(row.span(), "row out of bounds")
+                            .emit();
+                        return Err(CompileError::Failed);
+                    },
+                };
+                if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
+                    let row_accessed_vec = row_accessed_vector.children().borrow().deref().clone();
+                    let child_accessed = match row_accessed_vec.get(col_usize) {
+                        Some(child_accessed) => child_accessed,
+                        None => {
+                            diagnostics
+                                .diagnostic(miden_diagnostics::Severity::Error)
+                                .with_message("attempted to access a col which is out of bounds")
+                                .with_primary_label(col.span(), "col out of bounds")
+                                .emit();
+                            return Err(CompileError::Failed);
+                        },
+                    };
+                    Ok(Some(child_accessed.clone()))
+                } else {
+                    unreachable!(
+                        "Unexpected accessor, cannot have MirAccessType::Matrix with indexable {:?}",
+                        indexable
+                    );
+                }
+            } else {
+                unreachable!(
+                    "Unexpected accessor, cannot have MirAccessType::Matrix with indexable {:?}",
+                    indexable
+                );
+            }
+        },
+    }
+}
+
+/// Helper function to extract a usize value from an index expression with consistent error handling
+///
+/// Returns:
+/// - `Ok(Some(usize))` - Successfully extracted constant value
+/// - `Ok(None)` - Not a constant value but not required (compute_indices=false)
+/// - `Err(CompileError)` - Not a constant value when required (compute_indices=true)
+fn extract_index_value(
+    index: &Link<Op>,
+    compute_indices: bool,
+    diagnostics: &DiagnosticsHandler,
+) -> Result<Option<usize>, CompileError> {
+    match (get_inner_const(index), compute_indices) {
+        (Some(value), _) => Ok(Some(value as usize)),
+        (None, true) => {
+            diagnostics
+                .diagnostic(miden_diagnostics::Severity::Error)
+                .with_message("the index is not constant during constant propagation")
+                .with_primary_label(index.span(), "index is not constant")
+                .emit();
+            Err(CompileError::Failed)
+        },
+        (None, false) => Ok(None),
+    }
+}
+
+/// Helper function to add a row offset to a TraceAccess value, and return the node unchanged
+/// otherwise.
+fn add_row_offset_if_trace_access(node: &Link<Op>, offset: usize) -> Link<Op> {
+    if let Some(value) = node.clone().as_value() {
+        let mir_value = value.value.value.clone();
+        if let MirValue::TraceAccess(trace_access) = mir_value {
+            Value::create(SpannedMirValue {
+                span: value.value.span(),
+                value: MirValue::TraceAccess(TraceAccess {
+                    segment: trace_access.segment,
+                    column: trace_access.column,
+                    row_offset: trace_access.row_offset + offset,
+                }),
+            })
+        } else {
+            node.clone()
+        }
+    } else {
+        node.clone()
+    }
 }
