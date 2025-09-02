@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use air_parser::{
     LexicalScope,
-    ast::{self, AccessType, TraceSegmentId},
+    ast::{self, AccessType, ScalarExpr, TraceSegmentId},
     symbols,
 };
 use air_pass::Pass;
@@ -1241,21 +1241,34 @@ impl<'a> MirBuilder<'a> {
                         .build(),
                 ))
             },
-            AccessType::Index(_index) => {
-                // FIXME: PublicInputAccess probably needs to have a Link<Op> as index. For now we
-                // consider that an Accessor { public_input { index }, Index(index2)) } targets
-                // public input index + index2 (as an offset)
-                let public_input_access = PublicInputAccess::new(public_input.name(), 0);
-                let value = Value::builder()
-                    .value(SpannedMirValue {
-                        span: access.span(),
-                        value: MirValue::PublicInput(public_input_access),
-                    })
-                    .build();
-                let mir_access_type = self.translate_access_type(&access.access_type)?;
-                let accessor =
-                    Accessor::create(value, mir_access_type, access.offset, access.span());
-                Ok(Some(accessor))
+            AccessType::Index(index) => {
+                // If the index is a constant, we construct the corresponding PublicInputAccess
+                if let ScalarExpr::Const(c) = *index {
+                    let public_input_access =
+                        PublicInputAccess::new(public_input.name(), c.item as usize);
+                    let value = Value::builder()
+                        .value(SpannedMirValue {
+                            span: access.span(),
+                            value: MirValue::PublicInput(public_input_access),
+                        })
+                        .build();
+                    Ok(Some(value))
+                } else {
+                    // Otherwise, we need to wrap a PublicInputAccess with an accessor. In this
+                    // case, the accessor is not used to index into a vector,
+                    // but rather to offset the targeted column
+                    let public_input_access = PublicInputAccess::new(public_input.name(), 0);
+                    let value = Value::builder()
+                        .value(SpannedMirValue {
+                            span: access.span(),
+                            value: MirValue::PublicInput(public_input_access),
+                        })
+                        .build();
+                    let mir_access_type = self.translate_access_type(&access.access_type)?;
+                    let accessor =
+                        Accessor::create(value, mir_access_type, access.offset, access.span());
+                    Ok(Some(accessor))
+                }
             },
             _ => {
                 // This should have been caught earlier during compilation
@@ -1287,7 +1300,6 @@ impl<'a> MirBuilder<'a> {
                                 .build(),
                         )
                     },
-                    //FIXME? Convert to MirAccessType and add Accessor wrapper?
                     AccessType::Slice(range_expr) => {
                         let tab = TraceAccessBinding {
                             segment: binding.segment,
@@ -1324,18 +1336,15 @@ impl<'a> MirBuilder<'a> {
 
         if segment.name == id {
             // We access $main[i]
-            // FIXME: Check is_constant
-            if let AccessType::Index(_column) = access.access_type.clone() {
-                let ta = TraceAccess::new(TraceSegmentId::Main, 0, access.offset);
-                let value = Value::builder()
-                    .value(SpannedMirValue {
-                        span: access.span(),
-                        value: MirValue::TraceAccess(ta),
-                    })
-                    .build();
-                let mir_access_type = self.translate_access_type(&access.access_type)?;
-                let accessor = Accessor::create(value, mir_access_type, 0, access.span());
-                Ok(Some(accessor))
+            if let AccessType::Index(column) = access.access_type.clone() {
+                let node = self.translate_indexed_trace_access(
+                    column,
+                    TraceSegmentId::Main,
+                    0,
+                    access.offset,
+                    access,
+                )?;
+                Ok(Some(node))
             } else {
                 // This should have been caught earlier during compilation
                 unreachable!(
@@ -1365,25 +1374,57 @@ impl<'a> MirBuilder<'a> {
                         Ok(Some(value))
                     }
                 },
-                AccessType::Index(_extra_offset) if binding.size > 1 => {
-                    // FIXME?
-                    let ta = TraceAccess::new(binding.segment, binding.offset, access.offset);
-                    let value = Value::builder()
-                        .value(SpannedMirValue {
-                            span: access.span(),
-                            value: MirValue::TraceAccess(ta),
-                        })
-                        .build();
-                    let mir_access_type = self.translate_access_type(&access.access_type)?;
-                    let accessor = Accessor::create(value, mir_access_type, 0, access.span());
-
-                    Ok(Some(accessor))
+                AccessType::Index(extra_offset) if binding.size > 1 => {
+                    let node = self.translate_indexed_trace_access(
+                        extra_offset,
+                        binding.segment,
+                        binding.offset,
+                        access.offset,
+                        access,
+                    )?;
+                    Ok(Some(node))
                 },
                 _ => Ok(None),
             }
         } else {
             // We do not access a trace
             Ok(None)
+        }
+    }
+
+    /// Helper function to translate a trace_access based on an index. If the index is a constant,
+    /// we build the corresponding TraceAccess. Otherwise, we build an Accessor around the
+    /// TraceAccess, the index should then be treated as an offset and not a way to index into a
+    /// collection.
+    fn translate_indexed_trace_access(
+        &mut self,
+        index: Box<ScalarExpr>,
+        segment: TraceSegmentId,
+        offset: usize,
+        row_offset: usize,
+        access: &'a ast::SymbolAccess,
+    ) -> Result<Link<Op>, CompileError> {
+        // If the index is a constant, we construct the corresponding TraceAccess
+        if let ScalarExpr::Const(c) = *index {
+            let ta = TraceAccess::new(segment, offset + c.item as usize, row_offset);
+            Ok(Value::builder()
+                .value(SpannedMirValue {
+                    span: access.span(),
+                    value: MirValue::TraceAccess(ta),
+                })
+                .build())
+        } else {
+            // Otherwise, we need to wrap a TraceAccess with an accessor. In this case, the accessor
+            // is not used to index into a vector, but rather to offset the targeted column
+            let ta = TraceAccess::new(segment, offset, row_offset);
+            let value = Value::builder()
+                .value(SpannedMirValue {
+                    span: access.span(),
+                    value: MirValue::TraceAccess(ta),
+                })
+                .build();
+            let mir_access_type = self.translate_access_type(&access.access_type)?;
+            Ok(Accessor::create(value, mir_access_type, 0, access.span()))
         }
     }
 }
