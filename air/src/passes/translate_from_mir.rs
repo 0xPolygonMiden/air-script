@@ -109,7 +109,7 @@ impl Pass for MirToAir<'_> {
         // Note: In the MIR, buses operations are kept in integrity constraints to
         // allow them to be handled in the graph (e.g. inlined via evaluators). This is why
         // we need to first visit the integrity constraints, update the corresponding bus
-        // when encountering a BusOp, and then visit the buses to build them.
+        // when encountering a `BusOp`, and then visit the buses to build them.
         for bus in buses.values() {
             builder.build_bus(bus)?;
         }

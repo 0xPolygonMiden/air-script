@@ -9,7 +9,7 @@ pub use constant_propagation::ConstantPropagation;
 pub use inlining::Inlining;
 use miden_diagnostics::Spanned;
 pub use translate::AstToMir;
-pub use unrolling::Unrolling;
+pub use unrolling::{Unrolling, handle_accessory_visit};
 pub use visitor::Visitor;
 
 use crate::ir::{
@@ -22,9 +22,9 @@ use crate::ir::{
 /// It should be used when we want to reference the same node multiple times in the MIR graph (e.g.
 /// referencing let bound variables)
 ///
-/// Note: the current_replace_map is only used to keep track of For nodes, that can be referenced by
-/// Parameters inside their bodies Then, duplicated Parameters should reference the new For node,
-/// not the original one
+/// Note: the current_replace_map is only used to keep track of `For` nodes, that can be referenced
+/// by `Parameters` inside their bodies Then, duplicated Parameters should reference the new `For`
+/// node, not the original one
 pub fn duplicate_node(
     node: Link<Op>,
     current_replace_map: &mut HashMap<usize, (Link<Op>, Link<Op>)>,
@@ -216,17 +216,17 @@ pub fn duplicate_node(
 }
 
 /// Helper used to duplicate nodes and their children recursively, used during Inlining and
-/// Unrolling Additionally, if a Leaf is a Parameter that references the given ref_owner (if set to
-/// Some()) or ref_node, it is replaced with the corresponding item of the replace_parameter_list
+/// Unrolling Additionally, if a Leaf is a `Parameter` that references the given ref_owner (if set
+/// to Some()) or ref_node, it is replaced with the corresponding item of the replace_parameter_list
 /// Vec.
 ///
 /// This is useful for inlining function calls (and replacing their parameters with the arguments of
 /// the call) for Inlining, and for Unrolling loops (and replacing their parameters with the
 /// iterator values) for Unrolling. Inlining: replace_parameter_list = arguments should be the
-/// arguments from the Call() Unrolling: replace_parameter_list =
+/// arguments from the `Call` Unrolling: replace_parameter_list =
 /// self.for_inlining_context.unwrap().iterators
 ///
-/// Note: The params_for_ref_node parameters is used to keep track of Parameters, and update their
+/// Note: The params_for_ref_node parameters is used to keep track of `Parameters`, and update their
 /// ref_node as needed.
 pub fn duplicate_node_or_replace(
     current_replace_map: &mut HashMap<usize, (Link<Op>, Link<Op>)>,
