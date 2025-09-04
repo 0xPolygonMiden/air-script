@@ -47,7 +47,7 @@ impl Air for SelectorsAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![TransitionConstraintDegree::new(3), TransitionConstraintDegree::new(3), TransitionConstraintDegree::new(3)];
+        let main_degrees = vec![TransitionConstraintDegree::new(3), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(3)];
         let aux_degrees = vec![];
         let num_main_assertions = 1;
         let num_aux_assertions = 0;
@@ -83,7 +83,7 @@ impl Air for SelectorsAir {
         let main_current = frame.current();
         let main_next = frame.next();
         result[0] = (main_current[0] + (E::ONE - main_current[0]) * main_current[1]) * main_current[3] + (E::ONE - main_current[0]) * (E::ONE - main_current[1]) * (main_current[4] - E::from(Felt::new(8_u64)));
-        result[1] = ((E::ONE - main_current[0]) * main_current[1] + (E::ONE - main_current[0]) * (E::ONE - main_current[1])) * (main_current[5] - E::from(Felt::new(8_u64))) + main_current[0] * (main_current[4] - E::from(Felt::new(2_u64)));
+        result[1] = (E::ONE - main_current[0]) * (main_current[5] - E::from(Felt::new(8_u64))) + main_current[0] * (main_current[4] - E::from(Felt::new(2_u64)));
         result[2] = main_current[0] * (main_current[5] - E::from(Felt::new(4_u64))) + (E::ONE - main_current[0]) * main_current[1] * (main_current[4] - E::from(Felt::new(6_u64)));
     }
 
