@@ -18,3 +18,5 @@ anyhow = { workspace = true }
 miden-diagnostics = { workspace = true }
 mir = { package = "air-mir", path = "../mir", version = "0.5" }
 thiserror = { workspace = true }
+rand = "0.9"
+winter-math = { package = "winter-math", version = "0.12", default-features = false }

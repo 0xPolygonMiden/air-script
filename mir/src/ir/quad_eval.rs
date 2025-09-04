@@ -1,4 +1,6 @@
-use std::{collections::HashMap, hash::Hash, ops::Deref};
+extern crate alloc;
+use alloc::collections::BTreeMap;
+use std::ops::Deref;
 
 use air_parser::ast::TraceSegmentId;
 use miden_core::{Felt, QuadExtension};
@@ -22,11 +24,35 @@ fn rand_quad_felt<R: Rng + ?Sized>(rng: &mut R) -> QuadFelt {
 }
 
 /// Returns a [QuadFelt] corresponding to a given base element.
-fn const_quad_felt(felt: Felt) -> QuadFelt {
+pub fn const_quad_felt(felt: Felt) -> QuadFelt {
     QuadFelt::new(felt, Felt::ZERO)
 }
 
-/// Represents the current existing evaluations to persist random values taken by the same values.
+/// Helper function to either query an existing evaluation or create a new random one if the index
+/// is out of bounds.
+pub fn query_indexed_eval<R: Rng + ?Sized>(
+    rng: &mut R,
+    evaluations: &mut Vec<QuadFelt>,
+    index: usize,
+) -> QuadFelt {
+    if evaluations.len() <= index {
+        evaluations.resize_with(index + 1, || rand_quad_felt(rng));
+    }
+    evaluations[index]
+}
+
+/// Helper function to either query an existing evaluation or create a new random one if the element
+/// is not present in the map.
+pub fn query_mapped_eval<R: Rng + ?Sized, K: Ord + Eq + Clone>(
+    rng: &mut R,
+    evaluation_map: &mut BTreeMap<K, QuadFelt>,
+    element: &K,
+) -> QuadFelt {
+    *evaluation_map.entry(element.clone()).or_insert_with(|| rand_quad_felt(rng))
+}
+
+/// Holds the random inputs taken by leaf nodes, in order to persist them across different node
+/// evaluations.
 #[derive(Debug, Clone, Default)]
 pub struct RandomInputs {
     rng: ThreadRng,
@@ -34,8 +60,8 @@ pub struct RandomInputs {
     // $main[0], $main[0]', $main[1], $main[1]', $main[2], ...
     main_trace: Vec<QuadFelt>,
     rand_values: Vec<QuadFelt>,
-    public_inputs: HashMap<PublicInputAccess, QuadFelt>,
-    periodic_columns: HashMap<PeriodicColumnAccess, QuadFelt>,
+    public_inputs: BTreeMap<PublicInputAccess, QuadFelt>,
+    periodic_columns: BTreeMap<PeriodicColumnAccess, QuadFelt>,
 }
 
 impl RandomInputs {
@@ -101,7 +127,7 @@ impl RandomInputs {
                     MirValue::TraceAccess(trace_access) => match trace_access.segment {
                         TraceSegmentId::Main => {
                             let index = trace_access.column * 2 + trace_access.row_offset;
-                            Ok(query_indexed_cur_eval(&mut self.rng, &mut self.main_trace, index))
+                            Ok(query_indexed_eval(&mut self.rng, &mut self.main_trace, index))
                         },
                         _ => {
                             println!(
@@ -112,16 +138,16 @@ impl RandomInputs {
                         },
                     },
                     MirValue::RandomValue(u) => {
-                        Ok(query_indexed_cur_eval(&mut self.rng, &mut self.rand_values, *u))
+                        Ok(query_indexed_eval(&mut self.rng, &mut self.rand_values, *u))
                     },
                     // For PublicInput and PeriodicColumn, we use the Hash of the element to
                     // associate a unique random value or each public input and
                     // each periodic column access
                     MirValue::PublicInput(pi) => {
-                        Ok(query_hashed_cur_eval(&mut self.rng, &mut self.public_inputs, pi))
+                        Ok(query_mapped_eval(&mut self.rng, &mut self.public_inputs, pi))
                     },
                     MirValue::PeriodicColumn(pc) => {
-                        Ok(query_hashed_cur_eval(&mut self.rng, &mut self.periodic_columns, pc))
+                        Ok(query_mapped_eval(&mut self.rng, &mut self.periodic_columns, pc))
                     },
                     MirValue::Null
                     | MirValue::BusAccess(_)
@@ -150,7 +176,7 @@ impl RandomInputs {
                     let index = trace_access.column * 2 + a.offset;
                     match trace_access.segment {
                         TraceSegmentId::Main => {
-                            return Ok(query_indexed_cur_eval(
+                            return Ok(query_indexed_eval(
                                 &mut self.rng,
                                 &mut self.main_trace,
                                 index,
@@ -196,27 +222,4 @@ impl RandomInputs {
             },
         }
     }
-}
-
-/// Helper function to either query an existing evaluation or create a new random one if the index
-/// is out of bounds.
-fn query_indexed_cur_eval<R: Rng + ?Sized>(
-    rng: &mut R,
-    cur_eval_vec: &mut Vec<QuadFelt>,
-    index: usize,
-) -> QuadFelt {
-    if cur_eval_vec.len() <= index {
-        cur_eval_vec.resize_with(index + 1, || rand_quad_felt(rng));
-    }
-    cur_eval_vec[index]
-}
-
-/// Helper function to either query an existing evaluation or create a new random one if the element
-/// is not present in the map.
-fn query_hashed_cur_eval<R: Rng + ?Sized, H: Hash + Eq + Clone>(
-    rng: &mut R,
-    cur_eval_map: &mut HashMap<H, QuadFelt>,
-    element: &H,
-) -> QuadFelt {
-    *cur_eval_map.entry(element.clone()).or_insert_with(|| rand_quad_felt(rng))
 }

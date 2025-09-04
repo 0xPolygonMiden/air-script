@@ -4,6 +4,7 @@
 
 - Incremented MSRV to 1.89.
 - Add a constant propagation pass after other mir passes (#439).
+- Add a pass for common subexpression elimination in the constraint graph (#419).
 - Refactored the unrolling pass in MIR (#434).
 - Reorder unrolling passes to unroll list comprehensions before match statements (#431).
 
