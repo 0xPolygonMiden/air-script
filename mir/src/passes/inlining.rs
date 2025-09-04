@@ -12,19 +12,20 @@ use crate::{
     },
 };
 
-/// This pass handles inlining of Call nodes at there call sites.
+/// This pass handles inlining of `Call` nodes at their call sites.
 ///
 /// It works in three steps:
 /// * Firstly, we visit the graph to build the call dependency graph.
 /// * This dependency graph is then used to compute the wanted inlining order (we first replace
-///   calls to callees that do not have Calls in their body). If it is not possible create this
+///   calls to callees that do not have `Call` in their body). If it is not possible to create this
 ///   order, this means there is a circular dependency.
-/// * Then, we visit the graph again at each Call nodes, building a duplicate of the body (with
-///   Parameter replaced by call arguments), and replacing the Call node by this duplicate body.
+/// * Then, we visit the graph again at each `Call` nodes, building a duplicate of the body (with
+///   Parameter replaced by call arguments), and replacing the `Call` node by this duplicate body.
 ///  
 pub struct Inlining<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
+
 impl<'a> Inlining<'a> {
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self { diagnostics }
@@ -46,6 +47,7 @@ pub struct InliningFirstPass<'a> {
     // HashMap<CaleePtr, Callee, Vec<Call nodes where called>>
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
 }
+
 impl<'a> InliningFirstPass<'a> {
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self {
@@ -68,7 +70,6 @@ pub struct CallInliningContext {
     pure_function: bool,
     ref_node: Link<Node>,
 }
-impl CallInliningContext {}
 
 pub struct InliningSecondPass<'a> {
     diagnostics: &'a DiagnosticsHandler,
@@ -86,6 +87,7 @@ pub struct InliningSecondPass<'a> {
     // HashMap<CaleePtr, (Callee, Vec<Call nodes where called>)>
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
 }
+
 impl<'a> InliningSecondPass<'a> {
     pub fn new(
         diagnostics: &'a DiagnosticsHandler,
@@ -369,7 +371,7 @@ impl Visitor for InliningSecondPass<'_> {
                 self.call_inlining_context = None;
             }
 
-            // Effectively replace the Call node with the updated op
+            // Effectively replace the `Call` node with the updated op
             // Note: We also update the references of Parameters that referenced the node we are
             // replacing
             if let Some(updated_op) = updated_op {
@@ -389,10 +391,11 @@ impl Visitor for InliningSecondPass<'_> {
         }
         Ok(())
     }
+
     fn scan_node(&mut self, _graph: &Graph, node: Link<Node>) -> Result<(), CompileError> {
         self.work_stack().push(node.clone());
         if let Some(op) = node.clone().as_op() {
-            // If we scan a Call node, we do not visit its children (the call's arguments)
+            // If we scan a `Call` node, we do not visit its children (the call's arguments)
             // TODO INLINING: Check whether this is the wanted behavior
             if op.as_call().is_some() {
                 return Ok(());
@@ -431,15 +434,15 @@ impl Visitor for InliningSecondPass<'_> {
                 panic!("InliningSecondPass::visit_node on a non-Op node: {node:?}")
             });
 
-            // First, check if it's a known Call to inline,
+            // First, check if it's a known `Call` to inline,
             // if so, set the context and scan its body
             if call_op.clone().as_call().is_some() {
                 self.visit_call(graph, call_op.clone())?;
             } else {
                 // Else, we are currently visiting the body of a function or an evaluator of a call
                 // we want to inline We use our helper duplicate_node_or_replace to
-                // duplicate the body, while replacing the Function or Evaluator parameters with the
-                // Call arguments
+                // duplicate the body, while replacing the `Function` or `Evaluator` parameters with
+                // the `Call` arguments
                 if self.call_inlining_context.clone().unwrap().pure_function {
                     duplicate_node_or_replace(
                         &mut self.nodes_to_replace,
@@ -451,7 +454,7 @@ impl Visitor for InliningSecondPass<'_> {
                     );
                 } else {
                     // If we're inside the body of an evaluator, we first need to unpack the
-                    // arguments of the call to have a Vector of Trace columns, and not
+                    // arguments of the call to have a `Vector` of `TraceColumn`, and not
                     // bindings to multiple columns
                     let args =
                         self.call_inlining_context.clone().unwrap().arguments.borrow().clone();
