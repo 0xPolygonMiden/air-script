@@ -66,7 +66,7 @@ pub trait Visitor {
             Node::None(_) => Ok(()),
         }
     }
-    /// Visit a Function node
+    /// Visit a `Function` node
     fn visit_function(
         &mut self,
         _graph: &mut Graph,
@@ -74,7 +74,7 @@ pub trait Visitor {
     ) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit an Evaluator node
+    /// Visit an `Evaluator` node
     fn visit_evaluator(
         &mut self,
         _graph: &mut Graph,
@@ -82,11 +82,11 @@ pub trait Visitor {
     ) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit an Enf node
+    /// Visit an `Enf` node
     fn visit_enf(&mut self, _graph: &mut Graph, _enf: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a Boundary node
+    /// Visit a `Boundary` node
     fn visit_boundary(
         &mut self,
         _graph: &mut Graph,
@@ -94,47 +94,47 @@ pub trait Visitor {
     ) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit an Add node
+    /// Visit an `Add` node
     fn visit_add(&mut self, _graph: &mut Graph, _add: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a Sub node
+    /// Visit a `Sub` node
     fn visit_sub(&mut self, _graph: &mut Graph, _sub: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a Mul node
+    /// Visit a `Mul` node
     fn visit_mul(&mut self, _graph: &mut Graph, _mul: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit an Exp node
+    /// Visit an `Exp` node
     fn visit_exp(&mut self, _graph: &mut Graph, _exp: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit an If node
+    /// Visit an `If` node
     fn visit_if(&mut self, _graph: &mut Graph, _if_node: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a For node
+    /// Visit a `For` node
     fn visit_for(&mut self, _graph: &mut Graph, _for_node: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a Call node
+    /// Visit a `Call` node
     fn visit_call(&mut self, _graph: &mut Graph, _call: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a Fold node
+    /// Visit a `Fold` node
     fn visit_fold(&mut self, _graph: &mut Graph, _fold: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a Vector node
+    /// Visit a `Vector` node
     fn visit_vector(&mut self, _graph: &mut Graph, _vector: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a Matrix node
+    /// Visit a `Matrix` node
     fn visit_matrix(&mut self, _graph: &mut Graph, _matrix: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit an Accessor node
+    /// Visit an `Accessor` node
     fn visit_accessor(
         &mut self,
         _graph: &mut Graph,
@@ -142,11 +142,11 @@ pub trait Visitor {
     ) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a BusOp node
+    /// Visit a `BusOp` node
     fn visit_bus_op(&mut self, _graph: &mut Graph, _bus_op: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a Parameter node
+    /// Visit a `Parameter` node
     fn visit_parameter(
         &mut self,
         _graph: &mut Graph,
@@ -154,7 +154,7 @@ pub trait Visitor {
     ) -> Result<(), CompileError> {
         Ok(())
     }
-    /// Visit a Value node
+    /// Visit a `Value` node
     fn visit_value(&mut self, _graph: &mut Graph, _value: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
