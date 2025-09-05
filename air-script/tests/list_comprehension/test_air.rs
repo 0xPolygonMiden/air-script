@@ -21,7 +21,7 @@ impl AirTester for ListComprehensionAirTester {
         trace.fill(
             |state| {
                 state[0] = start;
-                state[1] = Felt::new(3);
+                state[1] = Felt::new(20);
                 state[2] = start;
                 state[3] = start;
                 state[4] = start;
@@ -34,7 +34,7 @@ impl AirTester for ListComprehensionAirTester {
                 state[11] = start;
                 state[12] = start;
                 state[13] = start;
-                state[14] = start;
+                state[14] = Felt::new(10);
                 state[15] = start;
             },
             |_, state| {

@@ -61,6 +61,9 @@ pub struct MirBuilder<'a> {
     mir: Mir,
     trace_columns: &'a Vec<ast::TraceSegment>,
     bindings: LexicalScope<&'a ast::Identifier, Link<Op>>,
+    // The root node is either the evaluator or function we're currently translating the body of,
+    // or None if we're not inside a function or evaluator (e.g. translating boundary / integrity
+    // constraints)
     root: Link<Root>,
     root_name: Option<&'a ast::QualifiedIdentifier>,
     in_boundary: bool,
@@ -344,15 +347,17 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
+    /// Translates each statement in the body of a function or evaluator `func`
     fn translate_body(
         &mut self,
         _ident: &ast::QualifiedIdentifier,
         func: Link<Root>,
         body: &'a Vec<ast::Statement>,
-    ) -> Result<Link<Root>, CompileError> {
+    ) -> Result<(), CompileError> {
+        // First, the root field sets the context that we are currently translating the body of
+        // `func`. It is for instance needed to correctly translate let statements and
+        // attach the statements of their bodies to the body of `func`.
         self.root = func.clone();
-        self.bindings.enter();
-        let func = func;
         for stmt in body {
             let op = self.translate_statement(stmt)?;
             match func.clone().borrow().deref() {
@@ -362,10 +367,8 @@ impl<'a> MirBuilder<'a> {
                     unreachable!("expected function or evaluator, got None")
                 },
             };
-            self.root = func.clone();
         }
-        self.bindings.exit();
-        Ok(func)
+        Ok(())
     }
 
     fn translate_type(&mut self, ty: &ast::Type) -> MirType {
@@ -376,6 +379,8 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
+    /// Translates a statement and returns the operation.
+    /// Note: for `let` statements, the returned operation is the last operation of its body.
     fn translate_statement(&mut self, stmt: &'a ast::Statement) -> Result<Link<Op>, CompileError> {
         match stmt {
             ast::Statement::Let(let_stmt) => self.translate_let(let_stmt),
@@ -386,14 +391,35 @@ impl<'a> MirBuilder<'a> {
             ast::Statement::BusEnforce(list_comp) => self.translate_bus_enforce(list_comp),
         }
     }
+
+    /// Translates a let statement by:
+    /// - binding its value to its name for the scope of its body,
+    /// - adding the statements of its body to the root's body if necessary,
+    /// - returning the operation of the last statement of its body, which is the value of the whole
+    ///   block.
+    ///
+    /// Note: as we already return the operation of the last statement, we do not need to add it to
+    /// the root's body here. This should be handled by the caller.
     fn translate_let(&mut self, let_stmt: &'a ast::Let) -> Result<Link<Op>, CompileError> {
         let name = &let_stmt.name;
         let value: Link<Op> = self.translate_expr(&let_stmt.value)?;
         let mut ret_value = value.clone();
         self.bindings.enter();
         self.bindings.insert(name, value.clone());
-        for stmt in let_stmt.body.iter() {
-            ret_value = self.translate_statement(stmt)?;
+        for (i, stmt) in let_stmt.body.iter().enumerate() {
+            let new_stmt = self.translate_statement(stmt)?;
+            // Skip the last statement as it is returned
+            if i < let_stmt.body.len() - 1 {
+                match self.root.borrow().deref() {
+                    Root::Function(f) => f.body.borrow_mut().push(new_stmt.clone()),
+                    Root::Evaluator(e) => e.body.borrow_mut().push(new_stmt.clone()),
+                    // Root::None means we are translating statements of boundary / integrity
+                    // constraints, for which statements are inserted on enforce, nothing to do
+                    // here.
+                    Root::None(_span) => {},
+                }
+            }
+            ret_value = new_stmt;
         }
         self.bindings.exit();
         Ok(ret_value)
