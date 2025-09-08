@@ -527,10 +527,13 @@ pub fn visit_vector_bis(vector: Link<Op>) -> Result<Option<Link<Op>>, CompileErr
     let vector_ref = vector.as_vector().unwrap();
     let children = vector_ref.elements.borrow().clone();
     let size = vector_ref.size;
+
+    // If the vector is of size 1, it is a scalar and we replace it by its only child
     if size == 1 {
         let child = children.first().unwrap();
         return Ok(Some(child.clone()));
     }
+    // Otherwise, it is already in its unrolled form, we do nothing
     Ok(None)
 }
 

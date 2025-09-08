@@ -45,6 +45,11 @@ impl UnrollingThirdPass<'_> {
     /// the match arms, and combining them to optimize the resulting vector of constraints if
     /// possible. We handle bus related constraints separately, as they cannot be combined with
     /// main trace constraints.
+    ///
+    /// The methods returns a `Vector` node containing all the optimized constraints equivalent to
+    /// the `If` node. This means it both applies the selectors to the constraints of each match
+    /// arm, and combines them in optimized constraints. The documentation of the match_optimizer
+    /// module contains additional details on the optimization methodology.
     fn visit_if_bis(&mut self, if_node: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
         let if_ref = if_node.as_if().unwrap();
         let match_arms = if_ref.match_arms.borrow();
