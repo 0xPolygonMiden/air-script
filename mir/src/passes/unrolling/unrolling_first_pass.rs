@@ -358,12 +358,12 @@ impl Visitor for UnrollingFirstPass<'_> {
             Node::Exp(e) => e.to_link().map_or(Ok(None), visit_exp_bis),
             Node::Fold(f) => f.to_link().map_or(Ok(None), visit_fold_bis),
             Node::Vector(v) => v.to_link().map_or(Ok(None), visit_vector_bis),
-            Node::Matrix(m) => m.to_link().map_or(Ok(None), visit_matrix_bis),
             Node::Accessor(a) => a.to_link().map_or(Ok(None), visit_accessor_bis),
             Node::Value(v) => v.to_link().map_or(Ok(None), visit_value_bis),
             Node::For(f) => f.to_link().map_or(Ok(None), |el| self.visit_for_bis(el)),
             Node::Parameter(p) => p.to_link().map_or(Ok(None), |el| self.visit_parameter_bis(el)),
             Node::BusOp(_b) => Ok(None),
+            Node::Matrix(_) => Ok(None), // Matrix are already unrolled, we have nothing to do
             Node::If(_i) => Ok(None),
             Node::None(_) => Ok(None),
             Node::Function(_) | Node::Evaluator(_) | Node::Call(_) => {
@@ -532,10 +532,6 @@ pub fn visit_vector_bis(vector: Link<Op>) -> Result<Option<Link<Op>>, CompileErr
         return Ok(Some(child.clone()));
     }
     Ok(None)
-}
-
-pub fn visit_matrix_bis(_matrix: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    Ok(None) // Matrix are already unrolled, we have nothing to do
 }
 
 /// Sanity check that all iterators have the same length.

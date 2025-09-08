@@ -11,7 +11,7 @@ use crate::{
             match_optimizer::MatchOptimizer,
             unrolling_first_pass::{
                 visit_add_bis, visit_boundary_bis, visit_enf_bis, visit_exp_bis, visit_fold_bis,
-                visit_matrix_bis, visit_mul_bis, visit_sub_bis, visit_value_bis, visit_vector_bis,
+                visit_mul_bis, visit_sub_bis, visit_value_bis, visit_vector_bis,
             },
         },
     },
@@ -115,11 +115,11 @@ impl Visitor for UnrollingThirdPass<'_> {
             Node::Exp(e) => e.to_link().map_or(Ok(None), visit_exp_bis),
             Node::Fold(f) => f.to_link().map_or(Ok(None), visit_fold_bis),
             Node::Vector(v) => v.to_link().map_or(Ok(None), visit_vector_bis),
-            Node::Matrix(m) => m.to_link().map_or(Ok(None), visit_matrix_bis),
             Node::Value(v) => v.to_link().map_or(Ok(None), visit_value_bis),
             Node::If(i) => i.to_link().map_or(Ok(None), |el| self.visit_if_bis(el)),
             Node::Accessor(_a) => Ok(None),
             Node::BusOp(_b) => Ok(None),
+            Node::Matrix(_) => Ok(None), // Matrix are already unrolled, we have nothing to do
             Node::None(_) => Ok(None),
             Node::Function(_)
             | Node::Evaluator(_)
