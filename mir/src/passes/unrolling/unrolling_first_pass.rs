@@ -1,3 +1,4 @@
+use core::panic;
 use std::{collections::HashMap, ops::Deref};
 
 use air_parser::ast::AccessType;
@@ -170,10 +171,9 @@ fn unroll_accessor_index_access_type(
     // Raise diag if index is out of bounds
     if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
         let indexable_vec = indexable_vector.children().borrow().clone();
-        let child_accessed = match indexable_vec.get(index) {
-            Some(child_accessed) => child_accessed,
-            None => unreachable!(), // raise diag
-        };
+        let child_accessed = indexable_vec
+            .get(index)
+            .unwrap_or_else(|| panic!("Index access out of bounds for indexable: {:?}", indexable));
         if let Some(value) = child_accessed.clone().as_value() {
             let mir_value = value.value.value.clone();
             match mir_value {
@@ -208,32 +208,28 @@ fn unroll_accessor_matrix_access_type(
     // Raise diag if index is out of bounds
     if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
         let indexable_vec = indexable_vector.children().borrow().clone();
-        let row_accessed = match indexable_vec.get(row) {
-            Some(row_accessed) => row_accessed,
-            None => unreachable!("Matrix access out of bounds for indexable: {:?}", indexable),
-        };
+        let row_accessed = indexable_vec.get(row).unwrap_or_else(|| {
+            panic!("Matrix access out of bounds for indexable: {:?}", indexable)
+        });
         if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
             let row_accessed_vec = row_accessed_vector.children().borrow().clone();
-            let child_accessed = match row_accessed_vec.get(col) {
-                Some(child_accessed) => child_accessed,
-                None => unreachable!("Matrix access out of bounds for indexable: {:?}", indexable),
-            };
+            let child_accessed = row_accessed_vec.get(col).unwrap_or_else(|| {
+                panic!("Matrix access out of bounds for indexable: {:?}", indexable)
+            });
             Some(child_accessed.clone())
         } else {
             unreachable!("unexpected non-vector child of a Matrix: {:?}", row_accessed);
         }
     } else if let Op::Matrix(indexable_matrix) = indexable.borrow().deref() {
         let indexable_vec = indexable_matrix.children().borrow().clone();
-        let row_accessed = match indexable_vec.get(row) {
-            Some(row_accessed) => row_accessed,
-            None => unreachable!("Matrix access out of bounds for indexable: {:?}", indexable),
-        };
+        let row_accessed = indexable_vec.get(row).unwrap_or_else(|| {
+            panic!("Matrix access out of bounds for indexable: {:?}", indexable)
+        });
         if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
             let row_accessed_vec = row_accessed_vector.children().borrow().clone();
-            let child_accessed = match row_accessed_vec.get(col) {
-                Some(child_accessed) => child_accessed,
-                None => unreachable!("Matrix access out of bounds for indexable: {:?}", indexable),
-            };
+            let child_accessed = row_accessed_vec.get(col).unwrap_or_else(|| {
+                panic!("Matrix access out of bounds for indexable: {:?}", indexable)
+            });
             Some(child_accessed.clone())
         } else {
             unreachable!("unexpected non-vector child of a Matrix: {:?}", row_accessed);
@@ -660,15 +656,12 @@ fn compute_iterator_len(iterator: Link<Op>) -> usize {
                 Op::Vector(_) => 1,
                 Op::Matrix(matrix) => {
                     let children = matrix.children().borrow().clone();
-                    match children.first() {
-                        Some(first_row) => match first_row.as_vector() {
-                            Some(row_vector) => row_vector.size,
-                            _ => unreachable!("Unexpected row type in matrix"),
-                        },
-                        None => {
-                            unreachable!("Unexpected empty matrix");
-                        },
-                    }
+                    children
+                        .first()
+                        .expect("Unexpected empty matrix")
+                        .as_vector()
+                        .expect("Expected vector for matrix row")
+                        .size
                 },
                 _ => unreachable!("Unexpected index into non indexable type"),
             },
