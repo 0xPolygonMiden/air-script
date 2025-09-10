@@ -41,7 +41,7 @@ pub struct Layout {
     /// Each variable is word-aligned (interleaving with unused variables),
     /// and the region is double-word aligned.
     pub reduced_tables_region: InputRegion,
-    /// Index of a specific reduced table within the [`reduced_tables_region`].
+    /// Index of a specific reduced table within the [`Self::reduced_tables_region`].
     pub reduced_tables: BTreeMap<PublicInputTableAccess, usize>,
     /// Index of the random challenge α used to randomize the multiset/logUp argument
     /// in the *aux* trace.
@@ -207,12 +207,9 @@ impl Layout {
     /// Input node associated with a trace variable.
     pub fn trace_access_node(&self, trace_access: &TraceAccess) -> Option<Node> {
         let TraceAccess { segment, column, row_offset } = *trace_access;
-        // We should only be able to access the main and aux segments.
-        if segment > 1 {
-            return None;
-        };
         let segments_in_row = self.trace_segments.get(row_offset)?;
-        let segment_region = segments_in_row.get(segment)?;
+        let segment_index = segment.index();
+        let segment_region = segments_in_row.get(segment_index)?;
         segment_region.as_node(column)
     }
 
@@ -281,7 +278,8 @@ pub enum StarkVar {
     /// interpolated.
     GenLast = 3,
     /// The variable `zᵐᵃˣ`, where `max` is equal to `trace_len / max_cycle_len`. Details can be
-    /// found in [`crate::builder::CircuitBuilder::periodic_column`]
+    /// found in `CircuitBuilder::periodic_column`.
+    // TODO: Make this method public or fix the link to the correct location
     ZMaxCycle = 4,
     /// The variable g⁻² corresponding to the penultimate point in the subgroup over which the
     /// trace is interpolated.

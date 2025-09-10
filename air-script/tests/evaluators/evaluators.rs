@@ -47,7 +47,7 @@ impl Air for EvaluatorsAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2)];
+        let main_degrees = vec![TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1)];
         let aux_degrees = vec![];
         let num_main_assertions = 1;
         let num_aux_assertions = 0;
@@ -89,6 +89,9 @@ impl Air for EvaluatorsAir {
         result[4] = main_current[1] * main_current[1] - main_current[1];
         result[5] = main_current[2] * main_current[2] - main_current[2];
         result[6] = main_current[3] * main_current[3] - main_current[3];
+        result[7] = main_current[4];
+        result[8] = main_current[5] - E::ONE;
+        result[9] = main_current[6] - E::from(Felt::new(4_u64));
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxRandElements<E>, result: &mut [E])

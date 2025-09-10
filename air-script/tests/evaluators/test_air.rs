@@ -1,5 +1,5 @@
 use winter_air::Air;
-use winter_math::fields::f64::BaseElement as Felt;
+use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 use winterfell::{Trace, TraceTable};
 
 use crate::{
@@ -22,10 +22,11 @@ impl AirTester for EvaluatorsAirTester {
             |state| {
                 state[0] = start;
                 state[1] = start;
+                state[2] = start;
                 state[3] = start;
-                state[4] = start;
-                state[5] = start;
-                state[6] = start;
+                state[4] = Felt::ZERO;
+                state[5] = Felt::new(1);
+                state[6] = Felt::new(4);
             },
             |_, state| {},
         );

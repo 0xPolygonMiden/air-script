@@ -208,7 +208,8 @@ impl Link<Owner> {
                 Root::None(span) => Owner::None(*span),
             };
         } else {
-            unreachable!();
+            // If the [Owner] is stale, we set it to None
+            to_update = Owner::None(self.span());
         }
 
         *self.borrow_mut() = to_update;

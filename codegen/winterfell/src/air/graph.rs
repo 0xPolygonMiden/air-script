@@ -32,7 +32,7 @@ impl Codegen for IntegrityConstraintDegree {
 
 impl Codegen for TraceAccess {
     fn to_string(&self, _ir: &Air, _elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
-        let frame = if self.segment == 0 { "main" } else { "aux" };
+        let frame = self.segment.to_string();
         let row_offset = match self.row_offset {
             0 => {
                 format!("current[{}]", self.column)
@@ -42,7 +42,7 @@ impl Codegen for TraceAccess {
             },
             _ => panic!("Winterfell doesn't support row offsets greater than 1."),
         };
-        if self.segment == 0 && self.segment != trace_segment {
+        if self.segment == TraceSegmentId::Main && self.segment != trace_segment {
             format!("E::from({frame}_{row_offset})")
         } else {
             format!("{frame}_{row_offset}")

@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic};
+use super::{compile_from_source, expect_diagnostic};
 
 #[test]
 fn trace_columns_index_access() {
@@ -17,7 +17,7 @@ fn trace_columns_index_access() {
         enf $main[0]' - $main[1] = 0;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn trace_cols_groups() {
         enf a[0]' = a[1] - 1;
     }";
 
-    assert!(compile(source).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]

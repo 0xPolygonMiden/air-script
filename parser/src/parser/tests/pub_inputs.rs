@@ -29,7 +29,9 @@ fn public_inputs_vec() {
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
-    expected.trace_columns.push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected
+        .trace_columns
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
     expected.public_inputs.insert(
         ident!(program_hash),
         PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(program_hash), 4),
@@ -70,7 +72,9 @@ fn public_inputs_table() {
     }";
 
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
-    expected.trace_columns.push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected
+        .trace_columns
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
     expected
         .public_inputs
         .insert(ident!(a), PublicInput::new_table(SourceSpan::UNKNOWN, ident!(a), 4));

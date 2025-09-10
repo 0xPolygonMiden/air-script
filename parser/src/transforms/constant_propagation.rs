@@ -594,6 +594,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                             // The selector cannot be evaluated, bail out early
                             _ => {
                                 self.in_list_comprehension = old_in_lc;
+                                self.local.exit();
                                 return ControlFlow::Continue(());
                             },
                         }
@@ -608,6 +609,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         folded.push(folded_body.item);
                     } else {
                         self.in_list_comprehension = old_in_lc;
+                        self.local.exit();
                         return ControlFlow::Continue(());
                     }
                 }

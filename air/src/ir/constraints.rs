@@ -1,3 +1,5 @@
+extern crate alloc;
+use alloc::collections::BTreeSet;
 use core::fmt;
 
 use super::*;
@@ -26,11 +28,11 @@ pub struct Constraints {
     /// Constraint roots for all boundary constraints against the execution trace, by trace
     /// segment, where boundary constraints are any constraints that apply to either the first
     /// or the last row of the trace.
-    boundary_constraints: Vec<Vec<ConstraintRoot>>,
+    boundary_constraints: BTreeMap<TraceSegmentId, Vec<ConstraintRoot>>,
     /// Constraint roots for all integrity constraints against the execution trace, by trace
     /// segment, where integrity constraints are any constraints that apply to every row or
     /// every frame.
-    integrity_constraints: Vec<Vec<ConstraintRoot>>,
+    integrity_constraints: BTreeMap<TraceSegmentId, Vec<ConstraintRoot>>,
     /// A directed acyclic graph which represents all of the constraints and their subexpressions.
     graph: AlgebraicGraph,
 }
@@ -38,8 +40,8 @@ impl Constraints {
     /// Constructs a new [Constraints] graph from the given parts
     pub const fn new(
         graph: AlgebraicGraph,
-        boundary_constraints: Vec<Vec<ConstraintRoot>>,
-        integrity_constraints: Vec<Vec<ConstraintRoot>>,
+        boundary_constraints: BTreeMap<TraceSegmentId, Vec<ConstraintRoot>>,
+        integrity_constraints: BTreeMap<TraceSegmentId, Vec<ConstraintRoot>>,
     ) -> Self {
         Self {
             graph,
@@ -48,13 +50,42 @@ impl Constraints {
         }
     }
 
+    /// Updates the root boundary and integrity constraints to use the new node indices  
+    /// values, given in the `renumbering_map`.  
+    ///  
+    /// This functions also removes duplicate constraints (that share the same root and domain).  
+    ///  
+    /// # Panics  
+    /// Panics if a constraint's node index is not found in the renumbering map.
+    pub fn renumber_and_deduplicate_constraints(
+        &mut self,
+        renumbering_map: &BTreeMap<NodeIndex, NodeIndex>,
+    ) {
+        // Iterate over all boundary and integrity constraints
+        for (_, segment_constraints) in self
+            .boundary_constraints
+            .iter_mut()
+            .chain(self.integrity_constraints.iter_mut())
+        {
+            let mut added_indices = BTreeSet::new();
+            segment_constraints.retain_mut(|constraint| {
+                let new_index = *renumbering_map
+                    .get(constraint.node_index())
+                    .expect("Error: cannot find constraint index in renumbering map");
+                // Don't keep duplicate constraints
+                if !added_indices.insert((new_index, constraint.domain)) {
+                    return false;
+                }
+                // If this constraint is new, we update its node index and keep it
+                constraint.update_node_index(new_index);
+                true
+            });
+        }
+    }
+
     /// Returns the number of boundary constraints applied against the specified trace segment.
     pub fn num_boundary_constraints(&self, trace_segment: TraceSegmentId) -> usize {
-        if self.boundary_constraints.len() <= trace_segment {
-            return 0;
-        }
-
-        self.boundary_constraints[trace_segment].len()
+        self.boundary_constraints.get(&trace_segment).map_or(0, |v| v.len())
     }
 
     /// Returns the set of boundary constraints for the given trace segment.
@@ -62,11 +93,7 @@ impl Constraints {
     /// Each boundary constraint is represented by a [ConstraintRoot] which is
     /// the root of the subgraph representing the constraint within the [AlgebraicGraph]
     pub fn boundary_constraints(&self, trace_segment: TraceSegmentId) -> &[ConstraintRoot] {
-        if self.boundary_constraints.len() <= trace_segment {
-            return &[];
-        }
-
-        &self.boundary_constraints[trace_segment]
+        self.boundary_constraints.get(&trace_segment).map_or(&[], |v| v.as_slice())
     }
 
     /// Returns a vector of the degrees of the integrity constraints for the specified trace
@@ -75,14 +102,11 @@ impl Constraints {
         &self,
         trace_segment: TraceSegmentId,
     ) -> Vec<IntegrityConstraintDegree> {
-        if self.integrity_constraints.len() <= trace_segment {
-            return vec![];
-        }
-
-        self.integrity_constraints[trace_segment]
-            .iter()
-            .map(|entry_index| self.graph.degree(entry_index.node_index()))
-            .collect()
+        self.integrity_constraints.get(&trace_segment).map_or(vec![], |v| {
+            v.iter()
+                .map(|entry_index| self.graph.degree(entry_index.node_index()))
+                .collect()
+        })
     }
 
     /// Returns the set of integrity constraints for the given trace segment.
@@ -90,11 +114,7 @@ impl Constraints {
     /// Each integrity constraint is represented by a [ConstraintRoot] which is
     /// the root of the subgraph representing the constraint within the [AlgebraicGraph]
     pub fn integrity_constraints(&self, trace_segment: TraceSegmentId) -> &[ConstraintRoot] {
-        if self.integrity_constraints.len() <= trace_segment {
-            return &[];
-        }
-
-        &self.integrity_constraints[trace_segment]
+        self.integrity_constraints.get(&trace_segment).map_or(&[], |v| v.as_slice())
     }
 
     /// Inserts a new constraint against `trace_segment`, using the provided `root` and `domain`
@@ -106,15 +126,9 @@ impl Constraints {
     ) {
         let root = ConstraintRoot::new(root, domain);
         if domain.is_boundary() {
-            if self.boundary_constraints.len() <= trace_segment {
-                self.boundary_constraints.resize(trace_segment + 1, vec![]);
-            }
-            self.boundary_constraints[trace_segment].push(root);
+            self.boundary_constraints.entry(trace_segment).or_default().push(root);
         } else {
-            if self.integrity_constraints.len() <= trace_segment {
-                self.integrity_constraints.resize(trace_segment + 1, vec![]);
-            }
-            self.integrity_constraints[trace_segment].push(root);
+            self.integrity_constraints.entry(trace_segment).or_default().push(root);
         }
     }
 
@@ -152,6 +166,12 @@ impl ConstraintRoot {
         &self.index
     }
 
+    /// Updates the node index this constraint refers to. This should be called if the graph is
+    /// updated after its initial construction, such as during common subexpression elimination.
+    pub fn update_node_index(&mut self, new_index: NodeIndex) {
+        self.index = new_index;
+    }
+
     /// Returns the [ConstraintDomain] for this constraint, which specifies the rows against which
     /// the constraint should be applied.
     pub const fn domain(&self) -> ConstraintDomain {
@@ -162,7 +182,7 @@ impl ConstraintRoot {
 /// [ConstraintDomain] corresponds to the domain over which a constraint is applied.
 ///
 /// See the docs on each variant for more details.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ConstraintDomain {
     /// For boundary constraints which apply to the first row
     FirstRow,

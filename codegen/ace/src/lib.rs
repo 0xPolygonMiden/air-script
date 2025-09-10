@@ -7,18 +7,15 @@ mod layout;
 #[cfg(test)]
 mod tests;
 
-use air_ir::{Air, ConstraintDomain};
+use air_ir::{Air, ConstraintDomain, TraceSegmentId};
 pub use mir::ir::QuadFelt;
 
-use crate::{
-    builder::{CircuitBuilder, LinearCombination},
-    layout::StarkVar,
-};
+use crate::builder::{CircuitBuilder, LinearCombination};
 pub use crate::{
     circuit::{Circuit as AceCircuit, Node as AceNode},
     encoded::EncodedCircuit as EncodedAceCircuit,
     inputs::{AceVars, AirInputs},
-    layout::Layout as AirLayout,
+    layout::{Layout as AirLayout, StarkVar},
 };
 
 /// Air constraints are organized in 3 main groups: integrity roots,
@@ -61,7 +58,7 @@ pub fn build_ace_circuit(air: &Air) -> anyhow::Result<(AceNode, AceCircuit)> {
     // ACE chiplet
     let mut cb = CircuitBuilder::new(air);
 
-    let segments = [0, 1];
+    let segments = [TraceSegmentId::Main, TraceSegmentId::Aux];
     let integrity_roots: Vec<_> = segments
         .iter()
         .flat_map(|&seg| air.integrity_constraints(seg))

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use air_ir::{CodeGenerator, CompileError};
-use air_pass::Pass;
+use air_script::compile;
 use miden_diagnostics::{
     CodeMap, DefaultEmitter, DiagnosticsHandler, term::termcolor::ColorChoice,
 };
@@ -26,15 +26,7 @@ impl Test {
         // Parse from file to internal representation
         let air = air_parser::parse_file(&diagnostics, codemap, &self.input_path)
             .map_err(CompileError::Parse)
-            .and_then(|ast| {
-                let mut pipeline = air_parser::transforms::ConstantPropagation::new(&diagnostics)
-                    .chain(mir::passes::AstToMir::new(&diagnostics))
-                    .chain(mir::passes::Inlining::new(&diagnostics))
-                    .chain(mir::passes::Unrolling::new(&diagnostics))
-                    .chain(air_ir::passes::MirToAir::new(&diagnostics))
-                    .chain(air_ir::passes::BusOpExpand::new(&diagnostics));
-                pipeline.run(ast)
-            })?;
+            .and_then(|program| compile(&diagnostics, program))?;
 
         let backend: Box<dyn CodeGenerator<Output = String>> = match target {
             Target::Winterfell => Box::new(air_codegen_winter::CodeGenerator),

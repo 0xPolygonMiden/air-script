@@ -2,6 +2,7 @@ mod bus;
 mod constraints;
 mod degree;
 mod operation;
+mod random_inputs;
 mod trace;
 mod value;
 
@@ -18,20 +19,18 @@ pub use self::{
     constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints},
     degree::IntegrityConstraintDegree,
     operation::Operation,
+    random_inputs::RandomInputs,
     trace::TraceAccess,
     value::{PeriodicColumnAccess, PublicInputAccess, Value},
 };
 
-/// The default segment against which a constraint is applied is the main trace segment.
-pub const DEFAULT_SEGMENT: TraceSegmentId = 0;
-/// The auxiliary trace segment.
-pub const AUX_SEGMENT: TraceSegmentId = 1;
 /// The offset of the "current" row during constraint evaluation.
 pub const CURRENT_ROW: usize = 0;
 /// The minimum cycle length of a periodic column
 pub const MIN_CYCLE_LENGTH: usize = 2;
 
-use std::collections::BTreeMap;
+extern crate alloc;
+use alloc::collections::BTreeMap;
 
 use miden_diagnostics::{SourceSpan, Spanned};
 
@@ -79,7 +78,7 @@ impl Air {
     ///
     /// An empty [Air] is meaningless until it has been populated with
     /// constraints and associated metadata. This is typically done by converting
-    /// an [air_parser::ast::Program] to this struct using the [crate::passes::AstToAir]
+    /// an [air_parser::ast::Program] to this struct using the [crate::passes::MirToAir]
     /// translation pass.
     pub fn new(name: Identifier) -> Self {
         Self {

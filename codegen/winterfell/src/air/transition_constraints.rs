@@ -22,7 +22,7 @@ pub(super) fn add_fn_evaluate_transition(impl_ref: &mut Impl, ir: &Air) {
     evaluate_transition.line("let main_next = frame.next();");
 
     // output the constraints.
-    add_constraints(evaluate_transition, ir, 0);
+    add_constraints(evaluate_transition, ir, TraceSegmentId::Main);
 }
 
 /// Adds an implementation of the "evaluate_aux_transition" method to the referenced Air
@@ -48,7 +48,7 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &Air) {
     evaluate_aux_transition.line("let aux_next = aux_frame.next();");
 
     // output the constraints.
-    add_constraints(evaluate_aux_transition, ir, 1);
+    add_constraints(evaluate_aux_transition, ir, TraceSegmentId::Aux);
 }
 
 /// Iterates through the integrity constraints in the IR, and appends a line of generated code to

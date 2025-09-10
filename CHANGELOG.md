@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 (TBD)
+
+- Incremented MSRV to 1.89.
+- Add a constant propagation pass after other mir passes (#439).
+- Add a pass for common subexpression elimination in the constraint graph (#419).
+- Refactored the unrolling pass in MIR (#434).
+- Fix regressions on MIR and list_comprehensions (#449).
+
 ## 0.4.0 (2025-06-20)
 
 ### Language

@@ -16,16 +16,8 @@ Example usage:
 // parse the source string to a Result containing the AST or an Error
 let ast = parse(source.as_str()).expect("Parsing failed");
 
-// Create the compilation pipeline needed to translate the AST to AIR
-let pipeline = air_parser::transforms::ConstantPropagation::new(&diagnostics)
-  .chain(mir::passes::AstToMir::new(&diagnostics))
-  .chain(mir::passes::Inlining::new(&diagnostics))
-  .chain(mir::passes::Unrolling::new(&diagnostics))
-  .chain(air_ir::passes::MirToAir::new(&diagnostics))
-  .chain(air_ir::passes::BusOpExpand::new(&diagnostics));
-
-// process the AST and the MIR to get a Result containing the AIR or a CompileError
-let air = pipeline.run(ast)
+// Compile AST into AIR
+let air = compile(&diagnostics, ast).expect("compilation failed");
 
 // generate Rust code targeting the Winterfell prover
 let rust_code = CodeGenerator::new(&air);

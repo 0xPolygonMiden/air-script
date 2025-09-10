@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use air_ir::{Air, ConstraintDomain, NodeIndex, Operation, Value};
+use air_ir::{Air, ConstraintDomain, NodeIndex, Operation, TraceSegmentId, Value};
 use miden_core::Felt;
 use winter_math::FieldElement;
 
@@ -66,7 +66,8 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
             Operation::Value(v) => match v {
                 Value::Constant(c) => QuadFelt::from(Felt::new(c)),
                 Value::TraceAccess(access) => {
-                    ace_vars.segments[access.row_offset][access.segment][access.column]
+                    let segment_index = access.segment.index();
+                    ace_vars.segments[access.row_offset][segment_index][access.column]
                 },
                 Value::PeriodicColumn(access) => periodic[&access.name],
                 Value::PublicInput(access) => {
@@ -98,7 +99,7 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
         std::iter::successors(Some(QuadFelt::ONE), move |alpha_prev| Some(*alpha_prev * alpha));
 
     // Evaluate linear-combination of integrity constraints.
-    let integrity: QuadFelt = [0, 1]
+    let integrity: QuadFelt = [TraceSegmentId::Main, TraceSegmentId::Aux]
         .into_iter()
         .flat_map(|segment| {
             air.constraints.integrity_constraints(segment).iter().map(|c| {
@@ -113,7 +114,7 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
         .fold(QuadFelt::ZERO, |acc, (eval, alpha_pow)| acc + eval * alpha_pow);
 
     // Evaluate linear-combination of integrity constraints for the first row
-    let boundary_first = [0, 1]
+    let boundary_first = [TraceSegmentId::Main, TraceSegmentId::Aux]
         .into_iter()
         .flat_map(|segment| {
             air.constraints
@@ -129,7 +130,7 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
         .fold(QuadFelt::ZERO, |acc, (eval, alpha_pow)| acc + eval * alpha_pow);
 
     // Evaluate linear-combination of integrity constraints for the last row
-    let boundary_last = [0, 1]
+    let boundary_last = [TraceSegmentId::Main, TraceSegmentId::Aux]
         .into_iter()
         .flat_map(|segment| {
             air.constraints

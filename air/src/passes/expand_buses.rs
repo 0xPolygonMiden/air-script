@@ -1,11 +1,10 @@
-use air_parser::ast::{Boundary, BusType};
+use air_parser::ast::{Boundary, BusType, TraceSegmentId};
 use air_pass::Pass;
 use miden_diagnostics::DiagnosticsHandler;
 use mir::ir::BusOpKind;
 
 use crate::{
-    AUX_SEGMENT, Air, BusBoundary, BusOp, CompileError, ConstraintDomain, NodeIndex, Operation,
-    TraceAccess,
+    Air, BusBoundary, BusOp, CompileError, ConstraintDomain, NodeIndex, Operation, TraceAccess,
 };
 
 pub struct BusOpExpand<'a> {
@@ -42,8 +41,8 @@ impl Pass for BusOpExpand<'_> {
 
             let bus_ops = bus.bus_ops.clone();
 
-            let bus_trace_access = TraceAccess::new(AUX_SEGMENT, bus_index, 0);
-            let bus_trace_access_with_offset = TraceAccess::new(AUX_SEGMENT, bus_index, 1);
+            let bus_trace_access = TraceAccess::new(TraceSegmentId::Aux, bus_index, 0);
+            let bus_trace_access_with_offset = TraceAccess::new(TraceSegmentId::Aux, bus_index, 1);
 
             let bus_access = ir
                 .constraint_graph_mut()
@@ -126,7 +125,7 @@ impl<'a> BusOpExpand<'a> {
             // Unconstrained boundaries do not require any constraints
             BusBoundary::Unconstrained => return,
         };
-        let bus_trace_access = TraceAccess::new(AUX_SEGMENT, bus_index, 0);
+        let bus_trace_access = TraceAccess::new(TraceSegmentId::Aux, bus_index, 0);
         let bus_access = ir
             .constraint_graph_mut()
             .insert_node(Operation::Value(crate::Value::TraceAccess(bus_trace_access)));
@@ -139,7 +138,7 @@ impl<'a> BusOpExpand<'a> {
             Boundary::Last => ConstraintDomain::LastRow,
         };
         // Store the generated constraint
-        ir.constraints.insert_constraint(AUX_SEGMENT, root, domain);
+        ir.constraints.insert_constraint(TraceSegmentId::Aux, root, domain);
     }
 
     /// Helper function to expand the integrity constraint of a multiset bus
@@ -235,7 +234,8 @@ impl<'a> BusOpExpand<'a> {
         // 6. Create the resulting constraint and insert it into the graph
         let root = graph.insert_node(Operation::Sub(p_prod, p_prime_prod));
 
-        ir.constraints.insert_constraint(AUX_SEGMENT, root, ConstraintDomain::EveryRow);
+        ir.constraints
+            .insert_constraint(TraceSegmentId::Aux, root, ConstraintDomain::EveryRow);
     }
 
     /// Helper function to expand the integrity constraint of a logup bus
@@ -372,6 +372,7 @@ impl<'a> BusOpExpand<'a> {
 
         // 5. Create the resulting constraint
         let root = graph.insert_node(Operation::Sub(q_term, q_prime_term));
-        ir.constraints.insert_constraint(AUX_SEGMENT, root, ConstraintDomain::EveryRow);
+        ir.constraints
+            .insert_constraint(TraceSegmentId::Aux, root, ConstraintDomain::EveryRow);
     }
 }

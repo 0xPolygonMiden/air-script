@@ -1,7 +1,11 @@
 use core::panic;
 use std::ops::Deref;
 
-use air_parser::{LexicalScope, ast, ast::AccessType, symbols};
+use air_parser::{
+    LexicalScope,
+    ast::{self, AccessType, TraceSegmentId},
+    symbols,
+};
 use air_pass::Pass;
 use air_types::*;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
@@ -58,6 +62,9 @@ pub struct MirBuilder<'a> {
     mir: Mir,
     trace_columns: &'a Vec<ast::TraceSegment>,
     bindings: LexicalScope<&'a ast::Identifier, Link<Op>>,
+    // The root node is either the evaluator or function we're currently translating the body of,
+    // or None if we're not inside a function or evaluator (e.g. translating boundary / integrity
+    // constraints)
     root: Link<Root>,
     root_name: Option<&'a ast::QualifiedIdentifier>,
     in_boundary: bool,
@@ -116,15 +123,15 @@ impl<'a> MirBuilder<'a> {
 
         for bus in self.mir.constraint_graph().buses.values() {
             let bus_type = bus.borrow().bus_type;
-            if let Some(ref mut mirvalue) = bus.borrow().get_first().as_value_mut() {
-                if let MirValue::PublicInputTable(ref mut first) = mirvalue.value.value {
-                    first.set_bus_type(bus_type);
-                }
+            if let Some(ref mut mirvalue) = bus.borrow().get_first().as_value_mut()
+                && let MirValue::PublicInputTable(ref mut first) = mirvalue.value.value
+            {
+                first.set_bus_type(bus_type);
             }
-            if let Some(ref mut mirvalue) = bus.borrow().get_last().as_value_mut() {
-                if let MirValue::PublicInputTable(ref mut last) = mirvalue.value.value {
-                    last.set_bus_type(bus_type);
-                }
+            if let Some(ref mut mirvalue) = bus.borrow().get_last().as_value_mut()
+                && let MirValue::PublicInputTable(ref mut last) = mirvalue.value.value
+            {
+                last.set_bus_type(bus_type);
             }
         }
         Ok(())
@@ -341,15 +348,17 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
+    /// Translates each statement in the body of a function or evaluator `func`
     fn translate_body(
         &mut self,
         _ident: &ast::QualifiedIdentifier,
         func: Link<Root>,
         body: &'a Vec<ast::Statement>,
-    ) -> Result<Link<Root>, CompileError> {
+    ) -> Result<(), CompileError> {
+        // First, the root field sets the context that we are currently translating the body of
+        // `func`. It is for instance needed to correctly translate let statements and
+        // attach the statements of their bodies to the body of `func`.
         self.root = func.clone();
-        self.bindings.enter();
-        let func = func;
         for stmt in body {
             let op = self.translate_statement(stmt)?;
             match func.clone().borrow().deref() {
@@ -359,12 +368,16 @@ impl<'a> MirBuilder<'a> {
                     unreachable!("expected function or evaluator, got None")
                 },
             };
-            self.root = func.clone();
         }
-        self.bindings.exit();
-        Ok(func)
+        Ok(())
     }
 
+    fn translate_type(&mut self, ty: &ast::Type) -> Type {
+        *ty
+    }
+
+    /// Translates a statement and returns the operation.
+    /// Note: for `let` statements, the returned operation is the last operation of its body.
     fn translate_statement(&mut self, stmt: &'a ast::Statement) -> Result<Link<Op>, CompileError> {
         match stmt {
             ast::Statement::Let(let_stmt) => self.translate_let(let_stmt),
@@ -375,14 +388,35 @@ impl<'a> MirBuilder<'a> {
             ast::Statement::BusEnforce(list_comp) => self.translate_bus_enforce(list_comp),
         }
     }
+
+    /// Translates a let statement by:
+    /// - binding its value to its name for the scope of its body,
+    /// - adding the statements of its body to the root's body if necessary,
+    /// - returning the operation of the last statement of its body, which is the value of the whole
+    ///   block.
+    ///
+    /// Note: as we already return the operation of the last statement, we do not need to add it to
+    /// the root's body here. This should be handled by the caller.
     fn translate_let(&mut self, let_stmt: &'a ast::Let) -> Result<Link<Op>, CompileError> {
         let name = &let_stmt.name;
         let value: Link<Op> = self.translate_expr(&let_stmt.value)?;
         let mut ret_value = value.clone();
         self.bindings.enter();
         self.bindings.insert(name, value.clone());
-        for stmt in let_stmt.body.iter() {
-            ret_value = self.translate_statement(stmt)?;
+        for (i, stmt) in let_stmt.body.iter().enumerate() {
+            let new_stmt = self.translate_statement(stmt)?;
+            // Skip the last statement as it is returned
+            if i < let_stmt.body.len() - 1 {
+                match self.root.borrow().deref() {
+                    Root::Function(f) => f.body.borrow_mut().push(new_stmt.clone()),
+                    Root::Evaluator(e) => e.body.borrow_mut().push(new_stmt.clone()),
+                    // Root::None means we are translating statements of boundary / integrity
+                    // constraints, for which statements are inserted on enforce, nothing to do
+                    // here.
+                    Root::None(_span) => {},
+                }
+            }
+            ret_value = new_stmt;
         }
         self.bindings.exit();
         Ok(ret_value)
@@ -1185,10 +1219,10 @@ impl<'a> MirBuilder<'a> {
             // If the let-bound variable is a parameter, we probably already have the type
             //
             // In that case, replacing the default type (Felt) with the one from the access
-            if let Some(mut param) = let_bound_access_expr.as_parameter_mut() {
-                if access.ty.is_some() {
-                    param.ty = access.ty
-                }
+            if let Some(mut param) = let_bound_access_expr.as_parameter_mut()
+                && access.ty.is_some()
+            {
+                param.ty = Some(self.translate_type(access.ty.as_ref().unwrap()));
             }
             let accessor: Link<Op> = Accessor::create(
                 duplicate_node(let_bound_access_expr, &mut Default::default()),
@@ -1301,40 +1335,44 @@ impl<'a> MirBuilder<'a> {
 
     // Check assumptions, probably this assumed that the inlining pass did some work
     fn trace_access(&self, access: &ast::SymbolAccess) -> Option<TraceAccess> {
+        assert_eq!(
+            self.trace_columns.len(),
+            1,
+            "In MIR, expected exactly one trace segment to be present"
+        );
         let id = access.name.as_ref();
-        for (i, segment) in self.trace_columns.iter().enumerate() {
-            if segment.name == id {
-                if let AccessType::Index(column) = access.access_type {
-                    return Some(TraceAccess::new(i, column, access.offset));
-                } else {
-                    // This should have been caught earlier during compilation
-                    unreachable!(
-                        "unexpected trace access type encountered during lowering: {:#?}",
-                        &access
-                    );
-                }
-            }
+        let segment = self.trace_columns.first().unwrap();
 
-            if let Some(binding) = segment.bindings.iter().find(|tb| tb.name.as_ref() == Some(id)) {
-                return match access.access_type {
-                    AccessType::Default if binding.size == 1 => {
-                        Some(TraceAccess::new(binding.segment, binding.offset, access.offset))
-                    },
-                    AccessType::Index(extra_offset) if binding.size > 1 => Some(TraceAccess::new(
-                        binding.segment,
-                        binding.offset + extra_offset,
-                        access.offset,
-                    )),
-                    // This should have been caught earlier during compilation
-                    /*_ => unreachable!(
-                        "unexpected trace access type encountered during lowering: {:#?}",
-                        access
-                    ),*/
-                    _ => None,
-                };
+        if segment.name == id {
+            // We access $main[i]
+            if let AccessType::Index(column) = access.access_type {
+                Some(TraceAccess::new(TraceSegmentId::Main, column, access.offset))
+            } else {
+                // This should have been caught earlier during compilation
+                unreachable!(
+                    "unexpected trace access type encountered during lowering: {:#?}",
+                    &access
+                );
             }
+        } else if let Some(binding) =
+            segment.bindings.iter().find(|tb| tb.name.as_ref() == Some(id))
+        {
+            // We access a trace binding defined in the main trace.
+            match access.access_type {
+                AccessType::Default if binding.size == 1 => {
+                    Some(TraceAccess::new(binding.segment, binding.offset, access.offset))
+                },
+                AccessType::Index(extra_offset) if binding.size > 1 => Some(TraceAccess::new(
+                    binding.segment,
+                    binding.offset + extra_offset,
+                    access.offset,
+                )),
+                _ => None,
+            }
+        } else {
+            // We do not access a trace
+            None
         }
-        None
     }
 }
 

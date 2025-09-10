@@ -15,7 +15,9 @@ public_inputs {
 }"#;
 
 fn add_base_expectations(expected: &mut Module) {
-    expected.trace_columns.push(trace_segment!(0, "$main", [(clk, 1)]));
+    expected
+        .trace_columns
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
     expected
         .public_inputs
         .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));

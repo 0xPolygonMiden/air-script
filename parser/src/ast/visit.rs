@@ -416,15 +416,15 @@ where
     for segment in module.trace_columns.iter_mut() {
         visitor.visit_mut_trace_segment(segment)?;
     }
-    if let Some(bc) = module.boundary_constraints.as_mut() {
-        if !bc.is_empty() {
-            visitor.visit_mut_boundary_constraints(bc)?;
-        }
+    if let Some(bc) = module.boundary_constraints.as_mut()
+        && !bc.is_empty()
+    {
+        visitor.visit_mut_boundary_constraints(bc)?;
     }
-    if let Some(ic) = module.integrity_constraints.as_mut() {
-        if !ic.is_empty() {
-            visitor.visit_mut_integrity_constraints(ic)?;
-        }
+    if let Some(ic) = module.integrity_constraints.as_mut()
+        && !ic.is_empty()
+    {
+        visitor.visit_mut_integrity_constraints(ic)?;
     }
 
     ControlFlow::Continue(())

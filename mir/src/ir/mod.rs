@@ -20,7 +20,9 @@ pub use mir::Mir;
 pub use node::Node;
 pub use nodes::*;
 pub use owner::Owner;
-pub use quad_eval::{QuadFelt, RandomInputs};
+pub use quad_eval::{
+    QuadFelt, RandomInputs, const_quad_felt, query_indexed_eval, query_mapped_eval,
+};
 pub use utils::*;
 /// A trait for nodes that can have children
 /// This is used with the Child trait to allow for easy traversal and manipulation of the graph

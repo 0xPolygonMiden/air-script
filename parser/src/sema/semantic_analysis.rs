@@ -299,16 +299,16 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
             self.visit_mut_bus(bus)?;
         }
 
-        if let Some(boundary_constraints) = module.boundary_constraints.as_mut() {
-            if !boundary_constraints.is_empty() {
-                self.visit_mut_boundary_constraints(boundary_constraints)?;
-            }
+        if let Some(boundary_constraints) = module.boundary_constraints.as_mut()
+            && !boundary_constraints.is_empty()
+        {
+            self.visit_mut_boundary_constraints(boundary_constraints)?;
         }
 
-        if let Some(integrity_constraints) = module.integrity_constraints.as_mut() {
-            if !integrity_constraints.is_empty() {
-                self.visit_mut_integrity_constraints(integrity_constraints)?;
-            }
+        if let Some(integrity_constraints) = module.integrity_constraints.as_mut()
+            && !integrity_constraints.is_empty()
+        {
+            self.visit_mut_integrity_constraints(integrity_constraints)?;
         }
 
         self.current_module = None;
@@ -1477,13 +1477,13 @@ impl SemanticAnalysis<'_> {
                                     },
                                     Ok(BindingType::Bus(_)) => {
                                         // Buses are valid in boundary constraints
-                                        (ty, 0)
+                                        (ty, TraceSegmentId::Main)
                                     },
                                     Ok(aty) => {
                                         let expected = BindingType::TraceColumn(TraceBinding::new(
                                             constraint_span,
                                             Identifier::new(constraint_span, symbols::Main),
-                                            0,
+                                            TraceSegmentId::Main,
                                             0,
                                             1,
                                             ty!(felt).unwrap(),
@@ -2021,7 +2021,7 @@ impl SemanticAnalysis<'_> {
 
 fn segment_id_to_name(id: TraceSegmentId) -> Symbol {
     match id {
-        0 => symbols::Main,
+        TraceSegmentId::Main => symbols::Main,
         _ => unimplemented!(),
     }
 }
