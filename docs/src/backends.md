@@ -2,10 +2,11 @@
 AirScript currently comes bundled with two backends:
 
 - [Winterfell backend](https://github.com/0xMiden/air-script/tree/main/codegen/winterfell) which outputs `Air` trait implementation for the [Winterfell prover](https://github.com/facebook/winterfell) (Rust).
+- [ACE backend](https://github.com/0xMiden/air-script/tree/main/codegen/ace) which outputs arithmetic circuits for Miden VM's ACE (Arithmetic Circuit Evaluation) chiplet for recursive STARK proof verification.
 
-These backends can be used programmatically as crates. They can also be used via AirScript CLI by specifying `--target` flag.
+These backends can be used programmatically as crates. 
 
-For example, the following will output Winterfell `Air` trait implementation for AIR constraints described in `example.air` file:
+The Winterfell backend can also be used via AirScript CLI by specifying `--target` flag. For example, the following will output Winterfell `Air` trait implementation for AIR constraints described in `example.air` file:
 ```
 ./target/release/airc transpile examples/example.air --target winterfell
 ```

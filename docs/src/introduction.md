@@ -6,6 +6,9 @@
 
 Currently, AirScript is on version 0.3, which includes about 95% of features needed to describe Miden VM constraints, and supports generation of constraint evaluation code for the following backends:
 
+- **Winterfell**: Generates Rust code implementing the `Air` trait for the [Winterfell prover](https://github.com/facebook/winterfell)
+- **ACE**: Generates arithmetic circuits for Miden VM's ACE (Arithmetic Circuit Evaluation) chiplet for recursive proof verification
+
 AirScript includes the following features:
 
 - **Trace Columns**: Users can declare trace columns for the main trace as individual columns or groups of columns (e.g. `main: [a, b, c[3], d],` where `a`, `b`, and `d` are single columns and `c` refers to a group of 3 columns)
