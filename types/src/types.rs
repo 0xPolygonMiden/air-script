@@ -146,13 +146,13 @@ macro_rules! kinds {
         $res
     };
     (RES: $res:expr; ?) => {
-        kinds!(RES: $crate::Push::push($res, $crate::kind!(?));)
+        kinds!(RES: $crate::Push::push($res, Option::Some(Box::new($crate::kind!(?))));)
     };
     (RES: $res:expr; _$([$($spec:tt)+])? $(, $($rest:tt)+)?) => {
-        kinds!(RES: $crate::Push::push($res, $crate::kind!(_$([$($spec)+])?)); $($($rest)+)?)
+        kinds!(RES: $crate::Push::push($res, Option::Some(Box::new($crate::kind!(_$([$($spec)+])?)))); $($($rest)+)?)
     };
     (RES: $res:expr; $name:ident$([$($spec:tt)+])? $(, $($rest:tt)+)?) => {
-        kinds!(RES: $crate::Push::push($res, $crate::kind!($name$([$($spec)+])?)); $($($rest)+)?)
+        kinds!(RES: $crate::Push::push($res, Option::Some(Box::new($crate::kind!($name$([$($spec)+])?)))); $($($rest)+)?)
     };
 }
 
@@ -185,10 +185,10 @@ pub enum FunctionType {
 }
 
 impl FunctionType {
-    pub fn args(&self) -> &[Option<Type>] {
+    pub fn params(&self) -> &[Option<Type>] {
         match self {
-            Self::Evaluator(args) => args,
-            Self::Function(args, _) => args,
+            Self::Evaluator(params) => params,
+            Self::Function(params, _) => params,
         }
     }
 
@@ -197,6 +197,23 @@ impl FunctionType {
             Self::Evaluator(_) => None,
             Self::Function(_, ret) => *ret,
         }
+    }
+
+    pub fn check_args_kinds(&self, args: &[&Kind]) -> bool {
+        eprintln!("Checking function type {} against params {:?}", self, args);
+        let params = self.params();
+        if params.len() != args.len() {
+            return false;
+        }
+        for (arg_ty, param_kind) in args.iter().zip(params.iter()) {
+            eprintln!("  Checking arg_ty {arg_ty:?} against param_kind {param_kind:?}");
+            if !arg_ty.is_subtype(param_kind) {
+                eprintln!("  Failed!: {arg_ty:?} is not a subtype of {param_kind:?}");
+                return false;
+            }
+        }
+        eprintln!("  Success!");
+        true
     }
 }
 
@@ -795,5 +812,46 @@ mod tests {
         assert_eq!(kind!(uint), Kind::Value(ty!(uint)));
         assert_eq!(kind!(_), Kind::Value(ty!(_)));
         assert_eq!(kind!(bool[3, 4]), Kind::Value(ty!(bool[3, 4])));
+    }
+
+    #[test]
+    fn test_fn_ty_check_param_kinds() {
+        // Scalar types
+        assert!(fty!(fn(uint, felt) -> felt).check_args_kinds(&[&kind!(uint), &kind!(felt)]),);
+        assert!(fty!(fn(felt, felt) -> felt).check_args_kinds(&[&kind!(felt), &kind!(bool)]),);
+        // Vector types
+        assert!(fty!(fn(_[3], felt[2]) -> felt).check_args_kinds(&[&kind!(_[3]), &kind!(felt[2])]));
+        assert!(
+            fty!(fn(_[3], felt[2]) -> felt).check_args_kinds(&[&kind!(bool[3]), &kind!(uint[2])])
+        );
+        // Aggregate types
+        assert!(fty!(fn(felt[2], bool[3], uint[2]) -> felt).check_args_kinds(&[
+            &kind!([bool, uint]),
+            &kind!([bool, bool, bool]),
+            &kind!([uint, uint]),
+        ]));
+
+        // Negative cases
+
+        // Scalar types
+        assert!(!fty!(fn(uint, bool) -> felt).check_args_kinds(&[&kind!(bool), &kind!(felt)]),);
+        assert!(!fty!(fn(felt, bool) -> felt).check_args_kinds(&[&kind!(felt), &kind!(uint[2])]),);
+        // Vector types
+        assert!(!fty!(fn(_[3], felt[2]) -> felt).check_args_kinds(&[&kind!(_), &kind!(felt[2])]));
+        assert!(
+            !fty!(fn(_[3], felt[2]) -> felt)
+                .check_args_kinds(&[&kind!(bool[3, 5]), &kind!(uint[2])])
+        );
+        // Aggregate types
+        assert!(!fty!(fn(felt[2], bool[3], uint[2]) -> felt).check_args_kinds(&[
+            &kind!([bool, uint]),
+            &kind!([bool, felt, uint]),
+            &kind!([uint, uint]),
+        ]));
+        assert!(!fty!(fn(felt[2], bool[3], uint[2]) -> felt).check_args_kinds(&[
+            &kind!([bool, uint]),
+            &kind!([bool, bool]),
+            &kind!([uint, uint]),
+        ]));
     }
 }
