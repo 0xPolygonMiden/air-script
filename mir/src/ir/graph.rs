@@ -139,7 +139,7 @@ impl Graph {
 
     /// Removes an integrity constraint from the graph.
     pub fn remove_integrity_constraints_root(&mut self, root: ir::Link<ir::Op>) {
-        self.boundary_constraints_roots.borrow_mut().retain(|n| *n != root);
+        self.integrity_constraints_roots.borrow_mut().retain(|n| *n != root);
     }
 
     /// Inserts a bus into the graph, returning an error
