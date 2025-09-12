@@ -5,6 +5,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use air_types::Typing;
 use miden_diagnostics::{SourceSpan, Spanned};
 
 /// A wrapper around a `Rc<RefCell<T>>` to allow custom trait implementations.
@@ -107,6 +108,15 @@ where
 {
     fn span(&self) -> SourceSpan {
         self.borrow().span()
+    }
+}
+
+impl<T> Typing for Link<T>
+where
+    T: Typing,
+{
+    fn ty(&self) -> Option<air_types::Type> {
+        self.borrow().ty()
     }
 }
 

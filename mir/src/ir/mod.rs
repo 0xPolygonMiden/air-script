@@ -116,3 +116,7 @@ pub trait Builder {
     /// Create a new empty builder that exposes all fields
     fn builder() -> Self::Empty;
 }
+
+pub trait BuilderHook {
+    fn finalize_hook(&mut self) {}
+}

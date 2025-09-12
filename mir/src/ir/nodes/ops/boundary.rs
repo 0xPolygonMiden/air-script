@@ -1,9 +1,10 @@
 use std::hash::Hash;
 
 use air_parser::ast::Boundary as BoundaryKind;
+use air_types::{ScalarTypeMut, Type, TypeMut, Typing};
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
+use crate::ir::{BackLink, Builder, BuilderHook, Child, Link, Node, Op, Owner, Parent, Singleton};
 
 /// A MIR operation to represent bounding a given op, `expr`, to access either the first or last row
 ///
@@ -18,6 +19,31 @@ pub struct Boundary {
     pub _owner: Singleton<Owner>,
     #[span]
     pub span: SourceSpan,
+    pub _ty: Option<Type>,
+}
+
+impl ScalarTypeMut for Boundary {
+    fn scalar_ty_mut(&mut self) -> &mut Option<air_types::ScalarType> {
+        self._ty.scalar_ty_mut()
+    }
+}
+
+impl TypeMut for Boundary {
+    fn ty_mut(&mut self) -> &mut Option<air_types::Type> {
+        self._ty.ty_mut()
+    }
+}
+
+impl Typing for Boundary {
+    fn ty(&self) -> Option<air_types::Type> {
+        self._ty.ty()
+    }
+}
+
+impl BuilderHook for Boundary {
+    fn finalize_hook(&mut self) {
+        self._ty = self.expr.borrow().ty();
+    }
 }
 
 impl Hash for Boundary {
@@ -32,7 +58,9 @@ impl Hash for Boundary {
 
 impl Boundary {
     pub fn create(expr: Link<Op>, kind: BoundaryKind, span: SourceSpan) -> Link<Op> {
-        Op::Boundary(Self { expr, kind, span, ..Default::default() }).into()
+        let mut boundary = Self { expr, kind, span, ..Default::default() };
+        boundary.finalize_hook();
+        Op::Boundary(boundary).into()
     }
 }
 

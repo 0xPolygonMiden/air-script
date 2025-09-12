@@ -1,8 +1,8 @@
 use std::ops::Deref;
 
-use miden_diagnostics::{SourceSpan, Spanned};
+use miden_diagnostics::Spanned;
 
-use crate::ir::{BackLink, Child, Link, Node, Op, Parent, Root};
+use crate::ir::{BackLink, Child, Link, Node, None, Op, Parent, Root};
 
 /// The nodes that can own [Op] nodes
 /// The [Owner] enum does not own it's inner struct to avoid reference cycles,
@@ -30,7 +30,7 @@ pub enum Owner {
     Enf(BackLink<Op>),
     For(BackLink<Op>),
     If(BackLink<Op>),
-    None(SourceSpan),
+    None(None),
 }
 
 impl Parent for Owner {
@@ -199,17 +199,17 @@ impl Link<Owner> {
                 Op::BusOp(_) => Owner::BusOp(BackLink::from(op_inner_val)),
                 Op::Parameter(_) => unreachable!(),
                 Op::Value(_) => unreachable!(),
-                Op::None(span) => Owner::None(*span),
+                Op::None(none) => Owner::None(none.clone()),
             };
         } else if let Some(root_inner_val) = self.as_root() {
             to_update = match root_inner_val.clone().borrow().deref() {
                 Root::Function(_) => Owner::Function(BackLink::from(root_inner_val)),
                 Root::Evaluator(_) => Owner::Evaluator(BackLink::from(root_inner_val)),
-                Root::None(span) => Owner::None(*span),
+                Root::None(none) => Owner::None(none.clone()),
             };
         } else {
             // If the [Owner] is stale, we set it to None
-            to_update = Owner::None(self.span());
+            to_update = Owner::None(None { span: self.span(), ty: None });
         }
 
         *self.borrow_mut() = to_update;

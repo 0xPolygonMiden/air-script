@@ -1,6 +1,7 @@
+use air_types::{FunctionType, Typing};
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{Builder, Link, Node, Op, Owner, Parent, Root, Singleton};
+use crate::ir::{Builder, BuilderHook, Link, Node, Op, Owner, Parent, Root, Singleton};
 
 /// A MIR Root to represent a Function definition
 #[derive(Default, Clone, PartialEq, Eq, Debug, Hash, Builder, Spanned)]
@@ -16,7 +17,16 @@ pub struct Function {
     pub _owner: Singleton<Owner>,
     #[span]
     pub span: SourceSpan,
+    pub func_ty: FunctionType,
 }
+
+impl Typing for Function {
+    fn ty(&self) -> Option<air_types::Type> {
+        self.func_ty.result()
+    }
+}
+
+impl BuilderHook for Function {}
 
 impl Function {
     pub fn create(
@@ -24,12 +34,14 @@ impl Function {
         return_type: Link<Op>,
         body: Vec<Link<Op>>,
         span: SourceSpan,
+        func_ty: FunctionType,
     ) -> Link<Root> {
         Root::Function(Self {
             parameters,
             return_type,
             body: Link::new(body),
             span,
+            func_ty,
             ..Default::default()
         })
         .into()

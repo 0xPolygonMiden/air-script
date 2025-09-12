@@ -1,6 +1,7 @@
+use air_types::{Kind, ScalarTypeMut, TypeMut, Typing};
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
+use crate::ir::{BackLink, Builder, BuilderHook, Child, Link, Node, Op, Owner, Parent, Singleton};
 
 /// A MIR operation to represent a vector of MIR ops of a given size
 #[derive(Default, Clone, PartialEq, Eq, Debug, Hash, Builder, Spanned)]
@@ -13,18 +14,44 @@ pub struct Vector {
     pub _owner: Singleton<Owner>,
     #[span]
     pub span: SourceSpan,
+    pub _kind: Option<Kind>,
+}
+
+impl ScalarTypeMut for Vector {
+    fn scalar_ty_mut(&mut self) -> &mut Option<air_types::ScalarType> {
+        self._kind.as_mut().unwrap().scalar_ty_mut()
+    }
+}
+
+impl TypeMut for Vector {
+    fn ty_mut(&mut self) -> &mut Option<air_types::Type> {
+        self._kind.as_mut().unwrap().ty_mut()
+    }
+}
+
+impl Typing for Vector {
+    fn ty(&self) -> Option<air_types::Type> {
+        self._kind.ty()
+    }
+}
+
+impl BuilderHook for Vector {
+    fn finalize_hook(&mut self) {
+        self._kind = self.elements.borrow().kind();
+    }
 }
 
 impl Vector {
     pub fn create(elements: Vec<Link<Op>>, span: SourceSpan) -> Link<Op> {
         let size = elements.len();
-        Op::Vector(Self {
+        let mut vec = Self {
             size,
             elements: Link::new(elements),
             span,
             ..Default::default()
-        })
-        .into()
+        };
+        vec.finalize_hook();
+        Op::Vector(vec).into()
     }
 }
 

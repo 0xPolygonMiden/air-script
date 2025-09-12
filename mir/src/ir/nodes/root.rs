@@ -3,11 +3,12 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use miden_diagnostics::{SourceSpan, Spanned};
+use air_types::Typing;
+use miden_diagnostics::Spanned;
 
 use crate::ir::{
-    BackLink, Evaluator, Function, Link, Node, Op, Owner, Parent, Singleton, get_inner,
-    get_inner_mut,
+    BackLink, BuilderHook, Evaluator, Function, Link, Node, None, Op, Owner, Parent, Singleton,
+    get_inner, get_inner_mut,
 };
 
 /// The root nodes of the MIR Graph
@@ -17,12 +18,22 @@ use crate::ir::{
 pub enum Root {
     Function(Function),
     Evaluator(Evaluator),
-    None(SourceSpan),
+    None(None),
+}
+
+impl BuilderHook for Root {
+    fn finalize_hook(&mut self) {
+        match self {
+            Root::Function(f) => f.finalize_hook(),
+            Root::Evaluator(e) => e.finalize_hook(),
+            Root::None(_) => {},
+        }
+    }
 }
 
 impl Default for Root {
     fn default() -> Self {
-        Root::None(SourceSpan::default())
+        Root::None(None::default())
     }
 }
 
@@ -33,6 +44,16 @@ impl Parent for Root {
             Root::Function(f) => f.children(),
             Root::Evaluator(e) => e.children(),
             Root::None(_) => Link::default(),
+        }
+    }
+}
+
+impl Typing for Root {
+    fn ty(&self) -> Option<air_types::Type> {
+        match self {
+            Root::Function(f) => f.ty(),
+            Root::Evaluator(e) => e.ty(),
+            Root::None(n) => n.ty(),
         }
     }
 }
@@ -70,7 +91,7 @@ impl Link<Root> {
                 e._node = Singleton::from(node.clone());
                 node
             },
-            Root::None(span) => Node::None(*span).into(),
+            Root::None(none) => Node::None(none.clone()).into(),
         }
     }
     /// Get the current [Root]'s [Owner] variant
@@ -90,7 +111,7 @@ impl Link<Root> {
                 e._owner = Singleton::from(owner.clone());
                 owner
             },
-            Root::None(span) => Owner::None(*span).into(),
+            Root::None(none) => Owner::None(none.clone()).into(),
         }
     }
     /// Try getting the current [Root]'s inner [Function].

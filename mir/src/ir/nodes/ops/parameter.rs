@@ -1,9 +1,9 @@
 use std::hash::{Hash, Hasher};
 
-use air_types::*;
+use air_types::{ScalarTypeMut, Type, TypeMut, Typing};
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Singleton};
+use crate::ir::{BackLink, Builder, BuilderHook, Child, Link, Node, Op, Owner, Singleton};
 
 /// A MIR operation to represent a `Parameter` in a function or evaluator.
 /// Also used in If and For loops to represent declared parameters.
@@ -15,12 +15,32 @@ pub struct Parameter {
     pub ref_node: BackLink<Owner>,
     /// The position of the `Parameter` in the referred node's `Parameter` list
     pub position: usize,
-    /// The type of the `Parameter`
-    pub ty: Option<Type>,
     pub _node: Singleton<Node>,
     #[span]
     pub span: SourceSpan,
+    /// The type of the `Parameter`
+    pub ty: Option<Type>,
 }
+
+impl ScalarTypeMut for Parameter {
+    fn scalar_ty_mut(&mut self) -> &mut Option<air_types::ScalarType> {
+        self.ty.scalar_ty_mut()
+    }
+}
+
+impl TypeMut for Parameter {
+    fn ty_mut(&mut self) -> &mut Option<air_types::Type> {
+        self.ty.ty_mut()
+    }
+}
+
+impl Typing for Parameter {
+    fn ty(&self) -> Option<air_types::Type> {
+        self.ty.ty()
+    }
+}
+
+impl BuilderHook for Parameter {}
 
 impl Parameter {
     pub fn create(position: usize, ty: Type, span: SourceSpan) -> Link<Op> {

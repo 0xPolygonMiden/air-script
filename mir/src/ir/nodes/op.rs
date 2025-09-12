@@ -3,12 +3,13 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use miden_diagnostics::{SourceSpan, Spanned};
+use air_types::{ScalarTypeMut, TypeMut, Typing};
+use miden_diagnostics::Spanned;
 
 use crate::ir::{
-    Accessor, Add, BackLink, Boundary, BusOp, Call, Child, ConstantValue, Enf, Exp, Fold, For, If,
-    Link, Matrix, MirValue, Mul, Node, Owner, Parameter, Parent, Singleton, SpannedMirValue, Sub,
-    Value, Vector, get_inner, get_inner_mut,
+    Accessor, Add, BackLink, Boundary, BuilderHook, BusOp, Call, Child, ConstantValue, Enf, Exp,
+    Fold, For, If, Link, Matrix, MirValue, Mul, Node, None, Owner, Parameter, Parent, Singleton,
+    SpannedMirValue, Sub, Value, Vector, get_inner, get_inner_mut,
 };
 
 /// The combined [Op]s and leaves of the MIR Graph.
@@ -33,7 +34,31 @@ pub enum Op {
     BusOp(BusOp),
     Parameter(Parameter),
     Value(Value),
-    None(SourceSpan),
+    None(None),
+}
+
+impl BuilderHook for Op {
+    fn finalize_hook(&mut self) {
+        match self {
+            Op::Enf(e) => e.finalize_hook(),
+            Op::Boundary(b) => b.finalize_hook(),
+            Op::Add(a) => a.finalize_hook(),
+            Op::Sub(s) => s.finalize_hook(),
+            Op::Mul(m) => m.finalize_hook(),
+            Op::Exp(e) => e.finalize_hook(),
+            Op::If(i) => i.finalize_hook(),
+            Op::For(f) => f.finalize_hook(),
+            Op::Call(c) => c.finalize_hook(),
+            Op::Fold(f) => f.finalize_hook(),
+            Op::Vector(v) => v.finalize_hook(),
+            Op::Matrix(m) => m.finalize_hook(),
+            Op::Accessor(a) => a.finalize_hook(),
+            Op::BusOp(b) => b.finalize_hook(),
+            Op::Parameter(p) => p.finalize_hook(),
+            Op::Value(v) => v.finalize_hook(),
+            Op::None(_) => {},
+        }
+    }
 }
 
 impl Default for Op {
@@ -130,6 +155,78 @@ impl Child for Op {
             Op::Parameter(p) => p.remove_parent(parent),
             Op::Value(v) => v.remove_parent(parent),
             Op::None(_) => {},
+        }
+    }
+}
+
+impl ScalarTypeMut for Op {
+    fn scalar_ty_mut(&mut self) -> &mut Option<air_types::ScalarType> {
+        match self {
+            Op::Enf(e) => e.scalar_ty_mut(),
+            Op::Boundary(b) => b.scalar_ty_mut(),
+            Op::Add(a) => a.scalar_ty_mut(),
+            Op::Sub(s) => s.scalar_ty_mut(),
+            Op::Mul(m) => m.scalar_ty_mut(),
+            Op::Exp(e) => e.scalar_ty_mut(),
+            Op::If(i) => i.scalar_ty_mut(),
+            Op::For(f) => f.scalar_ty_mut(),
+            Op::Call(c) => c.scalar_ty_mut(),
+            Op::Fold(f) => f.scalar_ty_mut(),
+            Op::Vector(v) => v.scalar_ty_mut(),
+            Op::Matrix(m) => m.scalar_ty_mut(),
+            Op::Accessor(a) => a.scalar_ty_mut(),
+            Op::BusOp(b) => b.scalar_ty_mut(),
+            Op::Parameter(p) => p.scalar_ty_mut(),
+            Op::Value(v) => v.scalar_ty_mut(),
+            Op::None(n) => n.scalar_ty_mut(),
+        }
+    }
+}
+
+impl TypeMut for Op {
+    fn ty_mut(&mut self) -> &mut Option<air_types::Type> {
+        match self {
+            Op::Enf(e) => e.ty_mut(),
+            Op::Boundary(b) => b.ty_mut(),
+            Op::Add(a) => a.ty_mut(),
+            Op::Sub(s) => s.ty_mut(),
+            Op::Mul(m) => m.ty_mut(),
+            Op::Exp(e) => e.ty_mut(),
+            Op::If(i) => i.ty_mut(),
+            Op::For(f) => f.ty_mut(),
+            Op::Call(c) => c.ty_mut(),
+            Op::Fold(f) => f.ty_mut(),
+            Op::Vector(v) => v.ty_mut(),
+            Op::Matrix(m) => m.ty_mut(),
+            Op::Accessor(a) => a.ty_mut(),
+            Op::BusOp(b) => b.ty_mut(),
+            Op::Parameter(p) => p.ty_mut(),
+            Op::Value(v) => v.ty_mut(),
+            Op::None(n) => n.ty_mut(),
+        }
+    }
+}
+
+impl Typing for Op {
+    fn ty(&self) -> Option<air_types::Type> {
+        match self {
+            Op::Enf(e) => e.ty(),
+            Op::Boundary(b) => b.ty(),
+            Op::Add(a) => a.ty(),
+            Op::Sub(s) => s.ty(),
+            Op::Mul(m) => m.ty(),
+            Op::Exp(e) => e.ty(),
+            Op::If(i) => i.ty(),
+            Op::For(f) => f.ty(),
+            Op::Call(c) => c.ty(),
+            Op::Fold(f) => f.ty(),
+            Op::Vector(v) => v.ty(),
+            Op::Matrix(m) => m.ty(),
+            Op::Accessor(a) => a.ty(),
+            Op::BusOp(b) => b.ty(),
+            Op::Parameter(p) => p.ty(),
+            Op::Value(v) => v.ty(),
+            Op::None(n) => n.ty(),
         }
     }
 }
@@ -385,7 +482,7 @@ impl Link<Op> {
                 value._node = Singleton::from(node.clone());
                 node
             },
-            Op::None(span) => Node::None(*span).into(),
+            Op::None(none) => Node::None(none.clone()).into(),
         }
     }
     /// Try getting the current [Op]'s [Owner] variant,

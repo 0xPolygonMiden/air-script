@@ -723,11 +723,11 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         //
         // * Must be trace bindings or aliases of same
         // * Must match the type signature of the callee
-        if let Ok(ty) = callee_binding_ty {
-            if let BindingType::Evaluator(params) = ty.item {
-                for (arg, param) in expr.args.iter().zip(params.iter()) {
-                    self.validate_evaluator_argument(expr.span(), arg, param)?;
-                }
+        if let Ok(ty) = callee_binding_ty
+            && let BindingType::Evaluator(params) = ty.item
+        {
+            for (arg, param) in expr.args.iter().zip(params.iter()) {
+                self.validate_evaluator_argument(expr.span(), arg, param)?;
             }
         }
 
@@ -1577,17 +1577,17 @@ impl SemanticAnalysis<'_> {
                                 //
                                 // If no type is known, a diagnostic is already emitted, so proceed
                                 // as if it is valid
-                                if let Some(ty) = access.column.ty.as_ref() {
-                                    if !ty.is_scalar() {
-                                        // Invalid constraint, only scalar values are allowed
-                                        self.type_mismatch(
-                                            Some(ty),
-                                            access.span(),
-                                            &ty!(_).unwrap(),
-                                            found.span(),
-                                            constraint_span,
-                                        )?;
-                                    }
+                                if let Some(ty) = access.column.ty.as_ref()
+                                    && !ty.is_scalar()
+                                {
+                                    // Invalid constraint, only scalar values are allowed
+                                    self.type_mismatch(
+                                        Some(ty),
+                                        access.span(),
+                                        &ty!(_).unwrap(),
+                                        found.span(),
+                                        constraint_span,
+                                    )?;
                                 }
 
                                 // Verify that the right-hand expression evaluates to a scalar

@@ -17,7 +17,6 @@ mod vector;
 
 pub use accessor::Accessor;
 pub use add::Add;
-pub use air_types::*;
 pub use boundary::Boundary;
 pub use bus_op::{BusOp, BusOpKind};
 pub use call::Call;

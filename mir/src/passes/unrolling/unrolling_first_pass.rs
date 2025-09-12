@@ -1,15 +1,15 @@
 use std::{collections::HashMap, ops::Deref};
 
 use air_parser::ast::AccessType;
+use air_types::{Type, ty};
 use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
 
-use air_types::{ty, Type};
 use crate::{
     CompileError,
     ir::{
         Accessor, Add, BackLink, Boundary, ConstantValue, Enf, Exp, FoldOperator, Graph, Link,
-        Matrix, MirValue, Mul, Node, Op, Owner, Parameter, Parent, RandomInputs,
-        SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value, Vector,
+        Matrix, MirValue, Mul, Node, Op, Owner, Parameter, Parent, RandomInputs, SpannedMirValue,
+        Sub, TraceAccess, TraceAccessBinding, Value, Vector,
     },
     passes::{
         Visitor,

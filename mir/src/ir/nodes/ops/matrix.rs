@@ -1,6 +1,7 @@
+use air_types::{Kind, ScalarTypeMut, TypeMut, Typing};
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
+use crate::ir::{BackLink, Builder, BuilderHook, Child, Link, Node, Op, Owner, Parent, Singleton};
 
 /// A MIR operation to represent a matrix of MIR ops of a given size
 #[derive(Default, Clone, PartialEq, Eq, Debug, Hash, Builder, Spanned)]
@@ -14,18 +15,44 @@ pub struct Matrix {
     pub _owner: Singleton<Owner>,
     #[span]
     pub span: SourceSpan,
+    pub _kind: Option<Kind>,
+}
+
+impl ScalarTypeMut for Matrix {
+    fn scalar_ty_mut(&mut self) -> &mut Option<air_types::ScalarType> {
+        self._kind.as_mut().unwrap().scalar_ty_mut()
+    }
+}
+
+impl TypeMut for Matrix {
+    fn ty_mut(&mut self) -> &mut Option<air_types::Type> {
+        self._kind.as_mut().unwrap().ty_mut()
+    }
+}
+
+impl Typing for Matrix {
+    fn ty(&self) -> Option<air_types::Type> {
+        self._kind.ty()
+    }
+}
+
+impl BuilderHook for Matrix {
+    fn finalize_hook(&mut self) {
+        self._kind = self.elements.borrow().kind();
+    }
 }
 
 impl Matrix {
     pub fn create(elements: Vec<Link<Op>>, span: SourceSpan) -> Link<Op> {
         let size = elements.len();
-        Op::Matrix(Self {
+        let mut mat = Self {
             size,
             elements: Link::new(elements),
             span,
             ..Default::default()
-        })
-        .into()
+        };
+        mat.finalize_hook();
+        Op::Matrix(mat).into()
     }
 }
 
