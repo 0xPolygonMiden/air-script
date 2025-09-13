@@ -9,6 +9,7 @@
 - Fix regressions on MIR and list_comprehensions (#449).
 - Update documentation and tests thereof (#437).
 - Reorder unrolling passes to unroll list comprehensions before match statements (#431).
+- Removed `TraceSegmentId::index()` and replaced segment indexing with `TraceShape<T>`/`FullTraceShape<T>` across ACE codegen, MIR-to-AIR pass, and constraints (#442).
 
 ## 0.4.0 (2025-06-20)
 
