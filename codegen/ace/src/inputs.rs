@@ -164,9 +164,12 @@ impl AceVars {
 
         // Trace values
         for row_offset in [0, 1] {
-            for (segment_row, region) in
-                zip(&self.segments[row_offset], &layout.trace_segments[row_offset])
-            {
+            let row_regions = [
+                &layout.trace_segments[row_offset].segments.main,
+                &layout.trace_segments[row_offset].segments.aux,
+                &layout.trace_segments[row_offset].quotient,
+            ];
+            for (segment_row, region) in zip(&self.segments[row_offset], row_regions) {
                 store(&mut mem, region, segment_row.as_slice());
             }
         }

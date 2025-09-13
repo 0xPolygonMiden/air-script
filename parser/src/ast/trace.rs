@@ -20,6 +20,12 @@ impl fmt::Display for TraceSegmentId {
     }
 }
 
+impl From<TraceSegmentId> for usize {
+    fn from(value: TraceSegmentId) -> Self {
+        value as usize
+    }
+}
+
 /// The index of a column in a particular trace segment
 pub type TraceColumnIndex = usize;
 

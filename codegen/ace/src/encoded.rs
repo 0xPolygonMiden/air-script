@@ -206,6 +206,7 @@ impl Circuit {
 mod tests {
     use std::iter::zip;
 
+    use air_ir::FullTraceShape;
     use super::*;
     use crate::{
         circuit::{ArithmeticOp, OperationNode},
@@ -229,22 +230,22 @@ mod tests {
             random_alpha: 0,
             random_beta: 0,
             trace_segments: [
-                [
+                FullTraceShape::new(
                     // Main
                     InputRegion { offset: 0, width: 1 },
                     // Aux
                     InputRegion { offset: 1, width: 0 },
                     // Quotient
-                    InputRegion { offset: 1, width: 0 },
-                ],
-                [
+                    InputRegion { offset: 1, width: 0 }
+                ),
+                FullTraceShape::new(
                     // Main
                     InputRegion { offset: 1, width: 1 },
                     // Aux
                     InputRegion { offset: 2, width: 0 },
                     // Quotient
-                    InputRegion { offset: 2, width: 0 },
-                ],
+                    InputRegion { offset: 2, width: 0 }
+                ),
             ],
             stark_vars: Default::default(),
             num_inputs: 2,

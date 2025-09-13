@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, ops::Range};
 
 use air_ir::{
-    Air, Identifier, PublicInput, PublicInputAccess, PublicInputTableAccess, TraceAccess,
+    Air, FullTraceShape, Identifier, PublicInput, PublicInputAccess, PublicInputTableAccess, TraceAccess,
 };
 
 use crate::circuit::Node;
@@ -69,7 +69,7 @@ pub struct Layout {
     /// # TODO(Issue #391):
     /// The degree of the quotient is fixed to 8 matching the degree of the VM constraints, but
     /// the actual degree can be derived from the [`Air`].
-    pub trace_segments: [[InputRegion; 3]; 2],
+    pub trace_segments: [FullTraceShape<InputRegion>; 2],
     /// Region containing the [`StarkVar`] variables.
     pub stark_vars: InputRegion,
     /// Total number of inputs, padded to the next word-multiple.
@@ -170,7 +170,11 @@ impl Layout {
         // during the FRI query phase.
         // At the moment, we do so by padding each trace with zero-valued columns.
         let trace_segments = [0, 1].map(|_row_offset| {
-            segment_widths.map(|width| allocate_region(offset, width, Alignment::DoubleWord))
+            FullTraceShape::new(
+                allocate_region(offset, segment_widths[0], Alignment::DoubleWord),
+                allocate_region(offset, segment_widths[1], Alignment::DoubleWord),
+                allocate_region(offset, segment_widths[2], Alignment::DoubleWord),
+            )
         });
 
         let stark_vars = allocate_region(offset, StarkVar::num_vars(), Alignment::Word);
@@ -208,10 +212,7 @@ impl Layout {
     pub fn trace_access_node(&self, trace_access: &TraceAccess) -> Option<Node> {
         let TraceAccess { segment, column, row_offset } = *trace_access;
         let segments_in_row = self.trace_segments.get(row_offset)?;
-        let segment_region = match segment {
-            air_ir::TraceSegmentId::Main => &segments_in_row[0],
-            air_ir::TraceSegmentId::Aux => &segments_in_row[1],
-        };
+        let segment_region = &segments_in_row[segment];
         segment_region.as_node(column)
     }
 
@@ -227,7 +228,7 @@ impl Layout {
 
     /// Input nodes associated with the quotient polynomial coefficients.
     pub fn quotient_nodes(&self) -> Vec<Node> {
-        self.trace_segments[0][2].iter_nodes().collect()
+        self.trace_segments[0].quotient.iter_nodes().collect()
     }
 
     /// Input node associated with an auxiliary STARK challenge/variable.

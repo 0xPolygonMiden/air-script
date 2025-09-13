@@ -85,7 +85,7 @@ impl Constraints {
 
     /// Returns the number of boundary constraints applied against the specified trace segment.
     pub fn num_boundary_constraints(&self, trace_segment: TraceSegmentId) -> usize {
-        self.boundary_constraints.get(trace_segment).len()
+        self.boundary_constraints[trace_segment].len()
     }
 
     /// Returns the set of boundary constraints for the given trace segment.
@@ -93,7 +93,7 @@ impl Constraints {
     /// Each boundary constraint is represented by a [ConstraintRoot] which is
     /// the root of the subgraph representing the constraint within the [AlgebraicGraph]
     pub fn boundary_constraints(&self, trace_segment: TraceSegmentId) -> &[ConstraintRoot] {
-        self.boundary_constraints.get(trace_segment).as_slice()
+        self.boundary_constraints[trace_segment].as_slice()
     }
 
     /// Returns a vector of the degrees of the integrity constraints for the specified trace
@@ -102,8 +102,7 @@ impl Constraints {
         &self,
         trace_segment: TraceSegmentId,
     ) -> Vec<IntegrityConstraintDegree> {
-        self.integrity_constraints
-            .get(trace_segment)
+        self.integrity_constraints[trace_segment]
             .iter()
             .map(|entry_index| self.graph.degree(entry_index.node_index()))
             .collect()
@@ -114,7 +113,7 @@ impl Constraints {
     /// Each integrity constraint is represented by a [ConstraintRoot] which is
     /// the root of the subgraph representing the constraint within the [AlgebraicGraph]
     pub fn integrity_constraints(&self, trace_segment: TraceSegmentId) -> &[ConstraintRoot] {
-        self.integrity_constraints.get(trace_segment).as_slice()
+        self.integrity_constraints[trace_segment].as_slice()
     }
 
     /// Inserts a new constraint against `trace_segment`, using the provided `root` and `domain`
@@ -126,9 +125,9 @@ impl Constraints {
     ) {
         let root = ConstraintRoot::new(root, domain);
         if domain.is_boundary() {
-            self.boundary_constraints.get_mut(trace_segment).push(root);
+            self.boundary_constraints[trace_segment].push(root);
         } else {
-            self.integrity_constraints.get_mut(trace_segment).push(root);
+            self.integrity_constraints[trace_segment].push(root);
         }
     }
 

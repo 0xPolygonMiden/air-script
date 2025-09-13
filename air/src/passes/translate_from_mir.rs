@@ -642,7 +642,7 @@ impl AirBuilder<'_> {
         trace_access: MirTraceAccess,
         boundary: &MirBoundary,
     ) -> Result<(), CompileError> {
-        if let Some(prev) = self.trace_columns.get_mut(trace_access.segment).mark_constrained(
+        if let Some(prev) = self.trace_columns[trace_access.segment].mark_constrained(
             boundary.span(),
             trace_access.column,
             boundary.kind,
