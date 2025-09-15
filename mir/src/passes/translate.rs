@@ -11,14 +11,9 @@ use air_types::*;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
 use crate::{
-    CompileError,
     ir::{
-        Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue,
-        Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir,
-        MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess, Root,
-        SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Type, Value, Vector, none,
-    },
-    passes::duplicate_node,
+        Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue, Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir, MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess, Root, SpannedMirValue, Stale, Sub, TraceAccess, TraceAccessBinding, Type, Value, Vector
+    }, passes::duplicate_node, CompileError
 };
 
 /// This pass transforms a given [ast::Program] into a Middle Intermediate Representation ([Mir])
@@ -493,8 +488,8 @@ impl<'a> MirBuilder<'a> {
 
         let for_node = For::create(
             iterator_nodes.into(),
-            Op::None(none::None { span: list_comp.span(), ty: None }).into(),
-            Op::None(none::None { span: list_comp.span(), ty: None }).into(),
+            Op::None(Stale { span: list_comp.span(), ty: None }).into(),
+            Op::None(Stale { span: list_comp.span(), ty: None }).into(),
             list_comp.span(),
         );
         set_all_ref_nodes(params, for_node.as_owner().unwrap());
@@ -799,7 +794,7 @@ impl<'a> MirBuilder<'a> {
                             })?;
                         },
                     }
-                    return Ok(Op::None(none::None { span: bin_op.span(), ty: None }).into());
+                    return Ok(Op::None(Stale { span: bin_op.span(), ty: None }).into());
                 }
             }
         }

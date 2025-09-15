@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use miden_diagnostics::Spanned;
 
-use crate::ir::{BackLink, Child, Link, Node, None, Op, Parent, Root};
+use crate::ir::{BackLink, Child, Link, Node, Stale, Op, Parent, Root};
 
 /// The nodes that can own [Op] nodes
 /// The [Owner] enum does not own it's inner struct to avoid reference cycles,
@@ -30,7 +30,7 @@ pub enum Owner {
     Enf(BackLink<Op>),
     For(BackLink<Op>),
     If(BackLink<Op>),
-    None(None),
+    None(Stale),
 }
 
 impl Parent for Owner {
@@ -209,7 +209,7 @@ impl Link<Owner> {
             };
         } else {
             // If the [Owner] is stale, we set it to None
-            to_update = Owner::None(None { span: self.span(), ty: None });
+            to_update = Owner::None(Stale { span: self.span(), ty: None });
         }
 
         *self.borrow_mut() = to_update;

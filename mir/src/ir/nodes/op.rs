@@ -8,7 +8,7 @@ use miden_diagnostics::Spanned;
 
 use crate::ir::{
     Accessor, Add, BackLink, Boundary, BuilderHook, BusOp, Call, Child, ConstantValue, Enf, Exp,
-    Fold, For, If, Link, Matrix, MirValue, Mul, Node, None, Owner, Parameter, Parent, Singleton,
+    Fold, For, If, Link, Matrix, MirValue, Mul, Node, Stale, Owner, Parameter, Parent, Singleton,
     SpannedMirValue, Sub, Value, Vector, get_inner, get_inner_mut,
 };
 
@@ -34,7 +34,7 @@ pub enum Op {
     BusOp(BusOp),
     Parameter(Parameter),
     Value(Value),
-    None(None),
+    None(Stale),
 }
 
 impl BuilderHook for Op {

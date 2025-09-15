@@ -7,7 +7,7 @@ use air_types::Typing;
 use miden_diagnostics::Spanned;
 
 use crate::ir::{
-    BackLink, BuilderHook, Evaluator, Function, Link, Node, None, Op, Owner, Parent, Singleton,
+    BackLink, BuilderHook, Evaluator, Function, Link, Node, Stale, Op, Owner, Parent, Singleton,
     get_inner, get_inner_mut,
 };
 
@@ -18,7 +18,7 @@ use crate::ir::{
 pub enum Root {
     Function(Function),
     Evaluator(Evaluator),
-    None(None),
+    None(Stale),
 }
 
 impl BuilderHook for Root {
@@ -33,7 +33,7 @@ impl BuilderHook for Root {
 
 impl Default for Root {
     fn default() -> Self {
-        Root::None(None::default())
+        Root::None(Stale::default())
     }
 }
 

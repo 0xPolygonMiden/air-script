@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use miden_diagnostics::Spanned;
 
-use crate::ir::{BackLink, Child, Link, None, Op, Owner, Parent, Root};
+use crate::ir::{BackLink, Child, Link, Stale, Op, Owner, Parent, Root};
 
 /// All the nodes that can be in the MIR Graph
 /// Combines all [Root] and [Op] variants
@@ -33,7 +33,7 @@ pub enum Node {
     BusOp(BackLink<Op>),
     Parameter(BackLink<Op>),
     Value(BackLink<Op>),
-    None(None),
+    None(Stale),
 }
 
 impl Default for Node {
@@ -230,7 +230,7 @@ impl Link<Node> {
             };
         } else {
             // If the [Node] is stale, we set it to None
-            to_update = Node::None(None { span: self.span(), ty: None });
+            to_update = Node::None(Stale { span: self.span(), ty: None });
         }
 
         *self.borrow_mut() = to_update;
