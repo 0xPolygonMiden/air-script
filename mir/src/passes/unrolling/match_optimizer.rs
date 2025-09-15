@@ -120,7 +120,10 @@ impl<'a> MatchOptimizer<'a> {
                 Some(index) => {
                     // If the eval is already in the list, we use its index in the
                     // node_evals vec
-                    let constraints_vec = self.constraints_evaluation_indices.get_mut(&index).expect("Error: An existing evaluation index was not found in constraints_evaluation_indices");
+                    let constraints_vec =
+                        self.constraints_evaluation_indices.get_mut(&index).expect(
+                            "Error: An evaluation index was not in constraints_evaluation_indices",
+                        );
 
                     // We add the constraint to the corresponding vector only if the
                     // condition is not already present

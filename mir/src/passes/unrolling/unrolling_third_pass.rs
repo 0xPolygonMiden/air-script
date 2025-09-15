@@ -37,9 +37,9 @@ impl<'a> UnrollingThirdPass<'a> {
     }
 }
 
-// For the first pass of Unrolling, we use a tweaked version of the Visitor trait,
-// each visit_*_bis function returns an Option<Link<Op>> instead of Result<(), CompileError>,
-// to mutate the nodes (e.g. modifying a Operation<Vectors> to Vector<Operations>)
+// For the third pass of Unrolling, we use a tweaked version of the Visitor trait,
+// each `visit_*_bis` function returns an `Option<Link<Op>>` instead of `Result<(), CompileError>`,
+// to mutate the nodes (e.g. modifying an `If` node to `Vector<Enf>`)
 impl UnrollingThirdPass<'_> {
     /// Visiting an `If` node consists of evaluating all the main trace constraints contained in
     /// the match arms, and combining them to optimize the resulting vector of constraints if
