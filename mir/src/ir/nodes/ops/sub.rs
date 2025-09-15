@@ -38,7 +38,7 @@ impl Typing for Sub {
 impl BuilderHook for Sub {
     fn finalize_hook(&mut self) {
         self._bin_ty = BinType::Sub(self.lhs.borrow().ty(), self.rhs.borrow().ty(), None);
-        let res = self._bin_ty.infer_bin_ty_add().unwrap();
+        let res = self._bin_ty.infer_bin_ty_sub().unwrap();
         *self._bin_ty.result_mut() = res;
     }
 }

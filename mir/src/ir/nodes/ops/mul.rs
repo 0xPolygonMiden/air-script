@@ -38,7 +38,7 @@ impl Typing for Mul {
 impl BuilderHook for Mul {
     fn finalize_hook(&mut self) {
         self._bin_ty = BinType::Mul(self.lhs.borrow().ty(), self.rhs.borrow().ty(), None);
-        let res = self._bin_ty.infer_bin_ty_add().unwrap();
+        let res = self._bin_ty.infer_bin_ty_mul().unwrap();
         *self._bin_ty.result_mut() = res;
     }
 }
