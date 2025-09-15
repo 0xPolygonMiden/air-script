@@ -1,17 +1,21 @@
-use core::panic;
 use std::{collections::HashMap, ops::Deref};
 
 use air_parser::ast::AccessType;
-use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
+use miden_diagnostics::{DiagnosticsHandler, Spanned};
 
 use crate::{
     CompileError,
     ir::{
-        Accessor, Add, Boundary, ConstantValue, Enf, Exp, FoldOperator, Graph, Link, Matrix,
-        MirType, MirValue, Mul, Node, Op, Owner, Parameter, Parent, SpannedMirValue, Sub,
-        TraceAccess, TraceAccessBinding, Value, Vector,
+        Accessor, Graph, Link, MirType, MirValue, Node, Op, Owner, Parameter, Parent,
+        SpannedMirValue, TraceAccess, Value, Vector,
     },
-    passes::{Visitor, unrolling::ForInliningContext},
+    passes::{
+        Visitor,
+        unrolling::{
+            ForInliningContext, visit_add_bis, visit_boundary_bis, visit_enf_bis, visit_exp_bis,
+            visit_fold_bis, visit_mul_bis, visit_sub_bis, visit_value_bis, visit_vector_bis,
+        },
+    },
 };
 
 pub struct UnrollingFirstPass<'a> {
@@ -42,103 +46,7 @@ impl<'a> UnrollingFirstPass<'a> {
     }
 }
 
-/// Unrolls a trace access binding into either:
-/// - a TraceAccess if it is of size 1
-/// - or a Vector<TraceAccess> otherwise.
-fn unroll_trace_access_binding(
-    trace_access_binding: &TraceAccessBinding,
-    span: SourceSpan,
-) -> Link<Op> {
-    if trace_access_binding.size == 1 {
-        Value::create(SpannedMirValue {
-            span,
-            value: MirValue::TraceAccess(TraceAccess {
-                segment: trace_access_binding.segment,
-                column: trace_access_binding.offset,
-                row_offset: 0,
-            }),
-        })
-    } else {
-        let mut vec = vec![];
-        for index in 0..trace_access_binding.size {
-            let val = Value::create(SpannedMirValue {
-                span,
-                value: MirValue::TraceAccess(TraceAccess {
-                    segment: trace_access_binding.segment,
-                    column: trace_access_binding.offset + index,
-                    row_offset: 0,
-                }),
-            });
-            vec.push(val);
-        }
-        Vector::create(vec, span)
-    }
-}
-
-/// Unrolls a constant vector into a Vector<ConstantValue::Felt>`
-fn unroll_constant_vector(constant_vector: &Vec<u64>, span: SourceSpan) -> Link<Op> {
-    let mut vec = vec![];
-    for val in constant_vector {
-        let val = Value::create(SpannedMirValue {
-            span,
-            value: MirValue::Constant(ConstantValue::Felt(*val)),
-        });
-        vec.push(val);
-    }
-    Vector::create(vec, span)
-}
-
-/// Unrolls a constant matrix into a `Matrix<Vector<ConstantValue::Felt>>`
-fn unroll_constant_matrix(constant_matrix: &Vec<Vec<u64>>, span: SourceSpan) -> Link<Op> {
-    let mut res_m = vec![];
-    for row in constant_matrix {
-        let mut res_row = vec![];
-        for val in row {
-            let val = Value::create(SpannedMirValue {
-                span,
-                value: MirValue::Constant(ConstantValue::Felt(*val)),
-            });
-            res_row.push(val);
-        }
-        let res_row_vec = Vector::create(res_row, span);
-        res_m.push(res_row_vec);
-    }
-    Matrix::create(res_m, span)
-}
-
-fn unroll_binary_op(
-    lhs: Link<Op>,
-    rhs: Link<Op>,
-    parent: Link<Op>,
-    span: SourceSpan,
-) -> Result<Option<Link<Op>>, CompileError> {
-    if let (Op::Vector(lhs_vector), Op::Vector(rhs_vector)) =
-        (lhs.borrow().deref(), rhs.borrow().deref())
-    {
-        let lhs_vec = lhs_vector.children().borrow().clone();
-        let rhs_vec = rhs_vector.children().borrow().clone();
-
-        if lhs_vec.len() != rhs_vec.len() {
-            unreachable!("Binary operation children type mismatch: {:?}", parent);
-        } else {
-            let mut new_vec = vec![];
-            for (lhs, rhs) in lhs_vec.iter().zip(rhs_vec.iter()) {
-                let new_node = match parent.borrow().deref() {
-                    Op::Add(_) => Add::create(lhs.clone(), rhs.clone(), span),
-                    Op::Sub(_) => Sub::create(lhs.clone(), rhs.clone(), span),
-                    Op::Mul(_) => Mul::create(lhs.clone(), rhs.clone(), span),
-                    Op::Exp(_) => Exp::create(lhs.clone(), rhs.clone(), span),
-                    _ => unreachable!("Unexpected parent operation: {:?}", parent),
-                };
-                new_vec.push(new_node);
-            }
-            return Ok(Some(Vector::create(new_vec, parent.span())));
-        }
-    }
-
-    Ok(None)
-}
-
+/// Unrolls an `Accessor` with `AccessType::Default` access type.
 fn unroll_accessor_default_access_type(
     indexable: Link<Op>,
     accessor_offset: usize,
@@ -161,6 +69,7 @@ fn unroll_accessor_default_access_type(
     Some(indexable.clone())
 }
 
+/// Unrolls an `Accessor` with `AccessType::Index` access type.
 fn unroll_accessor_index_access_type(
     indexable: Link<Op>,
     index: usize,
@@ -173,7 +82,7 @@ fn unroll_accessor_index_access_type(
         let indexable_vec = indexable_vector.children().borrow().clone();
         let child_accessed = indexable_vec
             .get(index)
-            .unwrap_or_else(|| panic!("Index access out of bounds for indexable: {:?}", indexable));
+            .unwrap_or_else(|| panic!("Index access out of bounds for indexable: {indexable:?}"));
         if let Some(value) = child_accessed.clone().as_value() {
             let mir_value = value.value.value.clone();
             match mir_value {
@@ -198,6 +107,7 @@ fn unroll_accessor_index_access_type(
     }
 }
 
+/// Unrolls an `Accessor` with `AccessType::Matrix` access type.
 fn unroll_accessor_matrix_access_type(
     indexable: Link<Op>,
     row: usize,
@@ -208,13 +118,13 @@ fn unroll_accessor_matrix_access_type(
     // Raise diag if index is out of bounds
     if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
         let indexable_vec = indexable_vector.children().borrow().clone();
-        let row_accessed = indexable_vec.get(row).unwrap_or_else(|| {
-            panic!("Matrix access out of bounds for indexable: {:?}", indexable)
-        });
+        let row_accessed = indexable_vec
+            .get(row)
+            .unwrap_or_else(|| panic!("Matrix access out of bounds for indexable: {indexable:?}"));
         if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
             let row_accessed_vec = row_accessed_vector.children().borrow().clone();
             let child_accessed = row_accessed_vec.get(col).unwrap_or_else(|| {
-                panic!("Matrix access out of bounds for indexable: {:?}", indexable)
+                panic!("Matrix access out of bounds for indexable: {indexable:?}")
             });
             Some(child_accessed.clone())
         } else {
@@ -222,13 +132,13 @@ fn unroll_accessor_matrix_access_type(
         }
     } else if let Op::Matrix(indexable_matrix) = indexable.borrow().deref() {
         let indexable_vec = indexable_matrix.children().borrow().clone();
-        let row_accessed = indexable_vec.get(row).unwrap_or_else(|| {
-            panic!("Matrix access out of bounds for indexable: {:?}", indexable)
-        });
+        let row_accessed = indexable_vec
+            .get(row)
+            .unwrap_or_else(|| panic!("Matrix access out of bounds for indexable: {indexable:?}"));
         if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
             let row_accessed_vec = row_accessed_vector.children().borrow().clone();
             let child_accessed = row_accessed_vec.get(col).unwrap_or_else(|| {
-                panic!("Matrix access out of bounds for indexable: {:?}", indexable)
+                panic!("Matrix access out of bounds for indexable: {indexable:?}")
             });
             Some(child_accessed.clone())
         } else {
@@ -363,6 +273,12 @@ impl Visitor for UnrollingFirstPass<'_> {
             Node::For(f) => f.to_link().map_or(Ok(None), |el| self.visit_for_bis(el))?,
             Node::Parameter(p) => {
                 p.to_link().map_or(Ok(None), |el| self.visit_parameter_bis(el))?
+            },
+            Node::BusOp(_b) => None,
+            Node::Matrix(_) => None, // Matrix are already unrolled, we have nothing to do
+            Node::If(_i) => None,
+            Node::None(_) => None,
+            _ => {
                 unreachable!(
                     "Unexpected node during Unrolling: Function, Evaluators and Calls should have been inlined before this pass. Found: {:?}",
                     node
@@ -371,7 +287,7 @@ impl Visitor for UnrollingFirstPass<'_> {
         };
 
         // We update the node if needed
-        if let Some(updated_op) = updated_op? {
+        if let Some(updated_op) = updated_op {
             node.as_op().unwrap().set(&updated_op);
         }
 
@@ -382,102 +298,17 @@ impl Visitor for UnrollingFirstPass<'_> {
 // HELPERS FUNCTIONS
 // ================================================================================================
 
-pub fn visit_enf_bis(enf: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    let enf_ref = enf.as_enf().unwrap();
-    let expr = enf_ref.expr.clone();
-    if let Op::Vector(vec) = expr.borrow().deref() {
-        let ops = vec.children().borrow().clone();
-        let new_vec = ops.iter().map(|op| Enf::create(op.clone(), enf_ref.span())).collect();
-        return Ok(Some(Vector::create(new_vec, enf_ref.span())));
-    }
-    Ok(None)
-}
-
-pub fn visit_value_bis(value: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let value_ref = value.as_value().unwrap();
-    let mir_value = value_ref.value.value.clone();
-    match &mir_value {
-        MirValue::Constant(c) => match c {
-            ConstantValue::Felt(_) => {},
-            ConstantValue::Vector(v) => {
-                return Ok(Some(unroll_constant_vector(v, value_ref.span())));
-            },
-            ConstantValue::Matrix(m) => {
-                return Ok(Some(unroll_constant_matrix(m, value_ref.span())));
-            },
-        },
-        MirValue::TraceAccessBinding(trace_access_binding) => {
-            return Ok(Some(unroll_trace_access_binding(trace_access_binding, value_ref.span())));
-        },
-        MirValue::TraceAccess(_)
-        | MirValue::PeriodicColumn(_)
-        | MirValue::PublicInput(_)
-        | MirValue::PublicInputTable(_)
-        | MirValue::RandomValue(_)
-        | MirValue::BusAccess(_)
-        | MirValue::Null
-        | MirValue::Unconstrained => {},
-    }
-    Ok(None)
-}
-
-pub fn visit_add_bis(add: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let add_ref = add.as_add().unwrap();
-    let lhs = add_ref.lhs.clone();
-    let rhs = add_ref.rhs.clone();
-    unroll_binary_op(lhs, rhs, add.clone(), add_ref.span())
-}
-
-pub fn visit_sub_bis(sub: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let sub_ref = sub.as_sub().unwrap();
-    let lhs = sub_ref.lhs.clone();
-    let rhs = sub_ref.rhs.clone();
-    unroll_binary_op(lhs, rhs, sub.clone(), sub_ref.span())
-}
-
-pub fn visit_mul_bis(mul: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let mul_ref = mul.as_mul().unwrap();
-    let lhs = mul_ref.lhs.clone();
-    let rhs = mul_ref.rhs.clone();
-    unroll_binary_op(lhs, rhs, mul.clone(), mul_ref.span())
-}
-
-pub fn visit_exp_bis(exp: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let exp_ref = exp.as_exp().unwrap();
-    let lhs = exp_ref.lhs.clone();
-    let rhs = exp_ref.rhs.clone();
-    unroll_binary_op(lhs, rhs, exp.clone(), exp_ref.span())
-}
-
-pub fn visit_boundary_bis(boundary: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let boundary_ref = boundary.as_boundary().unwrap();
-    let expr = boundary_ref.expr.clone();
-    let kind = boundary_ref.kind;
-    if let Op::Vector(vec) = expr.borrow().deref() {
-        let expr_vec = vec.children().borrow().clone();
-        let mut new_vec = vec![];
-        for expr in expr_vec.iter() {
-            let new_node = Boundary::create(expr.clone(), kind, boundary_ref.span());
-            new_vec.push(new_node);
-        }
-        return Ok(Some(Vector::create(new_vec, boundary_ref.span())));
-    };
-    Ok(None)
-}
-
+/// Unrolls an `Accessor` depending on its `AccessType`.
+///
+/// Note: If the `indexable` is a `Parameter` (referencing a `For` node), we do not unroll the
+/// `Accessor`, in order to handle nested `For` nodes.
 pub fn visit_accessor_bis(accessor: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
     let accessor_ref = accessor.as_accessor().unwrap();
     let indexable = accessor_ref.indexable.clone();
     let access_type = accessor_ref.access_type.clone();
     let offset = accessor_ref.offset;
     // If the indexable is a parameter, we keep the accessor as is, in
-    // order to handle nested For nodes
+    // order to handle nested `For` nodes
     if indexable.clone().as_parameter().is_none() {
         match access_type {
             AccessType::Default => {
@@ -494,42 +325,6 @@ pub fn visit_accessor_bis(accessor: Link<Op>) -> Result<Option<Link<Op>>, Compil
             },
         }
     }
-    Ok(None)
-}
-
-pub fn visit_fold_bis(fold: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    let fold_ref = fold.as_fold().unwrap();
-    let iterator = fold_ref.iterator.clone();
-    let operator = fold_ref.operator.clone();
-    let initial_value = fold_ref.initial_value.clone();
-    let iterator_ref = iterator.borrow();
-    let Op::Vector(iterator_vector) = iterator_ref.deref() else {
-        unreachable!("Expected vector iterator in fold, found: {:?}", iterator_ref);
-    };
-    let iterator_nodes = iterator_vector.children().borrow().clone();
-    let resulting_node =
-        iterator_nodes.iter().fold(initial_value, |acc_node, node| match operator {
-            FoldOperator::Add => Add::create(acc_node, node.clone(), fold_ref.span()),
-            FoldOperator::Mul => Mul::create(acc_node, node.clone(), fold_ref.span()),
-            FoldOperator::None => {
-                unreachable!("Unexpected unrolling of Fold with None FoldOperator")
-            },
-        });
-    Ok(Some(resulting_node))
-}
-
-pub fn visit_vector_bis(vector: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let vector_ref = vector.as_vector().unwrap();
-    let children = vector_ref.elements.borrow().clone();
-    let size = vector_ref.size;
-
-    // If the vector is of size 1, it is a scalar and we replace it by its only child
-    if size == 1 {
-        let child = children.first().unwrap();
-        return Ok(Some(child.clone()));
-    }
-    // Otherwise, it is already in its unrolled form, we do nothing
     Ok(None)
 }
 
