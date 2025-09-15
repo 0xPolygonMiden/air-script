@@ -111,26 +111,22 @@ impl Visitor for UnrollingThirdPass<'_> {
         // In this pass, we both need to dispatch the visitor depending on the node type,
         // and also mutate the node if needed. We implement custom visit_*_bis methods
         // that returns a Some(updated_node) if we need to update the node's value.
-        let updated_op: Result<Option<Link<Op>>, CompileError> = match node.borrow().deref() {
-            Node::Enf(e) => e.to_link().map_or(Ok(None), visit_enf_bis),
-            Node::Boundary(b) => b.to_link().map_or(Ok(None), visit_boundary_bis),
-            Node::Add(a) => a.to_link().map_or(Ok(None), visit_add_bis),
-            Node::Sub(s) => s.to_link().map_or(Ok(None), visit_sub_bis),
-            Node::Mul(m) => m.to_link().map_or(Ok(None), visit_mul_bis),
-            Node::Exp(e) => e.to_link().map_or(Ok(None), visit_exp_bis),
-            Node::Fold(f) => f.to_link().map_or(Ok(None), visit_fold_bis),
-            Node::Vector(v) => v.to_link().map_or(Ok(None), visit_vector_bis),
-            Node::Value(v) => v.to_link().map_or(Ok(None), visit_value_bis),
-            Node::If(i) => i.to_link().map_or(Ok(None), |el| self.visit_if_bis(el)),
-            Node::Accessor(_a) => Ok(None),
-            Node::BusOp(_b) => Ok(None),
-            Node::Matrix(_) => Ok(None), // Matrix are already unrolled, we have nothing to do
-            Node::None(_) => Ok(None),
-            Node::Function(_)
-            | Node::Evaluator(_)
-            | Node::Call(_)
-            | Node::For(_)
-            | Node::Parameter(_) => {
+        let updated_op: Option<Link<Op>> = match node.borrow().deref() {
+            Node::Enf(e) => e.to_link().map_or(Ok(None), visit_enf_bis)?,
+            Node::Boundary(b) => b.to_link().map_or(Ok(None), visit_boundary_bis)?,
+            Node::Add(a) => a.to_link().map_or(Ok(None), visit_add_bis)?,
+            Node::Sub(s) => s.to_link().map_or(Ok(None), visit_sub_bis)?,
+            Node::Mul(m) => m.to_link().map_or(Ok(None), visit_mul_bis)?,
+            Node::Exp(e) => e.to_link().map_or(Ok(None), visit_exp_bis)?,
+            Node::Fold(f) => f.to_link().map_or(Ok(None), visit_fold_bis)?,
+            Node::Vector(v) => v.to_link().map_or(Ok(None), visit_vector_bis)?,
+            Node::Value(v) => v.to_link().map_or(Ok(None), visit_value_bis)?,
+            Node::If(i) => i.to_link().map_or(Ok(None), |el| self.visit_if_bis(el))?,
+            Node::Accessor(_a) => None,
+            Node::BusOp(_b) => None,
+            Node::Matrix(_) => None, // Matrix are already unrolled, we have nothing to do
+            Node::None(_) => None,
+            _ => {
                 unreachable!(
                     "Unexpected node during Unrolling: Function, Evaluators, Calls, For nodes and Parameters should have been inlined before this pass. Found: {:?}",
                     node
@@ -139,7 +135,7 @@ impl Visitor for UnrollingThirdPass<'_> {
         };
 
         // We update the node if needed
-        if let Some(updated_op) = updated_op? {
+        if let Some(updated_op) = updated_op {
             node.as_op().unwrap().set(&updated_op);
         }
 
