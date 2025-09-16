@@ -4,13 +4,17 @@ use air_parser::ast::AccessType;
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
 
 use crate::{
+    CompileError,
     ir::{
-        Accessor, Graph, Link, MirType, MirValue, Node, Op, Owner, Parameter, Parent, SpannedMirValue, TraceAccess, Value, Vector
-    }, passes::{
+        Accessor, Graph, Link, MirType, MirValue, Node, Op, Owner, Parameter, Parent,
+        SpannedMirValue, TraceAccess, Value, Vector,
+    },
+    passes::{
+        Visitor,
         unrolling::{
-            visit_enf_bis, visit_fold_bis, visit_value_bis, visit_vector_bis, ForInliningContext
-        }, Visitor
-    }, CompileError
+            ForInliningContext, visit_enf_bis, visit_fold_bis, visit_value_bis, visit_vector_bis,
+        },
+    },
 };
 
 pub struct UnrollingFirstPass<'a> {

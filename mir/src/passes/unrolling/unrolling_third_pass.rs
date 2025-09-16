@@ -8,8 +8,7 @@ use crate::{
     passes::{
         Visitor,
         unrolling::{
-            match_optimizer::MatchOptimizer, visit_enf_bis,
-            visit_fold_bis, visit_value_bis,
+            match_optimizer::MatchOptimizer, visit_enf_bis, visit_fold_bis, visit_value_bis,
             visit_vector_bis,
         },
     },
