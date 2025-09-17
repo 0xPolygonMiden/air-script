@@ -35,3 +35,4 @@ winter-utils = { package = "winter-utils", version = "0.12", default-features = 
 winter-prover = { package = "winter-prover", version = "0.12", default-features = false }
 winter-verifier = { package = "winter-verifier", version = "0.12", default-features = false }
 winterfell = { package = "winterfell", version = "0.12", default-features = false }
+air-codegen-ace = { path = "../codegen/ace", version = "0.5" }
