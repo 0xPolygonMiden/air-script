@@ -848,13 +848,17 @@ impl Typing for BinaryExpr {
     }
 }
 impl ScalarTypeMut for BinaryExpr {
-    fn scalar_ty_mut(&mut self) -> &mut Option<ScalarType> {
-        self.bin_ty.as_mut().unwrap().scalar_ty_mut()
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
+        if let Some(bty) = self.bin_ty.as_mut() {
+            bty.update_scalar_ty_unchecked(new_ty);
+        }
     }
 }
 impl TypeMut for BinaryExpr {
-    fn ty_mut(&mut self) -> &mut Option<Type> {
-        self.bin_ty.as_mut().unwrap().ty_mut()
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        if let Some(bty) = self.bin_ty.as_mut() {
+            bty.update_ty_unchecked(new_ty);
+        }
     }
 }
 

@@ -5,6 +5,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use air_types::*;
 use miden_diagnostics::{SourceSpan, Spanned};
 
 /// A wrapper around a `Rc<RefCell<T>>` to allow custom trait implementations.
@@ -107,6 +108,24 @@ where
 {
     fn span(&self) -> SourceSpan {
         self.borrow().span()
+    }
+}
+
+impl<T: Typing> Typing for Link<T> {
+    fn ty(&self) -> Option<Type> {
+        self.borrow().ty()
+    }
+}
+
+impl<T: ScalarTypeMut> ScalarTypeMut for Link<T> {
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
+        self.borrow_mut().update_scalar_ty_unchecked(new_ty);
+    }
+}
+
+impl<T: TypeMut> TypeMut for Link<T> {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self.borrow_mut().update_ty_unchecked(new_ty);
     }
 }
 
