@@ -7,7 +7,8 @@ AirScript currently comes bundled with two backends:
 These backends can be used programmatically as crates. 
 
 The Winterfell backend can also be used via AirScript CLI by specifying `--target` flag. For example, the following will output Winterfell `Air` trait implementation for AIR constraints described in `example.air` file:
-```
+```bash
+# Make sure to run from the project root directory
 ./target/release/airc transpile examples/example.air --target winterfell
 ```
 In both cases we assumed that the CLI has been compiled as described [here](./introduction.md#cli).

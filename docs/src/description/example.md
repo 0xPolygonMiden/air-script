@@ -2,7 +2,9 @@
 
 This is an example AIR definition in AirScript that includes all existing AirScript syntax. It is intended to be syntactically demonstrative rather than meaningful.
 
-```
+## Complete Example
+
+```air
 def ExampleAir
 
 trace_columns {
@@ -19,7 +21,7 @@ periodic_columns {
 }
 
 buses {
-    logup: q,
+    logup q,
 }
 
 boundary_constraints {
@@ -33,8 +35,9 @@ boundary_constraints {
     enf b.last = stack_outputs[1];
     enf c.last = stack_outputs[2];
 
-    # set the bus q to be initially empty
+    # set the bus q to be empty at the beginning and end
     enf q.first = null;
+    enf q.last = null;
 }
 
 integrity_constraints {
@@ -50,7 +53,23 @@ integrity_constraints {
     # c = a * b when s = 1.
     enf s * (c - a * b) = 0;
 
-    # insert p to the q bus when s = 1
-    q.insert(p) when s;
+    # insert c to the q bus when s = 1
+    q.insert(c) when s;
 }
+```
+
+## Additional Examples
+
+For more practical examples, see the included examples in the `docs/examples/` directory:
+
+### Simple Addition
+
+```air
+{{#include ../../examples/simple_addition.air}}
+```
+
+### Fibonacci Sequence
+
+```air
+{{#include ../../examples/fibonacci.air}}
 ```

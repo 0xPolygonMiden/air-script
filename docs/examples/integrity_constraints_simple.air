@@ -1,0 +1,20 @@
+def IntegrityConstraintsExample_Simple
+
+trace_columns {
+    main: [a, b],
+}
+
+public_inputs {
+    stack_inputs: [16],
+    stack_outputs: [16],
+}
+
+boundary_constraints {
+    enf a.first = stack_inputs[0];
+    enf b.first = stack_inputs[1];
+}
+
+integrity_constraints {
+    enf a' = a + 1;
+    enf b' - b - 1 = 0;
+}

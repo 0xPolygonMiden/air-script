@@ -47,6 +47,9 @@ jobs:
       - name: Build book
         run: mdbook build docs/
 
+      - name: Test documentation examples
+        run: make test-docs
+
       # Only Upload documentation if we want to deploy (i.e. push to next).
       - name: Setup Pages
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/next' }}
