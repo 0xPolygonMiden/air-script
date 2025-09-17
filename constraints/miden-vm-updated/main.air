@@ -2,6 +2,12 @@ def MidenVMMinimal
 
 trace_columns {
     main: [m[80]],
+    # Logical segments:
+    # system: m[0..7]       - 8 columns
+    # decoder: m[8..31]     - 24 columns
+    # stack: m[32..50]      - 19 columns
+    # range_checker: m[51..52] - 2 columns
+    # chiplets: m[53..79]   - 27 columns
 }
 
 public_inputs {
