@@ -70,7 +70,7 @@ impl Air for BinaryAir {
 
     fn get_assertions(&self) -> Vec<Assertion<Felt>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(0, 0, Felt::ZERO));
+        result.push(Assertion::single(0, 0, self.stack_inputs[0]));
         result
     }
 

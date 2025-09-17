@@ -30,6 +30,18 @@ mir = { package = "air-mir", path = "../mir", version = "0.5" }
 
 [dev-dependencies]
 expect-test = "1.4"
+p3-air = { package = "p3-air", version = "0.3", default-features = false }
+p3-challenger = { package = "p3-challenger", version = "0.3", default-features = false }
+p3-circle = { package = "p3-circle", version = "0.3", default-features = false }
+p3-commit = { package = "p3-commit", version = "0.3", default-features = false }
+p3-field = { package = "p3-field", version = "0.3", default-features = false }
+p3-fri = { package = "p3-fri", version = "0.3", default-features = false }
+p3-matrix = { package = "p3-matrix", version = "0.3", default-features = false }
+p3-merkle-tree = { package = "p3-merkle-tree", version = "0.3", default-features = false }
+p3-mersenne-31 = { package = "p3-mersenne-31", version = "0.3", default-features = false }
+p3-sha256 = { package = "p3-sha256", version = "0.3", default-features = false }
+p3-symmetric = { package = "p3-symmetric", version = "0.3", default-features = false }
+p3-uni-stark = { package = "p3-uni-stark", version = "0.3", default-features = false }
 winter-air = { package = "winter-air", version = "0.12", default-features = false }
 winter-math = { package = "winter-math", version = "0.12", default-features = false }
 winter-utils = { package = "winter-utils", version = "0.12", default-features = false }

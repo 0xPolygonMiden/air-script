@@ -8,6 +8,7 @@ use miden_diagnostics::{
 
 pub enum Target {
     Winterfell,
+    Plonky3,
 }
 
 pub struct Test {
@@ -30,6 +31,7 @@ impl Test {
 
         let backend: Box<dyn CodeGenerator<Output = String>> = match target {
             Target::Winterfell => Box::new(air_codegen_winter::CodeGenerator),
+            Target::Plonky3 => Box::new(air_codegen_plonky3::CodeGenerator),
         };
 
         // generate Rust code targeting Winterfell
