@@ -57,7 +57,6 @@ fn test_miden_vm_air_randomized() {
     assert_eq!(eval, <_ as FieldElement>::ZERO);
     assert_eq!(encoded_circuit.circuit_hash(), CIRCUIT_HASH.into());
     assert_eq!(encoded_circuit.circuit_hash(), circuit_hash_expected);
-
 }
 
 const CIRCUIT_HASH: [Felt; 4] = [
