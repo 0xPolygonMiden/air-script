@@ -1,13 +1,7 @@
 def MidenVMMinimal
 
 trace_columns {
-    main: [m[80]],
-    # Logical segments:
-    # system: m[0..7]       - 8 columns
-    # decoder: m[8..31]     - 24 columns
-    # stack: m[32..50]      - 19 columns
-    # range_checker: m[51..52] - 2 columns
-    # chiplets: m[53..79]   - 27 columns
+    main: [system[8], decoder[24], stack[19], range_checker[2], chiplets[20], padding[7]],
 }
 
 public_inputs {
@@ -18,55 +12,55 @@ public_inputs {
 }
 
 buses {
-    multiset a_0_decoder_p1,
-    multiset a_1_decoder_p2,
-    multiset a_3_decoder_p3,
-    multiset a_4_stack_p1,
-    logup a_5_range_checker,
-    multiset a_6_v_table,
-    multiset a_7_chiplets_bus,
-    logup a_8_wiring_bus,
+    multiset bus_0_decoder_p1,
+    multiset bus_1_decoder_p2,
+    multiset bus_3_decoder_p3,
+    multiset bus_4_stack_p1,
+    logup bus_5_range_checker,
+    multiset bus_6_v_table,
+    multiset bus_7_chiplets_bus,
+    logup bus_8_wiring_bus,
 }
 
 boundary_constraints {
     # Main trace
 
     # Clock should start at 0
-    enf m[0].first = 0;
+    enf system[0].first = 0;
 
     # Auxiliary columns
 
     # Decoder
-    enf a_0_decoder_p1.first = unconstrained;
-    enf a_0_decoder_p1.last = unconstrained;
-    enf a_1_decoder_p2.first = unconstrained;
-    enf a_1_decoder_p2.last = unconstrained;
-    enf a_3_decoder_p3.first = unconstrained;
-    enf a_3_decoder_p3.last = unconstrained;
+    enf bus_0_decoder_p1.first = unconstrained;
+    enf bus_0_decoder_p1.last = unconstrained;
+    enf bus_1_decoder_p2.first = unconstrained;
+    enf bus_1_decoder_p2.last = unconstrained;
+    enf bus_3_decoder_p3.first = unconstrained;
+    enf bus_3_decoder_p3.last = unconstrained;
 
     # Stack overflow table
-    enf a_4_stack_p1.first = unconstrained;
-    enf a_4_stack_p1.last = unconstrained;
+    enf bus_4_stack_p1.first = unconstrained;
+    enf bus_4_stack_p1.last = unconstrained;
 
     # Range checker
-    enf a_5_range_checker.first = null;
-    enf a_5_range_checker.last = null;
+    enf bus_5_range_checker.first = null;
+    enf bus_5_range_checker.last = null;
 
     # Chiplets virtual table
     # Note that the second boundary constraint is not correct because this constraint
     # requires the introduction of computed boundary values.
-    enf a_6_v_table.first = unconstrained;
-    enf a_6_v_table.last = unconstrained;
+    enf bus_6_v_table.first = unconstrained;
+    enf bus_6_v_table.last = unconstrained;
 
     # Chiplets' bus
     # Note that the second boundary constraint is not correct because this constraint
     # requires the introduction of computed boundary values.
-    enf a_7_chiplets_bus.first = kernel_digests;
-    enf a_7_chiplets_bus.last = unconstrained;
+    enf bus_7_chiplets_bus.first = kernel_digests;
+    enf bus_7_chiplets_bus.last = unconstrained;
 
     # ACE wiring bus
-    enf a_8_wiring_bus.first = unconstrained;
-    enf a_8_wiring_bus.last = unconstrained;
+    enf bus_8_wiring_bus.first = unconstrained;
+    enf bus_8_wiring_bus.last = unconstrained;
 }
 
 
@@ -105,43 +99,42 @@ periodic_columns {
 integrity_constraints {
     # Main trace transitional constraints
 
-    enf m[0]' - (m[0] + 1) = 0;
+    enf system[0]' - (system[0] + 1) = 0;
 
 
     # Buses constraints
 
-    let mv0 = m[67];
-    let mv1 = m[68];
-    let sv0 = m[18];
-    let sv1 = m[19];
-    let sv2 = m[20];
-    let sv3 = m[21];
-    let v = m[52];
+    let mv0 = chiplets[14];
+    let mv1 = chiplets[15];
+    let sv0 = decoder[10];
+    let sv1 = decoder[11];
+    let sv2 = decoder[12];
+    let sv3 = decoder[13];
+    let v = range_checker[1];
 
     ## the flag indicating a stack operation with range checks.
-    let not_4 = 1 - m[13];
-    let not_5 = 1 - m[14];
-    let u32_rc_op = m[15] * not_4 * not_5;
+    let not_4 = 1 - decoder[5];
+    let not_5 = 1 - decoder[6];
+    let u32_rc_op = decoder[7] * not_4 * not_5;
    
 
     ## the flag indicating the memory portion of the chiplets trace.
-    let s_0 = m[53];
-    let s_1 = m[54];
-    let s_2 = m[55];
+    let s_0 = chiplets[0];
+    let s_1 = chiplets[1];
+    let s_2 = chiplets[2];
     let chiplets_memory_flag = s_0 * s_1 * (1 - s_2);
 
     ## The LogUp multiplicity.
-    let multiplicity = m[51];
+    let multiplicity = range_checker[0];
 
     ## Memory-related range checks.
-    a_5_range_checker.insert(v) with multiplicity;
-    a_5_range_checker.remove(mv0) when s_0 * s_1 * (1 - s_2);
-    a_5_range_checker.remove(mv1) when s_0 * s_1 * (1 - s_2);
+    bus_5_range_checker.insert(v) with multiplicity;
+    bus_5_range_checker.remove(mv0) when s_0 * s_1 * (1 - s_2);
+    bus_5_range_checker.remove(mv1) when s_0 * s_1 * (1 - s_2);
 
     ## Stack-related range checks.
-    a_5_range_checker.remove(sv0) when m[15] * not_4 * not_5;
-    a_5_range_checker.remove(sv1) when m[15] * not_4 * not_5;
-    a_5_range_checker.remove(sv2) when m[15] * not_4 * not_5;
-    a_5_range_checker.remove(sv3) when m[15] * not_4 * not_5;
+    bus_5_range_checker.remove(sv0) when decoder[7] * not_4 * not_5;
+    bus_5_range_checker.remove(sv1) when decoder[7] * not_4 * not_5;
+    bus_5_range_checker.remove(sv2) when decoder[7] * not_4 * not_5;
+    bus_5_range_checker.remove(sv3) when decoder[7] * not_4 * not_5;
 }
-
