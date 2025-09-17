@@ -207,6 +207,7 @@ mod tests {
     use std::iter::zip;
 
     use air_ir::FullTraceShape;
+
     use super::*;
     use crate::{
         circuit::{ArithmeticOp, OperationNode},
@@ -236,7 +237,7 @@ mod tests {
                     // Aux
                     InputRegion { offset: 1, width: 0 },
                     // Quotient
-                    InputRegion { offset: 1, width: 0 }
+                    InputRegion { offset: 1, width: 0 },
                 ),
                 FullTraceShape::new(
                     // Main
@@ -244,7 +245,7 @@ mod tests {
                     // Aux
                     InputRegion { offset: 2, width: 0 },
                     // Quotient
-                    InputRegion { offset: 2, width: 0 }
+                    InputRegion { offset: 2, width: 0 },
                 ),
             ],
             stark_vars: Default::default(),

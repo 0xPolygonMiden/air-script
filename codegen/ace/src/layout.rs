@@ -1,7 +1,8 @@
 use std::{collections::BTreeMap, ops::Range};
 
 use air_ir::{
-    Air, FullTraceShape, Identifier, PublicInput, PublicInputAccess, PublicInputTableAccess, TraceAccess,
+    Air, FullTraceShape, Identifier, PublicInput, PublicInputAccess, PublicInputTableAccess,
+    TraceAccess,
 };
 
 use crate::circuit::Node;

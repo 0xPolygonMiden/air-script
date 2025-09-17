@@ -22,13 +22,13 @@ impl AceVars {
         let layout = Layout::new(air);
         let public = layout.public_inputs.values().map(|pi| pi.random()).collect();
         let reduced_tables = layout.reduced_tables_region.random();
-        let segments = layout
-            .trace_segments
-            .map(|segment_row| FullTraceShape::new(
+        let segments = layout.trace_segments.map(|segment_row| {
+            FullTraceShape::new(
                 segment_row.segments.main.random(),
                 segment_row.segments.aux.random(),
                 segment_row.quotient.random(),
-            ));
+            )
+        });
         let stark = StarkInputs::random(air, log_trace_len);
         Self {
             public,

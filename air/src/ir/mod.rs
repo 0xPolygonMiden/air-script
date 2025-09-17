@@ -41,15 +41,9 @@ impl<T> TraceShape<T> {
     }
 
     /// Returns an iterator over mutable references to `(TraceSegmentId, T)` in segment order.
-    pub fn iter_mut(
-        &mut self,
-    ) -> impl Iterator<Item = (TraceSegmentId, &mut T)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (TraceSegmentId, &mut T)> {
         let (main, aux) = (&mut self.main, &mut self.aux);
-        [
-            (TraceSegmentId::Main, main),
-            (TraceSegmentId::Aux, aux),
-        ]
-        .into_iter()
+        [(TraceSegmentId::Main, main), (TraceSegmentId::Aux, aux)].into_iter()
     }
 }
 
