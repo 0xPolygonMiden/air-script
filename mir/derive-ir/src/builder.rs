@@ -564,20 +564,24 @@ fn make_build_method(
     match enum_wrapper {
         EnumWrapper::Op => quote! {
             pub fn build(&self) -> crate::ir::Link<Op> {
-                Op::#name(
+                let mut op = Op::#name(
                     #name {
                         #(#fields),*
                     }
-                ).into()
+                );
+                op.finalize_hook();
+                op.into()
             }
         },
         EnumWrapper::Root => quote! {
             pub fn build(&self) -> crate::ir::Link<Root> {
-                Root::#name(
+                let mut root = Root::#name(
                     #name {
                         #(#fields),*
                     }
-                ).into()
+                );
+                root.finalize_hook();
+                root.into()
             }
         },
     }

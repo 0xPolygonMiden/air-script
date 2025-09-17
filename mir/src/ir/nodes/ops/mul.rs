@@ -1,6 +1,7 @@
+use air_types::*;
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
+use crate::ir::{BackLink, Builder, BuilderHook, Child, Link, Node, Op, Owner, Parent, Singleton};
 
 /// A MIR operation to represent the multiplication of two MIR ops, `lhs` and `rhs`
 #[derive(Default, Clone, PartialEq, Eq, Debug, Hash, Builder, Spanned)]
@@ -13,11 +14,46 @@ pub struct Mul {
     pub _owner: Singleton<Owner>,
     #[span]
     pub span: SourceSpan,
+    pub _bin_ty: BinType,
+}
+
+impl ScalarTypeMut for Mul {
+    fn update_scalar_ty_unchecked(&mut self, new_sty: Option<ScalarType>) {
+        self._bin_ty.update_scalar_ty_unchecked(new_sty);
+    }
+}
+
+impl TypeMut for Mul {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self._bin_ty.update_ty_unchecked(new_ty);
+    }
+}
+
+impl Typing for Mul {
+    fn ty(&self) -> Option<Type> {
+        self._bin_ty.ty()
+    }
+}
+
+impl BuilderHook for Mul {
+    fn finalize_hook(&mut self) {
+        self._bin_ty = BinType::Mul(self.lhs.borrow().ty(), self.rhs.borrow().ty(), None);
+        let res = self._bin_ty.infer_bin_ty_mul().unwrap();
+        *self._bin_ty.result_mut() = res;
+    }
 }
 
 impl Mul {
     pub fn create(lhs: Link<Op>, rhs: Link<Op>, span: SourceSpan) -> Link<Op> {
-        Op::Mul(Self { lhs, rhs, span, ..Default::default() }).into()
+        let mut mul = Self {
+            lhs,
+            rhs,
+            span,
+            _bin_ty: BinType::default(),
+            ..Default::default()
+        };
+        mul.finalize_hook();
+        Op::Mul(mul).into()
     }
 }
 

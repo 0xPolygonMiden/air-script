@@ -1,8 +1,8 @@
 use std::ops::Deref;
 
-use miden_diagnostics::{SourceSpan, Spanned};
+use miden_diagnostics::Spanned;
 
-use crate::ir::{BackLink, Child, Link, Op, Owner, Parent, Root};
+use crate::ir::{BackLink, Child, Link, Stale, Op, Owner, Parent, Root};
 
 /// All the nodes that can be in the MIR Graph
 /// Combines all [Root] and [Op] variants
@@ -33,7 +33,7 @@ pub enum Node {
     BusOp(BackLink<Op>),
     Parameter(BackLink<Op>),
     Value(BackLink<Op>),
-    None(SourceSpan),
+    None(Stale),
 }
 
 impl Default for Node {
@@ -220,17 +220,17 @@ impl Link<Node> {
                 Op::BusOp(_) => Node::BusOp(BackLink::from(op_inner_val)),
                 Op::Parameter(_) => Node::Parameter(BackLink::from(op_inner_val)),
                 Op::Value(_) => Node::Value(BackLink::from(op_inner_val)),
-                Op::None(span) => Node::None(*span),
+                Op::None(none) => Node::None(none.clone()),
             };
         } else if let Some(root_inner_val) = self.as_root() {
             to_update = match root_inner_val.clone().borrow().deref() {
                 Root::Function(_) => Node::Function(BackLink::from(root_inner_val)),
                 Root::Evaluator(_) => Node::Evaluator(BackLink::from(root_inner_val)),
-                Root::None(span) => Node::None(*span),
+                Root::None(none) => Node::None(none.clone()),
             };
         } else {
             // If the [Node] is stale, we set it to None
-            to_update = Node::None(self.span());
+            to_update = Node::None(Stale { span: self.span(), ty: None });
         }
 
         *self.borrow_mut() = to_update;

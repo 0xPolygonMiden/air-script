@@ -1,7 +1,8 @@
 use air_parser::ast::{BusType, Identifier, QualifiedIdentifier, TraceColumnIndex, TraceSegmentId};
+use air_types::*;
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Bus, Child, Link, Node, Op, Owner, Singleton};
+use crate::ir::{BackLink, Builder, BuilderHook, Bus, Child, Link, Node, Op, Owner, Singleton};
 
 /// A MIR operation to represent a known value, [Value].
 ///
@@ -13,7 +14,28 @@ pub struct Value {
     #[span]
     pub value: SpannedMirValue,
     pub _node: Singleton<Node>,
+    pub ty: Option<Type>,
 }
+
+impl ScalarTypeMut for Value {
+    fn update_scalar_ty_unchecked(&mut self, new_sty: Option<ScalarType>) {
+        self.ty.update_scalar_ty_unchecked(new_sty);
+    }
+}
+
+impl TypeMut for Value {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self.ty = new_ty;
+    }
+}
+
+impl Typing for Value {
+    fn ty(&self) -> Option<Type> {
+        self.ty.ty()
+    }
+}
+
+impl BuilderHook for Value {}
 
 impl Value {
     pub fn create(value: SpannedMirValue) -> Link<Op> {

@@ -5,6 +5,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use air_types::Typing;
 use air_types::*;
 use miden_diagnostics::{SourceSpan, Spanned};
 

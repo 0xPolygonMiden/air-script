@@ -581,6 +581,28 @@ impl TypeMut for Option<Type> {
     }
 }
 
+impl ScalarTypeMut for Option<Kind> {
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
+        match self {
+            Some(Kind::Value(ty)) => ty.update_scalar_ty_unchecked(new_ty),
+            Some(Kind::Aggregate(_)) => panic!("Cannot mutate scalar type of an aggregate kind"),
+            Some(Kind::Callable(_)) => panic!("Cannot mutate scalar type of a callable kind"),
+            None => panic!("Cannot mutate scalar type of None"),
+        }
+    }
+}
+
+impl TypeMut for Option<Kind> {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        match self {
+            Some(Kind::Value(ty)) => ty.update_ty_unchecked(new_ty),
+            Some(Kind::Aggregate(_)) => panic!("Cannot mutate type of an aggregate kind"),
+            Some(Kind::Callable(_)) => panic!("Cannot mutate type of a callable kind"),
+            None => panic!("Cannot mutate type of None"),
+        }
+    }
+}
+
 impl<T: Typing> Typing for Option<T> {
     fn kind(&self) -> Option<Kind> {
         self.as_ref().and_then(|t| t.kind())

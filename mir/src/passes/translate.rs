@@ -11,14 +11,9 @@ use air_types::*;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
 use crate::{
-    CompileError,
     ir::{
-        Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue,
-        Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir,
-        MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess, Root,
-        SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Type, Value, Vector,
-    },
-    passes::duplicate_node,
+        Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue, Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir, MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess, Root, SpannedMirValue, Stale, Sub, TraceAccess, TraceAccessBinding, Type, Value, Vector
+    }, passes::duplicate_node, CompileError
 };
 
 /// This pass transforms a given [ast::Program] into a Middle Intermediate Representation ([Mir])
@@ -147,6 +142,7 @@ impl<'a> MirBuilder<'a> {
         ast_eval: &'a ast::EvaluatorFunction,
     ) -> Result<Link<Root>, CompileError> {
         let mut all_params_flatten = Vec::new();
+        let mut all_params_ty_flatten = Vec::new();
 
         self.root_name = Some(ident);
         let mut ev = Evaluator::builder().span(ast_eval.span);
@@ -163,12 +159,13 @@ impl<'a> MirBuilder<'a> {
                 for param in params {
                     all_params_flatten_for_trace_segment.push(param.clone());
                     all_params_flatten.push(param.clone());
+                    all_params_ty_flatten.push(binding.ty());
                 }
             }
 
             ev = ev.parameters(all_params_flatten_for_trace_segment.clone());
         }
-        let ev = ev.build();
+        let ev = ev.func_ty(FunctionType::Evaluator(all_params_ty_flatten)).build();
 
         set_all_ref_nodes(all_params_flatten.clone(), ev.as_owner());
 
@@ -233,6 +230,7 @@ impl<'a> MirBuilder<'a> {
         ast_func: &'a ast::Function,
     ) -> Result<Link<Root>, CompileError> {
         let mut params = Vec::new();
+        let mut params_ty = Vec::new();
 
         self.root_name = Some(ident);
         let mut func = Function::builder().span(ast_func.span());
@@ -241,13 +239,17 @@ impl<'a> MirBuilder<'a> {
             let name = Some(param_ident);
             let param = self.translate_params_fn(param_ident.span(), name, ty, &mut i)?;
             params.push(param.clone());
+            params_ty.push(Some(*ty));
             func = func.parameters(param.clone());
         }
         i += 1;
         let ret = Parameter::create(i, ast_func.return_type, ast_func.span());
         params.push(ret.clone());
 
-        let func = func.return_type(ret).build();
+        let func = func
+            .return_type(ret)
+            .func_ty(FunctionType::Function(params_ty, Some(ast_func.return_type)))
+            .build();
         set_all_ref_nodes(params.clone(), func.as_owner());
 
         self.mir.constraint_graph_mut().insert_function(*ident, func.clone())?;
@@ -486,8 +488,8 @@ impl<'a> MirBuilder<'a> {
 
         let for_node = For::create(
             iterator_nodes.into(),
-            Op::None(list_comp.span()).into(),
-            Op::None(list_comp.span()).into(),
+            Op::None(Stale { span: list_comp.span(), ty: None }).into(),
+            Op::None(Stale { span: list_comp.span(), ty: None }).into(),
             list_comp.span(),
         );
         set_all_ref_nodes(params, for_node.as_owner().unwrap());
@@ -701,6 +703,7 @@ impl<'a> MirBuilder<'a> {
                                 pc.period(),
                             )),
                         })
+                        .ty(pc.ty())
                         .build();
                     Ok(node)
                 } else if let Some(bus) = self.mir.constraint_graph().get_bus_link(&qual_ident) {
@@ -709,6 +712,7 @@ impl<'a> MirBuilder<'a> {
                             span: access.span(),
                             value: MirValue::BusAccess(BusAccess::new(bus.clone(), access.offset)),
                         })
+                        .ty(bus.borrow().ty())
                         .build();
                     Ok(node)
                 } else {
@@ -790,7 +794,7 @@ impl<'a> MirBuilder<'a> {
                             })?;
                         },
                     }
-                    return Ok(Op::None(bin_op.span()).into());
+                    return Ok(Op::None(Stale { span: bin_op.span(), ty: None }).into());
                 }
             }
         }
@@ -822,33 +826,34 @@ impl<'a> MirBuilder<'a> {
     fn translate_call(&mut self, call: &'a ast::Call) -> Result<Link<Op>, CompileError> {
         // First, resolve the callee, panic if it's not resolved
         let resolved_callee = call.callee.resolved().unwrap();
-
         if call.is_builtin() {
             // If it's a fold operator (Sum / Prod), handle it
             match call.callee.as_ref().name() {
                 symbols::Sum => {
                     assert_eq!(call.args.len(), 1);
+                    let acc = ast::ConstantExpr::Scalar(0);
                     let iterator_node = self.translate_expr(call.args.first().unwrap())?;
-                    let accumulator_node =
-                        self.translate_const(&ast::ConstantExpr::Scalar(0), call.span())?;
+                    let accumulator_node = self.translate_const(&acc, call.span())?;
                     let node = Fold::builder()
                         .span(call.span())
                         .iterator(iterator_node)
                         .operator(FoldOperator::Add)
                         .initial_value(accumulator_node)
+                        .ty(acc.ty())
                         .build();
                     Ok(node)
                 },
                 symbols::Prod => {
                     assert_eq!(call.args.len(), 1);
+                    let acc = ast::ConstantExpr::Scalar(1);
                     let iterator_node = self.translate_expr(call.args.first().unwrap())?;
-                    let accumulator_node =
-                        self.translate_const(&ast::ConstantExpr::Scalar(1), call.span())?;
+                    let accumulator_node = self.translate_const(&acc, call.span())?;
                     let node = Fold::builder()
                         .span(call.span())
                         .iterator(iterator_node)
                         .operator(FoldOperator::Mul)
                         .initial_value(accumulator_node)
+                        .ty(acc.ty())
                         .build();
                     Ok(node)
                 },
@@ -912,6 +917,7 @@ impl<'a> MirBuilder<'a> {
                 }
                 // safe to unwrap because we know it is a Function due to get_function
                 let callee_ref = callee.as_function().unwrap();
+
                 if callee_ref.parameters.len() != arg_nodes.len() {
                     self.diagnostics
                         .diagnostic(Severity::Error)
@@ -929,6 +935,27 @@ impl<'a> MirBuilder<'a> {
                             format!(
                                 "this functions has {} parameters",
                                 callee_ref.parameters.len()
+                            ),
+                        )
+                        .emit();
+                    return Err(CompileError::Failed);
+                }
+
+                let arg_kinds = arg_nodes.iter().map(|arg| arg.kind().unwrap()).collect::<Vec<_>>();
+                let arg_kinds_refs = arg_kinds.iter().collect::<Vec<_>>();
+                if callee_ref.func_ty.check_args_kinds(&arg_kinds_refs) {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("arguments typing mismatch")
+                        .with_primary_label(
+                            call.span(),
+                            format!("called function with arguments {:?}", arg_kinds_refs),
+                        )
+                        .with_secondary_label(
+                            call.callee.span(),
+                            format!(
+                                "this functions has parameters: {:?}",
+                                callee_ref.func_ty.params()
                             ),
                         )
                         .emit();
@@ -966,6 +993,26 @@ impl<'a> MirBuilder<'a> {
                             format!(
                                 "this function has {} trace segments",
                                 callee_ref.parameters.len()
+                            ),
+                        )
+                        .emit();
+                    return Err(CompileError::Failed);
+                }
+                let arg_kinds = arg_nodes.iter().map(|arg| arg.kind().unwrap()).collect::<Vec<_>>();
+                let arg_kinds_refs = arg_kinds.iter().collect::<Vec<_>>();
+                if callee_ref.func_ty.check_args_kinds(&arg_kinds_refs) {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("arguments typing mismatch")
+                        .with_primary_label(
+                            call.span(),
+                            format!("called evaluator with arguments {:?}", arg_kinds_refs),
+                        )
+                        .with_secondary_label(
+                            call.callee.span(),
+                            format!(
+                                "this evaluator has parameters: {:?}",
+                                callee_ref.func_ty.params()
                             ),
                         )
                         .emit();
@@ -1033,7 +1080,9 @@ impl<'a> MirBuilder<'a> {
         scalar_expr: &'a ast::ScalarExpr,
     ) -> Result<Link<Op>, CompileError> {
         match scalar_expr {
-            ast::ScalarExpr::Const(c) => self.translate_scalar_const(c.item, c.span()),
+            ast::ScalarExpr::Const(c) => {
+                self.translate_scalar_const(c.item, c.span(), scalar_expr.scalar_ty())
+            },
             ast::ScalarExpr::SymbolAccess(s) => self.translate_symbol_access(s),
             ast::ScalarExpr::BoundedSymbolAccess(s) => self.translate_bounded_symbol_access(s),
             ast::ScalarExpr::Binary(b) => self.translate_binary_op(b),
@@ -1055,12 +1104,13 @@ impl<'a> MirBuilder<'a> {
         &mut self,
         c: u64,
         span: SourceSpan,
+        sty: Option<ScalarType>,
     ) -> Result<Link<Op>, CompileError> {
         let value = SpannedMirValue {
             value: MirValue::Constant(ConstantValue::Felt(c)),
             span,
         };
-        let node = Value::builder().value(value).build();
+        let node = Value::builder().value(value).ty(ty!(sty)).build();
         Ok(node)
     }
 
@@ -1136,7 +1186,7 @@ impl<'a> MirBuilder<'a> {
             bus_op = bus_op.args(arg_node);
         }
         // Latch is unknown at this point, will be set later in translate_bus_enforce
-        let bus_op = bus_op.latch(1.into()).build();
+        let bus_op = bus_op.latch(1.into()).ty(ast_bus_op.ty()).build();
         Ok(bus_op)
     }
 
@@ -1146,9 +1196,13 @@ impl<'a> MirBuilder<'a> {
         span: SourceSpan,
     ) -> Result<Link<Op>, CompileError> {
         match c {
-            ast::ConstantExpr::Scalar(s) => self.translate_scalar_const(*s, span),
-            ast::ConstantExpr::Vector(v) => self.translate_vector_const(v.clone(), span),
-            ast::ConstantExpr::Matrix(m) => self.translate_matrix_const(m.clone(), span),
+            ast::ConstantExpr::Scalar(s) => self.translate_scalar_const(*s, span, c.scalar_ty()),
+            ast::ConstantExpr::Vector(v) => {
+                self.translate_vector_const(v.clone(), span, c.scalar_ty())
+            },
+            ast::ConstantExpr::Matrix(m) => {
+                self.translate_matrix_const(m.clone(), span, c.scalar_ty())
+            },
         }
     }
 
@@ -1156,10 +1210,11 @@ impl<'a> MirBuilder<'a> {
         &mut self,
         v: Vec<u64>,
         span: SourceSpan,
+        sty: Option<ScalarType>,
     ) -> Result<Link<Op>, CompileError> {
         let mut node = Vector::builder().size(v.len()).span(span);
         for value in v.iter() {
-            let value_node = self.translate_scalar_const(*value, span)?;
+            let value_node = self.translate_scalar_const(*value, span, sty)?;
             node = node.elements(value_node);
         }
         Ok(node.build())
@@ -1169,10 +1224,11 @@ impl<'a> MirBuilder<'a> {
         &mut self,
         m: Vec<Vec<u64>>,
         span: SourceSpan,
+        sty: Option<ScalarType>,
     ) -> Result<Link<Op>, CompileError> {
         let mut node = Matrix::builder().size(m.len()).span(span);
         for row in m.iter() {
-            let row_node = self.translate_vector_const(row.clone(), span)?;
+            let row_node = self.translate_vector_const(row.clone(), span, sty)?;
             node = node.elements(row_node);
         }
         let node = node.build();
@@ -1194,6 +1250,7 @@ impl<'a> MirBuilder<'a> {
                         span: access.span(),
                         value: MirValue::TraceAccess(trace_access),
                     })
+                    .ty(trace_access.ty())
                     .build());
             }
 
@@ -1203,6 +1260,7 @@ impl<'a> MirBuilder<'a> {
                         span: access.span(),
                         value: MirValue::TraceAccessBinding(tab),
                     })
+                    .ty(tab.ty())
                     .build());
             }
 
@@ -1240,6 +1298,7 @@ impl<'a> MirBuilder<'a> {
                     span: access.span(),
                     value: MirValue::TraceAccess(trace_access),
                 })
+                .ty(trace_access.ty())
                 .build());
         }
 
@@ -1250,6 +1309,7 @@ impl<'a> MirBuilder<'a> {
                     span: access.span(),
                     value: MirValue::TraceAccessBinding(tab),
                 })
+                .ty(tab.ty())
                 .build());
         }
 
@@ -1260,6 +1320,7 @@ impl<'a> MirBuilder<'a> {
                         span: access.span(),
                         value: MirValue::PublicInput(public_input_access),
                     })
+                    .ty(public_input_access.ty())
                     .build());
             },
             (None, Some(public_input_table_access)) => {
@@ -1268,6 +1329,7 @@ impl<'a> MirBuilder<'a> {
                         span: access.span(),
                         value: MirValue::PublicInputTable(public_input_table_access),
                     })
+                    .ty(public_input_table_access.ty())
                     .build());
             },
             _ => {},

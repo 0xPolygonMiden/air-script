@@ -200,7 +200,7 @@ pub fn duplicate_node(
             new_param
         },
         Op::Value(value) => Value::create(value.value.clone()),
-        Op::None(span) => Op::None(*span).into(),
+        Op::None(none) => Op::None(none.clone()).into(),
     }
 }
 

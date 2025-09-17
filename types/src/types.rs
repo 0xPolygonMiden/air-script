@@ -184,6 +184,12 @@ pub enum FunctionType {
     Function(Vec<Option<Type>>, Option<Type>),
 }
 
+impl Default for FunctionType {
+    fn default() -> Self {
+        Self::Evaluator(vec![])
+    }
+}
+
 impl FunctionType {
     pub fn params(&self) -> &[Option<Type>] {
         match self {
@@ -200,7 +206,7 @@ impl FunctionType {
     }
 
     pub fn check_args_kinds(&self, args: &[&Kind]) -> bool {
-        eprintln!("Checking function type {} against params {:?}", self, args);
+        eprintln!("Checking function type {self} against params {args:?}");
         let params = self.params();
         if params.len() != args.len() {
             return false;
@@ -236,7 +242,7 @@ impl core::fmt::Display for FunctionType {
                 )?;
                 f.write_str(") -> ")?;
                 if let Some(ret_type) = ret {
-                    write!(f, "{}", ret_type)
+                    write!(f, "{ret_type}")
                 } else {
                     f.write_str("?")
                 }
@@ -265,6 +271,12 @@ pub enum BinType {
     Sub(Option<Type>, Option<Type>, Option<Type>),
     Mul(Option<Type>, Option<Type>, Option<Type>),
     Exp(Option<Type>, Option<Type>, Option<Type>),
+}
+
+impl Default for BinType {
+    fn default() -> Self {
+        Self::Eq(None, None, None)
+    }
 }
 
 impl BinType {
@@ -691,6 +703,12 @@ pub enum Kind {
     Value(Option<Type>),
     Aggregate(Vec<Option<Box<Kind>>>),
     Callable(FunctionType),
+}
+
+impl Default for Kind {
+    fn default() -> Self {
+        Self::Value(None)
+    }
 }
 
 impl core::fmt::Display for Kind {
