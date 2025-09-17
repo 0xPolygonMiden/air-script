@@ -166,7 +166,7 @@ impl AceVars {
         mem[layout.random_beta] = self.random_beta;
 
         // Trace values
-        for row_offset in [0, 1] {
+        for (row_offset, _) in self.segments.iter().enumerate() {
             for i in 0..3 {
                 let region = &layout.trace_segments[row_offset][i];
                 let segment_row = &self.segments[row_offset][i];
