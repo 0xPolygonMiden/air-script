@@ -1,6 +1,10 @@
 mod types;
 
-use std::fmt::Debug;
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 use miden_diagnostics::{SourceSpan, Span};
 pub use types::*;
@@ -322,16 +326,16 @@ pub trait Typing {
 }
 
 pub trait ScalarTypeMut: Typing {
-    fn scalar_ty_mut(&mut self) -> &mut Option<ScalarType>;
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>);
     fn update_scalar_ty(&mut self, new_ty: Option<ScalarType>) -> Result<(), TypeError> {
         let ty = self.scalar_ty();
         if ty.is_none() {
             // WARN: This should only be true before type inference
             // Any None type should raise a diagnostic after type inference
-            *self.scalar_ty_mut() = new_ty;
+            self.update_scalar_ty_unchecked(new_ty);
         } else if ty.is_scalar_subtype(&new_ty) {
             // Allow widening of types
-            *self.scalar_ty_mut() = new_ty;
+            self.update_scalar_ty_unchecked(new_ty);
         } else {
             return Err(TypeError::IncompatibleScalarTypes { lhs: ty, rhs: new_ty, span: None });
         }
@@ -340,16 +344,16 @@ pub trait ScalarTypeMut: Typing {
 }
 
 pub trait TypeMut: Typing + ScalarTypeMut {
-    fn ty_mut(&mut self) -> &mut Option<Type>;
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>);
     fn update_ty(&mut self, new_ty: Option<Type>) -> Result<(), TypeError> {
         let ty = self.ty();
         if ty.is_none() {
             // WARN: This should only be true before type inference
             // Any None type should raise a diagnostic after type inference
-            *self.ty_mut() = new_ty;
+            self.update_ty_unchecked(new_ty);
         } else if ty.is_subtype(&new_ty) {
             // Allow widening of types
-            *self.ty_mut() = new_ty;
+            self.update_ty_unchecked(new_ty);
         } else {
             return Err(TypeError::NotASubtype { lhs: ty, rhs: new_ty, span: None });
         }
@@ -453,11 +457,11 @@ impl Typing for Type {
 }
 
 impl ScalarTypeMut for Type {
-    fn scalar_ty_mut(&mut self) -> &mut Option<ScalarType> {
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
         match self {
-            Type::Scalar(st) => st,
-            Type::Vector(st, _) => st,
-            Type::Matrix(st, ..) => st,
+            Type::Scalar(st) => *st = new_ty,
+            Type::Vector(st, _) => *st = new_ty,
+            Type::Matrix(st, ..) => *st = new_ty,
         }
     }
 }
@@ -475,14 +479,14 @@ impl Typing for FunctionType {
 }
 
 impl ScalarTypeMut for BinType {
-    fn scalar_ty_mut(&mut self) -> &mut Option<ScalarType> {
-        self.result_mut().scalar_ty_mut()
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
+        self.result_mut().update_scalar_ty_unchecked(new_ty);
     }
 }
 
 impl TypeMut for BinType {
-    fn ty_mut(&mut self) -> &mut Option<Type> {
-        self.result_mut()
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self.result_mut().update_ty_unchecked(new_ty);
     }
 }
 
@@ -507,9 +511,9 @@ impl Typing for BinType {
 }
 
 impl ScalarTypeMut for Kind {
-    fn scalar_ty_mut(&mut self) -> &mut Option<ScalarType> {
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
         match self {
-            Kind::Value(ty) => ty.scalar_ty_mut(),
+            Kind::Value(ty) => ty.update_scalar_ty_unchecked(new_ty),
             Kind::Aggregate(_) => panic!("Cannot mutate scalar type of an aggregate kind"),
             Kind::Callable(_) => panic!("Cannot mutate scalar type of a callable kind"),
         }
@@ -517,9 +521,9 @@ impl ScalarTypeMut for Kind {
 }
 
 impl TypeMut for Kind {
-    fn ty_mut(&mut self) -> &mut Option<Type> {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
         match self {
-            Kind::Value(ty) => ty,
+            Kind::Value(ty) => ty.update_ty_unchecked(new_ty),
             Kind::Aggregate(_) => panic!("Cannot mutate type of an aggregate kind"),
             Kind::Callable(_) => panic!("Cannot mutate type of a callable kind"),
         }
@@ -555,25 +559,25 @@ impl Typing for Kind {
 }
 
 impl ScalarTypeMut for Option<ScalarType> {
-    fn scalar_ty_mut(&mut self) -> &mut Option<ScalarType> {
-        self
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
+        *self = new_ty;
     }
 }
 
 impl ScalarTypeMut for Option<Type> {
-    fn scalar_ty_mut(&mut self) -> &mut Option<ScalarType> {
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
         match self {
-            Some(Type::Scalar(st)) => st,
-            Some(Type::Vector(st, _)) => st,
-            Some(Type::Matrix(st, ..)) => st,
+            Some(Type::Scalar(st)) => *st = new_ty,
+            Some(Type::Vector(st, _)) => *st = new_ty,
+            Some(Type::Matrix(st, ..)) => *st = new_ty,
             None => panic!("Cannot mutate scalar type of None"),
         }
     }
 }
 
 impl TypeMut for Option<Type> {
-    fn ty_mut(&mut self) -> &mut Option<Type> {
-        self
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        *self = new_ty;
     }
 }
 
@@ -595,6 +599,78 @@ impl<T: Typing> Typing for Box<T> {
     }
     fn ty(&self) -> Option<Type> {
         T::ty(self)
+    }
+}
+
+impl<T: ScalarTypeMut> ScalarTypeMut for RefCell<T> {
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
+        self.borrow_mut().update_scalar_ty_unchecked(new_ty);
+    }
+}
+
+impl<T: TypeMut> TypeMut for RefCell<T> {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self.borrow_mut().update_ty_unchecked(new_ty);
+    }
+}
+
+impl<T: Typing> Typing for RefCell<T> {
+    fn kind(&self) -> Option<Kind> {
+        self.borrow().kind()
+    }
+    fn ty(&self) -> Option<Type> {
+        self.borrow().ty()
+    }
+    fn scalar_ty(&self) -> Option<ScalarType> {
+        self.borrow().scalar_ty()
+    }
+}
+
+impl<T: ScalarTypeMut> ScalarTypeMut for RefMut<'_, T> {
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
+        self.deref_mut().update_scalar_ty_unchecked(new_ty);
+    }
+}
+
+impl<T: TypeMut> TypeMut for RefMut<'_, T> {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self.deref_mut().update_ty_unchecked(new_ty);
+    }
+}
+
+impl<T: Typing> Typing for RefMut<'_, T> {
+    fn kind(&self) -> Option<Kind> {
+        self.deref().kind()
+    }
+    fn ty(&self) -> Option<Type> {
+        self.deref().ty()
+    }
+    fn scalar_ty(&self) -> Option<ScalarType> {
+        self.deref().scalar_ty()
+    }
+}
+
+impl<T: Typing> Typing for Ref<'_, T> {
+    fn kind(&self) -> Option<Kind> {
+        self.deref().kind()
+    }
+    fn ty(&self) -> Option<Type> {
+        self.deref().ty()
+    }
+    fn scalar_ty(&self) -> Option<ScalarType> {
+        self.deref().scalar_ty()
+    }
+}
+
+impl<T: ScalarTypeMut> ScalarTypeMut for Span<T> {
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
+        self.item.update_scalar_ty_unchecked(new_ty);
+    }
+}
+
+impl<T: TypeMut> TypeMut for Span<T> {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self.item.update_ty_unchecked(new_ty);
     }
 }
 
