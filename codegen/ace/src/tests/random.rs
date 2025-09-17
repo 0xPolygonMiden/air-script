@@ -1,4 +1,4 @@
-use air_ir::Air;
+use air_ir::{Air, FullTraceShape};
 use rand::Rng;
 use winter_utils::Randomizable;
 
@@ -24,11 +24,11 @@ impl AceVars {
         let reduced_tables = layout.reduced_tables_region.random();
         let segments = layout
             .trace_segments
-            .map(|segment_row| [
+            .map(|segment_row| FullTraceShape::new(
                 segment_row.segments.main.random(),
                 segment_row.segments.aux.random(),
                 segment_row.quotient.random(),
-            ]);
+            ));
         let stark = StarkInputs::random(air, log_trace_len);
         Self {
             public,

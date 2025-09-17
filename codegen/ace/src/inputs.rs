@@ -1,6 +1,6 @@
 use std::iter::zip;
 
-use air_ir::Air;
+use air_ir::{Air, FullTraceShape};
 use miden_core::Felt;
 use winter_math::{FieldElement, StarkField};
 
@@ -42,7 +42,7 @@ pub struct AirInputs {
 pub struct AceVars {
     pub(crate) public: Vec<Vec<QuadFelt>>,
     pub(crate) reduced_tables: Vec<QuadFelt>,
-    pub(crate) segments: [[Vec<QuadFelt>; 3]; 2],
+    pub(crate) segments: [FullTraceShape<Vec<QuadFelt>>; 2],
     pub(crate) random_alpha: QuadFelt,
     pub(crate) random_beta: QuadFelt,
     pub(crate) stark: StarkInputs,
@@ -56,7 +56,10 @@ impl AirInputs {
         let [main_curr, main_next] = self.main;
         let [aux_curr, aux_next] = self.aux;
         let [quotient_curr, quotient_next] = self.quotient;
-        let segments = [[main_curr, aux_curr, quotient_curr], [main_next, aux_next, quotient_next]];
+        let segments = [
+            FullTraceShape::new(main_curr, aux_curr, quotient_curr),
+            FullTraceShape::new(main_next, aux_next, quotient_next),
+        ];
         AceVars {
             public: self.public,
             reduced_tables: self.reduced_tables,
@@ -164,12 +167,9 @@ impl AceVars {
 
         // Trace values
         for row_offset in [0, 1] {
-            let row_regions = [
-                &layout.trace_segments[row_offset].segments.main,
-                &layout.trace_segments[row_offset].segments.aux,
-                &layout.trace_segments[row_offset].quotient,
-            ];
-            for (segment_row, region) in zip(&self.segments[row_offset], row_regions) {
+            for i in 0..3 {
+                let region = &layout.trace_segments[row_offset][i];
+                let segment_row = &self.segments[row_offset][i];
                 store(&mut mem, region, segment_row.as_slice());
             }
         }

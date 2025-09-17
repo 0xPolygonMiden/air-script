@@ -39,6 +39,18 @@ impl<T> TraceShape<T> {
     pub fn map<U, F: FnMut(&T) -> U>(&self, mut f: F) -> TraceShape<U> {
         TraceShape { main: f(&self.main), aux: f(&self.aux) }
     }
+
+    /// Returns an iterator over mutable references to `(TraceSegmentId, T)` in segment order.
+    pub fn iter_mut(
+        &mut self,
+    ) -> core::array::IntoIter<(TraceSegmentId, &mut T), 2> {
+        let (main, aux) = (&mut self.main, &mut self.aux);
+        [
+            (TraceSegmentId::Main, main),
+            (TraceSegmentId::Aux, aux),
+        ]
+        .into_iter()
+    }
 }
 
 impl<T> core::ops::Index<TraceSegmentId> for TraceShape<T> {
