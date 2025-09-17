@@ -7,6 +7,7 @@
 - Add a pass for common subexpression elimination in the constraint graph (#419).
 - Refactored the unrolling pass in MIR (#434).
 - Fix regressions on MIR and list_comprehensions (#449).
+- Update documentation and tests thereof (#437).
 - Reorder unrolling passes to unroll list comprehensions before match statements (#431).
 
 ## 0.4.0 (2025-06-20)
