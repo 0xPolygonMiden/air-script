@@ -37,7 +37,12 @@ impl Typing for Mul {
 
 impl BuilderHook for Mul {
     fn finalize_hook(&mut self) {
-        self._bin_ty = BinType::Mul(self.lhs.borrow().ty(), self.rhs.borrow().ty(), None);
+        eprintln!("Finalizing Mul Op: {:#?}", self);
+        let lty = self.lhs.borrow().infer_ty();
+        let rty = self.rhs.borrow().infer_ty();
+        eprintln!("LHS Type: {:#?}", lty);
+        eprintln!("RHS Type: {:#?}", rty);
+        self._bin_ty = BinType::Mul(lty.unwrap(), rty.unwrap(), None);
         let res = self._bin_ty.infer_bin_ty_mul().unwrap();
         *self._bin_ty.result_mut() = res;
     }

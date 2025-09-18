@@ -181,7 +181,11 @@ pub struct TraceAccessBinding {
 }
 impl Typing for TraceAccessBinding {
     fn ty(&self) -> Option<Type> {
-        ty!(felt[self.size])
+        if self.size == 1 {
+            ty!(felt)
+        } else {
+            ty!(felt[self.size])
+        }
     }
 }
 
@@ -275,6 +279,6 @@ impl Default for SpannedMirValue {
 
 impl Typing for PublicInputTableAccess {
     fn ty(&self) -> Option<Type> {
-        ty!(felt[self.num_cols, usize::MAX])
+        ty!(felt[usize::MAX, self.num_cols])
     }
 }
