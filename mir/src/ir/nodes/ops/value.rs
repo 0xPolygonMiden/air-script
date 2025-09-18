@@ -144,11 +144,30 @@ pub struct TraceAccess {
     /// For example, if accessing a trace column with `a'`, where `a` is bound to a single column,
     /// the row offset would be `1`, as the `'` modifier indicates the "next" row.
     pub row_offset: usize,
+    /// The type of the value being accessed, if known.
+    /// Defaults to None until the access is resolved.
+    /// This should only be a felt or [felt; n] type.
+    ty: Option<Type>,
 }
 impl TraceAccess {
     /// Creates a new [TraceAccess].
     pub const fn new(segment: TraceSegmentId, column: TraceColumnIndex, row_offset: usize) -> Self {
-        Self { segment, column, row_offset }
+        Self { segment, column, row_offset, ty: None }
+    }
+}
+impl ScalarTypeMut for TraceAccess {
+    fn update_scalar_ty_unchecked(&mut self, new_sty: Option<ScalarType>) {
+        self.ty.update_scalar_ty_unchecked(new_sty);
+    }
+}
+impl TypeMut for TraceAccess {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self.ty = new_ty;
+    }
+}
+impl Typing for TraceAccess {
+    fn ty(&self) -> Option<Type> {
+        self.ty.ty()
     }
 }
 
@@ -159,6 +178,11 @@ pub struct TraceAccessBinding {
     pub offset: usize,
     /// The number of columns which are bound
     pub size: usize,
+}
+impl Typing for TraceAccessBinding {
+    fn ty(&self) -> Option<Type> {
+        ty!(felt[self.size])
+    }
 }
 
 /// Represents a typed value in the MIR.
@@ -188,10 +212,28 @@ pub struct PublicInputAccess {
     pub name: Identifier,
     /// The index of the element in the public input to access
     pub index: usize,
+    /// The type of the value being accessed, if known.
+    /// Defaults to None until the access is resolved.
+    ty: Option<Type>,
 }
 impl PublicInputAccess {
     pub const fn new(name: Identifier, index: usize) -> Self {
-        Self { name, index }
+        Self { name, index, ty: None }
+    }
+}
+impl ScalarTypeMut for PublicInputAccess {
+    fn update_scalar_ty_unchecked(&mut self, new_sty: Option<ScalarType>) {
+        self.ty.update_scalar_ty_unchecked(new_sty);
+    }
+}
+impl TypeMut for PublicInputAccess {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self.ty = new_ty;
+    }
+}
+impl Typing for PublicInputAccess {
+    fn ty(&self) -> Option<Type> {
+        self.ty.ty()
     }
 }
 
@@ -228,5 +270,11 @@ impl Default for SpannedMirValue {
             value: MirValue::Constant(ConstantValue::Felt(0)),
             span: Default::default(),
         }
+    }
+}
+
+impl Typing for PublicInputTableAccess {
+    fn ty(&self) -> Option<Type> {
+        ty!(felt[self.num_cols, usize::MAX])
     }
 }

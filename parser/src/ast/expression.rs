@@ -698,15 +698,6 @@ impl RangeExpr {
         self.try_into()
             .expect("attempted to convert non-constant range expression to constant")
     }
-
-    pub fn ty(&self) -> Option<Type> {
-        match (&self.start, &self.end) {
-            (RangeBound::Const(start), RangeBound::Const(end)) => {
-                ty!(uint[end.item.abs_diff(start.item)])
-            },
-            _ => None,
-        }
-    }
 }
 impl From<Range> for RangeExpr {
     fn from(range: Range) -> Self {
@@ -732,6 +723,16 @@ impl std::hash::Hash for RangeExpr {
 impl fmt::Display for RangeExpr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}..{}", &self.start, &self.end)
+    }
+}
+impl Typing for RangeExpr {
+    fn ty(&self) -> Option<Type> {
+        match (&self.start, &self.end) {
+            (RangeBound::Const(start), RangeBound::Const(end)) => {
+                ty!(uint[end.item.abs_diff(start.item)])
+            },
+            _ => None,
+        }
     }
 }
 

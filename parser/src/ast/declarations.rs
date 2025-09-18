@@ -306,6 +306,11 @@ impl PartialEq for PeriodicColumn {
         self.name == other.name && self.values == other.values
     }
 }
+impl Typing for PeriodicColumn {
+    fn ty(&self) -> Option<Type> {
+        ty!(felt[self.period()])
+    }
+}
 
 /// Declaration of a public input for an AirScript program.
 ///

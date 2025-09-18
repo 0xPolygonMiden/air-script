@@ -11,9 +11,14 @@ use air_types::*;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
 use crate::{
+    CompileError,
     ir::{
-        Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue, Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir, MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess, Root, SpannedMirValue, Stale, Sub, TraceAccess, TraceAccessBinding, Type, Value, Vector
-    }, passes::duplicate_node, CompileError
+        Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue,
+        Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir,
+        MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess, Root,
+        SpannedMirValue, Stale, Sub, TraceAccess, TraceAccessBinding, Type, Value, Vector,
+    },
+    passes::duplicate_node,
 };
 
 /// This pass transforms a given [ast::Program] into a Middle Intermediate Representation ([Mir])
@@ -712,7 +717,7 @@ impl<'a> MirBuilder<'a> {
                             span: access.span(),
                             value: MirValue::BusAccess(BusAccess::new(bus.clone(), access.offset)),
                         })
-                        .ty(bus.borrow().ty())
+                        .ty(ty!(?))
                         .build();
                     Ok(node)
                 } else {
@@ -1186,7 +1191,7 @@ impl<'a> MirBuilder<'a> {
             bus_op = bus_op.args(arg_node);
         }
         // Latch is unknown at this point, will be set later in translate_bus_enforce
-        let bus_op = bus_op.latch(1.into()).ty(ast_bus_op.ty()).build();
+        let bus_op = bus_op.latch(1.into()).build();
         Ok(bus_op)
     }
 
@@ -1255,12 +1260,13 @@ impl<'a> MirBuilder<'a> {
             }
 
             if let Some(tab) = self.trace_access_binding(access) {
+                let typ = tab.ty();
                 return Ok(Value::builder()
                     .value(SpannedMirValue {
                         span: access.span(),
                         value: MirValue::TraceAccessBinding(tab),
                     })
-                    .ty(tab.ty())
+                    .ty(typ)
                     .build());
             }
 
@@ -1304,12 +1310,13 @@ impl<'a> MirBuilder<'a> {
 
         // Otherwise, we check bindings, trace bindings, and public inputs, in that order
         if let Some(tab) = self.trace_access_binding(access) {
+            let typ = tab.ty();
             return Ok(Value::builder()
                 .value(SpannedMirValue {
                     span: access.span(),
                     value: MirValue::TraceAccessBinding(tab),
                 })
-                .ty(tab.ty())
+                .ty(typ)
                 .build());
         }
 
@@ -1324,12 +1331,13 @@ impl<'a> MirBuilder<'a> {
                     .build());
             },
             (None, Some(public_input_table_access)) => {
+                let typ = public_input_table_access.ty();
                 return Ok(Value::builder()
                     .value(SpannedMirValue {
                         span: access.span(),
                         value: MirValue::PublicInputTable(public_input_table_access),
                     })
-                    .ty(public_input_table_access.ty())
+                    .ty(typ)
                     .build());
             },
             _ => {},

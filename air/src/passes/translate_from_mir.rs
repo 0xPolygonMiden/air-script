@@ -610,11 +610,7 @@ impl AirBuilder<'_> {
                                 .emit();
                     return Err(CompileError::Failed);
                 }
-                MirTraceAccess {
-                    segment: trace_access_binding.segment,
-                    column: trace_access_binding.offset,
-                    row_offset: 0,
-                }
+                MirTraceAccess::new(trace_access_binding.segment, trace_access_binding.offset, 0)
             },
             SpannedMirValue {
                 value: MirValue::BusAccess(bus_access), ..

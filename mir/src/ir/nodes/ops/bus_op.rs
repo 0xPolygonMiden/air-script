@@ -1,6 +1,5 @@
 use std::hash::Hash;
 
-use air_types::*;
 use miden_diagnostics::{SourceSpan, Spanned};
 
 use crate::ir::{
@@ -26,25 +25,6 @@ pub struct BusOp {
     pub _owner: Singleton<Owner>,
     #[span]
     pub span: SourceSpan,
-    pub ty: Option<Type>,
-}
-
-impl ScalarTypeMut for BusOp {
-    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<ScalarType>) {
-        self.ty.update_scalar_ty_unchecked(new_ty);
-    }
-}
-
-impl TypeMut for BusOp {
-    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
-        self.ty = new_ty;
-    }
-}
-
-impl Typing for BusOp {
-    fn ty(&self) -> Option<Type> {
-        self.ty.ty()
-    }
 }
 
 impl BuilderHook for BusOp {}

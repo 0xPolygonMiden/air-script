@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use air_types::{ScalarTypeMut, TypeMut, Typing};
+use air_types::*;
 use miden_diagnostics::Spanned;
 
 use crate::ir::{
@@ -175,7 +175,7 @@ impl ScalarTypeMut for Op {
             Op::Vector(v) => v.update_scalar_ty_unchecked(new_ty),
             Op::Matrix(m) => m.update_scalar_ty_unchecked(new_ty),
             Op::Accessor(a) => a.update_scalar_ty_unchecked(new_ty),
-            Op::BusOp(b) => b.update_scalar_ty_unchecked(new_ty),
+            Op::BusOp(_) => {},
             Op::Parameter(p) => p.update_scalar_ty_unchecked(new_ty),
             Op::Value(v) => v.update_scalar_ty_unchecked(new_ty),
             Op::None(n) => n.update_scalar_ty_unchecked(new_ty),
@@ -199,7 +199,7 @@ impl TypeMut for Op {
             Op::Vector(v) => v.update_ty_unchecked(new_ty),
             Op::Matrix(m) => m.update_ty_unchecked(new_ty),
             Op::Accessor(a) => a.update_ty_unchecked(new_ty),
-            Op::BusOp(b) => b.update_ty_unchecked(new_ty),
+            Op::BusOp(_) => {},
             Op::Parameter(p) => p.update_ty_unchecked(new_ty),
             Op::Value(v) => v.update_ty_unchecked(new_ty),
             Op::None(n) => n.update_ty_unchecked(new_ty),
@@ -223,7 +223,7 @@ impl Typing for Op {
             Op::Vector(v) => v.ty(),
             Op::Matrix(m) => m.ty(),
             Op::Accessor(a) => a.ty(),
-            Op::BusOp(b) => b.ty(),
+            Op::BusOp(_) => ty!(?),
             Op::Parameter(p) => p.ty(),
             Op::Value(v) => v.ty(),
             Op::None(n) => n.ty(),

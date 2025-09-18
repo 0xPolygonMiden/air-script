@@ -58,22 +58,22 @@ fn unroll_trace_access_binding(
     if trace_access_binding.size == 1 {
         Value::create(SpannedMirValue {
             span,
-            value: MirValue::TraceAccess(TraceAccess {
-                segment: trace_access_binding.segment,
-                column: trace_access_binding.offset,
-                row_offset: 0,
-            }),
+            value: MirValue::TraceAccess(TraceAccess::new(
+                trace_access_binding.segment,
+                trace_access_binding.offset,
+                0,
+            )),
         })
     } else {
         let mut vec = vec![];
         for index in 0..trace_access_binding.size {
             let val = Value::create(SpannedMirValue {
                 span,
-                value: MirValue::TraceAccess(TraceAccess {
-                    segment: trace_access_binding.segment,
-                    column: trace_access_binding.offset + index,
-                    row_offset: 0,
-                }),
+                value: MirValue::TraceAccess(TraceAccess::new(
+                    trace_access_binding.segment,
+                    trace_access_binding.offset + index,
+                    0,
+                )),
             });
             vec.push(val);
         }
@@ -155,11 +155,11 @@ fn unroll_accessor_default_access_type(
         if let MirValue::TraceAccess(trace_access) = mir_value {
             let new_node = Value::create(SpannedMirValue {
                 span: value.value.span(),
-                value: MirValue::TraceAccess(TraceAccess {
-                    segment: trace_access.segment,
-                    column: trace_access.column,
-                    row_offset: trace_access.row_offset + accessor_offset,
-                }),
+                value: MirValue::TraceAccess(TraceAccess::new(
+                    trace_access.segment,
+                    trace_access.column,
+                    trace_access.row_offset + accessor_offset,
+                )),
             });
             return Some(new_node);
         }
@@ -187,11 +187,11 @@ fn unroll_accessor_index_access_type(
                 MirValue::TraceAccess(trace_access) => {
                     let new_node = Value::create(SpannedMirValue {
                         span: value.value.span(),
-                        value: MirValue::TraceAccess(TraceAccess {
-                            segment: trace_access.segment,
-                            column: trace_access.column,
-                            row_offset: trace_access.row_offset + accessor_offset,
-                        }),
+                        value: MirValue::TraceAccess(TraceAccess::new(
+                            trace_access.segment,
+                            trace_access.column,
+                            trace_access.row_offset + accessor_offset,
+                        )),
                     });
                     Some(new_node)
                 },

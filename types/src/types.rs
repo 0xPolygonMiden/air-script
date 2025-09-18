@@ -1,6 +1,6 @@
 use crate::{TypeError, Typing};
 
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ScalarType {
     Felt,
     Bool,
@@ -47,7 +47,7 @@ macro_rules! sty {
 }
 
 /// The types of values which can be represented in an AirScript program
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Type {
     // annotation: sty
     // where sty is the scalar type
@@ -175,7 +175,7 @@ macro_rules! tty {
 }
 
 /// Represents the type signature of a function
-#[derive(Hash, Debug, Clone, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FunctionType {
     /// An evaluator function, which has no results, and has
     /// a complex type signature due to the nature of trace bindings
@@ -264,7 +264,7 @@ macro_rules! fty {
     };
 }
 
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BinType {
     Eq(Option<Type>, Option<Type>, Option<Type>),
     Add(Option<Type>, Option<Type>, Option<Type>),
@@ -698,7 +698,7 @@ impl BinType {
     }
 }
 
-#[derive(Hash, Debug, Clone, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
     Value(Option<Type>),
     Aggregate(Vec<Option<Box<Kind>>>),
