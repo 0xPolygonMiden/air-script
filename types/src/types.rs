@@ -227,9 +227,9 @@ impl FunctionType {
                         Some(Type::Scalar(_)) => params_len += 1,
                         Some(Type::Vector(_, len)) => params_len += *len,
                         Some(Type::Matrix(_, _, _)) => {
-                            unreachable!("Evaluator functions cannot have matrix parameters")
+                            return false;
                         },
-                        None => unreachable!("Evaluator functions cannot have untyped parameters"),
+                        None => return false,
                     }
                 }
                 let mut args_len = 0;
@@ -238,9 +238,9 @@ impl FunctionType {
                         Some(Type::Scalar(_)) => args_len += 1,
                         Some(Type::Vector(_, len)) => args_len += len,
                         Some(Type::Matrix(_, _, _)) => {
-                            unreachable!("Evaluator functions cannot have matrix arguments")
+                            return false;
                         },
-                        None => unreachable!("Evaluator functions cannot have untyped arguments"),
+                        None => return false,
                     }
                 }
                 if params_len != args_len {
@@ -706,20 +706,16 @@ impl BinType {
     /// - a ? to any power is still a ?
     pub fn infer_bin_ty_exp(&self) -> Result<Option<Type>, TypeError> {
         if let Some(ret) = self.result() {
-            eprintln!("infer_bin_ty_exp: returning cached result {ret:?}");
             return Ok(Some(ret));
         }
         let lhs = self.lhs();
         let rhs = self.rhs();
-        eprintln!("infer_bin_ty_exp: lhs = {lhs:?}, rhs = {rhs:?}");
         if !((lhs.is_scalar() | lhs.is_none()) && (rhs.is_scalar() | rhs.is_none())) {
             return Err(TypeError::IncompatibleBinOp { bin_ty: *self, span: None });
         }
-        eprintln!("  MADE IT PAST THE SHAPE CHECK");
         match self {
             bty!(any ^ uint) => Ok(lhs),
             bty!(any ^ felt) | bty!(any ^ bool) | bty!(any ^ _) | bty!(any ^ ?) => {
-                eprintln!("  ERROR: any ^ !uint");
                 Err(TypeError::NonConstantExponent { bin_ty: *self, span: None })
             },
             _ => unreachable!("Undefined case for infer_bin_ty_exp: {self}"),

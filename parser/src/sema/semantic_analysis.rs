@@ -1876,7 +1876,6 @@ impl SemanticAnalysis<'_> {
     }
 
     fn expr_binding_type(&self, expr: &Expr) -> Result<BindingType, InvalidAccessError> {
-        eprintln!("sema::semantic_analysis::expr_binding_type");
         match expr {
             Expr::Const(constant) => {
                 Ok(BindingType::Local(constant.ty().expect("constant type should be known")))
@@ -1900,7 +1899,6 @@ impl SemanticAnalysis<'_> {
             Expr::Call(Call { ty: Some(ty), .. }) => Ok(BindingType::Local(*ty)),
             Expr::Binary(be) => Ok(BindingType::Local(be.ty().or(ty!(felt)).unwrap())),
             Expr::ListComprehension(lc) => {
-                eprintln!("list comprehension: {lc:#?}");
                 match lc.ty {
                     Some(ty) => Ok(BindingType::Local(ty)),
                     None => {
