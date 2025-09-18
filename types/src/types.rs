@@ -206,20 +206,49 @@ impl FunctionType {
     }
 
     pub fn check_args_kinds(&self, args: &[&Kind]) -> bool {
-        eprintln!("Checking function type {self} against params {args:?}");
-        let params = self.params();
-        if params.len() != args.len() {
-            return false;
+        match self {
+            Self::Function(params, _) => {
+                if params.len() != args.len() {
+                    return false;
+                }
+                for (arg_ty, param_kind) in args.iter().zip(params.iter()) {
+                    if !arg_ty.is_subtype(param_kind) {
+                        return false;
+                    }
+                }
+                true
+            },
+            Self::Evaluator(params) => {
+                // Only check that the number of columns match
+                // since evaluator arguments get matched as a vec of felt
+                let mut params_len = 0;
+                for param in params.iter() {
+                    match param {
+                        Some(Type::Scalar(_)) => params_len += 1,
+                        Some(Type::Vector(_, len)) => params_len += *len,
+                        Some(Type::Matrix(_, _, _)) => {
+                            unreachable!("Evaluator functions cannot have matrix parameters")
+                        },
+                        None => unreachable!("Evaluator functions cannot have untyped parameters"),
+                    }
+                }
+                let mut args_len = 0;
+                for arg in args.iter() {
+                    match arg.ty() {
+                        Some(Type::Scalar(_)) => args_len += 1,
+                        Some(Type::Vector(_, len)) => args_len += len,
+                        Some(Type::Matrix(_, _, _)) => {
+                            unreachable!("Evaluator functions cannot have matrix arguments")
+                        },
+                        None => unreachable!("Evaluator functions cannot have untyped arguments"),
+                    }
+                }
+                if params_len != args_len {
+                    return false;
+                }
+                true
+            },
         }
-        for (arg_ty, param_kind) in args.iter().zip(params.iter()) {
-            eprintln!("  Checking arg_ty {arg_ty:?} against param_kind {param_kind:?}");
-            if !arg_ty.is_subtype(param_kind) {
-                eprintln!("  Failed!: {arg_ty:?} is not a subtype of {param_kind:?}");
-                return false;
-            }
-        }
-        eprintln!("  Success!");
-        true
     }
 }
 

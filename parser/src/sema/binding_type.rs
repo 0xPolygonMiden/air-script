@@ -53,8 +53,7 @@ impl Typing for BindingType {
             Self::TraceColumn(tb) | Self::TraceParam(tb) => tb.kind(),
             Self::Vector(elems) => elems.kind(),
             Self::PublicInput(ty) => ty.kind(),
-            // NOTE: this may need to be felt?
-            Self::PeriodicColumn(_) => Some(kind!(bool)),
+            Self::PeriodicColumn(_) => Some(kind!(felt)),
         }
     }
     /// Get the value type of this binding, if applicable
@@ -67,7 +66,7 @@ impl Typing for BindingType {
             Self::PeriodicColumn(_) => ty!(felt),
             Self::Function(_) => None,
             Self::Evaluator(_) => None,
-            Self::Bus(_) => ty!(felt),
+            Self::Bus(_) => None,
         }
     }
 }

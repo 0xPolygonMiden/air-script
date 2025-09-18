@@ -299,7 +299,7 @@ impl<'a> MirBuilder<'a> {
             Type::Vector(_, size) => {
                 let mut params = Vec::new();
                 for _ in 0..*size {
-                    let param = Parameter::create(*i, ty!(felt[*size]).unwrap(), span);
+                    let param = Parameter::create(*i, ty!(felt).unwrap(), span);
                     *i += 1;
                     params.push(param);
                 }
@@ -758,6 +758,7 @@ impl<'a> MirBuilder<'a> {
         &mut self,
         bin_op: &'a ast::BinaryExpr,
     ) -> Result<Link<Op>, CompileError> {
+        eprintln!("translating binary op: {bin_op:#?}");
         let lhs = self.translate_scalar_expr(&bin_op.lhs)?;
         let rhs = self.translate_scalar_expr(&bin_op.rhs)?;
 
@@ -947,8 +948,9 @@ impl<'a> MirBuilder<'a> {
                 }
 
                 let arg_kinds = arg_nodes.iter().map(|arg| arg.kind().unwrap()).collect::<Vec<_>>();
+                eprintln!("arg kinds: {:#?}", arg_kinds);
                 let arg_kinds_refs = arg_kinds.iter().collect::<Vec<_>>();
-                if callee_ref.func_ty.check_args_kinds(&arg_kinds_refs) {
+                if !callee_ref.func_ty.check_args_kinds(&arg_kinds_refs) {
                     self.diagnostics
                         .diagnostic(Severity::Error)
                         .with_message("arguments typing mismatch")
@@ -1005,7 +1007,7 @@ impl<'a> MirBuilder<'a> {
                 }
                 let arg_kinds = arg_nodes.iter().map(|arg| arg.kind().unwrap()).collect::<Vec<_>>();
                 let arg_kinds_refs = arg_kinds.iter().collect::<Vec<_>>();
-                if callee_ref.func_ty.check_args_kinds(&arg_kinds_refs) {
+                if !callee_ref.func_ty.check_args_kinds(&arg_kinds_refs) {
                     self.diagnostics
                         .diagnostic(Severity::Error)
                         .with_message("arguments typing mismatch")
