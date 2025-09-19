@@ -3,8 +3,8 @@
 ##########################################################################################
 #
 # The Range Checker provides efficient 16-bit range checking for other VM components
-# using an optimized LogUp protocol with  optimized gap handling to minimize the minimal
-# trace length while supporting (practically) unlimited checks.
+# using the LogUp protocol with optimized gap handling to minimize the minimal
+# trace length while supporting (practically) unlimited range checks.
 #
 # STATUS: Not fully implemented
 #
