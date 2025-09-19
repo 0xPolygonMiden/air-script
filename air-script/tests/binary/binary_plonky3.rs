@@ -23,7 +23,7 @@ impl<F> BaseAirWithPublicValues<F> for BinaryAir {
 impl<AB: AirBuilderWithPublicValues> Air<AB> for BinaryAir {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let public_values = builder.public_values().to_vec();
+        let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),

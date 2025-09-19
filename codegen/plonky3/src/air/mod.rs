@@ -62,7 +62,7 @@ fn add_air_trait(scope: &mut Scope, ir: &Air, name: &str) {
 
     let eval_func = air_impl.new_fn("eval").arg_ref_self().arg("builder", "&mut AB");
     eval_func.line("let main = builder.main();");
-    eval_func.line("let public_values = builder.public_values().to_vec();");
+    eval_func.line("let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect(\"Wrong number of public values\");");
     eval_func.line("let (main_current, main_next) = (");
     eval_func.line("    main.row_slice(0).unwrap(),");
     eval_func.line("    main.row_slice(1).unwrap(),");
