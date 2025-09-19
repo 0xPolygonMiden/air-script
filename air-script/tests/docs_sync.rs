@@ -3,7 +3,8 @@ use std::{path::Path, process::Command};
 #[test]
 fn docs_sync() {
     let examples_dir = Path::new("../docs/examples");
-    // Use CARGO_MANIFEST_DIR to build an absolute path to airc, needed on Windows to correctly use `current_dir`.
+    // Use CARGO_MANIFEST_DIR to build an absolute path to airc, needed on Windows to correctly use
+    // `current_dir`.
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     let airc_path = Path::new(&manifest_dir).join("../target/release/airc");
 

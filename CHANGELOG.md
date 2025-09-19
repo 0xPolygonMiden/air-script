@@ -8,6 +8,7 @@
 - Refactored the unrolling pass in MIR (#434).
 - Fix regressions on MIR and list_comprehensions (#449).
 - Update documentation and tests thereof (#437).
+- Add Plonky3 codegen backend (#461).
 
 ## 0.4.0 (2025-06-20)
 

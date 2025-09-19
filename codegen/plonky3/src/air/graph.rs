@@ -1,6 +1,4 @@
-use air_ir::{
-    Air, IntegrityConstraintDegree, NodeIndex, Operation, TraceAccess, TraceSegmentId, Value,
-};
+use air_ir::{Air, NodeIndex, Operation, TraceAccess, TraceSegmentId, Value};
 
 // RUST STRING GENERATION FOR THE CONSTRAINT GRAPH
 // ================================================================================================
@@ -9,22 +7,6 @@ use air_ir::{
 /// the [AlgebraicGraph].
 pub trait Codegen {
     fn to_string(&self, ir: &Air, trace_segment: TraceSegmentId) -> String;
-}
-
-impl Codegen for IntegrityConstraintDegree {
-    fn to_string(&self, _ir: &Air, _trace_segment: TraceSegmentId) -> String {
-        if self.cycles().is_empty() {
-            format!("TransitionConstraintDegree::new({})", self.base())
-        } else {
-            let cycles = self
-                .cycles()
-                .iter()
-                .map(|cycle_len| cycle_len.to_string())
-                .collect::<Vec<String>>()
-                .join(", ");
-            format!("TransitionConstraintDegree::with_cycles({}, vec![{}])", self.base(), cycles)
-        }
-    }
 }
 
 impl Codegen for TraceAccess {
