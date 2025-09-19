@@ -543,8 +543,10 @@ fn check_evaluator_argument_sizes(
                         _ => unreachable!("expected felt or vector, got {:?}", ty),
                     };
                     trace_segments_arg_vector_len += size;
+                } else if let Some(vector) = indexable.as_vector() {
+                    trace_segments_arg_vector_len += vector.children().borrow().len();
                 } else {
-                    unreachable!("expected value or parameter, got {:?}", child);
+                    unreachable!("expected value, parameter, or vector, got {:?}", child);
                 }
             } else {
                 unreachable!("expected value or parameter, got {:?}", child);
@@ -646,8 +648,13 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                     };
 
                     args_unpacked.push(indexable.clone());
+                } else if let Some(vector) = indexable.as_vector() {
+                    // Flatten vector children instead of pushing the vector node
+                    for child in vector.children().borrow().iter() {
+                        args_unpacked.push(child.clone());
+                    }
                 } else {
-                    unreachable!("expected value or parameter (or accessor on one), got {:?}", arg);
+                    unreachable!("expected value, parameter, or vector (or accessor on one), got {:?}", arg);
                 }
             } else {
                 unreachable!("expected value or parameter (or accessor on one), got {:?}", arg);

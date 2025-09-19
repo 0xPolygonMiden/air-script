@@ -1,0 +1,17 @@
+mod system
+
+
+### System Constraints ###########################################################################
+
+# Enforces the transition constraints on the system columns
+ev system_transition([system[8]]) {
+    ## Clock increment ##
+    enf system_clock_transition([system]);
+}
+
+### Helper evaluators #############################################################################
+
+# System clock transition constraint - enforces that the clock increments by 1 at each step
+ev system_clock_transition([clk, rest[7]]) {
+    enf clk' = clk + 1;
+}

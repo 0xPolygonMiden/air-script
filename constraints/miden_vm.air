@@ -1,0 +1,80 @@
+def MidenVM
+
+use system::*;
+use range_checker::*;
+
+trace_columns {
+    main: [system[8], decoder[24], stack[19], range_checker[2], chiplets[20], padding[7]],
+}
+
+public_inputs {
+    stack_inputs: [16],
+    stack_outputs: [16],
+    program_digest: [4],
+    kernel_digests: [[5]],
+}
+
+buses {
+    multiset bus_0_decoder_p1,
+    multiset bus_1_decoder_p2,
+    multiset bus_2_decoder_p3,
+
+    multiset bus_3_stack_p1,
+
+    logup    bus_4_range_checker,
+
+    multiset bus_5_v_table,
+
+    multiset bus_6_chiplets_bus,
+
+    logup    bus_7_wiring_bus,
+}
+
+boundary_constraints {
+    # Main trace
+
+    # Clock should start at 0
+    enf system[0].first = 0;
+
+    # Auxiliary columns
+
+    # Decoder
+    enf bus_0_decoder_p1.first = unconstrained;
+    enf bus_0_decoder_p1.last = unconstrained;
+    enf bus_1_decoder_p2.first = unconstrained;
+    enf bus_1_decoder_p2.last = unconstrained;
+    enf bus_2_decoder_p3.first = unconstrained;
+    enf bus_2_decoder_p3.last = unconstrained;
+
+    # Stack overflow table
+    enf bus_3_stack_p1.first = unconstrained;
+    enf bus_3_stack_p1.last = unconstrained;
+
+    # Range checker
+    enf bus_4_range_checker.first = null;
+    enf bus_4_range_checker.last = null;
+
+    # Chiplets virtual table
+    # Note that the second boundary constraint is not correct because this constraint
+    # requires the introduction of computed boundary values.
+    enf bus_5_v_table.first = unconstrained;
+    enf bus_5_v_table.last = unconstrained;
+
+    # Chiplets' bus
+    # Note that the second boundary constraint is not correct because this constraint
+    # requires the introduction of computed boundary values.
+    enf bus_6_chiplets_bus.first = kernel_digests;
+    enf bus_6_chiplets_bus.last = unconstrained;
+
+    # ACE wiring bus
+    enf bus_7_wiring_bus.first = unconstrained;
+    enf bus_7_wiring_bus.last = unconstrained;
+}
+
+integrity_constraints {
+    # Main trace transitional constraints
+    enf system_transition([system]);
+
+    # Buses constraints
+    enf range_checker_constraints([decoder, range_checker, chiplets]);
+}

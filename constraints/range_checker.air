@@ -1,0 +1,36 @@
+mod range_checker
+
+### Range checker bus constraints #################################################################
+
+ev range_checker_constraints([decoder[24], range_checker[2], chiplets[20]]) {
+    let mv0 = chiplets[14];
+    let mv1 = chiplets[15];
+    let sv0 = decoder[10];
+    let sv1 = decoder[11];
+    let sv2 = decoder[12];
+    let sv3 = decoder[13];
+    let v = range_checker[1];
+    let multiplicity = range_checker[0];
+
+    ## the flag indicating a stack operation with range checks.
+    let not_4 = 1 - decoder[5];
+    let not_5 = 1 - decoder[6];
+    let u32_rc_op = decoder[7] * not_4 * not_5;
+   
+    ## the flag indicating the memory portion of the chiplets trace.
+    let s_0 = chiplets[0];
+    let s_1 = chiplets[1];
+    let s_2 = chiplets[2];
+    let chiplets_memory_flag = s_0 * s_1 * (1 - s_2);
+
+    ## Memory-related range checks.
+    bus_4_range_checker.insert(v) with multiplicity;
+    bus_4_range_checker.remove(mv0) when chiplets_memory_flag;
+    bus_4_range_checker.remove(mv1) when chiplets_memory_flag;
+
+    ## Stack-related range checks.
+    bus_4_range_checker.remove(sv0) when u32_rc_op;
+    bus_4_range_checker.remove(sv1) when u32_rc_op;
+    bus_4_range_checker.remove(sv2) when u32_rc_op;
+    bus_4_range_checker.remove(sv3) when u32_rc_op;
+}
