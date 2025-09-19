@@ -570,23 +570,23 @@ impl Module {
     }
 
     /// Traverse all of the items exported from this module
-    pub fn exports(&self) -> impl Iterator<Item = crate::ast::declarations::Export<'_>> + '_ {
+    pub fn exports(&self) -> impl Iterator<Item = Export<'_>> + '_ {
         self.constants
             .values()
-            .map(crate::ast::declarations::Export::Constant)
-            .chain(self.evaluators.values().map(crate::ast::declarations::Export::Evaluator))
-            .chain(self.functions.values().map(crate::ast::declarations::Export::Function))
+            .map(Export::Constant)
+            .chain(self.evaluators.values().map(Export::Evaluator))
+            .chain(self.functions.values().map(Export::Function))
     }
 
     /// Get the export with the given identifier, if it can be found
-    pub fn get(&self, id: &Identifier) -> Option<crate::ast::declarations::Export<'_>> {
+    pub fn get(&self, id: &Identifier) -> Option<Export<'_>> {
         if id.is_uppercase() {
-            self.constants.get(id).map(crate::ast::declarations::Export::Constant)
+            self.constants.get(id).map(Export::Constant)
         } else {
             self.evaluators
                 .get(id)
-                .map(crate::ast::declarations::Export::Evaluator)
-                .or_else(|| self.functions.get(id).map(crate::ast::declarations::Export::Function))
+                .map(Export::Evaluator)
+                .or_else(|| self.functions.get(id).map(Export::Function))
         }
     }
 }
