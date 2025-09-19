@@ -1,20 +1,129 @@
+##########################################################################################
+# UTILITY CONSTRAINTS MODULE
+##########################################################################################
+#
+# The Utils module provides fundamental constraint patterns and helper functions used
+# throughout the Miden VM constraint system. These utilities ensure consistency and
+# reusability across all VM components.
+#
+##########################################################################################
+
 mod utils
 
-### Helper evaluators ##############################################################################
+##########################################################################################
+# BINARY CONSTRAINT EVALUATORS
+##########################################################################################
 
-# Enforces that the provided columns must be binary.
+# Ensures value is either 0 or 1
+#
+# CONSTRAINT DEGREE: 2
+#
+# USAGE PATTERN:
+# ```air
+# let flag = column[i];
+# enf is_binary([flag]);  // Ensures flag ∈ {0, 1}
+# ```
 ev is_binary([a]) {
     enf a^2 = a;
 }
 
-# Enforces that value in column is copied over to the next row.
+##########################################################################################
+# STATE CONSISTENCY EVALUATORS
+##########################################################################################
+
+# State persistence constraint - ensures values remain constant across cycles
+#
+# INTUITION:
+#
+# Many VM components require certain values to remain stable during specific
+# operations or phases. This constraint enforces immutability when needed.
+#
+# CONSTRAINT DEGREE: 1
+#
+# USAGE PATTERN:
+# ```air
+# let stable_value = column[i];
+# enf is_unchanged([stable_value]) when operation_active;
+# ```
 ev is_unchanged([column]) {
     enf column' = column;
 }
 
-### Helper functions ##############################################################################
+##########################################################################################
+# LOGICAL OPERATION HELPERS
+##########################################################################################
 
-# Returns binary negation of `a`.
+# Binary negation function - computes logical NOT in finite field
+#
+# This is usually combined with another constraint to ensure booleaness
+#
+# CONSTRAINT DEGREE: 1
+#
+# USAGE EXAMPLES:
+# ```air
+# let not_flag = binary_not(flag);           // Simple negation
+# let condition = flag * binary_not(other);  // AND NOT pattern
+# ```
 fn binary_not(a: felt) -> felt {
-    return 1 - a;   
+    return 1 - a;
+}
+
+##########################################################################################
+# BOOLEAN ALGEBRA OPERATIONS
+##########################################################################################
+
+# Logical AND: returns 1 if both a and b are 1, else 0
+#
+# CONSTRAINT DEGREE: 2
+#
+# USAGE EXAMPLES:
+# ```air
+# let result = binary_and(flag_a, flag_b);
+# ```
+fn binary_and(a: felt, b: felt) -> felt {
+    return a * b;
+}
+
+# Logical OR: returns 1 if either a or b is 1, else 0
+#
+# Uses inclusion-exclusion principle: |A ∪ B| = |A| + |B| - |A ∩ B|
+#
+# CONSTRAINT DEGREE: 2
+#
+# USAGE EXAMPLES:
+# ```air
+# let result = binary_or(flag_a, flag_b);
+# ```
+fn binary_or(a: felt, b: felt) -> felt {
+    return a + b - a * b;
+}
+
+# Logical XOR: returns 1 if exactly one of a or b is 1, else 0
+#
+# CONSTRAINT DEGREE: 2
+#
+# USAGE EXAMPLES:
+# ```air
+# let result = binary_xor(flag_a, flag_b);
+# ```
+fn binary_xor(a: felt, b: felt) -> felt {
+    return a + b - 2 * a * b;
+}
+
+##########################################################################################
+# CONDITIONAL OPERATIONS
+##########################################################################################
+
+# Conditional selection: returns if_true when condition=1, if_false when condition=0
+#
+# This is a multiplexer function that selects between two values based on condition
+#
+# CONSTRAINT DEGREE: 2
+#
+# USAGE EXAMPLES:
+# ```air
+# let result = select(condition, true_value, false_value);
+# ```
+fn select(condition: felt, if_true: felt, if_false: felt) -> felt {
+    return condition * if_true + (1 - condition) * if_false;
 }
