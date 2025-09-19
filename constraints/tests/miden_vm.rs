@@ -1,16 +1,15 @@
 use std::sync::Arc;
 
 use air_ir::{compile, Air};
+use miden_core::crypto::hash::Rpo256;
 use miden_diagnostics::{
     term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
 };
-use winter_math::FieldElement;
 use winter_math::fields::f64::BaseElement as Felt;
-use miden_core::crypto::hash::Rpo256;
+use winter_math::FieldElement;
 
 use air_codegen_ace::{build_ace_circuit, AceCircuit, AceNode};
 
-/// Local copy of generate_circuit, since ace::tests version is not public
 fn generate_circuit(source: &str) -> (Air, AceCircuit, AceNode) {
     let code_map = Arc::new(CodeMap::new());
     let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
@@ -25,7 +24,8 @@ fn generate_circuit(source: &str) -> (Air, AceCircuit, AceNode) {
 
     (air, circuit, root)
 }
-/// Loads the MidenVM AIR example next to this test
+
+/// Loads the MidenVM AIR example
 pub fn load_miden_vm_air() -> std::io::Result<String> {
     let crate_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let path = format!("{}/miden_vm.air", crate_dir);
@@ -48,19 +48,16 @@ fn test_miden_vm_updated_air_randomized() {
 
     let circuit_description: Vec<Felt> = CIRCUIT_DESCRIPTION.into_iter().map(Felt::new).collect();
     let circuit_hash_expected = Rpo256::hash_elements(&circuit_description);
-    
+
     assert_eq!(eval, <_ as FieldElement>::ZERO);
-    assert_eq!(encoded_circuit.circuit_hash(), CIRCUIT_HASH.into());
     assert_eq!(encoded_circuit.circuit_hash(), circuit_hash_expected);
 }
 
-const CIRCUIT_HASH: [Felt; 4] = [
-    Felt::new(9139186206676821480),
-    Felt::new(12763675724578443945),
-    Felt::new(7621207635344139731),
-    Felt::new(1122100627503939866),
-];
-
+/// This circuit description is the one used in Miden VM's recursive verifier.
+///
+/// The idea is that, since this circuit evaluates to zero as part of the recursive verifier
+/// execution, the computational graph corresponding to the constraints on the Miden VM side
+/// matches the computational graph resulting from the air-script compilation pipline.
 const CIRCUIT_DESCRIPTION: [u64; 112] = [
     1,
     0,

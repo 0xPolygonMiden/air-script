@@ -1,40 +1,36 @@
 mod chiplets
 
+use utils::*;
+
 ### Chiplets Constraints ##########################################################################
 
 # Enforce the constraints on the hash, bitwise or memory chiplet, given the columns of the chiplet 
 # module trace.
-ev chiplets([s[3], chiplet_columns[15]]) {
-    enf chiplet_selectors([s]);
 
-    let s0 = !s[0];
-    let s1 = s[0] & !s[1];
-    let s2 = s[0] & s[1] & !s[2]';
-
-    enf match{
-        case s0: hash_chiplet([s[1], s[2], chiplet_columns]),
-        case s1: bitwise_chiplet([s[2], chiplet_columns]),
-        case s2: memory_chiplet([chiplet_columns]),
-    } 
-}
+# TODO
 
 ### Helper evaluators #############################################################################
 
 # Enforces that the chiplet selector columns are set correctly.
-ev chiplet_selectors([s[3]]) {
+ev chiplet_selectors([s[5]]) {
     # Enforce that selectors are binary.
     enf is_binary([s[0]]);
     enf is_binary([s[1]]) when s[0];
     enf is_binary([s[2]]) when s[0] & s[1];
+    enf is_binary([s[3]]) when s[0] & s[1] & s[2];
+    enf is_binary([s[4]]) when s[0] & s[1] & s[2] & s[3];
 
     # Enforce that the chiplets are stacked correctly by restricting selector values so they can 
     # only change from 0 to 1.
     enf s[0]' = s[0] when s[0];
     enf s[1]' = s[1] when s[0] & s[1];
     enf s[2]' = s[2] when s[0] & s[1] & s[2];
+    enf s[3]' = s[3] when s[0] & s[1] & s[2] & s[3];
+    enf s[4]' = s[4] when s[0] & s[1] & s[2] & s[3] & s[4];
 }
 
-# Enforces that the provided columns must be binary.
-ev is_binary([a]) {
-    enf a^2 = a;
+# Computes the flag indicating the memory portion of the chiplets trace.
+# This flag is s_0 * s_1 * (1 - s_2), which represents the memory chiplet selector pattern.
+fn memory_chiplet_flag(s_0: felt, s_1: felt, s_2: felt) -> felt {
+    return s_0 * s_1 * !s_2;
 }
