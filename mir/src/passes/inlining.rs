@@ -530,7 +530,8 @@ fn check_evaluator_argument_sizes(
                 // Check access type FIRST to determine how many elements this accessor represents
                 match access_type {
                     AccessType::Index(_) => {
-                        // Index access (like system[0]) always results in 1 element regardless of underlying type
+                        // Index access (like system[0]) always results in 1 element regardless of
+                        // underlying type
                         trace_segments_arg_vector_len += 1;
                     },
                     AccessType::Default => {

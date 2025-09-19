@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
+use air_codegen_ace::{build_ace_circuit, AceCircuit, AceNode};
 use air_ir::{compile, Air};
 use miden_core::crypto::hash::Rpo256;
 use miden_diagnostics::{
     term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
 };
-use winter_math::fields::f64::BaseElement as Felt;
-use winter_math::FieldElement;
-
-use air_codegen_ace::{build_ace_circuit, AceCircuit, AceNode};
+use winter_math::{fields::f64::BaseElement as Felt, FieldElement};
 
 fn generate_circuit(source: &str) -> (Air, AceCircuit, AceNode) {
     let code_map = Arc::new(CodeMap::new());
@@ -46,7 +44,7 @@ fn test_miden_vm_updated_air_randomized() {
 
     let encoded_circuit = circuit.to_ace();
 
-    let circuit_description: Vec<Felt> = CIRCUIT_DESCRIPTION.into_iter().map(Felt::new).collect();
+    let circuit_description: Vec<Felt> = EXPECTED_CIRCUIT.into_iter().map(Felt::new).collect();
     let circuit_hash_expected = Rpo256::hash_elements(&circuit_description);
 
     assert_eq!(eval, <_ as FieldElement>::ZERO);
@@ -58,7 +56,7 @@ fn test_miden_vm_updated_air_randomized() {
 /// The idea is that, since this circuit evaluates to zero as part of the recursive verifier
 /// execution, the computational graph corresponding to the constraints on the Miden VM side
 /// matches the computational graph resulting from the air-script compilation pipline.
-const CIRCUIT_DESCRIPTION: [u64; 112] = [
+const EXPECTED_CIRCUIT: [u64; 112] = [
     1,
     0,
     0,
