@@ -1,0 +1,6 @@
+mod bitwise
+
+periodic_columns {
+    k0: [1, 0, 0, 0, 0, 0, 0, 0],
+    k1: [1, 1, 1, 1, 1, 1, 1, 0],
+}

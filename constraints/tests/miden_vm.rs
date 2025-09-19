@@ -1,17 +1,16 @@
 use std::sync::Arc;
 
-use air_ir::{Air, compile};
-use miden_core::crypto::hash::Rpo256;
+use air_ir::{compile, Air};
 use miden_diagnostics::{
-    CodeMap, DefaultEmitter, DiagnosticsHandler, term::termcolor::ColorChoice,
+    term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
 };
 use winter_math::FieldElement;
 use winter_math::fields::f64::BaseElement as Felt;
+use miden_core::crypto::hash::Rpo256;
 
-// Import re-exports correctly from ace crate
-use air_codegen_ace::{AceCircuit, AceNode, build_ace_circuit};
+use air_codegen_ace::{build_ace_circuit, AceCircuit, AceNode};
 
-//// Local copy of generate_circuit, since ace::tests version is not public
+/// Local copy of generate_circuit, since ace::tests version is not public
 fn generate_circuit(source: &str) -> (Air, AceCircuit, AceNode) {
     let code_map = Arc::new(CodeMap::new());
     let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
@@ -26,34 +25,30 @@ fn generate_circuit(source: &str) -> (Air, AceCircuit, AceNode) {
 
     (air, circuit, root)
 }
-
-/// Loads the MidenVM minimal AIR example
+/// Loads the MidenVM AIR example next to this test
 pub fn load_miden_vm_air() -> std::io::Result<String> {
     let crate_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-    let path = format!("{crate_dir}/../constraints/miden-vm-updated/main.air");
+    let path = format!("{}/miden_vm.air", crate_dir);
     let content = std::fs::read_to_string(path)?;
+
     Ok(content)
 }
 
 #[test]
-fn test_miden_vm_air_randomized() {
+fn test_miden_vm_updated_air_randomized() {
     let air_string = load_miden_vm_air().expect("unable to read MidenVM AIR");
 
     let (_air, circuit, root_node) = generate_circuit(&air_string);
 
-    // For now, simplify: just build dummy inputs
+    // Provide dummy variable assignments since we are not generating valid ACE vars here
     let dummy_inputs = vec![Default::default(); circuit.layout.num_inputs];
     let eval = circuit.eval(root_node, &dummy_inputs);
 
     let encoded_circuit = circuit.to_ace();
 
-    println!("vars: {}", encoded_circuit.num_vars());
-    println!("inputs: {}", encoded_circuit.num_inputs());
-    println!("constants: {}", encoded_circuit.num_constants());
-    println!("hash: {:?}", encoded_circuit.circuit_hash());
-
     let circuit_description: Vec<Felt> = CIRCUIT_DESCRIPTION.into_iter().map(Felt::new).collect();
     let circuit_hash_expected = Rpo256::hash_elements(&circuit_description);
+    
     assert_eq!(eval, <_ as FieldElement>::ZERO);
     assert_eq!(encoded_circuit.circuit_hash(), CIRCUIT_HASH.into());
     assert_eq!(encoded_circuit.circuit_hash(), circuit_hash_expected);
