@@ -29,7 +29,7 @@ impl<AB: AirBuilderWithPublicValues> Air<AB> for BinaryAir {
             main.row_slice(1).unwrap(),
         );
         builder.when_first_row().assert_zero::<_>(main_current[0] - public_values[0].into());
-        builder.when_transition().assert_zero::<_>(main_current[0] * main_current[0] - main_current[0]);
-        builder.when_transition().assert_zero::<_>(main_current[1] * main_current[1] - main_current[1]);
+        builder.assert_zero::<_>(main_current[0] * main_current[0] - main_current[0]);
+        builder.assert_zero::<_>(main_current[1] * main_current[1] - main_current[1]);
     }
 }

@@ -1,14 +1,14 @@
 mod boundary_constraints;
 mod graph;
 use graph::Codegen;
-mod transition_constraints;
+mod integrity_constraints;
 
 use air_ir::Air;
 
 use super::Scope;
 use crate::air::{
     boundary_constraints::add_main_boundary_constraints,
-    transition_constraints::add_main_transition_constraints,
+    integrity_constraints::add_main_integrity_constraints,
 };
 
 // HELPERS TO GENERATE AN IMPLEMENTATION OF THE PLONKY3 AIR TRAIT
@@ -70,5 +70,5 @@ fn add_air_trait(scope: &mut Scope, ir: &Air, name: &str) {
 
     add_main_boundary_constraints(eval_func, ir);
 
-    add_main_transition_constraints(eval_func, ir);
+    add_main_integrity_constraints(eval_func, ir);
 }
