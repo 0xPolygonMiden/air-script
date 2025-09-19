@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
+use air_parser::ast::AccessType;
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Spanned};
 
@@ -524,29 +525,49 @@ fn check_evaluator_argument_sizes(
                 };
                 trace_segments_arg_vector_len += size;
             } else if let Some(accessor) = child.as_accessor() {
-                let Accessor { indexable, .. } = accessor.deref();
+                let Accessor { indexable, access_type, .. } = accessor.deref();
 
-                if let Some(value) = indexable.as_value() {
-                    let Value { value: SpannedMirValue { value, .. }, .. } = value.deref();
+                // Check access type FIRST to determine how many elements this accessor represents
+                match access_type {
+                    AccessType::Index(_) => {
+                        // Index access (like system[0]) always results in 1 element regardless of underlying type
+                        trace_segments_arg_vector_len += 1;
+                    },
+                    AccessType::Default => {
+                        // Default access - size depends on the underlying type
+                        if let Some(value) = indexable.as_value() {
+                            let Value { value: SpannedMirValue { value, .. }, .. } = value.deref();
 
-                    let param_size = match value {
-                        MirValue::TraceAccessBinding(tab) => tab.size,
-                        MirValue::TraceAccess(_) => 1,
-                        _ => unreachable!("expected trace access binding, got {:?}", value),
-                    };
-                    trace_segments_arg_vector_len += param_size;
-                } else if let Some(parameter) = indexable.as_parameter() {
-                    let Parameter { ty, .. } = parameter.deref();
-                    let size = match ty {
-                        MirType::Felt => 1,
-                        MirType::Vector(len) => *len,
-                        _ => unreachable!("expected felt or vector, got {:?}", ty),
-                    };
-                    trace_segments_arg_vector_len += size;
-                } else if let Some(vector) = indexable.as_vector() {
-                    trace_segments_arg_vector_len += vector.children().borrow().len();
-                } else {
-                    unreachable!("expected value, parameter, or vector, got {:?}", child);
+                            let param_size = match value {
+                                MirValue::TraceAccessBinding(tab) => tab.size,
+                                MirValue::TraceAccess(_) => 1,
+                                _ => unreachable!("expected trace access binding, got {:?}", value),
+                            };
+                            trace_segments_arg_vector_len += param_size;
+                        } else if let Some(parameter) = indexable.as_parameter() {
+                            let Parameter { ty, .. } = parameter.deref();
+                            let size = match ty {
+                                MirType::Felt => 1,
+                                MirType::Vector(len) => *len,
+                                _ => unreachable!("expected felt or vector, got {:?}", ty),
+                            };
+                            trace_segments_arg_vector_len += size;
+                        } else if let Some(vector) = indexable.as_vector() {
+                            let size = vector.children().borrow().len();
+                            trace_segments_arg_vector_len += size;
+                        } else if let Some(_nested_accessor) = indexable.as_accessor() {
+                            trace_segments_arg_vector_len += 1; // fallback
+                        } else {
+                            unreachable!(
+                                "expected value, parameter, vector, or accessor in default access, got {:?}",
+                                indexable
+                            );
+                        }
+                    },
+                    _ => {
+                        // Other access types - fallback to 1
+                        trace_segments_arg_vector_len += 1;
+                    },
                 }
             } else {
                 unreachable!("expected value or parameter, got {:?}", child);
@@ -654,7 +675,10 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                         args_unpacked.push(child.clone());
                     }
                 } else {
-                    unreachable!("expected value, parameter, or vector (or accessor on one), got {:?}", arg);
+                    unreachable!(
+                        "expected value, parameter, or vector (or accessor on one), got {:?}",
+                        arg
+                    );
                 }
             } else {
                 unreachable!("expected value or parameter (or accessor on one), got {:?}", arg);
