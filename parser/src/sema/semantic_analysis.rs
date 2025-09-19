@@ -1905,6 +1905,17 @@ impl SemanticAnalysis<'_> {
                         )
                     })
                 })
+                .or_else(|| {
+                    imported_from.functions.get(qid.as_ref()).map(|f| {
+                        Span::new(
+                            f.span(),
+                            BindingType::Function(FunctionType::Function(
+                                f.param_types(),
+                                f.return_type,
+                            )),
+                        )
+                    })
+                })
                 .ok_or(InvalidAccessError::UndefinedVariable)
         }
     }
