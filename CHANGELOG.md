@@ -8,6 +8,7 @@
 - Refactored the unrolling pass in MIR (#434).
 - Fix regressions on MIR and list_comprehensions (#449).
 - Update documentation and tests thereof (#437).
+- Create initial structure for writing Miden VM constraints (#464).
 
 ## 0.4.0 (2025-06-20)
 
