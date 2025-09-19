@@ -1,5 +1,32 @@
+##########################################################################################
+# HASHER CONSTRAINTS MODULE
+##########################################################################################
+#
+# The Hasher module is responsible for all hash-related operations, which includes:
+#
+# 1. A single permutation of Rescue Prime Optimized (RPO).
+# 2. A simple 2-to-1 hash.
+# 3. A linear hash of n field elements.
+# 4. Merkle path verification.
+# 5. Merkle root update.
+#
+# STATUS: Not implemented
+#
+# REFERENCES:
+# - Hasher chiplet design: https://0xmiden.github.io/miden-vm/design/chiplets/hasher.html
+##########################################################################################
+
 mod hasher
 
+##########################################################################################
+# PERIODIC COLUMNS
+##########################################################################################
+#
+# There are two groups of periodic columns used by the hasher chiplet:
+#
+# 1. 3 columns used to help select the instruction executed at a given row,
+# 2. 24 columns containing the round constants of the RPO hash function.
+#
 periodic_columns {
     cycle_row_0: [0, 0, 0, 0, 0, 0, 0, 1],
     cycle_row_6: [0, 0, 0, 0, 0, 0, 1, 0],

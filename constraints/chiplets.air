@@ -1,27 +1,78 @@
+##########################################################################################
+# CHIPLETS CONSTRAINTS MODULE
+##########################################################################################
+#
+# The Chiplets module contains specialized computation units that handle complex operations
+# like cryptographic hashing, bitwise operations, and memory access. Each chiplet uses a
+# hierarchical selector system to identify which operations are active.
+#
+# CHIPLETS COLUMN LAYOUT (20 columns):
+# ┌─────────┬──────────────────────────────────────────────────────────────────────┐
+# │ Columns │                        Purpose                                       │
+# ├─────────┼──────────────────────────────────────────────────────────────────────┤
+# │   0-4   │ s[5] - Hierarchical selector flags                                   │
+# │  5-19   │ Chiplet-specific data (hasher, bitwise ops, memory, ACE, kernel ROM) │
+# └─────────┴──────────────────────────────────────────────────────────────────────┘
+#
+# STATUS: Not fully implemented
+#
+# REFERENCES:
+# - Chiplets Design: https://0xmiden.github.io/miden-vm/design/chiplets/main.html
+##########################################################################################
+
 mod chiplets
 
 use utils::*;
 
-### Chiplets Constraints ##########################################################################
+##########################################################################################
+# CHIPLETS CONSTRAINTS
+##########################################################################################
 
-# Enforce the constraints on the hash, bitwise or memory chiplet, given the columns of the chiplet 
-# module trace.
+# TRANSITION CONSTRAINTS
+#
+# ev chiplets_transition([chiplets[20]]) {
+#     enf chiplet_selectors([chiplets[0..5]]);
+#
+#     let hash_active = ... ;
+#     let bitwise_active= ... ;
+#     let memory_active = ... ;
+#     let ace_active = ... ;
+#     let ker_rom_active = ... ;
+#     match enf {
+#         case hash_active: hash_chiplet_constraints([chiplets[5..20]]),
+#         case bitwise_active: bitwise_chiplet_constraints([chiplets[5..20]]),
+#         case memory_active: memory_chiplet_constraints([chiplets[5..20]]),
+#         case ace_active: ace_chiplet_constraints([chiplets[5..20]]),
+#         case ker_rom_active: ker_rom_chiplet_constraints([chiplets[5..20]]),
+#     };
+# }
 
-# TODO
+##########################################################################################
+# CHIPLET SELECTOR SYSTEM
+##########################################################################################
 
-### Helper evaluators #############################################################################
-
-# Enforces that the chiplet selector columns are set correctly.
+# Hierarchical chiplet selector constraints
+#
+# CONSTRAINT DEGREE: 2 (quadratic due to binary constraints)
+#
 ev chiplet_selectors([s[5]]) {
-    # Enforce that selectors are binary.
+    ####################################################################################
+    # BINARY CONSTRAINTS - Ensure all selectors are valid binary values
+    ####################################################################################
+
     enf is_binary([s[0]]);
+
     enf is_binary([s[1]]) when s[0];
     enf is_binary([s[2]]) when s[0] & s[1];
     enf is_binary([s[3]]) when s[0] & s[1] & s[2];
     enf is_binary([s[4]]) when s[0] & s[1] & s[2] & s[3];
 
-    # Enforce that the chiplets are stacked correctly by restricting selector values so they can 
-    # only change from 0 to 1.
+    ####################################################################################
+    # STABILITY CONSTRAINTS - Prevent deactivation (forbids 1→0 transitions)
+    ####################################################################################
+
+    # Once a selector level becomes active (1), it must remain active
+    # This ensures chiplet operations maintain consistent state throughout execution
     enf s[0]' = s[0] when s[0];
     enf s[1]' = s[1] when s[0] & s[1];
     enf s[2]' = s[2] when s[0] & s[1] & s[2];
@@ -29,8 +80,14 @@ ev chiplet_selectors([s[5]]) {
     enf s[4]' = s[4] when s[0] & s[1] & s[2] & s[3] & s[4];
 }
 
-# Computes the flag indicating the memory portion of the chiplets trace.
-# This flag is s_0 * s_1 * (1 - s_2), which represents the memory chiplet selector pattern.
+##########################################################################################
+# CHIPLET FLAG COMPUTING
+##########################################################################################
+
+# Memory chiplet identification function
+#
+# CONSTRAINT DEGREE: 3 (cubic due to three-factor multiplication)
+#
 fn memory_chiplet_flag(s_0: felt, s_1: felt, s_2: felt) -> felt {
     return s_0 * s_1 * !s_2;
 }

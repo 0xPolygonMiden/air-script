@@ -1,17 +1,56 @@
+##########################################################################################
+# SYSTEM CONSTRAINTS MODULE
+##########################################################################################
+#
+# System module is responsible for managing system data, including the current VM cycle
+# (clk), the free memory pointer (fmp) used for specifying the region of memory available
+# to procedure locals, and the current and parent execution contexts.
+#
+# SYSTEM COLUMN LAYOUT (8 columns):
+# ┌─────────┬──────────────────────────────────────────────────────────────────────┐
+# │ Column  │                        Purpose                                       │
+# ├─────────┼──────────────────────────────────────────────────────────────────────┤
+# │    0    │ clk - VM execution clock (increments each cycle)                     │
+# │    1    │ fmp - Free memory pointer (procedure local memory region)            │
+# │    2    │ ctx - Current execution context                                      │
+# │    3    │ in_syscall - System call execution flag                              │
+# │   4-7   │ Function hash - Current/parent function digest (4 elements)          │
+# └─────────┴──────────────────────────────────────────────────────────────────────┘
+#
+#
+# STATUS: Not fully implemented
+#
+# REFERENCES:
+# - System Design: https://0xmiden.github.io/miden-vm/design/main.html
+##########################################################################################
+
 mod system
 
+##########################################################################################
+# SYSTEM CONSTRAINT IMPLEMENTATION
+##########################################################################################
 
-### System Constraints ###########################################################################
-
-# Enforces the transition constraints on the system columns
+# Main system constraint evaluator - ensures proper system state transitions
 ev system_transition([system[8]]) {
-    ## Clock increment ##
-    enf system_clock_transition([system]);
+    # Clock progression constraint
+    enf system_clock_transition([system[0]]);
+
+    # TODO: Free memory pointer constraints
+    # TODO: Execution context constraints
+    # TODO: System call flag constraints
+    # TODO: Function hash management constraints
 }
 
-### Helper evaluators #############################################################################
+##########################################################################################
+# CLOCK CONSTRAINT
+##########################################################################################
 
-# System clock transition constraint - enforces that the clock increments by 1 at each step
-ev system_clock_transition([clk, rest[7]]) {
+# Clock increment by 1 constraint
+#
+#
+# CONSTRAINT DEGREE: 1 (linear)
+#
+# PURPOSE: Ensures VM execution cycles increase monotonically
+ev system_clock_transition([clk]) {
     enf clk' = clk + 1;
 }
