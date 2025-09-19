@@ -1,0 +1,20 @@
+mod utils
+
+### Helper evaluators ##############################################################################
+
+# Enforces that the provided columns must be binary.
+ev is_binary([a]) {
+    enf a^2 = a;
+}
+
+# Enforces that value in column is copied over to the next row.
+ev is_unchanged([column]) {
+    enf column' = column;
+}
+
+### Helper functions ##############################################################################
+
+# Returns binary negation of `a`.
+fn binary_not(a: felt) -> felt {
+    return 1 - a;   
+}

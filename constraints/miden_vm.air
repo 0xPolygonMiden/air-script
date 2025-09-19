@@ -1,7 +1,8 @@
 def MidenVM
 
-use system::*;
 use range_checker::*;
+use system::*;
+use utils::*;
 
 trace_columns {
     main: [system[8], decoder[24], stack[19], range_checker[2], chiplets[20], padding[7]],
@@ -74,7 +75,7 @@ boundary_constraints {
 integrity_constraints {
     # Main trace transitional constraints
     enf system_transition([system]);
-
+  
     # Buses constraints
     enf range_checker_constraints([decoder, range_checker, chiplets]);
 }
