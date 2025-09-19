@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use air_parser::{
     LexicalScope,
-    ast::{self, AccessType, TraceSegmentId},
+    ast::{self, Access, AccessType, TraceSegmentId},
     symbols,
 };
 use air_pass::Pass;
@@ -160,11 +160,11 @@ impl<'a> MirBuilder<'a> {
                 let span = binding.name.map_or(SourceSpan::UNKNOWN, |n| n.span());
                 let params =
                     self.translate_params_ev(span, binding.name.as_ref(), &binding.ty, &mut i)?;
-
+                let param_ty = binding.ty.access(AccessType::Index(0)).ok().or(ty!(felt));
                 for param in params {
                     all_params_flatten_for_trace_segment.push(param.clone());
                     all_params_flatten.push(param.clone());
-                    all_params_ty_flatten.push(binding.ty());
+                    all_params_ty_flatten.push(param_ty);
                 }
             }
 
@@ -1003,7 +1003,19 @@ impl<'a> MirBuilder<'a> {
                         .emit();
                     return Err(CompileError::Failed);
                 }
-                let arg_kinds = arg_nodes.iter().map(|arg| arg.kind().unwrap()).collect::<Vec<_>>();
+                let mut arg_kinds = vec![];
+                if let Some(first_arg) = arg_nodes.first() {
+                    let Some(v) = first_arg.as_vector() else {
+                        unreachable!(
+                            "expected first argument to be a vector, got {:#?}",
+                            first_arg
+                        );
+                    };
+                    for element in v.elements.borrow().iter() {
+                        arg_kinds.push(element.kind().unwrap());
+                    }
+                }
+                // let arg_kinds = arg_nodes.iter().map(|arg| arg.kind().unwrap()).collect::<Vec<_>>();
                 let arg_kinds_refs = arg_kinds.iter().collect::<Vec<_>>();
                 if !callee_ref.func_ty.check_args_kinds(&arg_kinds_refs) {
                     self.diagnostics
