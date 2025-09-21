@@ -249,9 +249,15 @@ FunctionBinding: (Identifier, Type) = {
 }
 
 FunctionBindingType: Type = {
-    <l:@L> "felt" <r:@R> => Type::Felt,
-    <l:@L> "felt" <size: Size> <r:@R> => Type::Vector(size as usize),
-    <l:@L> "felt" "[" <row_size: Num_u64> "," <col_size: Num_u64> "]" <r:@R> => Type::Matrix(row_size as usize, col_size as usize),
+    <l:@L> <sty: ScalarType> <r:@R> => Type::Scalar(sty),
+    <l:@L> <sty: ScalarType> <size: Size> <r:@R> => Type::Vector(sty, size as usize),
+    <l:@L> <sty: ScalarType> "[" <row_size: Num_u64> "," <col_size: Num_u64> "]" <r:@R> => Type::Matrix(sty, row_size as usize, col_size as usize),
+}
+
+ScalarType: Option<ScalarType> = {
+    "felt" => Some(ScalarType::Felt),
+    "uint" => Some(ScalarType::UInt),
+    "bool" => Some(ScalarType::Bool),
 }
 
 FunctionBody: Vec<Statement> = {
@@ -685,6 +691,8 @@ extern {
         "when" => Token::When,
         "with" => Token::With,
         "felt" => Token::Felt,
+        "uint" => Token::UInt,
+        "bool" => Token::Bool,
         "'" => Token::Quote,
         "=" => Token::Equal,
         "+" => Token::Plus,

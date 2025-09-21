@@ -1,14 +1,15 @@
 use std::{collections::HashMap, ops::Deref};
 
 use air_parser::ast::AccessType;
+use air_types::{Type, ty};
 use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
 
 use crate::{
     CompileError,
     ir::{
         Accessor, Add, BackLink, Boundary, ConstantValue, Enf, Exp, FoldOperator, Graph, Link,
-        Matrix, MirType, MirValue, Mul, Node, Op, Owner, Parameter, Parent, RandomInputs,
-        SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value, Vector,
+        Matrix, MirValue, Mul, Node, Op, Owner, Parameter, Parent, RandomInputs, SpannedMirValue,
+        Sub, TraceAccess, TraceAccessBinding, Value, Vector,
     },
     passes::{
         Visitor,
@@ -57,22 +58,22 @@ fn unroll_trace_access_binding(
     if trace_access_binding.size == 1 {
         Value::create(SpannedMirValue {
             span,
-            value: MirValue::TraceAccess(TraceAccess {
-                segment: trace_access_binding.segment,
-                column: trace_access_binding.offset,
-                row_offset: 0,
-            }),
+            value: MirValue::TraceAccess(TraceAccess::new(
+                trace_access_binding.segment,
+                trace_access_binding.offset,
+                0,
+            )),
         })
     } else {
         let mut vec = vec![];
         for index in 0..trace_access_binding.size {
             let val = Value::create(SpannedMirValue {
                 span,
-                value: MirValue::TraceAccess(TraceAccess {
-                    segment: trace_access_binding.segment,
-                    column: trace_access_binding.offset + index,
-                    row_offset: 0,
-                }),
+                value: MirValue::TraceAccess(TraceAccess::new(
+                    trace_access_binding.segment,
+                    trace_access_binding.offset + index,
+                    0,
+                )),
             });
             vec.push(val);
         }
@@ -154,11 +155,11 @@ fn unroll_accessor_default_access_type(
         if let MirValue::TraceAccess(trace_access) = mir_value {
             let new_node = Value::create(SpannedMirValue {
                 span: value.value.span(),
-                value: MirValue::TraceAccess(TraceAccess {
-                    segment: trace_access.segment,
-                    column: trace_access.column,
-                    row_offset: trace_access.row_offset + accessor_offset,
-                }),
+                value: MirValue::TraceAccess(TraceAccess::new(
+                    trace_access.segment,
+                    trace_access.column,
+                    trace_access.row_offset + accessor_offset,
+                )),
             });
             return Some(new_node);
         }
@@ -186,11 +187,11 @@ fn unroll_accessor_index_access_type(
                 MirValue::TraceAccess(trace_access) => {
                     let new_node = Value::create(SpannedMirValue {
                         span: value.value.span(),
-                        value: MirValue::TraceAccess(TraceAccess {
-                            segment: trace_access.segment,
-                            column: trace_access.column,
-                            row_offset: trace_access.row_offset + accessor_offset,
-                        }),
+                        value: MirValue::TraceAccess(TraceAccess::new(
+                            trace_access.segment,
+                            trace_access.column,
+                            trace_access.row_offset + accessor_offset,
+                        )),
                     });
                     Some(new_node)
                 },
@@ -522,7 +523,7 @@ impl UnrollingFirstPass<'_> {
         let mut new_vec = vec![];
         for i in 0..iterator_expected_len {
             let new_node =
-                Parameter::create(i, MirType::Felt, for_node.as_for().unwrap().deref().span());
+                Parameter::create(i, ty!(felt).unwrap(), for_node.as_for().unwrap().deref().span());
             new_vec.push(new_node.clone());
 
             let iterators_i = iterators
@@ -720,9 +721,11 @@ fn compute_iterator_len(iterator: Link<Op>) -> usize {
             AccessType::Matrix(..) => 1,
         },
         Op::Parameter(parameter) => match parameter.ty {
-            MirType::Felt => 1,
-            MirType::Vector(l) => l,
-            MirType::Matrix(l, _) => l,
+            Some(Type::Scalar(_)) => 1,
+            Some(Type::Vector(_, l)) => l,
+            Some(Type::Matrix(_, l, _)) => l,
+            // NOTE: This should probably be unreachable
+            None => 1,
         },
         _ => 1,
     }

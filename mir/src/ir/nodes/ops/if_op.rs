@@ -1,6 +1,7 @@
+use air_types::*;
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
+use crate::ir::{BackLink, Builder, BuilderHook, Child, Link, Node, Op, Owner, Parent, Singleton};
 
 /// A MIR operation to represent conditional constraints
 ///
@@ -18,7 +19,28 @@ pub struct If {
     pub _owner: Singleton<Owner>,
     #[span]
     pub span: SourceSpan,
+    pub ty: Option<Type>,
 }
+
+impl ScalarTypeMut for If {
+    fn update_scalar_ty_unchecked(&mut self, new_sty: Option<ScalarType>) {
+        self.ty.update_scalar_ty_unchecked(new_sty);
+    }
+}
+
+impl TypeMut for If {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self.ty = new_ty;
+    }
+}
+
+impl Typing for If {
+    fn ty(&self) -> Option<Type> {
+        self.ty.ty()
+    }
+}
+
+impl BuilderHook for If {}
 
 #[derive(Default, Clone, PartialEq, Eq, Debug, Hash)]
 pub struct MatchArm {

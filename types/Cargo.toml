@@ -1,0 +1,14 @@
+[package]
+name = "air-types"
+version = "1.0.0"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+miden-diagnostics = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"

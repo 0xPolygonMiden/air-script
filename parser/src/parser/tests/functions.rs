@@ -21,8 +21,8 @@ fn fn_def_with_scalars() {
         Function::new(
             SourceSpan::UNKNOWN,
             function_ident!(fn_with_scalars),
-            vec![(ident!(a), Type::Felt), (ident!(b), Type::Felt)],
-            Type::Felt,
+            vec![(ident!(a), ty!(felt).unwrap()), (ident!(b), ty!(felt).unwrap())],
+            ty!(felt).unwrap(),
             vec![return_!(expr!(add!(access!(a), access!(b))))],
         ),
     );
@@ -44,8 +44,8 @@ fn fn_def_with_vectors() {
         Function::new(
             SourceSpan::UNKNOWN,
             function_ident!(fn_with_vectors),
-            vec![(ident!(a), Type::Vector(12)), (ident!(b), Type::Vector(12))],
-            Type::Vector(12),
+            vec![(ident!(a), ty!(felt[12]).unwrap()), (ident!(b), ty!(felt[12]).unwrap())],
+            ty!(felt[12]).unwrap(),
             vec![return_!(expr!(lc!(((x, expr!(access!(a))), (y, expr!(access!(b)))) =>
                 add!(access!(x), access!(y)))))],
         ),
@@ -85,8 +85,8 @@ fn fn_use_scalars_and_vectors() {
         Function::new(
             SourceSpan::UNKNOWN,
             function_ident!(fn_with_scalars_and_vectors),
-            vec![(ident!(a), Type::Felt), (ident!(b), Type::Vector(12))],
-            Type::Felt,
+            vec![(ident!(a), ty!(felt).unwrap()), (ident!(b), ty!(felt[12]).unwrap())],
+            ty!(felt).unwrap(),
             vec![return_!(expr!(call!(sum(expr!(
                 lc!(((x, expr!(access!(b)))) => add!(access!(a), access!(x)))
             )))))],
@@ -152,8 +152,8 @@ fn fn_call_in_fn() {
         Function::new(
             SourceSpan::UNKNOWN,
             function_ident!(fold_vec),
-            vec![(ident!(a), Type::Vector(12))],
-            Type::Felt,
+            vec![(ident!(a), ty!(felt[12]).unwrap())],
+            ty!(felt).unwrap(),
             vec![return_!(expr!(call!(sum(expr!(lc!(((x, expr!(access!(a)))) => access!(x)))))))],
         ),
     );
@@ -163,8 +163,8 @@ fn fn_call_in_fn() {
         Function::new(
             SourceSpan::UNKNOWN,
             function_ident!(fold_scalar_and_vec),
-            vec![(ident!(a), Type::Felt), (ident!(b), Type::Vector(12))],
-            Type::Felt,
+            vec![(ident!(a), ty!(felt).unwrap()), (ident!(b), ty!(felt[12]).unwrap())],
+            ty!(felt).unwrap(),
             vec![return_!(expr!(add!(access!(a), call!(fold_vec(expr!(access!(b)))))))],
         ),
     );
@@ -234,8 +234,8 @@ fn fn_call_in_ev() {
         Function::new(
             SourceSpan::UNKNOWN,
             function_ident!(fold_vec),
-            vec![(ident!(a), Type::Vector(12))],
-            Type::Felt,
+            vec![(ident!(a), ty!(felt[12]).unwrap())],
+            ty!(felt).unwrap(),
             vec![return_!(expr!(call!(sum(expr!(lc!(((x, expr!(access!(a)))) => access!(x)))))))],
         ),
     );
@@ -245,8 +245,8 @@ fn fn_call_in_ev() {
         Function::new(
             SourceSpan::UNKNOWN,
             function_ident!(fold_scalar_and_vec),
-            vec![(ident!(a), Type::Felt), (ident!(b), Type::Vector(12))],
-            Type::Felt,
+            vec![(ident!(a), ty!(felt).unwrap()), (ident!(b), ty!(felt[12]).unwrap())],
+            ty!(felt).unwrap(),
             vec![return_!(expr!(add!(access!(a), call!(fold_vec(expr!(access!(b)))))))],
         ),
     );
@@ -319,8 +319,8 @@ fn fn_as_lc_iterables() {
         Function::new(
             SourceSpan::UNKNOWN,
             function_ident!(operation),
-            vec![(ident!(a), Type::Felt), (ident!(b), Type::Felt)],
-            Type::Felt,
+            vec![(ident!(a), ty!(felt).unwrap()), (ident!(b), ty!(felt).unwrap())],
+            ty!(felt).unwrap(),
             vec![let_!(x = expr!(add!(exp!(access!(a), access!(b)), int!(1))) =>
                 return_!(expr!(exp!(access!(b), access!(x)))))],
         ),
@@ -390,8 +390,8 @@ fn fn_call_in_binary_ops() {
         Function::new(
             SourceSpan::UNKNOWN,
             function_ident!(operation),
-            vec![(ident!(a), Type::Vector(12)), (ident!(b), Type::Vector(12))],
-            Type::Felt,
+            vec![(ident!(a), ty!(felt[12]).unwrap()), (ident!(b), ty!(felt[12]).unwrap())],
+            ty!(felt).unwrap(),
             vec![return_!(expr!(call!(sum(expr!(
                 lc!(((x, expr!(access!(a))), (y, expr!(access!(b)))) => add!(
                     access!(x),
@@ -466,8 +466,8 @@ fn fn_call_in_vector_def() {
         Function::new(
             SourceSpan::UNKNOWN,
             function_ident!(operation),
-            vec![(ident!(a), Type::Vector(12)), (ident!(b), Type::Vector(12))],
-            Type::Vector(12),
+            vec![(ident!(a), ty!(felt[12]).unwrap()), (ident!(b), ty!(felt[12]).unwrap())],
+            ty!(felt[12]).unwrap(),
             vec![return_!(expr!(lc!(((x, expr!(access!(a))), (y, expr!(access!(b)))) => add!(
                 access!(x),
                 access!(y)

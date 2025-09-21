@@ -183,7 +183,7 @@ pub fn duplicate_node(
                 .to_link()
                 .unwrap_or_else(|| panic!("invalid ref_node for parameter {parameter:?}",));
             let new_param =
-                Parameter::create(parameter.position, parameter.ty.clone(), parameter.span());
+                Parameter::create(parameter.position, parameter.ty.unwrap(), parameter.span());
 
             if let Some(_root_ref) = owner_ref.as_root() {
                 new_param.as_parameter_mut().unwrap().set_ref_node(owner_ref);
@@ -200,7 +200,7 @@ pub fn duplicate_node(
             new_param
         },
         Op::Value(value) => Value::create(value.value.clone()),
-        Op::None(span) => Op::None(*span).into(),
+        Op::None(none) => Op::None(none.clone()).into(),
     }
 }
 
@@ -428,7 +428,7 @@ pub fn duplicate_node_or_replace(
                 current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
             } else {
                 let new_param =
-                    Parameter::create(parameter.position, parameter.ty.clone(), parameter.span());
+                    Parameter::create(parameter.position, parameter.ty.unwrap(), parameter.span());
 
                 if let Some(_root_ref) = owner_ref.as_root() {
                     new_param.as_parameter_mut().unwrap().set_ref_node(owner_ref.clone());

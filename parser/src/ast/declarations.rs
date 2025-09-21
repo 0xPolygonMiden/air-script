@@ -144,10 +144,14 @@ impl Constant {
     pub const fn new(span: SourceSpan, name: Identifier, value: ConstantExpr) -> Self {
         Self { span, name, value }
     }
-
+}
+impl Typing for Constant {
     /// Gets the type of the value associated with this constant
-    pub fn ty(&self) -> Type {
+    fn ty(&self) -> Option<Type> {
         self.value.ty()
+    }
+    fn kind(&self) -> Option<Kind> {
+        self.value.kind()
     }
 }
 impl Eq for Constant {}
@@ -168,25 +172,24 @@ pub enum ConstantExpr {
     Vector(Vec<u64>),
     Matrix(Vec<Vec<u64>>),
 }
-impl ConstantExpr {
+impl Typing for ConstantExpr {
     /// Gets the type of this expression
-    pub fn ty(&self) -> Type {
+    fn ty(&self) -> Option<Type> {
         match self {
-            Self::Scalar(_) => Type::Felt,
-            Self::Vector(elems) => Type::Vector(elems.len()),
+            Self::Scalar(_) => ty!(uint),
+            Self::Vector(elems) => ty!(uint[elems.len()]),
             Self::Matrix(rows) => {
                 let num_rows = rows.len();
                 let num_cols = rows.first().unwrap().len();
-                Type::Matrix(num_rows, num_cols)
+                ty!(uint[num_rows, num_cols])
             },
         }
     }
-
-    /// Returns true if this expression is of aggregate type
-    pub fn is_aggregate(&self) -> bool {
-        matches!(self, Self::Vector(_) | Self::Matrix(_))
+    fn kind(&self) -> Option<Kind> {
+        self.ty().kind()
     }
 }
+
 impl fmt::Display for ConstantExpr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -255,14 +258,21 @@ impl Export<'_> {
             Self::Evaluator(item) => item.name,
         }
     }
-
+}
+impl Typing for Export<'_> {
     /// Returns the type of the value associated with this export
     ///
     /// NOTE: Evaluator functions have no return value, so they have no type associated.
     /// For this reason, this function returns `Option<Type>` rather than `Type`.
-    pub fn ty(&self) -> Option<Type> {
+    fn ty(&self) -> Option<Type> {
         match self {
-            Self::Constant(item) => Some(item.ty()),
+            Self::Constant(item) => item.ty(),
+            Self::Evaluator(_) => None,
+        }
+    }
+    fn kind(&self) -> Option<Kind> {
+        match self {
+            Self::Constant(item) => item.kind(),
             Self::Evaluator(_) => None,
         }
     }
@@ -294,6 +304,11 @@ impl Eq for PeriodicColumn {}
 impl PartialEq for PeriodicColumn {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.values == other.values
+    }
+}
+impl Typing for PeriodicColumn {
+    fn ty(&self) -> Option<Type> {
+        ty!(felt[self.period()])
     }
 }
 
@@ -373,22 +388,33 @@ pub struct EvaluatorFunction {
     pub name: Identifier,
     pub params: Vec<TraceSegment>,
     pub body: Vec<Statement>,
+    pub fn_ty: FunctionType,
 }
 impl EvaluatorFunction {
     /// Creates a new function.
-    pub const fn new(
+    pub fn new(
         span: SourceSpan,
         name: Identifier,
         params: Vec<TraceSegment>,
         body: Vec<Statement>,
     ) -> Self {
-        Self { span, name, params, body }
+        let param_tys = params.iter().map(|ty| ty.ty()).collect::<Vec<_>>();
+        let fn_ty = FunctionType::Evaluator(param_tys);
+        Self { span, name, params, body, fn_ty }
     }
 }
 impl Eq for EvaluatorFunction {}
 impl PartialEq for EvaluatorFunction {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.params == other.params && self.body == other.body
+    }
+}
+impl Typing for EvaluatorFunction {
+    fn ty(&self) -> Option<Type> {
+        None
+    }
+    fn kind(&self) -> Option<Kind> {
+        Some(Kind::Callable(self.fn_ty.clone()))
     }
 }
 
@@ -405,17 +431,28 @@ pub struct Function {
     pub params: Vec<(Identifier, Type)>,
     pub return_type: Type,
     pub body: Vec<Statement>,
+    pub fn_ty: FunctionType,
 }
 impl Function {
     /// Creates a new function.
-    pub const fn new(
+    pub fn new(
         span: SourceSpan,
         name: Identifier,
         params: Vec<(Identifier, Type)>,
         return_type: Type,
         body: Vec<Statement>,
     ) -> Self {
-        Self { span, name, params, return_type, body }
+        let p = params.iter().map(|(_, ty)| ty.ty()).collect::<Vec<_>>();
+        let r = return_type.ty();
+        let fn_ty = FunctionType::Function(p, r);
+        Self {
+            span,
+            name,
+            params,
+            return_type,
+            body,
+            fn_ty,
+        }
     }
 
     pub fn param_types(&self) -> Vec<Type> {

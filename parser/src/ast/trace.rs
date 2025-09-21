@@ -1,5 +1,6 @@
 use std::fmt;
 
+use air_types::{Kind, Typing, tty, ty};
 use miden_diagnostics::{SourceSpan, Spanned};
 
 use super::*;
@@ -65,9 +66,14 @@ impl TraceSegment {
         for binding in raw_bindings.into_iter() {
             let (name, size) = binding.item;
             let ty = match size {
-                1 => Type::Felt,
-                n => Type::Vector(n),
-            };
+                1 => tty!(name),
+                n => tty!(name[n]),
+            }
+            .unwrap_or_else(|| {
+                unreachable!(
+                    "Trace segment binding types should always be known, but got None for {name} with size {size}"
+                )
+            });
             bindings.push(TraceBinding::new(binding.span(), name, id, offset, size, ty));
             offset += size;
         }
@@ -116,6 +122,14 @@ impl TraceSegment {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.size == 0
+    }
+}
+impl Typing for TraceSegment {
+    fn ty(&self) -> Option<Type> {
+        match self.size {
+            1 => self.bindings.first().map(|b| b.ty())?,
+            _ => ty!(felt[self.size]),
+        }
     }
 }
 impl fmt::Debug for TraceSegment {
@@ -250,20 +264,22 @@ impl TraceBinding {
             ty,
         }
     }
+}
 
+impl Typing for TraceBinding {
     /// Returns a [Type] that describes what type of value this binding represents
-    #[inline]
-    pub fn ty(&self) -> Type {
-        self.ty
+    fn ty(&self) -> Option<Type> {
+        Some(self.ty)
     }
-
-    #[inline]
-    pub fn is_scalar(&self) -> bool {
-        self.ty.is_scalar()
+    fn kind(&self) -> Option<Kind> {
+        Some(Kind::Value(self.ty()))
     }
+}
 
+impl Access for TraceBinding {
+    type Accessed = Self;
     /// Derive a new [TraceBinding] derived from the current one given an [AccessType]
-    pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
+    fn access(&self, access_type: AccessType) -> Result<Self::Accessed, InvalidAccessError> {
         match access_type {
             AccessType::Default => Ok(*self),
             AccessType::Slice(_) if self.is_scalar() => Err(InvalidAccessError::SliceOfScalar),
@@ -277,7 +293,7 @@ impl TraceBinding {
                     Ok(Self {
                         offset,
                         size,
-                        ty: Type::Vector(size),
+                        ty: ty!(felt[size]).unwrap(),
                         ..*self
                     })
                 }
@@ -286,7 +302,12 @@ impl TraceBinding {
             AccessType::Index(idx) if idx >= self.size => Err(InvalidAccessError::IndexOutOfBounds),
             AccessType::Index(idx) => {
                 let offset = self.offset + idx;
-                Ok(Self { offset, size: 1, ty: Type::Felt, ..*self })
+                Ok(Self {
+                    offset,
+                    size: 1,
+                    ty: ty!(felt).unwrap(),
+                    ..*self
+                })
             },
             AccessType::Matrix(..) => Err(InvalidAccessError::IndexIntoScalar),
         }

@@ -1,6 +1,7 @@
+use air_types::*;
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
+use crate::ir::{BackLink, Builder, BuilderHook, Child, Link, Node, Op, Owner, Parent, Singleton};
 
 /// A MIR operation to enforce that a given MIR op, `expr` equals zero
 #[derive(Default, Clone, PartialEq, Eq, Debug, Hash, Builder, Spanned)]
@@ -12,11 +13,38 @@ pub struct Enf {
     pub _owner: Singleton<Owner>,
     #[span]
     pub span: SourceSpan,
+    pub _ty: Option<Type>,
+}
+
+impl ScalarTypeMut for Enf {
+    fn update_scalar_ty_unchecked(&mut self, new_sty: Option<ScalarType>) {
+        self._ty.update_scalar_ty_unchecked(new_sty);
+    }
+}
+
+impl TypeMut for Enf {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self._ty = new_ty;
+    }
+}
+
+impl Typing for Enf {
+    fn ty(&self) -> Option<Type> {
+        self._ty.ty()
+    }
+}
+
+impl BuilderHook for Enf {
+    fn finalize_hook(&mut self) {
+        self._ty = self.expr.borrow().ty();
+    }
 }
 
 impl Enf {
     pub fn create(expr: Link<Op>, span: SourceSpan) -> Link<Op> {
-        Op::Enf(Self { expr, span, ..Default::default() }).into()
+        let mut enf = Self { expr, span, ..Default::default() };
+        enf.finalize_hook();
+        Op::Enf(enf).into()
     }
 }
 

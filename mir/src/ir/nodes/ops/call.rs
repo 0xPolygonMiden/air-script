@@ -1,6 +1,9 @@
+use air_types::*;
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Root, Singleton};
+use crate::ir::{
+    BackLink, Builder, BuilderHook, Child, Link, Node, Op, Owner, Parent, Root, Singleton,
+};
 
 /// A MIR operation to represent a call to a given function, a `Root` that represents either a
 /// `Function` or an `Evaluator`
@@ -21,17 +24,43 @@ pub struct Call {
     pub _owner: Singleton<Owner>,
     #[span]
     pub span: SourceSpan,
+    pub _ty: Option<Type>,
+}
+
+impl ScalarTypeMut for Call {
+    fn update_scalar_ty_unchecked(&mut self, new_sty: Option<ScalarType>) {
+        self._ty.update_scalar_ty(new_sty);
+    }
+}
+
+impl TypeMut for Call {
+    fn update_ty_unchecked(&mut self, new_ty: Option<Type>) {
+        self._ty = new_ty;
+    }
+}
+
+impl Typing for Call {
+    fn ty(&self) -> Option<Type> {
+        self._ty.ty()
+    }
+}
+
+impl BuilderHook for Call {
+    fn finalize_hook(&mut self) {
+        self._ty = self.function.borrow().ty();
+    }
 }
 
 impl Call {
     pub fn create(function: Link<Root>, arguments: Vec<Link<Op>>, span: SourceSpan) -> Link<Op> {
-        Op::Call(Self {
+        let mut call = Self {
             function,
             arguments: Link::new(arguments),
             span,
             ..Default::default()
-        })
-        .into()
+        };
+        call.finalize_hook();
+        Op::Call(call).into()
     }
 }
 

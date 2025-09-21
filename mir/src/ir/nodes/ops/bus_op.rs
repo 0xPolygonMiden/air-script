@@ -2,7 +2,9 @@ use std::hash::Hash;
 
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Bus, Child, Link, Node, Op, Owner, Parent, Singleton};
+use crate::ir::{
+    BackLink, Builder, BuilderHook, Bus, Child, Link, Node, Op, Owner, Parent, Singleton,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 pub enum BusOpKind {
@@ -24,6 +26,8 @@ pub struct BusOp {
     #[span]
     pub span: SourceSpan,
 }
+
+impl BuilderHook for BusOp {}
 
 impl Hash for BusOp {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {

@@ -7,8 +7,11 @@ mod nodes;
 mod owner;
 mod quad_eval;
 mod utils;
+pub extern crate air_types;
 pub extern crate derive_ir;
 
+#[allow(unused_imports)]
+pub use air_types::*;
 pub use bus::Bus;
 pub use derive_ir::Builder;
 pub use graph::Graph;
@@ -112,4 +115,8 @@ pub trait Builder {
     type Full;
     /// Create a new empty builder that exposes all fields
     fn builder() -> Self::Empty;
+}
+
+pub trait BuilderHook {
+    fn finalize_hook(&mut self) {}
 }

@@ -3,12 +3,13 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use miden_diagnostics::{SourceSpan, Spanned};
+use air_types::*;
+use miden_diagnostics::Spanned;
 
 use crate::ir::{
-    Accessor, Add, BackLink, Boundary, BusOp, Call, Child, ConstantValue, Enf, Exp, Fold, For, If,
-    Link, Matrix, MirValue, Mul, Node, Owner, Parameter, Parent, Singleton, SpannedMirValue, Sub,
-    Value, Vector, get_inner, get_inner_mut,
+    Accessor, Add, BackLink, Boundary, BuilderHook, BusOp, Call, Child, ConstantValue, Enf, Exp,
+    Fold, For, If, Link, Matrix, MirValue, Mul, Node, Owner, Parameter, Parent, Singleton,
+    SpannedMirValue, Stale, Sub, Value, Vector, get_inner, get_inner_mut,
 };
 
 /// The combined [Op]s and leaves of the MIR Graph.
@@ -33,7 +34,31 @@ pub enum Op {
     BusOp(BusOp),
     Parameter(Parameter),
     Value(Value),
-    None(SourceSpan),
+    None(Stale),
+}
+
+impl BuilderHook for Op {
+    fn finalize_hook(&mut self) {
+        match self {
+            Op::Enf(e) => e.finalize_hook(),
+            Op::Boundary(b) => b.finalize_hook(),
+            Op::Add(a) => a.finalize_hook(),
+            Op::Sub(s) => s.finalize_hook(),
+            Op::Mul(m) => m.finalize_hook(),
+            Op::Exp(e) => e.finalize_hook(),
+            Op::If(i) => i.finalize_hook(),
+            Op::For(f) => f.finalize_hook(),
+            Op::Call(c) => c.finalize_hook(),
+            Op::Fold(f) => f.finalize_hook(),
+            Op::Vector(v) => v.finalize_hook(),
+            Op::Matrix(m) => m.finalize_hook(),
+            Op::Accessor(a) => a.finalize_hook(),
+            Op::BusOp(b) => b.finalize_hook(),
+            Op::Parameter(p) => p.finalize_hook(),
+            Op::Value(v) => v.finalize_hook(),
+            Op::None(_) => {},
+        }
+    }
 }
 
 impl Default for Op {
@@ -130,6 +155,78 @@ impl Child for Op {
             Op::Parameter(p) => p.remove_parent(parent),
             Op::Value(v) => v.remove_parent(parent),
             Op::None(_) => {},
+        }
+    }
+}
+
+impl ScalarTypeMut for Op {
+    fn update_scalar_ty_unchecked(&mut self, new_ty: Option<air_types::ScalarType>) {
+        match self {
+            Op::Enf(e) => e.update_scalar_ty_unchecked(new_ty),
+            Op::Boundary(b) => b.update_scalar_ty_unchecked(new_ty),
+            Op::Add(a) => a.update_scalar_ty_unchecked(new_ty),
+            Op::Sub(s) => s.update_scalar_ty_unchecked(new_ty),
+            Op::Mul(m) => m.update_scalar_ty_unchecked(new_ty),
+            Op::Exp(e) => e.update_scalar_ty_unchecked(new_ty),
+            Op::If(i) => i.update_scalar_ty_unchecked(new_ty),
+            Op::For(f) => f.update_scalar_ty_unchecked(new_ty),
+            Op::Call(c) => c.update_scalar_ty_unchecked(new_ty),
+            Op::Fold(f) => f.update_scalar_ty_unchecked(new_ty),
+            Op::Vector(v) => v.update_scalar_ty_unchecked(new_ty),
+            Op::Matrix(m) => m.update_scalar_ty_unchecked(new_ty),
+            Op::Accessor(a) => a.update_scalar_ty_unchecked(new_ty),
+            Op::BusOp(_) => {},
+            Op::Parameter(p) => p.update_scalar_ty_unchecked(new_ty),
+            Op::Value(v) => v.update_scalar_ty_unchecked(new_ty),
+            Op::None(n) => n.update_scalar_ty_unchecked(new_ty),
+        }
+    }
+}
+
+impl TypeMut for Op {
+    fn update_ty_unchecked(&mut self, new_ty: Option<air_types::Type>) {
+        match self {
+            Op::Enf(e) => e.update_ty_unchecked(new_ty),
+            Op::Boundary(b) => b.update_ty_unchecked(new_ty),
+            Op::Add(a) => a.update_ty_unchecked(new_ty),
+            Op::Sub(s) => s.update_ty_unchecked(new_ty),
+            Op::Mul(m) => m.update_ty_unchecked(new_ty),
+            Op::Exp(e) => e.update_ty_unchecked(new_ty),
+            Op::If(i) => i.update_ty_unchecked(new_ty),
+            Op::For(f) => f.update_ty_unchecked(new_ty),
+            Op::Call(c) => c.update_ty_unchecked(new_ty),
+            Op::Fold(f) => f.update_ty_unchecked(new_ty),
+            Op::Vector(v) => v.update_ty_unchecked(new_ty),
+            Op::Matrix(m) => m.update_ty_unchecked(new_ty),
+            Op::Accessor(a) => a.update_ty_unchecked(new_ty),
+            Op::BusOp(_) => {},
+            Op::Parameter(p) => p.update_ty_unchecked(new_ty),
+            Op::Value(v) => v.update_ty_unchecked(new_ty),
+            Op::None(n) => n.update_ty_unchecked(new_ty),
+        }
+    }
+}
+
+impl Typing for Op {
+    fn ty(&self) -> Option<air_types::Type> {
+        match self {
+            Op::Enf(e) => e.ty(),
+            Op::Boundary(b) => b.ty(),
+            Op::Add(a) => a.ty(),
+            Op::Sub(s) => s.ty(),
+            Op::Mul(m) => m.ty(),
+            Op::Exp(e) => e.ty(),
+            Op::If(i) => i.ty(),
+            Op::For(f) => f.ty(),
+            Op::Call(c) => c.ty(),
+            Op::Fold(f) => f.ty(),
+            Op::Vector(v) => v.ty(),
+            Op::Matrix(m) => m.ty(),
+            Op::Accessor(a) => a.ty(),
+            Op::BusOp(_) => ty!(?),
+            Op::Parameter(p) => p.ty(),
+            Op::Value(v) => v.ty(),
+            Op::None(n) => n.ty(),
         }
     }
 }
@@ -385,7 +482,7 @@ impl Link<Op> {
                 value._node = Singleton::from(node.clone());
                 node
             },
-            Op::None(span) => Node::None(*span).into(),
+            Op::None(none) => Node::None(none.clone()).into(),
         }
     }
     /// Try getting the current [Op]'s [Owner] variant,

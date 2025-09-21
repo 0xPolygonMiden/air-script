@@ -200,7 +200,24 @@ impl Let {
     pub fn new(span: SourceSpan, name: Identifier, value: Expr, body: Vec<Statement>) -> Self {
         Self { span, name, value, body }
     }
+}
+impl Eq for Let {}
+impl PartialEq for Let {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.value == other.value && self.body == other.body
+    }
+}
+impl fmt::Debug for Let {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Let")
+            .field("name", &self.name)
+            .field("value", &self.value)
+            .field("body", &self.body)
+            .finish()
+    }
+}
 
+impl Typing for Let {
     /// Return the type of the overall `let` expression.
     ///
     /// A `let` with an empty body, or with a body that terminates with a non-expression statement
@@ -210,7 +227,7 @@ impl Let {
     /// For `let` statements with a non-empty body that terminates with an expression, the `let` can
     /// be used in expression position, producing the value of the terminating expression in its
     /// body, and having the same type as that value.
-    pub fn ty(&self) -> Option<Type> {
+    fn ty(&self) -> Option<Type> {
         let mut last = self.body.last();
         while let Some(stmt) = last.take() {
             match stmt {
@@ -226,20 +243,5 @@ impl Let {
         }
 
         None
-    }
-}
-impl Eq for Let {}
-impl PartialEq for Let {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.value == other.value && self.body == other.body
-    }
-}
-impl fmt::Debug for Let {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Let")
-            .field("name", &self.name)
-            .field("value", &self.value)
-            .field("body", &self.body)
-            .finish()
     }
 }
