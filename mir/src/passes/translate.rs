@@ -729,7 +729,6 @@ impl<'a> MirBuilder<'a> {
                             format!("in this access expression `{access:#?}`"),
                         )
                         .emit();
-                    //unreachable!("expected reference to periodic column in `{:#?}`", access);
                     Err(CompileError::Failed)
                 }
             },
@@ -1353,9 +1352,7 @@ impl<'a> MirBuilder<'a> {
 
 fn set_all_ref_nodes(params: Vec<Link<Op>>, ref_node: Link<Owner>) {
     for param in params {
-        let Some(mut param) = param.as_parameter_mut() else {
-            unreachable!("expected parameter, got {:?}", param);
-        };
+        let mut param = param.as_parameter_mut().expect("Tried to set ref node on non-parameter");
         param.set_ref_node(ref_node.clone());
     }
 }
