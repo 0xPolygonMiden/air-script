@@ -10,7 +10,7 @@ use crate::{
         BackLink, ConstantValue, Graph, Link, Mir, MirAccessType, MirValue, Node, Op, Parent,
         SpannedMirValue, Value,
     },
-    passes::unrolling::handle_accessory_visit,
+    passes::handle_accessor_visit,
 };
 
 pub struct ConstantPropagation<'a> {
@@ -127,7 +127,7 @@ impl ConstantPropagation<'_> {
         _graph: &mut Graph,
         accessor: Link<Op>,
     ) -> Result<Option<Link<Op>>, CompileError> {
-        handle_accessory_visit(accessor.clone(), true, self.diagnostics)
+        handle_accessor_visit(accessor.clone(), true, self.diagnostics)
     }
 }
 

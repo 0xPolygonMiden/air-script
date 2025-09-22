@@ -12,7 +12,6 @@ mod unrolling_second_pass;
 mod unrolling_third_pass;
 
 use unrolling_first_pass::UnrollingFirstPass;
-pub use unrolling_first_pass::handle_accessory_visit;
 use unrolling_second_pass::UnrollingSecondPass;
 use unrolling_third_pass::UnrollingThirdPass;
 
