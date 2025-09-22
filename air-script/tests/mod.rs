@@ -40,3 +40,5 @@ mod system;
 mod trace_col_groups;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod variables;
+
+mod docs_sync;

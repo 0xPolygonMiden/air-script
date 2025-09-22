@@ -5,12 +5,15 @@ multilingual = false
 src = "src"
 title = "AirScript by Miden"
 
-[output.html]
-git-repository-url = "https://github.com/0xMiden/air-script/"
-mathjax-support = true
+[build]
+build-dir = "target/book"
 
 [preprocessor.katex]
 after = ["links"]
+
+[output.html]
+git-repository-url = "https://github.com/0xMiden/air-script/"
+mathjax-support = true
 
 [output.linkcheck]
 warning-policy = "ignore"

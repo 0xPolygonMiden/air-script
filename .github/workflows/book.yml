@@ -47,6 +47,9 @@ jobs:
       - name: Build book
         run: mdbook build docs/
 
+      - name: Test documentation examples
+        run: make test-docs
+
       # Only Upload documentation if we want to deploy (i.e. push to next).
       - name: Setup Pages
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/next' }}
@@ -58,7 +61,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           # We specify multiple [output] sections in our book.toml which causes mdbook to create separate folders for each. This moves the generated `html` into its own `html` subdirectory.
-          path: ./docs/book/html
+          path: ./docs/target/book/html
 
   # Deployment job only runs on push to next.
   deploy:

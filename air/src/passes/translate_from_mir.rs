@@ -321,10 +321,7 @@ impl AirBuilder<'_> {
                 let child = accessor.indexable.clone();
                 let child = indexed_accessor(&child);
 
-                let Some(value) = child.as_value() else {
-                    unreachable!("Expected value in accessor, found: {:?}", child);
-                };
-
+                let value = child.as_value().expect("Expected value in accessor");
                 let mir_value = &value.value.value;
 
                 let value = match mir_value {

@@ -4,11 +4,11 @@ use winter_math::{ExtensionOf, FieldElement, ToElements};
 use winter_utils::{ByteWriter, Serializable};
 
 pub struct PublicInputs {
-    stack_inputs: [Felt; 16],
+    stack_inputs: [Felt; 1],
 }
 
 impl PublicInputs {
-    pub fn new(stack_inputs: [Felt; 16]) -> Self {
+    pub fn new(stack_inputs: [Felt; 1]) -> Self {
         Self { stack_inputs }
     }
 }
@@ -27,18 +27,18 @@ impl ToElements<Felt> for PublicInputs {
     }
 }
 
-pub struct EvaluatorsAir {
+pub struct SelectorsAir {
     context: AirContext<Felt>,
-    stack_inputs: [Felt; 16],
+    stack_inputs: [Felt; 1],
 }
 
-impl EvaluatorsAir {
+impl SelectorsAir {
     pub fn last_step(&self) -> usize {
         self.trace_length() - self.context().num_transition_exemptions()
     }
 }
 
-impl Air for EvaluatorsAir {
+impl Air for SelectorsAir {
     type BaseField = Felt;
     type PublicInputs = PublicInputs;
 
@@ -47,7 +47,7 @@ impl Air for EvaluatorsAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1)];
+        let main_degrees = vec![TransitionConstraintDegree::new(3), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(3)];
         let aux_degrees = vec![];
         let num_main_assertions = 1;
         let num_aux_assertions = 0;
@@ -70,7 +70,7 @@ impl Air for EvaluatorsAir {
 
     fn get_assertions(&self) -> Vec<Assertion<Felt>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(0, 0, Felt::ZERO));
+        result.push(Assertion::single(5, 0, Felt::ZERO));
         result
     }
 
@@ -82,16 +82,9 @@ impl Air for EvaluatorsAir {
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
-        result[0] = main_next[0] - main_current[0];
-        result[1] = main_next[2] - main_current[2];
-        result[2] = main_next[6] - main_current[6];
-        result[3] = main_current[0] * main_current[0] - main_current[0];
-        result[4] = main_current[1] * main_current[1] - main_current[1];
-        result[5] = main_current[2] * main_current[2] - main_current[2];
-        result[6] = main_current[3] * main_current[3] - main_current[3];
-        result[7] = main_current[4];
-        result[8] = main_current[5] - E::ONE;
-        result[9] = main_current[6] - E::from(Felt::new(4_u64));
+        result[0] = (main_current[0] + (E::ONE - main_current[0]) * main_current[1]) * main_current[3] + (E::ONE - main_current[0]) * (E::ONE - main_current[1]) * (main_current[4] - E::from(Felt::new(8_u64)));
+        result[1] = (E::ONE - main_current[0]) * (main_current[5] - E::from(Felt::new(8_u64))) + main_current[0] * (main_current[4] - E::from(Felt::new(2_u64)));
+        result[2] = main_current[0] * (main_current[5] - E::from(Felt::new(4_u64))) + (E::ONE - main_current[0]) * main_current[1] * (main_current[4] - E::from(Felt::new(6_u64)));
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxRandElements<E>, result: &mut [E])

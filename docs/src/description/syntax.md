@@ -41,13 +41,13 @@ Parentheses (`(` and `)`) are supported and can be included in any expression ex
 
 The following is allowed:
 
-```
+```air
 a * (b + c)
 ```
 
 The following is not allowed:
 
-```
+```air
 a^(2 + 3)
 ```
 
@@ -68,7 +68,7 @@ The following accessor may only be applied to public inputs declared in `public_
 
 Here is an example of usage of first and last boundaries and a public input within a boundary constraint:
 
-```
+```air
 trace_columns {
     main: [a],
 }
@@ -92,7 +92,7 @@ The following accessor may only be applied to trace columns when they are refere
 
 Here is an example of usage of the Next Row operator within an integrity constraint:
 
-```
+```air
 trace_columns {
   main: [a, b],
 }
