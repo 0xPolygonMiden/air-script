@@ -7,7 +7,7 @@ use super::visitor::Visitor;
 use crate::{
     CompileError,
     ir::{
-        BackLink, ConstantValue, Graph, Link, Mir, MirAccessType, MirValue, Node, Op, Parent,
+        ConstantValue, Graph, Link, Mir, MirAccessType, MirValue, Node, Op, Parent,
         SpannedMirValue, Value,
     },
     passes::handle_accessor_visit,
@@ -40,11 +40,7 @@ impl<'a> ConstantPropagation<'a> {
 // each visit_*_bis function returns an Option<Link<Op>> instead of Result<(), CompileError>,
 // to mutate the nodes (e.g. modifying a Add(lhs, rhs) to Value(lhs + rhs)).
 impl ConstantPropagation<'_> {
-    fn visit_add_bis(
-        &mut self,
-        _graph: &mut Graph,
-        add: Link<Op>,
-    ) -> Result<Option<Link<Op>>, CompileError> {
+    fn visit_add_bis(&mut self, add: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
         // safe to unwrap because we just dispatched on it
         let add_ref = add.as_add().unwrap();
         let lhs = add_ref.lhs.clone();
@@ -59,11 +55,7 @@ impl ConstantPropagation<'_> {
         }
     }
 
-    fn visit_sub_bis(
-        &mut self,
-        _graph: &mut Graph,
-        sub: Link<Op>,
-    ) -> Result<Option<Link<Op>>, CompileError> {
+    fn visit_sub_bis(&mut self, sub: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
         // safe to unwrap because we just dispatched on it
         let sub_ref = sub.as_sub().unwrap();
         let lhs = sub_ref.lhs.clone();
@@ -76,11 +68,7 @@ impl ConstantPropagation<'_> {
         }
     }
 
-    fn visit_mul_bis(
-        &mut self,
-        _graph: &mut Graph,
-        mul: Link<Op>,
-    ) -> Result<Option<Link<Op>>, CompileError> {
+    fn visit_mul_bis(&mut self, mul: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
         // safe to unwrap because we just dispatched on it
         let mul_ref = mul.as_mul().unwrap();
         let lhs = mul_ref.lhs.clone();
@@ -97,11 +85,7 @@ impl ConstantPropagation<'_> {
         }
     }
 
-    fn visit_exp_bis(
-        &mut self,
-        _graph: &mut Graph,
-        exp: Link<Op>,
-    ) -> Result<Option<Link<Op>>, CompileError> {
+    fn visit_exp_bis(&mut self, exp: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
         // safe to unwrap because we just dispatched on it
         let exp_ref = exp.as_exp().unwrap();
         let lhs = exp_ref.lhs.clone();
@@ -122,11 +106,7 @@ impl ConstantPropagation<'_> {
         }
     }
 
-    fn visit_accessor_bis(
-        &mut self,
-        _graph: &mut Graph,
-        accessor: Link<Op>,
-    ) -> Result<Option<Link<Op>>, CompileError> {
+    fn visit_accessor_bis(&mut self, accessor: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
         handle_accessor_visit(accessor.clone(), true, self.diagnostics)
     }
 }
@@ -156,7 +136,7 @@ impl Visitor for ConstantPropagation<'_> {
         combined_roots.collect()
     }
 
-    fn visit_node(&mut self, graph: &mut Graph, node: Link<Node>) -> Result<(), CompileError> {
+    fn visit_node(&mut self, _graph: &mut Graph, node: Link<Node>) -> Result<(), CompileError> {
         if node.is_stale() {
             return Ok(());
         }
@@ -164,38 +144,29 @@ impl Visitor for ConstantPropagation<'_> {
         // In this pass, we both need to dispatch the visitor depending on the node type,
         // and also mutate the node if needed. We implement custom visit_*_bis methods
         // that returns a Some(updated_node) if we need to update the node's value.
-        let updated_op: Result<Option<Link<Op>>, CompileError> = match node.borrow().deref() {
-            Node::Add(a) => to_link_and(a.clone(), graph, |g, el| self.visit_add_bis(g, el)),
-            Node::Sub(s) => to_link_and(s.clone(), graph, |g, el| self.visit_sub_bis(g, el)),
-            Node::Mul(m) => to_link_and(m.clone(), graph, |g, el| self.visit_mul_bis(g, el)),
-            Node::Exp(e) => to_link_and(e.clone(), graph, |g, el| self.visit_exp_bis(g, el)),
-            Node::Accessor(a) => {
-                to_link_and(a.clone(), graph, |g, el| self.visit_accessor_bis(g, el))
-            },
-            // For all the following cases, there is nothing to fold
+        let updated_op: Option<Link<Op>> = match node.borrow().deref() {
+            Node::Add(a) => a.to_link().map_or(Ok(None), |el| self.visit_add_bis(el))?,
+            Node::Sub(s) => s.to_link().map_or(Ok(None), |el| self.visit_sub_bis(el))?,
+            Node::Mul(m) => m.to_link().map_or(Ok(None), |el| self.visit_mul_bis(el))?,
+            Node::Exp(e) => e.to_link().map_or(Ok(None), |el| self.visit_exp_bis(el))?,
+            Node::Accessor(e) => e.to_link().map_or(Ok(None), |el| self.visit_accessor_bis(el))?,
             Node::Vector(_)
             | Node::Matrix(_)
             | Node::Enf(_)
             | Node::Boundary(_)
             | Node::BusOp(_)
             | Node::Value(_)
-            | Node::None(_) => Ok(None),
-            Node::Function(_) | Node::Evaluator(_) | Node::Call(_) => {
+            | Node::None(_) => None,
+            _ => {
                 unreachable!(
-                    "Unexpected node during Mir's ConstantPropagation: Function, Evaluators and Calls should have been inlined before this pass. Found: {:?}",
-                    node
-                );
-            },
-            Node::If(_) | Node::For(_) | Node::Fold(_) | Node::Parameter(_) => {
-                unreachable!(
-                    "Unexpected node during Mir's ConstantPropagation: If, For, Fold and Parameter should have been unrolled before this pass. Found: {:?}",
+                    "Unexpected node during Mir's ConstantPropagation: Function, Evaluators, Calls, If, For, Fold and Parameter should have been inlined and unrolled before this pass. Found: {:?}",
                     node
                 );
             },
         };
 
         // We update the node if needed
-        if let Some(updated_op) = updated_op? {
+        if let Some(updated_op) = updated_op {
             node.as_op().unwrap().set(&updated_op);
         }
 
@@ -205,23 +176,6 @@ impl Visitor for ConstantPropagation<'_> {
 
 // HELPERS FUNCTIONS
 // ================================================================================================
-
-/// Tries to upgrade a BackLink to a Link<Op> and apply a given closure to it if it is successful,
-/// otherwise returns None.
-fn to_link_and<F>(
-    back: BackLink<Op>,
-    graph: &mut Graph,
-    f: F,
-) -> Result<Option<Link<Op>>, CompileError>
-where
-    F: FnOnce(&mut Graph, Link<Op>) -> Result<Option<Link<Op>>, CompileError>,
-{
-    if let Some(op) = back.to_link() {
-        f(graph, op)
-    } else {
-        Ok(None)
-    }
-}
 
 /// Helper function to extract the constant felt value from a Link<Op> if it is one.
 fn get_inner_const(value: &Link<Op>) -> Option<u64> {
