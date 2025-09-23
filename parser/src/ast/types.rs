@@ -18,7 +18,6 @@ impl Access for Type {
                         Ok(Self::Vector(sty, slice_range.len()))
                     }
                 },
-                AccessType::Index(idx) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 AccessType::Index(_) => Ok(Self::Scalar(sty)),
                 AccessType::Matrix(..) => Err(InvalidAccessError::IndexIntoScalar),
                 _ => unreachable!(),
@@ -32,11 +31,7 @@ impl Access for Type {
                         Ok(Self::Matrix(sty, slice_range.len(), cols))
                     }
                 },
-                AccessType::Index(idx) if idx >= rows => Err(InvalidAccessError::IndexOutOfBounds),
                 AccessType::Index(_) => Ok(Self::Vector(sty, cols)),
-                AccessType::Matrix(row, col) if row >= rows || col >= cols => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                },
                 AccessType::Matrix(..) => Ok(Self::Scalar(sty)),
                 _ => unreachable!(),
             },

@@ -1,10 +1,35 @@
 use std::hash::Hash;
 
-use air_parser::ast::{Access, AccessType};
 use air_types::*;
 use miden_diagnostics::{SourceSpan, Spanned};
 
 use crate::ir::{BackLink, Builder, BuilderHook, Child, Link, Node, Op, Owner, Parent, Singleton};
+
+pub trait MirAccess {
+    type Accessed;
+    /// Return a new [Type] representing the type of the value produced by the given [MirAccessType]
+    fn mir_access(&self, access_type: MirAccessType) -> Self::Accessed;
+}
+
+impl MirAccess for Type {
+    type Accessed = Self;
+    /// Return a new [Type] representing the type of the value produced by the given [MirAccessType]
+    fn mir_access(&self, access_type: MirAccessType) -> Self::Accessed {
+        match *self {
+            ty if access_type == MirAccessType::Default => ty,
+            Self::Scalar(sty) => Self::Scalar(sty),
+            Self::Vector(sty, _len) => match access_type {
+                MirAccessType::Index(_) => Self::Scalar(sty),
+                _ => unreachable!(),
+            },
+            Self::Matrix(sty, _rows, cols) => match access_type {
+                MirAccessType::Index(_) => Self::Vector(sty, cols),
+                MirAccessType::Matrix(..) => Self::Scalar(sty),
+                _ => unreachable!(),
+            },
+        }
+    }
+}
 
 /// A MIR operation to represent accessing a given op, `indexable`, in two different ways:
 /// - access_type: AccessType, which describes for example how to access a given index for a Vector
@@ -15,7 +40,7 @@ use crate::ir::{BackLink, Builder, BuilderHook, Child, Link, Node, Op, Owner, Pa
 pub struct Accessor {
     pub parents: Vec<BackLink<Owner>>,
     pub indexable: Link<Op>,
-    pub access_type: AccessType,
+    pub access_type: MirAccessType,
     pub offset: usize,
     pub _node: Singleton<Node>,
     pub _owner: Singleton<Owner>,
@@ -44,18 +69,22 @@ impl Typing for Accessor {
 
 impl BuilderHook for Accessor {
     fn finalize_hook(&mut self) {
-        self._ty = self
-            .indexable
-            .borrow()
-            .ty()
-            .map(|ty| ty.access(self.access_type.clone()).unwrap());
+        self._ty = self.indexable.borrow().ty().map(|ty| ty.mir_access(self.access_type.clone()));
     }
+}
+
+#[derive(Hash, Clone, PartialEq, Eq, Debug, Default)]
+pub enum MirAccessType {
+    #[default]
+    Default,
+    Index(Link<Op>),
+    Matrix(Link<Op>, Link<Op>),
 }
 
 impl Accessor {
     pub fn create(
         indexable: Link<Op>,
-        access_type: AccessType,
+        access_type: MirAccessType,
         offset: usize,
         span: SourceSpan,
     ) -> Link<Op> {
@@ -74,7 +103,14 @@ impl Accessor {
 impl Parent for Accessor {
     type Child = Op;
     fn children(&self) -> Link<Vec<Link<Self::Child>>> {
-        Link::new(vec![self.indexable.clone()])
+        let vec = match self.access_type {
+            MirAccessType::Default => vec![self.indexable.clone()],
+            MirAccessType::Index(ref idx) => vec![self.indexable.clone(), idx.clone()],
+            MirAccessType::Matrix(ref row, ref col) => {
+                vec![self.indexable.clone(), row.clone(), col.clone()]
+            },
+        };
+        Link::new(vec)
     }
 }
 

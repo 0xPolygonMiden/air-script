@@ -169,11 +169,12 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                             offset: 0,
                             size: segment.size,
                             ty: ty!(felt[segment.size]).unwrap(),
+                            access: None,
                         })
                     ),
                     None
                 );
-                for binding in segment.bindings.iter().copied() {
+                for binding in segment.bindings.iter().cloned() {
                     assert_eq!(
                         self.locals.insert(
                             NamespacedIdentifier::Binding(binding.name.unwrap()),
@@ -184,6 +185,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                                 offset: binding.offset,
                                 size: binding.size,
                                 ty: binding.ty,
+                                access: binding.access,
                             })
                         ),
                         None
@@ -347,6 +349,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                         offset: trace_binding.offset,
                         size: trace_binding.size,
                         ty: trace_binding.ty,
+                        access: trace_binding.access.clone(),
                     }),
                 );
             }
@@ -591,7 +594,10 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
             match self.expr_binding_type(iterable) {
                 Ok(iterable_binding_ty) => {
                     let binding_ty = iterable_binding_ty
-                        .access(AccessType::Index(0))
+                        .access(AccessType::Index(Box::new(ScalarExpr::Const(Span::new(
+                            iterable.span(),
+                            0,
+                        )))))
                         .expect("unexpected scalar iterable");
                     binding_tys.push((binding, iterable.span(), Some(binding_ty)));
                 },
@@ -1243,7 +1249,7 @@ impl SemanticAnalysis<'_> {
             Expr::SymbolAccess(access) => {
                 match self.access_binding_type(access) {
                     Ok(BindingType::TraceColumn(tr) | BindingType::TraceParam(tr)) => {
-                        if tr.size == param.size {
+                        if tr.tb_size() == param.size {
                             // Success, the argument and parameter types match up, but
                             // we must make sure the segments also match
                             let same_segment = tr.segment == param.id;
@@ -1252,27 +1258,27 @@ impl SemanticAnalysis<'_> {
                                 let segment_name = segment_id_to_name(tr.segment);
                                 self.has_type_errors = true;
                                 self.diagnostics
-                                    .diagnostic(Severity::Error)
-                                    .with_message("invalid evaluator function argument")
-                                    .with_primary_label(
-                                        arg.span(),
-                                        format!(
-                                            "callee expects columns from the {expected_segment} trace"),
-                                    )
-                                    .with_secondary_label(
-                                        tr.span,
-                                        format!(
-                                            "but this column is from the {segment_name} trace"),
-                                    )
-                                    .emit();
+                                        .diagnostic(Severity::Error)
+                                        .with_message("invalid evaluator function argument")
+                                        .with_primary_label(
+                                            arg.span(),
+                                            format!(
+                                                "callee expects columns from the {expected_segment} trace"),
+                                        )
+                                        .with_secondary_label(
+                                            tr.span,
+                                            format!(
+                                                "but this column is from the {segment_name} trace"),
+                                        )
+                                        .emit();
                             }
                         } else {
                             self.has_type_errors = true;
                             self.diagnostics.diagnostic(Severity::Error)
-                                .with_message("invalid call")
-                                .with_primary_label(span, "type mismatch in function argument")
-                                .with_secondary_label(arg.span(), format!("callee expects {} trace columns here, but this binding provides {}", param.size, tr.size))
-                                .emit();
+                                    .with_message("invalid call")
+                                    .with_primary_label(span, "type mismatch in function argument")
+                                    .with_secondary_label(arg.span(), format!("callee expects {} trace columns here, but this binding provides {}", param.size, tr.tb_size()))
+                                    .emit();
                         }
                     },
                     Ok(BindingType::Vector(ref elems)) => {
@@ -1281,25 +1287,25 @@ impl SemanticAnalysis<'_> {
                             match elem {
                                 BindingType::TraceColumn(tr) | BindingType::TraceParam(tr) => {
                                     if tr.segment == param.id {
-                                        size += tr.size;
+                                        size += tr.tb_size();
                                     } else {
                                         let expected_segment = segment_id_to_name(param.id);
                                         let segment_name = segment_id_to_name(tr.segment);
                                         self.has_type_errors = true;
                                         self.diagnostics
-                                            .diagnostic(Severity::Error)
-                                            .with_message("invalid evaluator function argument")
-                                            .with_primary_label(
-                                                arg.span(),
-                                                format!(
-                                                    "callee expects columns from the {expected_segment} trace"),
-                                            )
-                                            .with_secondary_label(
-                                                tr.span,
-                                                format!(
-                                                    "but this column is from the {segment_name} trace"),
-                                            )
-                                            .emit();
+                                                .diagnostic(Severity::Error)
+                                                .with_message("invalid evaluator function argument")
+                                                .with_primary_label(
+                                                    arg.span(),
+                                                    format!(
+                                                        "callee expects columns from the {expected_segment} trace"),
+                                                )
+                                                .with_secondary_label(
+                                                    tr.span,
+                                                    format!(
+                                                        "but this column is from the {segment_name} trace"),
+                                                )
+                                                .emit();
                                         return ControlFlow::Continue(());
                                     }
                                 },
@@ -1372,7 +1378,7 @@ impl SemanticAnalysis<'_> {
                     match self.expr_binding_type(elem) {
                         Ok(BindingType::TraceColumn(tr) | BindingType::TraceParam(tr)) => {
                             if tr.segment == param.id {
-                                size += tr.size;
+                                size += tr.tb_size();
                             } else {
                                 let expected_segment = segment_id_to_name(param.id);
                                 let segment_name = segment_id_to_name(tr.segment);
@@ -1457,15 +1463,19 @@ impl SemanticAnalysis<'_> {
 
                         // Ensure the referenced symbol was a trace column, and that it produces a
                         // scalar value, or a bus
-                        let (found, _segment) =
-                            match self.resolvable_binding_type(&access.column.name) {
-                                Ok(ty) => match ty.item.access(access.column.access_type.clone()) {
+                        let (found, _segment) = match self
+                            .resolvable_binding_type(&access.column.name)
+                        {
+                            Ok(ty) => {
+                                let accessed_ty = ty.item.access(access.column.access_type.clone());
+                                match accessed_ty.clone() {
                                     Ok(BindingType::TraceColumn(tb))
                                     | Ok(BindingType::TraceParam(tb)) => {
-                                        if tb.is_scalar() {
-                                            (ty, tb.segment)
+                                        let tb_type = tb.ty();
+                                        if tb_type.is_scalar() {
+                                            (Span::new(ty.span(), accessed_ty.unwrap()), tb.segment)
                                         } else {
-                                            let inferred = tb.ty();
+                                            let inferred = tb_type;
                                             return self.type_mismatch(
                                                 inferred.as_ref(),
                                                 access.span(),
@@ -1497,12 +1507,13 @@ impl SemanticAnalysis<'_> {
                                         );
                                     },
                                     _ => return ControlFlow::Break(SemanticAnalysisError::Invalid),
-                                },
-                                Err(_) => {
-                                    // We've already raised a diagnostic for the undefined variable
-                                    return ControlFlow::Break(SemanticAnalysisError::Invalid);
-                                },
-                            };
+                                }
+                            },
+                            Err(_) => {
+                                // We've already raised a diagnostic for the undefined variable
+                                return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                            },
+                        };
 
                         match (found.clone().item, expr.rhs.as_mut()) {
                             // Buses boundaries can be constrained by null or set to be

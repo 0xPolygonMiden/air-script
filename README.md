@@ -25,7 +25,54 @@ The project is organized into several crates as follows:
 | [MIR](mir) | Contains the middle intermediate representation (`MIR`). The purpose of the `MIR` is to provide a representation of an AirScript program that allows for optimization and translation to `AirIR` containing the `AlgebraicGraph`. |
 | [AIR](air) | Contains the IR for AirScript, `AirIR`. `AirIR` is initialized with an AirScript MIR, which it converts to an internal representation that can be optimized and used to generate code in multiple target languages. |
 | [Winterfell code generator](codegen/winterfell/) | Contains a code generator targeting the [Winterfell prover](https://github.com/novifinancial/winterfell) Rust library. The Winterfell code generator converts a provided AirScript `AirIR` into Rust code that represents the AIR as a new custom struct that implements Winterfell's `Air` trait. |
+| [ACE code generator](codegen/ace/) | Contains a code generator targeting Miden VM's ACE (Arithmetic Circuit Evaluation) chiplet. Converts AirScript constraints into arithmetic circuits optimized for recursive STARK proof verification within Miden assembly programs. |
 | [AirScript](air-script) | Aggregates all components of the AirScript compiler into a single place and provides a CLI as an executable to transpile AIRs defined in AirScript to the specified target language. Also contains integration tests for AirScript. |
+
+## Documentation and Examples
+
+AirScript documentation uses mdBook and is located in the `docs/` directory. Examples are stored in `docs/examples/` and are included in the documentation using mdBook's include syntax.
+
+### Adding New Examples
+
+To add a new example to the documentation:
+
+1. **Create the example file**: Add your `.air` file to `docs/examples/`
+2. **Test compilation**: Ensure the example compiles using the CLI:
+   ```bash
+   cargo build --release
+   target/release/airc transpile docs/examples/your_example.air -o /tmp/test.rs
+   ```
+3. **Include in documentation**: Add the example to the relevant markdown file in `docs/src/` using:
+   
+      ```air
+      {{#include ../../examples/your_example.air}}
+      ```
+      
+### Testing Documentation Examples
+
+The project includes an integration test that ensures all documentation examples compile successfully:
+
+```bash
+cargo test -p air-script --test docs_sync
+```
+
+This test automatically:
+- Builds the AirScript CLI tool
+- Finds all `.air` files in `docs/examples/`
+- Transpiles each example to verify compilation
+- Cleans up generated files
+
+The `docs_sync` test runs as part of the CI pipeline to ensure documentation examples remain valid and up-to-date.
+
+### Documentation Build Test
+
+The project also includes a documentation build test that runs as part of CI:
+
+```bash
+make test-docs
+```
+
+This test ensures that the documentation builds correctly and validates that `docs/build.rs` runs properly when the `DOCS_TEST` environment variable is set.
 
 ## Contributing to AirScript
 

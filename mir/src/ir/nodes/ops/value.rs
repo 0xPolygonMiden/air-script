@@ -147,7 +147,7 @@ pub struct TraceAccess {
     /// The type of the value being accessed, if known.
     /// Defaults to None until the access is resolved.
     /// This should only be a felt or [felt; n] type.
-    ty: Option<Type>,
+    pub ty: Option<Type>,
 }
 impl TraceAccess {
     /// Creates a new [TraceAccess].
@@ -218,7 +218,7 @@ pub struct PublicInputAccess {
     pub index: usize,
     /// The type of the value being accessed, if known.
     /// Defaults to None until the access is resolved.
-    ty: Option<Type>,
+    pub ty: Option<Type>,
 }
 impl PublicInputAccess {
     pub const fn new(name: Identifier, index: usize) -> Self {

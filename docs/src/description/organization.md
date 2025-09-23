@@ -21,7 +21,7 @@ Note that constants and evaluators are not really distinct sections but rather a
 
 ### Root module
 A root module defines an entrypoint into an AirScript project. It must start with a name declaration which consists of a `def` keyword followed by the name of the AIR project. For example:
-```
+```air
 def ExampleAir
 ```
 where the name of the module must:
@@ -40,7 +40,7 @@ To aid with boundary and integrity constraint descriptions, a root module may al
 
 ### Library modules
 Library modules can be used to split integrity constraint descriptions across multiple files. A library module must start with a name declaration which consists of a `mod` keyword followed by the name of the module. For example:
-```
+```air
 mod example_module
 ```
 where the name of the module must:
@@ -55,7 +55,7 @@ Library modules inherit buses declarations of the root module. That is, evaluato
 
 ## Importing evaluators
 A module can import constants and evaluators from library modules via a `use` statement. For example:
-```
+```air
 use my_module::my_evaluator
 use my_module::my_constant
 ```
@@ -66,7 +66,7 @@ where:
 Once an evaluator or a constant is imported, it can be used in the same way as evaluators and constants defined in the importing module.
 
 To import multiple evaluators and constants, multiple `use` statements must be used:
-```
+```air
 use my_module::foo
 use my_module::bar
 use my_other_module::baz

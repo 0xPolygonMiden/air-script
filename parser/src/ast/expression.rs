@@ -913,7 +913,7 @@ pub trait Access {
 }
 
 /// Represents the way an identifier is accessed/referenced in the source.
-#[derive(Hash, Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub enum AccessType {
     /// Access refers to the entire bound value
     #[default]
@@ -923,9 +923,9 @@ pub enum AccessType {
     /// Access binds the value at a specific index of an aggregate value (i.e. vector or matrix)
     ///
     /// The result type may be either a scalar or a vector, depending on the type of the aggregate
-    Index(usize),
+    Index(Box<ScalarExpr>),
     /// Access binds the value at a specific row and column of a matrix value
-    Matrix(usize, usize),
+    Matrix(Box<ScalarExpr>, Box<ScalarExpr>),
 }
 impl fmt::Display for AccessType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1014,7 +1014,7 @@ impl SymbolAccess {
             AccessType::Slice(base_range) => {
                 self.access_slice(base_range.to_slice_range(), access_type)
             },
-            AccessType::Index(base_idx) => self.access_index(*base_idx, access_type),
+            AccessType::Index(base_idx) => self.access_index(base_idx.clone(), access_type),
             AccessType::Matrix(..) => match access_type {
                 AccessType::Default => Ok(self.clone()),
                 _ => Err(InvalidAccessError::IndexIntoScalar),
@@ -1028,15 +1028,11 @@ impl SymbolAccess {
             AccessType::Default => Ok(self.clone()),
             AccessType::Index(idx) => match ty {
                 Type::Scalar(_) => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Vector(_, len) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Vector(sty, _) => Ok(Self {
                     access_type: AccessType::Index(idx),
                     ty: ty!(sty),
                     ..self.clone()
                 }),
-                Type::Matrix(_, rows, _) if idx >= rows => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                },
                 Type::Matrix(sty, _, cols) => Ok(Self {
                     access_type: AccessType::Index(idx),
                     ty: ty!(sty[cols]),
@@ -1050,17 +1046,11 @@ impl SymbolAccess {
                 // let rlen = slice_range.end.abs_diff(slice_range.start);
                 match ty {
                     Type::Scalar(_) => Err(InvalidAccessError::IndexIntoScalar),
-                    Type::Vector(_, len) if slice_range.end > len => {
-                        Err(InvalidAccessError::IndexOutOfBounds)
-                    },
                     Type::Vector(sty, _) => Ok(Self {
                         access_type: AccessType::Slice(range),
                         ty: ty!(sty[rlen]),
                         ..self.clone()
                     }),
-                    Type::Matrix(_, rows, _) if slice_range.end > rows => {
-                        Err(InvalidAccessError::IndexOutOfBounds)
-                    },
                     Type::Matrix(sty, _, cols) => Ok(Self {
                         access_type: AccessType::Slice(range),
                         ty: ty!(sty[rlen, cols]),
@@ -1070,9 +1060,6 @@ impl SymbolAccess {
             },
             AccessType::Matrix(row, col) => match ty {
                 Type::Scalar(_) | Type::Vector(..) => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Matrix(_, rows, cols) if row >= rows || col >= cols => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                },
                 Type::Matrix(sty, ..) => Ok(Self {
                     access_type: AccessType::Matrix(row, col),
                     ty: ty!(sty),
@@ -1092,20 +1079,50 @@ impl SymbolAccess {
             AccessType::Default => Ok(self.clone()),
             AccessType::Index(idx) => match ty {
                 Type::Scalar(_) => unreachable!(),
-                Type::Vector(_, len) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
-                Type::Vector(sty, _) => Ok(Self {
-                    access_type: AccessType::Index(base_range.start + idx),
-                    ty: ty!(sty),
-                    ..self.clone()
-                }),
-                Type::Matrix(_, rows, _) if idx >= rows => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
+                Type::Vector(sty, _) => {
+                    let lhs_expr = Box::new(ScalarExpr::Const(Span::new(
+                        self.span(),
+                        base_range.start as u64,
+                    )));
+                    let rhs_expr = idx.clone();
+                    let mut bin_ty = BinType::Add(lhs_expr.ty(), rhs_expr.ty(), None);
+                    let res = bin_ty.infer_bin_ty_add().unwrap();
+                    *bin_ty.result_mut() = res;
+                    let binary_expr = BinaryExpr {
+                        span: self.span(),
+                        op: BinaryOp::Add,
+                        lhs: lhs_expr,
+                        rhs: rhs_expr,
+                        bin_ty: Some(bin_ty),
+                    };
+                    Ok(Self {
+                        access_type: AccessType::Index(Box::new(ScalarExpr::Binary(binary_expr))),
+                        ty: ty!(sty),
+                        ..self.clone()
+                    })
                 },
-                Type::Matrix(sty, _, cols) => Ok(Self {
-                    access_type: AccessType::Index(base_range.start + idx),
-                    ty: ty!(sty[cols]),
-                    ..self.clone()
-                }),
+                Type::Matrix(sty, _, cols) => {
+                    let lhs_expr = Box::new(ScalarExpr::Const(Span::new(
+                        self.span(),
+                        base_range.start as u64,
+                    )));
+                    let rhs_expr = idx.clone();
+                    let mut bin_ty = BinType::Add(lhs_expr.ty(), rhs_expr.ty(), None);
+                    let res = bin_ty.infer_bin_ty_add().unwrap();
+                    *bin_ty.result_mut() = res;
+                    let binary_expr = BinaryExpr {
+                        span: self.span(),
+                        op: BinaryOp::Add,
+                        lhs: lhs_expr,
+                        rhs: rhs_expr,
+                        bin_ty: Some(bin_ty),
+                    };
+                    Ok(Self {
+                        access_type: AccessType::Index(Box::new(ScalarExpr::Binary(binary_expr))),
+                        ty: ty!(sty[cols]),
+                        ..self.clone()
+                    })
+                },
             },
             AccessType::Slice(range) => {
                 let slice_range = range.to_slice_range();
@@ -1140,9 +1157,6 @@ impl SymbolAccess {
             },
             AccessType::Matrix(row, col) => match ty {
                 Type::Scalar(_) | Type::Vector(..) => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Matrix(_, rows, cols) if row >= rows || col >= cols => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                },
                 Type::Matrix(sty, ..) => Ok(Self {
                     access_type: AccessType::Matrix(row, col),
                     ty: ty!(sty),
@@ -1154,7 +1168,7 @@ impl SymbolAccess {
 
     fn access_index(
         &self,
-        base_idx: usize,
+        base_idx: Box<ScalarExpr>,
         access_type: AccessType,
     ) -> Result<Self, InvalidAccessError> {
         let ty = self.ty.unwrap();
@@ -1162,15 +1176,11 @@ impl SymbolAccess {
             AccessType::Default => Ok(self.clone()),
             AccessType::Index(idx) => match ty {
                 Type::Scalar(_) => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Vector(_, len) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Vector(sty, _) => Ok(Self {
                     access_type: AccessType::Matrix(base_idx, idx),
                     ty: ty!(sty),
                     ..self.clone()
                 }),
-                Type::Matrix(_, rows, _) if idx >= rows => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                },
                 Type::Matrix(sty, _, cols) => Ok(Self {
                     access_type: AccessType::Matrix(base_idx, idx),
                     ty: ty!(sty[cols]),

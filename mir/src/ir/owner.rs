@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use miden_diagnostics::Spanned;
 
-use crate::ir::{BackLink, Child, Link, Node, Stale, Op, Parent, Root};
+use crate::ir::{BackLink, Child, Link, Node, Op, Parent, Root, Stale};
 
 /// The nodes that can own [Op] nodes
 /// The [Owner] enum does not own it's inner struct to avoid reference cycles,

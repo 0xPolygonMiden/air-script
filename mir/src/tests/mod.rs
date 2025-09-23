@@ -1,6 +1,7 @@
 mod access;
 mod boundary_constraints;
 mod buses;
+mod computed_indices;
 mod constant;
 mod evaluators;
 mod functions;

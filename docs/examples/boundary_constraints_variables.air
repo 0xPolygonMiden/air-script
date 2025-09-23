@@ -1,0 +1,19 @@
+def BoundaryConstraintsExample_Variables
+
+trace_columns {
+    main: [p1],
+}
+
+public_inputs {
+    stack_inputs: [16],
+}
+
+boundary_constraints {
+    let x = 3
+    let y = 4
+    enf p1.first = x * y
+}
+
+integrity_constraints {
+    enf p1' = p1 + 1;
+}

@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use miden_diagnostics::Spanned;
 
-use crate::ir::{BackLink, Child, Link, Stale, Op, Owner, Parent, Root};
+use crate::ir::{BackLink, Child, Link, Op, Owner, Parent, Root, Stale};
 
 /// All the nodes that can be in the MIR Graph
 /// Combines all [Root] and [Op] variants

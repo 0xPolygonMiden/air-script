@@ -30,6 +30,59 @@ impl<'a> Inlining<'a> {
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self { diagnostics }
     }
+
+    /// Runs the Inlining pass once (with both InliningFirstPass and InliningSecondPass)
+    ///
+    /// Returns true if any calls were inlined, false otherwise, to let the caller know if any
+    /// changes were made or if we reached a fixed point.
+    fn run_once(&mut self, ir: &mut Mir) -> Result<bool, CompileError> {
+        // The first pass only identifies the call graph dependencies and the needed calls to inline
+        let mut first_pass = InliningFirstPass::new(self.diagnostics);
+        Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
+
+        // We then create the inlining order (inlining first the functions and evaluators that do
+        // not call other functions or evaluators)
+        let func_eval_inlining_order =
+            create_inlining_order(self.diagnostics, first_pass.func_eval_dependency_graph.clone())?;
+
+        // The second pass actually inlines the calls
+        let mut second_pass = InliningSecondPass::new(
+            self.diagnostics,
+            func_eval_inlining_order.clone(),
+            first_pass.func_eval_nodes_where_called.clone(),
+        );
+        Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
+
+        Ok(second_pass.had_calls)
+    }
+}
+
+// If we have to run the inlining algorithm `INLINING_LIMIT`, we return an error
+const INLINING_LIMIT: usize = 10;
+
+impl Pass for Inlining<'_> {
+    type Input<'a> = Mir;
+    type Output<'a> = Mir;
+    type Error = CompileError;
+
+    fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
+        let mut had_calls = true;
+        let mut iterations = 0;
+
+        while had_calls && iterations < INLINING_LIMIT {
+            had_calls = self.run_once(&mut ir)?;
+            iterations += 1;
+        }
+
+        if had_calls {
+            self.diagnostics.error(
+                "Inlining call depth limit reached, some calls may not have been inlined. Aborting.".to_string(),
+            );
+            return Err(CompileError::Failed);
+        }
+
+        Ok(ir)
+    }
 }
 
 pub struct InliningFirstPass<'a> {
@@ -86,6 +139,7 @@ pub struct InliningSecondPass<'a> {
 
     // HashMap<CaleePtr, (Callee, Vec<Call nodes where called>)>
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
+    had_calls: bool,
 }
 
 impl<'a> InliningSecondPass<'a> {
@@ -102,34 +156,8 @@ impl<'a> InliningSecondPass<'a> {
             params_for_ref_node: HashMap::new(),
             func_eval_nodes_where_called,
             func_eval_inlining_order,
+            had_calls: false,
         }
-    }
-}
-
-impl Pass for Inlining<'_> {
-    type Input<'a> = Mir;
-    type Output<'a> = Mir;
-    type Error = CompileError;
-
-    fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
-        // The first pass only identifies the call graph dependencies and the needed calls to inline
-        let mut first_pass = InliningFirstPass::new(self.diagnostics);
-        Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
-
-        // We then create the inlining order (inlining first the functions and evaluators that do
-        // not call other functions or evaluators)
-        let func_eval_inlining_order =
-            create_inlining_order(self.diagnostics, first_pass.func_eval_dependency_graph.clone())?;
-
-        // The second pass actually inlines the calls
-        let mut second_pass = InliningSecondPass::new(
-            self.diagnostics,
-            func_eval_inlining_order.clone(),
-            first_pass.func_eval_nodes_where_called.clone(),
-        );
-        Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
-
-        Ok(ir)
     }
 }
 
@@ -283,7 +311,10 @@ impl Visitor for InliningSecondPass<'_> {
         call_nodes_to_inline_in_order
     }
     fn run(&mut self, graph: &mut Graph) -> Result<(), CompileError> {
-        for root_node in self.root_nodes_to_visit(graph).iter() {
+        let root_nodes_to_visit = self.root_nodes_to_visit(graph);
+        self.had_calls = !root_nodes_to_visit.is_empty();
+
+        for root_node in root_nodes_to_visit {
             let mut updated_op = None;
 
             if let Some(op) = root_node.as_op() {
@@ -408,9 +439,10 @@ impl Visitor for InliningSecondPass<'_> {
     }
 
     fn visit_call(&mut self, _graph: &mut Graph, _call: Link<Op>) -> Result<(), CompileError> {
-        let Some(context) = self.call_inlining_context.clone() else {
-            unreachable!("InliningSecondPass::visit_node: call_inlining_context is None");
-        };
+        let context = self
+            .call_inlining_context
+            .clone()
+            .expect("InliningSecondPass::visit_node: call_inlining_context is None");
         if context.pure_function {
             // Instead of scanning all the body, we only scan the last node,
             // which represents the return value of the function
@@ -500,9 +532,9 @@ fn check_evaluator_argument_sizes(
     for ((trace_segment_id, trace_segments_params), trace_segments_arg) in
         callee_params.iter().enumerate().zip(args.iter())
     {
-        let Some(trace_segments_arg_vector) = trace_segments_arg.as_vector() else {
-            unreachable!("expected vector, got {:?}", trace_segments_arg);
-        };
+        let trace_segments_arg_vector = trace_segments_arg
+            .as_vector()
+            .unwrap_or_else(|| panic!("expected vector, got {trace_segments_arg:?}"));
         let children = trace_segments_arg_vector.children();
         let mut trace_segments_arg_vector_len = 0;
         for child in children.borrow().deref() {
@@ -583,11 +615,9 @@ fn check_evaluator_argument_sizes(
 fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
     let mut args_unpacked = Vec::new();
     for args_for_trace_segment in args.iter() {
-        let Some(trace_segment_vec) = args_for_trace_segment.as_vector() else {
-            unreachable!(
-                "Arguments of a Call node to Evaluator should be a Vectors for each trace segment"
-            );
-        };
+        let trace_segment_vec = args_for_trace_segment.as_vector().expect(
+            "Arguments of a Call node to Evaluator should be a Vectors for each trace segment",
+        );
         let children = trace_segment_vec.children();
         for arg in children.borrow().deref() {
             if let Some(value) = arg.as_value() {
@@ -636,7 +666,7 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                         _ => unreachable!("expected trace access binding, got {:?}", value),
                     };
 
-                    args_unpacked.push(indexable.clone());
+                    args_unpacked.push(arg.clone());
                 } else if let Some(parameter) = indexable.as_parameter() {
                     let Parameter { ty, .. } = parameter.deref();
                     let _size = match ty {
@@ -645,7 +675,7 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                         _ => unreachable!("expected felt or vector, got {:?}", ty),
                     };
 
-                    args_unpacked.push(indexable.clone());
+                    args_unpacked.push(arg.clone());
                 } else {
                     unreachable!("expected value or parameter (or accessor on one), got {:?}", arg);
                 }

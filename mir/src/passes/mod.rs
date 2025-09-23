@@ -7,14 +7,18 @@ use std::{collections::HashMap, ops::Deref};
 
 pub use constant_propagation::ConstantPropagation;
 pub use inlining::Inlining;
-use miden_diagnostics::Spanned;
+use miden_diagnostics::{DiagnosticsHandler, Spanned};
 pub use translate::AstToMir;
 pub use unrolling::Unrolling;
 pub use visitor::Visitor;
 
-use crate::ir::{
-    Accessor, Add, Boundary, BusOp, Call, Enf, Exp, Fold, For, If, Link, MatchArm, Matrix, Mul,
-    Node, Op, Owner, Parameter, Parent, Sub, Value, Vector,
+use crate::{
+    CompileError,
+    ir::{
+        Accessor, Add, Boundary, BusOp, Call, ConstantValue, Enf, Exp, Fold, For, If, Link,
+        MatchArm, Matrix, MirAccessType, MirValue, Mul, Node, Op, Owner, Parameter, Parent,
+        PublicInputAccess, SpannedMirValue, Sub, TraceAccess, Value, Vector,
+    },
 };
 
 /// Helper to duplicate a MIR node and its children recursively
@@ -162,10 +166,19 @@ pub fn duplicate_node(
         },
         Op::Accessor(accessor) => {
             let indexable = accessor.indexable.clone();
-            let access_type = accessor.access_type.clone();
+            let new_access_type = match accessor.access_type.clone() {
+                MirAccessType::Default => MirAccessType::Default,
+                MirAccessType::Index(index) => {
+                    MirAccessType::Index(duplicate_node(index, current_replace_map))
+                },
+                MirAccessType::Matrix(row, col) => MirAccessType::Matrix(
+                    duplicate_node(row, current_replace_map),
+                    duplicate_node(col, current_replace_map),
+                ),
+            };
             let offset = accessor.offset;
             let new_indexable = duplicate_node(indexable, current_replace_map);
-            Accessor::create(new_indexable, access_type, offset, accessor.span())
+            Accessor::create(new_indexable, new_access_type, offset, accessor.span())
         },
         Op::BusOp(bus_op) => {
             let bus = bus_op.bus.clone();
@@ -187,8 +200,9 @@ pub fn duplicate_node(
 
             if let Some(_root_ref) = owner_ref.as_root() {
                 new_param.as_parameter_mut().unwrap().set_ref_node(owner_ref);
-            } else if let Some((_replaced_node, replaced_by)) =
-                current_replace_map.get(&owner_ref.as_op().unwrap().get_ptr())
+            } else if let Some(op_ref) = owner_ref.as_op()
+                && let Some((_replaced_node, replaced_by)) =
+                    current_replace_map.get(&op_ref.get_ptr())
             {
                 new_param
                     .as_parameter_mut()
@@ -230,46 +244,46 @@ pub fn duplicate_node_or_replace(
     match node.borrow().deref() {
         Op::Enf(enf) => {
             let expr = enf.expr.clone();
-            let new_expr = current_replace_map.get(&expr.get_ptr()).unwrap().1.clone();
+            let new_expr = current_replace_map[&expr.get_ptr()].1.clone();
             let new_node = Enf::create(new_expr, enf.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::Boundary(boundary) => {
             let expr = boundary.expr.clone();
             let kind = boundary.kind;
-            let new_expr = current_replace_map.get(&expr.get_ptr()).unwrap().1.clone();
+            let new_expr = current_replace_map[&expr.get_ptr()].1.clone();
             let new_node = Boundary::create(new_expr, kind, boundary.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::Add(add) => {
             let lhs = add.lhs.clone();
             let rhs = add.rhs.clone();
-            let new_lhs_node = current_replace_map.get(&lhs.get_ptr()).unwrap().1.clone();
-            let new_rhs_node = current_replace_map.get(&rhs.get_ptr()).unwrap().1.clone();
+            let new_lhs_node = current_replace_map[&lhs.get_ptr()].1.clone();
+            let new_rhs_node = current_replace_map[&rhs.get_ptr()].1.clone();
             let new_node = Add::create(new_lhs_node, new_rhs_node, add.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::Sub(sub) => {
             let lhs = sub.lhs.clone();
             let rhs = sub.rhs.clone();
-            let new_lhs_node = current_replace_map.get(&lhs.get_ptr()).unwrap().1.clone();
-            let new_rhs_node = current_replace_map.get(&rhs.get_ptr()).unwrap().1.clone();
+            let new_lhs_node = current_replace_map[&lhs.get_ptr()].1.clone();
+            let new_rhs_node = current_replace_map[&rhs.get_ptr()].1.clone();
             let new_node = Sub::create(new_lhs_node, new_rhs_node, sub.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::Mul(mul) => {
             let lhs = mul.lhs.clone();
             let rhs = mul.rhs.clone();
-            let new_lhs_node = current_replace_map.get(&lhs.get_ptr()).unwrap().1.clone();
-            let new_rhs_node = current_replace_map.get(&rhs.get_ptr()).unwrap().1.clone();
+            let new_lhs_node = current_replace_map[&lhs.get_ptr()].1.clone();
+            let new_rhs_node = current_replace_map[&rhs.get_ptr()].1.clone();
             let new_node = Mul::create(new_lhs_node, new_rhs_node, mul.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::Exp(exp) => {
             let lhs = exp.lhs.clone();
             let rhs = exp.rhs.clone();
-            let new_lhs_node = current_replace_map.get(&lhs.get_ptr()).unwrap().1.clone();
-            let new_rhs_node = current_replace_map.get(&rhs.get_ptr()).unwrap().1.clone();
+            let new_lhs_node = current_replace_map[&lhs.get_ptr()].1.clone();
+            let new_rhs_node = current_replace_map[&rhs.get_ptr()].1.clone();
             let new_node = Exp::create(new_lhs_node, new_rhs_node, exp.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
@@ -280,9 +294,8 @@ pub fn duplicate_node_or_replace(
                 .iter()
                 .cloned()
                 .map(|arm| {
-                    let new_expr = current_replace_map.get(&arm.expr.get_ptr()).unwrap().1.clone();
-                    let new_cond =
-                        current_replace_map.get(&arm.condition.get_ptr()).unwrap().1.clone();
+                    let new_expr = current_replace_map[&arm.expr.get_ptr()].1.clone();
+                    let new_cond = current_replace_map[&arm.condition.get_ptr()].1.clone();
                     MatchArm::new(new_expr, new_cond)
                 })
                 .collect::<Vec<_>>();
@@ -297,10 +310,10 @@ pub fn duplicate_node_or_replace(
                 .borrow()
                 .iter()
                 .cloned()
-                .map(|iterator| current_replace_map.get(&iterator.get_ptr()).unwrap().1.clone())
+                .map(|iterator| current_replace_map[&iterator.get_ptr()].1.clone())
                 .collect::<Vec<_>>()
                 .into();
-            let new_body = current_replace_map.get(&body.get_ptr()).unwrap().1.clone();
+            let new_body = current_replace_map[&body.get_ptr()].1.clone();
             let new_selector = current_replace_map
                 .get(&selector.get_ptr())
                 .map(|selector| selector.1.clone())
@@ -328,7 +341,7 @@ pub fn duplicate_node_or_replace(
                 .borrow()
                 .iter()
                 .cloned()
-                .map(|argument| current_replace_map.get(&argument.get_ptr()).unwrap().1.clone())
+                .map(|argument| current_replace_map[&argument.get_ptr()].1.clone())
                 .collect::<Vec<_>>();
             let new_node = Call::create(function, new_arguments, call.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
@@ -337,9 +350,8 @@ pub fn duplicate_node_or_replace(
             let iterator = fold.iterator.clone();
             let operator = fold.operator.clone();
             let initial_value = fold.initial_value.clone();
-            let new_iterator = current_replace_map.get(&iterator.get_ptr()).unwrap().1.clone();
-            let new_initial_value =
-                current_replace_map.get(&initial_value.get_ptr()).unwrap().1.clone();
+            let new_iterator = current_replace_map[&iterator.get_ptr()].1.clone();
+            let new_initial_value = current_replace_map[&initial_value.get_ptr()].1.clone();
             let new_node = Fold::create(new_iterator, operator, new_initial_value, fold.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
@@ -350,7 +362,7 @@ pub fn duplicate_node_or_replace(
             let new_children = children
                 .iter()
                 .cloned()
-                .map(|child| current_replace_map.get(&child.get_ptr()).unwrap().1.clone())
+                .map(|child| current_replace_map[&child.get_ptr()].1.clone())
                 .collect();
             let new_node = Vector::create(new_children, vector.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
@@ -372,7 +384,7 @@ pub fn duplicate_node_or_replace(
                 let new_row_as_vec = row_children
                     .iter()
                     .cloned()
-                    .map(|child| current_replace_map.get(&child.get_ptr()).unwrap().1.clone())
+                    .map(|child| current_replace_map[&child.get_ptr()].1.clone())
                     .collect::<Vec<_>>();
                 let new_row = Vector::create(new_row_as_vec, row.span());
                 new_matrix.push(new_row);
@@ -382,10 +394,20 @@ pub fn duplicate_node_or_replace(
         },
         Op::Accessor(accessor) => {
             let indexable = accessor.indexable.clone();
-            let access_type = accessor.access_type.clone();
+            let new_access_type = match accessor.access_type.clone() {
+                MirAccessType::Default => MirAccessType::Default,
+                MirAccessType::Index(index) => {
+                    MirAccessType::Index(current_replace_map[&index.get_ptr()].1.clone())
+                },
+                MirAccessType::Matrix(row, col) => MirAccessType::Matrix(
+                    current_replace_map[&row.get_ptr()].1.clone(),
+                    current_replace_map[&col.get_ptr()].1.clone(),
+                ),
+            };
             let offset = accessor.offset;
-            let new_indexable = current_replace_map.get(&indexable.get_ptr()).unwrap().1.clone();
-            let new_node = Accessor::create(new_indexable, access_type, offset, accessor.span());
+            let new_indexable = current_replace_map[&indexable.get_ptr()].1.clone();
+            let new_node =
+                Accessor::create(new_indexable, new_access_type, offset, accessor.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::BusOp(bus_op) => {
@@ -397,9 +419,9 @@ pub fn duplicate_node_or_replace(
             let new_args = args
                 .iter()
                 .cloned()
-                .map(|arg| current_replace_map.get(&arg.get_ptr()).unwrap().1.clone())
+                .map(|arg| current_replace_map[&arg.get_ptr()].1.clone())
                 .collect();
-            let new_latch = current_replace_map.get(&latch.get_ptr()).unwrap().1.clone();
+            let new_latch = current_replace_map[&latch.get_ptr()].1.clone();
             let new_node = BusOp::create(bus.clone(), kind, new_args, bus_op.span());
 
             // Update latch of cloned bus_op
@@ -424,7 +446,8 @@ pub fn duplicate_node_or_replace(
             };
 
             if owner_ref == ref_owner {
-                let new_node = replace_parameter_list[parameter.position].clone();
+                let replace_by_node = replace_parameter_list[parameter.position].clone();
+                let new_node = duplicate_node(replace_by_node, &mut Default::default());
                 current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
             } else {
                 let new_param =
@@ -448,5 +471,267 @@ pub fn duplicate_node_or_replace(
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::None(_) => {},
+    }
+}
+
+/// Helper function to extract the constant felt value from a Link<Op> if it is one.
+pub fn get_inner_const(value: &Link<Op>) -> Option<u64> {
+    match value.borrow().deref() {
+        Op::Value(Value {
+            value:
+                SpannedMirValue {
+                    value: MirValue::Constant(ConstantValue::Felt(c)),
+                    ..
+                },
+            ..
+        }) => Some(*c),
+        _ => None,
+    }
+}
+
+/// Handle the visit of an accessor node, used for both Unrolling and ConstantPropagation passes
+/// The `compute_indices` bool indicates whether we the indices need to be known constant at this
+/// stage.
+pub fn handle_accessor_visit(
+    accessor: Link<Op>,
+    compute_indices: bool,
+    diagnostics: &DiagnosticsHandler,
+) -> Result<Option<Link<Op>>, CompileError> {
+    let accessor_ref = accessor.as_accessor().unwrap();
+    let indexable = accessor_ref.indexable.clone();
+    let mir_access_type = accessor_ref.access_type.clone();
+    let offset = accessor_ref.offset;
+
+    match mir_access_type {
+        // If we have a Default accessor, we add the row offset if needed, otherwise we just return
+        // the indexable
+        MirAccessType::Default => Ok(Some(add_row_offset_if_trace_access(&indexable, offset))),
+        // If we have an Index accessor, we compute the index and query the index-th element of the
+        // indexable. If the index is not a constant and computed_indices is true, we raise
+        // a diagnostic. If the index is not a constant and computed_indices is false, we
+        // keep the node as is. If the index is an out-of-bound constant, we raise a
+        // diagnostic.
+        MirAccessType::Index(index) => unroll_accessor_index_access_type(
+            indexable,
+            index,
+            offset,
+            compute_indices,
+            diagnostics,
+        ),
+        // If we have an Matrix accessor, we compute both the corresponding row and column, and
+        // query the indexable accordingly. If either of row or col is not a constant and
+        // computed_indices is true, we raise a diagnostic. If either of row or col is not a
+        // constant and computed_indices is false, we keep the node as is. If either of row
+        // or col is an out-of-bound constant, we raise a diagnostic.
+        MirAccessType::Matrix(row, col) => {
+            unroll_accessor_matrix_access_type(indexable, row, col, compute_indices, diagnostics)
+        },
+    }
+}
+
+/// Helper function to unroll an Index accessor
+fn unroll_accessor_index_access_type(
+    indexable: Link<Op>,
+    index: Link<Op>,
+    accessor_offset: usize,
+    compute_indices: bool,
+    diagnostics: &DiagnosticsHandler,
+) -> Result<Option<Link<Op>>, CompileError> {
+    let Some(index_usize) = extract_index_value(&index, compute_indices, diagnostics)? else {
+        return Ok(None);
+    };
+    if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
+        let indexable_vec = indexable_vector.children().borrow().deref().clone();
+        let child_accessed = match indexable_vec.get(index_usize) {
+            Some(child_accessed) => child_accessed,
+            None => {
+                diagnostics
+                    .diagnostic(miden_diagnostics::Severity::Error)
+                    .with_message("attempted to access an index which is out of bounds")
+                    .with_primary_label(index.span(), "index out of bounds")
+                    .emit();
+                return Err(CompileError::Failed);
+            },
+        };
+        Ok(Some(add_row_offset_if_trace_access(child_accessed, accessor_offset)))
+    } else if let Some(value) = indexable.clone().as_value() {
+        // If the indexable is either a PublicInput or a TraceAccess, we treat the index as
+        // an offset
+        let mir_value = value.value.value.clone();
+        match mir_value {
+            MirValue::PublicInput(public_input_access) => {
+                let new_node = Value::create(SpannedMirValue {
+                    span: value.value.span(),
+                    value: MirValue::PublicInput(PublicInputAccess {
+                        name: public_input_access.name,
+                        index: public_input_access.index + index_usize,
+                        ty: public_input_access.ty,
+                    }),
+                });
+                Ok(Some(new_node))
+            },
+            MirValue::TraceAccess(trace_access) => {
+                // We also need to account for the row offset
+                let new_node = Value::create(SpannedMirValue {
+                    span: value.value.span(),
+                    value: MirValue::TraceAccess(TraceAccess {
+                        segment: trace_access.segment,
+                        column: trace_access.column + index_usize,
+                        row_offset: trace_access.row_offset,
+                        ty: trace_access.ty,
+                    }),
+                });
+                Ok(Some(new_node))
+            },
+            _ => {
+                unreachable!(
+                    "Unexpected accessor, cannot have MirAccessType::Index with indexable {:?}",
+                    indexable
+                );
+            },
+        }
+    } else {
+        unreachable!(
+            "Unexpected accessor, cannot have MirAccessType::Index with indexable {:?}",
+            indexable
+        );
+    }
+}
+
+/// Helper function to unroll a Matrix accessor
+fn unroll_accessor_matrix_access_type(
+    indexable: Link<Op>,
+    row: Link<Op>,
+    col: Link<Op>,
+    compute_indices: bool,
+    diagnostics: &DiagnosticsHandler,
+) -> Result<Option<Link<Op>>, CompileError> {
+    let Some(row_usize) = extract_index_value(&row, compute_indices, diagnostics)? else {
+        return Ok(None);
+    };
+    let Some(col_usize) = extract_index_value(&col, compute_indices, diagnostics)? else {
+        return Ok(None);
+    };
+    // Replace the current node by the index-th element of the vector
+    // Raise diag if index is out of bounds
+    if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
+        let indexable_vec = indexable_vector.children().borrow().deref().clone();
+        let row_accessed = match indexable_vec.get(row_usize) {
+            Some(row_accessed) => row_accessed,
+            None => {
+                diagnostics
+                    .diagnostic(miden_diagnostics::Severity::Error)
+                    .with_message("attempted to access a row which is out of bounds")
+                    .with_primary_label(row.span(), "row out of bounds")
+                    .emit();
+                return Err(CompileError::Failed);
+            },
+        };
+        if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
+            let row_accessed_vec = row_accessed_vector.children().borrow().deref().clone();
+            let child_accessed = match row_accessed_vec.get(col_usize) {
+                Some(child_accessed) => child_accessed,
+                None => {
+                    diagnostics
+                        .diagnostic(miden_diagnostics::Severity::Error)
+                        .with_message("attempted to access a col which is out of bounds")
+                        .with_primary_label(col.span(), "col out of bounds")
+                        .emit();
+                    return Err(CompileError::Failed);
+                },
+            };
+            Ok(Some(child_accessed.clone()))
+        } else {
+            unreachable!(
+                "Unexpected accessor, cannot have MirAccessType::Matrix with indexable {:?}",
+                indexable
+            );
+        }
+    } else if let Op::Matrix(indexable_matrix) = indexable.borrow().deref() {
+        let indexable_vec = indexable_matrix.children().borrow().deref().clone();
+        let row_accessed = match indexable_vec.get(row_usize) {
+            Some(row_accessed) => row_accessed,
+            None => {
+                diagnostics
+                    .diagnostic(miden_diagnostics::Severity::Error)
+                    .with_message("attempted to access a row which is out of bounds")
+                    .with_primary_label(row.span(), "row out of bounds")
+                    .emit();
+                return Err(CompileError::Failed);
+            },
+        };
+        if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
+            let row_accessed_vec = row_accessed_vector.children().borrow().deref().clone();
+            let child_accessed = match row_accessed_vec.get(col_usize) {
+                Some(child_accessed) => child_accessed,
+                None => {
+                    diagnostics
+                        .diagnostic(miden_diagnostics::Severity::Error)
+                        .with_message("attempted to access a col which is out of bounds")
+                        .with_primary_label(col.span(), "col out of bounds")
+                        .emit();
+                    return Err(CompileError::Failed);
+                },
+            };
+            Ok(Some(child_accessed.clone()))
+        } else {
+            unreachable!(
+                "Unexpected accessor, cannot have MirAccessType::Matrix with indexable {:?}",
+                indexable
+            );
+        }
+    } else {
+        unreachable!(
+            "Unexpected accessor, cannot have MirAccessType::Matrix with indexable {:?}",
+            indexable
+        );
+    }
+}
+
+/// Helper function to extract a usize value from an index expression with consistent error handling
+///
+/// Returns:
+/// - `Ok(Some(usize))` - Successfully extracted constant value
+/// - `Ok(None)` - Not a constant value but not required (compute_indices=false)
+/// - `Err(CompileError)` - Not a constant value when required (compute_indices=true)
+fn extract_index_value(
+    index: &Link<Op>,
+    compute_indices: bool,
+    diagnostics: &DiagnosticsHandler,
+) -> Result<Option<usize>, CompileError> {
+    match (get_inner_const(index), compute_indices) {
+        (Some(value), _) => Ok(Some(value as usize)),
+        (None, true) => {
+            diagnostics
+                .diagnostic(miden_diagnostics::Severity::Error)
+                .with_message("the index is not constant during constant propagation")
+                .with_primary_label(index.span(), "index is not constant")
+                .emit();
+            Err(CompileError::Failed)
+        },
+        (None, false) => Ok(None),
+    }
+}
+
+/// Helper function to add a row offset to a `TraceAccess` value, and return the node unchanged
+/// otherwise.
+fn add_row_offset_if_trace_access(node: &Link<Op>, offset: usize) -> Link<Op> {
+    if let Some(value) = node.clone().as_value() {
+        let mir_value = value.value.value.clone();
+        if let MirValue::TraceAccess(trace_access) = mir_value {
+            Value::create(SpannedMirValue {
+                span: value.value.span(),
+                value: MirValue::TraceAccess(TraceAccess {
+                    segment: trace_access.segment,
+                    column: trace_access.column,
+                    row_offset: trace_access.row_offset + offset,
+                    ty: trace_access.ty,
+                }),
+            })
+        } else {
+            node.clone()
+        }
+    } else {
+        node.clone()
     }
 }

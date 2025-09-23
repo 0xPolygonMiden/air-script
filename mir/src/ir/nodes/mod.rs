@@ -1,16 +1,16 @@
-pub mod stale;
 mod op;
 mod ops;
 mod root;
 mod roots;
+pub mod stale;
 
 use std::cell::{Ref, RefMut};
 
-pub use stale::*;
 pub use op::Op;
 pub use ops::*;
 pub use root::Root;
 pub use roots::*;
+pub use stale::*;
 
 /// Apply a getter function to a `Ref<T>` and return a `Ref<U>`  if the getter succeeds.
 pub fn get_inner<T, U>(obj: Ref<T>, getter: impl Fn(&T) -> Option<&U>) -> Option<Ref<U>> {

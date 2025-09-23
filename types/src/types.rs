@@ -226,7 +226,7 @@ impl FunctionType {
                     match param {
                         Some(Type::Scalar(_)) => params_len += 1,
                         Some(Type::Vector(_, len)) => params_len += *len,
-                        Some(Type::Matrix(_, _, _)) => {
+                        Some(Type::Matrix(..)) => {
                             return false;
                         },
                         None => return false,
@@ -237,7 +237,7 @@ impl FunctionType {
                     match arg.ty() {
                         Some(Type::Scalar(_)) => args_len += 1,
                         Some(Type::Vector(_, len)) => args_len += len,
-                        Some(Type::Matrix(_, _, _)) => {
+                        Some(Type::Matrix(..)) => {
                             return false;
                         },
                         None => return false,

@@ -7,7 +7,7 @@ use air_types::Typing;
 use miden_diagnostics::Spanned;
 
 use crate::ir::{
-    BackLink, BuilderHook, Evaluator, Function, Link, Node, Stale, Op, Owner, Parent, Singleton,
+    BackLink, BuilderHook, Evaluator, Function, Link, Node, Op, Owner, Parent, Singleton, Stale,
     get_inner, get_inner_mut,
 };
 
