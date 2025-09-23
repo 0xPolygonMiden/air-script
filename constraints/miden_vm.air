@@ -13,6 +13,7 @@
 
 def MidenVM
 
+use hasher::*;
 use range_checker::*;
 use system::*;
 use utils::*;
