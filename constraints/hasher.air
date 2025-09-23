@@ -121,12 +121,7 @@ ev hasher_state([s[3], h[12], i]) {
     # Enforce that when absorbing the next set of elements into the state during linear hash 
     # computation (i.e. f_abp = 1) the first 4 elements (the capacity portion) are carried over to 
     # the next row.
-    enf f_abp * (h[0]' - h[0]) = 0;
-    enf f_abp * (h[1]' - h[1]) = 0;
-    enf f_abp * (h[2]' - h[2]) = 0;
-    enf f_abp * (h[3]' - h[3]) = 0;
-    # TODO: Change to the following when supported
-    # enf f_abp * (h[j]' - h[j]) = 0 for j in 0..4;
+    enf f_abp * (h' - h) = 0 for h in h;
 
     # TODO: Double check the following and fix both docs and VM if there is a typo
     #
