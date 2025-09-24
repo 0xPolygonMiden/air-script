@@ -34,10 +34,14 @@ impl Graph {
         if node.as_function().is_none() {
             return Err(CompileError::Failed);
         }
-        match self.functions.insert(ident, node) {
-            None => Ok(()),
-            Some(link) => {
-                if let ir::Root::None(_) = *link.borrow() {
+        match self.functions.entry(ident) {
+            std::collections::btree_map::Entry::Vacant(v) => {
+                v.insert(node);
+                Ok(())
+            },
+            std::collections::btree_map::Entry::Occupied(mut occ) => {
+                if let ir::Root::None(_) = *occ.get().borrow() {
+                    occ.insert(node);
                     Ok(())
                 } else {
                     Err(CompileError::Failed)
@@ -81,10 +85,14 @@ impl Graph {
         if node.as_evaluator().is_none() {
             return Err(CompileError::Failed);
         }
-        match self.evaluators.insert(ident, node) {
-            None => Ok(()),
-            Some(link) => {
-                if let ir::Root::None(_) = *link.borrow() {
+        match self.evaluators.entry(ident) {
+            std::collections::btree_map::Entry::Vacant(v) => {
+                v.insert(node);
+                Ok(())
+            },
+            std::collections::btree_map::Entry::Occupied(mut occ) => {
+                if let ir::Root::None(_) = *occ.get().borrow() {
+                    occ.insert(node);
                     Ok(())
                 } else {
                     Err(CompileError::Failed)
@@ -149,7 +157,13 @@ impl Graph {
         ident: QualifiedIdentifier,
         bus: ir::Link<ir::Bus>,
     ) -> Result<(), CompileError> {
-        self.buses.insert(ident, bus).map_or(Ok(()), |_| Err(CompileError::Failed))
+        match self.buses.entry(ident) {
+            std::collections::btree_map::Entry::Vacant(v) => {
+                v.insert(bus);
+                Ok(())
+            },
+            std::collections::btree_map::Entry::Occupied(_) => Err(CompileError::Failed),
+        }
     }
 
     /// Queries a given bus, returning a [ir::Link<ir::Bus>] if it exists.
