@@ -8,7 +8,7 @@ pub(super) fn add_main_boundary_constraints(eval_func: &mut Function, ir: &Air) 
     for constraint in ir.boundary_constraints(TraceSegmentId::Main) {
         let expr_root = constraint.node_index();
 
-        let expr_root_string = expr_root.to_string(ir, TraceSegmentId::Main);
+        let expr_root_string = expr_root.to_string(ir);
 
         let assertion = format!("builder.when_first_row().assert_zero::<_>({expr_root_string});");
 

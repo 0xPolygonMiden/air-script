@@ -49,6 +49,27 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         .arg_ref_self()
         .ret("usize")
         .line("NUM_PUBLIC_VALUES");
+
+    // add the custom BaseAirWithPeriodicColumns implementation block
+    let base_air_with_periodic_columns_impl = scope
+        .new_impl(name)
+        .generic("F: PrimeCharacteristicRing")
+        .impl_trait("BaseAirWithPeriodicColumns<F>");
+    let base_air_with_periodic_columns_impl_func = base_air_with_periodic_columns_impl
+        .new_fn("get_periodic_columns")
+        .arg_ref_self()
+        .ret("Vec<Vec<F>>");
+    base_air_with_periodic_columns_impl_func.line("vec![");
+
+    for col in ir.periodic_columns() {
+        let values_str = col.values
+            .iter()
+            .map(|v| format!("F::from_u64({v})")) // or use a custom formatter if needed
+            .collect::<Vec<_>>()
+            .join(", ");
+        base_air_with_periodic_columns_impl_func.line(format!("    vec![{values_str}],"));
+    }
+    base_air_with_periodic_columns_impl_func.line("]");
 }
 
 /// Updates the provided scope with the custom Air struct and an Air trait implementation based on
@@ -57,12 +78,13 @@ fn add_air_trait(scope: &mut Scope, ir: &Air, name: &str) {
     // add the implementation block for the Air trait.
     let air_impl = scope
         .new_impl(name)
-        .generic("AB: AirBuilderWithPublicValues")
+        .generic("AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns")
         .impl_trait("Air<AB>");
 
     let eval_func = air_impl.new_fn("eval").arg_ref_self().arg("builder", "&mut AB");
     eval_func.line("let main = builder.main();");
     eval_func.line("let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect(\"Wrong number of public values\");");
+    eval_func.line("let periodic_values = builder.periodic_columns();");
     eval_func.line("let (main_current, main_next) = (");
     eval_func.line("    main.row_slice(0).unwrap(),");
     eval_func.line("    main.row_slice(1).unwrap(),");

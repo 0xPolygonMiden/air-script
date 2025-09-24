@@ -10,4 +10,6 @@ pub(super) fn add_imports(scope: &mut Scope) {
     scope.import("p3_air", "BaseAirWithPublicValues");
     scope.import("p3_matrix", "Matrix");
     scope.import("p3_field", "PrimeCharacteristicRing");
+    scope.import("crate::helpers", "AirBuilderWithPeriodicColumns");
+    scope.import("crate::helpers", "BaseAirWithPeriodicColumns");
 }

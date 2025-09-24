@@ -7,7 +7,7 @@ use super::Codegen;
 pub(super) fn add_main_integrity_constraints(eval_func: &mut Function, ir: &Air) {
     for constraint in ir.integrity_constraints(TraceSegmentId::Main) {
         let expr_root = constraint.node_index();
-        let expr_root_string = expr_root.to_string(ir, TraceSegmentId::Main);
+        let expr_root_string = expr_root.to_string(ir);
 
         // If the constraint is a transition constraint (depends on the next row), we do not
         // evaluate it in the last row, with the `when_transition` method.
