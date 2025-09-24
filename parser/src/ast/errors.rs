@@ -59,6 +59,10 @@ impl ToDiagnostic for InvalidExprError {
 pub enum InvalidTypeError {
     #[error("expected iterable to be a vector")]
     NonVectorIterable(SourceSpan),
+    #[error("unknown type at this stage")]
+    UnknownType(SourceSpan),
+    #[error("index should be an int scalar")]
+    NonIntScalarIndex(SourceSpan),
 }
 impl Eq for InvalidTypeError {}
 impl PartialEq for InvalidTypeError {
@@ -74,6 +78,14 @@ impl ToDiagnostic for InvalidTypeError {
                 .with_message("invalid type")
                 .with_labels(vec![Label::primary(span.source_id(), span).with_message(message)])
                 .with_notes(vec!["Only vectors can be used as iterables".to_string()]),
+            Self::UnknownType(span) => Diagnostic::error()
+                .with_message("invalid type")
+                .with_labels(vec![Label::primary(span.source_id(), span).with_message(message)])
+                .with_notes(vec!["Type must be known at this stage".to_string()]),
+            Self::NonIntScalarIndex(span) => Diagnostic::error()
+                .with_message("invalid type")
+                .with_labels(vec![Label::primary(span.source_id(), span).with_message(message)])
+                .with_notes(vec!["Index must be an integer scalar".to_string()]),
         }
     }
 }

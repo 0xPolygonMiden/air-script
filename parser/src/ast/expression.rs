@@ -1085,7 +1085,9 @@ impl SymbolAccess {
                         base_range.start as u64,
                     )));
                     let rhs_expr = idx.clone();
-                    let mut bin_ty = BinType::Add(lhs_expr.ty(), rhs_expr.ty(), None);
+                    let lty = lhs_expr.infer_ty();
+                    let rty = rhs_expr.infer_ty();
+                    let mut bin_ty = BinType::Add(lty.unwrap(), rty.unwrap(), None);
                     let res = bin_ty.infer_bin_ty_add().unwrap();
                     *bin_ty.result_mut() = res;
                     let binary_expr = BinaryExpr {
@@ -1107,7 +1109,9 @@ impl SymbolAccess {
                         base_range.start as u64,
                     )));
                     let rhs_expr = idx.clone();
-                    let mut bin_ty = BinType::Add(lhs_expr.ty(), rhs_expr.ty(), None);
+                    let lty = lhs_expr.infer_ty();
+                    let rty = rhs_expr.infer_ty();
+                    let mut bin_ty = BinType::Add(lty.unwrap(), rty.unwrap(), None);
                     let res = bin_ty.infer_bin_ty_add().unwrap();
                     *bin_ty.result_mut() = res;
                     let binary_expr = BinaryExpr {

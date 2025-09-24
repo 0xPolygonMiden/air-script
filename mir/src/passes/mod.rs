@@ -5,6 +5,8 @@ mod unrolling;
 mod visitor;
 use std::{collections::HashMap, ops::Deref};
 
+use air_parser::ast::InvalidTypeError;
+use air_types::Typing;
 pub use constant_propagation::ConstantPropagation;
 pub use inlining::Inlining;
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
@@ -474,8 +476,9 @@ pub fn duplicate_node_or_replace(
     }
 }
 
-/// Helper function to extract the constant felt value from a Link<Op> if it is one.
-pub fn get_inner_const(value: &Link<Op>) -> Option<u64> {
+/// Helper function to extract the constant felt value from a Link<Op>, that is a MirAccessType
+/// index, row or col, if it is one.
+pub fn get_inner_const(value: &Link<Op>) -> Result<Option<u64>, CompileError> {
     match value.borrow().deref() {
         Op::Value(Value {
             value:
@@ -484,8 +487,24 @@ pub fn get_inner_const(value: &Link<Op>) -> Option<u64> {
                     ..
                 },
             ..
-        }) => Some(*c),
-        _ => None,
+        }) => {
+            let Some(ty) = value.ty() else {
+                return Err(CompileError::SemanticAnalysis(
+                    air_parser::SemanticAnalysisError::InvalidType(InvalidTypeError::UnknownType(
+                        value.span(),
+                    )),
+                ));
+            };
+            if !ty.is_scalar() || !ty.is_scalar_int() {
+                return Err(CompileError::SemanticAnalysis(
+                    air_parser::SemanticAnalysisError::InvalidType(
+                        InvalidTypeError::NonIntScalarIndex(value.span()),
+                    ),
+                ));
+            }
+            Ok(Some(*c))
+        },
+        _ => Ok(None),
     }
 }
 
@@ -699,7 +718,7 @@ fn extract_index_value(
     compute_indices: bool,
     diagnostics: &DiagnosticsHandler,
 ) -> Result<Option<usize>, CompileError> {
-    match (get_inner_const(index), compute_indices) {
+    match (get_inner_const(index)?, compute_indices) {
         (Some(value), _) => Ok(Some(value as usize)),
         (None, true) => {
             diagnostics
