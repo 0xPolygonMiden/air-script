@@ -10,8 +10,15 @@ pub(super) fn add_main_boundary_constraints(eval_func: &mut Function, ir: &Air) 
 
         let expr_root_string = expr_root.to_string(ir);
 
-        let assertion = format!("builder.when_first_row().assert_zero::<_>({expr_root_string});");
-
+        let assertion = match constraint.domain() {
+            air_ir::ConstraintDomain::FirstRow => {
+                format!("builder.when_first_row().assert_zero::<_>({expr_root_string});")
+            },
+            air_ir::ConstraintDomain::LastRow => {
+                format!("builder.when_last_row().assert_zero::<_>({expr_root_string});")
+            },
+            _ => unreachable!("Boundary constraints can only be applied to the first or last row"),
+        };
         eval_func.line(assertion);
     }
 }
