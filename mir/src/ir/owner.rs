@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use miden_diagnostics::Spanned;
 
-use crate::ir::{BackLink, Child, Link, Node, Stale, Op, Parent, Root};
+use crate::ir::{BackLink, Child, Link, Node, Op, Parent, Root, Stale};
 
 /// The nodes that can own [Op] nodes
 /// The [Owner] enum does not own it's inner struct to avoid reference cycles,
@@ -30,6 +30,7 @@ pub enum Owner {
     Enf(BackLink<Op>),
     For(BackLink<Op>),
     If(BackLink<Op>),
+    Cast(BackLink<Op>),
     None(Stale),
 }
 
@@ -53,6 +54,7 @@ impl Parent for Owner {
             Owner::Matrix(m) => m.children(),
             Owner::Accessor(a) => a.children(),
             Owner::BusOp(b) => b.children(),
+            Owner::Cast(c) => c.children(),
             Owner::None(_) => Link::default(),
         }
     }
@@ -78,6 +80,7 @@ impl Child for Owner {
             Owner::Matrix(m) => m.get_parents(),
             Owner::Accessor(a) => a.get_parents(),
             Owner::BusOp(b) => b.get_parents(),
+            Owner::Cast(c) => c.get_parents(),
             Owner::None(_) => Vec::default(),
         }
     }
@@ -99,6 +102,7 @@ impl Child for Owner {
             Owner::Matrix(m) => m.add_parent(parent),
             Owner::Accessor(a) => a.add_parent(parent),
             Owner::BusOp(b) => b.add_parent(parent),
+            Owner::Cast(c) => c.add_parent(parent),
             Owner::None(_) => (),
         }
     }
@@ -120,6 +124,7 @@ impl Child for Owner {
             Owner::Matrix(m) => m.remove_parent(parent),
             Owner::Accessor(a) => a.remove_parent(parent),
             Owner::BusOp(b) => b.remove_parent(parent),
+            Owner::Cast(c) => c.remove_parent(parent),
             Owner::None(_) => (),
         }
     }
@@ -145,6 +150,7 @@ impl PartialEq for Owner {
             (Owner::Matrix(lhs), Owner::Matrix(rhs)) => lhs.to_link() == rhs.to_link(),
             (Owner::Accessor(lhs), Owner::Accessor(rhs)) => lhs.to_link() == rhs.to_link(),
             (Owner::BusOp(lhs), Owner::BusOp(rhs)) => lhs.to_link() == rhs.to_link(),
+            (Owner::Cast(lhs), Owner::Cast(rhs)) => lhs.to_link() == rhs.to_link(),
             (Owner::None(_), Owner::None(_)) => true,
             _ => false,
         }
@@ -171,6 +177,7 @@ impl std::hash::Hash for Owner {
             Owner::Matrix(m) => m.to_link().hash(state),
             Owner::Accessor(a) => a.to_link().hash(state),
             Owner::BusOp(b) => b.to_link().hash(state),
+            Owner::Cast(c) => c.to_link().hash(state),
             Owner::None(s) => s.hash(state),
         }
     }
@@ -199,6 +206,7 @@ impl Link<Owner> {
                 Op::BusOp(_) => Owner::BusOp(BackLink::from(op_inner_val)),
                 Op::Parameter(_) => unreachable!(),
                 Op::Value(_) => unreachable!(),
+                Op::Cast(_) => Owner::Cast(BackLink::from(op_inner_val)),
                 Op::None(none) => Owner::None(none.clone()),
             };
         } else if let Some(root_inner_val) = self.as_root() {
@@ -243,6 +251,7 @@ impl Link<Owner> {
             Owner::Enf(_) => None,
             Owner::For(_) => None,
             Owner::If(_) => None,
+            Owner::Cast(_) => None,
             Owner::None(_) => None,
         }
     }
@@ -266,6 +275,7 @@ impl Link<Owner> {
             Owner::Enf(back) => back.to_link(),
             Owner::For(back) => back.to_link(),
             Owner::If(back) => back.to_link(),
+            Owner::Cast(back) => back.to_link(),
             Owner::None(_) => None,
         }
     }
@@ -301,6 +311,7 @@ impl BackLink<Owner> {
                 Owner::Enf(back) => back.to_link().map(|l| l.get_ptr()).unwrap_or(0),
                 Owner::For(back) => back.to_link().map(|l| l.get_ptr()).unwrap_or(0),
                 Owner::If(back) => back.to_link().map(|l| l.get_ptr()).unwrap_or(0),
+                Owner::Cast(back) => back.to_link().map(|l| l.get_ptr()).unwrap_or(0),
                 Owner::None(_) => 0,
             })
             .unwrap_or(0)

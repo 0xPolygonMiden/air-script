@@ -252,7 +252,7 @@ impl AirBuilder<'_> {
                     ));
                 };
 
-                let ConstantValue::Felt(rhs_value) = constant_value else {
+                let ConstantValue::Scalar(rhs_value) = constant_value else {
                     return Err(CompileError::SemanticAnalysis(
                         SemanticAnalysisError::InvalidExpr(
                             ast::InvalidExprError::NonConstantExponent(rhs.span()),
@@ -267,7 +267,7 @@ impl AirBuilder<'_> {
 
                 let value = match mir_value {
                     MirValue::Constant(constant_value) => {
-                        if let ConstantValue::Felt(felt) = constant_value {
+                        if let ConstantValue::Scalar(felt) = constant_value {
                             crate::ir::Value::Constant(*felt)
                         } else {
                             unreachable!()
@@ -323,7 +323,7 @@ impl AirBuilder<'_> {
 
                 let value = match mir_value {
                     MirValue::Constant(constant_value) => {
-                        if let ConstantValue::Felt(felt) = constant_value {
+                        if let ConstantValue::Scalar(felt) = constant_value {
                             crate::ir::Value::Constant(*felt)
                         } else {
                             unreachable!()

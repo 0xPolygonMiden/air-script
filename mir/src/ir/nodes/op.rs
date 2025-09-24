@@ -7,8 +7,8 @@ use air_types::*;
 use miden_diagnostics::Spanned;
 
 use crate::ir::{
-    Accessor, Add, BackLink, Boundary, BuilderHook, BusOp, Call, Child, ConstantValue, Enf, Exp,
-    Fold, For, If, Link, Matrix, MirValue, Mul, Node, Owner, Parameter, Parent, Singleton,
+    Accessor, Add, BackLink, Boundary, BuilderHook, BusOp, Call, Cast, Child, ConstantValue, Enf,
+    Exp, Fold, For, If, Link, Matrix, MirValue, Mul, Node, Owner, Parameter, Parent, Singleton,
     SpannedMirValue, Stale, Sub, Value, Vector, get_inner, get_inner_mut,
 };
 
@@ -34,6 +34,7 @@ pub enum Op {
     BusOp(BusOp),
     Parameter(Parameter),
     Value(Value),
+    Cast(Cast),
     None(Stale),
 }
 
@@ -56,6 +57,7 @@ impl BuilderHook for Op {
             Op::BusOp(b) => b.finalize_hook(),
             Op::Parameter(p) => p.finalize_hook(),
             Op::Value(v) => v.finalize_hook(),
+            Op::Cast(c) => c.finalize_hook(),
             Op::None(_) => {},
         }
     }
@@ -87,6 +89,7 @@ impl Parent for Op {
             Op::BusOp(b) => b.children(),
             Op::Parameter(_) => Link::default(),
             Op::Value(_) => Link::default(),
+            Op::Cast(c) => c.children(),
             Op::None(_) => Link::default(),
         }
     }
@@ -112,6 +115,7 @@ impl Child for Op {
             Op::BusOp(b) => b.get_parents(),
             Op::Parameter(p) => p.get_parents(),
             Op::Value(v) => v.get_parents(),
+            Op::Cast(c) => c.get_parents(),
             Op::None(_) => Default::default(),
         }
     }
@@ -133,6 +137,7 @@ impl Child for Op {
             Op::BusOp(b) => b.add_parent(parent),
             Op::Parameter(p) => p.add_parent(parent),
             Op::Value(v) => v.add_parent(parent),
+            Op::Cast(c) => c.add_parent(parent),
             Op::None(_) => {},
         }
     }
@@ -154,6 +159,7 @@ impl Child for Op {
             Op::BusOp(b) => b.remove_parent(parent),
             Op::Parameter(p) => p.remove_parent(parent),
             Op::Value(v) => v.remove_parent(parent),
+            Op::Cast(c) => c.remove_parent(parent),
             Op::None(_) => {},
         }
     }
@@ -178,6 +184,7 @@ impl ScalarTypeMut for Op {
             Op::BusOp(_) => {},
             Op::Parameter(p) => p.update_scalar_ty_unchecked(new_ty),
             Op::Value(v) => v.update_scalar_ty_unchecked(new_ty),
+            Op::Cast(_) => {},
             Op::None(n) => n.update_scalar_ty_unchecked(new_ty),
         }
     }
@@ -202,6 +209,7 @@ impl TypeMut for Op {
             Op::BusOp(_) => {},
             Op::Parameter(p) => p.update_ty_unchecked(new_ty),
             Op::Value(v) => v.update_ty_unchecked(new_ty),
+            Op::Cast(_) => {},
             Op::None(n) => n.update_ty_unchecked(new_ty),
         }
     }
@@ -226,6 +234,7 @@ impl Typing for Op {
             Op::BusOp(_) => ty!(?),
             Op::Parameter(p) => p.ty(),
             Op::Value(v) => v.ty(),
+            Op::Cast(c) => c.ty(),
             Op::None(n) => n.ty(),
         }
     }
@@ -252,6 +261,7 @@ impl Link<Op> {
             Op::BusOp(b) => format!("Op::BusOp@{}({:#?})", self.get_ptr(), b),
             Op::Parameter(p) => format!("Op::Parameter@{}({:#?})", self.get_ptr(), p),
             Op::Value(v) => format!("Op::Value@{}({:#?})", self.get_ptr(), v),
+            Op::Cast(c) => format!("Op::Cast@{}({:#?})", self.get_ptr(), c),
             Op::None(_) => "Op::None".to_string(),
         }
     }
@@ -327,6 +337,9 @@ impl Link<Op> {
             Op::Value(value) => {
                 value._node = Singleton::from(node.clone());
             },
+            Op::Cast(cast) => {
+                cast._node = Singleton::from(node.clone());
+            },
             Op::None(_) => {},
         }
     }
@@ -377,6 +390,9 @@ impl Link<Op> {
             },
             Op::Parameter(_parameter) => {},
             Op::Value(_value) => {},
+            Op::Cast(cast) => {
+                cast._owner = Singleton::from(owner.clone());
+            },
             Op::None(_) => {},
         }
     }
@@ -482,6 +498,12 @@ impl Link<Op> {
                 value._node = Singleton::from(node.clone());
                 node
             },
+            Op::Cast(Cast { _node: Singleton(Some(link)), .. }) => link.clone(),
+            Op::Cast(cast) => {
+                let node: Link<Node> = Node::Cast(back).into();
+                cast._node = Singleton::from(node.clone());
+                node
+            },
             Op::None(none) => Node::None(none.clone()).into(),
         }
     }
@@ -576,6 +598,12 @@ impl Link<Op> {
             },
             Op::Parameter(_) => None,
             Op::Value(_) => None,
+            Op::Cast(Cast { _owner: Singleton(Some(link)), .. }) => Some(link.clone()),
+            Op::Cast(cast) => {
+                let owner: Link<Owner> = Owner::Cast(back).into();
+                cast._owner = Singleton::from(owner.clone());
+                cast._owner.0.clone()
+            },
             Op::None(_) => None,
         }
     }
@@ -835,13 +863,29 @@ impl Link<Op> {
             _ => None,
         })
     }
+    /// Try getting the current [Op]'s inner [Cast].
+    /// Returns None if the current [Op] is not a [Cast] or the Rc count is zero.
+    pub fn as_cast(&self) -> Option<Ref<'_, Cast>> {
+        get_inner(self.borrow(), |op| match op {
+            Op::Cast(inner) => Some(inner),
+            _ => None,
+        })
+    }
+    /// Try getting the current [Op]'s inner [Cast], borrowing mutably.
+    /// Returns None if the current [Op] is not a [Cast] or the Rc count is zero.
+    pub fn as_cast_mut(&self) -> Option<RefMut<'_, Cast>> {
+        get_inner_mut(self.borrow_mut(), |op| match op {
+            Op::Cast(inner) => Some(inner),
+            _ => None,
+        })
+    }
 }
 
 impl From<i64> for Link<Op> {
     fn from(value: i64) -> Self {
         Op::Value(Value {
             value: SpannedMirValue {
-                value: MirValue::Constant(ConstantValue::Felt(value as u64)),
+                value: MirValue::Constant(ConstantValue::Scalar(value as u64)),
                 ..Default::default()
             },
             ..Default::default()

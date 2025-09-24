@@ -5,6 +5,7 @@ mod unrolling;
 mod visitor;
 use std::{collections::HashMap, ops::Deref};
 
+use air_types::Typing;
 pub use constant_propagation::ConstantPropagation;
 pub use inlining::Inlining;
 use miden_diagnostics::Spanned;
@@ -13,8 +14,8 @@ pub use unrolling::Unrolling;
 pub use visitor::Visitor;
 
 use crate::ir::{
-    Accessor, Add, Boundary, BusOp, Call, Enf, Exp, Fold, For, If, Link, MatchArm, Matrix, Mul,
-    Node, Op, Owner, Parameter, Parent, Sub, Value, Vector,
+    Accessor, Add, Boundary, BusOp, Call, Cast, Enf, Exp, Fold, For, If, Link, MatchArm, Matrix,
+    Mul, Node, Op, Owner, Parameter, Parent, Sub, Value, Vector,
 };
 
 /// Helper to duplicate a MIR node and its children recursively
@@ -200,6 +201,12 @@ pub fn duplicate_node(
             new_param
         },
         Op::Value(value) => Value::create(value.value.clone()),
+        Op::Cast(cast) => {
+            let value = cast.value.clone();
+            let ty = cast.ty();
+            let new_expr = duplicate_node(value, current_replace_map);
+            Cast::create(new_expr, ty, cast.span())
+        },
         Op::None(none) => Op::None(none.clone()).into(),
     }
 }
@@ -445,6 +452,13 @@ pub fn duplicate_node_or_replace(
         },
         Op::Value(value) => {
             let new_node = Value::create(value.value.clone());
+            current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
+        },
+        Op::Cast(cast) => {
+            let value = cast.value.clone();
+            let ty = cast.ty();
+            let new_expr = current_replace_map.get(&value.get_ptr()).unwrap().1.clone();
+            let new_node = Cast::create(new_expr, ty, cast.span());
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::None(_) => {},

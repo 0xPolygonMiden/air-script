@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Deref};
 
 use air_parser::ast::AccessType;
-use air_types::{Type, ty};
+use air_types::{Type, Typing, ty};
 use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
 
 use crate::{
@@ -87,7 +87,7 @@ fn unroll_constant_vector(constant_vector: &Vec<u64>, span: SourceSpan) -> Link<
     for val in constant_vector {
         let val = Value::create(SpannedMirValue {
             span,
-            value: MirValue::Constant(ConstantValue::Felt(*val)),
+            value: MirValue::Constant(ConstantValue::Scalar(*val)),
         });
         vec.push(val);
     }
@@ -102,7 +102,7 @@ fn unroll_constant_matrix(constant_matrix: &Vec<Vec<u64>>, span: SourceSpan) -> 
         for val in row {
             let val = Value::create(SpannedMirValue {
                 span,
-                value: MirValue::Constant(ConstantValue::Felt(*val)),
+                value: MirValue::Constant(ConstantValue::Scalar(*val)),
             });
             res_row.push(val);
         }
@@ -264,7 +264,7 @@ impl UnrollingFirstPass<'_> {
         let mir_value = value_ref.value.value.clone();
         match &mir_value {
             MirValue::Constant(c) => match c {
-                ConstantValue::Felt(_) => {},
+                ConstantValue::Scalar(_) => {},
                 ConstantValue::Vector(v) => {
                     return Ok(Some(unroll_constant_vector(v, value_ref.span())));
                 },
@@ -578,6 +578,14 @@ impl UnrollingFirstPass<'_> {
     ) -> Result<Option<Link<Op>>, CompileError> {
         Ok(None) // Matrix are already unrolled, we have nothing to do
     }
+
+    fn visit_cast_bis(
+        &mut self,
+        _graph: &mut Graph,
+        _cast: Link<Op>,
+    ) -> Result<Option<Link<Op>>, CompileError> {
+        Ok(None)
+    }
 }
 
 impl Visitor for UnrollingFirstPass<'_> {
@@ -640,6 +648,7 @@ impl Visitor for UnrollingFirstPass<'_> {
                 to_link_and(p.clone(), graph, |g, el| self.visit_parameter_bis(g, el))
             },
             Node::Value(v) => to_link_and(v.clone(), graph, |g, el| self.visit_value_bis(g, el)),
+            Node::Cast(c) => to_link_and(c.clone(), graph, |g, el| self.visit_cast_bis(g, el)),
             Node::None(_) => Ok(None),
             Node::Function(_) | Node::Evaluator(_) | Node::Call(_) => {
                 unreachable!(

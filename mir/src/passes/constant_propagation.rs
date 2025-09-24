@@ -88,7 +88,7 @@ impl ConstantPropagation<'_> {
 
         match (get_inner_const(&lhs), get_inner_const(&rhs)) {
             (Some(0), _) | (_, Some(0)) => Ok(Some(Value::create(SpannedMirValue {
-                value: MirValue::Constant(ConstantValue::Felt(0)),
+                value: MirValue::Constant(ConstantValue::Scalar(0)),
                 span: mul_ref.span,
             }))),
             (Some(1), _) => Ok(Some(rhs)),
@@ -109,12 +109,12 @@ impl ConstantPropagation<'_> {
 
         if let Some(0) = get_inner_const(&lhs) {
             Ok(Some(Value::create(SpannedMirValue {
-                value: MirValue::Constant(ConstantValue::Felt(0)),
+                value: MirValue::Constant(ConstantValue::Scalar(0)),
                 span: exp_ref.span,
             })))
         } else if let Some(0) = get_inner_const(&rhs) {
             Ok(Some(Value::create(SpannedMirValue {
-                value: MirValue::Constant(ConstantValue::Felt(1)),
+                value: MirValue::Constant(ConstantValue::Scalar(1)),
                 span: exp_ref.span,
             })))
         } else {
@@ -169,6 +169,7 @@ impl Visitor for ConstantPropagation<'_> {
             | Node::BusOp(_)
             | Node::Value(_)
             | Node::Accessor(_)
+            | Node::Cast(_)
             | Node::None(_) => Ok(None),
             Node::Function(_) | Node::Evaluator(_) | Node::Call(_) => {
                 unreachable!(
@@ -219,7 +220,7 @@ fn get_inner_const(value: &Link<Op>) -> Option<u64> {
         Op::Value(Value {
             value:
                 SpannedMirValue {
-                    value: MirValue::Constant(ConstantValue::Felt(c)),
+                    value: MirValue::Constant(ConstantValue::Scalar(c)),
                     ..
                 },
             ..
@@ -275,7 +276,7 @@ fn try_fold_const_binary_op(
         };
         if let Some(folded) = folded {
             let new_value = Value::create(SpannedMirValue {
-                value: MirValue::Constant(crate::ir::ConstantValue::Felt(folded)),
+                value: MirValue::Constant(crate::ir::ConstantValue::Scalar(folded)),
                 span,
             });
             updated_binary_op = Some(new_value);

@@ -47,7 +47,7 @@ impl From<i64> for Value {
     fn from(value: i64) -> Self {
         Self {
             value: SpannedMirValue {
-                value: MirValue::Constant(ConstantValue::Felt(value as u64)),
+                value: MirValue::Constant(ConstantValue::Scalar(value as u64)),
                 span: Default::default(),
             },
             ..Default::default()
@@ -124,9 +124,26 @@ impl BusAccess {
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum ConstantValue {
-    Felt(u64),
+    Scalar(u64),
     Vector(Vec<u64>),
     Matrix(Vec<Vec<u64>>),
+}
+
+impl Typing for ConstantValue {
+    fn ty(&self) -> Option<Type> {
+        match self {
+            ConstantValue::Scalar(_) => ty!(uint),
+            ConstantValue::Vector(v) => ty!(uint[v.len()]),
+            ConstantValue::Matrix(m) => {
+                let row_count = m.len();
+                if row_count == 0 {
+                    return ty!(uint[usize::MAX, usize::MAX]);
+                }
+                let col_count = m.iter().map(|r| r.len()).max().unwrap_or(usize::MAX);
+                ty!(uint[row_count, col_count])
+            },
+        }
+    }
 }
 
 /// [TraceAccess] is like SymbolAccess, but is used to describe an access to a specific trace
@@ -271,7 +288,7 @@ impl PublicInputTableAccess {
 impl Default for SpannedMirValue {
     fn default() -> Self {
         Self {
-            value: MirValue::Constant(ConstantValue::Felt(0)),
+            value: MirValue::Constant(ConstantValue::Scalar(0)),
             span: Default::default(),
         }
     }

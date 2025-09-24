@@ -13,10 +13,11 @@ use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned}
 use crate::{
     CompileError,
     ir::{
-        Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue,
-        Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir,
-        MirValue, Mul, Op, Owner, Parameter, PublicInputAccess, PublicInputTableAccess, Root,
-        SpannedMirValue, Stale, Sub, TraceAccess, TraceAccessBinding, Type, Value, Vector,
+        Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, Cast,
+        ConstantValue, Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm,
+        Matrix, Mir, MirValue, Mul, Op, Owner, Parameter, PublicInputAccess,
+        PublicInputTableAccess, Root, SpannedMirValue, Stale, Sub, TraceAccess, TraceAccessBinding,
+        Type, Value, Vector,
     },
     passes::duplicate_node,
 };
@@ -885,8 +886,9 @@ impl<'a> MirBuilder<'a> {
                     let _ = self.insert_enforce(node);
                     let bool_x = duplicate_node(x, &mut Default::default());
                     // TODO: cast to a bool
-                    //bool_x.update_ty(ty!(bool));
-                    Ok(bool_x)
+                    let cast =
+                        Cast::builder().value(bool_x).span(call.span()).ty(ty!(bool)).build();
+                    Ok(cast)
                 },
                 other => unimplemented!("unhandled builtin: {}", other),
             }
@@ -1124,7 +1126,7 @@ impl<'a> MirBuilder<'a> {
         sty: Option<ScalarType>,
     ) -> Result<Link<Op>, CompileError> {
         let value = SpannedMirValue {
-            value: MirValue::Constant(ConstantValue::Felt(c)),
+            value: MirValue::Constant(ConstantValue::Scalar(c)),
             span,
         };
         let node = Value::builder().value(value).ty(ty!(sty)).build();

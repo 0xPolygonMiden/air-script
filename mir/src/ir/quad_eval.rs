@@ -113,7 +113,7 @@ impl RandomInputs {
             },
             Op::Value(v) => {
                 match &v.value.value {
-                    MirValue::Constant(ConstantValue::Felt(c)) => {
+                    MirValue::Constant(ConstantValue::Scalar(c)) => {
                         let felt = Felt::new(*c);
                         Ok(const_quad_felt(felt))
                     },
@@ -220,6 +220,7 @@ impl RandomInputs {
                 );
                 Err(CompileError::Failed)
             },
+            Op::Cast(cast) => self.eval(cast.value.clone()),
         }
     }
 }

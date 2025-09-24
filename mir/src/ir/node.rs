@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use miden_diagnostics::Spanned;
 
-use crate::ir::{BackLink, Child, Link, Stale, Op, Owner, Parent, Root};
+use crate::ir::{BackLink, Child, Link, Op, Owner, Parent, Root, Stale};
 
 /// All the nodes that can be in the MIR Graph
 /// Combines all [Root] and [Op] variants
@@ -33,6 +33,7 @@ pub enum Node {
     BusOp(BackLink<Op>),
     Parameter(BackLink<Op>),
     Value(BackLink<Op>),
+    Cast(BackLink<Op>),
     None(Stale),
 }
 
@@ -64,6 +65,7 @@ impl PartialEq for Node {
             (Node::BusOp(lhs), Node::BusOp(rhs)) => lhs.to_link() == rhs.to_link(),
             (Node::Parameter(lhs), Node::Parameter(rhs)) => lhs.to_link() == rhs.to_link(),
             (Node::Value(lhs), Node::Value(rhs)) => lhs.to_link() == rhs.to_link(),
+            (Node::Cast(lhs), Node::Cast(rhs)) => lhs.to_link() == rhs.to_link(),
             (Node::None(_), Node::None(_)) => true,
             _ => false,
         }
@@ -92,6 +94,7 @@ impl std::hash::Hash for Node {
             Node::BusOp(b) => b.to_link().hash(state),
             Node::Parameter(p) => p.to_link().hash(state),
             Node::Value(v) => v.to_link().hash(state),
+            Node::Cast(c) => c.to_link().hash(state),
             Node::None(_) => (),
         }
     }
@@ -119,6 +122,7 @@ impl Parent for Node {
             Node::BusOp(b) => b.children(),
             Node::Parameter(_p) => Link::default(),
             Node::Value(_v) => Link::default(),
+            Node::Cast(c) => c.children(),
             Node::None(_) => Link::default(),
         }
     }
@@ -146,6 +150,7 @@ impl Child for Node {
             Node::BusOp(b) => b.get_parents(),
             Node::Parameter(p) => p.get_parents(),
             Node::Value(v) => v.get_parents(),
+            Node::Cast(c) => c.get_parents(),
             Node::None(_) => Vec::default(),
         }
     }
@@ -169,6 +174,7 @@ impl Child for Node {
             Node::BusOp(b) => b.add_parent(parent),
             Node::Parameter(p) => p.add_parent(parent),
             Node::Value(v) => v.add_parent(parent),
+            Node::Cast(c) => c.add_parent(parent),
             Node::None(_) => (),
         }
     }
@@ -192,6 +198,7 @@ impl Child for Node {
             Node::BusOp(b) => b.remove_parent(parent),
             Node::Parameter(p) => p.remove_parent(parent),
             Node::Value(v) => v.remove_parent(parent),
+            Node::Cast(c) => c.remove_parent(parent),
             Node::None(_) => (),
         }
     }
@@ -220,6 +227,7 @@ impl Link<Node> {
                 Op::BusOp(_) => Node::BusOp(BackLink::from(op_inner_val)),
                 Op::Parameter(_) => Node::Parameter(BackLink::from(op_inner_val)),
                 Op::Value(_) => Node::Value(BackLink::from(op_inner_val)),
+                Op::Cast(_) => Node::Cast(BackLink::from(op_inner_val)),
                 Op::None(none) => Node::None(none.clone()),
             };
         } else if let Some(root_inner_val) = self.as_root() {
@@ -276,6 +284,7 @@ impl Link<Node> {
             Node::BusOp(_) => None,
             Node::Parameter(_) => None,
             Node::Value(_) => None,
+            Node::Cast(_) => None,
             Node::None(_) => None,
         }
     }
@@ -301,6 +310,7 @@ impl Link<Node> {
             Node::BusOp(inner) => inner.to_link(),
             Node::Parameter(inner) => inner.to_link(),
             Node::Value(inner) => inner.to_link(),
+            Node::Cast(inner) => inner.to_link(),
             Node::None(_) => None,
         }
     }

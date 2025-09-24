@@ -227,7 +227,7 @@ impl<'a> MatchOptimizer<'a> {
             // representing `enf x = y`
             let zero_node = Value::create(SpannedMirValue {
                 span: Default::default(),
-                value: MirValue::Constant(ConstantValue::Felt(0)),
+                value: MirValue::Constant(ConstantValue::Scalar(0)),
             });
             // The following unwrap is safe as we always have at least one constraint above
             let new_node_with_sub_zero = Sub::create(cur_node.unwrap(), zero_node, span);

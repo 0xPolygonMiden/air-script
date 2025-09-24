@@ -62,6 +62,7 @@ pub trait Visitor {
             Node::Accessor(a) => self.visit_accessor(graph, a.clone().into()),
             Node::BusOp(b) => self.visit_bus_op(graph, b.clone().into()),
             Node::Parameter(p) => self.visit_parameter(graph, p.clone().into()),
+            Node::Cast(c) => self.visit_cast(graph, c.clone().into()),
             Node::Value(v) => self.visit_value(graph, v.clone().into()),
             Node::None(_) => Ok(()),
         }
@@ -152,6 +153,10 @@ pub trait Visitor {
         _graph: &mut Graph,
         _parameter: Link<Op>,
     ) -> Result<(), CompileError> {
+        Ok(())
+    }
+    /// Visit a `Cast` node
+    fn visit_cast(&mut self, _graph: &mut Graph, _cast: Link<Op>) -> Result<(), CompileError> {
         Ok(())
     }
     /// Visit a `Value` node
