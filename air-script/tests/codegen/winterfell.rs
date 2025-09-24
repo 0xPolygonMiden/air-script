@@ -2,9 +2,6 @@ use expect_test::expect_file;
 
 use super::helpers::{Target, Test};
 
-// tests_wo_mir
-// ================================================================================================
-
 #[test]
 fn binary() {
     let generated_air = Test::new("tests/binary/binary.air".to_string())

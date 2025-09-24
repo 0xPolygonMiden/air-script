@@ -29,8 +29,8 @@ impl AirTester for FibonacciAirTester {
             |_, state| {
                 let cur_a = state[0];
                 let cur_b = state[1];
-                state[1] = cur_a + cur_b;
                 state[0] = cur_b;
+                state[1] = cur_a + cur_b;
             },
         );
 

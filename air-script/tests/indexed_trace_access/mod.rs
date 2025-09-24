@@ -1,4 +1,10 @@
 #[rustfmt::skip]
 #[allow(clippy::all)]
 mod indexed_trace_access;
-mod test_air;
+#[rustfmt::skip]
+#[allow(clippy::all)]
+#[allow(unused_imports)]
+mod indexed_trace_access_plonky3;
+
+mod test_air_plonky3;
+mod test_air_winterfell;

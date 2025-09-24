@@ -7,4 +7,18 @@ mod selectors_combine_complex;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 mod selectors_with_evaluators;
-mod test_air;
+#[rustfmt::skip]
+#[allow(clippy::all)]
+#[allow(unused_imports)]
+mod selectors_combine_simple_plonky3;
+#[rustfmt::skip]
+#[allow(clippy::all)]
+#[allow(unused_imports)]
+mod selectors_combine_complex_plonky3;
+#[rustfmt::skip]
+#[allow(clippy::all)]
+#[allow(unused_imports)]
+mod selectors_with_evaluators_plonky3;
+
+mod test_air_plonky3;
+mod test_air_winterfell;
