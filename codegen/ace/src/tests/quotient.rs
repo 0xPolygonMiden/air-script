@@ -66,11 +66,7 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
             Operation::Value(v) => match v {
                 Value::Constant(c) => QuadFelt::from(Felt::new(c)),
                 Value::TraceAccess(access) => {
-                    let segment_index = match access.segment {
-                        TraceSegmentId::Main => 0,
-                        TraceSegmentId::Aux => 1,
-                    };
-                    ace_vars.segments[access.row_offset][segment_index][access.column]
+                    ace_vars.segments[access.row_offset][access.segment][access.column]
                 },
                 Value::PeriodicColumn(access) => periodic[&access.name],
                 Value::PublicInput(access) => {

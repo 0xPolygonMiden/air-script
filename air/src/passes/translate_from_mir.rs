@@ -53,15 +53,16 @@ impl Pass for MirToAir<'_> {
 
         // Build trace segments shape: always include main; aux may be empty
         let trace_columns_main = main_trace_segment.clone();
-        let mut trace_columns_aux = TraceSegment::new(
-            SourceSpan::default(),
-            TraceSegmentId::Aux,
-            Identifier::new(SourceSpan::default(), Symbol::intern("$aux")),
-            vec![],
-        );
 
         let mut bus_bindings_map = BTreeMap::new();
-        if !buses.is_empty() {
+        let trace_columns_aux = if buses.is_empty() {
+            TraceSegment::new(
+                SourceSpan::default(),
+                TraceSegmentId::Aux,
+                Identifier::new(SourceSpan::default(), Symbol::intern("$aux")),
+                vec![],
+            )
+        } else {
             let bus_raw_bindings: Vec<_> = buses
                 .keys()
                 .map(|k| Span::new(k.span(), (Identifier::new(k.span(), k.name()), 1)))
@@ -77,8 +78,8 @@ impl Pass for MirToAir<'_> {
             for binding in aux_trace_segment.bindings.iter() {
                 bus_bindings_map.insert(binding.name.unwrap(), binding.offset);
             }
-            trace_columns_aux = aux_trace_segment;
-        }
+            aux_trace_segment
+        };
 
         let trace_columns = TraceShape::new(trace_columns_main, trace_columns_aux);
 

@@ -20,16 +20,13 @@ pub struct AirInputs {
     pub public: Vec<Vec<QuadFelt>>,
     /// Reduced public input table values used as boundaries for buses.
     pub reduced_tables: Vec<QuadFelt>,
-    /// Evaluations of the *main* trace.
-    pub main: [Vec<QuadFelt>; 2],
+    /// Evaluations of the segments in the order `main`, `aux`, `quotient`,
+    /// for the current row and next row.
+    pub segments: [FullTraceShape<Vec<QuadFelt>>; 2],
     /// Verifier challenge α used to randomize the multi-set/logUp polynomials in the *aux* trace.
     pub random_alpha: QuadFelt,
     /// Verifier challenge β used to fingerprint bus messages for the *aux* trace.
     pub random_beta: QuadFelt,
-    /// Evaluations of the *aux* trace.
-    pub aux: [Vec<QuadFelt>; 2],
-    /// Evaluations of the *quotient* parts, including in the next row.
-    pub quotient: [Vec<QuadFelt>; 2],
     /// Verifier challenge used to compute the linear combination of constraints.
     pub alpha: QuadFelt,
     /// Verifier challenge corresponding to the point at which the constraint evaluation check is
@@ -53,13 +50,7 @@ impl AirInputs {
     /// the values that would be present in the proof's transcript.
     pub fn into_ace_vars(self, air: &Air) -> AceVars {
         let stark = StarkInputs::new(air, self.log_trace_len, self.alpha, self.z);
-        let [main_curr, main_next] = self.main;
-        let [aux_curr, aux_next] = self.aux;
-        let [quotient_curr, quotient_next] = self.quotient;
-        let segments = [
-            FullTraceShape::new(main_curr, aux_curr, quotient_curr),
-            FullTraceShape::new(main_next, aux_next, quotient_next),
-        ];
+        let segments = self.segments;
         AceVars {
             public: self.public,
             reduced_tables: self.reduced_tables,
