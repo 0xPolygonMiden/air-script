@@ -2,13 +2,190 @@
 # MEMORY CONSTRAINTS MODULE
 ##########################################################################################
 #
-# Miden VM supports linear read-write random access memory. This memory is element-addressable,
-# meaning that a single value is located at each address, although reading and writing values
-# to/from memory in batches of four is supported and is optimized for.
+# The Memory chiplet provides linear read-write random access memory for the Miden VM.
+# Memory is element-addressable with addresses in range [0, 2^32), supporting both individual
+# element access and optimized word-aligned batch operations (4 elements per word).
 #
-# STATUS: Not implemented
+# MEMORY TABLE LAYOUT:
+# ┌─────────┬────────────────────────────────────────────────────────────────────────┐
+# │ Column  │                               Purpose                                  │
+# ├─────────┼────────────────────────────────────────────────────────────────────────┤
+# │   rw    │ Read/write selector: 0=read, 1=write                                   │
+# │   ew    │ Element/word access selector: 0=element, 1=word                        │
+# │   ctx   │ Context ID for execution context separation                             │
+# │ w_addr  │ Word address (must be divisible by 4 for aligned access)                   │
+# │ idx0/1  │ Element index within word [0,3] - binary decomposition of low 2 bits           │
+# │   clk   │ Clock cycle when operation occurred                                            │
+# │ v0-v3   │ Four field elements stored in memory word                                     
+# │ d0/d1   │ Delta tracking columns for monotonicity verification                              │
+# │   d_inv     │ Inverse delta column between two consecutive context IDs, addresses, or clock cycles                   │
+# │ f_scw   │ Same context/word address flag for sequential access optimization                         │
+# └─────────┴────────────────────────────────────────────────────────────────────────┘
+#
+# STATUS: Partially implemented (missing bus constraints)
 #
 # REFERENCES:
 # - Memory Design: https://0xmiden.github.io/miden-vm/design/chiplets/memory.html
 ##########################################################################################
 
+mod memory
+
+use utils::*;
+
+##########################################################################################
+# MEMORY CHIPLET CONSTRAINTS
+##########################################################################################
+
+ev memory_chiplet_constraints([flag_all_rows, flag_not_last_row, flag_first_row, memory[15]]) {
+
+    let is_read = memory[0];        # Read(1)/Write(0) selector
+    let is_word_access = memory[1]; # Element(0)/Word(1) access selector
+    let ctx = memory[2];           # Context ID
+    let addr = memory[3];          # Memory address
+    let idx0 = memory[4];          # Element index bit 0
+    let idx1 = memory[5];          # Element index bit 1
+    let clk = memory[6];           # Clock cycle
+    let v0 = memory[7];            # Memory value 0
+    let v1 = memory[8];            # Memory value 1
+    let v2 = memory[9];            # Memory value 2
+    let v3 = memory[10];           # Memory value 3
+    let d0 = memory[11];           # Context delta
+    let d1 = memory[12];           # Address delta
+    let d_inv = memory[13];        # Delta inverse
+    let f_scw = memory[14];        # Same context/word flag
+
+    # Binary column constraints
+    enf enforce_binary_columns([is_read, is_word_access, idx0, idx1]) when flag_all_rows;
+
+    # Delta inverse constraints
+    enf enforce_d_inv([ctx, addr, clk, d0, d1, d_inv]) when flag_not_last_row;
+
+    # Context/address/clock delta constraints
+    enf enforce_delta([ctx, addr, clk, d0, d1, d_inv]) when flag_not_last_row;
+
+    # Same context/word flag constraints
+    enf enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]) when flag_not_last_row;
+
+    # Same context/word/addr/clock access constraints
+    enf enforce_same_context_word_addr_and_clock([is_read, ctx, clk, d_inv]) when flag_not_last_row;
+
+    # Memory value constraints
+    enf enforce_values([flag_first_row, flag_not_last_row, is_read, is_word_access, ctx, addr, idx0, idx1, clk, v0, v1, v2, v3, f_scw]);
+}
+
+##########################################################################################
+# HELPER EVALUATORS
+##########################################################################################
+
+# Constrains binary columns for selectors and indices
+ev enforce_binary_columns([is_read, is_word_access, idx0, idx1]) {
+    # Read/write selector must be binary
+    enf is_binary([is_read]);
+
+    # Element/word access selector must be binary
+    enf is_binary([is_word_access]);
+
+    # Index bit 0 must be binary
+    enf is_binary([idx0]);
+
+    # Index bit 1 must be binary
+    enf is_binary([idx1]);
+}
+
+# Constrains the delta inverse column
+ev enforce_d_inv([ctx, addr, clk, d0, d1, d_inv]) {
+    let ctx_delta = ctx' - ctx;
+    let addr_delta = addr' - addr;
+    let n0 = ctx_delta * d_inv';
+    let n1 = addr_delta * d_inv';
+
+    # n0 is binary
+    enf is_binary(n0);
+
+    # when context changes, n0 must be 1
+    enf binary_not(n0) * ctx_delta = 0;
+
+    # when n0 is 0 then n1 is binary
+    enf binary_not(n0) * is_binary(n1) = 0;
+
+    # when n0 and n1 are both 0, then addr must not change
+    enf binary_not(n0) * binary_not(n1) * addr_delta = 0;
+}
+
+# Enforces monotonicity constraints for context, address, and clock transitions
+ev enforce_delta([ctx, addr, clk, d0, d1, d_inv]) {
+    let ctx_delta = ctx' - ctx;
+    let addr_delta = addr' - addr;
+    let clk_delta = clk' - clk;
+    let delta_next = d1' * 2^16 + d0';
+    let n0 = ctx_delta * d_inv';
+    let n1 = addr_delta * d_inv';
+
+    enf n0 * ctx_delta + binary_not(n0) * (n1 * addr_delta + binary_not(n1) * clk_delta) = delta_next;
+}
+
+# Enforces correct f_scw flag computation
+ev enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]) {
+    let ctx_delta = ctx' - ctx;
+    let addr_delta = addr' - addr;
+    let n0 = ctx_delta * d_inv';
+    let n1 = addr_delta * d_inv';
+
+    enf f_scw' = binary_not(n0) * binary_not(n1);
+}
+
+# Enforces that accesses to same context, word address, and clock must be reads
+ev enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]) {
+    let clk_delta = clk' - clk;
+    let clk_no_change = binary_not(clk_delta) * d_inv';
+    
+    enf binary_not(is_read) * binary_not(is_read') = 0 when clk_no_change * f_scw';
+}
+
+# Enforces memory initialization, value consistency, and proper read/write semantics
+ev enforce_values([flag_first_row, flag_not_last_row, is_read, is_word_access, ctx, addr, idx0, idx1, clk, v0, v1, v2, v3, f_scw]) {
+    
+    # the i'th `f` flag is set to 1 when `i == 2 * idx1 + idx0`
+    let f0 = binary_not(idx1') * binary_not(idx0');
+    let f1 = binary_not(idx1') * idx0';
+    let f2 = idx1' * binary_not(idx0');
+    let f3 = idx1' * idx0';
+
+    # c_i is set to 1 when `v'[i]` is not written to, and 0 otherwise.
+    #
+    # In other words, c_i is set to 1 when `v'[i]` needs to be constrained (to either 0 or `v[i]`).
+    #
+    # Note that `c_i` only uses values in the "next" row. This is because it must be used to
+    # constrain the first row of the memory chiplet, where that row sits in the "next" position of
+    # the frame, and the "current" row belongs to the previous chiplet (and hence the "current" row
+    # must not be accessed).
+    #
+    # As a result, `c_i` does not include the constraint of being in the memory chiplet, or in the
+    # same context and word - these must be enforced separately.
+    let f = [f0, f1, f2, f3];
+    let c = [compute_c_i(f_i, is_read', is_word_access') for f_i in f];
+
+    # first row constraints: when row' is the first row, and v'[i] is not written to, then v'[i]
+    # must be 0.
+    enf c[0] * v0' = 0 when flag_first_row;
+    enf c[1] * v1' = 0 when flag_first_row;
+    enf c[2] * v2' = 0 when flag_first_row;
+    enf c[3] * v3' = 0 when flag_first_row;
+
+    # non-first row constraints:  if v[i] is not written to,
+    # - (f_scw' = 1) then its value needs to be copied over from the previous row,
+    # - (f_scw' = 0) then its value needs to be set to 0.
+    enf c[0] * (f_scw' * (v0' - v0) + binary_not(f_scw') * v0') = 0;
+    enf c[1] * (f_scw' * (v1' - v1) + binary_not(f_scw') * v1') = 0;
+    enf c[2] * (f_scw' * (v2' - v2) + binary_not(f_scw') * v2') = 0;
+    enf c[3] * (f_scw' * (v3' - v3) + binary_not(f_scw') * v3') = 0;
+}
+
+##########################################################################################
+# HELPER FUNCTIONS
+##########################################################################################
+
+fn compute_c_i(f_i: felt, is_read_next: felt, is_word_access_next: felt) -> felt {
+    let z_i = binary_not(is_word_access_next) * binary_not(f_i);
+    return is_read_next + binary_not(is_read_next) * z_i;
+}
