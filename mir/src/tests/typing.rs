@@ -18,7 +18,7 @@ fn test_typing() {
     }
 
     integrity_constraints {
-        let b2 = assert_bool(b);
+        let b2 = as_bool(b);
         let c = select(a, b2);
         enf c = 42;
     }

@@ -863,7 +863,7 @@ impl<'a> MirBuilder<'a> {
                         .build();
                     Ok(node)
                 },
-                symbols::AssertBool => {
+                symbols::AsBool => {
                     assert_eq!(call.args.len(), 1);
                     let x = self.translate_expr(call.args.first().unwrap())?;
                     // enf x^2 = x

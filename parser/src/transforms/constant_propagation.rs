@@ -402,7 +402,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                             }
                         }
                     },
-                    symbols::AssertBool => {
+                    symbols::AsBool => {
                         assert_eq!(call.args.len(), 1);
                         match &call.args[0] {
                             // If the assertion is a constant 0 or 1, it's valid

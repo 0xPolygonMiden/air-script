@@ -17,15 +17,15 @@ pub mod predefined {
     pub const Sum: Symbol = Symbol::new(2);
     /// The symbol `prod`
     pub const Prod: Symbol = Symbol::new(3);
-    /// The symbol `assert_bool`
-    pub const AssertBool: Symbol = Symbol::new(4);
+    /// The symbol `as_bool`
+    pub const AsBool: Symbol = Symbol::new(4);
 
     pub(super) const __SYMBOLS: &[(Symbol, &str)] = &[
         (Main, "$main"),
         (Builtin, "$builtin"),
         (Sum, "sum"),
         (Prod, "prod"),
-        (AssertBool, "assert_bool"),
+        (AsBool, "as_bool"),
     ];
 }
 

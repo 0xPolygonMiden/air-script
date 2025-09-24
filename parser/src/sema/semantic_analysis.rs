@@ -1179,7 +1179,7 @@ impl SemanticAnalysis<'_> {
             },
             // The known built-in cast functions - each takes a single argument, which
             // must be a subtype of the expected type
-            symbols::AssertBool => {
+            symbols::AsBool => {
                 match call.args.as_slice() {
                     [arg] => {
                         match self.expr_binding_type(arg) {
@@ -1987,8 +1987,8 @@ impl SemanticAnalysis<'_> {
                     let folder_ty = FunctionType::Function(vec![ty!(felt[usize::MAX])], ty!(felt));
                     Ok(Span::new(qid.span(), BindingType::Function(folder_ty)))
                 },
-                symbols::AssertBool => {
-                    // An `assert_bool(x)` is equivalent to an `enf x^2 = x and
+                symbols::AsBool => {
+                    // An `as_bool(x)` is equivalent to an `enf x^2 = x and
                     // a cast from felt to bool`.
                     Ok(Span::new(qid.span(), BindingType::Function(fty!(fn(felt) -> bool))))
                 },
