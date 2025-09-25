@@ -106,13 +106,13 @@ ev enforce_d_inv([ctx, addr, clk, d0, d1, d_inv]) {
     enf binary_constraint(n0) = 0;
 
     # When context changes, n0 must be 1
-    enf ctx_delta = 0 when binary_not(n0);
+    enf ctx_delta * binary_not(n0) = 0;
 
     # When n0 is 0 then n1 is binary
-    enf binary_constraint(n1) = 0 when binary_not(n0);
+    enf binary_not(n0) * binary_constraint(n1) = 0;
 
     # When n0 and n1 are both 0, then address must not change
-    enf addr_delta = 0 when binary_not(n0) * binary_not(n1);
+    enf binary_not(n0) * binary_not(n1) * addr_delta = 0;
 }
 
 # Enforces monotonicity constraints for context, address, and clock transitions
@@ -140,9 +140,9 @@ ev enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]) {
 # Enforces that accesses to same context, word address, and clock must be reads
 ev enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]) {
     let clk_delta = clk' - clk;
-    let clk_no_change = binary_not(clk_delta) * d_inv';
+    let clk_no_change = binary_not(clk_delta * d_inv');
 
-    enf binary_not(is_read) * binary_not(is_read') = 0 when clk_no_change * f_scw';
+    enf f_scw' * clk_no_change * binary_not(is_read) * binary_not(is_read') = 0;
 }
 
 # Enforces memory initialization, value consistency, and proper read/write semantics
@@ -169,10 +169,9 @@ ev enforce_values([s0, s1, s2, is_read, is_word_access, ctx, addr, idx0, idx1, c
     # As a result, `c_i` does not include the constraint of being in the memory chiplet, or in the
     # same context and word - these must be enforced separately.
     let f = [f0, f1, f2, f3];
-    let c = [compute_c_i(f_i, is_read', is_word_access') for f_i in f]; # Constraint flags for each value
+    let c = [compute_c_i(f_i, is_read', is_word_access') for f_i in f];
 
     # First row constraints: when v'[i] is not written to, then v'[i] must be 0.
-    # (This would be enforced by boundary conditions in practice)
     # enf c[0] * v0' = 0 when flag_first_row;
     # enf c[1] * v1' = 0 when flag_first_row;
     # enf c[2] * v2' = 0 when flag_first_row;
