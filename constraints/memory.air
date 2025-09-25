@@ -106,13 +106,13 @@ ev enforce_d_inv([ctx, addr, clk, d0, d1, d_inv]) {
     enf binary_constraint(n0) = 0;
 
     # When context changes, n0 must be 1
-    enf ctx_delta * binary_not(n0) = 0;
+    enf ctx_delta = 0 when binary_not(n0);
 
     # When n0 is 0 then n1 is binary
-    enf binary_not(n0) * binary_constraint(n1) = 0;
+    enf binary_constraint(n1) = 0 when binary_not(n0);
 
     # When n0 and n1 are both 0, then address must not change
-    enf binary_not(n0) * binary_not(n1) * addr_delta = 0;
+    enf addr_delta = 0 when binary_not(n0) * binary_not(n1);
 }
 
 # Enforces monotonicity constraints for context, address, and clock transitions
@@ -140,16 +140,16 @@ ev enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]) {
 # Enforces that accesses to same context, word address, and clock must be reads
 ev enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]) {
     let clk_delta = clk' - clk;
-    let clk_no_change = binary_not(clk_delta * d_inv');
+    let clk_no_change = binary_not(clk_delta) * d_inv';
 
-    enf f_scw' * clk_no_change * binary_not(is_read) * binary_not(is_read') = 0;
+    enf binary_not(is_read) * binary_not(is_read') = 0 when clk_no_change * f_scw';
 }
 
 # Enforces memory initialization, value consistency, and proper read/write semantics
 ev enforce_values([s0, s1, s2, is_read, is_word_access, ctx, addr, idx0, idx1, clk, v0, v1, v2, v3, f_scw]) {
 
-    let flag_not_last_row = flag_not_last_row(s0, s1, s2); # Not transitioning out of memory chiplet
-    let flag_first_row = flag_first_row(s0, s1, s2);       # First row of memory chiplet
+    let flag_not_last_row = flag_not_last_row(s0, s1, s2);
+    let flag_first_row = flag_first_row(s0, s1, s2);
 
     # The i'th `f` flag is set to 1 when `i == 2 * idx1 + idx0`
     let f0 = binary_not(idx1') * binary_not(idx0');
