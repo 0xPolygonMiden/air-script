@@ -54,8 +54,8 @@ ev memory_chiplet_constraints([s0, s1, s2, memory[15]]) {
     let f_scw = memory[14];         # Same context/word flag
 
 
-    let flag_all_rows = flag_all_rows(s0, s1, s2);
-    let flag_not_last_row = flag_not_last_row(s0, s1, s2);
+    let flag_all_rows = flag_all_rows(s0, s1, s2);         # Memory chiplet is active
+    let flag_not_last_row = flag_not_last_row(s0, s1, s2); # Not transitioning out of memory chiplet
 
     # Binary column constraints
     enf enforce_binary_columns([is_read, is_word_access, idx0, idx1]) when flag_all_rows;
@@ -148,8 +148,8 @@ ev enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]) {
 # Enforces memory initialization, value consistency, and proper read/write semantics
 ev enforce_values([s0, s1, s2, is_read, is_word_access, ctx, addr, idx0, idx1, clk, v0, v1, v2, v3, f_scw]) {
 
-    let flag_not_last_row = flag_not_last_row(s0, s1, s2);
-    let flag_first_row = flag_first_row(s0, s1, s2);
+    let flag_not_last_row = flag_not_last_row(s0, s1, s2); # Not transitioning out of memory chiplet
+    let flag_first_row = flag_first_row(s0, s1, s2);       # First row of memory chiplet
 
     # The i'th `f` flag is set to 1 when `i == 2 * idx1 + idx0`
     let f0 = binary_not(idx1') * binary_not(idx0');
@@ -169,7 +169,7 @@ ev enforce_values([s0, s1, s2, is_read, is_word_access, ctx, addr, idx0, idx1, c
     # As a result, `c_i` does not include the constraint of being in the memory chiplet, or in the
     # same context and word - these must be enforced separately.
     let f = [f0, f1, f2, f3];
-    let c = [compute_c_i(f_i, is_read', is_word_access') for f_i in f];
+    let c = [compute_c_i(f_i, is_read', is_word_access') for f_i in f]; # Constraint flags for each value
 
     # First row constraints: when v'[i] is not written to, then v'[i] must be 0.
     # (This would be enforced by boundary conditions in practice)
@@ -191,25 +191,32 @@ ev enforce_values([s0, s1, s2, is_read, is_word_access, ctx, addr, idx0, idx1, c
 # HELPER FUNCTIONS
 ##########################################################################################
 
+# Memory chiplet active flag
 fn flag_all_rows(s0: felt, s1: felt, s2: felt) -> felt {
     return s0 * s1 * binary_not(s2);
 }
 
+# Memory chiplet active flag for next row
 fn flag_all_rows_next(s0: felt, s1: felt, s2: felt) -> felt {
     return s0' * s1' * binary_not(s2');
 }
 
+# Memory chiplet active in current row and row is not the last one of the memory chiplet
 fn flag_not_last_row(s0: felt, s1: felt, s2: felt) -> felt {
     return s0 * s1 * binary_not(s2');
 }
+
+# Bitwise chiplet active flag
 fn bitwise_chiplet_flag(s0: felt, s1: felt) -> felt {
     return s0 * binary_not(s1);
 }
 
+# First row of memory chiplet (transitioning from bitwise to memory)
 fn flag_first_row(s0: felt, s1: felt, s2: felt) -> felt {
     return bitwise_chiplet_flag(s0, s1, s2) * flag_all_rows_next(s0, s1, s2);
 }
 
+# Computes constraint flag: 1 if value needs to be constrained, 0 otherwise
 fn compute_c_i(f_i: felt, is_read_next: felt, is_word_access_next: felt) -> felt {
     let z_i = binary_not(is_word_access_next) * binary_not(f_i);
     return is_read_next + binary_not(is_read_next) * z_i;
