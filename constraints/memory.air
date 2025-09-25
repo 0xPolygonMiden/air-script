@@ -10,7 +10,7 @@
 # ┌─────────┬──────────────────────────────────────────────────────────────────────────┐
 # │ Column  │                               Purpose                                    │
 # ├─────────┼──────────────────────────────────────────────────────────────────────────┤
-# │   rw    │ Read/write selector: 0=read, 1=write                                     │
+# │   rw    │ Read/write selector: 1=read, 0=write                                     │
 # │   ew    │ Element/word access selector: 0=element, 1=word                          │
 # │   ctx   │ Context ID for execution context separation                              │
 # │ w_addr  │ Word address (must be divisible by 4 for aligned access)                 │
@@ -213,7 +213,7 @@ fn bitwise_chiplet_flag(s0: felt, s1: felt) -> felt {
 
 # First row of memory chiplet (transitioning from bitwise to memory)
 fn flag_first_row(s0: felt, s1: felt, s2: felt) -> felt {
-    return bitwise_chiplet_flag(s0, s1, s2) * flag_all_rows_next(s0, s1, s2);
+    return bitwise_chiplet_flag(s0, s1) * flag_all_rows_next(s0, s1, s2);
 }
 
 # Computes constraint flag: 1 if value needs to be constrained, 0 otherwise
