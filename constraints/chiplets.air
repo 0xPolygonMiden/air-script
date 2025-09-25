@@ -22,14 +22,14 @@
 
 mod chiplets
 
-use memory::*;
+use memory::memory_chiplet_constraints;
 use utils::*;
 
 ##########################################################################################
 # CHIPLETS CONSTRAINTS
 ##########################################################################################
 
-ev chiplets_constraints([chiplets[20]]) {
+ev chiplets_transition([chiplets[20]]) {
     enf chiplet_selectors([chiplets[0..5]]);
 
     let hash_active = hasher_chiplet_flag(chiplets[0]);
@@ -38,14 +38,13 @@ ev chiplets_constraints([chiplets[20]]) {
     let ace_active = ace_chiplet_flag(chiplets[0], chiplets[1], chiplets[2], chiplets[3]);
     let ker_rom_active = ker_rom_chiplet_flag(chiplets[0], chiplets[1], chiplets[2], chiplets[3], chiplets[4]);
 
-    enf chiplets[0] = 0;
-    #enf match {
+    enf match {
         #case hash_active: hash_chiplet_constraints([chiplets[1..20]]),
         #case bitwise_active: bitwise_chiplet_constraints([chiplets[2..20]]),
-        #case memory_active: memory_chiplet_constraints([chiplets[0..18]]),
-        #case ace_active: ace_chiplet_constraints([chiplets[0], chiplets[1], chiplets[2], chiplets[3], chiplets[4..20]]),
+        case memory_active: memory_chiplet_constraints([chiplets[0..18]]),
+        #case ace_active: ace_chiplet_constraints([chiplets[4..20]]),
         #case ker_rom_active: ker_rom_chiplet_constraints([chiplets[5..20]]),
-    #};
+    };
 }
 
 ##########################################################################################
