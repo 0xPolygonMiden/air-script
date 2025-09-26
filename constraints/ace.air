@@ -65,23 +65,23 @@ ev ace_chiplet_constraints([s0, s1, s2, s3, ace[16]]) {
 
     let flag_ace = flag_ace_active(s0, s1, s2, s3);
     let flag_ace_first = flag_ace_next_is_first_row(s0, s1, s2, s2');
-    let flag_ace_next = flag_ace_current_and_next(s0, s1, s2, s3. s3');
+    let flag_ace_next = flag_ace_current_and_next(s0, s1, s2, s3, s3');
     let flag_ace_last = flag_ace_last(s0, s1, s2, s3, s3');
         
     # Section and block flags constraints
-    enf section_block_flags_constraints([s0, s1, s2, s2_next, s3, s3_next, sstart, sstart', sblock, id0, n_eval]);
+    enf section_block_flags_constraints([s0, s1, s2, s2', s3, s3', sstart, sstart', sblock, id0, n_eval]);
 
-    enf section_constraints(...) when flag_ace_next;
+    enf section_constraints([sstart, sblock, ctx, ptr, clk, id0]) when flag_ace_next;
 
     # READ block constraints
-    enf enforce_read_block_constraints([sstart, sblock, ctx, ptr, clk, id0, v0_0, v0_1, id1, v1_0, v1_1, id2, v2_0, v2_1, m0]) when flag_ace;
+    enf enforce_read_block_constraints([sblock, id0, id1]) when flag_ace;
 
     # EVAL block constraints
-    enf enforce_eval_block_constraints([sstart, sblock, ctx, ptr, clk, op, id0, v0_0, v0_1, id1, v1_0, v1_1, id2, v2_0, v2_1, m0]) when flag_ace;
+    enf enforce_eval_block_constraints([sblock, op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]) when flag_ace;
 
     # Finalization constraints
-    let f_end = binary_or(binary_and(flag_ace_next, sstart'), flag_ace_last); 
-    enf finalization_constraints(...) when f_end;
+    let f_end = binary_or(binary_and(flag_ace_next, sstart'), flag_ace_last);
+    enf finalization_constraints([id0, v0_0, v0_1]) when f_end;
 }
 
 ##########################################################################################
@@ -97,20 +97,20 @@ ev enforce_binary_columns([sstart, sblock]) {
     enf is_binary([sblock]);
 }
 
-ev section_block_flags_constraints([s0, s1, s2, s2_next, s3, s3_next, sstart, sstart', sblock, id0, n_eval]) {
+ev section_block_flags_constraints([s0, s1, s2, s2_next, s3, s3_next, sstart, sstart_next, sblock, id0, n_eval]) {
         
     let flag_ace = flag_ace_active(s0, s1, s2, s3);
     let flag_ace_first = flag_ace_next_is_first_row(s0, s1, s2, s2');
-    let flag_ace_next = flag_ace_current_and_next(s0, s1, s2, s3. s3');
+    let flag_ace_next = flag_ace_current_and_next(s0, s1, s2, s3, s3');
     let flag_ace_last = flag_ace_last(s0, s1, s2, s3, s3');
         
-    let section_flags = section_flags(s0, s1, s2, s3, s3', sstart, sstart');
+    let section_flags = section_flags(s0, s1, s2, s3, s3_next, sstart, sstart_next);
     let f_start = section_flags[0];
     let f_next = section_flags[1];
     let f_end = section_flags[2];
 
-    let block_flags = block_flags(s_block);
-    let block_flags_next = block_flags(s_block');
+    let block_flags = block_flags(sblock);
+    let block_flags_next = block_flags(sblock');
     let f_read = block_flags[0];
     let f_eval = block_flags[1];
     let f_read_next = block_flags_next[0];
@@ -132,106 +132,100 @@ ev section_block_flags_constraints([s0, s1, s2, s2_next, s3, s3_next, sstart, ss
 
     enf f_read = 0 when f_end;
 
-    enf select(f_read_next, n_eval', id0') = n_eval when binary_and(f_ace, f_read);
+    enf select(f_read_next, n_eval', id0') = n_eval when binary_and(flag_ace, f_read);
+}
+
+# Section-level constraints (common to both READ and EVAL blocks)
+ev section_constraints([sstart, sblock, ctx, ptr, clk, id0]) {
+    let flag_within_section = binary_not(sstart');
+    let flag_read = !sblock;
+    let flag_eval = sblock;
+
+    # Context consistency within a section
+    enf ctx' = ctx when flag_within_section;
+
+    # Clock consistency within a section
+    enf clk' = clk when flag_within_section;
+
+    # Memory pointer must decrease by 4 in READ blocks and by 1 in EVAL blocks
+    enf ptr' = ptr + 4 * flag_read + flag_eval when flag_within_section;
+
+    # Node identifiers decreases by 2 in READ blocks and by 1 in EVAL blocks
+    enf id0 = id0' + 2 * flag_read + flag_eval when flag_within_section;
+
+}
+
+# Finalization constraints (ensure final result is zero)
+ev finalization_constraints([id0, v0_0, v0_1]) {
+    # The final result of the arithmetic circuit evaluation must be zero
+    # This ensures the circuit represents a valid constraint
+    enf v0_0 = 0;
+    enf v0_1 = 0;
+
+    # Final node ID should be the root node
+    enf id0 = 0;
 }
 
 # READ block operation constraints
-ev enforce_read_block_constraints([sstart, sblock, ctx, ptr, clk, id0, v0_0, v0_1, id1, v1_0, v1_1, id2, v2_0, v2_1, m0]) {
+ev enforce_read_block_constraints([sblock, id0, id1]) {
     let is_read_block = binary_not(sblock);
 
     # In READ block, we read two extension field elements and assign node IDs
-    # Node IDs should be decremented for new nodes
-    enf is_read_block * (id0' - (id0 + 2)) = 0;
-    enf is_read_block * (id1' - (id1 - 1)) = 0;
-
-    # Memory pointer increments by 2 in READ block (reading 2 extension field elements)
-    enf is_read_block * (ptr' - (ptr + 4)) = 0;
-
-    # In READ block, id2 and v2 are used for additional node data
-    # m0 contains multiplicity information for wire bus operations
-    enf is_read_block * (m0 - 1) = 0;      # Standard multiplicity for insertions
+    # The two node IDs should be consecutive
+    enf id1 = id0 - 1 when is_read_block;
 }
 
 # EVAL block operation constraints
-ev enforce_eval_block_constraints([sstart, sblock, ctx, ptr, clk, op, id0, v0_0, v0_1, id1, v1_0, v1_1, id2, v2_0, v2_1, m0]) {
+ev enforce_eval_block_constraints([sblock, op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]) {
     let is_eval_block = sblock;
 
     # In EVAL block, we decode instruction and perform arithmetic operation
-    # The 'op' column contains the operation type
+    # The 'op' column contains the operation type and must be equal to either -1, 0, or 1
+    enf op * (op - 1) * (op + 1) = 0 when is_eval_block;
 
-    # Memory pointer increments by 1 in EVAL block (reading 1 instruction)
-    enf is_eval_block * (ptr' - (ptr + 1)) = 0;
-
-    # Wire bus operations: consume two inputs, produce one output
-    # For EVAL operations, we consume id0 and id1, produce result in id2
-    enf is_eval_block * (m0 + 1) = 0;      # Consume nodes (negative multiplicity for consumption)
-
-    # In EVAL block, id2 represents the result node ID
-    # v2_0, v2_1 represent the result node value as extension field element
     # Arithmetic operation constraint based on op type
     enf enforce_arithmetic_operation([op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]) when is_eval_block;
 }
 
-# Wire bus mechanism constraints
-ev enforce_wire_bus_constraints([sblock, id0, v0_0, v0_1, id1, v1_0, v1_1, id2, v2_0, v2_1, m0]) {
-    # Wire bus tracks node insertions and consumptions using logUp argument
-    # Each (id, value) pair must be inserted exactly as many times as consumed
-    # Extension field elements are represented as pairs (v_0, v_1)
-
-    let is_read_block = binary_not(sblock);
-    let is_eval_block = sblock;
-
-    # Bus interaction for first node (extension field element)
-    enf bus_ace_wire.insert(id0, v0_0, v0_1) with m0 when is_read_block;  # READ inserts
-    enf bus_ace_wire.remove(id0, v0_0, v0_1) with m0 when is_eval_block;  # EVAL consumes
-
-    # Bus interaction for second node (extension field element)
-    enf bus_ace_wire.insert(id1, v1_0, v1_1) with m0 when is_read_block;  # READ inserts
-    enf bus_ace_wire.remove(id1, v1_0, v1_1) with m0 when is_eval_block;  # EVAL consumes
-
-    # Result node insertion in EVAL block
-    # id2 acts as result node ID, v2_0/v2_1 as result extension field element
-    enf bus_ace_wire.insert(id2, v2_0, v2_1) with 1 when is_eval_block;  # EVAL produces result
-}
 
 # Arithmetic operation evaluation for EVAL block
 ev enforce_arithmetic_operation([op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]) {
     # Decode operation and enforce arithmetic constraint for extension field elements
     # Extension field elements are represented as (a_0, a_1) where element = a_0 + a_1 * α
 
-    # For demonstration: assume basic operations
-    # op = 0: ADD, op = 1: SUB, op = 2: MUL
-    let is_add = (1 - op) * (2 - op);      # op = 0
-    let is_sub = op * (2 - op);            # op = 1
-    let is_mul = op * (op - 1);            # op = 2
+    let linear_op = compute_linear_op(op, v1_0, v1_1, v2_0, v2_1);
+    let linear_op_0 = linear_op[0];
+    let linear_op_1 = linear_op[1];
 
-    # For extension field addition: (a_0 + a_1*α) + (b_0 + b_1*α) = (a_0+b_0) + (a_1+b_1)*α
-    enf is_add * (v2_0 - (v0_0 + v1_0)) = 0;  # Result element 0
-    enf is_add * (v2_1 - (v0_1 + v1_1)) = 0;  # Result element 1
+    let non_linear_op = compute_non_linear_op(v1_0, v1_1, v2_0, v2_1);
+    let non_linear_op_0 = non_linear_op[0];
+    let non_linear_op_1 = non_linear_op[1];
 
-    # For extension field subtraction: (a_0 + a_1*α) - (b_0 + b_1*α) = (a_0-b_0) + (a_1-b_1)*α
-    enf is_sub * (v2_0 - (v0_0 - v1_0)) = 0;  # Result element 0
-    enf is_sub * (v2_1 - (v0_1 - v1_1)) = 0;  # Result element 1
+    let op_square = op^2;
 
-    # For extension field multiplication: (a_0 + a_1*α) * (b_0 + b_1*α)
-    # = a_0*b_0 + a_1*b_1*α^2 + (a_0*b_1 + a_1*b_0)*α
-    # Simplified assuming α^2 = -1 (common extension field property)
-    enf is_mul * (v2_0 - (v0_0 * v1_0 - v0_1 * v1_1)) = 0;  # Real part
-    enf is_mul * (v2_1 - (v0_0 * v1_1 + v0_1 * v1_0)) = 0;  # Imaginary part
+    enf op_square * linear_op_0 + (1 - op_square) * non_linear_op_0 = v0_0;
+    enf op_square * linear_op_1 + (1 - op_square) * non_linear_op_1 = v0_1;
 }
 
-# Valid block transition patterns
-ev enforce_valid_block_transitions([sstart, sblock]) {
-    # Block transitions should follow valid patterns
-    # READ blocks can transition to EVAL blocks
-    # EVAL blocks can transition to READ blocks (new section) or continue EVAL
+fn compute_linear_op(op: felt, v1_0: felt, v1_1: felt, v2_0: felt, v2_1: felt) -> felt[2] {
+    let res0 = v1_0 + op * v2_0;
+    let res1 = v1_1 + op * v2_1;
+    return [res0, res1];
+}
 
-    let is_read_to_eval = binary_not(sblock) * sblock';
-    let is_eval_to_read = sblock * binary_not(sblock') * sstart';
-    let is_eval_to_eval = sblock * sblock' * binary_not(sstart');
+# Multiplication in the quadratic extension field.
+#
+# The extension is 𝔽ₚ[x]/(x² - x + 2)
+fn compute_non_linear_op(v1_0: felt, v1_1: felt, v2_0: felt, v2_1: felt) -> felt[2] {
+    let a0 = v1_0;
+    let a1 = v1_1;
+    let b0 = v2_0;
+    let b1 = v2_1;
+    
+    let res0 = a0 * b0 - 2 * a1 * b1;
+    let res1 = (b0 + b1) * (a0 + a1) - a0 * b0;
 
-    # Valid transitions
-    enf (is_read_to_eval + is_eval_to_read + is_eval_to_eval) <= 1;
+    return [res0, res1];
 }
 
 ##########################################################################################
