@@ -408,9 +408,10 @@ impl Visitor for InliningSecondPass<'_> {
     }
 
     fn visit_call(&mut self, _graph: &mut Graph, _call: Link<Op>) -> Result<(), CompileError> {
-        let Some(context) = self.call_inlining_context.clone() else {
-            unreachable!("InliningSecondPass::visit_node: call_inlining_context is None");
-        };
+        let context = self
+            .call_inlining_context
+            .clone()
+            .expect("InliningSecondPass::visit_node: call_inlining_context is None");
         if context.pure_function {
             // Instead of scanning all the body, we only scan the last node,
             // which represents the return value of the function
@@ -500,9 +501,9 @@ fn check_evaluator_argument_sizes(
     for ((trace_segment_id, trace_segments_params), trace_segments_arg) in
         callee_params.iter().enumerate().zip(args.iter())
     {
-        let Some(trace_segments_arg_vector) = trace_segments_arg.as_vector() else {
-            unreachable!("expected vector, got {:?}", trace_segments_arg);
-        };
+        let trace_segments_arg_vector = trace_segments_arg
+            .as_vector()
+            .unwrap_or_else(|| panic!("expected vector, got {trace_segments_arg:?}"));
         let children = trace_segments_arg_vector.children();
         let mut trace_segments_arg_vector_len = 0;
         for child in children.borrow().deref() {
@@ -583,11 +584,9 @@ fn check_evaluator_argument_sizes(
 fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
     let mut args_unpacked = Vec::new();
     for args_for_trace_segment in args.iter() {
-        let Some(trace_segment_vec) = args_for_trace_segment.as_vector() else {
-            unreachable!(
-                "Arguments of a Call node to Evaluator should be a Vectors for each trace segment"
-            );
-        };
+        let trace_segment_vec = args_for_trace_segment.as_vector().expect(
+            "Arguments of a Call node to Evaluator should be a Vectors for each trace segment",
+        );
         let children = trace_segment_vec.children();
         for arg in children.borrow().deref() {
             if let Some(value) = arg.as_value() {

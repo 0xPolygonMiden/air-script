@@ -76,7 +76,8 @@ impl Transpile {
                         path
                     },
                 };
-                let code = backend.generate(&air).expect("code generation failed");
+                let code =
+                    backend.generate(&air).map_err(|e| format!("code generation failed: {e}"))?;
                 if let Err(err) = fs::write(&output_path, code) {
                     return Err(format!("{err:?}"));
                 }

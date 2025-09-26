@@ -283,6 +283,17 @@ fn selectors_combine_complex() {
 }
 
 #[test]
+fn selectors_combine_with_list_comprehensions() {
+    let generated_air =
+        Test::new("tests/selectors/selectors_combine_with_list_comprehensions.air".to_string())
+            .transpile(Target::Winterfell)
+            .unwrap();
+
+    let expected = expect_file!["../selectors/selectors_combine_with_list_comprehensions.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
 fn constraint_comprehension() {
     let generated_air =
         Test::new("tests/constraint_comprehension/constraint_comprehension.air".to_string())

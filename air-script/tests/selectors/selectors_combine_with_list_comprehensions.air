@@ -1,13 +1,7 @@
 def SelectorsAir
 
-const R = [8, 4, 20, 31, 5, 15];
-
 trace_columns {
     main: [s[3], a, b, c],
-}
-
-buses {
-    multiset p,
 }
 
 public_inputs {
@@ -16,16 +10,18 @@ public_inputs {
 
 boundary_constraints {
     enf c.first = 0;
-    enf p.first = null;
-    enf p.last = null;
 }
 
-fn double_with_mult(a: felt) -> felt {
+fn double_mul(a: felt) -> felt {
     return 2*a;
 }
 
-fn double_with_add(a: felt) -> felt {
+fn double_add(a: felt) -> felt {
     return a+a;
+}
+
+fn triple(a: felt) -> felt {
+    return 3*a;
 }
 
 # Note: If the constraints `a, b, ..., i` verify the following equivalency:
@@ -43,27 +39,28 @@ fn double_with_add(a: felt) -> felt {
 #   s0 * d + s1 * f = 0
 
 ev ev_s0([a, b, c]) {
-    enf a = double_with_mult(R[0]); #a
-    enf b = R[1]; #b
-    enf a = double_with_add(R[0]); #c
-    enf c = R[2]; #d
+    let vec1 = [double_add(i) for i in 0..5];
 
-    p.insert(1, 2) when c;
+    enf a = vec1[0]; #a
+    enf b = vec1[1]; #b
+    enf a = vec1[1] - 2; #c
+    enf c = vec1[2]; #d
 }  
 
 ev ev_s1([a, b, c]) {
-    enf a = 16; #e
-    enf b = R[3]; #f
-    enf c = R[4]; #g
+    let vec2 = [double_mul(i) for i in 0..5];
 
-    p.insert(1, 2) when c;
+    enf a = vec2[2] - 4; #e
+    enf b = vec2[3]; #f
+    enf c = vec2[4]; #g
 }  
 
 ev ev_s2([a, b, c]) {
-    enf b = R[4]; #h
-    enf c = R[4]; #i
-
-    p.remove(3, 4) when b;
+    let vec_3i = [triple(i) for i in 0..5];
+    let vec_i = [i for i in 0..5];
+    let vec = [m-n for (m,n) in (vec_3i, vec_i)];
+    enf b = vec[4]; #h
+    enf c = vec[4]; #i
 }
 
 integrity_constraints {
