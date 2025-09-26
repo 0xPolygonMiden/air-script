@@ -30,7 +30,7 @@ use ace::*;
 # CHIPLETS CONSTRAINTS
 ##########################################################################################
 
-ev chiplets_constraints([chiplets[20]]) {
+ev chiplets_transition([chiplets[20]]) {
     enf chiplet_selectors([chiplets[0..5]]);
 
     let hash_active = hasher_chiplet_flag(chiplets[0]);
