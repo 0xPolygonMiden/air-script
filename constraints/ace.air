@@ -17,26 +17,26 @@
 #
 # ACE TRACE TABLE LAYOUT (16 columns):
 #
-# ┌─────────┬──────────────────────────────────────────────────────────────────────────┐
-# │ Column  │                               Purpose                                    │
-# ├─────────┼──────────────────────────────────────────────────────────────────────────┤
-# │ sstart  │ Section start flag: 1=first row of section, 0=otherwise                 │
-# │ sblock  │ Block selector: 0=READ block, 1=EVAL block                              │
-# │   ctx   │ Memory access context (constant within section)                         │
-# │   ptr   │ Memory pointer (increments by 4 in READ, 1 in EVAL)                     │
-# │   clk   │ Memory access clock cycle (constant within section)                     │
-# │   op    │ Operation type: -1=SUB, 0=MUL, 1=ADD (EVAL blocks only)                 │
-# │   id0   │ Result node identifier (decrements by 2 in READ, 1 in EVAL)             │
-# │  v0_0   │ Result node value - first extension field element                       │
-# │  v0_1   │ Result node value - second extension field element                      │
-# │   id1   │ First operand node identifier                                           │
-# │  v1_0   │ First operand value - first extension field element                     │
-# │  v1_1   │ First operand value - second extension field element                    │
-# │ id2/n_eval  │ DUAL USE: Second operand node ID (EVAL) / Evaluations count (READ)      │
-# │  v2_0   │ Second operand value - first extension field element                    │
-# │  v2_1   │ Second operand value - second extension field element                   │
-# │   m0    │ Wire bus multiplicity for node tracking                                 │
-# └─────────┴──────────────────────────────────────────────────────────────────────────┘
+# ┌─────────────┬────────────────────────────────────────────────────────────────────────────┐
+# │   Column    │ Purpose                                                                    │
+# ├─────────────┼────────────────────────────────────────────────────────────────────────────┤
+# │ sstart      │ Section start flag (binary): 1 = first row of section, 0 = otherwise       │
+# │ sblock      │ Block selector (binary): 0 = READ block, 1 = EVAL block                    │
+# │ ctx         │ Memory access context (constant throughout section)                        │
+# │ ptr         │ Memory pointer: increments by +4 in READ, +1 in EVAL blocks                │
+# │ clk         │ Memory access clock cycle (constant within section)                        │
+# │ op          │ Operation type (EVAL only): -1 = SUB, 0 = MUL, 1 = ADD                     │
+# │ id0         │ Result node ID: decrements by -2 in READ, -1 in EVAL                       │
+# │ v0_0        │ Result node value (extension field element, coefficient 0)                 │
+# │ v0_1        │ Result node value (extension field element, coefficient 1)                 │
+# │ id1         │ First operand node ID                                                      │
+# │ v1_0        │ First operand value (extension field element, coefficient 0)               │
+# │ v1_1        │ First operand value (extension field element, coefficient 1)               │
+# │ id2 / n_eval│ Dual use: 2nd operand node ID (EVAL) / #evaluations in section (READ)      │
+# │ v2_0        │ Second operand value (extension field element, coefficient 0)              │
+# │ v2_1        │ Second operand value (extension field element, coefficient 1)              │
+# │ m0          │ Wire bus multiplicity (for node tracking, not yet implemented)             │
+# └─────────────┴────────────────────────────────────────────────────────────────────────────┘
 #
 # STATUS: Core constraints implemented, wire bus constraints not implemented
 #
@@ -123,7 +123,6 @@ ev section_block_flags_constraints([s0, s1, s2, s2_next, s3, s3_next, sstart, ss
     let f_read_next = block_flags_next[0];
     let f_eval_next = block_flags_next[1];
 
-
     # Binary constraints for section and block flags
     enf enforce_binary_columns([sstart, sblock]) when flag_ace;
 
@@ -180,7 +179,6 @@ ev section_constraints([sstart, sblock, ctx, ptr, clk, id0]) {
 
     # Node identifiers decreases by 2 in READ blocks and by 1 in EVAL blocks
     enf id0 = id0' + 2 * flag_read + flag_eval when flag_within_section;
-
 }
 
 # Finalization constraints (ensure final result is zero)
@@ -322,4 +320,3 @@ fn block_flags(s_block: felt) -> felt[2] {
 
     return [f_read, f_eval];
 }
-
