@@ -157,7 +157,7 @@ ev enforce_binary_columns([sstart, sblock]) {
     enf is_binary([sblock]);
 }
 
-# Section-level constraints (common to both read and EVAL blocks)
+# Section-level constraints (common to both READ and EVAL blocks)
 #
 # These constraints apply throughout an entire section regardless of block type:
 # - Context (ctx) and clock (clk) remain constant within a section
