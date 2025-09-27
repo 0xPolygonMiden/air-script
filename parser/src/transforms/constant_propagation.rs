@@ -573,7 +573,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                             ScalarExpr::Const(selected) => {
                                 // If the selector returns false on this iteration, go to the next
                                 // step
-                                if *selected == 0 {
+                                if selected.item == 0 {
                                     continue;
                                 }
                             },
