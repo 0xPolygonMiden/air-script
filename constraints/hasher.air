@@ -140,53 +140,81 @@ ev hasher_state([s[3], h[12], i]) {
 # HELPER FUNCTIONS
 ##########################################################################################
 
-# Set to 1 when selector flags are (1,0,1) on rows which are multiples of 8. This is flag of 
-# the instruction that initiates Merkle path verification computation.
+##########################################################################################
+# INSTRUCTION FLAGS - DETAILED DESCRIPTIONS
+##########################################################################################
+#
+# Based on official Miden VM documentation: https://0xmiden.github.io/miden-vm/design/chiplets/hasher.html
+#
+# The hasher chiplet uses selector columns s[0], s[1], s[2] to encode different operations:
+#
+# INITIALIZATION FLAGS (on rows which are multiples of 8 - cycle_row_0):
+# • f_bp:  (1,0,0) - Begin Permutation
+#          Initiates: single permutation, 2-to-1 hash, or linear hash computation
+# • f_mp:  (1,0,1) - Merkle Path verification
+#          Starts standard Merkle path verification computation
+# • f_mv:  (1,1,0) - Merkle path Verification for "old" node
+#          Begins verification for old leaf value during Merkle root update
+# • f_mu:  (1,1,1) - Merkle path verification for "new" node
+#          Starts verification for new leaf value during Merkle root update
+#
+# ABSORPTION FLAGS (on rows 1 less than multiple of 8 - cycle_row_7):
+# • f_abp: (1,0,0) - Absorb elements for linear hash (continuing computation)
+#          Absorbs next set of elements into hasher state during linear hash
+# • f_mpa: (1,0,1) - Merkle Path Absorb during standard verification
+#          Absorbs next Merkle path node during standard verification
+# • f_mva: (1,1,0) - Merkle path absorb for "old" node verification
+#          Absorbs next node during "old" leaf verification (Merkle root update)
+# • f_mua: (1,1,1) - Merkle path absorb for "new" node verification
+#          Absorbs next node during "new" leaf verification (Merkle root update)
+#
+# OUTPUT FLAGS (on rows 1 less than multiple of 8 - cycle_row_7):
+# • f_hout: (0,0,0) - Hash Output
+#           Returns the result of the currently running hash computation
+# • f_sout: (0,0,1) - State Output
+#           Returns the entire 12-element hasher state
+# • f_out:  Combined flag (f_hout | f_sout) - any output operation
+#
+##########################################################################################
+
+# f_mp: Merkle Path verification flag (1,0,1) on cycle_row_0
+# Initiates standard Merkle path verification computation.
 fn get_f_mp(s: felt[3]) -> felt {
     return cycle_row_0 & s[0] & binary_not(s[1]) & s[2];
 }
 
-
-# Set to 1 when selector flags are (1,1,0) on rows which are multiples of 8. This is flag of 
-# the instruction that initiates Merkle path verification for the "old" node value during 
-# Merkle root update computation.
+# f_mv: Merkle path Verification for "old" node flag (1,1,0) on cycle_row_0
+# Begins verification for old leaf value during Merkle root update computation.
 fn get_f_mv(s: felt[3]) -> felt {
     return cycle_row_0 & s[0] & s[1] & binary_not(s[2]);
 }
 
-# Set to 1 when selector flags are (1,1,1) on rows which are multiples of 8. This is flag of 
-# the instruction that initiates Merkle path verification for the "new" node value during
-# Merkle root update computation.
+# f_mu: Merkle path verification for "new" node flag (1,1,1) on cycle_row_0
+# Starts verification for new leaf value during Merkle root update computation.
 fn get_f_mu(s: felt[3]) -> felt {
     return cycle_row_0 & s[0] & s[1] & s[2];
 }
 
-# Set to 1 when selector flags are (1,0,0) on rows which are 1 less than a multiple of 8. This 
-# is flag of the instruction that absorbs a new set of elements into the hasher state when 
-# computing a linear hash of many elements.
+# f_abp: Absorb elements for linear hash flag (1,0,0) on cycle_row_7
+# Absorbs next set of elements into hasher state during linear hash computation.
 fn get_f_abp(s: felt[3]) -> felt {
     return cycle_row_7 & s[0] & binary_not(s[1]) & binary_not(s[2]);
 }
 
-# Set to 1 when selector flags are (1,0,1) on rows which are 1 less than a multiple of 8. This 
-# is flag of the instruction that absorbs the next Merkle path node into the hasher state 
-# during Merkle path verification computation.
+# f_mpa: Merkle Path Absorb flag (1,0,1) on cycle_row_7
+# Absorbs next Merkle path node during standard verification computation.
 fn get_f_mpa(s: felt[3]) -> felt {
     return cycle_row_7 & s[0] & binary_not(s[1]) & s[2];
 }
 
-# Set to 1 when selector flags are (1,1,0) on rows which are 1 less than a multiple of 8. This 
-# is flag of the instruction that absorbs the next Merkle path node into the hasher state 
-# during Merkle path verification for the "old" node value during Merkle root update 
-# computation.
+# f_mva: Merkle path absorb for "old" node flag (1,1,0) on cycle_row_7
+# Absorbs next node during "old" leaf verification (Merkle root update computation).
 fn get_f_mva(s: felt[3]) -> felt {
     return cycle_row_7 & s[0] & s[1] & binary_not(s[2]);
 }
 
-# Set to 1 when selector flags are (1,1,1) on rows which are 1 less than a multiple of 8. This 
-# is flag of the instruction that absorbs the next Merkle path node into the hasher state 
-# during Merkle path verification for the "new" node value during Merkle root update 
-# computation.
+# f_mua: Merkle path absorb for "new" node flag (1,1,1) on cycle_row_7
+# Absorbs next node during "new" leaf verification (Merkle root update computation).
 fn get_f_mua(s: felt[3]) -> felt {
     return cycle_row_7 & s[0] & s[1] & s[2];
 }
@@ -194,11 +222,11 @@ fn get_f_mua(s: felt[3]) -> felt {
 # We can define two flags:
 # 1. Flag f_hout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & binary_not(s[2]), 
 # which is set to 1 when selector flags are (0,0,0) on rows which are 1 less than a multiple 
-# of 8. This is flag of the instruction that returns the result of the currently running 
-# computation.
+# of 8. This flag is for the instruction that returns the resulting digest of the currently
+# running computation.
 # 2. Flag f_sout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & s[2], which is set to 1 
-# when selector flags are (0,0,1) on rows which are 1 less than a multiple of 8. This is flag 
-# of the instruction that returns the whole hasher state.
+# when selector flags are (0,0,1) on rows which are 1 less than a multiple of 8. This flag is
+# for the instruction that returns the whole hasher state.
 #
 # Flag f_out is set to 1 when either f_hout = 1 or f_sout = 1 in the current row.
 fn get_f_out(s: felt[3]) -> felt {
