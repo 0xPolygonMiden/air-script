@@ -107,7 +107,8 @@ fn binary_or(a: felt, b: felt) -> felt {
 # let result = binary_xor(flag_a, flag_b);
 # ```
 fn binary_xor(a: felt, b: felt) -> felt {
-    return a + b - 2 * a * b;
+    let ab = a * b;
+    return a + b - (ab + ab);
 }
 
 ##########################################################################################
@@ -125,5 +126,5 @@ fn binary_xor(a: felt, b: felt) -> felt {
 # let result = select(condition, true_value, false_value);
 # ```
 fn select(condition: felt, if_true: felt, if_false: felt) -> felt {
-    return condition * if_true + (1 - condition) * if_false;
+    return condition * (if_true - if_false) + if_false;
 }
