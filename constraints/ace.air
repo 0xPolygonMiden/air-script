@@ -161,8 +161,8 @@ ev enforce_binary_columns([sstart, sblock]) {
 #
 # These constraints apply throughout an entire section regardless of block type:
 # - Context (ctx) and clock (clk) remain constant within a section
-# - Memory pointer (ptr) increments predictably: +4 in READ, +1 in EVAL
-# - Node identifiers (id0) decrement predictably: -2 in READ, -1 in EVAL
+# - Memory pointer (ptr) increments with fixed increments: +4 in READ, +1 in EVAL
+# - Node identifiers (id0) decrement with fixed decrements: -2 in READ, -1 in EVAL
 ev section_constraints([sstart, sblock, ctx, ptr, clk, id0]) {
     let flag_within_section = binary_not(sstart');
     let flag_read = !sblock;
@@ -200,7 +200,7 @@ ev enforce_read_block_constraints([sblock, id0, id1]) {
     let is_read_block = binary_not(sblock);
 
     # In READ block, we read two extension field elements and assign node IDs
-    # The two node IDs should be consecutive
+    # The two node IDs should be consecutive. Note that the node IDs are decreasing.
     enf id1 = id0 - 1 when is_read_block;
 }
 
