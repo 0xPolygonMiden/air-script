@@ -53,7 +53,7 @@ use utils::*;
 # ACE CHIPLET CONSTRAINTS
 ##########################################################################################
 
-ev ace_chiplet_constraints([s0, s1, s2, s3, ace[16]]) {
+ev ace_chiplet_constraints([s3, ace[16]]) {
     let sstart = ace[0];    # Section start flag
     let sblock = ace[1];    # Block selector (0=READ, 1=EVAL)
     let ctx = ace[2];       # Memory access context
@@ -72,21 +72,20 @@ ev ace_chiplet_constraints([s0, s1, s2, s3, ace[16]]) {
     let v2_1 = ace[14];     # Third node value (element 1)
     let m0 = ace[15];       # Multiplicity for wire bus operations
 
-    let flag_ace = flag_ace_active(s0, s1, s2, s3);
-    let flag_ace_next = flag_ace_current_and_next(s0, s1, s2, s3, s3');
-    let flag_ace_last = flag_ace_last(s0, s1, s2, s3, s3');
+    let flag_ace_next = flag_ace_current_and_next(s3');
+    let flag_ace_last = flag_ace_last(s3');
         
     # Section and block flags constraints
-    enf section_block_flags_constraints([s0, s1, s2, s2', s3, s3', sstart, sstart', sblock, id0, n_eval]);
+    enf section_block_flags_constraints([s3, sstart, sstart', sblock, id0, n_eval]);
 
     # Section general constraints
     enf section_constraints([sstart, sblock, ctx, ptr, clk, id0]) when flag_ace_next;
 
     # Section specific constraints: READ block
-    enf enforce_read_block_constraints([sblock, id0, id1]) when flag_ace;
+    enf enforce_read_block_constraints([sblock, id0, id1]);
 
     # Section specific constraints: EVAL block
-    enf enforce_eval_block_constraints([sblock, op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]) when flag_ace;
+    enf enforce_eval_block_constraints([sblock, op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]);
 
     # Finalization constraints
     let f_end = binary_or(binary_and(flag_ace_next, sstart'), flag_ace_last);
@@ -104,14 +103,11 @@ ev ace_chiplet_constraints([s0, s1, s2, s3, ace[16]]) {
 # - Block transitions follow valid patterns (READ→EVAL within sections)
 # - Section boundaries are correctly marked with sstart flags
 # - READ→EVAL transition occurs when n_eval matches id0
-ev section_block_flags_constraints([s0, s1, s2, s2_next, s3, s3_next, sstart, sstart_next, sblock, id0, n_eval]) {
+ev section_block_flags_constraints([s3, sstart, sstart_next, sblock, id0, n_eval]) {
+    let flag_ace_next = flag_ace_current_and_next(s3');
+    let flag_ace_last = flag_ace_last(s3');
         
-    let flag_ace = flag_ace_active(s0, s1, s2, s3);
-    let flag_ace_first = flag_ace_next_is_first_row(s0, s1, s2, s2');
-    let flag_ace_next = flag_ace_current_and_next(s0, s1, s2, s3, s3');
-    let flag_ace_last = flag_ace_last(s0, s1, s2, s3, s3');
-        
-    let section_flags = section_flags(s0, s1, s2, s3, s3_next, sstart, sstart_next);
+    let section_flags = section_flags(s3', sstart, sstart_next);
     let f_start = section_flags[0];
     let f_next = section_flags[1];
     let f_end = section_flags[2];
@@ -124,10 +120,7 @@ ev section_block_flags_constraints([s0, s1, s2, s2_next, s3, s3_next, sstart, ss
     let f_eval_next = block_flags_next[1];
 
     # Binary constraints for section and block flags
-    enf enforce_binary_columns([sstart, sblock]) when flag_ace;
-
-    # First row after transitioning to ACE should be section start
-    enf binary_not(sstart') when flag_ace_first;
+    enf enforce_binary_columns([sstart, sblock]);
 
     # Last row of ACE chiplet cannot be section start
     enf sstart = 0 when flag_ace_last;
@@ -145,7 +138,7 @@ ev section_block_flags_constraints([s0, s1, s2, s2_next, s3, s3_next, sstart, ss
     enf f_read = 0 when f_end;
 
     # READ→EVAL transition occurs when n_eval matches id0+1
-    enf select(f_read_next, n_eval', id0' + 1) = n_eval when binary_and(flag_ace, f_read);
+    enf select(f_read_next, n_eval', id0' + 1) = n_eval when f_read;
 }
 
 # Constrains binary columns for flags and selectors
@@ -275,39 +268,23 @@ fn compute_non_linear_op(v1_0: felt, v1_1: felt, v2_0: felt, v2_1: felt) -> felt
 # HELPER FUNCTIONS
 ##########################################################################################
 
-# ACE chiplet active flag
-fn flag_ace_active(s0: felt, s1: felt, s2: felt, s3: felt) -> felt {
-    return s0 * s1 * s2 * binary_not(s3);
-}
-
-# Previous chiplet active flag
-fn flag_previous_chip_active(s0: felt, s1: felt, s2: felt) -> felt {
-    return s0 * s1 * (1 - s2);
-}
-
-# Transitioning from previous chiplet to ACE chiplet first row
-fn flag_ace_next_is_first_row(s0: felt, s1: felt, s2: felt, s2_next: felt) -> felt {
-    return flag_previous_chip_active(s0, s1, s2) * !s2_next;
-}
-
 # ACE chiplet active in current row and continuing to next row
-fn flag_ace_current_and_next(s0: felt, s1: felt, s2: felt, s3: felt, s3_next: felt) -> felt {
-    return flag_ace_active(s0, s1, s2, s3) * !s3_next;
+fn flag_ace_current_and_next(s3_next: felt) -> felt {
+    return !s3_next;
 }
 
 # ACE chiplet active in current row but transitioning out in next row
-fn flag_ace_last(s0: felt, s1: felt, s2: felt, s3: felt, s3_next: felt) -> felt {
-    return flag_ace_active(s0, s1, s2, s3) * s3_next;
+fn flag_ace_last(s3_next: felt) -> felt {
+    return s3_next;
 }
 
 # Computes section-level flags: [f_start, f_next, f_end]
-fn section_flags(s0: felt, s1: felt, s2: felt, s3: felt, s3_next: felt, s_start: felt, s_start_next: felt) -> felt[3] {
-    let f_ace = flag_ace_active(s0, s1, s2, s3);
-    let f_ace_next = flag_ace_current_and_next(s0, s1, s2, s3, s3_next);
-    let f_ace_last = flag_ace_last(s0, s1, s2, s3, s3_next);
+fn section_flags(s3_next: felt, s_start: felt, s_start_next: felt) -> felt[3] {
+    let f_ace_next = flag_ace_current_and_next(s3_next);
+    let f_ace_last = flag_ace_last(s3_next);
 
-    let f_start = binary_and(f_ace, s_start);
-    let f_next = binary_and(f_ace_next, !s_start_next);
+    let f_start = s_start;
+    let f_next = !s_start_next;
     let f_end = binary_or(binary_and(f_ace_next, s_start_next), f_ace_last);
 
     return [f_start, f_next, f_end];
