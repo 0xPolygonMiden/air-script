@@ -23,6 +23,7 @@
 mod chiplets
 
 use memory::memory_chiplet_constraints;
+use kernel_rom::*;
 use utils::*;
 use ace::*;
 
@@ -44,8 +45,8 @@ ev chiplets_constraints([chiplets[20]]) {
         #case hash_active: hash_chiplet_constraints([chiplets[1..20]]),
         #case bitwise_active: bitwise_chiplet_constraints([chiplets[2..20]]),
         #case memory_active: memory_chiplet_constraints([chiplets[0..18]]),
-        case ace_active: ace_chiplet_constraints([chiplets[3], chiplets[4..20]]),
-        #case ker_rom_active: ker_rom_chiplet_constraints([chiplets[5..20]]),
+        case ace_active: ace_chiplet_constraints([chiplets[0], chiplets[1], chiplets[2], chiplets[3], chiplets[4..20]]),
+        case ker_rom_active: kernel_rom_chiplet([chiplets[4], chiplets[6..11]]),
     };
 }
 

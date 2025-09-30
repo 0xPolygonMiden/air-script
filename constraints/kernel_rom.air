@@ -1,0 +1,68 @@
+##########################################################################################
+# KERNEL ROM CHIPLET
+##########################################################################################
+#
+# The Kernel ROM chiplet is responsible for tracking execution of kernel (system) calls.
+# It maintains a record of all kernel procedure digests and ensures proper initialization
+# of kernel procedures while preserving privacy about call frequency.
+#
+# The chiplet contains digest values for all kernel procedures and enforces contiguity
+# constraints to ensure proper execution tracking.
+#
+# STATUS: Core constraints implemented, bus constraints not implemented
+#
+# REFERENCES:
+# - Kernel ROM Chiplet: https://0xmiden.github.io/miden-vm/design/chiplets/kernel_rom.html
+##########################################################################################
+
+mod kernel_rom
+
+use utils::*;
+
+##########################################################################################
+# KERNEL ROM CHIPLET TRANSITION CONSTRAINTS
+##########################################################################################
+
+# Enforces the constraints on the kernel ROM chiplet given its columns.
+#
+# Max constraint degree: 3
+ev kernel_rom_chiplet([s4, sfirst, r[4]]) {
+    enf kernel_rom_selector([sfirst]);
+    enf kernel_rom_digest_contiguity([s4, sfirst, r]);
+}
+
+##########################################################################################
+# HELPERS
+##########################################################################################
+
+### Helper evaluators #############################################################################
+
+# Enforces that the kernel ROM selector is valid.
+#
+# Max constraint degree: 2
+ev kernel_rom_selector([sfirst]) {
+    # Enforce that sfirst is binary (0 or 1).
+    # Constraint degree: 2
+    enf is_binary([sfirst]);
+
+    # First row initialization constraint
+    # This is part of the ACE chiplet constraints
+}
+
+# Enforces digest contiguity constraints for the kernel ROM.
+#
+# When sfirst = 0, consecutive rows must contain identical digest values to ensure
+# proper tracking of kernel procedure executions.
+#
+# Max constraint degree: 3
+ev kernel_rom_digest_contiguity([s4, sfirst, r[4]]) {
+    # Enforce that when sfirst = 0 (not the start of a new digest block),
+    # the digest values in the current row must be identical to the next row.
+    # This ensures contiguous blocks of identical digest values.
+    #
+    # Note: This constraint is disabled when the next row is the last row of the kernel ROM chiplet
+    # which is indicated by s4' being set to 1
+    # 
+    # TODO: Check if the following inlines to what is expected
+    enf is_unchanged([r]) for r in r when binary_and(binary_not(s4'), binary_not(sfirst'));
+}
