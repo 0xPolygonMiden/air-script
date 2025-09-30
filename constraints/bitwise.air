@@ -134,8 +134,8 @@ ev output_aggregation([op_flag, a, b, a_limb[4], b_limb[4], zp, z]) {
     # exclusive, the constraints for different operations can be aggregated into the same result
     # indices.
     # Constraints degree: 3
-    let a_and_b = sum([2^i * a * b for (i, a, b) in (0..4, a_limb, b_limb)]);
-    let a_xor_b = sum([2^i * (a + b - 2 * a * b) for (i, a, b) in (0..4, a_limb, b_limb)]);
+    let a_and_b = compute_limb_and(a_limb, b_limb);
+    let a_xor_b = compute_limb_xor(a_limb, b_limb);
 
     enf z = zp * 16 + op_flag * (a_xor_b - a_and_b)  + a_and_b;
 }
@@ -148,11 +148,11 @@ fn aggregate_limbs(limbs: felt[4]) -> felt {
 }
 
 # Computes AND operation result for a 4-bit limb using fold/reduce approach.
-fn compute_limb_and(a_limbs: felt[4], b_limbs: felt[4]) -> felt {
-    return sum([2^i * binary_and(a_bit, b_bit) for (i, a_bit, b_bit) in (0..4, a_limbs, b_limbs)]);
+fn compute_limb_and(a_limb: felt[4], b_limb: felt[4]) -> felt {
+    return sum([2^i * binary_and(a_bit, b_bit) for (i, a_bit, b_bit) in (0..4, a_limb, b_limb)]);
 }
 
 # Computes XOR operation result for a 4-bit limb using fold/reduce approach.
-fn compute_limb_xor(a_limbs: felt[4], b_limbs: felt[4]) -> felt {
-    return sum([2^i * binary_xor(a_bit, b_bit) for (i, a_bit, b_bit) in (0..4, a_limbs, b_limbs)]);
+fn compute_limb_xor(a_limb: felt[4], b_limb: felt[4]) -> felt {
+    return sum([2^i * binary_xor(a_bit, b_bit) for (i, a_bit, b_bit) in (0..4, a_limb, b_limb)]);
 }
