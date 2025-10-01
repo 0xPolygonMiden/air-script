@@ -177,17 +177,9 @@ impl Visitor for ConstantPropagation<'_> {
 // HELPERS FUNCTIONS
 // ================================================================================================
 
-/// Helper function to extract the constant felt value from a Link<Op> if it is one.
-fn get_inner_const(value: &Link<Op>) -> Option<u64> {
+pub fn get_inner_const(value: &Link<Op>) -> Option<u64> {
     match value.borrow().deref() {
-        Op::Value(Value {
-            value:
-                SpannedMirValue {
-                    value: MirValue::Constant(ConstantValue::Felt(c)),
-                    ..
-                },
-            ..
-        }) => Some(*c),
+        Op::Value(v) => v.get_inner_const(),
         Op::Accessor(accessor) => {
             match (accessor.access_type.clone(), accessor.indexable.borrow().deref()) {
                 (MirAccessType::Default, _) => get_inner_const(&accessor.indexable),

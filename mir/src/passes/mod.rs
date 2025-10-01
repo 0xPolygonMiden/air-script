@@ -477,14 +477,7 @@ pub fn duplicate_node_or_replace(
 /// Helper function to extract the constant felt value from a Link<Op> if it is one.
 pub fn get_inner_const(value: &Link<Op>) -> Option<u64> {
     match value.borrow().deref() {
-        Op::Value(Value {
-            value:
-                SpannedMirValue {
-                    value: MirValue::Constant(ConstantValue::Felt(c)),
-                    ..
-                },
-            ..
-        }) => Some(*c),
+        Op::Value(v) => v.get_inner_const(),
         _ => None,
     }
 }
