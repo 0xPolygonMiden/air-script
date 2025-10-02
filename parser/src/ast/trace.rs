@@ -20,13 +20,9 @@ impl fmt::Display for TraceSegmentId {
     }
 }
 
-impl TraceSegmentId {
-    /// Returns the index of this segment
-    pub const fn index(&self) -> usize {
-        match self {
-            TraceSegmentId::Main => 0,
-            TraceSegmentId::Aux => 1,
-        }
+impl From<TraceSegmentId> for usize {
+    fn from(value: TraceSegmentId) -> Self {
+        value as usize
     }
 }
 
