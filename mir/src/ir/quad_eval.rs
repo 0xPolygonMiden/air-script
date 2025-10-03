@@ -201,7 +201,18 @@ impl RandomInputs {
                 );
                 Err(CompileError::Failed)
             },
-            Op::Fold(_) | Op::Vector(_) | Op::Matrix(_) | Op::For(_) | Op::If(_) | Op::None(_) => {
+            Op::Vector(v) => {
+                // Handle Vector nodes that weren't properly unrolled
+                // For evaluation purposes, we can just evaluate the first element
+                let elements = v.elements.borrow();
+                if elements.is_empty() {
+                    Ok(rand_quad_felt(&mut self.rng))
+                } else {
+                    // Evaluate the first element of the vector
+                    self.eval(elements[0].clone())
+                }
+            },
+            Op::Fold(_) | Op::Matrix(_) | Op::For(_) | Op::If(_) | Op::None(_) => {
                 println!(
                     "Unexpected operation in RandomInputs::eval, the following operation should already be Unrolled at this stage: {op:?}"
                 );

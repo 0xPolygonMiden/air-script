@@ -22,7 +22,13 @@
 
 mod chiplets
 
-use memory::memory_chiplet_constraints;
+use bitwise::bitwise_chiplet_constraints;
+use memory::memory_chiplet_constraints_all_rows;
+use memory::memory_chiplet_constraints_all_rows_except_last;
+use memory::flag_memory_active_not_last_row;
+use memory::flag_next_row_first_row_memory;
+use memory::memory_chiplet_constraints_first_row;
+
 use utils::*;
 
 ##########################################################################################
@@ -30,21 +36,40 @@ use utils::*;
 ##########################################################################################
 
 ev chiplets_transition([chiplets[20]]) {
-    enf chiplet_selectors([chiplets[0..5]]);
+    # Chiplets' flag constraints
 
-    let hash_active = hasher_chiplet_flag(chiplets[0]);
-    let bitwise_active= bitwise_chiplet_flag(chiplets[0], chiplets[1]);
-    let memory_active = memory_chiplet_flag(chiplets[0], chiplets[1], chiplets[2]);
-    let ace_active = ace_chiplet_flag(chiplets[0], chiplets[1], chiplets[2], chiplets[3]);
-    let ker_rom_active = ker_rom_chiplet_flag(chiplets[0], chiplets[1], chiplets[2], chiplets[3], chiplets[4]);
+    let s0 = chiplets[0];
+    let s1 = chiplets[1];
+    let s2 = chiplets[2];
+    let s3 = chiplets[3];
+    let s4 = chiplets[4];
+
+    enf chiplet_selectors([s0, s1, s2, s3, s4]);
+
+    # Uniform chiplets' constraints
+
+    let hash_active = hasher_chiplet_flag(s0);
+    let bitwise_active= bitwise_chiplet_flag(s0, s1);
+    let memory_active = memory_chiplet_flag(s0, s1, s2);
+    let ace_active = ace_chiplet_flag(s0, s1, s2, s3);
+    let ker_rom_active = ker_rom_chiplet_flag(s0, s1, s2, s3, s4);
 
     enf match {
         #case hash_active: hash_chiplet_constraints([chiplets[1..20]]),
-        #case bitwise_active: bitwise_chiplet_constraints([chiplets[2..20]]),
-        case memory_active: memory_chiplet_constraints([chiplets[0..18]]),
+        case bitwise_active: bitwise_chiplet_constraints([chiplets[1], chiplets[2..15]]),
+        case memory_active: memory_chiplet_constraints_all_rows([chiplets[3..18]]),
         #case ace_active: ace_chiplet_constraints([chiplets[4..20]]),
         #case ker_rom_active: ker_rom_chiplet_constraints([chiplets[5..20]]),
     };
+
+    # Non-uniform chiplets' constraints
+
+    let flag_next_row_first_row_memory = flag_next_row_first_row_memory(s0, s1, s2);   # Next row is the first row in memory chiplet
+    let flag_memory_active_not_last_row = flag_memory_active_not_last_row(s0, s1, s2); # Not transitioning out of memory chiplet
+
+    enf memory_chiplet_constraints_first_row([chiplets[3..18]]) when flag_next_row_first_row_memory;
+    enf memory_chiplet_constraints_all_rows_except_last([chiplets[3..18]]) when flag_memory_active_not_last_row;
+
 }
 
 ##########################################################################################
