@@ -89,7 +89,12 @@ impl Visitor for UnrollingSecondPass<'_> {
                             );
                             new_vec.push(new_node_child_with_selector);
                         }
-                        Vector::create(new_vec, root.span())
+                        // If we have only one element, return it directly instead of wrapping in Vector
+                        if new_vec.len() == 1 {
+                            new_vec.into_iter().next().unwrap()
+                        } else {
+                            Vector::create(new_vec, root.span())
+                        }
                     } else {
                         Mul::create(selector, new_node, root.span())
                     }
@@ -98,7 +103,22 @@ impl Visitor for UnrollingSecondPass<'_> {
                 };
 
             // Update the root node with the new inlined body and reset the context to None
-            root.as_op().unwrap().set(&new_node_with_selector_if_needed);
+            if let Some(op) = root.as_op() {
+                op.set(&new_node_with_selector_if_needed);
+            } else {
+                match root.borrow().deref() {
+                    crate::ir::Node::Parameter(_) => {
+                        // Parameter nodes are placeholders and don't need to be updated
+                        // This is expected behavior when processing For loop unrolling
+                    },
+                    _ => {
+                        self.diagnostics.diagnostic(miden_diagnostics::Severity::Warning)
+                            .with_message("Unexpected node type during for loop unrolling")
+                            .with_primary_label(root.span(), "expected Op or Parameter node")
+                            .emit();
+                    }
+                }
+            }
             self.for_inlining_context = None;
         }
 

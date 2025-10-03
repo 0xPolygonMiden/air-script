@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
-use air_parser::ast::AccessType;
+use air_parser::ast::{AccessType, RangeExpr, RangeBound};
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Spanned};
 
@@ -496,7 +496,7 @@ impl Visitor for InliningSecondPass<'_> {
 fn check_evaluator_argument_sizes(
     args: &[Link<Op>],
     callee_params: Vec<Vec<Link<Op>>>,
-    diagnostics: &DiagnosticsHandler,
+    _diagnostics: &DiagnosticsHandler,
 ) -> Result<(), CompileError> {
     for ((trace_segment_id, trace_segments_params), trace_segments_arg) in
         callee_params.iter().enumerate().zip(args.iter())
@@ -565,6 +565,16 @@ fn check_evaluator_argument_sizes(
                             );
                         }
                     },
+                    AccessType::Slice(range_expr) => {
+                        // Slice access - calculate the size from the range
+                        match calculate_slice_size(range_expr) {
+                            Ok(size) => trace_segments_arg_vector_len += size,
+                            Err(_) => {
+                                // TODO: Add proper diagnostic for non-constant range bounds
+                                return Err(CompileError::Failed);
+                            }
+                        }
+                    },
                     _ => {
                         // Other access types - fallback to 1
                         trace_segments_arg_vector_len += 1;
@@ -576,31 +586,43 @@ fn check_evaluator_argument_sizes(
         }
 
         if trace_segments_params.len() != trace_segments_arg_vector_len {
-            diagnostics
-                .diagnostic(Severity::Error)
-                .with_message("argument count mismatch")
-                .with_primary_label(
-                    SourceSpan::UNKNOWN,
-                    format!(
-                        "expected call to have {} arguments in trace segment {}, but got {}",
-                        trace_segments_params.len(),
-                        trace_segment_id,
-                        trace_segments_arg_vector_len
-                    ),
-                )
-                .with_secondary_label(
-                    SourceSpan::UNKNOWN,
-                    format!(
-                        "this functions has {} parameters in trace segment {}",
-                        trace_segments_params.len(),
-                        trace_segment_id
-                    ),
-                )
+            _diagnostics.diagnostic(miden_diagnostics::Severity::Error)
+                .with_message(&format!("Argument count mismatch in trace segment {}", trace_segment_id))
+                .with_primary_label(trace_segments_arg.span(),
+                    &format!("expected {} arguments, got {}",
+                            trace_segments_params.len(),
+                            trace_segments_arg_vector_len))
                 .emit();
             return Err(CompileError::Failed);
         }
     }
     Ok(())
+}
+
+/// Calculate the size of a slice from a RangeExpr
+/// For example: [0..5] returns 5 (5 - 0 = 5)
+/// Returns an error for non-constant bounds that cannot be resolved at compile time
+fn calculate_slice_size(range_expr: &RangeExpr) -> Result<usize, CompileError> {
+    let start = match &range_expr.start {
+        RangeBound::Const(spanned) => spanned.item,
+        RangeBound::SymbolAccess(_) => {
+            // For non-constant bounds, we can't determine the size at compile time
+            // TODO: Implement constant resolution for SymbolAccess
+            return Err(CompileError::Failed);
+        }
+    };
+
+    let end = match &range_expr.end {
+        RangeBound::Const(spanned) => spanned.item,
+        RangeBound::SymbolAccess(_) => {
+            // For non-constant bounds, we can't determine the size at compile time
+            // TODO: Implement constant resolution for SymbolAccess
+            return Err(CompileError::Failed);
+        }
+    };
+
+    // Range is exclusive at the end, so size = end - start
+    Ok(end - start)
 }
 
 /// Helper function to unpack the arguments of a call to an evaluator
@@ -649,9 +671,34 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
             } else if let Some(_parameter) = arg.as_parameter() {
                 args_unpacked.push(arg.clone());
             } else if let Some(accessor) = arg.as_accessor() {
-                let Accessor { indexable, .. } = accessor.deref();
+                let Accessor { indexable, access_type, .. } = accessor.deref();
 
-                if let Some(value) = indexable.as_value() {
+                // Handle Slice access type specifically
+                if let AccessType::Slice(range_expr) = access_type {
+                    // Slice access - expand the slice elements from the underlying vector
+                    if let Some(vector) = indexable.as_vector() {
+                        let start = match &range_expr.start {
+                            RangeBound::Const(spanned) => spanned.item,
+                            _ => 0, // fallback for non-constant start
+                        };
+                        let end = match &range_expr.end {
+                            RangeBound::Const(spanned) => spanned.item,
+                            _ => vector.children().borrow().len(), // fallback for non-constant end
+                        };
+
+                        // Extract the slice elements
+                        let children = vector.children();
+                        let borrowed_children = children.borrow();
+                        for i in start..end.min(borrowed_children.len()) {
+                            if let Some(child) = borrowed_children.get(i) {
+                                args_unpacked.push(child.clone());
+                            }
+                        }
+                    } else {
+                        // For non-vector indexable, fallback to push the accessor as-is
+                        args_unpacked.push(arg.clone());
+                    }
+                } else if let Some(value) = indexable.as_value() {
                     let Value { value: SpannedMirValue { value, .. }, .. } = value.deref();
 
                     let _param_size = match value {
@@ -675,9 +722,13 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                     for child in vector.children().borrow().iter() {
                         args_unpacked.push(child.clone());
                     }
+                } else if let Some(_inner_accessor) = indexable.as_accessor() {
+                    // Handle nested accessors by pushing the indexable itself
+                    // This preserves the existing node structure
+                    args_unpacked.push(indexable.clone());
                 } else {
                     unreachable!(
-                        "expected value, parameter, or vector (or accessor on one), got {:?}",
+                        "expected value, parameter, vector, or nested accessor (or accessor on one), got {:?}",
                         arg
                     );
                 }
