@@ -36,7 +36,7 @@ use utils::*;
 # MEMORY CHIPLET CONSTRAINTS
 ##########################################################################################
 
-# Enforces memory initialization semantics
+# Enforces proper memory initialization when entering memory chiplet
 ev memory_chiplet_constraints_first_row([memory[15]]) {
     let is_read = memory[0];        # Read(1)/Write(0) selector
     let is_word_access = memory[1]; # Element(0)/Word(1) access selector
@@ -49,7 +49,7 @@ ev memory_chiplet_constraints_first_row([memory[15]]) {
     let v2 = memory[9];             # Memory value 2
     let v3 = memory[10];            # Memory value 3
 
-    # The i'th `f` flag is set to 1 when `i == 2 * idx1 + idx0`
+    # Element selection flags: f[i] = 1 when element index (2*idx1 + idx0) equals i
     let f0 = binary_not(idx1') * binary_not(idx0');
     let f1 = binary_not(idx1') * idx0';
     let f2 = idx1' * binary_not(idx0');
@@ -76,6 +76,8 @@ ev memory_chiplet_constraints_first_row([memory[15]]) {
     enf v3' = 0 when c[3];
 }
 
+# Enforces constraints that apply to every row in the memory chiplet
+# These are basic validity constraints for selectors and indices
 ev memory_chiplet_constraints_all_rows([memory[15]]) {
     let is_read = memory[0];        # Read(1)/Write(0) selector
     let is_word_access = memory[1]; # Element(0)/Word(1) access selector
@@ -86,6 +88,8 @@ ev memory_chiplet_constraints_all_rows([memory[15]]) {
     enf enforce_binary_columns([is_read, is_word_access, idx0, idx1]);
 }
 
+# Enforces memory state transition constraints for all rows except the final row
+# Includes monotonicity, value consistency, and proper read/write semantics
 ev memory_chiplet_constraints_all_rows_except_last([memory[15]]) {
     let is_read = memory[0];        # Read(1)/Write(0) selector
     let is_word_access = memory[1]; # Element(0)/Word(1) access selector
@@ -190,7 +194,7 @@ ev enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]) {
 
 # Enforces memory value consistency, and proper read/write semantics
 ev enforce_values_consistency([is_read, is_word_access, idx0, idx1, v0, v1, v2, v3, f_scw]) {
-    # The i'th `f` flag is set to 1 when `i == 2 * idx1 + idx0`
+    # Element selection flags: f[i] = 1 when element index (2*idx1 + idx0) equals i
     let f0 = binary_not(idx1') * binary_not(idx0');
     let f1 = binary_not(idx1') * idx0';
     let f2 = idx1' * binary_not(idx0');
@@ -216,7 +220,7 @@ ev enforce_values_consistency([is_read, is_word_access, idx0, idx1, v0, v1, v2, 
     enf f_scw' * (v0' - v0) + binary_not(f_scw') * v0' = 0 when c[0];
     enf f_scw' * (v1' - v1) + binary_not(f_scw') * v1' = 0 when c[1];
     enf f_scw' * (v2' - v2) + binary_not(f_scw') * v2' = 0 when c[2];
-    enf f_scw' * (v3' - v3) + binary_not(f_scw') * v3' = 0 when c[0];
+    enf f_scw' * (v3' - v3) + binary_not(f_scw') * v3' = 0 when c[3];
 }
 
 ##########################################################################################
