@@ -154,7 +154,7 @@ integrity_constraints {
     ####################################################################################
 
     # System state transitions
-    enf system_transition([system]);
+    enf system_transition([system[0..8]]);
 
     # TODO: Decoder constraints - Program execution and MAST verification
     # enf decoder_constraints([decoder]);
@@ -163,14 +163,14 @@ integrity_constraints {
     # enf stack_constraints([stack]);
 
     # TODO: Chiplet constraints - Hash, bitwise, ACE, memory operations, and kernel ROM
-    enf chiplets_constraints([chiplets]);
+    enf chiplets_transition([chiplets[0..20]]);
 
     ####################################################################################
     # BUS CONSTRAINTS
     ####################################################################################
 
     # Range checker bus protocol - Connects stack and chiplets for 16-bit range checks
-    enf range_checker_constraints([decoder, range_checker, chiplets]);
+    enf range_checker_constraints([decoder[0..24], range_checker[0..2], chiplets[0..20]]);
 
     # TODO: Additional bus constraints for complete VM verification
     # enf decoder_bus_constraints([decoder]);

@@ -527,6 +527,21 @@ fn check_evaluator_argument_sizes(
             } else if let Some(accessor) = child.as_accessor() {
                 let Accessor { indexable, access_type, .. } = accessor.deref();
 
+                // Handle slice access like chiplets[3..18] - count as expanded elements
+                if let air_parser::ast::AccessType::Slice(range) = access_type {
+                    use std::ops::Range;
+                    let range_bounds: Range<usize> = match range.try_into() {
+                        Ok(range) => range,
+                        Err(_) => {
+                            eprintln!("Failed to convert range expression in argument counting");
+                            trace_segments_arg_vector_len += 1;
+                            continue;
+                        }
+                    };
+                    trace_segments_arg_vector_len += range_bounds.len();
+                    continue;
+                }
+
                 // Check access type FIRST to determine how many elements this accessor represents
                 match access_type {
                     AccessType::Index(_) => {
@@ -586,13 +601,10 @@ fn check_evaluator_argument_sizes(
         }
 
         if trace_segments_params.len() != trace_segments_arg_vector_len {
-            _diagnostics.diagnostic(miden_diagnostics::Severity::Error)
-                .with_message(&format!("Argument count mismatch in trace segment {}", trace_segment_id))
-                .with_primary_label(trace_segments_arg.span(),
-                    &format!("expected {} arguments, got {}",
-                            trace_segments_params.len(),
-                            trace_segments_arg_vector_len))
-                .emit();
+            // Instead of emitting a diagnostic that fails, just return an error
+            // The FileMissing error suggests the diagnostics system can't handle SourceSpan::UNKNOWN
+            eprintln!("Argument count mismatch: expected {} arguments in trace segment {}, but got {}",
+                     trace_segments_params.len(), trace_segment_id, trace_segments_arg_vector_len);
             return Err(CompileError::Failed);
         }
     }
@@ -636,6 +648,38 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
         };
         let children = trace_segment_vec.children();
         for arg in children.borrow().deref() {
+
+            // Check if this argument is a slice accessor that needs expansion
+            if let Some(accessor) = arg.as_accessor() {
+                let Accessor { indexable, access_type, .. } = accessor.deref();
+
+                // Handle slice access like chiplets[3..18]
+                if let air_parser::ast::AccessType::Slice(range) = access_type {
+                    use std::ops::Range;
+                    let range_bounds: Range<usize> = match range.try_into() {
+                        Ok(range) => range,
+                        Err(_) => {
+                            eprintln!("Failed to convert range expression to concrete range in vector context");
+                            args_unpacked.push(arg.clone());
+                            continue;
+                        }
+                    };
+
+                    // Generate individual accessor nodes for each index in the range
+                    for index in range_bounds {
+                        let index_accessor = Accessor::create(
+                            indexable.clone(),
+                            air_parser::ast::AccessType::Index(index),
+                            0, // offset
+                            SourceSpan::UNKNOWN,
+                        );
+                        args_unpacked.push(index_accessor);
+                    }
+                    continue;
+                }
+            }
+
+
             if let Some(value) = arg.as_value() {
                 let Value {
                     value: SpannedMirValue { span, value, .. },
@@ -673,30 +717,28 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
             } else if let Some(accessor) = arg.as_accessor() {
                 let Accessor { indexable, access_type, .. } = accessor.deref();
 
-                // Handle Slice access type specifically
-                if let AccessType::Slice(range_expr) = access_type {
-                    // Slice access - expand the slice elements from the underlying vector
-                    if let Some(vector) = indexable.as_vector() {
-                        let start = match &range_expr.start {
-                            RangeBound::Const(spanned) => spanned.item,
-                            _ => 0, // fallback for non-constant start
-                        };
-                        let end = match &range_expr.end {
-                            RangeBound::Const(spanned) => spanned.item,
-                            _ => vector.children().borrow().len(), // fallback for non-constant end
-                        };
-
-                        // Extract the slice elements
-                        let children = vector.children();
-                        let borrowed_children = children.borrow();
-                        for i in start..end.min(borrowed_children.len()) {
-                            if let Some(child) = borrowed_children.get(i) {
-                                args_unpacked.push(child.clone());
-                            }
+                // Handle slice access like chiplets[0..5] or chiplets[3..18]
+                if let air_parser::ast::AccessType::Slice(range) = access_type {
+                    // Extract range bounds
+                    use std::ops::Range;
+                    let range_bounds: Range<usize> = match range.try_into() {
+                        Ok(range) => range,
+                        Err(_) => {
+                            eprintln!("Failed to convert range expression to concrete range");
+                            args_unpacked.push(arg.clone());
+                            continue;
                         }
-                    } else {
-                        // For non-vector indexable, fallback to push the accessor as-is
-                        args_unpacked.push(arg.clone());
+                    };
+
+                    // Generate individual accessor nodes for each index in the range
+                    for index in range_bounds {
+                        let index_accessor = Accessor::create(
+                            indexable.clone(),
+                            air_parser::ast::AccessType::Index(index),
+                            0, // offset
+                            SourceSpan::UNKNOWN,
+                        );
+                        args_unpacked.push(index_accessor);
                     }
                 } else if let Some(value) = indexable.as_value() {
                     let Value { value: SpannedMirValue { value, .. }, .. } = value.deref();
@@ -722,13 +764,46 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                     for child in vector.children().borrow().iter() {
                         args_unpacked.push(child.clone());
                     }
-                } else if let Some(_inner_accessor) = indexable.as_accessor() {
-                    // Handle nested accessors by pushing the indexable itself
-                    // This preserves the existing node structure
-                    args_unpacked.push(indexable.clone());
+                } else if let Some(nested_accessor) = indexable.as_accessor() {
+                    // Handle nested accessor: Accessor(Accessor(...))
+                    // Recursively resolve the nested accessor structure
+                    fn resolve_nested_accessor(accessor_node: &Link<Op>) -> Vec<Link<Op>> {
+                        if let Some(accessor) = accessor_node.as_accessor() {
+                            let Accessor { indexable, access_type, .. } = accessor.deref();
+
+                            // Handle slice access in nested accessors
+                            if let air_parser::ast::AccessType::Slice(range) = access_type {
+                                use std::ops::Range;
+                                let range_bounds: Range<usize> = match range.try_into() {
+                                    Ok(range) => range,
+                                    Err(_) => {
+                                        eprintln!("Failed to convert nested range expression to concrete range");
+                                        return vec![accessor_node.clone()];
+                                    }
+                                };
+
+                                // Generate individual accessor nodes for each index in the range
+                                let mut expanded = Vec::new();
+                                for index in range_bounds {
+                                    let index_accessor = Accessor::create(
+                                        indexable.clone(),
+                                        air_parser::ast::AccessType::Index(index),
+                                        0, // offset
+                                        SourceSpan::UNKNOWN,
+                                    );
+                                    expanded.push(index_accessor);
+                                }
+                                return expanded;
+                            }
+                        }
+                        vec![accessor_node.clone()]
+                    }
+
+                    let resolved = resolve_nested_accessor(&indexable);
+                    args_unpacked.extend(resolved);
                 } else {
                     unreachable!(
-                        "expected value, parameter, vector, or nested accessor (or accessor on one), got {:?}",
+                        "expected value, parameter, vector, or accessor (or nested accessor on one), got {:?}",
                         arg
                     );
                 }
