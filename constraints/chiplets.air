@@ -36,7 +36,7 @@ use ace::*;
 # CHIPLETS CONSTRAINTS
 ##########################################################################################
 
-ev chiplets_transition([chiplets[20]]) {
+ev chiplets_constraints([chiplets[20]]) {
     # Chiplets' flag constraints
 
     let s0 = chiplets[0];
