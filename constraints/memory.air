@@ -187,7 +187,7 @@ ev enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]) {
 # Enforces that accesses to same context, word address, and clock must be reads
 ev enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]) {
     let clk_delta = clk' - clk;
-    let clk_no_change = binary_not(clk_delta) * d_inv';
+    let clk_no_change = binary_not(clk_delta * d_inv');
 
     enf binary_not(is_read) * binary_not(is_read') = 0 when clk_no_change * f_scw';
 }
