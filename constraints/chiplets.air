@@ -22,6 +22,8 @@
 
 mod chiplets
 
+use ace::ace_chiplet_constraints_all_rows;
+use ace::ace_chiplet_constraints_first_row;
 use bitwise::bitwise_chiplet_constraints;
 use memory::memory_chiplet_constraints_all_rows;
 use memory::memory_chiplet_constraints_all_rows_except_last;
@@ -30,7 +32,6 @@ use memory::flag_next_row_first_row_memory;
 use memory::memory_chiplet_constraints_first_row;
 
 use utils::*;
-use ace::*;
 
 ##########################################################################################
 # CHIPLETS CONSTRAINTS
@@ -59,7 +60,7 @@ ev chiplets_constraints([chiplets[20]]) {
         #case hash_active: hash_chiplet_constraints([chiplets[1..20]]),
         case bitwise_active: bitwise_chiplet_constraints([chiplets[2..15]]),
         case memory_active: memory_chiplet_constraints_all_rows([chiplets[3..18]]),
-        #case ace_active: ace_chiplet_constraints([chiplets[4..20]]),
+        case ace_active: ace_chiplet_constraints_all_rows([chiplets[3..20]]),
         #case ker_rom_active: ker_rom_chiplet_constraints([chiplets[5..20]]),
     };
 
@@ -72,6 +73,13 @@ ev chiplets_constraints([chiplets[20]]) {
 
     # Apply transition constraints while active in memory chiplet (excluding final row)
     enf memory_chiplet_constraints_all_rows_except_last([chiplets[3..18]]) when flag_memory_active_not_last_row;
+
+    # ACE chiplet requires special handling for its first row
+    # The first ACE row comes right after the memory chiplet when s2 transitions from 0 to 1.
+    let next_row_first_ace = binary_and(memory_active, s2');
+
+    # Enforce constraints on the first row of ACE chiplet
+    enf ace_chiplet_constraints_first_row([chiplets[3..20]]) when next_row_first_ace;
 
 }
 

@@ -53,7 +53,7 @@ use utils::*;
 # ACE CHIPLET CONSTRAINTS
 ##########################################################################################
 
-ev ace_chiplet_constraints([s3, ace[16]]) {
+ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
     let sstart = ace[0];    # Section start flag
     let sblock = ace[1];    # Block selector (0=READ, 1=EVAL)
     let ctx = ace[2];       # Memory access context
@@ -90,6 +90,12 @@ ev ace_chiplet_constraints([s3, ace[16]]) {
     # Finalization constraints
     let f_end = binary_or(binary_and(flag_ace_next, sstart'), flag_ace_last);
     enf finalization_constraints([id0, v0_0, v0_1]) when f_end;
+}
+
+ev ace_chiplet_constraints_first_row([s3, ace[16]]) {
+    let sstart = ace[0];    # Section start flag
+
+    enf sstart' = 1;
 }
 
 ##########################################################################################
@@ -236,8 +242,8 @@ ev enforce_arithmetic_operation([op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]) {
 
     let op_square = op^2;
 
-    enf op_square * linear_op_0 + (1 - op_square) * non_linear_op_0 = v0_0;
-    enf op_square * linear_op_1 + (1 - op_square) * non_linear_op_1 = v0_1;
+    enf op_square * (linear_op_0 - non_linear_op_0) + non_linear_op_0 = v0_0;
+    enf op_square * (linear_op_1 - non_linear_op_1) + non_linear_op_1 = v0_1;
 }
 
 # Computes linear operations (addition and subtraction) in extension field
