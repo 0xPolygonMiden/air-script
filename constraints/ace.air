@@ -53,6 +53,7 @@ use utils::*;
 # ACE CHIPLET CONSTRAINTS
 ##########################################################################################
 
+# Enforces constraints on all rows of ACE chiplet.
 ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
     let sstart = ace[0];    # Section start flag
     let sblock = ace[1];    # Block selector (0=READ, 1=EVAL)
@@ -92,6 +93,7 @@ ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
     enf finalization_constraints([id0, v0_0, v0_1]) when f_end;
 }
 
+# Enforces that on the first row of ACE chiplet we should have sstart' = 1
 ev ace_chiplet_constraints_first_row([s3, ace[16]]) {
     let sstart = ace[0];    # Section start flag
 
