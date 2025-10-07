@@ -64,7 +64,7 @@ ev chiplets_constraints([chiplets[20]]) {
     let ace_active = ace_chiplet_flag(s0, s1, s2, s3);    # Active when: s0 * s1 * s2 * !s3
     let ker_rom_active = ker_rom_chiplet_flag(s0, s1, s2, s3, s4); # Active when: s0 * s1 * s2 * s3 * !s4
 
-    # Apply chiplet-specific constraints based on hierarchical selector state.
+    # Apply chiplet-specific constraints based on selectors.
     enf match {
         #case hash_active: hash_chiplet_constraints([chiplets[1..20]]),
         case bitwise_active: bitwise_chiplet_constraints([chiplets[2..15]]),
