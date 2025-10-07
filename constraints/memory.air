@@ -36,7 +36,61 @@ use utils::*;
 # MEMORY CHIPLET CONSTRAINTS
 ##########################################################################################
 
-ev memory_chiplet_constraints([s0, s1, s2, memory[15]]) {
+# Enforces proper memory initialization when entering memory chiplet
+ev memory_chiplet_constraints_first_row([memory[15]]) {
+    let is_read = memory[0];        # Read(1)/Write(0) selector
+    let is_word_access = memory[1]; # Element(0)/Word(1) access selector
+    let ctx = memory[2];            # Context ID
+    let addr = memory[3];           # Memory address
+    let idx0 = memory[4];           # Element index bit 0
+    let idx1 = memory[5];           # Element index bit 1
+    let v0 = memory[7];             # Memory value 0
+    let v1 = memory[8];             # Memory value 1
+    let v2 = memory[9];             # Memory value 2
+    let v3 = memory[10];            # Memory value 3
+
+    # Element selection flags: f[i] = 1 when element index (2*idx1 + idx0) equals i
+    let f0 = binary_not(idx1') * binary_not(idx0');
+    let f1 = binary_not(idx1') * idx0';
+    let f2 = idx1' * binary_not(idx0');
+    let f3 = idx1' * idx0';
+
+    # c_i is set to 1 when `v'[i]` is not written to, and 0 otherwise.
+    #
+    # In other words, c_i is set to 1 when `v'[i]` needs to be constrained (to either 0 or `v[i]`).
+    #
+    # Note that `c_i` only uses values in the "next" row. This is because it must be used to
+    # constrain the first row of the memory chiplet, where that row sits in the "next" position of
+    # the frame, and the "current" row belongs to the previous chiplet (and hence the "current" row
+    # must not be accessed).
+    #
+    # As a result, `c_i` does not include the constraint of being in the memory chiplet, or in the
+    # same context and word - these must be enforced separately.
+    let f = [f0, f1, f2, f3];
+    let c = [compute_c_i(f_i, is_read', is_word_access') for f_i in f];
+
+    # Enforce that when v'[i] is not written to, then v'[i] must be 0.
+    enf v0' = 0 when c[0];
+    enf v1' = 0 when c[1];
+    enf v2' = 0 when c[2];
+    enf v3' = 0 when c[3];
+}
+
+# Enforces constraints that apply to every row in the memory chiplet
+# These are basic validity constraints for selectors and indices
+ev memory_chiplet_constraints_all_rows([memory[15]]) {
+    let is_read = memory[0];        # Read(1)/Write(0) selector
+    let is_word_access = memory[1]; # Element(0)/Word(1) access selector
+    let idx0 = memory[4];           # Element index bit 0
+    let idx1 = memory[5];           # Element index bit 1
+
+    # Binary column constraints
+    enf enforce_binary_columns([is_read, is_word_access, idx0, idx1]);
+}
+
+# Enforces memory state transition constraints for all rows except the final row
+# Includes monotonicity, value consistency, and proper read/write semantics
+ev memory_chiplet_constraints_all_rows_except_last([memory[15]]) {
     let is_read = memory[0];        # Read(1)/Write(0) selector
     let is_word_access = memory[1]; # Element(0)/Word(1) access selector
     let ctx = memory[2];            # Context ID
@@ -53,27 +107,20 @@ ev memory_chiplet_constraints([s0, s1, s2, memory[15]]) {
     let d_inv = memory[13];         # Delta inverse
     let f_scw = memory[14];         # Same context/word flag
 
-
-    let flag_all_rows = flag_all_rows(s0, s1, s2);         # Memory chiplet is active
-    let flag_not_last_row = flag_not_last_row(s0, s1, s2); # Not transitioning out of memory chiplet
-
-    # Binary column constraints
-    enf enforce_binary_columns([is_read, is_word_access, idx0, idx1]) when flag_all_rows;
-
     # Delta inverse constraints
-    enf enforce_d_inv([ctx, addr, clk, d0, d1, d_inv]) when flag_not_last_row;
+    enf enforce_d_inv([ctx, addr, clk, d0, d1, d_inv]);
 
     # Context/address/clock delta constraints
-    enf enforce_delta([ctx, addr, clk, d0, d1, d_inv]) when flag_not_last_row;
+    enf enforce_delta([ctx, addr, clk, d0, d1, d_inv]);
 
     # Same context/word flag constraints
-    enf enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]) when flag_not_last_row;
+    enf enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]);
 
     # Same context/word/addr/clock access constraints
-    enf enforce_same_context_word_addr_and_clock([is_read, ctx, clk, d_inv]) when flag_not_last_row;
+    enf enforce_same_context_word_addr_and_clock([is_read, ctx, clk, d_inv]);
 
     # Memory value constraints
-    enf enforce_values([s0, s1, s2, is_read, is_word_access, ctx, addr, idx0, idx1, clk, v0, v1, v2, v3, f_scw]);
+    enf enforce_values_consistency([is_read, is_word_access, idx0, idx1, v0, v1, v2, v3, f_scw]);
 }
 
 ##########################################################################################
@@ -140,18 +187,14 @@ ev enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]) {
 # Enforces that accesses to same context, word address, and clock must be reads
 ev enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]) {
     let clk_delta = clk' - clk;
-    let clk_no_change = binary_not(clk_delta) * d_inv';
+    let clk_no_change = binary_not(clk_delta * d_inv');
 
     enf binary_not(is_read) * binary_not(is_read') = 0 when clk_no_change * f_scw';
 }
 
-# Enforces memory initialization, value consistency, and proper read/write semantics
-ev enforce_values([s0, s1, s2, is_read, is_word_access, ctx, addr, idx0, idx1, clk, v0, v1, v2, v3, f_scw]) {
-
-    let flag_not_last_row = flag_not_last_row(s0, s1, s2);
-    let flag_first_row = flag_first_row(s0, s1, s2);
-
-    # The i'th `f` flag is set to 1 when `i == 2 * idx1 + idx0`
+# Enforces memory value consistency, and proper read/write semantics
+ev enforce_values_consistency([is_read, is_word_access, idx0, idx1, v0, v1, v2, v3, f_scw]) {
+    # Element selection flags: f[i] = 1 when element index (2*idx1 + idx0) equals i
     let f0 = binary_not(idx1') * binary_not(idx0');
     let f1 = binary_not(idx1') * idx0';
     let f2 = idx1' * binary_not(idx0');
@@ -171,19 +214,13 @@ ev enforce_values([s0, s1, s2, is_read, is_word_access, ctx, addr, idx0, idx1, c
     let f = [f0, f1, f2, f3];
     let c = [compute_c_i(f_i, is_read', is_word_access') for f_i in f];
 
-    # First row constraints: when v'[i] is not written to, then v'[i] must be 0.
-    # enf c[0] * v0' = 0 when flag_first_row;
-    # enf c[1] * v1' = 0 when flag_first_row;
-    # enf c[2] * v2' = 0 when flag_first_row;
-    # enf c[3] * v3' = 0 when flag_first_row;
-
-    # Non-first row constraints: if v[i] is not written to,
+    # Non-first row constraints: if v[i]' is not written to and,
     # - (f_scw' = 1) then its value needs to be copied over from the previous row,
     # - (f_scw' = 0) then its value needs to be set to 0.
-    enf c[0] * (f_scw' * (v0' - v0) + binary_not(f_scw') * v0') = 0 when flag_not_last_row;
-    enf c[1] * (f_scw' * (v1' - v1) + binary_not(f_scw') * v1') = 0 when flag_not_last_row;
-    enf c[2] * (f_scw' * (v2' - v2) + binary_not(f_scw') * v2') = 0 when flag_not_last_row;
-    enf c[3] * (f_scw' * (v3' - v3) + binary_not(f_scw') * v3') = 0 when flag_not_last_row;
+    enf f_scw' * (v0' - v0) + binary_not(f_scw') * v0' = 0 when c[0];
+    enf f_scw' * (v1' - v1) + binary_not(f_scw') * v1' = 0 when c[1];
+    enf f_scw' * (v2' - v2) + binary_not(f_scw') * v2' = 0 when c[2];
+    enf f_scw' * (v3' - v3) + binary_not(f_scw') * v3' = 0 when c[3];
 }
 
 ##########################################################################################
@@ -201,18 +238,13 @@ fn flag_all_rows_next(s0: felt, s1: felt, s2: felt) -> felt {
 }
 
 # Memory chiplet active in current row and row is not the last one of the memory chiplet
-fn flag_not_last_row(s0: felt, s1: felt, s2: felt) -> felt {
+fn flag_memory_active_not_last_row(s0: felt, s1: felt, s2: felt) -> felt {
     return s0 * s1 * binary_not(s2');
 }
 
-# Bitwise chiplet active flag
-fn bitwise_chiplet_flag(s0: felt, s1: felt) -> felt {
-    return s0 * binary_not(s1);
-}
-
 # First row of memory chiplet (transitioning from bitwise to memory)
-fn flag_first_row(s0: felt, s1: felt, s2: felt) -> felt {
-    return bitwise_chiplet_flag(s0, s1) * flag_all_rows_next(s0, s1, s2);
+fn flag_next_row_first_row_memory(s0: felt, s1: felt, s2: felt) -> felt {
+    return (1 - s1) * flag_all_rows_next(s0, s1, s2);
 }
 
 # Computes constraint flag: 1 if value needs to be constrained, 0 otherwise

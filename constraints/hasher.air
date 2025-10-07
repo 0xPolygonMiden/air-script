@@ -43,43 +43,50 @@ ev hash_chiplet([s[3], h[12], i]) {
 
 # Enforce selector columns constraints
 ev selector_columns([s[3]]) {
+    # Enforce that selector columns are binary.
+    enf is_binary([selector]) for selector in s;
 
-    let f_out = get_f_out(s);
-    let f_out_next = get_f_out_next(s);
+    # Compute relevant flags
     let f_abp = get_f_abp(s);
     let f_mpa = get_f_mpa(s);
     let f_mva = get_f_mva(s);
     let f_mua = get_f_mua(s);
+    let f_out = get_f_out(s);
+    let f_out_next = get_f_out_next(s);
+
+    # Enforce that unless f_out = 1 or f_out' = 1, the values in columns s[1] and s[2] are copied 
+    # over to the next row.
+    # This encodes the fact that we can change the op flags only at the end of a cycle in order
+    # to output a result, or at the start of a new cycle to initiate a new operation.
+    enf is_unchanged([s[1]]) when !f_out & !f_out_next;
+    enf is_unchanged([s[2]]) when !f_out & !f_out_next;
 
     # Flag that is true when the performed operation is one of the operations represented by flags
     # f_abp, f_mpa, f_mva or f_mua
     let f_comp = f_abp + f_mpa + f_mva + f_mua;
 
-    # Enforce that selector columns are binary.
-    enf is_binary([selector]) for selector in s;
-
-    # Enforce that unless f_out = 1 or f_out' = 1, the values in columns s[1] and s[2] are copied 
-    # over to the next row.
-    enf is_unchanged([s[1]]) when !f_out & !f_out_next;
-    enf is_unchanged([s[2]]) when !f_out & !f_out_next;
-
     # Enforce that if any of f_abp, f_mpa, f_mva, f_mua flags is set to 1, the next value of s[0] 
     # is 0.
-    enf s[0]' * f_comp = 0;
+    # This basically enforces the exclusion of all op which initiate a new op (at the start of a new
+    # cycle). Note that f_comp is a flag that is set only on rows which are 1 less than a multiple of 8
+    # and hence the following constrains the 0-th selector at the start of a new cycle.
+    enf s[0]' = 0 when f_comp;
 
     # Enforce that no invalid combinations of flags are allowed.
-    enf cycle_row_7 * binary_not(s[0]) * s[1] = 0;
+    # This enforces that if s[0] is 0 then the either f_hout or f_sout is set.§§
+    enf s[1] = 0 when binary_and(cycle_row_7, binary_not(s[0]));
 }
 
 # Enforce node index constraints
 ev node_index([s[3], i]) {
-    let f_out = get_f_out(s);
+    # Compute relevant flags
     let f_mp = get_f_mp(s);
     let f_mv = get_f_mv(s);
     let f_mu = get_f_mu(s);
     let f_mpa = get_f_mpa(s);
     let f_mva = get_f_mva(s);
     let f_mua = get_f_mua(s);
+    let f_out = get_f_out(s);
 
     # Flag indicating to enforce the constraint that b is binary only when a new node is absorbed into
     # the hasher state (when the hash operation is either one of Merkle path verification or 
@@ -90,10 +97,10 @@ ev node_index([s[3], i]) {
     let b = i - 2 * i';
 
     # Enforce that b is binary only when a new node is absorbed into the hasher state.
-    enf f_an * (b^2 - b) = 0;
+    enf b^2 - b = 0 when f_an;
 
     # Enforce that when a computation is finished i = 0.
-    enf f_out * i = 0;
+    enf i = 0 when f_out;
 
     # Enforce that the value in i is copied over to the next row unless we are absorbing a new row 
     # or the computation is finished.
@@ -143,8 +150,6 @@ ev hasher_state([s[3], h[12], i]) {
 ##########################################################################################
 # INSTRUCTION FLAGS - DETAILED DESCRIPTIONS
 ##########################################################################################
-#
-# Based on official Miden VM documentation: https://0xmiden.github.io/miden-vm/design/chiplets/hasher.html
 #
 # The hasher chiplet uses selector columns s[0], s[1], s[2] to encode different operations:
 #
