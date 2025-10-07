@@ -26,9 +26,23 @@ use utils::*;
 # Enforces the constraints on the kernel ROM chiplet given its columns.
 #
 # Max constraint degree: 3
-ev kernel_rom_chiplet([s4, sfirst, r[4]]) {
+ev ker_rom_chiplet_constraints([s4, sfirst, r[4]]) {
     enf kernel_rom_selector([sfirst]);
     enf kernel_rom_digest_contiguity([s4, sfirst, r]);
+}
+
+# Enforces initialization constraints for the first row of kernel ROM chiplet execution.
+#
+# According to the official specification, the first row must have sfirst = 1 to ensure
+# proper digest matching and initialization of kernel procedure tracking.
+#
+# Max constraint degree: 1
+ev kernel_rom_chiplet_constraints_first_row([s4, sfirst, r[4]]) {
+    # FIRST ROW INITIALIZATION CONSTRAINT:
+    # The first row of any kernel ROM chiplet execution must have sfirst' = 1
+    # This ensures proper initialization of kernel procedure digest tracking.
+    # Without this, the chiplet could start in an invalid intermediate state.
+    enf sfirst' = 1;
 }
 
 ##########################################################################################
