@@ -51,7 +51,7 @@ ev kernel_rom_selector([sfirst]) {
 
 # Enforces digest contiguity constraints for the kernel ROM.
 #
-# When sfirst = 0, consecutive rows must contain identical digest values to ensure
+# When sfirst' = 0, consecutive rows must contain identical digest values to ensure
 # proper tracking of kernel procedure executions.
 #
 # Max constraint degree: 3
@@ -60,7 +60,7 @@ ev kernel_rom_digest_contiguity([s4, sfirst, r[4]]) {
     # the digest values in the current row must be identical to the next row.
     # This ensures contiguous blocks of identical digest values.
     #
-    # Note: This constraint is disabled when the next row is the last row of the kernel ROM chiplet
+    # Note: This constraint is disabled when the current row is the last row of the kernel ROM chiplet
     # which is indicated by s4' being set to 1
     # 
     # TODO: Check if the following inlines to what is expected
