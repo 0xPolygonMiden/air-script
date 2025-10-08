@@ -242,7 +242,6 @@ impl<'a> MirBuilder<'a> {
             params.push(param.clone());
             func = func.parameters(param.clone());
         }
-        i += 1;
         let ret = Parameter::create(i, self.translate_type(&ast_func.return_type), ast_func.span());
         params.push(ret.clone());
 
