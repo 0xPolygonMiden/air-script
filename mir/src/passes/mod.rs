@@ -483,7 +483,7 @@ pub fn get_inner_const(value: &Link<Op>) -> Option<u64> {
 }
 
 /// Handle the visit of an accessor node, used for both Unrolling and ConstantPropagation passes
-/// The `expect_constant_indices` bool indicates whether the indices need to be known constant at
+/// The `expect_constant_indices` bool indicates whether the indices need to be constant at
 /// this stage.
 pub fn handle_accessor_visit(
     accessor: Link<Op>,
@@ -531,10 +531,11 @@ fn unroll_accessor_index_access_type(
     indexable: Link<Op>,
     index: Link<Op>,
     accessor_offset: usize,
-    compute_indices: bool,
+    expect_constant_indices: bool,
     diagnostics: &DiagnosticsHandler,
 ) -> Result<Option<Link<Op>>, CompileError> {
-    let Some(index_usize) = extract_index_value(&index, compute_indices, diagnostics)? else {
+    let Some(index_usize) = extract_index_value(&index, expect_constant_indices, diagnostics)?
+    else {
         return Ok(None);
     };
     if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
@@ -598,13 +599,13 @@ fn unroll_accessor_matrix_access_type(
     indexable: Link<Op>,
     row: Link<Op>,
     col: Link<Op>,
-    compute_indices: bool,
+    expect_constant_indices: bool,
     diagnostics: &DiagnosticsHandler,
 ) -> Result<Option<Link<Op>>, CompileError> {
-    let Some(row_usize) = extract_index_value(&row, compute_indices, diagnostics)? else {
+    let Some(row_usize) = extract_index_value(&row, expect_constant_indices, diagnostics)? else {
         return Ok(None);
     };
-    let Some(col_usize) = extract_index_value(&col, compute_indices, diagnostics)? else {
+    let Some(col_usize) = extract_index_value(&col, expect_constant_indices, diagnostics)? else {
         return Ok(None);
     };
     // Replace the current node by the index-th element of the vector
@@ -687,14 +688,14 @@ fn unroll_accessor_matrix_access_type(
 ///
 /// Returns:
 /// - `Ok(Some(usize))` - Successfully extracted constant value
-/// - `Ok(None)` - Not a constant value but not required (compute_indices=false)
-/// - `Err(CompileError)` - Not a constant value when required (compute_indices=true)
+/// - `Ok(None)` - Not a constant value but not required (expect_constant_indices=false)
+/// - `Err(CompileError)` - Not a constant value when required (expect_constant_indices=true)
 fn extract_index_value(
     index: &Link<Op>,
-    compute_indices: bool,
+    expect_constant_indices: bool,
     diagnostics: &DiagnosticsHandler,
 ) -> Result<Option<usize>, CompileError> {
-    match (get_inner_const(index), compute_indices) {
+    match (get_inner_const(index), expect_constant_indices) {
         (Some(value), _) => Ok(Some(value as usize)),
         (None, true) => {
             diagnostics
