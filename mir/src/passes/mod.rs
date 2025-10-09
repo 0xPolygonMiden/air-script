@@ -483,11 +483,11 @@ pub fn get_inner_const(value: &Link<Op>) -> Option<u64> {
 }
 
 /// Handle the visit of an accessor node, used for both Unrolling and ConstantPropagation passes
-/// The `compute_indices` bool indicates whether we the indices need to be known constant at this
-/// stage.
+/// The `expect_constant_indices` bool indicates whether the indices need to be known constant at
+/// this stage.
 pub fn handle_accessor_visit(
     accessor: Link<Op>,
-    compute_indices: bool,
+    expect_constant_indices: bool,
     diagnostics: &DiagnosticsHandler,
 ) -> Result<Option<Link<Op>>, CompileError> {
     let accessor_ref = accessor.as_accessor().unwrap();
@@ -508,7 +508,7 @@ pub fn handle_accessor_visit(
             indexable,
             index,
             offset,
-            compute_indices,
+            expect_constant_indices,
             diagnostics,
         ),
         // If we have an Matrix accessor, we compute both the corresponding row and column, and
@@ -516,9 +516,13 @@ pub fn handle_accessor_visit(
         // computed_indices is true, we raise a diagnostic. If either of row or col is not a
         // constant and computed_indices is false, we keep the node as is. If either of row
         // or col is an out-of-bound constant, we raise a diagnostic.
-        MirAccessType::Matrix(row, col) => {
-            unroll_accessor_matrix_access_type(indexable, row, col, compute_indices, diagnostics)
-        },
+        MirAccessType::Matrix(row, col) => unroll_accessor_matrix_access_type(
+            indexable,
+            row,
+            col,
+            expect_constant_indices,
+            diagnostics,
+        ),
     }
 }
 
