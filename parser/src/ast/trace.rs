@@ -261,7 +261,9 @@ impl TraceBinding {
             Some(AccessType::Default) => self.ty,
             Some(AccessType::Slice(range_expr)) => Type::Vector(range_expr.to_slice_range().len()),
             Some(AccessType::Index(_)) => Type::Felt,
-            Some(AccessType::Matrix(..)) => Type::Felt,
+            Some(AccessType::Matrix(..)) => {
+                unreachable!("matrix access not supported on trace bindings")
+            },
             None => self.ty,
         }
     }
