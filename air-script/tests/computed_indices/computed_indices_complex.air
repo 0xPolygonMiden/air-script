@@ -7,7 +7,7 @@ const MDS = [
 ];
 
 trace_columns {
-    main: [a[2]],
+    main: [a[2], state_1[2], state_2[2]],
 }
 
 public_inputs {
@@ -25,8 +25,8 @@ boundary_constraints {
 }
 
 integrity_constraints {
-    let state_1 = [1, 1];
-    let state_2 = [2, 0];
+    # with state_1 = [1, 1];
+    # with state_2 = [2, 0];
     
     # [1+2, 2+3, 3+4]
     # [3, 5, 7]
