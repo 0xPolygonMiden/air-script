@@ -14,7 +14,9 @@
 def MidenVM
 
 use chiplets::chiplets_constraints;
+use decoder::decoder;
 use range_checker::*;
+use stack::stack;
 use system::*;
 use utils::*;
 
@@ -105,6 +107,20 @@ boundary_constraints {
     enf system[0].first = 0;
 
     ####################################################################################
+    # STACK BOUNDARIES
+    ####################################################################################
+
+    # Stack depth (b0) must be 16 at start and end
+    # This ensures the stack begins and ends with exactly 16 visible elements
+    enf stack[16].first = 16;   # b0 = 16 (minimum stack depth)
+    enf stack[16].last = 16;    # b0 = 16 (stack returns to minimum depth)
+
+    # Overflow table address (b1) must be 0 at start and end
+    # This ensures no overflow elements exist at program boundaries
+    enf stack[17].first = 0;    # b1 = 0 (no overflow at start)
+    enf stack[17].last = 0;     # b1 = 0 (no overflow at end)
+
+    ####################################################################################
     # AUXILIARY COLUMN BOUNDARIES
     ####################################################################################
 
@@ -156,13 +172,13 @@ integrity_constraints {
     # System state transitions
     enf system_transition([system[0..8]]);
 
-    # TODO: Decoder constraints - Program execution and MAST verification
-    # enf decoder_constraints([decoder]);
+    # Decoder constraints - Program execution and operation decoding (needs stack top s0)
+    enf decoder([decoder, stack[0]]);
 
-    # TODO: Stack constraints - Operand stack operations and overflow handling
-    # enf stack_constraints([stack]);
+    # Stack constraints - Operand stack operations and overflow handling
+    enf stack([stack[0..19], decoder[0..24], system[0], system[1]]);  # Pass decoder columns, system clock, and fmp for flag computation
 
-    # TODO: Chiplet constraints - Hash, bitwise, ACE, memory operations, and kernel ROM
+    # Chiplet constraints - Hash, bitwise, ACE, memory operations, and kernel ROM
     enf chiplets_constraints([chiplets[0..20]]);
 
     ####################################################################################

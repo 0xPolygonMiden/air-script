@@ -1,15 +1,1847 @@
 ##########################################################################################
-# STACK CONSTRAINTS MODULE
+# MIDEN VM - OPERAND STACK CONSTRAINTS
 ##########################################################################################
 #
-# The Stack module manages Miden VM's operand stack which is practically of unlimited depth
-# (up to 2³² items), though only the top 16 stack items are directly accessible, with deeper
-# items stored in an overflow virtual table.
+# This module implements the stack constraints following the Miden VM specification:
+# https://0xmiden.github.io/miden-vm/design/stack/main.html
 #
-# STATUS: Not implemented
-#
-# REFERENCES:
-# - Stack Design: https://0xmiden.github.io/miden-vm/design/stack/main.html
 ##########################################################################################
 
 mod stack
+
+use decoder::*;
+use utils::*;
+
+##########################################################################################
+# STACK TRACE LAYOUT
+##########################################################################################
+#
+# The stack trace consists of 19 columns:
+# - s0-s15: Stack elements (16 columns) - top 16 elements always visible
+# - b0: Stack depth (must be ≥ 16)
+# - b1: Overflow table address (when depth > 16)
+# - h0: Helper column (witness for depth > 16)
+#
+##########################################################################################
+
+# Main stack constraint evaluator with decoder integration
+ev stack([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, b0, b1, h0,
+          decoder_addr, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+          decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5, decoder_h6, decoder_h7,
+          decoder_sp, decoder_gc, decoder_ox, decoder_c0, decoder_c1, decoder_c2, decoder_e0, decoder_e1,
+          system_clk, system_fmp]) {
+    # Stack element columns (always visible top 16 elements)
+    # s0-s15 are the top 16 stack elements (s0 = top of stack)
+    # b0 = stack depth (≥ 16)
+    # b1 = overflow table address
+    # h0 = helper column (witness)
+
+    ####################################################################################
+    # STACK GENERAL CONSTRAINTS
+    ####################################################################################
+
+    enf stack_general_constraints([s15, b0, b1, h0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+                                  decoder_h5, decoder_e0, decoder_e1, system_clk]);
+
+    ####################################################################################
+    # OPERATION-SPECIFIC CONSTRAINTS
+    ####################################################################################
+
+    enf stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
+                                       b0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+                                       decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5,
+                                       decoder_e0, decoder_e1, system_clk, system_fmp]);
+
+}
+
+##########################################################################################
+# GENERAL CONSTRAINTS
+##########################################################################################
+
+# Unified stack general constraints evaluator
+ev stack_general_constraints([s15, b0, b1, h0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+                             decoder_h5, decoder_e0, decoder_e1, system_clk]) {
+
+    # 1. STACK OVERFLOW FLAG CONSTRAINTS
+    enf stack_overflow_flag([b0, h0]);
+
+    # 2. STACK DEPTH CONSTRAINTS
+    enf stack_depth_constraints([b0, h0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+                                decoder_h5, decoder_e0, decoder_e1]);
+
+    # 3. RIGHT SHIFT B1 CONSTRAINT
+    enf right_shift_b1_constraint([b1, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6, decoder_e0, decoder_e1, system_clk]);
+
+    # 4. LEFT SHIFT ZERO INSERTION CONSTRAINT
+    enf left_shift_zero_insertion([s15, b0, h0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+                                  decoder_h5, decoder_e0, decoder_e1]);
+}
+
+# Stack overflow flag constraint
+# Constraint: (1−fov)⋅(b0−16)=0 | degree=3
+ev stack_overflow_flag([b0, h0]) {
+    # The overflow flag fov is computed using helper column h0 as witness:
+    # - When b0 = 16: h0 = 0, so fov = 0
+    # - When b0 > 16: h0 = (b0-16)^(-1), so fov = 1
+
+    let depth_excess = b0 - 16;
+    let fov = depth_excess * h0;
+
+    # Helper column witness constraint: ensures h0 is either 0 or inverse of (b0-16)
+    # When depth_excess ≠ 0, this forces fov = 1, meaning h0 = (depth_excess)^(-1)
+    # When depth_excess = 0, this constraint is automatically satisfied
+    enf depth_excess * (1 - fov) = 0;
+}
+
+# Left shift zero insertion constraint
+# Constraint: fshl⋅(1−fov)⋅s15′=0 | degree=8
+ev left_shift_zero_insertion([s15, b0, h0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6, decoder_h5, decoder_e0, decoder_e1]) {
+    # When fshl=1 and fov=0 (i.e., left shift when depth=16), s15' must be 0
+
+    # Compute overflow flag using helper column witness
+    let depth_excess = b0 - 16;
+    let fov = depth_excess * h0;
+
+    # Use helper function to compute left shift flag
+    let op_bits = [decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6];
+    let fshl = flag_shl(op_bits, decoder_h5, decoder_e0, decoder_e1);
+
+    # Official left shift zero insertion constraint: fshl⋅(1−fov)⋅s15′=0
+    let constraint = fshl * (1 - fov) * s15';
+
+    enf constraint = 0;
+}
+
+# Stack depth constraint
+ev stack_depth_constraints([b0, h0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6, decoder_h5, decoder_e0, decoder_e1]) {
+    # Compute overflow flag using helper column witness
+    let depth_excess = b0 - 16;
+    let fov = depth_excess * h0;
+
+    # Use helper functions to compute stack shift flags
+    let op_bits = [decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6];
+    let fshl = flag_shl(op_bits, decoder_h5, decoder_e0, decoder_e1);
+    let fshr = flag_shr(op_bits, decoder_e0, decoder_e1);
+
+    # Stack depth constraint
+    # depth decreases if overflow table is not empty on shift-left ops 
+    # depth increases on shift-right ops 
+    enf b0' - b0 - fshr + fshl * fov = 0;
+}
+
+# Right shift B1 constraint
+ev right_shift_b1_constraint([b1, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6, decoder_e0, decoder_e1, system_clk]) {
+    # Official constraint: fshr⋅(b1′−k0)=0 | degree=7
+    # Ensures b1 is set to current clock cycle during right shifts
+
+    # Use helper function to compute right shift flag
+    let op_bits = [decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6];
+    let fshr = flag_shr(op_bits, decoder_e0, decoder_e1);
+
+    # k0 is the current clock cycle from system column
+    let k0 = system_clk;
+
+    # Official right shift B1 constraint: fshr⋅(b1′−k0)=0
+    # When fshr=1 (right shift operation), b1' must equal k0 (current clock cycle)
+    let constraint = fshr * (b1' - k0);
+
+    enf constraint = 0;
+}
+
+##########################################################################################
+# OPERATION-SPECIFIC STACK CONSTRAINTS
+##########################################################################################
+
+# Applies the appropriate operation-specific constraints based on active operation flags
+ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
+                               stack_b0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+                               decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5,
+                               decoder_e0, decoder_e1,
+                               system_clk, system_fmp
+                               ])
+    {
+
+    let op_bits = [decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6];
+
+    # Apply operation-specific constraints using match pattern
+    # The op flags are mutually exclusive and hence only one operation will be active at a time
+    # and only one set of constraints applies
+
+    # Operations ordered following the Miden VM specification table
+    # Group 1: No stack shift operations (opcodes 0-31) - in specification order
+    let is_noop = flag_noop(op_bits);           # Opcode 0
+    let is_eqz = flag_eqz(op_bits);             # Opcode 1
+    let is_neg = flag_neg(op_bits);             # Opcode 2
+    let is_inv = flag_inv(op_bits);             # Opcode 3
+    let is_incr = flag_incr(op_bits);           # Opcode 4
+    let is_not = flag_not(op_bits);             # Opcode 5
+    let is_fmpadd = flag_fmpadd(op_bits);       # Opcode 6
+    let is_mload = flag_mload(op_bits);         # Opcode 7
+    let is_swap = flag_swap(op_bits);           # Opcode 8
+    let is_caller = flag_caller(op_bits);       # Opcode 9
+    let is_movup2 = flag_movup2(op_bits);       # Opcode 10
+    let is_movdn2 = flag_movdn2(op_bits);       # Opcode 11
+    let is_movup3 = flag_movup3(op_bits);       # Opcode 12
+    let is_movdn3 = flag_movdn3(op_bits);       # Opcode 13
+    let is_advpopw = flag_advpopw(op_bits);     # Opcode 14
+    let is_expacc = flag_expacc(op_bits);       # Opcode 15
+    let is_movup4 = flag_movup4(op_bits);       # Opcode 16
+    let is_movdn4 = flag_movdn4(op_bits);       # Opcode 17
+    let is_movup5 = flag_movup5(op_bits);       # Opcode 18
+    let is_movdn5 = flag_movdn5(op_bits);       # Opcode 19
+    let is_movup6 = flag_movup6(op_bits);       # Opcode 20
+    let is_movdn6 = flag_movdn6(op_bits);       # Opcode 21
+    let is_movup7 = flag_movup7(op_bits);       # Opcode 22
+    let is_movdn7 = flag_movdn7(op_bits);       # Opcode 23
+    let is_swapw = flag_swapw(op_bits);         # Opcode 24
+    let is_ext2mul = flag_ext2mul(op_bits);     # Opcode 25
+    let is_movup8 = flag_movup8(op_bits);       # Opcode 26
+    let is_movdn8 = flag_movdn8(op_bits);       # Opcode 27
+    let is_swapw2 = flag_swapw2(op_bits);       # Opcode 28
+    let is_swapw3 = flag_swapw3(op_bits);       # Opcode 29
+    let is_swapdw = flag_swapdw(op_bits);       # Opcode 30
+    let is_emit = flag_emit(op_bits);           # Opcode 31
+
+    # Group 2: Left stack shift operations - ordered by Miden VM specification (opcodes 32-47)
+    let is_assert = flag_assert(op_bits);       # Opcode 32
+    let is_eq = flag_eq(op_bits);               # Opcode 33
+    let is_add = flag_add(op_bits);             # Opcode 34
+    let is_mul = flag_mul(op_bits);             # Opcode 35
+    let is_and = flag_and(op_bits);             # Opcode 36
+    let is_or = flag_or(op_bits);               # Opcode 37
+    let is_u32and = flag_u32and(op_bits);       # Opcode 38
+    let is_u32xor = flag_u32xor(op_bits);       # Opcode 39
+    let is_frie2f4 = flag_frie2f4(op_bits);     # Opcode 40
+    let is_drop = flag_drop(op_bits);           # Opcode 41
+    let is_cswap = flag_cswap(op_bits);         # Opcode 42
+    let is_cswapw = flag_cswapw(op_bits);       # Opcode 43
+    let is_mloadw = flag_mloadw(op_bits);       # Opcode 44
+    let is_mstore = flag_mstore(op_bits);       # Opcode 45
+    let is_mstorew = flag_mstorew(op_bits);     # Opcode 46
+    let is_fmpupdate = flag_fmpupdate(op_bits);   # Opcode 47
+
+    # Group 3: Right stack shift operations - ordered by Miden VM specification (opcodes 48-63)
+    let is_pad = flag_pad(op_bits);             # Opcode 48
+    let is_dup = flag_dup(op_bits);             # Opcode 49
+    let is_dup1 = flag_dup1(op_bits);           # Opcode 50
+    let is_dup2 = flag_dup2(op_bits);           # Opcode 51
+    let is_dup3 = flag_dup3(op_bits);           # Opcode 52
+    let is_dup4 = flag_dup4(op_bits);           # Opcode 53
+    let is_dup5 = flag_dup5(op_bits);           # Opcode 54
+    let is_dup6 = flag_dup6(op_bits);           # Opcode 55
+    let is_dup7 = flag_dup7(op_bits);           # Opcode 56
+    let is_dup9 = flag_dup9(op_bits);           # Opcode 57
+    let is_dup11 = flag_dup11(op_bits);         # Opcode 58
+    let is_dup13 = flag_dup13(op_bits);         # Opcode 59
+    let is_dup15 = flag_dup15(op_bits);         # Opcode 60
+    let is_advpop = flag_advpop(op_bits);       # Opcode 61
+    let is_sdepth = flag_sdepth(op_bits);       # Opcode 62
+    let is_clk = flag_clk(op_bits);             # Opcode 63
+
+    # Group 3.5: u32 operations (opcodes 64-78, binary prefix 100)
+    let is_u32add = flag_u32add(op_bits);       # Opcode 64: 100_0000
+    let is_u32sub = flag_u32sub(op_bits);       # Opcode 66: 100_0010
+    let is_u32mul = flag_u32mul(op_bits);       # Opcode 68: 100_0100
+    let is_u32div = flag_u32div(op_bits);       # Opcode 70: 100_0110
+    let is_u32split = flag_u32split(op_bits);   # Opcode 72: 100_1000
+    let is_u32assert2 = flag_u32assert2(op_bits); # Opcode 74: 100_1010
+    let is_u32add3 = flag_u32add3(op_bits);     # Opcode 76: 100_1100
+    let is_u32madd = flag_u32madd(op_bits);     # Opcode 78: 100_1110
+
+    # Group 4: High-degree operations (101 group) - requires e0 for degree reduction
+    let is_hperm = flag_hperm(op_bits, decoder_e0);  # Opcode 80 (101_0000)
+    let is_mpverify = flag_mpverify(op_bits, decoder_e0);  # Opcode 81 (101_0001)
+    let is_pipe = flag_pipe(op_bits, decoder_e0);  # Opcode 82 (101_0010)
+    let is_mstream = flag_mstream(op_bits, decoder_e0);  # Opcode 83 (101_0011)
+    let is_split = flag_split(op_bits, decoder_e0);  # Opcode 84 (101_0100)
+    let is_loop = flag_loop(op_bits, decoder_e0);  # Opcode 85 (101_0101)
+    let is_hornerext = flag_hornerext(op_bits, decoder_e0);  # Opcode 89 (101_1001)
+    let is_push = flag_push(op_bits, decoder_e0);  # Opcode 91 (101_1011)
+    let is_evalcircuit = flag_evalcircuit(op_bits, decoder_e0);  # Opcode 93 (101_1101)
+
+    # Group 5: Very high-degree operations (110 group) - requires e1 for degree reduction
+    let is_mrupdate = flag_mrupdate(op_bits, decoder_e1);  # Opcode 96 (110_0000)
+    let is_hornerbase = flag_hornerbase(op_bits, decoder_e1);  # Opcode 100 (110_0100)
+
+    enf match {
+        # No stack shift operations - ordered by Miden VM specification (opcodes 0-31)
+        case is_noop: noop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 0
+        case is_eqz: eqz_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0]),# 1
+        case is_neg: neg_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),           # 2
+        case is_inv: inv_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),           # 3
+        case is_incr: incr_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 4
+        case is_not: not_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),           # 5
+        case is_fmpadd: fmpadd_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_fmp]), # 6
+        case is_mload: mload_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),       # 7
+        case is_swap: swap_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 8
+        case is_caller: caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 9
+        case is_movup2: movup2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 10
+        case is_movdn2: movdn2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 11
+        case is_movup3: movup3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 12
+        case is_movdn3: movdn3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 13
+        case is_advpopw: advpopw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 14
+        case is_expacc: expacc_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0]),  # 15
+        case is_movup4: movup4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 16
+        case is_movdn4: movdn4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 17
+        case is_movup5: movup5_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 18
+        case is_movdn5: movdn5_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 19
+        case is_movup6: movup6_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 20
+        case is_movdn6: movdn6_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 21
+        case is_movup7: movup7_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 22
+        case is_movdn7: movdn7_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 23
+        case is_swapw: swapw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),       # 24
+        case is_ext2mul: ext2mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 25
+        case is_movup8: movup8_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 26
+        case is_movdn8: movdn8_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 27
+        case is_swapw2: swapw2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 28
+        case is_swapw3: swapw3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 29
+        case is_swapdw: swapdw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 30
+        case is_emit: emit_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 31
+
+        # Left stack shift operations - ordered by Miden VM specification (opcodes 32-47)
+        case is_assert: assert_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 32
+        case is_eq: eq_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0]),       # 33
+        case is_add: add_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 34
+        case is_mul: mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 35
+        case is_and: and_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 36
+        case is_or: or_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),           # 37
+        case is_u32and: u32and_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 38
+        case is_u32xor: u32xor_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 39
+        case is_frie2f4: frie2f4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 40
+        case is_drop: drop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),       # 41
+        case is_cswap: cswap_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 42
+        case is_cswapw: cswapw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 43
+        case is_mloadw: mloadw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 44
+        case is_mstore: mstore_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 45
+        case is_mstorew: mstorew_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 46
+        case is_fmpupdate: fmpupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_fmp]), # 47
+
+        # Right stack shift operations - ordered by Miden VM specification (opcodes 48-63)
+        case is_pad: pad_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),       # 48
+        case is_dup: dup_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),       # 49
+        case is_dup1: dup1_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 50
+        case is_dup2: dup2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 51
+        case is_dup3: dup3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 52
+        case is_dup4: dup4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 53
+        case is_dup5: dup5_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 54
+        case is_dup6: dup6_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 55
+        case is_dup7: dup7_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 56
+        case is_dup9: dup9_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 57
+        case is_dup11: dup11_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 58
+        case is_dup13: dup13_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 59
+        case is_dup15: dup15_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 60
+        case is_advpop: advpop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 61
+        case is_sdepth: sdepth_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_b0]), # 62
+        case is_clk: clk_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_clk]), # 63
+
+        # u32 operations (100 group)
+        case is_u32add: u32add_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3]), # 64
+        case is_u32sub: u32sub_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3]), # 66
+        case is_u32mul: u32mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4]), # 68
+        case is_u32div: u32div_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3]), # 70
+        case is_u32split: u32split_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4]), # 72
+        case is_u32assert2: u32assert2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3]), # 74
+        case is_u32add3: u32add3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3]), # 76
+        case is_u32madd: u32madd_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4]), # 78
+
+        # High-degree operations (101 group)
+        case is_hperm: hperm_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 80
+        case is_mpverify: mpverify_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 81
+        case is_pipe: pipe_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 82
+        case is_mstream: mstream_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 83
+        case is_split: split_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 84
+        case is_loop: loop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 85
+        case is_hornerext: hornerext_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 89
+        case is_push: push_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 91
+        case is_evalcircuit: evalcircuit_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 93
+
+        # Very high-degree operations (110 group)
+        case is_mrupdate: mrupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 96
+        case is_hornerbase: hornerbase_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 100
+    };
+
+}
+
+# NOOP operation: No operation - all stack elements remain unchanged
+# Stack behavior: [a, b, c, ...] -> [a, b, c, ...] (no change)
+ev noop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # All positions unchanged
+    enf s0' = s0;
+    enf s1' = s1;
+    enf s2' = s2;
+    enf s3' = s3;
+    enf s4' = s4;
+    enf s5' = s5;
+    enf s6' = s6;
+    enf s7' = s7;
+    enf s8' = s8;
+    enf s9' = s9;
+    enf s10' = s10;
+    enf s11' = s11;
+    enf s12' = s12;
+    enf s13' = s13;
+    enf s14' = s14;
+    enf s15' = s15;
+}
+
+# ADD operation: Add top two stack elements
+# Stack behavior: [a, b, c, ...] -> [a+b, c, ...] (left shift - decreases depth by 1)
+ev add_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets the computed sum
+    enf s0' = s0 + s1;
+
+    # Positions 1-14: Left shift (each position gets value from position+1)
+    enf s1' = s2;
+    enf s2' = s3;
+    enf s3' = s4;
+    enf s4' = s5;
+    enf s5' = s6;
+    enf s6' = s7;
+    enf s7' = s8;
+    enf s8' = s9;
+    enf s9' = s10;
+    enf s10' = s11;
+    enf s11' = s12;
+    enf s12' = s13;
+    enf s13' = s14;
+    enf s14' = s15;
+
+    # Position 15: Gets value from overflow table or 0
+}
+
+# HPERM operation: Apply RPO permutation to top 12 elements (high-degree operation)
+# Stack behavior: [r0, r1, r2, r3, r4, r5, r6, r7, c0, c1, c2, c3, ...] -> [r0', r1', r2', r3', r4', r5', r6', r7', c0', c1', c2', c3', ...]
+# Applies Rescue Prime Optimized permutation to top 12 elements (8 rate + 4 capacity)
+ev hperm_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0-11: Transformed by RPO permutation (unconstrained, validated by hash chiplet)
+    # Positions 12-15: Unchanged
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MPVERIFY operation: Verify Merkle path (high-degree operation)
+# Stack behavior: [V0, V1, V2, V3, d, i, R0, R1, R2, R3, ...] -> [V0, V1, V2, V3, d, i, R0, R1, R2, R3, ...]
+# Verifies Merkle path from node value V to root R at depth d and index i
+ev mpverify_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0-9: Unchanged (node value, depth, index, root all stay on stack)
+    enf s0' = s0; enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
+    enf s8' = s8; enf s9' = s9;
+    # Positions 10-15: Unchanged
+    enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# PIPE operation: Pop two words from advice stack, write to memory, place on stack (high-degree operation)
+# Stack behavior: [a, b, c, d, e, f, g, h, i, j, k, l, addr, ...] -> [d7, d6, d5, d4, d3, d2, d1, d0, i, j, k, l, addr+8, ...]
+# Pops 8 elements from advice stack, writes to memory at address s12, places values on stack top, address incremented by 8
+ev pipe_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0-7: Overwritten by advice stack values (unconstrained in stack module)
+    # Positions 8-11: Unchanged
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    # Position 12: Address incremented by 8 (2 words)
+    enf s12' = s12 + 8;
+    # Positions 13-15: Unchanged
+    enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MSTREAM operation: Load two words from memory (high-degree operation)
+# Stack behavior: [a, b, c, d, e, f, g, h, i, j, k, l, addr, ...] -> [v7, v6, v5, v4, v3, v2, v1, v0, i, j, k, l, addr+8, ...]
+# Loads 8 elements from memory starting at address s12, address incremented by 8
+ev mstream_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0-7: Overwritten by memory values (unconstrained)
+    # Positions 8-11: Unchanged
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    # Position 12: Address incremented by 8
+    enf s12' = s12 + 8;
+    # Positions 13-15: Unchanged
+    enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# PUSH operation: Push an immediate value onto the stack (high-degree operation)
+# Stack behavior: [a, b, c, ...] -> [imm, a, b, c, ...] (right shift - increases depth by 1)
+# The immediate value is provided by the decoder and validated by the Op Group Table
+# This evaluator only constrains the stack shift; s0' is unconstrained here
+ev push_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets immediate value from decoder (unconstrained in stack module)
+    # The correctness of s0' is enforced by the Op Group Table, not here
+
+    # Positions 1-15: Right shift (each position gets value from position-1)
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# MRUPDATE operation: Update Merkle tree node (very high-degree operation)
+# Stack behavior: [V0, V1, V2, V3, d, i, R0, R1, R2, R3, NV0, NV1, NV2, NV3, ...] -> [NR0, NR1, NR2, NR3, d, i, R0, R1, R2, R3, NV0, NV1, NV2, NV3, ...]
+# Updates node from old value V to new value NV, replaces top with new root NR
+ev mrupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0-3: Overwritten by new root (unconstrained, validated by hash chiplet)
+    # Positions 4-15: Unchanged (depth, index, old root, new value all stay)
+    enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# HORNERBASE operation: Horner polynomial evaluation (very high-degree operation)
+# Stack behavior: [a0, a1, a2, a3, a4, a5, a6, a7, -, -, -, -, -, alpha_ptr, acc0, acc1] -> [a0, a1, a2, a3, a4, a5, a6, a7, -, -, -, -, -, alpha_ptr, acc0', acc1']
+# Performs 8 steps of Horner method to evaluate polynomial with coefficients a0-a7 at extension field point α
+# Helper registers: h0=α0, h1=α1, h2=k0, h3=k1, h4=tmp0, h5=tmp1
+ev hornerbase_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4, h5]) {
+    # Positions 0-13: Unchanged
+    enf s0' = s0; enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13;
+
+    # Local variables for readability
+    let a0 = h0;
+    let a1 = h1;
+    let acc0 = s14;
+    let acc1 = s15;
+    let tmp0 = h4;
+    let tmp1 = h5;
+
+    # Constraint 1: tmp0 computation | degree=5
+    enf tmp0 = acc0 * a0^4 - 8 * acc1 * a0^3 * a1 - 12 * acc0 * a0^2 * a1^2 - 12 * acc1 * a0^2 * a1^2
+             - 8 * acc0 * a0 * a1^3 + 8 * acc1 * a0 * a1^3 + 2 * acc0 * a1^4 + 6 * acc1 * a1^4
+             + s7 * a0^3 - 6 * s7 * a0 * a1^2 - 2 * s7 * a1^3
+             + s6 * a0^2 - 2 * s6 * a1^2
+             + s5 * a0
+             + s4;
+
+    # Constraint 2: tmp1 computation | degree=5
+    enf tmp1 = acc1 * a0^4 + 4 * acc0 * a0^3 * a1 + 4 * acc1 * a0^3 * a1 + 6 * acc0 * a0^2 * a1^2
+             - 6 * acc1 * a0^2 * a1^2 - 4 * acc0 * a0 * a1^3 - 12 * acc1 * a0 * a1^3
+             - 3 * acc0 * a1^4 - acc1 * a1^4
+             + 3 * s7 * a0^2 * a1 + 3 * s7 * a0 * a1^2 - s7 * a1^3
+             + 2 * s6 * a0 * a1 + s6 * a1^2
+             + s5 * a1;
+
+    # Constraint 3: acc0' computation | degree=5
+    enf s14' = tmp0 * a0^4 - 8 * tmp1 * a0^3 * a1 - 12 * tmp0 * a0^2 * a1^2 - 12 * tmp1 * a0^2 * a1^2
+             - 8 * tmp0 * a0 * a1^3 + 8 * tmp1 * a0 * a1^3 + 2 * tmp0 * a1^4 + 6 * tmp1 * a1^4
+             + s3 * a0^3 - 6 * s3 * a0 * a1^2 - 2 * s3 * a1^3
+             + s2 * a0^2 - 2 * s2 * a1^2
+             + s1 * a0
+             + s0;
+
+    # Constraint 4: acc1' computation | degree=5
+    enf s15' = tmp1 * a0^4 + 4 * tmp0 * a0^3 * a1 + 4 * tmp1 * a0^3 * a1 + 6 * tmp0 * a0^2 * a1^2
+             - 6 * tmp1 * a0^2 * a1^2 - 4 * tmp0 * a0 * a1^3 - 12 * tmp1 * a0 * a1^3
+             - 3 * tmp0 * a1^4 - tmp1 * a1^4
+             + 3 * s3 * a0^2 * a1 + 3 * s3 * a0 * a1^2 - s3 * a1^3
+             + 2 * s2 * a0 * a1 + s2 * a1^2
+             + s1 * a1;
+}
+
+# HORNEREXT operation: Horner polynomial evaluation with extension field coefficients (high-degree operation)
+# Stack: [s0,s1: a0, s2,s3: a1, s4,s5: a2, s6,s7: a3, s8..s12: unused, s13: alpha_ptr, s14: acc0, s15: acc1]
+# Helpers: h0=α0, h1=α1 (evaluation point), h2=k0, h3=k1, h4=tmp0, h5=tmp1
+# Evaluates polynomial in extension field 𝔽p² using Horner method over 4 extension field coefficients
+ev hornerext_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4, h5]) {
+    # Positions 0-13: Unchanged
+    enf s0' = s0; enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13;
+
+    # Local variables for readability
+    let a0 = h0;
+    let a1 = h1;
+    let acc0 = s14;
+    let acc1 = s15;
+    let tmp0 = h4;
+    let tmp1 = h5;
+
+    # Constraint 1: tmp0 computation | degree=3
+    enf tmp0 = acc0 * a0^2 - 4 * acc1 * a0 * a1 - 2 * acc0 * a1^2 - 2 * acc1 * a1^2
+             + s6 * a0 - 2 * s7 * a1
+             + s4;
+
+    # Constraint 2: tmp1 computation | degree=3
+    enf tmp1 = acc1 * a0^2 + 2 * acc0 * a0 * a1 + 2 * acc1 * a0 * a1 + acc0 * a1^2 - acc1 * a1^2
+             + s7 * a0 + s6 * a1 + s7 * a1
+             + s5;
+
+    # Constraint 3: acc0' computation | degree=3
+    enf s14' = tmp0 * a0^2 - 4 * tmp1 * a0 * a1 - 2 * tmp0 * a1^2 - 2 * tmp1 * a1^2
+             + s2 * a0 - 2 * s3 * a1
+             + s0;
+
+    # Constraint 4: acc1' computation | degree=3
+    enf s15' = tmp1 * a0^2 + 2 * tmp0 * a0 * a1 + 2 * tmp1 * a0 * a1 + tmp0 * a1^2 - tmp1 * a1^2
+             + s3 * a0 + s2 * a1 + s3 * a1
+             + s1;
+}
+
+# EVALCIRCUIT operation: Evaluate arithmetic circuit (high-degree operation)
+# Stack: [ptr: circuit pointer, nread: read count, neval: eval count, ...] - all unchanged
+# Evaluates arithmetic circuit using ACE chiplet, asserts result equals zero
+ev evalcircuit_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # All positions unchanged (circuit evaluation handled by ACE chiplet)
+    enf s0' = s0; enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# DUP operation: Duplicate top stack element
+# Stack behavior: [a, b, c, ...] -> [a, a, b, c, ...] (right shift - increases depth by 1)
+ev dup_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets duplicated value (stays same)
+    enf s0' = s0;
+
+    # Positions 1-15: Right shift (each position gets value from position-1)
+    enf s1' = s0;   # Original s0 shifts down to s1
+    enf s2' = s1;   # s1 shifts down to s2
+    enf s3' = s2;   # s2 shifts down to s3
+    enf s4' = s3;   # s3 shifts down to s4
+    enf s5' = s4;   # s4 shifts down to s5
+    enf s6' = s5;   # s5 shifts down to s6
+    enf s7' = s6;   # s6 shifts down to s7
+    enf s8' = s7;   # s7 shifts down to s8
+    enf s9' = s8;   # s8 shifts down to s9
+    enf s10' = s9;  # s9 shifts down to s10
+    enf s11' = s10; # s10 shifts down to s11
+    enf s12' = s11; # s11 shifts down to s12
+    enf s13' = s12; # s12 shifts down to s13
+    enf s14' = s13; # s13 shifts down to s14
+    enf s15' = s14; # s14 shifts down to s15
+    # Original s15 is pushed to overflow table (handled by other constraints)
+}
+
+# SWAP operation: Exchange top two stack elements
+# Stack behavior: [a, b, c, ...] -> [b, a, c, ...] (no stack shift)
+ev swap_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0,1: Swapped
+    enf s0' = s1;   # s1 moves to top
+    enf s1' = s0;   # s0 moves to second
+
+    # Positions 2-15: Unchanged
+    enf s2' = s2;
+    enf s3' = s3;
+    enf s4' = s4;
+    enf s5' = s5;
+    enf s6' = s6;
+    enf s7' = s7;
+    enf s8' = s8;
+    enf s9' = s9;
+    enf s10' = s10;
+    enf s11' = s11;
+    enf s12' = s12;
+    enf s13' = s13;
+    enf s14' = s14;
+    enf s15' = s15;
+}
+
+# DROP operation: Remove top stack element
+# Stack behavior: [a, b, c, ...] -> [b, c, ...] (left shift - decreases depth by 1)
+ev drop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # All positions shift up (left shift)
+    enf s0' = s1;   # s1 moves to top
+    enf s1' = s2;   # s2 moves to second
+    enf s2' = s3;   # s3 moves to third
+    enf s3' = s4;   # s4 moves to fourth
+    enf s4' = s5;   # s5 moves to fifth
+    enf s5' = s6;   # s6 moves to sixth
+    enf s6' = s7;   # s7 moves to seventh
+    enf s7' = s8;   # s8 moves to eighth
+    enf s8' = s9;   # s9 moves to ninth
+    enf s9' = s10;  # s10 moves to tenth
+    enf s10' = s11; # s11 moves to eleventh
+    enf s11' = s12; # s12 moves to twelfth
+    enf s12' = s13; # s13 moves to thirteenth
+    enf s13' = s14; # s14 moves to fourteenth
+    enf s14' = s15; # s15 moves to fifteenth
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# PAD operation: Push 0 onto the stack
+# Stack behavior: [a, b, c, ...] -> [0, a, b, c, ...] (right shift - increases depth by 1)
+ev pad_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets 0
+    enf s0' = 0;
+
+    # Positions 1-15: Right shift (each position gets value from position-1)
+    enf s1' = s0;   # s0 shifts down to s1
+    enf s2' = s1;   # s1 shifts down to s2
+    enf s3' = s2;   # s2 shifts down to s3
+    enf s4' = s3;   # s3 shifts down to s4
+    enf s5' = s4;   # s4 shifts down to s5
+    enf s6' = s5;   # s5 shifts down to s6
+    enf s7' = s6;   # s6 shifts down to s7
+    enf s8' = s7;   # s7 shifts down to s8
+    enf s9' = s8;   # s8 shifts down to s9
+    enf s10' = s9;  # s9 shifts down to s10
+    enf s11' = s10; # s10 shifts down to s11
+    enf s12' = s11; # s11 shifts down to s12
+    enf s13' = s12; # s12 shifts down to s13
+    enf s14' = s13; # s13 shifts down to s14
+    enf s15' = s14; # s14 shifts down to s15
+    # Original s15 is pushed to overflow table (handled by other constraints)
+}
+
+# MUL operation: Multiply top two stack elements
+# Stack behavior: [a, b, c, ...] -> [a*b, c, ...] (left shift - decreases depth by 1)
+ev mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets the computed product
+    enf s0' = s0 * s1;
+
+    # Positions 1-14: Left shift (each position gets value from position+1)
+    enf s1' = s2;
+    enf s2' = s3;
+    enf s3' = s4;
+    enf s4' = s5;
+    enf s5' = s6;
+    enf s6' = s7;
+    enf s7' = s8;
+    enf s8' = s9;
+    enf s9' = s10;
+    enf s10' = s11;
+    enf s11' = s12;
+    enf s12' = s13;
+    enf s13' = s14;
+    enf s14' = s15;
+
+    # Position 15: Gets value from overflow table or 0
+    # (handled by left_shift_zero_insertion constraint)
+}
+
+# ASSERT operation: Remove top stack element and assert it equals 1
+# Stack behavior: [a, b, c, ...] -> [b, c, ...] (left shift - decreases depth by 1, requires a = 1)
+ev assert_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Assert that the top element equals 1
+    enf s0 = 1;
+
+    # All positions shift up (left shift) - same as DROP
+    enf s0' = s1;   # s1 moves to top
+    enf s1' = s2;   # s2 moves to second
+    enf s2' = s3;   # s3 moves to third
+    enf s3' = s4;   # s4 moves to fourth
+    enf s4' = s5;   # s5 moves to fifth
+    enf s5' = s6;   # s6 moves to sixth
+    enf s6' = s7;   # s7 moves to seventh
+    enf s7' = s8;   # s8 moves to eighth
+    enf s8' = s9;   # s9 moves to ninth
+    enf s9' = s10;  # s10 moves to tenth
+    enf s10' = s11; # s11 moves to eleventh
+    enf s11' = s12; # s12 moves to twelfth
+    enf s12' = s13; # s13 moves to thirteenth
+    enf s13' = s14; # s14 moves to fourteenth
+    enf s14' = s15; # s15 moves to fifteenth
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# EQ operation: Compare top two stack elements for equality
+# Stack behavior: [a, b, c, ...] -> [(a == b ? 1 : 0), c, ...] (left shift - decreases depth by 1)
+ev eq_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0]) {
+    # Position 0: Gets comparison result (1 if s0 == s1, 0 otherwise)
+    let diff = s0 - s1;
+    enf diff * s0' = 0;
+    enf s0' = (1 - diff * h0);
+
+    # Positions 1-14: Left shift (each position gets value from position+1)
+    enf s1' = s2;
+    enf s2' = s3;
+    enf s3' = s4;
+    enf s4' = s5;
+    enf s5' = s6;
+    enf s6' = s7;
+    enf s7' = s8;
+    enf s8' = s9;
+    enf s9' = s10;
+    enf s10' = s11;
+    enf s11' = s12;
+    enf s12' = s13;
+    enf s13' = s14;
+    enf s14' = s15;
+
+    # Position 15: Gets value from overflow table or 0
+    # (handled by left_shift_zero_insertion constraint)
+}
+
+# DUP1 operation: Duplicate element at position 1 to the top
+# Stack behavior: [a, b, c, ...] -> [b, a, b, c, ...] (right shift - increases depth by 1)
+ev dup1_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s1 (element from position 1 is duplicated to top)
+    enf s0' = s1;
+
+    # Positions 1-15: Right shift (each position gets value from position-1)
+    enf s1' = s0;   # s0 shifts down to s1
+    enf s2' = s1;   # s1 shifts down to s2 (but s1 is also copied to top)
+    enf s3' = s2;   # s2 shifts down to s3
+    enf s4' = s3;   # s3 shifts down to s4
+    enf s5' = s4;   # s4 shifts down to s5
+    enf s6' = s5;   # s5 shifts down to s6
+    enf s7' = s6;   # s6 shifts down to s7
+    enf s8' = s7;   # s7 shifts down to s8
+    enf s9' = s8;   # s8 shifts down to s9
+    enf s10' = s9;  # s9 shifts down to s10
+    enf s11' = s10; # s10 shifts down to s11
+    enf s12' = s11; # s11 shifts down to s12
+    enf s13' = s12; # s12 shifts down to s13
+    enf s14' = s13; # s13 shifts down to s14
+    enf s15' = s14; # s14 shifts down to s15
+    # Original s15 is pushed to overflow table (handled by other constraints)
+}
+
+# DUP2 operation: Duplicate element at position 2 to the top
+# Stack behavior: [a, b, c, d, ...] -> [c, a, b, c, d, ...] (right shift - increases depth by 1)
+ev dup2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s2 (element from position 2 is duplicated to top)
+    enf s0' = s2;
+
+    # Positions 1-15: Right shift (each position gets value from position-1)
+    enf s1' = s0;   # s0 shifts down to s1
+    enf s2' = s1;   # s1 shifts down to s2
+    enf s3' = s2;   # s2 shifts down to s3 (but s2 is also copied to top)
+    enf s4' = s3;   # s3 shifts down to s4
+    enf s5' = s4;   # s4 shifts down to s5
+    enf s6' = s5;   # s5 shifts down to s6
+    enf s7' = s6;   # s6 shifts down to s7
+    enf s8' = s7;   # s7 shifts down to s8
+    enf s9' = s8;   # s8 shifts down to s9
+    enf s10' = s9;  # s9 shifts down to s10
+    enf s11' = s10; # s10 shifts down to s11
+    enf s12' = s11; # s11 shifts down to s12
+    enf s13' = s12; # s12 shifts down to s13
+    enf s14' = s13; # s13 shifts down to s14
+    enf s15' = s14; # s14 shifts down to s15
+    # Original s15 is pushed to overflow table (handled by other constraints)
+}
+
+# DUP3 operation: Duplicate element at position 3 to the top
+# Stack behavior: [a, b, c, d, e, ...] -> [d, a, b, c, d, e, ...] (right shift - increases depth by 1)
+ev dup3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s3 (element from position 3 is duplicated to top)
+    enf s0' = s3;
+
+    # Positions 1-15: Right shift (each position gets value from position-1)
+    enf s1' = s0;   # s0 shifts down to s1
+    enf s2' = s1;   # s1 shifts down to s2
+    enf s3' = s2;   # s2 shifts down to s3
+    enf s4' = s3;   # s3 shifts down to s4 (but s3 is also copied to top)
+    enf s5' = s4;   # s4 shifts down to s5
+    enf s6' = s5;   # s5 shifts down to s6
+    enf s7' = s6;   # s6 shifts down to s7
+    enf s8' = s7;   # s7 shifts down to s8
+    enf s9' = s8;   # s8 shifts down to s9
+    enf s10' = s9;  # s9 shifts down to s10
+    enf s11' = s10; # s10 shifts down to s11
+    enf s12' = s11; # s11 shifts down to s12
+    enf s13' = s12; # s12 shifts down to s13
+    enf s14' = s13; # s13 shifts down to s14
+    enf s15' = s14; # s14 shifts down to s15
+    # Original s15 is pushed to overflow table (handled by other constraints)
+}
+
+# DUP4 operation: Duplicate element at position 4 to the top
+ev dup4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    enf s0' = s4;
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# DUP5 operation: Duplicate element at position 5 to the top
+ev dup5_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    enf s0' = s5;
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# DUP6 operation: Duplicate element at position 6 to the top
+ev dup6_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    enf s0' = s6;
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# DUP7 operation: Duplicate element at position 7 to the top
+ev dup7_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    enf s0' = s7;
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# DUP9 operation: Duplicate element at position 9 to the top
+ev dup9_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    enf s0' = s9;
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# DUP11 operation: Duplicate element at position 11 to the top
+ev dup11_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    enf s0' = s11;
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# DUP13 operation: Duplicate element at position 13 to the top
+ev dup13_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    enf s0' = s13;
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# DUP15 operation: Duplicate element at position 15 to the top
+ev dup15_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    enf s0' = s15;
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# ADVPOP operation: Pop value from advice stack and push to operand stack top
+ev advpop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets value from advice stack (unconstrained - comes from external input)
+    # Positions 1-15: Right shift (each position gets value from position-1)
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# SDEPTH operation: Push current stack depth to the top
+ev sdepth_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_depth]) {
+    # SDEPTH: Push current stack depth to stack (right shift)
+    # s0' gets current stack depth (b0), all other elements shift right
+    enf s0' = stack_depth;
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# CLK operation: Push current clock cycle to the top
+ev clk_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, clk]) {
+    # Position 0: Gets current clock cycle (properly constrained)
+    enf s0' = clk;
+
+    # Positions 1-15: Right shift (each position gets value from position-1)
+    enf s1' = s0; enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7;
+    enf s9' = s8; enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+##########################################################################################
+# LEFT STACK SHIFT OPERATION CONSTRAINTS
+##########################################################################################
+
+# AND operation: Bitwise AND of two field elements
+# Stack behavior: [a, b, c, ...] -> [a & b, c, ...] (left shift - decreases depth by 1)
+ev and_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets bitwise AND result
+    # Constraint: s0' = s0 & s1 (bitwise AND in field arithmetic is multiplication)
+    enf s0' = binary_and(s0, s1);
+
+    # Positions 1-14: Left shift (each position gets value from position+1)
+    enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9;
+    enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# OR operation: Bitwise OR of two field elements
+# Stack behavior: [a, b, c, ...] -> [a | b, c, ...] (left shift - decreases depth by 1)
+ev or_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets bitwise OR Result
+    # Constraint: s0 and s1 must be boolean (0 or 1), and s0' = s0 | s1
+    enf is_binary(s0);
+    enf is_binary(s1);
+    enf s0' = binary_or(s0, s1);
+
+    # Positions 1-14: Left shift (each position gets value from position+1)
+    enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9;
+    enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# CSWAP operation: Conditional swap based on top element
+# Stack behavior: [c, a, b, ...] -> [a_or_b, b_or_a, ...] where swap occurs if c != 0 (left shift - decreases depth by 1)
+# If c = 0: [c, a, b, ...] -> [a, b, ...] (no swap)
+# If c = 1: [c, a, b, ...] -> [b, a, ...] (swap)
+ev cswap_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Control bit (s0) must be binary (0 or 1)
+    # Constraint: s0^2 - s0 = 0, which is s0 * (s0 - 1) = 0 (degree 2)
+    enf s0 * (s0 - 1) = 0;
+
+    # Position 0: Conditional swap for first element
+    # Constraint: s0' - s0 * s2 - (1 - s0) * s1 = 0 (degree 2)
+    # - If s0 = 0: s0' = 0 * s2 + 1 * s1 = s1 (no swap, keep s1)
+    # - If s0 = 1: s0' = 1 * s2 + 0 * s1 = s2 (swap, take s2)
+    enf s0' = s0 * s2 + (1 - s0) * s1;
+
+    # Position 1: Conditional swap for second element
+    # Constraint: s1' - s0 * s1 - (1 - s0) * s2 = 0 (degree 2)
+    # - If s0 = 0: s1' = 0 * s1 + 1 * s2 = s2 (no swap, keep s2)
+    # - If s0 = 1: s1' = 1 * s1 + 0 * s2 = s1 (swap, take s1)
+    enf s1' = s0 * s1 + (1 - s0) * s2;
+
+    # Positions 2-14: Left shift (each position gets value from position+1)
+    enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9;
+    enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# CSWAPW operation: Conditional word swap based on top element (left shift - decreases depth by 1)
+# Swaps two 4-element words (A and B) based on control bit, then pops the control bit
+#
+# Stack layout (current frame):
+#   s0 = c (control bit)
+#   s1-s4 = A (word A: [a0, a1, a2, a3])
+#   s5-s8 = B (word B: [b0, b1, b2, b3])
+#
+# Stack behavior:
+#   If c = 0 (no swap): [c, a0, a1, a2, a3, b0, b1, b2, b3, ...] -> [a0, a1, a2, a3, b0, b1, b2, b3, ...]
+#   If c = 1 (swap):    [c, a0, a1, a2, a3, b0, b1, b2, b3, ...] -> [b0, b1, b2, b3, a0, a1, a2, a3, ...]
+#
+# The operation uses three types of constraints:
+# 1. Binary constraint ensuring c ∈ {0, 1}
+# 2. Conditional multiplexer for first word: selects between A (if c=0) or B (if c=1)
+# 3. Conditional multiplexer for second word: selects between B (if c=0) or A (if c=1)
+ev cswapw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Binary constraint: Control element must be 0 or 1
+    # Constraint: s0^2 - s0 = 0, equivalently s0 * (s0 - 1) = 0 (degree 2)
+    # This ensures s0 ∈ {0, 1}
+    enf s0 * (s0 - 1) = 0;
+
+    # First word output (positions 0-3 in next frame): Conditional multiplexer
+    # For i ∈ [0, 4): Constraint s_i' = s0 * s_(i+5) + (1 - s0) * s_(i+1) (degree 2)
+    # This implements: s_i' = c ? B[i] : A[i]
+    #
+    # Position 0: s0' = s0 * s5 + (1 - s0) * s1
+    #   If c = 0: s0' = 0 * b0 + 1 * a0 = a0 (output first element of A)
+    #   If c = 1: s0' = 1 * b0 + 0 * a0 = b0 (output first element of B)
+    enf s0' = s0 * s5 + (1 - s0) * s1;
+    enf s1' = s0 * s6 + (1 - s0) * s2;
+    enf s2' = s0 * s7 + (1 - s0) * s3;
+    enf s3' = s0 * s8 + (1 - s0) * s4;
+
+    # Second word output (positions 4-7 in next frame): Conditional multiplexer
+    # For i ∈ [0, 4): Constraint s_(i+4)' = s0 * s_(i+1) + (1 - s0) * s_(i+5) (degree 2)
+    # This implements: s_(i+4)' = c ? A[i] : B[i]
+    #
+    # Position 4: s4' = s0 * s1 + (1 - s0) * s5
+    #   If c = 0: s4' = 0 * a0 + 1 * b0 = b0 (output first element of B)
+    #   If c = 1: s4' = 1 * a0 + 0 * b0 = a0 (output first element of A)
+    enf s4' = s0 * s1 + (1 - s0) * s5;
+    enf s5' = s0 * s2 + (1 - s0) * s6;
+    enf s6' = s0 * s3 + (1 - s0) * s7;
+    enf s7' = s0 * s4 + (1 - s0) * s8;
+
+    # Positions 8-14: Left shift (each position gets value from position+1)
+    enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# U32SPLIT operation: Split element into u32 low and high parts
+# Stack: [a, ...] -> [lo, hi, ...] (right shift - increases depth by 1)
+# Helpers: h0=limb0, h1=limb1, h2=limb2, h3=limb3 (16-bit limbs), h4=m (validity check)
+ev u32split_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4]) {
+    # Local variables for 16-bit limbs
+    let limb0 = h0;
+    let limb1 = h1;
+    let limb2 = h2;
+    let limb3 = h3;
+    let m = h4;
+
+    # Constraint 1: Original value reconstruction s0 = 2^48·h3 + 2^32·h2 + 2^16·h1 + h0
+    enf s0 = limb3 * 2^48 + limb2 * 2^32 + limb1 * 2^16 + limb0;
+
+    # Constraint 2: Lower 32 bits s1' = 2^16·h1 + h0
+    let v_lo = limb1 * 2^16 + limb0;
+    enf s1' = v_lo;
+
+    # Constraint 3: Upper 32 bits s0' = 2^16·h3 + h2
+    let v_hi = limb3 * 2^16 + limb2;
+    enf s0' = v_hi;
+
+    # Constraint 4: Element validity check (1 - m·(2^32 - 1 - v_hi))·v_lo = 0 | degree=3
+    enf (1 - m * (2^32 - 1 - v_hi)) * v_lo = 0;
+
+    # Positions 2-15: Right shift
+    enf s2' = s1; enf s3' = s2; enf s4' = s3; enf s5' = s4; enf s6' = s5; enf s7' = s6; enf s8' = s7; enf s9' = s8;
+    enf s10' = s9; enf s11' = s10; enf s12' = s11; enf s13' = s12; enf s14' = s13; enf s15' = s14;
+}
+
+# U32ASSERT2 operation: Assert that two stack values are valid u32 values (< 2^32)
+# Stack behavior: [b, a, ...] -> [b, a, ...] (unchanged - this is an assertion operation)
+# Helper registers: h0-h1 contain 16-bit limbs of a, h2-h3 contain 16-bit limbs of b
+ev u32assert2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3]) {
+    # Local variables for 16-bit limbs
+    let limb0_a = h0;  # Low limb of a
+    let limb1_a = h1;  # High limb of a
+    let limb0_b = h2;  # Low limb of b
+    let limb1_b = h3;  # High limb of b
+
+    # Constraint 1: Verify b (at s0) can be represented as two 16-bit limbs
+    enf s0' = limb1_b * 2^16 + limb0_b;
+
+    # Constraint 2: Verify a (at s1) can be represented as two 16-bit limbs
+    enf s1' = limb1_a * 2^16 + limb0_a;
+
+    # Positions 2-15: Unchanged
+    enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9;
+    enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# U32ADD operation: Addition of two u32 values
+# Stack behavior: [b, a, ...] -> [d, c, ...] where c = (a + b) mod 2^32, d = carry bit (0 or 1)
+# Helper registers: h0-h2 contain 16-bit limbs of sum, h3 is set to 0
+ev u32add_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3]) {
+    # Local variables for 16-bit limbs
+    let limb0 = h0;  # Low 16-bit limb of sum
+    let limb1 = h1;  # Mid 16-bit limb of sum
+    let limb2 = h2;  # High limb (carry bit)
+
+    # Constraint 1: Sum reconstruction s0 + s1 = 2^32·h2 + 2^16·h1 + h0
+    enf s0 + s1 = limb2 * 2^32 + limb1 * 2^16 + limb0;
+
+    # Constraint 2: Carry bit s0' = h2 (0 or 1)
+    enf s0' = limb2;
+
+    # Constraint 3: Lower 32 bits s1' = 2^16·h1 + h0
+    enf s1' = limb1 * 2^16 + limb0;
+
+    # Positions 2-15: Unchanged
+    enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9;
+    enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# U32SUB operation: Subtraction of two u32 values
+# Stack behavior: [b, a, ...] -> [d, c, ...] where c = (a - b) mod 2^32, d = borrow bit (0 or 1)
+# Helper registers: h0-h1 contain 16-bit limbs of difference, h2-h3 are set to 0
+ev u32sub_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3]) {
+    # Local variables for 16-bit limbs
+    let limb0 = h0;  # Low 16-bit limb of difference
+    let limb1 = h1;  # High 16-bit limb of difference
+
+    # Constraint 1: Subtraction relationship s1 = s0 + s1' + 2^32·s0' (i.e., a = b + c + 2^32·d)
+    enf s1 - s0 = s1' + s0' * 2^32;
+
+    # Constraint 2: Borrow bit is binary s0'^2 - s0' = 0
+    enf is_binary([s0']);
+
+    # Constraint 3: Result s1' = 2^16·h1 + h0
+    enf s1' = limb1 * 2^16 + limb0;
+
+    # Positions 2-15: Unchanged
+    enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9;
+    enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# U32DIV operation: Division of two u32 values
+# Stack behavior: [b, a, ...] -> [d, c, ...] where c = a / b (quotient), d = a mod b (remainder)
+# Helper registers: h0-h1 contain 16-bit limbs of (a - c), h2-h3 contain 16-bit limbs of (b - d - 1)
+ev u32div_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3]) {
+    # Constraint 1: Division relationship s1 = s0·s1' + s0' (i.e., a = b·c + d) | degree=2
+    enf s1 = s0 * s1' + s0';
+
+    # Constraint 2: Quotient bound s1 - s1' = 2^16·h1 + h0 (ensures c ≤ a)
+    enf s1 - s1' = h1 * 2^16 + h0;
+
+    # Constraint 3: Remainder bound s0 - s0' - 1 = 2^16·h2 + h3 (ensures d < b)
+    enf s0 - s0' - 1 = h2 * 2^16 + h3;
+
+    # Positions 2-15: Unchanged
+    enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9;
+    enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# U32ADD3 operation: Addition of three u32 values
+# Stack behavior: [c, b, a, ...] -> [e, d, ...] where d = (a + b + c) mod 2^32, e = (a + b + c) / 2^32
+# Helper registers: h0-h2 contain 16-bit limbs of sum, h3 is set to 0
+ev u32add3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3]) {
+    # Local variables for 16-bit limbs
+    let limb0 = h0;  # Low 16-bit limb of sum
+    let limb1 = h1;  # Mid 16-bit limb of sum
+    let limb2 = h2;  # High limb (can be 0, 1, or 2)
+
+    # Constraint 1: Sum reconstruction s0 + s1 + s2 = 2^32·h2 + 2^16·h1 + h0
+    enf s0 + s1 + s2 = limb2 * 2^32 + limb1 * 2^16 + limb0;
+
+    # Constraint 2: High 32 bits s0' = h2
+    enf s0' = limb2;
+
+    # Constraint 3: Lower 32 bits s1' = 2^16·h1 + h0
+    enf s1' = limb1 * 2^16 + limb0;
+
+    # Positions 2-14: Left shift (position 2 consumed)
+    enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9; enf s9' = s10;
+    enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+}
+
+# U32MUL operation: Multiplication of two u32 values
+# Stack behavior: [a, b, ...] -> [lo, hi, ...] where lo = (a * b) mod 2^32, hi = (a * b) / 2^32
+# Helper registers: h0-h3 contain 16-bit limbs of product, h4 contains m for validity check
+ev u32mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4]) {
+    # Local variables for 16-bit limbs
+    let limb0 = h0;
+    let limb1 = h1;
+    let limb2 = h2;
+    let limb3 = h3;
+    let m = h4;
+
+    # Constraint 1: Product reconstruction s0 * s1 = 2^48·h3 + 2^32·h2 + 2^16·h1 + h0 | degree=2
+    enf s0 * s1 = limb3 * 2^48 + limb2 * 2^32 + limb1 * 2^16 + limb0;
+
+    # Constraint 2: Lower 32 bits s1' = 2^16·h1 + h0
+    let v_lo = limb1 * 2^16 + limb0;
+    enf s1' = v_lo;
+
+    # Constraint 3: Upper 32 bits s0' = 2^16·h3 + h2
+    let v_hi = limb3 * 2^16 + limb2;
+    enf s0' = v_hi;
+
+    # Constraint 4: Element validity check (1 - m·(2^32 - 1 - v_hi))·v_lo = 0 | degree=3
+    enf (1 - m * (2^32 - 1 - v_hi)) * v_lo = 0;
+
+    # Positions 2-15: Unchanged
+    enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9;
+    enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# U32MADD operation: Multiply-add of three u32 values (a + b * c)
+# Stack behavior: [c, b, a, ...] -> [d, e, ...] where d = (a + b * c) / 2^32 (hi), e = (a + b * c) mod 2^32 (lo)
+# Helper registers: h0-h3 contain 16-bit limbs of result, h4 contains m for validity check
+ev u32madd_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4]) {
+    # Local variables for 16-bit limbs
+    let limb0 = h0;
+    let limb1 = h1;
+    let limb2 = h2;
+    let limb3 = h3;
+    let m = h4;
+
+    # Constraint 1: Multiply-add reconstruction s0 * s1 + s2 = 2^48·h3 + 2^32·h2 + 2^16·h1 + h0 | degree=2
+    enf s0 * s1 + s2 = limb3 * 2^48 + limb2 * 2^32 + limb1 * 2^16 + limb0;
+
+    # Constraint 2: Lower 32 bits s1' = 2^16·h1 + h0
+    let v_lo = limb1 * 2^16 + limb0;
+    enf s1' = v_lo;
+
+    # Constraint 3: Upper 32 bits s0' = 2^16·h3 + h2
+    let v_hi = limb3 * 2^16 + limb2;
+    enf s0' = v_hi;
+
+    # Constraint 4: Element validity check (1 - m·(2^32 - 1 - v_hi))·v_lo = 0 | degree=3
+    enf (1 - m * (2^32 - 1 - v_hi)) * v_lo = 0;
+
+    # Positions 2-14: Left shift (position 2 consumed in operation)
+    enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9; enf s9' = s10;
+    enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+}
+
+# U32AND operation: Bitwise AND of two u32 values
+# Stack behavior: [a, b, c, ...] -> [a & b, c, ...] where a,b are u32 values (left shift - decreases depth by 1)
+ev u32and_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets u32 bitwise AND result from Bitwise chiplet (unconstrained in stack module)
+    # Positions 1-14: Left shift (each position gets value from position+1)
+    enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9;
+    enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# U32XOR operation: Bitwise XOR of two u32 values
+# Stack behavior: [a, b, c, ...] -> [a ^ b, c, ...] where a,b are u32 values (left shift - decreases depth by 1)
+ev u32xor_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets u32 bitwise XOR result from Bitwise chiplet (unconstrained in stack module)
+    # Positions 1-14: Left shift (each position gets value from position+1)
+    enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9;
+    enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# MLOADW operation: Load word from memory at address s4
+# Stack behavior: [a, b, c, d, addr, ...] -> [v3, v2, v1, v0, ...]
+ev mloadw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0-3: Overwritten by memory word (unconstrained)
+    # Positions 4-14: Left shift
+    enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9; enf s9' = s10;
+    enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+}
+
+# MSTORE operation: Store element to memory at address s0
+# Stack behavior: [addr, value, ...] -> [value, ...]
+ev mstore_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0-14: Left shift by 1 (address consumed, value stays)
+    enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6;
+    enf s6' = s7; enf s7' = s8; enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12;
+    enf s12' = s13; enf s13' = s14; enf s14' = s15;
+}
+
+# MSTOREW operation: Store word to memory at address s0
+# Stack behavior: [addr, v0, v1, v2, v3, ...] -> [v0, v1, v2, v3, ...]
+ev mstorew_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0-14: Left shift by 1 (address consumed, word stays)
+    enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6;
+    enf s6' = s7; enf s7' = s8; enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12;
+    enf s12' = s13; enf s13' = s14; enf s14' = s15;
+}
+
+# FRIE2F4 operation: TODO
+ev frie2f4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # TODO: FRIE2F4 is not yet implemented
+    enf s0 = 0;
+}
+
+# FMPADD operation: Add FMP value to top stack element (no stack depth change)
+# Stack behavior: [a, ...] -> [a + fmp, ...] (no depth change)
+ev fmpadd_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, fmp]) {
+    # Position 0: Gets s0 + fmp (adds FMP value to top element)
+    enf s0' = s0 + fmp;
+    # Positions 1-15: Unchanged (all other elements stay in place)
+    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# FMPUPDATE operation: Add top stack value to FMP and remove it (left shift - decreases depth by 1)
+# Stack behavior: [value, ...] -> [...] updates FMP = FMP + value
+ev fmpupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, fmp]) {
+    # FMP system state constraint: new_fmp = fmp + s0 (the top stack value is added to FMP)
+    enf fmp' = fmp + s0;
+
+    # Stack behavior: Left shift by 1 (removes the value from stack)
+    enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8;
+    enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# SPLIT operation: Flow control operation for conditional execution (high-degree)
+# Stack behavior: [condition, ...] -> [...] removes condition and branches (left shift - decreases depth by 1)
+ev split_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: condition is consumed (unconstrained - handled by flow control)
+    # Positions 0-14: Left shift by 1 (removes condition from stack)
+    enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8;
+    enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# LOOP operation: Flow control operation for iterative execution (high-degree)
+# Stack behavior: [condition, ...] -> [...] removes condition and loops (left shift - decreases depth by 1)
+ev loop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: condition is consumed (unconstrained - handled by flow control)
+    # Positions 0-14: Left shift by 1 (removes condition from stack)
+    enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8;
+    enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+##########################################################################################
+# NO STACK SHIFT OPERATION CONSTRAINTS (MOVUP/MOVDN)
+##########################################################################################
+
+# MOVUP2 operation: Move element at position 2 to the top
+# Stack behavior: [a, b, c, d, ...] -> [c, a, b, d, ...] (no depth change)
+ev movup2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s2 (element from position 2 moves to top)
+    enf s0' = s2;
+
+    # Position 1: Gets s0 (original top element moves down one position)
+    enf s1' = s0;
+
+    # Position 2: Gets s1 (element from position 1 moves down one position)
+    enf s2' = s1;
+
+    # Positions 3-15: Unchanged (all other elements stay in place)
+    enf s3' = s3;
+    enf s4' = s4;
+    enf s5' = s5;
+    enf s6' = s6;
+    enf s7' = s7;
+    enf s8' = s8;
+    enf s9' = s9;
+    enf s10' = s10;
+    enf s11' = s11;
+    enf s12' = s12;
+    enf s13' = s13;
+    enf s14' = s14;
+    enf s15' = s15;
+}
+
+# MOVDN2 operation: Move top element down to position 2
+# Stack behavior: [a, b, c, d, ...] -> [b, c, a, d, ...] (no depth change)
+ev movdn2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s1 (element from position 1 moves to top)
+    enf s0' = s1;
+
+    # Position 1: Gets s2 (element from position 2 moves up one position)
+    enf s1' = s2;
+
+    # Position 2: Gets s0 (original top element moves down to position 2)
+    enf s2' = s0;
+
+    # Positions 3-15: Unchanged (all other elements stay in place)
+    enf s3' = s3;
+    enf s4' = s4;
+    enf s5' = s5;
+    enf s6' = s6;
+    enf s7' = s7;
+    enf s8' = s8;
+    enf s9' = s9;
+    enf s10' = s10;
+    enf s11' = s11;
+    enf s12' = s12;
+    enf s13' = s13;
+    enf s14' = s14;
+    enf s15' = s15;
+}
+
+# MOVUP3 operation: Move element at position 3 to the top
+# Stack behavior: [a, b, c, d, ...] -> [d, a, b, c, ...] (no depth change)
+ev movup3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s3 (element from position 3 moves to top)
+    enf s0' = s3;
+    # Position 1: Gets s0 (original top element moves down one position)
+    enf s1' = s0;
+    # Position 2: Gets s1 (element from position 1 moves down one position)
+    enf s2' = s1;
+    # Position 3: Gets s2 (element from position 2 moves down one position)
+    enf s3' = s2;
+    # Positions 4-15: Unchanged (all other elements stay in place)
+    enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVDN3 operation: Move top element to position 3
+# Stack behavior: [a, b, c, d, ...] -> [b, c, d, a, ...] (no depth change)
+ev movdn3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s1 (element from position 1 moves to top)
+    enf s0' = s1;
+    # Position 1: Gets s2 (element from position 2 moves up one position)
+    enf s1' = s2;
+    # Position 2: Gets s3 (element from position 3 moves up one position)
+    enf s2' = s3;
+    # Position 3: Gets s0 (original top element moves down to position 3)
+    enf s3' = s0;
+    # Positions 4-15: Unchanged (all other elements stay in place)
+    enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVUP4 operation: Move element at position 4 to the top
+# Stack behavior: [a, b, c, d, e, ...] -> [e, a, b, c, d, ...] (no depth change)
+ev movup4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s4 (element from position 4 moves to top)
+    enf s0' = s4;
+    # Position 1: Gets s0 (original top element moves down one position)
+    enf s1' = s0;
+    # Position 2: Gets s1 (element from position 1 moves down one position)
+    enf s2' = s1;
+    # Position 3: Gets s2 (element from position 2 moves down one position)
+    enf s3' = s2;
+    # Position 4: Gets s3 (element from position 3 moves down one position)
+    enf s4' = s3;
+    # Positions 5-15: Unchanged (all other elements stay in place)
+    enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVDN4 operation: Move top element to position 4
+# Stack behavior: [a, b, c, d, e, ...] -> [b, c, d, e, a, ...] (no depth change)
+ev movdn4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s1 (element from position 1 moves to top)
+    enf s0' = s1;
+    # Position 1: Gets s2 (element from position 2 moves up one position)
+    enf s1' = s2;
+    # Position 2: Gets s3 (element from position 3 moves up one position)
+    enf s2' = s3;
+    # Position 3: Gets s4 (element from position 4 moves up one position)
+    enf s3' = s4;
+    # Position 4: Gets s0 (original top element moves down to position 4)
+    enf s4' = s0;
+    # Positions 5-15: Unchanged (all other elements stay in place)
+    enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVUP5 operation: Move element at position 5 to the top
+# Stack behavior: [a, b, c, d, e, f, ...] -> [f, a, b, c, d, e, ...] (no depth change)
+ev movup5_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s5 (element from position 5 moves to top)
+    enf s0' = s5;
+    # Position 1: Gets s0 (original top element moves down one position)
+    enf s1' = s0;
+    # Position 2: Gets s1 (element from position 1 moves down one position)
+    enf s2' = s1;
+    # Position 3: Gets s2 (element from position 2 moves down one position)
+    enf s3' = s2;
+    # Position 4: Gets s3 (element from position 3 moves down one position)
+    enf s4' = s3;
+    # Position 5: Gets s4 (element from position 4 moves down one position)
+    enf s5' = s4;
+    # Positions 6-15: Unchanged (all other elements stay in place)
+    enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVDN5 operation: Move top element to position 5
+# Stack behavior: [a, b, c, d, e, f, ...] -> [b, c, d, e, f, a, ...] (no depth change)
+ev movdn5_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s1 (element from position 1 moves to top)
+    enf s0' = s1;
+    # Position 1: Gets s2 (element from position 2 moves up one position)
+    enf s1' = s2;
+    # Position 2: Gets s3 (element from position 3 moves up one position)
+    enf s2' = s3;
+    # Position 3: Gets s4 (element from position 4 moves up one position)
+    enf s3' = s4;
+    # Position 4: Gets s5 (element from position 5 moves up one position)
+    enf s4' = s5;
+    # Position 5: Gets s0 (original top element moves down to position 5)
+    enf s5' = s0;
+    # Positions 6-15: Unchanged (all other elements stay in place)
+    enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVUP6 operation: Move element at position 6 to the top
+# Stack behavior: [a, b, c, d, e, f, g, ...] -> [g, a, b, c, d, e, f, ...] (no depth change)
+ev movup6_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s6 (element from position 6 moves to top)
+    enf s0' = s6;
+    # Position 1: Gets s0 (original top element moves down one position)
+    enf s1' = s0;
+    # Position 2: Gets s1 (element from position 1 moves down one position)
+    enf s2' = s1;
+    # Position 3: Gets s2 (element from position 2 moves down one position)
+    enf s3' = s2;
+    # Position 4: Gets s3 (element from position 3 moves down one position)
+    enf s4' = s3;
+    # Position 5: Gets s4 (element from position 4 moves down one position)
+    enf s5' = s4;
+    # Position 6: Gets s5 (element from position 5 moves down one position)
+    enf s6' = s5;
+    # Positions 7-15: Unchanged (all other elements stay in place)
+    enf s7' = s7; enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVDN6 operation: Move top element to position 6
+# Stack behavior: [a, b, c, d, e, f, g, ...] -> [b, c, d, e, f, g, a, ...] (no depth change)
+ev movdn6_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s1 (element from position 1 moves to top)
+    enf s0' = s1;
+    # Position 1: Gets s2 (element from position 2 moves up one position)
+    enf s1' = s2;
+    # Position 2: Gets s3 (element from position 3 moves up one position)
+    enf s2' = s3;
+    # Position 3: Gets s4 (element from position 4 moves up one position)
+    enf s3' = s4;
+    # Position 4: Gets s5 (element from position 5 moves up one position)
+    enf s4' = s5;
+    # Position 5: Gets s6 (element from position 6 moves up one position)
+    enf s5' = s6;
+    # Position 6: Gets s0 (original top element moves down to position 6)
+    enf s6' = s0;
+    # Positions 7-15: Unchanged (all other elements stay in place)
+    enf s7' = s7; enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVUP7 operation: Move element at position 7 to the top
+# Stack behavior: [a, b, c, d, e, f, g, h, ...] -> [h, a, b, c, d, e, f, g, ...] (no depth change)
+ev movup7_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s7 (element from position 7 moves to top)
+    enf s0' = s7;
+    # Position 1: Gets s0 (original top element moves down one position)
+    enf s1' = s0;
+    # Position 2: Gets s1 (element from position 1 moves down one position)
+    enf s2' = s1;
+    # Position 3: Gets s2 (element from position 2 moves down one position)
+    enf s3' = s2;
+    # Position 4: Gets s3 (element from position 3 moves down one position)
+    enf s4' = s3;
+    # Position 5: Gets s4 (element from position 4 moves down one position)
+    enf s5' = s4;
+    # Position 6: Gets s5 (element from position 5 moves down one position)
+    enf s6' = s5;
+    # Position 7: Gets s6 (element from position 6 moves down one position)
+    enf s7' = s6;
+    # Positions 8-15: Unchanged (all other elements stay in place)
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVDN7 operation: Move top element to position 7
+# Stack behavior: [a, b, c, d, e, f, g, h, ...] -> [b, c, d, e, f, g, h, a, ...] (no depth change)
+ev movdn7_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s1 (element from position 1 moves to top)
+    enf s0' = s1;
+    # Position 1: Gets s2 (element from position 2 moves up one position)
+    enf s1' = s2;
+    # Position 2: Gets s3 (element from position 3 moves up one position)
+    enf s2' = s3;
+    # Position 3: Gets s4 (element from position 4 moves up one position)
+    enf s3' = s4;
+    # Position 4: Gets s5 (element from position 5 moves up one position)
+    enf s4' = s5;
+    # Position 5: Gets s6 (element from position 6 moves up one position)
+    enf s5' = s6;
+    # Position 6: Gets s7 (element from position 7 moves up one position)
+    enf s6' = s7;
+    # Position 7: Gets s0 (original top element moves down to position 7)
+    enf s7' = s0;
+    # Positions 8-15: Unchanged (all other elements stay in place)
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVUP8 operation: Move element at position 8 to the top
+# Stack behavior: [a, b, c, d, e, f, g, h, i, ...] -> [i, a, b, c, d, e, f, g, h, ...] (no depth change)
+ev movup8_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s8 (element from position 8 moves to top)
+    enf s0' = s8;
+    # Position 1: Gets s0 (original top element moves down one position)
+    enf s1' = s0;
+    # Position 2: Gets s1 (element from position 1 moves down one position)
+    enf s2' = s1;
+    # Position 3: Gets s2 (element from position 2 moves down one position)
+    enf s3' = s2;
+    # Position 4: Gets s3 (element from position 3 moves down one position)
+    enf s4' = s3;
+    # Position 5: Gets s4 (element from position 4 moves down one position)
+    enf s5' = s4;
+    # Position 6: Gets s5 (element from position 5 moves down one position)
+    enf s6' = s5;
+    # Position 7: Gets s6 (element from position 6 moves down one position)
+    enf s7' = s6;
+    # Position 8: Gets s7 (element from position 7 moves down one position)
+    enf s8' = s7;
+    # Positions 9-15: Unchanged (all other elements stay in place)
+    enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MOVDN8 operation: Move top element to position 8
+# Stack behavior: [a, b, c, d, e, f, g, h, i, ...] -> [b, c, d, e, f, g, h, i, a, ...] (no depth change)
+ev movdn8_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s1 (element from position 1 moves to top)
+    enf s0' = s1;
+    # Position 1: Gets s2 (element from position 2 moves up one position)
+    enf s1' = s2;
+    # Position 2: Gets s3 (element from position 3 moves up one position)
+    enf s2' = s3;
+    # Position 3: Gets s4 (element from position 4 moves up one position)
+    enf s3' = s4;
+    # Position 4: Gets s5 (element from position 5 moves up one position)
+    enf s4' = s5;
+    # Position 5: Gets s6 (element from position 6 moves up one position)
+    enf s5' = s6;
+    # Position 6: Gets s7 (element from position 7 moves up one position)
+    enf s6' = s7;
+    # Position 7: Gets s8 (element from position 8 moves up one position)
+    enf s7' = s8;
+    # Position 8: Gets s0 (original top element moves down to position 8)
+    enf s8' = s0;
+    # Positions 9-15: Unchanged (all other elements stay in place)
+    enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+##########################################################################################
+# NO STACK SHIFT OPERATION CONSTRAINTS (FIELD, SYSTEM, I/O, WORD, CRYPTO)
+##########################################################################################
+
+# EQZ operation: Test if top element equals zero (no stack depth change)
+# Stack behavior: [a, ...] -> [a == 0, ...] (no depth change)
+# Uses helper register h0 as witness for computing inverse when s0 ≠ 0
+ev eqz_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0]) {
+    # Position 0: Gets result of (s0 == 0) - zero test
+    # Constraint 1: s0' * s0 = 0 (degree 2)
+    # - If s0 = 0: this is satisfied for any s0'
+    # - If s0 ≠ 0: this forces s0' = 0
+    enf s0' * s0 = 0;
+
+    # Constraint 2: s0' - (1 - s0 * h0) = 0, or equivalently: s0' = 1 - s0 * h0 (degree 2)
+    # - If s0 = 0: h0 can be anything, and s0' = 1 - 0 = 1
+    # - If s0 ≠ 0: prover sets h0 = s0^(-1), so s0' = 1 - s0 * s0^(-1) = 1 - 1 = 0
+    # Together with constraint 1, this ensures (s0' = 1 iff s0 = 0) and (s0' is binary)
+    enf s0' = 1 - (s0 * h0);
+
+    # Positions 1-15: Unchanged (all other elements stay in place)
+    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# NEG operation: Compute additive inverse (no stack depth change)
+# Stack behavior: [a, ...] -> [-a, ...] (no depth change)
+ev neg_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets additive inverse of s0
+    enf s0' + s0 = 0;
+    # Positions 1-15: Unchanged (all other elements stay in place)
+    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# INV operation: Compute multiplicative inverse (no stack depth change)
+# Stack behavior: [a, ...] -> [1/a, ...] (no depth change)
+ev inv_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets multiplicative inverse of s0
+    # Constraint: s0' must be the multiplicative inverse of s0 in the field
+    # Note: In the Miden VM, calling INV on 0 will cause a runtime trap/error
+    # The constraint system assumes s0 ≠ 0 (zero inputs are handled at the VM level)
+    enf s0' * s0 = 1; # Multiplicative inverse: s0' = s0^(-1)
+
+    # Positions 1-15: Unchanged (all other elements stay in place)
+    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# INCR operation: Add 1 to top element (no stack depth change)
+# Stack behavior: [a, ...] -> [a + 1, ...] (no depth change)
+ev incr_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets s0 + 1
+    enf s0' = s0 + 1;
+    # Positions 1-15: Unchanged (all other elements stay in place)
+    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# NOT operation: Compute logical NOT (no stack depth change)
+# Stack behavior: [a, ...] -> [!a, ...] (no depth change)
+ev not_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets logical NOT of s0
+    # Constraint: s0 must be boolean (0 or 1), and s0' = 1 - s0
+    # This ensures proper boolean NOT operation in the field
+    enf is_binary([s0]);    # s0 must be 0 or 1 (boolean constraint)
+    enf s0' = 1 - s0;         # Boolean NOT: if s0=0 then s0'=1, if s0=1 then s0'=0
+
+    # Positions 1-15: Unchanged (all other elements stay in place)
+    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# EXPACC operation: Exponentiate and accumulate (no stack depth change)
+# Stack behavior: [bit, base, acc, exp, ...] -> [bit', base', acc', exp', ...] (no depth change)
+# Performs one round of exponentiation via repeated squaring
+# Uses helper register h0 to compute conditional accumulator update
+ev expacc_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0]) {
+    # Position 0 (bit): Must be binary (0 or 1)
+    # Constraint: s0'^2 - s0' = 0, which is s0' * (s0' - 1) = 0
+    enf s0' * (s0' - 1) = 0;
+
+    # Position 1 (base): Square the base for next iteration
+    # Constraint: s1' - s1^2 = 0, so s1' = s1^2
+    enf s1' = s1 * s1;
+
+    # Helper register h0: Computes the multiplier for accumulator update
+    # h0 = ((s1 - 1) * s0') + 1
+    # - If s0' = 1 (bit set): h0 = (s1 - 1) + 1 = s1 (multiply acc by base)
+    # - If s0' = 0 (bit clear): h0 = 0 + 1 = 1 (keep acc unchanged)
+    let h0_expected = (s1 - 1) * s0' + 1;
+    enf h0 = h0_expected;
+
+    # Position 2 (acc): Update accumulator conditionally based on bit
+    # Constraint: s2' - s2 * h0 = 0, so s2' = s2 * h0
+    enf s2' = s2 * h0;
+
+    # Position 3 (exp): Exponent reconstruction/bit aggregation
+    # Constraint: s3' = s3 * 2 + s0' (degree 1)
+    # This constraint builds up the exponent by shifting and adding bits
+    # Equivalently: s3 = (s3' - s0') / 2, extracting bit s0' from s3
+    # The operation processes exponent bits to compute base^exp via repeated squaring
+    enf s3' = (s3 * 2) + s0';
+
+    # Positions 4-15: Unchanged (all other elements stay in place)
+    enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# CALLER operation: Get ID of the calling context (no stack depth change)
+# Stack behavior: [...] -> [caller_id, ...] (no depth change)
+ev caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Gets caller context ID from system state
+    # TODO: Integrate with system context columns to get actual caller ID
+    enf s0' = 0; # Placeholder - needs system context integration
+    # Positions 1-15: Unchanged (all other elements stay in place)
+    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# EMIT operation: Emit an event with the specified event ID (no stack depth change)
+# Stack behavior: [event_id, ...] -> [event_id, ...] (no depth change)
+ev emit_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    enf s0' = s0; enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# MLOAD operation: Load word from memory (no stack depth change)
+# Stack behavior: [addr, ...] -> [mem[addr], ...] (no depth change)
+ev mload_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Position 0: Overwritten by memory value (unconstrained)
+    # Positions 1-15: Unchanged
+    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# ADVPOPW operation: Pop word from advice stack (no stack depth change)
+# Stack behavior: [...] -> [advice_word_elem0, advice_word_elem1, advice_word_elem2, advice_word_elem3, ...] (no depth change)
+ev advpopw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0-3: Overwritten by advice stack values (unconstrained here)
+    # Positions 4-15: Unchanged
+    enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# SWAPW operation: Swap top word with second word (no stack depth change)
+# Stack behavior: [a0, a1, a2, a3, b0, b1, b2, b3, ...] -> [b0, b1, b2, b3, a0, a1, a2, a3, ...] (no depth change)
+ev swapw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Swap first word (positions 0-3) with second word (positions 4-7)
+    enf s0' = s4; enf s1' = s5; enf s2' = s6; enf s3' = s7;
+    enf s4' = s0; enf s5' = s1; enf s6' = s2; enf s7' = s3;
+    # Positions 8-15: Unchanged (all other elements stay in place)
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# SWAPW2 operation: Swap top word with third word (no stack depth change)
+# Stack behavior: [a0, a1, a2, a3, b0, b1, b2, b3, c0, c1, c2, c3, ...] -> [c0, c1, c2, c3, b0, b1, b2, b3, a0, a1, a2, a3, ...] (no depth change)
+ev swapw2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Swap first word (positions 0-3) with third word (positions 8-11)
+    enf s0' = s8; enf s1' = s9; enf s2' = s10; enf s3' = s11;
+    # Second word (positions 4-7) stays in place
+    enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
+    # Third word (positions 8-11) gets original first word
+    enf s8' = s0; enf s9' = s1; enf s10' = s2; enf s11' = s3;
+    # Positions 12-15: Unchanged (all other elements stay in place)
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# SWAPW3 operation: Swap top word with fourth word (no stack depth change)
+# Stack behavior: [a0, a1, a2, a3, b0, b1, b2, b3, c0, c1, c2, c3, d0, d1, d2, d3] -> [d0, d1, d2, d3, b0, b1, b2, b3, c0, c1, c2, c3, a0, a1, a2, a3] (no depth change)
+ev swapw3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Swap first word (positions 0-3) with fourth word (positions 12-15)
+    enf s0' = s12; enf s1' = s13; enf s2' = s14; enf s3' = s15;
+    # Second and third words (positions 4-11) stay in place
+    enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    # Fourth word (positions 12-15) gets original first word
+    enf s12' = s0; enf s13' = s1; enf s14' = s2; enf s15' = s3;
+}
+
+# SWAPDW operation: Swap top double-word with second double-word (no stack depth change)
+# Stack behavior: [a0, a1, a2, a3, a4, a5, a6, a7, b0, b1, b2, b3, b4, b5, b6, b7] -> [b0, b1, b2, b3, b4, b5, b6, b7, a0, a1, a2, a3, a4, a5, a6, a7] (no depth change)
+ev swapdw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Swap first double-word (positions 0-7) with second double-word (positions 8-15)
+    enf s0' = s8; enf s1' = s9; enf s2' = s10; enf s3' = s11;
+    enf s4' = s12; enf s5' = s13; enf s6' = s14; enf s7' = s15;
+    enf s8' = s0; enf s9' = s1; enf s10' = s2; enf s11' = s3;
+    enf s12' = s4; enf s13' = s5; enf s14' = s6; enf s15' = s7;
+}
+
+# EXT2MUL operation: Multiply two quadratic extension field elements (no stack depth change)
+# Stack behavior: [b1, b0, a1, a0, ...] -> [b1, b0, c1, c0, ...] where c = a * b in 𝔽ₚ[x]/(x² - x + 2)
+# Extension field elements: a = a1·x + a0, b = b1·x + b0
+# Multiplication result: c = (a1·b0 + a0·b1 + a1·b1)·x + (a0·b0 - 2·a1·b1)
+ev ext2mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Stack positions: s0 = b1, s1 = b0, s2 = a1, s3 = a0
+    # Result positions: s0' = b1, s1' = b0, s2' = c1 (x coefficient), s3' = c0 (constant term)
+
+    # Position 0 (b1): Unchanged (remains on stack)
+    # Constraint: s0' - s0 = 0 (degree 1)
+    enf s0' = s0;
+
+    # Position 1 (b0): Unchanged (remains on stack)
+    # Constraint: s1' - s1 = 0 (degree 1)
+    enf s1' = s1;
+
+    # Position 2 (c1): x coefficient of product using Karatsuba optimization
+    # Constraint: s2' - (s0 + s1) * (s2 + s3) + s1 * s3 = 0 (degree 2)
+    # Formula: c1 = a1·b0 + a0·b1 + a1·b1
+    #            = (a0 + a1)(b0 + b1) - a0·b0  [Karatsuba trick]
+    #            = (s3 + s2)(s1 + s0) - s3·s1
+    enf s2' = (s0 + s1) * (s2 + s3) - s1 * s3;
+
+    # Position 3 (c0): Constant term of product
+    # Constraint: s3' - s1 * s3 + 2 * s0 * s2 = 0 (degree 2)
+    # Formula: c0 = a0·b0 - 2·a1·b1
+    #            = s3·s1 - 2·s2·s0
+    enf s3' = s1 * s3 - 2 * s0 * s2;
+
+    # Positions 4-15: Unchanged (all other elements stay in place)
+    enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}

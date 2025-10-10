@@ -1,14 +1,1086 @@
 ##########################################################################################
-# DECODER CONSTRAINTS
+# MIDEN VM - PROGRAM DECODER CONSTRAINTS
 ##########################################################################################
 #
-# Miden VM program decoder is responsible for ensuring that a program with a given MAST
-# root is executed by the VM.
+# This module implements the decoder constraints from the Miden VM specification:
+# https://0xmiden.github.io/miden-vm/design/decoder/main.html
 #
-# STATUS: Not implemented
-#
-# REFERENCES:
-# - Decoder Design: https://0xmiden.github.io/miden-vm/design/decoder/main.html
 ##########################################################################################
 
 mod decoder
+
+use utils::*;
+
+##########################################################################################
+# DECODER TRACE LAYOUT
+##########################################################################################
+#
+# The decoder trace consists of 24 columns organized into logical registers:
+#
+# Block Address Registers (1 column):
+# - addr: Address of current block's hasher (unique block identifier)
+#
+# Opcode Registers (7 columns):
+# - b0-b6: Binary registers encoding individual opcode bits
+#
+# Hasher Registers (8 columns):
+# - h0-h7: Hash computations and operation-specific helper variables
+#
+# Execution State Registers (3 columns):
+# - sp: Binary flag indicating execution inside a basic block
+# - gc: Tracks unprocessed operation groups in current basic block
+# - ox: Tracks current operation's index within operation group
+#
+# Operation Batch Flags (3 columns):
+# - c0, c1, c2: Indicate number of operation groups in a batch
+#
+# Additional Registers (2 columns):
+# - e0, e1: Extra registers for constraint degree reduction
+#
+##########################################################################################
+
+# Main decoder constraint evaluator
+# Note: Decoder needs access to stack top (s0) for general constraints
+ev decoder([addr, b0, b1, b2, b3, b4, b5, b6, h0, h1, h2, h3, h4, h5, h6, h7, sp, gc, ox, c0, c1, c2, e0, e1, s0]) {
+    # DECODING
+
+    # GENERAL DECODER CONSTRAINTS
+    enf general_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, h4, h5, h6, h7, addr, sp, s0]);
+
+    # BASIC BLOCK CONSTRAINTS
+    enf basic_block_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, h4, h5, h6, h7, addr, sp, gc, ox]);
+
+    # OPERATION BATCH FLAGS CONSTRAINTS
+    enf op_batch_flags_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, h4, h5, h6, h7, c0, c1, c2]);
+
+    # OP FLAGS BITS
+
+    # U32 OPERATIONS BIT CONSTRAINTS
+    # Force b0 = 0 for all u32 operations (100_xxx0 pattern)
+    enf u32_bit_constraints([b0, b1, b2, b3, b4, b5, b6]);
+
+    # HIGH-DEGREE OPERATIONS BIT CONSTRAINTS
+    # Define degree reduction: e0 = b6 * (1-b5) * b4 for 101-prefix group
+    enf high_degree_bit_constraints([b0, b1, b2, b3, b4, b5, b6, e0]);
+
+    # VERY HIGH-DEGREE OPERATIONS BIT CONSTRAINTS
+    # Define degree reduction and force last 2 bits to be 0 for 11-prefix groups
+    enf very_high_degree_bit_constraints([b0, b1, b2, b3, b4, b5, b6, e1]);
+}
+
+##########################################################################################
+# GENERAL DECODER CONSTRAINTS EVALUATOR
+##########################################################################################
+# Reference: https://0xmiden.github.io/miden-vm/design/decoder/constraints.html#general-constraints
+#
+# All 10 general decoder constraints consolidated into a single evaluator for efficiency.
+# This allows computing operation flags once and reusing them across all constraints.
+#
+ev general_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, h4, h5, h6, h7, addr, sp, s0]) {
+    # Compute all required operation flags once
+    let fsplit = flag_split([b0, b1, b2, b3, b4, b5, b6], e0);
+    let floop = flag_loop([b0, b1, b2, b3, b4, b5, b6], e0);
+    let fdyn = flag_dyn([b0, b1, b2, b3, b4, b5, b6], e0);
+    let frepeat = flag_repeat([b0, b1, b2, b3, b4, b5, b6], e1);
+    let frespan = flag_respan([b0, b1, b2, b3, b4, b5, b6], e1);
+    let fend = flag_end([b0, b1, b2, b3, b4, b5, b6], e1);
+    let fhalt = flag_halt([b0, b1, b2, b3, b4, b5, b6], e1);
+    let fctrl = flag_ctrl([b0, b1, b2, b3, b4, b5, b6], e0, e1);
+
+    # 1. SPLIT/LOOP Binary Constraint (degree 7)
+    # Ensures top of stack is binary (0 or 1) when executing SPLIT or LOOP operations
+    let fsplit_loop = fsplit + floop;
+    enf is_binary([s0]) when fsplit_loop;
+
+    # 2. DYN Hasher Zero Constraint (degree 6)
+    # Sets all hasher registers to 0 during DYN operation
+    enf h0 = 0 when fdyn;
+    enf h1 = 0 when fdyn;
+    enf h2 = 0 when fdyn;
+    enf h3 = 0 when fdyn;
+    enf h4 = 0 when fdyn;
+    enf h5 = 0 when fdyn;
+    enf h6 = 0 when fdyn;
+    enf h7 = 0 when fdyn;
+
+    # 3. REPEAT Top-of-Stack Constraint (degree 5)
+    # Ensures top of stack is 1 during REPEAT operation
+    enf s0 = 1 when frepeat;
+
+    # 4. REPEAT Loop Body Constraint (degree 5)
+    # Ensures REPEAT operation occurs inside a loop (h4 must be 1)
+    enf h4 = 1 when frepeat;
+
+    # 5. RESPAN Block ID Increment Constraint (degree 5)
+    # Block address incremented by 8 during RESPAN
+    enf addr' = addr + 8 when frespan;
+
+    # 6. END Loop Exit Constraint (degree 6)
+    # Ensures top of stack is 0 when exiting a loop via END (when h5 = 1)
+    let is_loop = h5;
+    enf s0 = 0 when fend & is_loop;
+
+    # 7. END-REPEAT State Preservation Constraint (degree 9)
+    # Copies block hash and loop body flag during END-REPEAT transition
+    # Formula: fend * frepeat' * (hi' - hi) = 0 for i ∈ [0, 5)
+    let frepeat_next = flag_repeat([b0', b1', b2', b3', b4', b5', b6'], e1');
+    let fend_frepeat_next = fend * frepeat_next;
+    enf h0' = h0 when fend_frepeat_next;
+    enf h1' = h1 when fend_frepeat_next;
+    enf h2' = h2 when fend_frepeat_next;
+    enf h3' = h3 when fend_frepeat_next;
+    enf h4' = h4 when fend_frepeat_next;
+
+    # 8. HALT Instruction Sequence Constraint (degree 8)
+    # Ensures HALT is followed only by HALT
+    # Formula: fhalt * (1 - fhalt') = 0
+    let fhalt_next = flag_halt([b0', b1', b2', b3', b4', b5', b6'], e1');
+    enf fhalt * (1 - fhalt_next) = 0;
+
+    # 9. HALT Block Address Constraint (degree 5)
+    # When HALT operation is executed, block address must be 0
+    enf addr = 0 when fhalt;
+
+    # 10. Each operation bit must be 0 or 1 (binary constraint)
+    enf is_binary([b0]) = 0;
+    enf is_binary([b1]) = 0;
+    enf is_binary([b2]) = 0;
+    enf is_binary([b3]) = 0;
+    enf is_binary([b4]) = 0;
+    enf is_binary([b5]) = 0;
+    enf is_binary([b6]) = 0;
+
+    # 11. In-Span and Control Flow Constraint (degree 5)
+    # When sp = 1 (inside basic block), no control flow ops can execute
+    # When sp = 0 (outside basic block), only control flow ops can execute
+    enf fctrl = 1 - sp;
+}
+
+##########################################################################################
+# BASIC BLOCK CONSTRAINTS EVALUATOR
+##########################################################################################
+# Reference: https://0xmiden.github.io/miden-vm/design/decoder/constraints.html#basic-block
+#
+# Consolidated constraints for basic block execution including:
+# - In-span column (sp): Binary flag for basic block execution state
+# - Block address (addr): Block identifier consistency
+# - Group count (gc): Operation group tracking
+# - Op group decoding (h0): Operation group extraction
+# - Op index (ox): Operation position within group
+#
+ev basic_block_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, h4, h5, h6, h7, addr, sp, gc, ox]) {
+    # Compute all required operation flags once for efficiency
+    let fspan = flag_span([b0, b1, b2, b3, b4, b5, b6], e0);
+    let frespan = flag_respan([b0, b1, b2, b3, b4, b5, b6], e1);
+    let fend = flag_end([b0, b1, b2, b3, b4, b5, b6], e1);
+    let fimm = flag_imm([b0, b1, b2, b3, b4, b5, b6], e0);
+
+    # Compute next-row operation flags
+    let fend_next = flag_end([b0', b1', b2', b3', b4', b5', b6'], e1');
+    let frespan_next = flag_respan([b0', b1', b2', b3', b4', b5', b6'], e1');
+
+    # Compute helper values used across multiple constraints
+    let delta_gc = gc' - gc;  # Group count change
+    let delta_ox = ox' - ox;  # Op index change
+
+    # Compute opcode for next row: op' = Σ(bi' * 2^i) for i = 0 to 6
+    let op_next = b0' + 2 * b1' + 4 * b2' + 8 * b3' + 16 * b4' + 32 * b5' + 64 * b6';
+
+    # ==================================================================================
+    # IN-SPAN COLUMN CONSTRAINTS (3 constraints)
+    # Reference: https://0xmiden.github.io/miden-vm/design/decoder/constraints.html#in-span-column-constraints
+    # ==================================================================================
+
+    # 1. When executing SPAN or RESPAN, next sp must be set to 1 (degree 6)
+    enf sp' = 1 when (fspan + frespan);
+
+    # 2. When next operation is END or RESPAN, next sp must be set to 0 (degree 5)
+    enf sp' = 0 when (fend_next + frespan_next);
+
+    # 3. In all other cases, sp must be copied to next row (degree 6)
+    enf sp' = sp when !(fspan + frespan + fend_next + frespan_next);
+
+    # ==================================================================================
+    # BLOCK ADDRESS CONSTRAINTS (1 constraint)
+    # Reference: https://0xmiden.github.io/miden-vm/design/decoder/constraints.html#block-address-constraints
+    # ==================================================================================
+
+    # 4. When inside basic block, block address must remain the same (degree 2)
+    enf addr' = addr when sp;
+
+    # ==================================================================================
+    # GROUP COUNT CONSTRAINTS (5 constraints)
+    # Reference: https://0xmiden.github.io/miden-vm/design/decoder/constraints.html#group-count-constraints
+    # ==================================================================================
+
+    # 5. Inside basic block, gc can stay same or decrease by 1 (degree 3)
+    enf delta_gc = 1 when sp * delta_gc;
+
+    # 6. When gc decrements, either h0 is 0 or immediate value op is executed (degree 8)
+    enf (1 - fimm) * h0 = 0 when sp * delta_gc;
+
+    # 7. During SPAN, RESPAN, or immediate value ops, gc must decrement by 1 (degree 6)
+    enf delta_gc = 1 when (fspan + frespan + fimm);
+
+    # 8. If next operation is END or RESPAN, gc must remain same (degree 5)
+    enf delta_gc = 0 when  (fend_next + frespan_next);
+
+    # 9. When END operation is executed, gc must be 0 (degree 5)
+    enf gc = 0 when fend;
+
+    # ==================================================================================
+    # OP GROUP DECODING CONSTRAINTS (2 constraints)
+    # Reference: https://0xmiden.github.io/miden-vm/design/decoder/constraints.html#op-group-decoding-constraints
+    # ==================================================================================
+
+    # Special group count flag: fsgc = sp * sp' * (1 - Δgc)
+    let fsgc = sp * sp' * (1 - delta_gc);
+
+    # 10. When span/respan/immediate ops occur or gc doesn't change, h0 decrements by op' (degree 6)
+    # Note: Using 2^7 (128) as the radix since operations are 7-bit values (0-127)
+    enf h0 = h0' * 2^7 + op_next when fspan + frespan + fimm + fsgc;
+
+    # 11. When in basic block and next op is END or RESPAN, h0 must be zero (degree 6)
+    enf h0 = 0 when sp * (fend_next + frespan_next);
+
+    # ==================================================================================
+    # OP INDEX CONSTRAINTS (4 constraints)
+    # Reference: https://0xmiden.github.io/miden-vm/design/decoder/constraints.html#op-index-constraints
+    # ==================================================================================
+
+    # New group flag: ng = Δgc (when gc decrements, we start a new group)
+    let ng = delta_gc;
+
+    # 12. When executing SPAN or RESPAN, next ox must be set to 0 (degree 6)
+    enf ox' = 0 when fspan + frespan;
+
+    # 13. When starting new operation group inside basic block, next ox must be 0 (degree 6)
+    enf ox' = 0 when sp & ng;
+
+    # 14. When inside basic block but not starting new group, ox must increment by 1 (degree 7)
+    enf delta_ox = 1 when sp * sp' * (1 - ng);
+
+    # 15. Op index must be in range [0, 8] (degree 9)
+    # Product constraint: Π(ox - i) for i = 0 to 8
+    enf ox * (ox - 1) * (ox - 2) * (ox - 3) * (ox - 4) * (ox - 5) * (ox - 6) * (ox - 7) * (ox - 8) = 0;
+}
+
+##########################################################################################
+# OPERATION BATCH FLAGS CONSTRAINTS EVALUATOR
+##########################################################################################
+# Reference: https://0xmiden.github.io/miden-vm/design/decoder/constraints.html#op-batch-flags-constraints
+#
+# Operation batch flags (c0, c1, c2) indicate the number of operation groups in a batch.
+# The specification uses bc0, bc1, bc2 as column names, but the trace uses c0, c1, c2.
+#
+ev op_batch_flags_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, h4, h5, h6, h7, c0, c1, c2]) {
+    # Compute required operation flags
+    let fspan = flag_span([b0, b1, b2, b3, b4, b5, b6], e0);
+    let frespan = flag_respan([b0, b1, b2, b3, b4, b5, b6], e1);
+
+    # Compute batch group flags (corrected formulas from specification)
+    let fg8 = c0;                             # 8 groups (c0=1)
+    let fg4 = (1 - c0) * c1 * c2;             # 4 groups (c0=0, c1=1, c2=1)
+    let fg2 = (1 - c0) * (1 - c1) * c2;       # 2 groups (c0=0, c1=0, c2=1)
+    let fg1 = (1 - c0) * c1 * (1 - c2);       # 1 group  (c0=0, c1=1, c2=0)
+
+    # ==================================================================================
+    # BATCH FLAG CONSTRAINTS (6 constraints)
+    # ==================================================================================
+
+    # 1-3. Batch flags must be binary (degree 2 each)
+    enf is_binary([c0]) = 0;
+    enf is_binary([c1]) = 0;
+    enf is_binary([c2]) = 0;
+
+    # 4. When SPAN or RESPAN executed, exactly one batch flag must be set (degree 5)
+    enf (fspan + frespan) - (fg1 + fg2 + fg4 + fg8) = 0;
+
+    # 5. When not executing SPAN or RESPAN, all batch flags must be zero (degree 6)
+    enf (1 - (fspan + frespan)) * (c0 + c1 + c2) = 0;
+
+    # 6. For batches with ≤4 groups, higher registers h4-h7 must be zero (degree 4 each)
+    let fg1_2_4 = fg1 + fg2 + fg4;
+    enf h4 = 0 when fg1_2_4;
+    enf h5 = 0 when fg1_2_4;
+    enf h6 = 0 when fg1_2_4;
+    enf h7 = 0 when fg1_2_4;
+
+    # 7. For batches with ≤2 groups, registers h2-h3 must be zero (degree 4 each)
+    let fg1_2 = fg1 + fg2;
+    enf h2 = 0 when fg1_2;
+    enf h3 = 0 when fg1_2;
+
+    # 8. For single-group batches, register h1 must be zero (degree 4)
+    enf h1 = 0 when fg1;
+}
+
+##########################################################################################
+# OP FLAG BITS CONSTRAINTS EVALUATOR
+##########################################################################################
+
+# U32 operations constraint: Force b0 = 0 for all u32 operations
+# This ensures u32 opcodes always end with 0: 100_xxx0
+ev u32_bit_constraints([b0, b1, b2, b3, b4, b5, b6]) {
+    let f_u32_group = b6 * (1 - b5) * (1 - b4);
+    enf b0 = 0 when f_u32_group;
+}
+
+# High-degree operations constraint: e0 = b6 * (1 - b5) * b4
+# This defines the degree reduction for 101 group operations
+ev high_degree_bit_constraints([b0, b1, b2, b3, b4, b5, b6, e0]) {
+    enf e0 = b6 * (1 - b5) * b4;
+}
+
+# Very high-degree operations constraints: Multiple constraints for 110/111 groups
+# These enforce degree reduction and force last 2 bits to 0
+ev very_high_degree_bit_constraints([b0, b1, b2, b3, b4, b5, b6, e1]) {
+    # Degree reduction: e1 = b6 * b5
+    enf e1 = b6 * b5;
+
+    # Force last 2 bits to 0 for very high-degree operations
+    enf b0 = 0 when e1;
+    enf b1 = 0 when e1;
+}
+
+##########################################################################################
+# SYSTEMATIC OPERATION FLAG FUNCTIONS - INDIVIDUAL FLAGS PER OP
+##########################################################################################
+
+##########################################################################################
+# NO STACK SHIFT OPERATIONS (000 group) - 16 operations
+##########################################################################################
+
+fn flag_noop(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_eqz(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]) * (1 - bits[1]) * bits[0];
+}
+
+fn flag_neg(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]) * bits[1] * (1 - bits[0]);
+}
+
+fn flag_inv(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]) * bits[1] * bits[0];
+}
+
+fn flag_incr(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_not(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * bits[2] * (1 - bits[1]) * bits[0];
+}
+
+fn flag_fmpadd(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * bits[2] * bits[1] * (1 - bits[0]);
+}
+
+fn flag_mload(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * bits[2] * bits[1] * bits[0];
+}
+
+fn flag_swap(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * bits[3] * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_caller(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * bits[3] * (1 - bits[2]) * (1 - bits[1]) * bits[0];
+}
+
+fn flag_movup2(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * bits[3] * (1 - bits[2]) * bits[1] * (1 - bits[0]);
+}
+
+fn flag_movdn2(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * bits[3] * (1 - bits[2]) * bits[1] * bits[0];
+}
+
+fn flag_movup3(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * bits[3] * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_movdn3(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * bits[3] * bits[2] * (1 - bits[1]) * bits[0];
+}
+
+fn flag_advpopw(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * bits[3] * bits[2] * bits[1] * (1 - bits[0]);
+}
+
+fn flag_expacc(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * bits[3] * bits[2] * bits[1] * bits[0];
+}
+
+##########################################################################################
+# NO-SHIFT OPERATIONS (001 group) - 15 operations
+##########################################################################################
+
+fn flag_movup4(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * (1 - bits[3]) * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_movdn4(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * (1 - bits[3]) * (1 - bits[2]) * (1 - bits[1]) * bits[0];
+}
+
+fn flag_movup5(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * (1 - bits[3]) * (1 - bits[2]) * bits[1] * (1 - bits[0]);
+}
+
+fn flag_movdn5(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * (1 - bits[3]) * (1 - bits[2]) * bits[1] * bits[0];
+}
+
+fn flag_movup6(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * (1 - bits[3]) * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_movdn6(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * (1 - bits[3]) * bits[2] * (1 - bits[1]) * bits[0];
+}
+
+fn flag_movup7(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * (1 - bits[3]) * bits[2] * bits[1] * (1 - bits[0]);
+}
+
+fn flag_movdn7(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * (1 - bits[3]) * bits[2] * bits[1] * bits[0];
+}
+
+fn flag_swapw(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * bits[3] * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_ext2mul(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * bits[3] * (1 - bits[2]) * (1 - bits[1]) * bits[0];
+}
+
+fn flag_movup8(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * bits[3] * (1 - bits[2]) * bits[1] * (1 - bits[0]);
+}
+
+fn flag_movdn8(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * bits[3] * (1 - bits[2]) * bits[1] * bits[0];
+}
+
+fn flag_swapw2(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * bits[3] * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_swapw3(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * bits[3] * bits[2] * (1 - bits[1]) * bits[0];
+}
+
+fn flag_swapdw(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * bits[3] * bits[2] * bits[1] * (1 - bits[0]);
+}
+
+fn flag_emit(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * (1 - bits[5]) * bits[4] * bits[3] * bits[2] * bits[1] * bits[0];
+}
+
+##########################################################################################
+# LEFT STACK SHIFT OPERATIONS (010 group) - 16 operations
+##########################################################################################
+
+fn flag_assert(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_eq(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]) * (1 - bits[1]) * bits[0];
+}
+
+fn flag_add(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]) * bits[1] * (1 - bits[0]);
+}
+
+fn flag_mul(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]) * bits[1] * bits[0];
+}
+
+fn flag_and(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * (1 - bits[3]) * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_or(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * (1 - bits[3]) * bits[2] * (1 - bits[1]) * bits[0];
+}
+
+fn flag_u32and(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * (1 - bits[3]) * bits[2] * bits[1] * (1 - bits[0]);
+}
+
+fn flag_u32xor(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * (1 - bits[3]) * bits[2] * bits[1] * bits[0];
+}
+
+fn flag_frie2f4(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * bits[3] * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_drop(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * bits[3] * (1 - bits[2]) * (1 - bits[1]) * bits[0];
+}
+
+fn flag_cswap(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * bits[3] * (1 - bits[2]) * bits[1] * (1 - bits[0]);
+}
+
+fn flag_cswapw(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * bits[3] * (1 - bits[2]) * bits[1] * bits[0];
+}
+
+fn flag_mloadw(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * bits[3] * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_mstore(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * bits[3] * bits[2] * (1 - bits[1]) * bits[0];
+}
+
+fn flag_mstorew(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * bits[3] * bits[2] * bits[1] * (1 - bits[0]);
+}
+
+fn flag_fmpupdate(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * bits[3] * bits[2] * bits[1] * bits[0];
+}
+
+##########################################################################################
+# RIGHT STACK SHIFT OPERATIONS (011 group) - 16 operations
+##########################################################################################
+
+fn flag_pad(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * (1 - bits[3]) * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_dup(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * (1 - bits[3]) * (1 - bits[2]) * (1 - bits[1]) * bits[0];
+}
+
+fn flag_dup1(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * (1 - bits[3]) * (1 - bits[2]) * bits[1] * (1 - bits[0]);
+}
+
+fn flag_dup2(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * (1 - bits[3]) * (1 - bits[2]) * bits[1] * bits[0];
+}
+
+fn flag_dup3(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * (1 - bits[3]) * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_dup4(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * (1 - bits[3]) * bits[2] * (1 - bits[1]) * bits[0];
+}
+
+fn flag_dup5(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * (1 - bits[3]) * bits[2] * bits[1] * (1 - bits[0]);
+}
+
+fn flag_dup6(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * (1 - bits[3]) * bits[2] * bits[1] * bits[0];
+}
+
+fn flag_dup7(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * bits[3] * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_dup9(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * bits[3] * (1 - bits[2]) * (1 - bits[1]) * bits[0];
+}
+
+fn flag_dup11(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * bits[3] * (1 - bits[2]) * bits[1] * (1 - bits[0]);
+}
+
+fn flag_dup13(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * bits[3] * (1 - bits[2]) * bits[1] * bits[0];
+}
+
+fn flag_dup15(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * bits[3] * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_advpop(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * bits[3] * bits[2] * (1 - bits[1]) * bits[0];
+}
+
+
+fn flag_sdepth(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * bits[3] * bits[2] * bits[1] * (1 - bits[0]);
+}
+
+fn flag_clk(bits: felt[7]) -> felt {
+    return (1 - bits[6]) * bits[5] * bits[4] * bits[3] * bits[2] * bits[1] * bits[0];
+}
+
+##########################################################################################
+# U32 OPERATIONS (100 group) - 8 operations
+##########################################################################################
+
+fn flag_u32add(bits: felt[7]) -> felt {
+    return bits[6] * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_u32sub(bits: felt[7]) -> felt {
+    return bits[6] * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]) * bits[1] * (1 - bits[0]);
+}
+
+fn flag_u32mul(bits: felt[7]) -> felt {
+    return bits[6] * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_u32div(bits: felt[7]) -> felt {
+    return bits[6] * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * bits[2] * bits[1] * (1 - bits[0]);
+}
+
+fn flag_u32split(bits: felt[7]) -> felt {
+    return bits[6] * (1 - bits[5]) * (1 - bits[4]) * bits[3] * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_u32assert2(bits: felt[7]) -> felt {
+    return bits[6] * (1 - bits[5]) * (1 - bits[4]) * bits[3] * (1 - bits[2]) * bits[1] * (1 - bits[0]);
+}
+
+fn flag_u32add3(bits: felt[7]) -> felt {
+    return bits[6] * (1 - bits[5]) * (1 - bits[4]) * bits[3] * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_u32madd(bits: felt[7]) -> felt {
+    return bits[6] * (1 - bits[5]) * (1 - bits[4]) * bits[3] * bits[2] * bits[1] * (1 - bits[0]);
+}
+
+##########################################################################################
+# HIGH-DEGREE OPERATIONS (101 group) - 16 operations
+# These operations use e0 for degree reduction: op_flag = f_101 * f_xxxx  = e0 * f_xxxx
+##########################################################################################
+
+fn flag_hperm(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x0000(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_mpverify(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x0001(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_pipe(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x0010(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_mstream(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x0011(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_split(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x0100(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_loop(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x0101(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_span(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x0110(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_join(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x0111(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_dyn(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x1000(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_hornerext(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x1001(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_op101_1010(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x1010(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_push(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x1011(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_dyncall(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x1100(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_evalcircuit(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x1101(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_op101_1110(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x1110(bits[3], bits[2], bits[1], bits[0]);
+}
+
+fn flag_op101_1111(bits: felt[7], e0: felt) -> felt {
+    return e0 * f_x1111(bits[3], bits[2], bits[1], bits[0]);
+}
+
+##########################################################################################
+# VERY HIGH-DEGREE OPERATIONS (110 and 111 groups) - 8 operations
+# These operations use e1 for degree reduction and last 2 bits must be 0
+##########################################################################################
+
+fn flag_mrupdate(bits: felt[7], e1: felt) -> felt {
+    return e1 * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]);  # 110_0000, last 2 bits forced to 0
+}
+
+fn flag_hornerbase(bits: felt[7], e1: felt) -> felt {
+    return e1 * (1 - bits[4]) * bits[3] * (1 - bits[2]);        # 110_0100, last 2 bits forced to 0
+}
+
+fn flag_syscall(bits: felt[7], e1: felt) -> felt {
+    return e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]);       # 110_1000, last 2 bits forced to 0
+}
+
+fn flag_call(bits: felt[7], e1: felt) -> felt {
+    return e1 * bits[4] * bits[3] * (1 - bits[2]);             # 110_1100, last 2 bits forced to 0
+}
+
+fn flag_end(bits: felt[7], e1: felt) -> felt {
+    return e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]);       # 111_0000, last 2 bits forced to 0
+}
+
+fn flag_repeat(bits: felt[7], e1: felt) -> felt {
+    return e1 * bits[4] * (1 - bits[3]) * bits[2];             # 111_0100, last 2 bits forced to 0
+}
+
+fn flag_respan(bits: felt[7], e1: felt) -> felt {
+    return e1 * bits[4] * bits[3] * (1 - bits[2]);             # 111_1000, last 2 bits forced to 0
+}
+
+fn flag_halt(bits: felt[7], e1: felt) -> felt {
+    return e1 * bits[4] * bits[3] * bits[2];                   # 111_1100, last 2 bits forced to 0
+}
+
+##########################################################################################
+# COMPOSITE FLAGS - SYSTEMATIC FUNCTIONS
+##########################################################################################
+
+# Helper functions for the first 3 bits (b6, b5, b4) - systematic bit pattern matching
+fn f_000(b6: felt, b5: felt, b4: felt) -> felt {
+    return (1 - b6) * (1 - b5) * (1 - b4);
+}
+
+fn f_001(b6: felt, b5: felt, b4: felt) -> felt {
+    return (1 - b6) * (1 - b5) * b4;
+}
+
+fn f_010(b6: felt, b5: felt, b4: felt) -> felt {
+    return (1 - b6) * b5 * (1 - b4);
+}
+
+fn f_011(b6: felt, b5: felt, b4: felt) -> felt {
+    return (1 - b6) * b5 * b4;
+}
+
+fn f_u32rc(b6: felt, b5: felt, b4: felt) -> felt {
+    return b6 * (1 - b5) * (1 - b4);
+}
+
+fn f_101(b6: felt, b5: felt, b4: felt) -> felt {
+    return b6 * (1 - b5) * b4;
+}
+
+fn f_110(b6: felt, b5: felt, b4: felt) -> felt {
+    return b6 * b5 * (1 - b4);
+}
+
+fn f_111(b6: felt, b5: felt, b4: felt) -> felt {
+    return b6 * b5 * b4;
+}
+
+# Helper functions for the last 4 bits (b3, b2, b1, b0)
+fn f_x0000(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return (1 - b3) * (1 - b2) * (1 - b1) * (1 - b0);
+}
+
+fn f_x0001(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return (1 - b3) * (1 - b2) * (1 - b1) * b0;
+}
+
+fn f_x0010(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return (1 - b3) * (1 - b2) * b1 * (1 - b0);
+}
+
+fn f_x0011(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return (1 - b3) * (1 - b2) * b1 * b0;
+}
+
+fn f_x0100(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return (1 - b3) * b2 * (1 - b1) * (1 - b0);
+}
+
+fn f_x0101(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return (1 - b3) * b2 * (1 - b1) * b0;
+}
+
+fn f_x0110(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return (1 - b3) * b2 * b1 * (1 - b0);
+}
+
+fn f_x0111(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return (1 - b3) * b2 * b1 * b0;
+}
+
+fn f_x1000(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return b3 * (1 - b2) * (1 - b1) * (1 - b0);
+}
+
+fn f_x1001(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return b3 * (1 - b2) * (1 - b1) * b0;
+}
+
+fn f_x1010(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return b3 * (1 - b2) * b1 * (1 - b0);
+}
+
+fn f_x1011(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return b3 * (1 - b2) * b1 * b0;
+}
+
+fn f_x1100(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return b3 * b2 * (1 - b1) * (1 - b0);
+}
+
+fn f_x1101(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return b3 * b2 * (1 - b1) * b0;
+}
+
+fn f_x1110(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return b3 * b2 * b1 * (1 - b0);
+}
+
+fn f_x1111(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
+    return b3 * b2 * b1 * b0;
+}
+
+##########################################################################################
+# ALL-IN-ONE OPERATION FLAGS COMPUTATION - ALL 96 MIDEN VM OPERATIONS IN ONE GO
+##########################################################################################
+
+# Complete operation flags computation - computes all 96 Miden VM operation flags
+# This function computes all individual operation flags including high-degree and very high-degree operations
+# This will be used in the future in order to optimize op flags computation
+fn compute_all_operation_flags(bits: felt[7], e0: felt, e1: felt) -> felt[96] {
+    # Use helper functions for bit patterns
+    let f_000_val = f_000(bits[6], bits[5], bits[4]);
+    let f_001_val = f_001(bits[6], bits[5], bits[4]);
+    let f_010_val = f_010(bits[6], bits[5], bits[4]);
+    let f_011_val = f_011(bits[6], bits[5], bits[4]);
+    let f_u32rc_val = f_u32rc(bits[6], bits[5], bits[4]);
+    let f_101_val = f_101(bits[6], bits[5], bits[4]);
+    let f_110_val = f_110(bits[6], bits[5], bits[4]);
+    let f_111_val = f_111(bits[6], bits[5], bits[4]);
+
+    # Helper bit patterns for last 4 bits using existing helper functions
+    let f_x0000_val = f_x0000(bits[3], bits[2], bits[1], bits[0]);
+    let f_x0001_val = f_x0001(bits[3], bits[2], bits[1], bits[0]);
+    let f_x0010_val = f_x0010(bits[3], bits[2], bits[1], bits[0]);
+    let f_x0011_val = f_x0011(bits[3], bits[2], bits[1], bits[0]);
+    let f_x0100_val = f_x0100(bits[3], bits[2], bits[1], bits[0]);
+    let f_x0101_val = f_x0101(bits[3], bits[2], bits[1], bits[0]);
+    let f_x0110_val = f_x0110(bits[3], bits[2], bits[1], bits[0]);
+    let f_x0111_val = f_x0111(bits[3], bits[2], bits[1], bits[0]);
+    let f_x1000_val = f_x1000(bits[3], bits[2], bits[1], bits[0]);
+    let f_x1001_val = f_x1001(bits[3], bits[2], bits[1], bits[0]);
+    let f_x1010_val = f_x1010(bits[3], bits[2], bits[1], bits[0]);
+    let f_x1011_val = f_x1011(bits[3], bits[2], bits[1], bits[0]);
+    let f_x1100_val = f_x1100(bits[3], bits[2], bits[1], bits[0]);
+    let f_x1101_val = f_x1101(bits[3], bits[2], bits[1], bits[0]);
+    let f_x1110_val = f_x1110(bits[3], bits[2], bits[1], bits[0]);
+    let f_x1111_val = f_x1111(bits[3], bits[2], bits[1], bits[0]);
+
+
+    # Return all 96 operation flags as felt[96] array
+    return [
+        # No stack shift operations (000 group) - 16 operations
+        f_000_val * f_x0000_val,    # op_noop
+        f_000_val * f_x0001_val,    # op_eqz
+        f_000_val * f_x0010_val,    # op_neg
+        f_000_val * f_x0011_val,    # op_inv
+        f_000_val * f_x0100_val,    # op_incr
+        f_000_val * f_x0101_val,    # op_not
+        f_000_val * f_x0110_val,    # op_fmpadd
+        f_000_val * f_x0111_val,    # op_mload
+        f_000_val * f_x1000_val,    # op_swap
+        f_000_val * f_x1001_val,    # op_caller
+        f_000_val * f_x1010_val,    # op_movup2
+        f_000_val * f_x1011_val,    # op_movdn2
+        f_000_val * f_x1100_val,    # op_movup3
+        f_000_val * f_x1101_val,    # op_movdn3
+        f_000_val * f_x1110_val,    # op_advpop1
+        f_000_val * f_x1111_val,    # op_expacc
+
+        # More no-shift operations (001 group) - 16 operations
+        f_001_val * f_x0000_val,    # op_movup4
+        f_001_val * f_x0001_val,    # op_movdn4
+        f_001_val * f_x0010_val,    # op_movup5
+        f_001_val * f_x0011_val,    # op_movdn5
+        f_001_val * f_x0100_val,    # op_movup6
+        f_001_val * f_x0101_val,    # op_movdn6
+        f_001_val * f_x0110_val,    # op_movup7
+        f_001_val * f_x0111_val,    # op_movdn7
+        f_001_val * f_x1000_val,    # op_swapw
+        f_001_val * f_x1001_val,    # op_ext2mul
+        f_001_val * f_x1010_val,    # op_movup8
+        f_001_val * f_x1011_val,    # op_movdn8
+        f_001_val * f_x1100_val,    # op_swapw2
+        f_001_val * f_x1101_val,    # op_swapw3
+        f_001_val * f_x1110_val,    # op_swapdw
+        f_001_val * f_x1111_val,    # op_emit
+
+        # Left stack shift operations (010 group) - 16 operations
+        f_010_val * f_x0000_val,    # op_assert
+        f_010_val * f_x0001_val,    # op_eq
+        f_010_val * f_x0010_val,    # op_add
+        f_010_val * f_x0011_val,    # op_mul
+        f_010_val * f_x0100_val,    # op_and
+        f_010_val * f_x0101_val,    # op_or
+        f_010_val * f_x0110_val,    # op_u32and
+        f_010_val * f_x0111_val,    # op_u32xor
+        f_010_val * f_x1000_val,    # op_frie2f4
+        f_010_val * f_x1001_val,    # op_drop
+        f_010_val * f_x1010_val,    # op_cswap
+        f_010_val * f_x1011_val,    # op_cswapw
+        f_010_val * f_x1100_val,    # op_mloadw
+        f_010_val * f_x1101_val,    # op_mstore
+        f_010_val * f_x1110_val,    # op_mstorew
+        f_010_val * f_x1111_val,    # op_fmpupdate
+
+        # Right stack shift operations (011 group) - 16 operations
+        f_011_val * f_x0000_val,    # op_pad
+        f_011_val * f_x0001_val,    # op_dup
+        f_011_val * f_x0010_val,    # op_dup1
+        f_011_val * f_x0011_val,    # op_dup2
+        f_011_val * f_x0100_val,    # op_dup3
+        f_011_val * f_x0101_val,    # op_dup4
+        f_011_val * f_x0110_val,    # op_dup5
+        f_011_val * f_x0111_val,    # op_dup6
+        f_011_val * f_x1000_val,    # op_dup7
+        f_011_val * f_x1001_val,    # op_dup9
+        f_011_val * f_x1010_val,    # op_dup11
+        f_011_val * f_x1011_val,    # op_dup13
+        f_011_val * f_x1100_val,    # op_dup15
+        f_011_val * f_x1101_val,    # op_advpop2
+        f_011_val * f_x1110_val,    # op_sdepth
+        f_011_val * f_x1111_val,    # op_clk
+
+        # u32 operations (100 group) - 8 operations
+        f_u32rc_val * f_x0000_val,    # op_u32add
+        f_u32rc_val * f_x0010_val,    # op_u32sub
+        f_u32rc_val * f_x0100_val,    # op_u32mul
+        f_u32rc_val * f_x0110_val,    # op_u32div
+        f_u32rc_val * f_x1000_val,    # op_u32split
+        f_u32rc_val * f_x1010_val,    # op_u32assert2
+        f_u32rc_val * f_x1100_val,    # op_u32add3
+        f_u32rc_val * f_x1110_val,    # op_u32madd
+
+        # High-degree operations (101 group) - 16 operations
+        e0 * f_x0000_val,    # op_hperm
+        e0 * f_x0001_val,    # op_mpverify
+        e0 * f_x0010_val,    # op_pipe
+        e0 * f_x0011_val,    # op_mstream
+        e0 * f_x0100_val,    # op_split
+        e0 * f_x0101_val,    # op_loop
+        e0 * f_x0110_val,    # op_span
+        e0 * f_x0111_val,    # op_join
+        e0 * f_x1000_val,    # op_dyn
+        e0 * f_x1001_val,    # op_hornerext
+        e0 * f_x1010_val,    # op_101_1010 (unused)
+        e0 * f_x1011_val,    # op_push (high-degree)
+        e0 * f_x1100_val,    # op_dyncall
+        e0 * f_x1101_val,    # op_evalcircuit
+        e0 * f_x1110_val,    # op_101_1110 (unused)
+        e0 * f_x1111_val,    # op_101_1111 (unused)
+
+        # Very high-degree operations (110/111 groups) - 8 operations
+        e1 * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]),    # op_mrupdate (110_0000)
+        e1 * (1 - bits[4]) * bits[3] * (1 - bits[2]),          # op_hornerbase (110_0100)
+        e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]),          # op_syscall (110_1000)
+        e1 * bits[4] * bits[3] * (1 - bits[2]),                # op_call (110_1100)
+        e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]),          # op_end (111_0000)
+        e1 * bits[4] * (1 - bits[3]) * bits[2],                # op_repeat (111_0100)
+        e1 * bits[4] * bits[3] * (1 - bits[2]),                # op_respan (111_1000)
+        e1 * bits[4] * bits[3] * bits[2]                       # op_halt (111_1100)
+    ];
+}
+
+##########################################################################################
+# STACK FLAG HELPER FUNCTIONS
+##########################################################################################
+#
+# These helper functions compute the composite fctrl, fshl and fshr flags
+# Reference: https://0xmiden.github.io/miden-vm/design/stack/op_constraints.html#composite-flags
+#
+##########################################################################################
+
+# Right-Shift Flag: fshr = (1−b6)⋅b5⋅b4 + fu32split + fpush (degree 6)
+fn flag_shr(bits: felt[7], e0: felt, e1: felt) -> felt {
+    # Base right shift pattern: (1−b6)⋅b5⋅b4
+    let fshr_base = (1 - bits[6]) * bits[5] * bits[4];
+
+    # u32split flag: causes right shift (splits one element into two)
+    let fu32split = flag_u32split(bits);
+
+    # Push operations flag: fpush = e0 * b3 * (1-b2) * b1 * b0 (opcode 91: 101_1011)
+    let fpush = e0 * bits[3] * (1 - bits[2]) * bits[1] * bits[0];
+
+    return fshr_base + fu32split + fpush;
+}
+
+# Left-Shift Flag: fshl = (1−b6)⋅b5⋅(1−b4) + fadd3_madd + fsplit_loop + frepeat + fend⋅h5 (degree 5)
+fn flag_shl(bits: felt[7], h5: felt, e0: felt, e1: felt) -> felt {
+    # Base left shift pattern: (1−b6)⋅b5⋅(1−b4)
+    let fshl_base = (1 - bits[6]) * bits[5] * (1 - bits[4]);
+
+    # fadd3_madd: u32add3 and u32madd operations
+    let fadd3_madd = bits[6] * (1 - bits[5]) * (1 - bits[4]) * bits[3] * bits[2];
+
+    # fsplit_loop: SPLIT and LOOP operations (101 group with specific pattern)
+    let fsplit_loop = e0 * (1 - bits[3]) * bits[2] * (1 - bits[1]);
+
+    # frepeat: REPEAT operation (opcode 116: 111_0100)
+    let frepeat = e1 * bits[4] * (1 - bits[3]) * bits[2];
+
+    # fend⋅h5: END operation with h5 helper bit
+    let fend = e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]);
+    let fend_h5 = fend * h5;
+
+    return fshl_base + fadd3_madd + fsplit_loop + frepeat + fend_h5;
+}
+
+# Control Flow Flag: fctrl = fspan,join,split,loop + fend,repeat,respan,halt + fdyn + fcall + fsyscall (degree 5)
+fn flag_ctrl(bits: felt[7], e0: felt, e1: felt) -> felt {
+    # fspan,join,split,loop: High-degree control flow ops with pattern e0⋅(1−b3)⋅b2
+    let fspan_join_split_loop = e0 * (1 - bits[3]) * bits[2];
+
+    # fend,repeat,respan,halt: Very high-degree control flow ops with pattern e1⋅b4
+    let fend_repeat_respan_halt = e1 * bits[4];
+
+    # fdyn: DYN operation (opcode 88: 101_1000)
+    let fdyn = e0 * bits[3] * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
+
+    # fcall: CALL operation (opcode 108: 110_1100)
+    let fcall = e1 * bits[4] * bits[3] * (1 - bits[2]);
+
+    # fsyscall: SYSCALL operation (opcode 104: 110_1000)
+    let fsyscall = e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]);
+
+    return fspan_join_split_loop + fend_repeat_respan_halt + fdyn + fcall + fsyscall;
+}
+
+# Immediate Value Flag: fimm = fpush (degree 5)
+fn flag_imm(bits: felt[7], e0: felt) -> felt {
+    # fpush: PUSH operation (opcode 91: 101_1011)
+    return e0 * bits[3] * (1 - bits[2]) * bits[1] * bits[0];
+}
