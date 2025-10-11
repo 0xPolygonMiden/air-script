@@ -930,8 +930,8 @@ ev and_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, 
 ev or_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
     # Position 0: Gets bitwise OR Result
     # Constraint: s0 and s1 must be boolean (0 or 1), and s0' = s0 | s1
-    enf is_binary(s0);
-    enf is_binary(s1);
+    enf is_binary([s0]);
+    enf is_binary([s1]);
     enf s0' = binary_or(s0, s1);
 
     # Positions 1-14: Left shift (each position gets value from position+1)
