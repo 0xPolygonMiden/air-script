@@ -1390,14 +1390,9 @@ impl<'a> MirBuilder<'a> {
                             value: MirValue::TraceAccess(ta),
                         })
                         .build();
-                    if let Some(binding_access) = &binding.access {
-                        let mir_binding_access = self.translate_access_type(binding_access)?;
-                        let accessor =
-                            Accessor::create(value, mir_binding_access, 0, access.span());
-                        Ok(Some(accessor))
-                    } else {
-                        Ok(Some(value))
-                    }
+                    let mir_binding_access = self.translate_access_type(&binding.access)?;
+                    let accessor = Accessor::create(value, mir_binding_access, 0, access.span());
+                    Ok(Some(accessor))
                 },
                 AccessType::Index(extra_offset) if binding.size > 1 => {
                     let node = self.translate_indexed_trace_access(

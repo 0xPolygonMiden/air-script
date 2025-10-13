@@ -169,7 +169,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                             offset: 0,
                             size: segment.size,
                             ty: Type::Vector(segment.size),
-                            access: None,
+                            access: AccessType::Default,
                         })
                     ),
                     None

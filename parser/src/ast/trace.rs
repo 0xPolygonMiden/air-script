@@ -227,7 +227,7 @@ pub struct TraceBinding {
     /// The effective type of this binding
     pub ty: Type,
     /// The access type associated to this TraceBinding
-    pub access: Option<AccessType>,
+    pub access: AccessType,
 }
 impl TraceBinding {
     /// Creates a new trace binding.
@@ -246,7 +246,7 @@ impl TraceBinding {
             offset,
             size,
             ty,
-            access: None,
+            access: AccessType::Default,
         }
     }
 
@@ -254,13 +254,12 @@ impl TraceBinding {
     #[inline]
     pub fn ty(&self) -> Type {
         match self.access.clone() {
-            Some(AccessType::Default) => self.ty,
-            Some(AccessType::Slice(range_expr)) => Type::Vector(range_expr.to_slice_range().len()),
-            Some(AccessType::Index(_)) => Type::Felt,
-            Some(AccessType::Matrix(..)) => {
+            AccessType::Default => self.ty,
+            AccessType::Slice(range_expr) => Type::Vector(range_expr.to_slice_range().len()),
+            AccessType::Index(_) => Type::Felt,
+            AccessType::Matrix(..) => {
                 unreachable!("matrix access not supported on trace bindings")
             },
-            None => self.ty,
         }
     }
 
@@ -281,17 +280,16 @@ impl TraceBinding {
     /// Derive a new [TraceBinding] derived from the current one given an [AccessType]
     pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
         let combined_access = match (self.access.clone(), access_type.clone()) {
-            (None, _) => access_type,
-            (Some(AccessType::Default), _) => access_type,
-            (Some(_), AccessType::Default) => self.access.clone().unwrap(),
-            (Some(AccessType::Slice(range_expr)), AccessType::Slice(range_expr1)) => {
+            (AccessType::Default, _) => access_type,
+            (_, AccessType::Default) => self.access.clone(),
+            (AccessType::Slice(range_expr), AccessType::Slice(range_expr1)) => {
                 let range_expr = range_expr.to_slice_range();
                 let range_expr1 = range_expr1.to_slice_range();
                 let combined_range =
                     (range_expr.start + range_expr1.start)..(range_expr.end + range_expr1.end);
                 AccessType::Slice(combined_range.into())
             },
-            (Some(AccessType::Slice(range_expr)), AccessType::Index(index_expr)) => {
+            (AccessType::Slice(range_expr), AccessType::Index(index_expr)) => {
                 let range_expr_usize = range_expr.to_slice_range();
                 let new_expr = ScalarExpr::Binary(BinaryExpr::new(
                     self.span(),
@@ -301,13 +299,13 @@ impl TraceBinding {
                 ));
                 AccessType::Index(Box::new(new_expr))
             },
-            (Some(AccessType::Index(_)), AccessType::Index(_)) => {
+            (AccessType::Index(_), AccessType::Index(_)) => {
                 return Err(InvalidAccessError::IndexIntoScalar);
             },
-            (Some(AccessType::Matrix(..)), _) | (Some(_), AccessType::Matrix(..)) => {
+            (AccessType::Matrix(..), _) | (_, AccessType::Matrix(..)) => {
                 return Err(InvalidAccessError::IndexIntoScalar);
             },
-            (Some(expression::AccessType::Index(_)), expression::AccessType::Slice(_)) => {
+            (expression::AccessType::Index(_), expression::AccessType::Slice(_)) => {
                 return Err(InvalidAccessError::SliceOfScalar);
             },
         };
@@ -318,7 +316,7 @@ impl TraceBinding {
         {
             return Err(InvalidAccessError::IndexOutOfBounds);
         }
-        Ok(Self { access: Some(combined_access), ..*self })
+        Ok(Self { access: combined_access, ..*self })
     }
 }
 impl Eq for TraceBinding {}
