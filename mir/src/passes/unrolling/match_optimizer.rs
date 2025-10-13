@@ -281,7 +281,8 @@ fn have_disjoint_conditions(
     true
 }
 
-/// Flattens a constraint expression (potentially containing nested vectors) into a vector of individual constraints.
+/// Flattens a constraint expression (potentially containing nested vectors) into a vector of
+/// individual constraints.
 fn flatten_constraints(op: &Link<Op>) -> Vec<Link<Op>> {
     match op.borrow().deref() {
         Op::Vector(vec) => {
