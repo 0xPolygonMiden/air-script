@@ -3,7 +3,8 @@ use winter_math::fields::f64::BaseElement as Felt;
 use winterfell::{AuxTraceWithMetadata, Trace, TraceTable, matrix::ColMatrix};
 
 use crate::{
-    buses::buses_complex::{BusesAir, PublicInputs},
+    buses::buses_complex::PublicInputs,
+    generate_air_test,
     helpers::{AirTester, MyTraceTable},
 };
 
@@ -56,17 +57,4 @@ impl AirTester for BusesAirTester {
     }
 }
 
-#[test]
-fn test_buses_air() {
-    let air_tester = Box::new(BusesAirTester {});
-    let length = 1024;
-
-    let main_trace = air_tester.build_main_trace(length);
-    let aux_trace = air_tester.build_aux_trace(length);
-    let pub_inputs = air_tester.public_inputs();
-    let trace_info = air_tester.build_trace_info(length);
-    let options = air_tester.build_proof_options();
-
-    let air = BusesAir::new(trace_info, pub_inputs, options);
-    main_trace.validate::<BusesAir, Felt>(&air, aux_trace.as_ref());
-}
+generate_air_test!(test_buses_air, crate::buses::buses_complex::BusesAir, BusesAirTester, 1024);

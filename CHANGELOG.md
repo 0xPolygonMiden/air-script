@@ -8,6 +8,7 @@
 - Refactored the unrolling pass in MIR (#434).
 - Update documentation and tests thereof (#437).
 - Add a constant propagation pass after other mir passes (#439).
+- Removed `TraceSegmentId::index()` and replaced segment indexing with `TraceShape<T>`/`FullTraceShape<T>` across ACE codegen, MIR-to-AIR pass, and constraints (#442).
 - Allow computed indices (#444).
 - Fix regressions on MIR and list_comprehensions (#449).
 

@@ -24,6 +24,134 @@ pub use self::{
     value::{PeriodicColumnAccess, PublicInputAccess, Value},
 };
 
+/// A fixed two segment trace shape containing values for the main and aux segments.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct TraceShape<T> {
+    pub main: T,
+    pub aux: T,
+}
+
+impl<T> TraceShape<T> {
+    pub fn new(main: T, aux: T) -> Self {
+        Self { main, aux }
+    }
+
+    pub fn map<U, F: FnMut(&T) -> U>(&self, mut f: F) -> TraceShape<U> {
+        TraceShape { main: f(&self.main), aux: f(&self.aux) }
+    }
+
+    /// Returns an iterator over mutable references to `(TraceSegmentId, T)` in segment order.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (TraceSegmentId, &mut T)> {
+        let (main, aux) = (&mut self.main, &mut self.aux);
+        [(TraceSegmentId::Main, main), (TraceSegmentId::Aux, aux)].into_iter()
+    }
+}
+
+impl<T> core::ops::Index<TraceSegmentId> for TraceShape<T> {
+    type Output = T;
+    fn index(&self, index: TraceSegmentId) -> &Self::Output {
+        match index {
+            TraceSegmentId::Main => &self.main,
+            TraceSegmentId::Aux => &self.aux,
+        }
+    }
+}
+
+impl<T> core::ops::IndexMut<TraceSegmentId> for TraceShape<T> {
+    fn index_mut(&mut self, index: TraceSegmentId) -> &mut Self::Output {
+        match index {
+            TraceSegmentId::Main => &mut self.main,
+            TraceSegmentId::Aux => &mut self.aux,
+        }
+    }
+}
+
+impl<T> core::ops::Index<usize> for TraceShape<T> {
+    type Output = T;
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.main,
+            1 => &self.aux,
+            _ => panic!("invalid segment index"),
+        }
+    }
+}
+
+impl<T> core::ops::IndexMut<usize> for TraceShape<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        match index {
+            0 => &mut self.main,
+            1 => &mut self.aux,
+            _ => panic!("invalid segment index"),
+        }
+    }
+}
+
+/// A fixed three segment trace shape containing values for the main, aux, and quotient segments.
+///
+/// This wraps a two segment `TraceShape<T>` for the witness traces, and adds a separate
+/// `quotient` segment which is not addressable via `TraceSegmentId`.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct FullTraceShape<T> {
+    pub segments: TraceShape<T>,
+    pub quotient: T,
+}
+
+impl<T> FullTraceShape<T> {
+    pub fn new(main: T, aux: T, quotient: T) -> Self {
+        Self {
+            segments: TraceShape::new(main, aux),
+            quotient,
+        }
+    }
+
+    #[inline]
+    pub fn segments(&self) -> &TraceShape<T> {
+        &self.segments
+    }
+
+    #[inline]
+    pub fn segments_mut(&mut self) -> &mut TraceShape<T> {
+        &mut self.segments
+    }
+}
+
+impl<T> core::ops::Index<TraceSegmentId> for FullTraceShape<T> {
+    type Output = T;
+    fn index(&self, index: TraceSegmentId) -> &Self::Output {
+        &self.segments[index]
+    }
+}
+
+impl<T> core::ops::IndexMut<TraceSegmentId> for FullTraceShape<T> {
+    fn index_mut(&mut self, index: TraceSegmentId) -> &mut Self::Output {
+        &mut self.segments[index]
+    }
+}
+
+impl<T> core::ops::Index<usize> for FullTraceShape<T> {
+    type Output = T;
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.segments.main,
+            1 => &self.segments.aux,
+            2 => &self.quotient,
+            _ => panic!("invalid segment index"),
+        }
+    }
+}
+
+impl<T> core::ops::IndexMut<usize> for FullTraceShape<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        match index {
+            0 => &mut self.segments.main,
+            1 => &mut self.segments.aux,
+            2 => &mut self.quotient,
+            _ => panic!("invalid segment index"),
+        }
+    }
+}
+
 /// The offset of the "current" row during constraint evaluation.
 pub const CURRENT_ROW: usize = 0;
 /// The minimum cycle length of a periodic column

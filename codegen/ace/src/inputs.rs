@@ -1,6 +1,6 @@
 use std::iter::zip;
 
-use air_ir::Air;
+use air_ir::{Air, FullTraceShape};
 use miden_core::Felt;
 use winter_math::{FieldElement, StarkField};
 
@@ -20,16 +20,13 @@ pub struct AirInputs {
     pub public: Vec<Vec<QuadFelt>>,
     /// Reduced public input table values used as boundaries for buses.
     pub reduced_tables: Vec<QuadFelt>,
-    /// Evaluations of the *main* trace.
-    pub main: [Vec<QuadFelt>; 2],
+    /// Evaluations of the segments in the order `main`, `aux`, `quotient`,
+    /// for the current row and next row.
+    pub segments: [FullTraceShape<Vec<QuadFelt>>; 2],
     /// Verifier challenge α used to randomize the multi-set/logUp polynomials in the *aux* trace.
     pub random_alpha: QuadFelt,
     /// Verifier challenge β used to fingerprint bus messages for the *aux* trace.
     pub random_beta: QuadFelt,
-    /// Evaluations of the *aux* trace.
-    pub aux: [Vec<QuadFelt>; 2],
-    /// Evaluations of the *quotient* parts, including in the next row.
-    pub quotient: [Vec<QuadFelt>; 2],
     /// Verifier challenge used to compute the linear combination of constraints.
     pub alpha: QuadFelt,
     /// Verifier challenge corresponding to the point at which the constraint evaluation check is
@@ -42,7 +39,7 @@ pub struct AirInputs {
 pub struct AceVars {
     pub(crate) public: Vec<Vec<QuadFelt>>,
     pub(crate) reduced_tables: Vec<QuadFelt>,
-    pub(crate) segments: [[Vec<QuadFelt>; 3]; 2],
+    pub(crate) segments: [FullTraceShape<Vec<QuadFelt>>; 2],
     pub(crate) random_alpha: QuadFelt,
     pub(crate) random_beta: QuadFelt,
     pub(crate) stark: StarkInputs,
@@ -53,10 +50,7 @@ impl AirInputs {
     /// the values that would be present in the proof's transcript.
     pub fn into_ace_vars(self, air: &Air) -> AceVars {
         let stark = StarkInputs::new(air, self.log_trace_len, self.alpha, self.z);
-        let [main_curr, main_next] = self.main;
-        let [aux_curr, aux_next] = self.aux;
-        let [quotient_curr, quotient_next] = self.quotient;
-        let segments = [[main_curr, aux_curr, quotient_curr], [main_next, aux_next, quotient_next]];
+        let segments = self.segments;
         AceVars {
             public: self.public,
             reduced_tables: self.reduced_tables,
@@ -163,10 +157,10 @@ impl AceVars {
         mem[layout.random_beta] = self.random_beta;
 
         // Trace values
-        for row_offset in [0, 1] {
-            for (segment_row, region) in
-                zip(&self.segments[row_offset], &layout.trace_segments[row_offset])
-            {
+        for (row_offset, _) in self.segments.iter().enumerate() {
+            for i in 0..3 {
+                let region = &layout.trace_segments[row_offset][i];
+                let segment_row = &self.segments[row_offset][i];
                 store(&mut mem, region, segment_row.as_slice());
             }
         }
