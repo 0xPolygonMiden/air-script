@@ -7,7 +7,7 @@ const MDS = [
 ];
 
 trace_columns {
-    main: [a[2], state_1[2], state_2[2]],
+    main: [a[2], s[2]],
 }
 
 public_inputs {
@@ -24,29 +24,38 @@ boundary_constraints {
     enf a[0].first = 0;
 }
 
+# Note: 
+# In this test, we aim to test that computed indices work well even if:
+# - The value of the index can only be known late during the compilation process (during MIR's constant propagation)
+# - The 
 integrity_constraints {
-    # with state_1 = [1, 1];
-    # with state_2 = [2, 0];
     
-    # [1+2, 2+3, 3+4]
-    # [3, 5, 7]
-    let vec_1 = apply_mds(state_1);
-    
-    # [2, 4, 6]
+    # vec_1 is a list_comprehension that depends on the state
+    # vec_1 = [
+    #    1 * s[0] + 2 * s[1],
+    #    2 * s[0] + 3 * s[1],
+    #    3 * s[0] + 4 * s[1]
+    # ];
+    let vec_1 = apply_mds(s);
+
+    let state_2 = [2, 0];
+    # vec_2 is a list_comprehension that will not get constant-folded early, but will produce constant values
     let vec_2 = apply_mds(state_2);
 
-    # 2 * 2 - 4
+    # x will get the value 2 * 2 - 4 = 0
     let x = double(2) - vec_2[1];
-
-    # vec_2[0] = 2
+    
+    # y will get the value vec_2[0] = 2
     let y = vec_2[x];
 
-    # vec_1[2] = 7
+    # z will then be vec_1[2] = 3 * s[0] + 4 * s[1]
     let z = vec_1[y];
 
-    enf a[1] = double(z);
+    # we enforce 3 * s[0] + 4 * s[1] = 0
+    enf z = 0;
 }
 
+# We use apply_mds function to produce a list comprehension that will not get constant-folded during AST
 fn apply_mds(state: felt[2]) -> felt[3] {
     return [sum([s * m for (s, m) in (state, mds_row)]) for mds_row in MDS];
 }
