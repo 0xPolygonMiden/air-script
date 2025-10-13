@@ -232,6 +232,12 @@ impl AirBuilder<'_> {
     /// Will panic when encountering an unexpected operation
     /// (i.e. that is not a binary operation, a value, enf node or an accessor)
     fn insert_mir_operation(&mut self, mir_node: &Link<Op>) -> Result<NodeIndex, CompileError> {
+        // First, we need to remove accessors and vector wrappers to get the actual scalar operation
+        // to insert. Notes:
+        // - at this point, we expect trivial `Accessor` (with either constant index or default
+        //   access type) or `Vector` with size 1.
+        // - in case of nested list comprehensions, we may need to unwrap two accessors, so we
+        //   unwrap them multiple times.
         let mir_node = accessor_to_scalar(mir_node);
         let mir_node = vec_to_scalar(&mir_node);
         let mir_node = accessor_to_scalar(&mir_node);
