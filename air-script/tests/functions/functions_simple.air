@@ -47,7 +47,7 @@ boundary_constraints {
 integrity_constraints {
     # -------- function call is assigned to a variable and used in a binary expression ------------
 
-    # binary expression invloving scalar expressions
+    # binary expression involving scalar expressions
     let simple_expression = t * v;
     enf simple_expression = 1;
 

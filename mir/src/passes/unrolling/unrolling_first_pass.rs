@@ -331,13 +331,13 @@ pub fn visit_accessor_bis(accessor: Link<Op>) -> Result<Option<Link<Op>>, Compil
 /// Note that semantic analysis should have already checked they are valid.
 fn validate_iterators_and_get_expected_len(iterators: &[Link<Op>]) -> usize {
     if iterators.is_empty() {
-        unreachable!("Semantic analysis should have catched empty iterators");
+        unreachable!("Semantic analysis should have caught empty iterators");
     }
     let iterator_expected_len = compute_iterator_len(iterators[0].clone());
     for iterator in iterators.iter().skip(1) {
         let iterator_len = compute_iterator_len(iterator.clone());
         if iterator_len != iterator_expected_len {
-            unreachable!("Semantic analysis should have catched iterator length mismatch");
+            unreachable!("Semantic analysis should have caught iterator length mismatch");
         }
     }
     iterator_expected_len
