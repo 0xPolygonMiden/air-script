@@ -10,6 +10,7 @@
 - Update documentation and tests thereof (#437).
 - Reorder unrolling passes to unroll list comprehensions before match statements (#431).
 - Removed `TraceSegmentId::index()` and replaced segment indexing with `TraceShape<T>`/`FullTraceShape<T>` across ACE codegen, MIR-to-AIR pass, and constraints (#442).
+- Fixed a vector unrolling issue in nested match evaluations (#491).
 
 ## 0.4.0 (2025-06-20)
 
