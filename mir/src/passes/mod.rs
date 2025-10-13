@@ -15,9 +15,9 @@ pub use visitor::Visitor;
 use crate::{
     CompileError,
     ir::{
-        Accessor, Add, Boundary, BusOp, Call, ConstantValue, Enf, Exp, Fold, For, If, Link,
-        MatchArm, Matrix, MirAccessType, MirValue, Mul, Node, Op, Owner, Parameter, Parent,
-        PublicInputAccess, SpannedMirValue, Sub, TraceAccess, Value, Vector,
+        Accessor, Add, Boundary, BusOp, Call, Enf, Exp, Fold, For, If, Link, MatchArm, Matrix,
+        MirAccessType, MirValue, Mul, Node, Op, Owner, Parameter, Parent, PublicInputAccess,
+        SpannedMirValue, Sub, TraceAccess, Value, Vector,
     },
 };
 
