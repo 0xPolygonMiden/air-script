@@ -22,7 +22,7 @@
 # │ f_scw   │ Same context/word address flag for sequential access optimization        │
 # └─────────┴──────────────────────────────────────────────────────────────────────────┘
 #
-# STATUS: Implemented (memory constraints complete, bus integration active)
+# STATUS: Partially implemented (missing bus integration)
 #
 # REFERENCES:
 # - Memory Design: https://0xmiden.github.io/miden-vm/design/chiplets/memory.html
