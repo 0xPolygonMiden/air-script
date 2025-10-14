@@ -133,25 +133,51 @@ struct AirBuilder<'a> {
 
 /// In case of nested list comprehension, we may not have entirely unrolled outer loops iterators
 /// so we need to ensure these cases are properly indexed.
-fn indexed_accessor(mir_node: &Link<Op>) -> Link<Op> {
+fn accessor_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
     if let Some(accessor) = mir_node.as_accessor() {
-        if let AccessType::Index(index) = accessor.access_type {
-            if let Some(vec) = accessor.indexable.as_vector() {
-                let children = vec.elements.borrow().deref().clone();
-                if index >= children.len() {
-                    panic!(
-                        "Index out of bounds during indexed accessor translation from MIR to AIR: {index}",
-                    );
+        match accessor.access_type {
+            AccessType::Index(index) => {
+                if let Some(vec) = accessor.indexable.as_vector() {
+                    let children = vec.elements.borrow().deref().clone();
+                    if index >= children.len() {
+                        panic!(
+                            "Index out of bounds during indexed accessor translation from MIR to AIR: {index}",
+                        );
+                    }
+                    children[index].clone()
+                } else {
+                    mir_node.clone()
                 }
-                children[index].clone()
-            } else {
-                mir_node.clone()
-            }
-        } else {
-            mir_node.clone()
+            },
+            AccessType::Default => {
+                add_row_offset_if_trace_access(&accessor.indexable, accessor.offset)
+            },
+            _ => mir_node.clone(),
         }
     } else {
         mir_node.clone()
+    }
+}
+
+/// Helper function to add a row offset to a TraceAccess value, and return the node unchanged
+/// otherwise.
+fn add_row_offset_if_trace_access(node: &Link<Op>, offset: usize) -> Link<Op> {
+    if let Some(value) = node.clone().as_value() {
+        let mir_value = value.value.value.clone();
+        if let MirValue::TraceAccess(trace_access) = mir_value {
+            mir::ir::Value::create(SpannedMirValue {
+                span: value.value.span(),
+                value: MirValue::TraceAccess(mir::ir::TraceAccess {
+                    segment: trace_access.segment,
+                    column: trace_access.column,
+                    row_offset: trace_access.row_offset + offset,
+                }),
+            })
+        } else {
+            node.clone()
+        }
+    } else {
+        node.clone()
     }
 }
 
@@ -165,8 +191,8 @@ fn vec_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
             panic!("Vector of len >1 after unrolling: {mir_node:?}");
         }
         let child = children.first().unwrap();
-        let child = indexed_accessor(child);
-        let child = vec_to_scalar(&child);
+        let child = vec_to_scalar(child);
+        let child = accessor_to_scalar(&child);
         child.clone()
     } else {
         mir_node.clone()
@@ -206,8 +232,15 @@ impl AirBuilder<'_> {
     /// Will panic when encountering an unexpected operation
     /// (i.e. that is not a binary operation, a value, enf node or an accessor)
     fn insert_mir_operation(&mut self, mir_node: &Link<Op>) -> Result<NodeIndex, CompileError> {
-        let mir_node = indexed_accessor(mir_node);
+        // First, we need to remove accessors and vector wrappers to get the actual scalar operation
+        // to insert. Notes:
+        // - at this point, we expect trivial `Accessor` (with either constant index or default
+        //   access type) or `Vector` with size 1.
+        // - in case of nested list comprehensions, we may need to unwrap two accessors, so we
+        //   unwrap them multiple times.
+        let mir_node = accessor_to_scalar(mir_node);
         let mir_node = vec_to_scalar(&mir_node);
+        let mir_node = accessor_to_scalar(&mir_node);
         let mir_node_ref = mir_node.borrow();
         match mir_node_ref.deref() {
             Op::Add(add) => {
@@ -322,7 +355,7 @@ impl AirBuilder<'_> {
             Op::Accessor(accessor) => {
                 let offset = accessor.offset;
                 let child = accessor.indexable.clone();
-                let child = indexed_accessor(&child);
+                let child = accessor_to_scalar(&child);
 
                 let value = child.as_value().expect("Expected value in accessor");
                 let mir_value = &value.value.value;
@@ -393,7 +426,7 @@ impl AirBuilder<'_> {
             },
             Op::Enf(enf) => {
                 let child_op = enf.expr.clone();
-                let child_op = indexed_accessor(&child_op);
+                let child_op = accessor_to_scalar(&child_op);
                 let child_op = vec_to_scalar(&child_op);
 
                 self.build_boundary_constraint(&child_op)?;
@@ -402,10 +435,10 @@ impl AirBuilder<'_> {
             Op::Sub(sub) => {
                 // Check that lhs is a Bounded trace access
                 let lhs = sub.lhs.clone();
-                let lhs = indexed_accessor(&lhs);
+                let lhs = accessor_to_scalar(&lhs);
                 let lhs = vec_to_scalar(&lhs);
                 let rhs = sub.rhs.clone();
-                let rhs = indexed_accessor(&rhs);
+                let rhs = accessor_to_scalar(&rhs);
                 let rhs = vec_to_scalar(&rhs);
                 let lhs_span = lhs.span();
                 let rhs_span = rhs.span();
@@ -505,7 +538,7 @@ impl AirBuilder<'_> {
             },
             Op::Enf(enf) => {
                 let child_op = enf.expr.clone();
-                let child_op = indexed_accessor(&child_op);
+                let child_op = accessor_to_scalar(&child_op);
                 let child_op = vec_to_scalar(&child_op);
                 let child_op = enf_to_scalar(&child_op);
                 match child_op.clone().borrow().deref() {

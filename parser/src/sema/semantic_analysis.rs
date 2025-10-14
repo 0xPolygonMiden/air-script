@@ -750,6 +750,16 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                         expr.rhs.span(),
                         expr.span(),
                     );
+                } else if lty != Type::Felt {
+                    self.has_type_errors = true;
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("unexpected type")
+                        .with_primary_label(
+                            expr.span(),
+                            "binary operations are only allowed on scalar values",
+                        )
+                        .emit();
                 }
                 ControlFlow::Continue(())
             },
