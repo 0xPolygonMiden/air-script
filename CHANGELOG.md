@@ -10,6 +10,7 @@
 - Add a constant propagation pass after other mir passes (#439).
 - Removed `TraceSegmentId::index()` and replaced segment indexing with `TraceShape<T>`/`FullTraceShape<T>` across ACE codegen, MIR-to-AIR pass, and constraints (#442).
 - Fix regressions on MIR and list_comprehensions (#449).
+- Add CSE and hoist extension conversions in constraint emission (#493).
 
 ## 0.4.0 (2025-06-20)
 
