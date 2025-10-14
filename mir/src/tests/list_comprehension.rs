@@ -28,7 +28,7 @@ fn list_comprehension_nested_nobind() {
         let state = [6, 5, 4];
         let expected = [13, 58, 103, 148];
         let result = [inner_loop(state, row) for row in TABLE];
-        enf expected = result;
+        enf expected = result for (expected, result) in (expected, result);
     }
 
     fn inner_loop(st: felt[3], ro: felt[3]) -> felt {
@@ -61,7 +61,7 @@ fn list_comprehension_nested_nobind() {
         let state = [6, 5, 4];
         let expected = [13, 58, 103, 148];
         let result = [sum([s * m for (s, m) in (state, row)]) for row in TABLE];
-        enf expected = result;
+        enf expected = result for (expected, result) in (expected, result);
     }";
 
     let Ok(mut nested) = compile(source_nested) else {

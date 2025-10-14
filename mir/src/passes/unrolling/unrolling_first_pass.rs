@@ -12,8 +12,7 @@ use crate::{
     passes::{
         Visitor,
         unrolling::{
-            ForInliningContext, visit_add_bis, visit_boundary_bis, visit_enf_bis, visit_exp_bis,
-            visit_fold_bis, visit_mul_bis, visit_sub_bis, visit_value_bis, visit_vector_bis,
+            ForInliningContext, visit_enf_bis, visit_fold_bis, visit_value_bis, visit_vector_bis,
         },
     },
 };
@@ -261,11 +260,6 @@ impl Visitor for UnrollingFirstPass<'_> {
         // that returns a Some(updated_node) if we need to update the node's value.
         let updated_op: Option<Link<Op>> = match node.borrow().deref() {
             Node::Enf(e) => e.to_link().map_or(Ok(None), visit_enf_bis)?,
-            Node::Boundary(b) => b.to_link().map_or(Ok(None), visit_boundary_bis)?,
-            Node::Add(a) => a.to_link().map_or(Ok(None), visit_add_bis)?,
-            Node::Sub(s) => s.to_link().map_or(Ok(None), visit_sub_bis)?,
-            Node::Mul(m) => m.to_link().map_or(Ok(None), visit_mul_bis)?,
-            Node::Exp(e) => e.to_link().map_or(Ok(None), visit_exp_bis)?,
             Node::Fold(f) => f.to_link().map_or(Ok(None), visit_fold_bis)?,
             Node::Vector(v) => v.to_link().map_or(Ok(None), visit_vector_bis)?,
             Node::Accessor(a) => a.to_link().map_or(Ok(None), visit_accessor_bis)?,
@@ -274,10 +268,15 @@ impl Visitor for UnrollingFirstPass<'_> {
             Node::Parameter(p) => {
                 p.to_link().map_or(Ok(None), |el| self.visit_parameter_bis(el))?
             },
-            Node::BusOp(_b) => None,
-            Node::Matrix(_) => None, // Matrix are already unrolled, we have nothing to do
-            Node::If(_i) => None,
-            Node::None(_) => None,
+            Node::Boundary(_)
+            | Node::Add(_)
+            | Node::Sub(_)
+            | Node::Mul(_)
+            | Node::Exp(_)
+            | Node::BusOp(_)
+            | Node::Matrix(_)
+            | Node::If(_)
+            | Node::None(_) => None,
             _ => {
                 unreachable!(
                     "Unexpected node during Unrolling: Function, Evaluators and Calls should have been inlined before this pass. Found: {:?}",
@@ -332,13 +331,13 @@ pub fn visit_accessor_bis(accessor: Link<Op>) -> Result<Option<Link<Op>>, Compil
 /// Note that semantic analysis should have already checked they are valid.
 fn validate_iterators_and_get_expected_len(iterators: &[Link<Op>]) -> usize {
     if iterators.is_empty() {
-        unreachable!("Semantic analysis should have catched empty iterators");
+        unreachable!("Semantic analysis should have caught empty iterators");
     }
     let iterator_expected_len = compute_iterator_len(iterators[0].clone());
     for iterator in iterators.iter().skip(1) {
         let iterator_len = compute_iterator_len(iterator.clone());
         if iterator_len != iterator_expected_len {
-            unreachable!("Semantic analysis should have catched iterator length mismatch");
+            unreachable!("Semantic analysis should have caught iterator length mismatch");
         }
     }
     iterator_expected_len

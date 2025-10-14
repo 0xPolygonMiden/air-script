@@ -30,7 +30,7 @@ jobs:
       - name: Clippy
         run: |
           rustup update --no-self-update
-          rustup component add clippy
+          rustup component add --toolchain stable clippy
           make clippy
 
   rustfmt:

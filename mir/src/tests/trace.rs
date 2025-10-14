@@ -153,3 +153,23 @@ fn err_ic_trace_cols_group_used_as_scalar() {
 
     expect_diagnostic(source, "type mismatch");
 }
+
+#[test]
+fn err_binop_on_non_scalar() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk, a[4], b[4]],
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        enf a[1].first = 0;
+    }
+    integrity_constraints {
+        enf a = b;
+    }";
+
+    expect_diagnostic(source, "binary operations are only allowed on scalar values");
+}

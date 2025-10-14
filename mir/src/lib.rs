@@ -1,5 +1,3 @@
-mod codegen;
-
 pub mod ir;
 pub mod passes;
 #[cfg(test)]
@@ -9,7 +7,6 @@ use air_parser::ast::Program;
 use air_pass::Pass;
 use miden_diagnostics::{Diagnostic, DiagnosticsHandler, ToDiagnostic};
 
-pub use self::codegen::CodeGenerator;
 use crate::ir::Mir;
 
 /// Abstracts the various passes done on the MIR representation of the program.
