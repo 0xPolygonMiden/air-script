@@ -3,7 +3,7 @@ use winter_math::fields::f64::BaseElement as Felt;
 use winterfell::{Trace, TraceTable};
 
 use crate::{
-    generate_air_test,
+    generate_air_winterfell_test,
     helpers::{AirTester, MyTraceTable},
     periodic_columns::periodic_columns::PublicInputs,
 };
@@ -37,7 +37,7 @@ impl AirTester for PeriodicColumnsAirTester {
     }
 }
 
-generate_air_test!(
+generate_air_winterfell_test!(
     test_periodic_columns_air,
     crate::periodic_columns::periodic_columns::PeriodicColumnsAir,
     PeriodicColumnsAirTester,

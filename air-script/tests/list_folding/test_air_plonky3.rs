@@ -13,6 +13,7 @@ use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
 use p3_uni_stark::StarkConfig;
 
 use crate::{
+    generate_air_plonky3_test,
     helpers::check_constraints_with_periodic_columns,
     list_folding::list_folding_plonky3::{ListFoldingAir, NUM_COLUMNS},
 };
@@ -92,38 +93,8 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<
     trace
 }
 
-#[test]
-fn test_air_plonky3() {
-    type Val = Mersenne31;
-    type Challenge = BinomialExtensionField<Val, 3>;
-
-    type ByteHash = Sha256;
-    type FieldHash = SerializingHasher<ByteHash>;
-    type MyCompress = CompressionFunctionFromHasher<ByteHash, 2, 32>;
-    type ValMmcs = MerkleTreeMmcs<Val, u8, FieldHash, MyCompress, 32>;
-    type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
-    type Challenger = SerializingChallenger32<Val, HashChallenger<u8, ByteHash, 32>>;
-    type Pcs = CirclePcs<Val, ValMmcs, ChallengeMmcs>;
-    type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
-
-    let byte_hash = ByteHash {};
-    let field_hash = FieldHash::new(Sha256);
-    let compress = MyCompress::new(byte_hash);
-    let val_mmcs = ValMmcs::new(field_hash, compress);
-    let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
-    let challenger = Challenger::from_hasher(vec![], byte_hash);
-    let fri_params = create_benchmark_fri_params(challenge_mmcs);
-    let pcs = Pcs {
-        mmcs: val_mmcs,
-        fri_params,
-        _phantom: PhantomData,
-    };
-    let config = MyConfig::new(pcs, challenger);
-
-    let inputs = vec![1; 16];
-    let inputs_m31: Vec<Val> = inputs.iter().map(|&x| Val::new_checked(x).unwrap()).collect();
-
-    let trace = generate_trace_rows::<Val>(inputs);
-
-    check_constraints_with_periodic_columns(&ListFoldingAir {}, &trace, &inputs_m31);
+fn generate_inputs() -> Vec<u32> {
+    vec![1; 16]
 }
+
+generate_air_plonky3_test!(test_air_plonky3, ListFoldingAir);

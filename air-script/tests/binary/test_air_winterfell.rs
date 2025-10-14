@@ -4,7 +4,7 @@ use winterfell::{Trace, TraceTable};
 
 use crate::{
     binary::binary::PublicInputs,
-    generate_air_test,
+    generate_air_winterfell_test,
     helpers::{AirTester, MyTraceTable},
 };
 
@@ -39,4 +39,9 @@ impl AirTester for BinaryAirTester {
     }
 }
 
-generate_air_test!(test_binary_air, crate::binary::binary::BinaryAir, BinaryAirTester, 1024);
+generate_air_winterfell_test!(
+    test_binary_air,
+    crate::binary::binary::BinaryAir,
+    BinaryAirTester,
+    1024
+);

@@ -4,7 +4,7 @@ use winterfell::{AuxTraceWithMetadata, Trace, TraceTable, matrix::ColMatrix};
 
 use crate::{
     buses::buses_complex::PublicInputs,
-    generate_air_test,
+    generate_air_winterfell_test,
     helpers::{AirTester, MyTraceTable},
 };
 
@@ -57,4 +57,9 @@ impl AirTester for BusesAirTester {
     }
 }
 
-generate_air_test!(test_buses_air, crate::buses::buses_complex::BusesAir, BusesAirTester, 1024);
+generate_air_winterfell_test!(
+    test_buses_air,
+    crate::buses::buses_complex::BusesAir,
+    BusesAirTester,
+    1024
+);

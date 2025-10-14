@@ -6,7 +6,7 @@ use winterfell::{AuxTraceWithMetadata, Trace, TraceTable, matrix::ColMatrix};
 
 use crate::{
     bitwise::bitwise::PublicInputs,
-    generate_air_test,
+    generate_air_winterfell_test,
     helpers::{AirTester, MyTraceTable},
 };
 
@@ -50,4 +50,9 @@ impl AirTester for BitwiseAirTester {
     }
 }
 
-generate_air_test!(test_bitwise_air, crate::bitwise::bitwise::BitwiseAir, BitwiseAirTester, 1024);
+generate_air_winterfell_test!(
+    test_bitwise_air,
+    crate::bitwise::bitwise::BitwiseAir,
+    BitwiseAirTester,
+    1024
+);

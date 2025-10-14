@@ -4,7 +4,7 @@ use winterfell::{Trace, TraceTable};
 
 use crate::{
     functions::functions_complex::PublicInputs,
-    generate_air_test,
+    generate_air_winterfell_test,
     helpers::{AirTester, MyTraceTable},
 };
 
@@ -68,7 +68,7 @@ impl AirTester for FunctionsAirTester {
     }
 }
 
-generate_air_test!(
+generate_air_winterfell_test!(
     test_functions_complex_air,
     crate::functions::functions_complex::FunctionsAir,
     FunctionsAirTester,

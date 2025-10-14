@@ -3,7 +3,7 @@ use winter_math::fields::f64::BaseElement as Felt;
 use winterfell::{Trace, TraceTable};
 
 use crate::{
-    generate_air_test,
+    generate_air_winterfell_test,
     helpers::{AirTester, MyTraceTable},
     list_folding::list_folding::PublicInputs,
 };
@@ -53,7 +53,7 @@ impl AirTester for ListFoldingAirTester {
     }
 }
 
-generate_air_test!(
+generate_air_winterfell_test!(
     test_list_folding_air,
     crate::list_folding::list_folding::ListFoldingAir,
     ListFoldingAirTester,

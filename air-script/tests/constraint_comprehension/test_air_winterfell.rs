@@ -4,7 +4,7 @@ use winterfell::{Trace, TraceTable};
 
 use crate::{
     constraint_comprehension::constraint_comprehension::PublicInputs,
-    generate_air_test,
+    generate_air_winterfell_test,
     helpers::{AirTester, MyTraceTable},
 };
 
@@ -48,7 +48,7 @@ impl AirTester for ConstraintComprehensionAirTester {
     }
 }
 
-generate_air_test!(
+generate_air_winterfell_test!(
     test_constraint_comprehension_air,
     crate::constraint_comprehension::constraint_comprehension::ConstraintComprehensionAir,
     ConstraintComprehensionAirTester,

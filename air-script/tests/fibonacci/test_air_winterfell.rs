@@ -6,7 +6,7 @@ use winterfell::{AuxTraceWithMetadata, Trace, TraceTable, matrix::ColMatrix};
 
 use crate::{
     fibonacci::fibonacci::PublicInputs,
-    generate_air_test,
+    generate_air_winterfell_test,
     helpers::{AirTester, MyTraceTable},
 };
 
@@ -45,7 +45,7 @@ impl AirTester for FibonacciAirTester {
     }
 }
 
-generate_air_test!(
+generate_air_winterfell_test!(
     test_fibonacci_air,
     crate::fibonacci::fibonacci::FibonacciAir,
     FibonacciAirTester,

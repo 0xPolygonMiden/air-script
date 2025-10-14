@@ -3,7 +3,7 @@ use winter_math::fields::f64::BaseElement as Felt;
 use winterfell::{Trace, TraceTable};
 
 use crate::{
-    generate_air_test,
+    generate_air_winterfell_test,
     helpers::{AirTester, MyTraceTable},
     system::system::PublicInputs,
 };
@@ -39,4 +39,9 @@ impl AirTester for SystemAirTester {
     }
 }
 
-generate_air_test!(test_system_air, crate::system::system::SystemAir, SystemAirTester, 1024);
+generate_air_winterfell_test!(
+    test_system_air,
+    crate::system::system::SystemAir,
+    SystemAirTester,
+    1024
+);

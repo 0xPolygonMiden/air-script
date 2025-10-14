@@ -4,7 +4,7 @@ use winterfell::{Trace, TraceTable};
 
 use crate::{
     constant_in_range::constant_in_range::PublicInputs,
-    generate_air_test,
+    generate_air_winterfell_test,
     helpers::{AirTester, MyTraceTable},
 };
 
@@ -46,7 +46,7 @@ impl AirTester for ConstantInRangeAirTester {
     }
 }
 
-generate_air_test!(
+generate_air_winterfell_test!(
     test_constant_in_range_air,
     crate::constant_in_range::constant_in_range::ConstantInRangeAir,
     ConstantInRangeAirTester,
