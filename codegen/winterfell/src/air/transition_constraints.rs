@@ -1,6 +1,6 @@
 use air_ir::{Air, TraceSegmentId};
 
-use super::{Codegen, ElemType, Impl};
+use super::{Impl, graph::to_string_with_temps};
 
 // HELPERS TO GENERATE THE WINTERFELL TRANSITION CONSTRAINT METHODS
 // ================================================================================================
@@ -55,10 +55,10 @@ pub(super) fn add_fn_evaluate_aux_transition(impl_ref: &mut Impl, ir: &Air) {
 /// the provided codegen function body for each constraint.
 fn add_constraints(func_body: &mut codegen::Function, ir: &Air, trace_segment: TraceSegmentId) {
     for (idx, constraint) in ir.integrity_constraints(trace_segment).iter().enumerate() {
-        func_body.line(format!(
-            "result[{}] = {};",
-            idx,
-            constraint.node_index().to_string(ir, ElemType::Ext, trace_segment)
-        ));
+        let (temps, expr) = to_string_with_temps(ir, constraint.node_index(), trace_segment);
+        for t in temps {
+            func_body.line(t);
+        }
+        func_body.line(format!("result[{idx}] = {expr};"));
     }
 }
