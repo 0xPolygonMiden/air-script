@@ -1,0 +1,69 @@
+##########################################################################################
+# BITWISE OPERATIONS CHIPLET
+##########################################################################################
+#
+# The Bitwise chiplet handles bitwise logical operations (AND, XOR) on 32-bit values.
+# It decomposes field elements into their binary representation and performs bit-level
+# operations efficiently using field arithmetic.
+#
+# STATUS: Not implemented
+#
+# REFERENCES:
+# - Bitwise Chiplet: https://0xmiden.github.io/miden-vm/design/chiplets/bitwise.html
+##########################################################################################
+
+mod bitwise
+
+##########################################################################################
+# BITWISE OPERATION CONSTANTS (Periodic Columns)
+##########################################################################################
+#
+# Periodic constants contain values needed to switch various constraints on or off.
+#
+periodic_columns {
+    k0: [1, 0, 0, 0, 0, 0, 0, 0],
+    k1: [1, 1, 1, 1, 1, 1, 1, 0],
+}
+
+##########################################################################################
+# BITWISE CHIPLET TRANSITION CONSTRAINTS
+##########################################################################################
+#
+# The bitwise chiplet processes 32-bit integers by decomposing them into individual
+# bits, applying bitwise operations, and recomposing the results. This approach
+# enables verification of bitwise logic within the field arithmetic constraint system.
+#
+# PLANNED CONSTRAINT EVALUATORS:
+#
+# ev bitwise_decomposition([bitwise[16]]) {
+#     
+#     # TODO
+#     
+# }
+#
+# ev bitwise_aggregation([bitwise[16]]) {
+#     
+#     # TODO
+#     
+# }
+#
+# ev bitwise_selectors([bitwise[16]]) {
+#     
+#     # TODO
+#
+# }
+#
+##########################################################################################
+# BUS CONSTRAINTS
+##########################################################################################
+#
+# The bitwise chiplet communicates with the stack component using the chiplets bus.
+#
+# MESSAGE FORMAT:
+#
+# Each bitwise operation message contains:
+# - Operation type (AND/XOR)
+# - Input operands (a, b) as 32-bit values
+# - Expected result (c)
+#
+##########################################################################################

@@ -1,0 +1,14 @@
+##########################################################################################
+# MEMORY CONSTRAINTS MODULE
+##########################################################################################
+#
+# Miden VM supports linear read-write random access memory. This memory is element-addressable,
+# meaning that a single value is located at each address, although reading and writing values
+# to/from memory in batches of four is supported and is optimized for.
+#
+# STATUS: Not implemented
+#
+# REFERENCES:
+# - Memory Design: https://0xmiden.github.io/miden-vm/design/chiplets/memory.html
+##########################################################################################
+

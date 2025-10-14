@@ -153,7 +153,10 @@ fn vec_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
         let size = vector.size;
         let children = vector.elements.borrow().deref().clone();
         if size != 1 {
-            eprintln!("INFO: Multi-element Vector (len={}) in expression context. Processing first element. This may indicate incomplete constraint unrolling.", size);
+            eprintln!(
+                "INFO: Multi-element Vector (len={}) in expression context. Processing first element. This may indicate incomplete constraint unrolling.",
+                size
+            );
             // Instead of panicking, process the first element
         }
         let child = children.first().unwrap();
@@ -362,9 +365,10 @@ impl AirBuilder<'_> {
                     Ok(self.insert_op(Operation::Value(value)))
                 } else {
                     // Handle complex expressions by recursively processing them
-                    // If offset is non-zero, we need to apply it somehow, but for complex expressions
-                    // the offset handling becomes tricky. For now, if offset is non-zero, we'll panic
-                    // to identify cases that need special handling.
+                    // If offset is non-zero, we need to apply it somehow, but for complex
+                    // expressions the offset handling becomes tricky. For now,
+                    // if offset is non-zero, we'll panic to identify cases that
+                    // need special handling.
                     if offset != 0 {
                         panic!("Cannot apply offset {} to complex expression: {:?}", offset, child);
                     }

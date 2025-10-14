@@ -26,6 +26,7 @@ env_logger = "0.11"
 log = { version = "0.4", default-features = false }
 miden-diagnostics = { workspace = true }
 mir = { package = "air-mir", path = "../mir", version = "0.5" }
+miden-core = { package = "miden-core", version = "0.13", default-features = false }
 
 [dev-dependencies]
 expect-test = "1.4"
@@ -35,3 +36,4 @@ winter-utils = { package = "winter-utils", version = "0.12", default-features = 
 winter-prover = { package = "winter-prover", version = "0.12", default-features = false }
 winter-verifier = { package = "winter-verifier", version = "0.12", default-features = false }
 winterfell = { package = "winterfell", version = "0.12", default-features = false }
+air-codegen-ace = { path = "../codegen/ace", version = "0.5" }

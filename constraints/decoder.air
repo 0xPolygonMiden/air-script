@@ -1,0 +1,14 @@
+##########################################################################################
+# DECODER CONSTRAINTS
+##########################################################################################
+#
+# Miden VM program decoder is responsible for ensuring that a program with a given MAST
+# root is executed by the VM.
+#
+# STATUS: Not implemented
+#
+# REFERENCES:
+# - Decoder Design: https://0xmiden.github.io/miden-vm/design/decoder/main.html
+##########################################################################################
+
+mod decoder
