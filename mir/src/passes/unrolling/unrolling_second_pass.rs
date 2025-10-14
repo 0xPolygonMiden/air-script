@@ -76,31 +76,32 @@ impl Visitor for UnrollingSecondPass<'_> {
             let new_node = self.nodes_to_replace.get(&body.get_ptr()).unwrap().1.clone();
 
             // If there is a selector, we need to enforce it on the body
-            let new_node_with_selector_if_needed =
-                if let Some(selector) = self.for_inlining_context.clone().unwrap().selector {
-                    if let Op::Vector(new_node_vector) = new_node.borrow().deref() {
-                        let new_node_vec = new_node_vector.children().borrow().deref().clone();
-                        let mut new_vec = vec![];
-                        for new_node_child in new_node_vec.into_iter() {
-                            let new_node_child_with_selector = Mul::create(
-                                duplicate_node(selector.clone(), &mut HashMap::new()),
-                                new_node_child,
-                                root.span(),
-                            );
-                            new_vec.push(new_node_child_with_selector);
-                        }
-                        // If we have only one element, return it directly instead of wrapping in Vector
-                        if new_vec.len() == 1 {
-                            new_vec.into_iter().next().unwrap()
-                        } else {
-                            Vector::create(new_vec, root.span())
-                        }
+            let new_node_with_selector_if_needed = if let Some(selector) =
+                self.for_inlining_context.clone().unwrap().selector
+            {
+                if let Op::Vector(new_node_vector) = new_node.borrow().deref() {
+                    let new_node_vec = new_node_vector.children().borrow().deref().clone();
+                    let mut new_vec = vec![];
+                    for new_node_child in new_node_vec.into_iter() {
+                        let new_node_child_with_selector = Mul::create(
+                            duplicate_node(selector.clone(), &mut HashMap::new()),
+                            new_node_child,
+                            root.span(),
+                        );
+                        new_vec.push(new_node_child_with_selector);
+                    }
+                    // If we have only one element, return it directly instead of wrapping in Vector
+                    if new_vec.len() == 1 {
+                        new_vec.into_iter().next().unwrap()
                     } else {
-                        Mul::create(selector, new_node, root.span())
+                        Vector::create(new_vec, root.span())
                     }
                 } else {
-                    new_node
-                };
+                    Mul::create(selector, new_node, root.span())
+                }
+            } else {
+                new_node
+            };
 
             // Update the root node with the new inlined body and reset the context to None
             if let Some(op) = root.as_op() {
@@ -112,11 +113,12 @@ impl Visitor for UnrollingSecondPass<'_> {
                         // This is expected behavior when processing For loop unrolling
                     },
                     _ => {
-                        self.diagnostics.diagnostic(miden_diagnostics::Severity::Warning)
+                        self.diagnostics
+                            .diagnostic(miden_diagnostics::Severity::Warning)
                             .with_message("Unexpected node type during for loop unrolling")
                             .with_primary_label(root.span(), "expected Op or Parameter node")
                             .emit();
-                    }
+                    },
                 }
             }
             self.for_inlining_context = None;

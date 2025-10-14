@@ -181,7 +181,7 @@ fn unroll_accessor_index_access_type(
             None => {
                 // Index out of bounds - return the last element as a fallback
                 indexable_vec.last().unwrap()
-            }
+            },
         };
         if let Some(value) = child_accessed.clone().as_value() {
             let mir_value = value.value.value.clone();
@@ -230,7 +230,7 @@ fn unroll_accessor_index_access_type(
     } else {
         // Arithmetic operations (Add, Sub, Mul, etc.) cannot be indexed directly
         // This is an error - expressions like (a + b)[0] are not supported
-        return None; // Signal that this accessor cannot be unrolled and should error
+        None // Signal that this accessor cannot be unrolled and should error
     }
 }
 
@@ -402,7 +402,8 @@ impl UnrollingFirstPass<'_> {
         let expr = enf_ref.expr.clone();
         if let Op::Vector(vec) = expr.borrow().deref() {
             let ops = vec.children().borrow().clone();
-            let new_vec: Vec<_> = ops.iter().map(|op| Enf::create(op.clone(), enf_ref.span())).collect();
+            let new_vec: Vec<_> =
+                ops.iter().map(|op| Enf::create(op.clone(), enf_ref.span())).collect();
 
             // If we have only one element, return it directly instead of wrapping in Vector
             if new_vec.len() == 1 {
@@ -463,7 +464,7 @@ impl UnrollingFirstPass<'_> {
                         Some(result) => return Ok(Some(result)),
                         None => {
                             return Err(CompileError::Failed); // TODO: Add proper diagnostic message
-                        }
+                        },
                     }
                 },
                 AccessType::Matrix(row, col) => {
@@ -629,7 +630,8 @@ impl UnrollingFirstPass<'_> {
         //
         // However, the visitor pattern only allows returning one replacement node, not multiple.
         // This causes a conflict:
-        // 1. Preserving Vector nodes (Ok(None)) causes "Vector should be Unrolled" errors in RandomInputs::eval
+        // 1. Preserving Vector nodes (Ok(None)) causes "Vector should be Unrolled" errors in
+        //    RandomInputs::eval
         // 2. Flattening to first child causes lost constraints and incorrect code generation
         //
         // The proper solution requires architectural changes to handle multi-constraint expansion

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
-use air_parser::ast::{AccessType, RangeExpr, RangeBound};
+use air_parser::ast::{AccessType, RangeBound, RangeExpr};
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Spanned};
 
@@ -587,7 +587,7 @@ fn check_evaluator_argument_sizes(
                             Err(_) => {
                                 // TODO: Add proper diagnostic for non-constant range bounds
                                 return Err(CompileError::Failed);
-                            }
+                            },
                         }
                     },
                     _ => {
@@ -626,7 +626,7 @@ fn calculate_slice_size(range_expr: &RangeExpr) -> Result<usize, CompileError> {
             // For non-constant bounds, we can't determine the size at compile time
             // TODO: Implement constant resolution for SymbolAccess
             return Err(CompileError::Failed);
-        }
+        },
     };
 
     let end = match &range_expr.end {
@@ -635,7 +635,7 @@ fn calculate_slice_size(range_expr: &RangeExpr) -> Result<usize, CompileError> {
             // For non-constant bounds, we can't determine the size at compile time
             // TODO: Implement constant resolution for SymbolAccess
             return Err(CompileError::Failed);
-        }
+        },
     };
 
     // Range is exclusive at the end, so size = end - start
