@@ -15,6 +15,7 @@
 
 def MidenVM
 
+use bitwise::*;
 use hasher::*;
 use range_checker::*;
 use system::*;

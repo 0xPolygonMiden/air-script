@@ -6,13 +6,17 @@
 # It decomposes field elements into their binary representation and performs bit-level
 # operations efficiently using field arithmetic.
 #
-# STATUS: Not implemented
+# Each bitwise operation spans exactly 8 rows, with limbs processed in little-endian order.
+#
+# STATUS: Partially implemented (missing bus constraints)
 #
 # REFERENCES:
 # - Bitwise Chiplet: https://0xmiden.github.io/miden-vm/design/chiplets/bitwise.html
 ##########################################################################################
 
 mod bitwise
+
+use utils::*;
 
 ##########################################################################################
 # BITWISE OPERATION CONSTANTS (Periodic Columns)
@@ -21,8 +25,8 @@ mod bitwise
 # Periodic constants contain values needed to switch various constraints on or off.
 #
 periodic_columns {
-    k0: [1, 0, 0, 0, 0, 0, 0, 0],
-    k1: [1, 1, 1, 1, 1, 1, 1, 0],
+    k_first: [1, 0, 0, 0, 0, 0, 0, 0],
+    k_transition: [1, 1, 1, 1, 1, 1, 1, 0],
 }
 
 ##########################################################################################
@@ -32,27 +36,16 @@ periodic_columns {
 # The bitwise chiplet processes 32-bit integers by decomposing them into individual
 # bits, applying bitwise operations, and recomposing the results. This approach
 # enables verification of bitwise logic within the field arithmetic constraint system.
+
+# Enforces the constraints on the bitwise chiplet given its columns.
 #
-# PLANNED CONSTRAINT EVALUATORS:
-#
-# ev bitwise_decomposition([bitwise[16]]) {
-#     
-#     # TODO
-#     
-# }
-#
-# ev bitwise_aggregation([bitwise[16]]) {
-#     
-#     # TODO
-#     
-# }
-#
-# ev bitwise_selectors([bitwise[16]]) {
-#     
-#     # TODO
-#
-# }
-#
+# Max constraint degree: 4
+ev bitwise_chiplet([op_flag, a, b, a_limb[4], b_limb[4], zp, z]) {
+    enf bitwise_op_flag([op_flag]);
+    enf input_decomposition([a, b, a_limb, b_limb]);
+    enf output_aggregation([op_flag, a, b, a_limb, b_limb, zp, z]);
+}
+
 ##########################################################################################
 # BUS CONSTRAINTS
 ##########################################################################################
@@ -67,3 +60,99 @@ periodic_columns {
 # - Expected result (c)
 #
 ##########################################################################################
+
+##########################################################################################
+# HELPERS
+##########################################################################################
+
+### Helper evaluators #############################################################################
+
+# Enforces that the bitwise operation flag is valid.
+#
+# Max constraint degree: 2
+ev bitwise_op_flag([op_flag]) {
+    # Enforce operation flag is binary (0 for AND, 1 for XOR).
+    # Constraint degree: 2
+    enf is_binary([op_flag]);
+
+    # Enforce operation flag should stay the same throughout the 8-row cycle.
+    # Constraint degree: 2
+    enf op_flag' = op_flag when k_transition;
+}
+
+
+# Enforces that the input to the bitwise chiplet is decomposed into limbs correctly.
+#
+# Max constraint degree: 2
+ev input_decomposition([a, b, a_limb[4], b_limb[4]]) {
+    # Enforce that the input is decomposed into valid bits.
+    # Constraints degree: 2
+    enf is_binary([a]) for a in a_limb;
+    enf is_binary([b]) for b in b_limb;
+
+    # Enforce that the value in the first row of column `a` of the current 8-row cycle should be
+    # the aggregation of the decomposed bit columns `a_limb` (little-endian).
+    let a_aggr = aggregate_limbs(a_limb);
+    # Constraint degree: 2
+    enf a = a_aggr when k_first;
+
+    # Enforce that the value in the first row of column `b` of the current 8-row cycle should be
+    # the aggregation of the decomposed bit columns `b_limb` (little-endian).
+    let b_aggr = aggregate_limbs(b_limb);
+    # Constraint degree: 2
+    enf b = b_aggr when k_first;
+
+    # Enforce that for all rows in an 8-row cycle, except for the last one, the values in a and b
+    # columns are increased by the values contained in the individual bit columns a_limb and
+    # b_limb.
+    # Constraints degree: 2
+    enf a' = a * 16 + a_aggr when k_transition;
+    enf b' = b * 16 + b_aggr when k_transition;
+}
+
+
+# Enforces that the output of the bitwise operation is aggregated correctly from the decomposed
+# limbs.
+#
+# Max constraint degree: 3
+ev output_aggregation([op_flag, a, b, a_limb[4], b_limb[4], zp, z]) {
+    # Enforce that in the first row, the aggregated output value of the previous row should be 0.
+    # Constraint degree: 2
+    enf zp = 0 when k_first;
+
+    # Enforce that for each row except the last, the aggregated output value must equal the
+    # previous aggregated output value in the next row.
+    # Constraint degree: 2
+    enf zp' = z when k_transition;
+
+    # Enforce that for all rows the value in the z column is computed by multiplying the previous
+    # output value (from the zp column in the current row) by 16 and then adding it to the bitwise
+    # operation applied to the row's set of bits of a_limb and b_limb. The entire constraint must
+    # also be multiplied by the operation selector flag to ensure it is only applied for the
+    # appropriate operation. The constraint for AND is enforced when op_flag = 0 and the constraint for
+    # XOR is enforced when op_flag = 1. Because the selectors for the AND and XOR operations are mutually
+    # exclusive, the constraints for different operations can be aggregated into the same result
+    # indices.
+    # Constraints degree: 3
+    let a_and_b = compute_limb_and(a_limb, b_limb);
+    let a_xor_b = compute_limb_xor(a_limb, b_limb);
+
+    enf z = zp * 16 + op_flag * (a_xor_b - a_and_b)  + a_and_b;
+}
+
+### Helper functions ##############################################################################
+
+# Returns value aggregated from limbs in little-endian order.
+fn aggregate_limbs(limbs: felt[4]) -> felt {
+    return sum([2^i * limb for (i, limb) in (0..4, limbs)]);
+}
+
+# Computes AND operation result for a 4-bit limb using fold/reduce approach.
+fn compute_limb_and(a_limb: felt[4], b_limb: felt[4]) -> felt {
+    return sum([2^i * binary_and(a_bit, b_bit) for (i, a_bit, b_bit) in (0..4, a_limb, b_limb)]);
+}
+
+# Computes XOR operation result for a 4-bit limb using fold/reduce approach.
+fn compute_limb_xor(a_limb: felt[4], b_limb: felt[4]) -> felt {
+    return sum([2^i * binary_xor(a_bit, b_bit) for (i, a_bit, b_bit) in (0..4, a_limb, b_limb)]);
+}
