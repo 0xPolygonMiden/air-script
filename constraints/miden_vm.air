@@ -15,7 +15,7 @@
 
 def MidenVM
 
-use chiplets::chiplets_transition;
+use chiplets::chiplets_constraints;
 use bitwise::*;
 use hasher::*;
 use range_checker::*;
