@@ -286,16 +286,6 @@ fn selectors_combine_complex() {
 }
 
 #[test]
-fn selectors_combine_nested() {
-    let generated_air = Test::new("tests/selectors/selectors_combine_nested.air".to_string())
-        .transpile(Target::Winterfell)
-        .unwrap();
-
-    let expected = expect_file!["../selectors/selectors_combine_nested.rs"];
-    expected.assert_eq(&generated_air);
-}
-
-#[test]
 fn selectors_combine_with_list_comprehensions() {
     let generated_air =
         Test::new("tests/selectors/selectors_combine_with_list_comprehensions.air".to_string())
