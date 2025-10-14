@@ -14,10 +14,10 @@ impl Codegen for TraceAccess {
         let frame = self.segment.to_string();
         let row_offset = match self.row_offset {
             0 => {
-                format!("current[{}]", self.column)
+                format!("current[{}].into()", self.column)
             },
             1 => {
-                format!("next[{}]", self.column)
+                format!("next[{}].into()", self.column)
             },
             _ => panic!("Plonky3 doesn't support row offsets greater than 1."),
         };
@@ -46,7 +46,9 @@ impl Codegen for Operation {
 impl Codegen for Value {
     fn to_string(&self, ir: &Air) -> String {
         match self {
-            Value::Constant(value) => format!("AB::Expr::from(AB::F::from_u64({value}))"),
+            Value::Constant(0) => format!("AB::Expr::ZERO"),
+            Value::Constant(1) => format!("AB::Expr::ONE"),
+            Value::Constant(value) => format!("AB::Expr::from_u64({value})"),
             Value::TraceAccess(trace_access) => trace_access.to_string(ir),
             Value::PublicInput(air_ir::PublicInputAccess { name, index }) => {
                 let get_public_input_offset = |name: &str| {
@@ -95,17 +97,25 @@ fn binary_op_to_string(ir: &Air, op: &Operation) -> String {
             format!("{lhs} - {rhs}")
         },
         Operation::Mul(l_idx, r_idx) => {
-            let lhs = if ir.constraint_graph().node(l_idx).op().precedence() < op.precedence() {
+            let lhs_op = ir.constraint_graph().node(l_idx).op();
+            let rhs_op = ir.constraint_graph().node(r_idx).op();
+
+            let lhs = if lhs_op.precedence() < op.precedence() {
                 format!("({})", l_idx.to_string(ir))
             } else {
                 l_idx.to_string(ir)
             };
-            let rhs = if ir.constraint_graph().node(r_idx).op().precedence() < op.precedence() {
+            let rhs = if rhs_op.precedence() < op.precedence() {
                 format!("({})", r_idx.to_string(ir))
             } else {
                 r_idx.to_string(ir)
             };
-            format!("{lhs} * {rhs}")
+
+            match (lhs_op, rhs_op) {
+                (_, Operation::Value(Value::Constant(2))) => format!("{lhs}.double()"),
+                (Operation::Value(Value::Constant(2)), _) => format!("{rhs}.double()"),
+                _ => format!("{lhs} * {rhs}"),
+            }
         },
         _ => panic!("unsupported operation"),
     }
