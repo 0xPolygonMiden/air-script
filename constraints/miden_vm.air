@@ -6,6 +6,8 @@
 # efficient execution and proving of arbitrary computations. This AIR specification defines
 # the arithmetic constraints that govern the VM's execution.
 #
+# STATUS: Not fully implemented
+#
 # REFERENCES:
 # - Miden VM implementation: https://0xmiden.github.io/miden-vm/
 # - Miden VM documentation : https://0xmiden.github.io/miden-vm/intro/main.html
@@ -13,7 +15,9 @@
 
 def MidenVM
 
-use chiplets::chiplets_constraints;
+use chiplets::chiplets_transition;
+use bitwise::*;
+use hasher::*;
 use range_checker::*;
 use system::*;
 use utils::*;
