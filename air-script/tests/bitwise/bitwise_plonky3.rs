@@ -39,23 +39,23 @@ impl<AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns> Air<AB> for
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero::<_>(main_current[13]);
-        builder.assert_zero::<_>(main_current[0] * main_current[0] - main_current[0]);
-        builder.when_transition().assert_zero::<_>(periodic_values[1].into() * (main_next[0] - main_current[0]));
-        builder.assert_zero::<_>(main_current[3] * main_current[3] - main_current[3]);
-        builder.assert_zero::<_>(main_current[4] * main_current[4] - main_current[4]);
-        builder.assert_zero::<_>(main_current[5] * main_current[5] - main_current[5]);
-        builder.assert_zero::<_>(main_current[6] * main_current[6] - main_current[6]);
-        builder.assert_zero::<_>(main_current[7] * main_current[7] - main_current[7]);
-        builder.assert_zero::<_>(main_current[8] * main_current[8] - main_current[8]);
-        builder.assert_zero::<_>(main_current[9] * main_current[9] - main_current[9]);
-        builder.assert_zero::<_>(main_current[10] * main_current[10] - main_current[10]);
-        builder.assert_zero::<_>(periodic_values[0].into() * (main_current[1] - (main_current[3] + AB::Expr::from(AB::F::from_u64(2)) * main_current[4] + AB::Expr::from(AB::F::from_u64(4)) * main_current[5] + AB::Expr::from(AB::F::from_u64(8)) * main_current[6])));
-        builder.assert_zero::<_>(periodic_values[0].into() * (main_current[2] - (main_current[7] + AB::Expr::from(AB::F::from_u64(2)) * main_current[8] + AB::Expr::from(AB::F::from_u64(4)) * main_current[9] + AB::Expr::from(AB::F::from_u64(8)) * main_current[10])));
-        builder.when_transition().assert_zero::<_>(periodic_values[1].into() * (main_next[1] - (main_current[1] * AB::Expr::from(AB::F::from_u64(16)) + main_current[3] + AB::Expr::from(AB::F::from_u64(2)) * main_current[4] + AB::Expr::from(AB::F::from_u64(4)) * main_current[5] + AB::Expr::from(AB::F::from_u64(8)) * main_current[6])));
-        builder.when_transition().assert_zero::<_>(periodic_values[1].into() * (main_next[2] - (main_current[2] * AB::Expr::from(AB::F::from_u64(16)) + main_current[7] + AB::Expr::from(AB::F::from_u64(2)) * main_current[8] + AB::Expr::from(AB::F::from_u64(4)) * main_current[9] + AB::Expr::from(AB::F::from_u64(8)) * main_current[10])));
-        builder.assert_zero::<_>(periodic_values[0].into() * main_current[11]);
-        builder.when_transition().assert_zero::<_>(periodic_values[1].into() * (main_current[12] - main_next[11]));
-        builder.assert_zero::<_>((AB::Expr::from(AB::F::from_u64(1)) - main_current[0]) * (main_current[12] - (main_current[11] * AB::Expr::from(AB::F::from_u64(16)) + main_current[3] * main_current[7] + AB::Expr::from(AB::F::from_u64(2)) * main_current[4] * main_current[8] + AB::Expr::from(AB::F::from_u64(4)) * main_current[5] * main_current[9] + AB::Expr::from(AB::F::from_u64(8)) * main_current[6] * main_current[10])) + main_current[0] * (main_current[12] - (main_current[11] * AB::Expr::from(AB::F::from_u64(16)) + main_current[3] + main_current[7] - AB::Expr::from(AB::F::from_u64(2)) * main_current[3] * main_current[7] + AB::Expr::from(AB::F::from_u64(2)) * (main_current[4] + main_current[8] - AB::Expr::from(AB::F::from_u64(2)) * main_current[4] * main_current[8]) + AB::Expr::from(AB::F::from_u64(4)) * (main_current[5] + main_current[9] - AB::Expr::from(AB::F::from_u64(2)) * main_current[5] * main_current[9]) + AB::Expr::from(AB::F::from_u64(8)) * (main_current[6] + main_current[10] - AB::Expr::from(AB::F::from_u64(2)) * main_current[6] * main_current[10]))));
+        builder.when_first_row().assert_zero::<_>(main_current[13].into());
+        builder.assert_zero::<_>(main_current[0].into() * main_current[0].into() - main_current[0].into());
+        builder.when_transition().assert_zero::<_>(periodic_values[1].into() * (main_next[0].into() - main_current[0].into()));
+        builder.assert_zero::<_>(main_current[3].into() * main_current[3].into() - main_current[3].into());
+        builder.assert_zero::<_>(main_current[4].into() * main_current[4].into() - main_current[4].into());
+        builder.assert_zero::<_>(main_current[5].into() * main_current[5].into() - main_current[5].into());
+        builder.assert_zero::<_>(main_current[6].into() * main_current[6].into() - main_current[6].into());
+        builder.assert_zero::<_>(main_current[7].into() * main_current[7].into() - main_current[7].into());
+        builder.assert_zero::<_>(main_current[8].into() * main_current[8].into() - main_current[8].into());
+        builder.assert_zero::<_>(main_current[9].into() * main_current[9].into() - main_current[9].into());
+        builder.assert_zero::<_>(main_current[10].into() * main_current[10].into() - main_current[10].into());
+        builder.assert_zero::<_>(periodic_values[0].into() * (main_current[1].into() - (main_current[3].into() + main_current[4].into().double() + AB::Expr::from_u64(4) * main_current[5].into() + AB::Expr::from_u64(8) * main_current[6].into())));
+        builder.assert_zero::<_>(periodic_values[0].into() * (main_current[2].into() - (main_current[7].into() + main_current[8].into().double() + AB::Expr::from_u64(4) * main_current[9].into() + AB::Expr::from_u64(8) * main_current[10].into())));
+        builder.when_transition().assert_zero::<_>(periodic_values[1].into() * (main_next[1].into() - (main_current[1].into() * AB::Expr::from_u64(16) + main_current[3].into() + main_current[4].into().double() + AB::Expr::from_u64(4) * main_current[5].into() + AB::Expr::from_u64(8) * main_current[6].into())));
+        builder.when_transition().assert_zero::<_>(periodic_values[1].into() * (main_next[2].into() - (main_current[2].into() * AB::Expr::from_u64(16) + main_current[7].into() + main_current[8].into().double() + AB::Expr::from_u64(4) * main_current[9].into() + AB::Expr::from_u64(8) * main_current[10].into())));
+        builder.assert_zero::<_>(periodic_values[0].into() * main_current[11].into());
+        builder.when_transition().assert_zero::<_>(periodic_values[1].into() * (main_current[12].into() - main_next[11].into()));
+        builder.assert_zero::<_>((AB::Expr::ONE - main_current[0].into()) * (main_current[12].into() - (main_current[11].into() * AB::Expr::from_u64(16) + main_current[3].into() * main_current[7].into() + main_current[4].into().double() * main_current[8].into() + AB::Expr::from_u64(4) * main_current[5].into() * main_current[9].into() + AB::Expr::from_u64(8) * main_current[6].into() * main_current[10].into())) + main_current[0].into() * (main_current[12].into() - (main_current[11].into() * AB::Expr::from_u64(16) + main_current[3].into() + main_current[7].into() - main_current[3].into().double() * main_current[7].into() + (main_current[4].into() + main_current[8].into() - main_current[4].into().double() * main_current[8].into()).double() + AB::Expr::from_u64(4) * (main_current[5].into() + main_current[9].into() - main_current[5].into().double() * main_current[9].into()) + AB::Expr::from_u64(8) * (main_current[6].into() + main_current[10].into() - main_current[6].into().double() * main_current[10].into()))));
     }
 }

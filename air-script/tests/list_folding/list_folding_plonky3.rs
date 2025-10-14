@@ -37,10 +37,10 @@ impl<AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns> Air<AB> for
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero::<_>(main_current[11]);
-        builder.when_transition().assert_zero::<_>(main_next[5] - (main_current[9] + main_current[10] + main_current[11] + main_current[12] + main_current[13] * main_current[14] * main_current[15] * main_current[16]));
-        builder.when_transition().assert_zero::<_>(main_next[6] - (main_current[9] + main_current[10] + main_current[11] + main_current[12] + main_current[13] * main_current[14] * main_current[15] * main_current[16]));
-        builder.when_transition().assert_zero::<_>(main_next[7] - (main_current[9] * main_current[13] + main_current[10] * main_current[14] + main_current[11] * main_current[15] + main_current[12] * main_current[16] + (main_current[9] + main_current[13]) * (main_current[10] + main_current[14]) * (main_current[11] + main_current[15]) * (main_current[12] + main_current[16])));
-        builder.when_transition().assert_zero::<_>(main_next[8] - (main_current[1] + main_current[9] * main_current[13] + main_current[10] * main_current[14] + main_current[11] * main_current[15] + main_current[12] * main_current[16] + main_current[9] * main_current[13] + main_current[10] * main_current[14] + main_current[11] * main_current[15] + main_current[12] * main_current[16]));
+        builder.when_first_row().assert_zero::<_>(main_current[11].into());
+        builder.when_transition().assert_zero::<_>(main_next[5].into() - (main_current[9].into() + main_current[10].into() + main_current[11].into() + main_current[12].into() + main_current[13].into() * main_current[14].into() * main_current[15].into() * main_current[16].into()));
+        builder.when_transition().assert_zero::<_>(main_next[6].into() - (main_current[9].into() + main_current[10].into() + main_current[11].into() + main_current[12].into() + main_current[13].into() * main_current[14].into() * main_current[15].into() * main_current[16].into()));
+        builder.when_transition().assert_zero::<_>(main_next[7].into() - (main_current[9].into() * main_current[13].into() + main_current[10].into() * main_current[14].into() + main_current[11].into() * main_current[15].into() + main_current[12].into() * main_current[16].into() + (main_current[9].into() + main_current[13].into()) * (main_current[10].into() + main_current[14].into()) * (main_current[11].into() + main_current[15].into()) * (main_current[12].into() + main_current[16].into())));
+        builder.when_transition().assert_zero::<_>(main_next[8].into() - (main_current[1].into() + main_current[9].into() * main_current[13].into() + main_current[10].into() * main_current[14].into() + main_current[11].into() * main_current[15].into() + main_current[12].into() * main_current[16].into() + main_current[9].into() * main_current[13].into() + main_current[10].into() * main_current[14].into() + main_current[11].into() * main_current[15].into() + main_current[12].into() * main_current[16].into()));
     }
 }

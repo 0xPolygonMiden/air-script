@@ -37,8 +37,8 @@ impl<AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns> Air<AB> for
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero::<_>(main_current[8]);
-        builder.when_transition().assert_zero::<_>(main_next[2] - (main_current[2] + AB::Expr::from(AB::F::from_u64(1))));
-        builder.when_transition().assert_zero::<_>(main_next[1] - (main_current[1] - AB::Expr::from(AB::F::from_u64(1))));
+        builder.when_first_row().assert_zero::<_>(main_current[8].into());
+        builder.when_transition().assert_zero::<_>(main_next[2].into() - (main_current[2].into() + AB::Expr::ONE));
+        builder.when_transition().assert_zero::<_>(main_next[1].into() - (main_current[1].into() - AB::Expr::ONE));
     }
 }

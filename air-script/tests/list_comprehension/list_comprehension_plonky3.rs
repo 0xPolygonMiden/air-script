@@ -37,12 +37,12 @@ impl<AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns> Air<AB> for
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero::<_>(main_current[10]);
-        builder.assert_zero::<_>(main_current[0] - main_current[2]);
-        builder.assert_zero::<_>(main_current[4] - main_current[0] * AB::Expr::from(AB::F::from_u64(8)) * main_current[11]);
-        builder.when_transition().assert_zero::<_>(main_current[4] - main_current[0] * (main_next[8] - main_next[12]));
-        builder.assert_zero::<_>(main_current[6] - main_current[0] * (main_current[9] - main_current[14]));
-        builder.assert_zero::<_>(main_current[1] - (main_current[5] - main_current[8] - main_current[12] + AB::Expr::from(AB::F::from_u64(10)) + main_current[6] - main_current[9] - main_current[13] + AB::Expr::from(AB::F::from_u64(20)) + main_current[7] - main_current[10] - main_current[14]));
-        builder.assert_zero::<_>(main_current[14] - AB::Expr::from(AB::F::from_u64(10)));
+        builder.when_first_row().assert_zero::<_>(main_current[10].into());
+        builder.assert_zero::<_>(main_current[0].into() - main_current[2].into());
+        builder.assert_zero::<_>(main_current[4].into() - main_current[0].into() * AB::Expr::from_u64(8) * main_current[11].into());
+        builder.when_transition().assert_zero::<_>(main_current[4].into() - main_current[0].into() * (main_next[8].into() - main_next[12].into()));
+        builder.assert_zero::<_>(main_current[6].into() - main_current[0].into() * (main_current[9].into() - main_current[14].into()));
+        builder.assert_zero::<_>(main_current[1].into() - (main_current[5].into() - main_current[8].into() - main_current[12].into() + AB::Expr::from_u64(10) + main_current[6].into() - main_current[9].into() - main_current[13].into() + AB::Expr::from_u64(20) + main_current[7].into() - main_current[10].into() - main_current[14].into()));
+        builder.assert_zero::<_>(main_current[14].into() - AB::Expr::from_u64(10));
     }
 }

@@ -37,16 +37,16 @@ impl<AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns> Air<AB> for
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero::<_>(main_current[0] - AB::Expr::from(AB::F::from_u64(1)));
-        builder.when_first_row().assert_zero::<_>(main_current[1] - AB::Expr::from(AB::F::from_u64(1)));
-        builder.when_first_row().assert_zero::<_>(main_current[2]);
-        builder.when_first_row().assert_zero::<_>(main_current[3] - AB::Expr::from(AB::F::from_u64(1)));
-        builder.when_first_row().assert_zero::<_>(main_current[4] - AB::Expr::from(AB::F::from_u64(1)));
-        builder.when_last_row().assert_zero::<_>(main_current[6]);
-        builder.when_transition().assert_zero::<_>(main_next[0] - (main_current[0] + AB::Expr::from(AB::F::from_u64(1))));
-        builder.when_transition().assert_zero::<_>(main_next[1]);
-        builder.when_transition().assert_zero::<_>(main_next[2] - main_current[2]);
-        builder.when_transition().assert_zero::<_>(main_next[5] - (main_current[5] + AB::Expr::from(AB::F::from_u64(1))));
-        builder.assert_zero::<_>(main_current[4] - AB::Expr::from(AB::F::from_u64(1)));
+        builder.when_first_row().assert_zero::<_>(main_current[0].into() - AB::Expr::ONE);
+        builder.when_first_row().assert_zero::<_>(main_current[1].into() - AB::Expr::ONE);
+        builder.when_first_row().assert_zero::<_>(main_current[2].into());
+        builder.when_first_row().assert_zero::<_>(main_current[3].into() - AB::Expr::ONE);
+        builder.when_first_row().assert_zero::<_>(main_current[4].into() - AB::Expr::ONE);
+        builder.when_last_row().assert_zero::<_>(main_current[6].into());
+        builder.when_transition().assert_zero::<_>(main_next[0].into() - (main_current[0].into() + AB::Expr::ONE));
+        builder.when_transition().assert_zero::<_>(main_next[1].into());
+        builder.when_transition().assert_zero::<_>(main_next[2].into() - main_current[2].into());
+        builder.when_transition().assert_zero::<_>(main_next[5].into() - (main_current[5].into() + AB::Expr::ONE));
+        builder.assert_zero::<_>(main_current[4].into() - AB::Expr::ONE);
     }
 }

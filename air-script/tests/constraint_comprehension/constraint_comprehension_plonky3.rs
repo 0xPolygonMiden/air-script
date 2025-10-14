@@ -37,10 +37,10 @@ impl<AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns> Air<AB> for
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero::<_>(main_current[8]);
-        builder.assert_zero::<_>(main_current[6] - main_current[10]);
-        builder.assert_zero::<_>(main_current[7] - main_current[11]);
-        builder.assert_zero::<_>(main_current[8] - main_current[12]);
-        builder.assert_zero::<_>(main_current[9] - main_current[13]);
+        builder.when_first_row().assert_zero::<_>(main_current[8].into());
+        builder.assert_zero::<_>(main_current[6].into() - main_current[10].into());
+        builder.assert_zero::<_>(main_current[7].into() - main_current[11].into());
+        builder.assert_zero::<_>(main_current[8].into() - main_current[12].into());
+        builder.assert_zero::<_>(main_current[9].into() - main_current[13].into());
     }
 }
