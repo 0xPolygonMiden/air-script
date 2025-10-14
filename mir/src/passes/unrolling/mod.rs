@@ -110,60 +110,6 @@ pub fn visit_value_bis(value: Link<Op>) -> Result<Option<Link<Op>>, CompileError
     Ok(None)
 }
 
-/// Unrolls an `Add` on vectors into vectors of `Add`.
-pub fn visit_add_bis(add: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let add_ref = add.as_add().unwrap();
-    let lhs = add_ref.lhs.clone();
-    let rhs = add_ref.rhs.clone();
-    unroll_binary_op(lhs, rhs, add.clone(), add_ref.span())
-}
-
-/// Unrolls a `Sub` on vectors into vectors of `Sub`.
-pub fn visit_sub_bis(sub: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let sub_ref = sub.as_sub().unwrap();
-    let lhs = sub_ref.lhs.clone();
-    let rhs = sub_ref.rhs.clone();
-    unroll_binary_op(lhs, rhs, sub.clone(), sub_ref.span())
-}
-
-/// Unrolls a `Mul` on vectors into vectors of `Mul`.
-pub fn visit_mul_bis(mul: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let mul_ref = mul.as_mul().unwrap();
-    let lhs = mul_ref.lhs.clone();
-    let rhs = mul_ref.rhs.clone();
-    unroll_binary_op(lhs, rhs, mul.clone(), mul_ref.span())
-}
-
-/// Unrolls an `Exp` on vectors into vectors of `Exp`.
-pub fn visit_exp_bis(exp: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let exp_ref = exp.as_exp().unwrap();
-    let lhs = exp_ref.lhs.clone();
-    let rhs = exp_ref.rhs.clone();
-    unroll_binary_op(lhs, rhs, exp.clone(), exp_ref.span())
-}
-
-/// Unrolls a `Boundary` on vectors into a `Vector<Boundary>`.
-pub fn visit_boundary_bis(boundary: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    // safe to unwrap because we just dispatched on it
-    let boundary_ref = boundary.as_boundary().unwrap();
-    let expr = boundary_ref.expr.clone();
-    let kind = boundary_ref.kind;
-    if let Op::Vector(vec) = expr.borrow().deref() {
-        let expr_vec = vec.children().borrow().clone();
-        let mut new_vec = vec![];
-        for expr in expr_vec.iter() {
-            let new_node = Boundary::create(expr.clone(), kind, boundary_ref.span());
-            new_vec.push(new_node);
-        }
-        return Ok(Some(Vector::create(new_vec, boundary_ref.span())));
-    };
-    Ok(None)
-}
-
 /// Unrolls a `Fold`. We replace the `Fold` node by a series of binary operations (e.g. `Add` or
 /// `Mul`) applied to the initial value and each element of the iterator, depending on the
 /// `FoldOperator`.
@@ -270,39 +216,4 @@ fn unroll_constant_matrix(constant_matrix: &Vec<Vec<u64>>, span: SourceSpan) -> 
         res_m.push(res_row_vec);
     }
     Matrix::create(res_m, span)
-}
-
-/// Unrolls a binary operation (`Add`, `Sub`, `Mul`, `Exp`) on vectors into vectors of binary
-/// operations.
-fn unroll_binary_op(
-    lhs: Link<Op>,
-    rhs: Link<Op>,
-    parent: Link<Op>,
-    span: SourceSpan,
-) -> Result<Option<Link<Op>>, CompileError> {
-    if let (Op::Vector(lhs_vector), Op::Vector(rhs_vector)) =
-        (lhs.borrow().deref(), rhs.borrow().deref())
-    {
-        let lhs_vec = lhs_vector.children().borrow().clone();
-        let rhs_vec = rhs_vector.children().borrow().clone();
-
-        if lhs_vec.len() != rhs_vec.len() {
-            unreachable!("Binary operation children type mismatch: {:?}", parent);
-        } else {
-            let mut new_vec = vec![];
-            for (lhs, rhs) in lhs_vec.iter().zip(rhs_vec.iter()) {
-                let new_node = match parent.borrow().deref() {
-                    Op::Add(_) => Add::create(lhs.clone(), rhs.clone(), span),
-                    Op::Sub(_) => Sub::create(lhs.clone(), rhs.clone(), span),
-                    Op::Mul(_) => Mul::create(lhs.clone(), rhs.clone(), span),
-                    Op::Exp(_) => Exp::create(lhs.clone(), rhs.clone(), span),
-                    _ => unreachable!("Unexpected parent operation: {:?}", parent),
-                };
-                new_vec.push(new_node);
-            }
-            return Ok(Some(Vector::create(new_vec, parent.span())));
-        }
-    }
-
-    Ok(None)
 }
