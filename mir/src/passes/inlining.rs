@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
-use air_parser::ast::{AccessType, RangeExpr, RangeBound};
+use air_parser::ast::{AccessType, RangeBound, RangeExpr};
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Spanned};
 
@@ -536,7 +536,7 @@ fn check_evaluator_argument_sizes(
                             eprintln!("Failed to convert range expression in argument counting");
                             trace_segments_arg_vector_len += 1;
                             continue;
-                        }
+                        },
                     };
                     trace_segments_arg_vector_len += range_bounds.len();
                     continue;
@@ -587,7 +587,7 @@ fn check_evaluator_argument_sizes(
                             Err(_) => {
                                 // TODO: Add proper diagnostic for non-constant range bounds
                                 return Err(CompileError::Failed);
-                            }
+                            },
                         }
                     },
                     _ => {
@@ -602,9 +602,14 @@ fn check_evaluator_argument_sizes(
 
         if trace_segments_params.len() != trace_segments_arg_vector_len {
             // Instead of emitting a diagnostic that fails, just return an error
-            // The FileMissing error suggests the diagnostics system can't handle SourceSpan::UNKNOWN
-            eprintln!("Argument count mismatch: expected {} arguments in trace segment {}, but got {}",
-                     trace_segments_params.len(), trace_segment_id, trace_segments_arg_vector_len);
+            // The FileMissing error suggests the diagnostics system can't handle
+            // SourceSpan::UNKNOWN
+            eprintln!(
+                "Argument count mismatch: expected {} arguments in trace segment {}, but got {}",
+                trace_segments_params.len(),
+                trace_segment_id,
+                trace_segments_arg_vector_len
+            );
             return Err(CompileError::Failed);
         }
     }
@@ -621,7 +626,7 @@ fn calculate_slice_size(range_expr: &RangeExpr) -> Result<usize, CompileError> {
             // For non-constant bounds, we can't determine the size at compile time
             // TODO: Implement constant resolution for SymbolAccess
             return Err(CompileError::Failed);
-        }
+        },
     };
 
     let end = match &range_expr.end {
@@ -630,7 +635,7 @@ fn calculate_slice_size(range_expr: &RangeExpr) -> Result<usize, CompileError> {
             // For non-constant bounds, we can't determine the size at compile time
             // TODO: Implement constant resolution for SymbolAccess
             return Err(CompileError::Failed);
-        }
+        },
     };
 
     // Range is exclusive at the end, so size = end - start
@@ -648,7 +653,6 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
         };
         let children = trace_segment_vec.children();
         for arg in children.borrow().deref() {
-
             // Check if this argument is a slice accessor that needs expansion
             if let Some(accessor) = arg.as_accessor() {
                 let Accessor { indexable, access_type, .. } = accessor.deref();
@@ -659,10 +663,12 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                     let range_bounds: Range<usize> = match range.try_into() {
                         Ok(range) => range,
                         Err(_) => {
-                            eprintln!("Failed to convert range expression to concrete range in vector context");
+                            eprintln!(
+                                "Failed to convert range expression to concrete range in vector context"
+                            );
                             args_unpacked.push(arg.clone());
                             continue;
-                        }
+                        },
                     };
 
                     // Generate individual accessor nodes for each index in the range
@@ -678,7 +684,6 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                     continue;
                 }
             }
-
 
             if let Some(value) = arg.as_value() {
                 let Value {
@@ -727,7 +732,7 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                             eprintln!("Failed to convert range expression to concrete range");
                             args_unpacked.push(arg.clone());
                             continue;
-                        }
+                        },
                     };
 
                     // Generate individual accessor nodes for each index in the range
@@ -764,7 +769,7 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                     for child in vector.children().borrow().iter() {
                         args_unpacked.push(child.clone());
                     }
-                } else if let Some(nested_accessor) = indexable.as_accessor() {
+                } else if let Some(_nested_accessor) = indexable.as_accessor() {
                     // Handle nested accessor: Accessor(Accessor(...))
                     // Recursively resolve the nested accessor structure
                     fn resolve_nested_accessor(accessor_node: &Link<Op>) -> Vec<Link<Op>> {
@@ -777,9 +782,11 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                                 let range_bounds: Range<usize> = match range.try_into() {
                                     Ok(range) => range,
                                     Err(_) => {
-                                        eprintln!("Failed to convert nested range expression to concrete range");
+                                        eprintln!(
+                                            "Failed to convert nested range expression to concrete range"
+                                        );
                                         return vec![accessor_node.clone()];
-                                    }
+                                    },
                                 };
 
                                 // Generate individual accessor nodes for each index in the range
