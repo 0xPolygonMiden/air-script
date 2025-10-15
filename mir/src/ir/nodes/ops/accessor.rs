@@ -1,6 +1,5 @@
 use std::hash::Hash;
 
-use air_parser::ast::AccessType;
 use miden_diagnostics::{SourceSpan, Spanned};
 
 use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
@@ -14,7 +13,7 @@ use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singlet
 pub struct Accessor {
     pub parents: Vec<BackLink<Owner>>,
     pub indexable: Link<Op>,
-    pub access_type: AccessType,
+    pub access_type: MirAccessType,
     pub offset: usize,
     pub _node: Singleton<Node>,
     pub _owner: Singleton<Owner>,
@@ -22,10 +21,18 @@ pub struct Accessor {
     pub span: SourceSpan,
 }
 
+#[derive(Hash, Clone, PartialEq, Eq, Debug, Default)]
+pub enum MirAccessType {
+    #[default]
+    Default,
+    Index(Link<Op>),
+    Matrix(Link<Op>, Link<Op>),
+}
+
 impl Accessor {
     pub fn create(
         indexable: Link<Op>,
-        access_type: AccessType,
+        access_type: MirAccessType,
         offset: usize,
         span: SourceSpan,
     ) -> Link<Op> {
@@ -43,7 +50,14 @@ impl Accessor {
 impl Parent for Accessor {
     type Child = Op;
     fn children(&self) -> Link<Vec<Link<Self::Child>>> {
-        Link::new(vec![self.indexable.clone()])
+        let vec = match self.access_type {
+            MirAccessType::Default => vec![self.indexable.clone()],
+            MirAccessType::Index(ref idx) => vec![self.indexable.clone(), idx.clone()],
+            MirAccessType::Matrix(ref row, ref col) => {
+                vec![self.indexable.clone(), row.clone(), col.clone()]
+            },
+        };
+        Link::new(vec)
     }
 }
 
