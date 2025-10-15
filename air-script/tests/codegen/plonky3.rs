@@ -111,7 +111,6 @@ fn bitwise() {
     expected.assert_eq(&generated_air);
 }
 
-
 #[test]
 fn computed_indices_complex() {
     let generated_air =
