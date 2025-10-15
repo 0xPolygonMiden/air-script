@@ -14,11 +14,23 @@
 # │    1    │ fmp - Free memory pointer (procedure local memory region)            │
 # │    2    │ ctx - Current execution context                                      │
 # │    3    │ in_syscall - System call execution flag                              │
-# │   4-7   │ Function hash - Current/parent function digest (4 elements)          │
+# │   4-7   │ fn_hash - Current function digest (4 elements)                       │
 # └─────────┴──────────────────────────────────────────────────────────────────────┘
 #
+# CONTEXT SWITCHING OPERATIONS:
+# ┌──────────┬─────────┬─────────┬──────────────┬──────────────────────────────┐
+# │ Operation│   ctx'  │   fmp'  │   fn_hash'   │         Purpose              │
+# ├──────────┼─────────┼─────────┼──────────────┼──────────────────────────────┤
+# │ CALL     │ clk + 1 │  2^30   │ Load new     │ Call known procedure         │
+# │ SYSCALL  │    0    │  2^31   │ Preserve     │ Call kernel (root context)   │
+# │ DYNCALL  │ clk + 1 │  2^30   │ Load new     │ Call with runtime hash       │
+# └──────────┴─────────┴─────────┴──────────────┴──────────────────────────────┘
+# - CALL: Target hash in program MAST (compile-time known)
+# - SYSCALL: Target verified in kernel ROM, preserves caller hash for `caller` instruction
+# - DYNCALL: Target hash loaded from memory at address s0 (runtime determined)
+# - All three reset stack to depth 16, but only DYNCALL shifts stack elements left
 #
-# STATUS: Not fully implemented
+# STATUS: Partially implemented (missing bus integration)
 #
 # REFERENCES:
 # - System Design: https://0xmiden.github.io/miden-vm/design/main.html
@@ -26,31 +38,126 @@
 
 mod system
 
+use utils::*;
+use decoder::*;
+
 ##########################################################################################
 # SYSTEM CONSTRAINT IMPLEMENTATION
 ##########################################################################################
 
 # Main system constraint evaluator - ensures proper system state transitions
-ev system_transition([system[8]]) {
-    # Clock progression constraint
-    enf system_clock_transition([system[0]]);
+# Requires decoder columns for operation flags and function hash loading
+ev system_transition([system[8], decoder[24]]) {
+    # Extract system columns
+    let clk = system[0];
+    let fmp = system[1];
+    let ctx = system[2];
+    let in_syscall = system[3];
+    let fn_hash_0 = system[4];
+    let fn_hash_1 = system[5];
+    let fn_hash_2 = system[6];
+    let fn_hash_3 = system[7];
 
-    # TODO: Free memory pointer constraints
-    # TODO: Execution context constraints
-    # TODO: System call flag constraints
-    # TODO: Function hash management constraints
-}
+    # Extract decoder columns needed for operation flags
+    let b0 = decoder[1];
+    let b1 = decoder[2];
+    let b2 = decoder[3];
+    let b3 = decoder[4];
+    let b4 = decoder[5];
+    let b5 = decoder[6];
+    let b6 = decoder[7];
+    let decoder_h0 = decoder[8];
+    let decoder_h1 = decoder[9];
+    let decoder_h2 = decoder[10];
+    let decoder_h3 = decoder[11];
+    let decoder_h4 = decoder[12];
+    let decoder_h5 = decoder[13];
+    let decoder_h6 = decoder[14];
+    let decoder_h7 = decoder[15];
+    let e0 = decoder[22];
+    let e1 = decoder[23];
 
-##########################################################################################
-# CLOCK CONSTRAINT
-##########################################################################################
+    # Compute operation flags (needed for all constraints)
+    let f_call = flag_call([b0, b1, b2, b3, b4, b5, b6], e1);
+    let f_syscall = flag_syscall([b0, b1, b2, b3, b4, b5, b6], e1);
+    let f_dyncall = flag_dyncall([b0, b1, b2, b3, b4, b5, b6], e0);
+    let f_end = flag_end([b0, b1, b2, b3, b4, b5, b6], e1);
+    let f_fmpupdate = flag_fmpupdate([b0, b1, b2, b3, b4, b5, b6]);
 
-# Clock increment by 1 constraint
-#
-#
-# CONSTRAINT DEGREE: 1 (linear)
-#
-# PURPOSE: Ensures VM execution cycles increase monotonically
-ev system_clock_transition([clk]) {
+    ####################################################################################
+    # SYSTEM CLOCK CONSTRAINT
+    ####################################################################################
+
+    # Clock progression constraint (always active)
     enf clk' = clk + 1;
+
+    ####################################################################################
+    # FREE MEMORY POINTER CONSTRAINTS
+    ####################################################################################
+
+    # CALL/DYNCALL: Reset FMP to 2^30 (procedure local memory region start)
+    enf fmp' = 2^30 when (f_call + f_dyncall);
+
+    # SYSCALL: Reset FMP to 2^31 (syscall local memory region start)
+    enf fmp' = 2^31 when f_syscall;
+
+    # Default is FMP remains unchanged (except for FMPUPDATE handled by stack, and END handled by decoder bus)
+    enf fmp' = fmp when !(f_call + f_syscall + f_dyncall + f_fmpupdate + f_end);
+
+    ####################################################################################
+    # EXECUTION CONTEXT CONSTRAINTS
+    ####################################################################################
+
+    # CALL/DYNCALL: Create new context with ID = current_clk + 1
+    enf ctx' = clk + 1 when (f_call + f_dyncall);
+
+    # SYSCALL: Return to root context (ID = 0)
+    enf ctx' = 0 when f_syscall;
+
+    # Default is context remains unchanged (except END which is handled by block stack table)
+    enf ctx' = ctx when !(f_call + f_syscall + f_dyncall + f_end);
+
+    ####################################################################################
+    # SYSTEM CALL FLAG CONSTRAINTS
+    ####################################################################################
+
+    # Binary constraint: in_syscall must be 0 or 1
+    enf in_syscall * (1 - in_syscall) = 0;
+
+    # SYSCALL: Set flag to 1
+    enf in_syscall' = 1 when f_syscall;
+
+    # END: Clear flag if currently in syscall
+    enf in_syscall' = 0 when f_end & in_syscall;
+
+    # Default is flag remains unchanged for all other operations (except SYSCALL and END-in-syscall)
+    enf in_syscall' = in_syscall when !(f_syscall + (f_end & in_syscall));
+
+    ####################################################################################
+    # FUNCTION HASH CONSTRAINTS
+    ####################################################################################
+
+    # CALL: Load function hash from decoder h0-h3
+    enf fn_hash_0' = decoder_h0 when f_call;
+    enf fn_hash_1' = decoder_h1 when f_call;
+    enf fn_hash_2' = decoder_h2 when f_call;
+    enf fn_hash_3' = decoder_h3 when f_call;
+
+    # SYSCALL: Function hash unchanged (preserved from calling context)
+    enf fn_hash_0' = fn_hash_0 when f_syscall;
+    enf fn_hash_1' = fn_hash_1 when f_syscall;
+    enf fn_hash_2' = fn_hash_2 when f_syscall;
+    enf fn_hash_3' = fn_hash_3 when f_syscall;
+
+    # DYNCALL: Load function hash from decoder h0-h3 (same as CALL)
+    enf fn_hash_0' = decoder_h0 when f_dyncall;
+    enf fn_hash_1' = decoder_h1 when f_dyncall;
+    enf fn_hash_2' = decoder_h2 when f_dyncall;
+    enf fn_hash_3' = decoder_h3 when f_dyncall;
+
+    # Default: Function hash unchanged for all other operations
+    enf fn_hash_0' = fn_hash_0 when !(f_call + f_syscall + f_dyncall + f_end);
+    enf fn_hash_1' = fn_hash_1 when !(f_call + f_syscall + f_dyncall + f_end);
+    enf fn_hash_2' = fn_hash_2 when !(f_call + f_syscall + f_dyncall + f_end);
+    enf fn_hash_3' = fn_hash_3 when !(f_call + f_syscall + f_dyncall + f_end);
 }

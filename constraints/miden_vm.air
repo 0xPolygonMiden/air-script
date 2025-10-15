@@ -173,14 +173,14 @@ integrity_constraints {
     # MAIN TRACE CONSTRAINTS
     ####################################################################################
 
-    # System state transitions
-    enf system_transition([system[0..8]]);
+    # System state transitions (needs decoder columns for operation flags)
+    enf system_transition([system[0..8], decoder[0..24]]);
 
     # Decoder constraints - Program execution and operation decoding (needs stack top s0)
     enf decoder([decoder, stack[0]]);
 
     # Stack constraints - Operand stack operations and overflow handling
-    enf stack([stack[0..19], decoder[0..24], system[0], system[1]]);  # Pass decoder columns, system clock, and fmp for flag computation
+    enf stack([stack[0..19], decoder[0..24], system[0], system[1], system[4], system[5], system[6], system[7]]);  # Pass decoder columns, system clock, fmp, and fn_hash for operations
 
     # Chiplet constraints - Hash, bitwise, ACE, memory operations, and kernel ROM
     enf chiplets_constraints([chiplets[0..20]]);

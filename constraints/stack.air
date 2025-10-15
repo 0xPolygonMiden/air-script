@@ -29,7 +29,7 @@ ev stack([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, 
           decoder_addr, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
           decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5, decoder_h6, decoder_h7,
           decoder_sp, decoder_gc, decoder_ox, decoder_c0, decoder_c1, decoder_c2, decoder_e0, decoder_e1,
-          system_clk, system_fmp]) {
+          system_clk, system_fmp, system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3]) {
     # Stack element columns (always visible top 16 elements)
     # s0-s15 are the top 16 stack elements (s0 = top of stack)
     # b0 = stack depth (≥ 16)
@@ -48,9 +48,10 @@ ev stack([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, 
     ####################################################################################
 
     enf stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
-                                       b0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+                                       b0, b1, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
                                        decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5,
-                                       decoder_e0, decoder_e1, system_clk, system_fmp]);
+                                       decoder_e0, decoder_e1, system_clk, system_fmp,
+                                       system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3]);
 
 }
 
@@ -154,10 +155,11 @@ ev right_shift_b1_constraint([b1, decoder_b0, decoder_b1, decoder_b2, decoder_b3
 
 # Applies the appropriate operation-specific constraints based on active operation flags
 ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
-                               stack_b0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+                               stack_b0, stack_b1, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
                                decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5,
                                decoder_e0, decoder_e1,
-                               system_clk, system_fmp
+                               system_clk, system_fmp,
+                               system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3
                                ])
     {
 
@@ -255,13 +257,17 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
     let is_mstream = flag_mstream(op_bits, decoder_e0);  # Opcode 83 (101_0011)
     let is_split = flag_split(op_bits, decoder_e0);  # Opcode 84 (101_0100)
     let is_loop = flag_loop(op_bits, decoder_e0);  # Opcode 85 (101_0101)
+    let is_dyn = flag_dyn(op_bits, decoder_e0);  # Opcode 88 (101_1000)
     let is_hornerext = flag_hornerext(op_bits, decoder_e0);  # Opcode 89 (101_1001)
     let is_push = flag_push(op_bits, decoder_e0);  # Opcode 91 (101_1011)
+    let is_dyncall = flag_dyncall(op_bits, decoder_e0);  # Opcode 92 (101_1100)
     let is_evalcircuit = flag_evalcircuit(op_bits, decoder_e0);  # Opcode 93 (101_1101)
 
     # Group 5: Very high-degree operations (110 group) - requires e1 for degree reduction
     let is_mrupdate = flag_mrupdate(op_bits, decoder_e1);  # Opcode 96 (110_0000)
     let is_hornerbase = flag_hornerbase(op_bits, decoder_e1);  # Opcode 100 (110_0100)
+    let is_syscall = flag_syscall(op_bits, decoder_e1);  # Opcode 104 (110_1000)
+    let is_call = flag_call(op_bits, decoder_e1);  # Opcode 108 (110_1100)
 
     enf match {
         # No stack shift operations - ordered by Miden VM specification (opcodes 0-31)
@@ -274,7 +280,7 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
         case is_fmpadd: fmpadd_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_fmp]), # 6
         case is_mload: mload_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),       # 7
         case is_swap: swap_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 8
-        case is_caller: caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 9
+        case is_caller: caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3]),     # 9
         case is_movup2: movup2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 10
         case is_movdn2: movdn2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 11
         case is_movup3: movup3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 12
@@ -351,13 +357,17 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
         case is_mstream: mstream_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 83
         case is_split: split_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 84
         case is_loop: loop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 85
+        case is_dyn: dyn_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 88
         case is_hornerext: hornerext_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 89
         case is_push: push_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 91
+        case is_dyncall: dyncall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_b0, stack_b1]), # 92
         case is_evalcircuit: evalcircuit_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 93
 
         # Very high-degree operations (110 group)
         case is_mrupdate: mrupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 96
         case is_hornerbase: hornerbase_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 100
+        case is_syscall: syscall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_b0, stack_b1]), # 104
+        case is_call: call_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_b0, stack_b1]), # 108
     };
 
 }
@@ -1310,6 +1320,14 @@ ev loop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11,
     # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
 }
 
+# DYN operation: Execute code block dynamically without context switch
+ev dyn_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Stack LEFT SHIFT: all elements shift up one position
+    enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8;
+    enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' from overflow table or 0 (handled by left_shift_zero_insertion)
+}
+
 ##########################################################################################
 # NO STACK SHIFT OPERATION CONSTRAINTS (MOVUP/MOVDN)
 ##########################################################################################
@@ -1731,14 +1749,20 @@ ev expacc_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
     enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
 }
 
-# CALLER operation: Get ID of the calling context (no stack depth change)
-# Stack behavior: [...] -> [caller_id, ...] (no depth change)
-ev caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
-    # Position 0: Gets caller context ID from system state
-    # TODO: Integrate with system context columns to get actual caller ID
-    enf s0' = 0; # Placeholder - needs system context integration
-    # Positions 1-15: Unchanged (all other elements stay in place)
-    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+# CALLER operation: Get hash of the calling function (no stack depth change)
+# Stack behavior: [...] -> [fn_hash[0], fn_hash[1], fn_hash[2], fn_hash[3], ...] (no depth change)
+# Loads the function hash (4 elements) from system state onto top of stack
+# Note: CALLER can only be executed within a SYSCALL; constraints enforced in system.air
+ev caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
+                                  fn_hash_0, fn_hash_1, fn_hash_2, fn_hash_3]) {
+    # Positions 0-3: Load function hash word from system state
+    enf s0' = fn_hash_0;
+    enf s1' = fn_hash_1;
+    enf s2' = fn_hash_2;
+    enf s3' = fn_hash_3;
+
+    # Positions 4-15: Unchanged (all other elements stay in place)
+    enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
     enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
 }
 
@@ -1844,4 +1868,38 @@ ev ext2mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s
     # Positions 4-15: Unchanged (all other elements stay in place)
     enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
     enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+##########################################################################################
+# CONTEXT SWITCHING OPERATIONS
+##########################################################################################
+
+# CALL operation: Call a function and start a new execution context
+ev call_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, b0, b1]) {
+    # Stack elements s0-s15 remain unchanged (no shift)
+
+    # Reset stack depth and overflow address for new context
+    enf b0' = 16;
+    enf b1' = 0;
+}
+
+# SYSCALL operation: Call kernel function in root context
+ev syscall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, b0, b1]) {
+    # Stack elements s0-s15 remain unchanged (no shift)
+
+    # Reset stack depth and overflow address for root context
+    enf b0' = 16;
+    enf b1' = 0;
+}
+
+# DYNCALL operation: Call function dynamically with hash from memory
+ev dyncall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, b0, b1]) {
+    # Stack LEFT SHIFT: all elements shift up one position
+    enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8;
+    enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' from overflow table or 0 (handled by left_shift_zero_insertion)
+
+    # Reset stack depth and overflow address for new context
+    enf b0' = 16;
+    enf b1' = 0;
 }
