@@ -6,9 +6,12 @@ use air_parser::{
 };
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
-use mir::ir::{
-    Boundary as MirBoundary, ConstantValue, Link, Mir, MirValue, Op, Parent, SpannedMirValue,
-    TraceAccess as MirTraceAccess,
+use mir::{
+    ir::{
+        Boundary as MirBoundary, ConstantValue, Link, Mir, MirAccessType, MirValue, Op, Parent,
+        SpannedMirValue, TraceAccess as MirTraceAccess,
+    },
+    passes::get_inner_const,
 };
 
 use crate::{CompileError, graph::NodeIndex, ir::*};
@@ -135,10 +138,13 @@ struct AirBuilder<'a> {
 /// so we need to ensure these cases are properly indexed.
 fn accessor_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
     if let Some(accessor) = mir_node.as_accessor() {
-        match accessor.access_type {
-            AccessType::Index(index) => {
+        match accessor.access_type.clone() {
+            MirAccessType::Index(index) => {
                 if let Some(vec) = accessor.indexable.as_vector() {
                     let children = vec.elements.borrow().deref().clone();
+                    let index = get_inner_const(&index)
+                        .expect("Index should be a constant value after constant propagation")
+                        as usize;
                     if index >= children.len() {
                         panic!(
                             "Index out of bounds during indexed accessor translation from MIR to AIR: {index}",
@@ -149,7 +155,7 @@ fn accessor_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
                     mir_node.clone()
                 }
             },
-            AccessType::Default => {
+            MirAccessType::Default => {
                 add_row_offset_if_trace_access(&accessor.indexable, accessor.offset)
             },
             _ => mir_node.clone(),

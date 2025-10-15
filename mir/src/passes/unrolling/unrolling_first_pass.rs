@@ -1,16 +1,15 @@
 use std::{collections::HashMap, ops::Deref};
 
-use air_parser::ast::AccessType;
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
 
 use crate::{
     CompileError,
     ir::{
-        Accessor, Graph, Link, MirType, MirValue, Node, Op, Owner, Parameter, Parent,
-        SpannedMirValue, TraceAccess, Value, Vector,
+        Accessor, ConstantValue, Graph, Link, MirAccessType, MirType, MirValue, Node, Op, Owner,
+        Parameter, Parent, SpannedMirValue, Value, Vector,
     },
     passes::{
-        Visitor,
+        Visitor, handle_accessor_visit,
         unrolling::{
             ForInliningContext, visit_enf_bis, visit_fold_bis, visit_value_bis, visit_vector_bis,
         },
@@ -45,109 +44,6 @@ impl<'a> UnrollingFirstPass<'a> {
     }
 }
 
-/// Unrolls an `Accessor` with `AccessType::Default` access type.
-fn unroll_accessor_default_access_type(
-    indexable: Link<Op>,
-    accessor_offset: usize,
-) -> Option<Link<Op>> {
-    if let Some(value) = indexable.clone().as_value() {
-        let mir_value = value.value.value.clone();
-
-        if let MirValue::TraceAccess(trace_access) = mir_value {
-            let new_node = Value::create(SpannedMirValue {
-                span: value.value.span(),
-                value: MirValue::TraceAccess(TraceAccess {
-                    segment: trace_access.segment,
-                    column: trace_access.column,
-                    row_offset: trace_access.row_offset + accessor_offset,
-                }),
-            });
-            return Some(new_node);
-        }
-    }
-    Some(indexable.clone())
-}
-
-/// Unrolls an `Accessor` with `AccessType::Index` access type.
-fn unroll_accessor_index_access_type(
-    indexable: Link<Op>,
-    index: usize,
-    accessor_offset: usize,
-) -> Option<Link<Op>> {
-    // Check that the child node is a vector, raise diag otherwise
-    // Replace the current node by the index-th element of the vector
-    // Raise diag if index is out of bounds
-    if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
-        let indexable_vec = indexable_vector.children().borrow().clone();
-        let child_accessed = indexable_vec
-            .get(index)
-            .unwrap_or_else(|| panic!("Index access out of bounds for indexable: {indexable:?}"));
-        if let Some(value) = child_accessed.clone().as_value() {
-            let mir_value = value.value.value.clone();
-            match mir_value {
-                MirValue::TraceAccess(trace_access) => {
-                    let new_node = Value::create(SpannedMirValue {
-                        span: value.value.span(),
-                        value: MirValue::TraceAccess(TraceAccess {
-                            segment: trace_access.segment,
-                            column: trace_access.column,
-                            row_offset: trace_access.row_offset + accessor_offset,
-                        }),
-                    });
-                    Some(new_node)
-                },
-                _ => Some(child_accessed.clone()),
-            }
-        } else {
-            Some(child_accessed.clone())
-        }
-    } else {
-        unreachable!("indexable is {:?}", indexable); // raise diag
-    }
-}
-
-/// Unrolls an `Accessor` with `AccessType::Matrix` access type.
-fn unroll_accessor_matrix_access_type(
-    indexable: Link<Op>,
-    row: usize,
-    col: usize,
-) -> Option<Link<Op>> {
-    // Check that the child node is a matrix, raise diag otherwise
-    // Replace the current node by the index-th element of the vector
-    // Raise diag if index is out of bounds
-    if let Op::Vector(indexable_vector) = indexable.borrow().deref() {
-        let indexable_vec = indexable_vector.children().borrow().clone();
-        let row_accessed = indexable_vec
-            .get(row)
-            .unwrap_or_else(|| panic!("Matrix access out of bounds for indexable: {indexable:?}"));
-        if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
-            let row_accessed_vec = row_accessed_vector.children().borrow().clone();
-            let child_accessed = row_accessed_vec.get(col).unwrap_or_else(|| {
-                panic!("Matrix access out of bounds for indexable: {indexable:?}")
-            });
-            Some(child_accessed.clone())
-        } else {
-            unreachable!("unexpected non-vector child of a Matrix: {:?}", row_accessed);
-        }
-    } else if let Op::Matrix(indexable_matrix) = indexable.borrow().deref() {
-        let indexable_vec = indexable_matrix.children().borrow().clone();
-        let row_accessed = indexable_vec
-            .get(row)
-            .unwrap_or_else(|| panic!("Matrix access out of bounds for indexable: {indexable:?}"));
-        if let Op::Vector(row_accessed_vector) = row_accessed.borrow().deref() {
-            let row_accessed_vec = row_accessed_vector.children().borrow().clone();
-            let child_accessed = row_accessed_vec.get(col).unwrap_or_else(|| {
-                panic!("Matrix access out of bounds for indexable: {indexable:?}")
-            });
-            Some(child_accessed.clone())
-        } else {
-            unreachable!("unexpected non-vector child of a Matrix: {:?}", row_accessed);
-        }
-    } else {
-        unreachable!("unexpected matrix access type on indexable {:?}", indexable);
-    }
-}
-
 // For the first pass of Unrolling, we use a tweaked version of the Visitor trait,
 // each visit_*_bis function returns an `Option<Link<Op>>` instead of `Result<(), CompileError>`,
 // to mutate the nodes (e.g. modifying an `Operation<Vectors>` to `Vector<Operations>`)
@@ -167,6 +63,17 @@ impl UnrollingFirstPass<'_> {
             .or_default()
             .push(parameter.clone());
         Ok(None)
+    }
+
+    fn visit_accessor_bis(&mut self, accessor: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
+        let accessor_ref = accessor.as_accessor().unwrap();
+        let indexable = accessor_ref.indexable.clone();
+        if indexable.clone().as_parameter().is_none() {
+            handle_accessor_visit(accessor.clone(), false, self.diagnostics)
+        } else {
+            // We keep accessors wrapping parameters to allow for nested list comprehensions.
+            Ok(None)
+        }
     }
 
     fn visit_for_bis(&mut self, for_node: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
@@ -262,7 +169,7 @@ impl Visitor for UnrollingFirstPass<'_> {
             Node::Enf(e) => e.to_link().map_or(Ok(None), visit_enf_bis)?,
             Node::Fold(f) => f.to_link().map_or(Ok(None), visit_fold_bis)?,
             Node::Vector(v) => v.to_link().map_or(Ok(None), visit_vector_bis)?,
-            Node::Accessor(a) => a.to_link().map_or(Ok(None), visit_accessor_bis)?,
+            Node::Accessor(a) => a.to_link().map_or(Ok(None), |el| self.visit_accessor_bis(el))?,
             Node::Value(v) => v.to_link().map_or(Ok(None), visit_value_bis)?,
             Node::For(f) => f.to_link().map_or(Ok(None), |el| self.visit_for_bis(el))?,
             Node::Parameter(p) => {
@@ -297,36 +204,6 @@ impl Visitor for UnrollingFirstPass<'_> {
 // HELPERS FUNCTIONS
 // ================================================================================================
 
-/// Unrolls an `Accessor` depending on its `AccessType`.
-///
-/// Note: If the `indexable` is a `Parameter` (referencing a `For` node), we do not unroll the
-/// `Accessor`, in order to handle nested `For` nodes.
-pub fn visit_accessor_bis(accessor: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-    let accessor_ref = accessor.as_accessor().unwrap();
-    let indexable = accessor_ref.indexable.clone();
-    let access_type = accessor_ref.access_type.clone();
-    let offset = accessor_ref.offset;
-    // If the indexable is a parameter, we keep the accessor as is, in
-    // order to handle nested `For` nodes
-    if indexable.clone().as_parameter().is_none() {
-        match access_type {
-            AccessType::Default => {
-                return Ok(unroll_accessor_default_access_type(indexable, offset));
-            },
-            AccessType::Index(index) => {
-                return Ok(unroll_accessor_index_access_type(indexable, index, offset));
-            },
-            AccessType::Matrix(row, col) => {
-                return Ok(unroll_accessor_matrix_access_type(indexable, row, col));
-            },
-            AccessType::Slice(_range_expr) => {
-                unreachable!(); // Slices are not scalar, raise diag
-            },
-        }
-    }
-    Ok(None)
-}
-
 /// Sanity check that all iterators have the same length.
 /// Note that semantic analysis should have already checked they are valid.
 fn validate_iterators_and_get_expected_len(iterators: &[Link<Op>]) -> usize {
@@ -343,15 +220,14 @@ fn validate_iterators_and_get_expected_len(iterators: &[Link<Op>]) -> usize {
     iterator_expected_len
 }
 
-/// Computes the length of a node that is used as an iterator in a For node.
+/// Computes the length of a node that is used as an iterator in a `For` node.
 fn compute_iterator_len(iterator: Link<Op>) -> usize {
     match iterator.borrow().deref() {
         Op::Vector(vector) => vector.size,
         Op::Matrix(matrix) => matrix.size,
         Op::Accessor(accessor) => match &accessor.access_type {
-            AccessType::Default => compute_iterator_len(accessor.indexable.clone()),
-            AccessType::Slice(range_expr) => range_expr.to_slice_range().count(),
-            AccessType::Index(_) => match accessor.indexable.borrow().deref() {
+            MirAccessType::Default => compute_iterator_len(accessor.indexable.clone()),
+            MirAccessType::Index(_) => match accessor.indexable.borrow().deref() {
                 Op::Vector(_) => 1,
                 Op::Matrix(matrix) => {
                     let children = matrix.children().borrow().clone();
@@ -364,7 +240,7 @@ fn compute_iterator_len(iterator: Link<Op>) -> usize {
                 },
                 _ => unreachable!("Unexpected index into non indexable type"),
             },
-            AccessType::Matrix(..) => 1,
+            MirAccessType::Matrix(..) => 1,
         },
         Op::Parameter(parameter) => match parameter.ty {
             MirType::Felt => 1,
@@ -391,12 +267,18 @@ fn get_iterator_child(op: Link<Op>, i: usize) -> Link<Op> {
                 // If we access an outer loop parameter in the body of an inner
                 // loop, we need to create
                 // an Accessor for the correct index in this parameter
-                Op::Parameter(_parameter) => Accessor::create(
-                    accessor.indexable.clone(),
-                    AccessType::Index(i),
-                    0,
-                    accessor.span(),
-                ),
+                Op::Parameter(_parameter) => {
+                    let mir_access_type = MirAccessType::Index(Value::create(SpannedMirValue {
+                        span: accessor.span(),
+                        value: MirValue::Constant(ConstantValue::Felt(i as u64)),
+                    }));
+                    Accessor::create(
+                        accessor.indexable.clone(),
+                        mir_access_type,
+                        0,
+                        accessor.span(),
+                    )
+                },
                 _ => op.clone(),
             }
         },

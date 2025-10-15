@@ -168,12 +168,30 @@ macro_rules! access {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
+            AccessType::Index(Box::new(int!($idx))),
+            0,
+        ))
+    };
+
+    ($name:ident [ $idx:expr ]) => {
+        ScalarExpr::SymbolAccess(SymbolAccess::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            ident!($name),
             AccessType::Index($idx),
             0,
         ))
     };
 
     ($name:literal [ $idx:literal ]) => {
+        ScalarExpr::SymbolAccess(SymbolAccess::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            ident!($name),
+            AccessType::Index(Box::new(int!($idx))),
+            0,
+        ))
+    };
+
+    ($name:literal [ $idx:expr ]) => {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
@@ -186,12 +204,31 @@ macro_rules! access {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
+            AccessType::Matrix(Box::new(int!($row)), Box::new(int!($col))),
+            0,
+        ))
+    };
+
+    ($name:ident [ $row:expr ] [ $col:expr ]) => {
+        ScalarExpr::SymbolAccess(SymbolAccess::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            ident!($name),
             AccessType::Matrix($row, $col),
             0,
         ))
     };
 
     ($name:ident [ $row:literal ] [ $col:literal ], $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ResolvableIdentifier::Local(ident!($name)),
+            access_type: AccessType::Matrix(Box::new(int!($row)), Box::new(int!($col))),
+            offset: 0,
+            ty: Some($ty),
+        })
+    };
+
+    ($name:ident [ $row:expr ] [ $col:expr ], $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
@@ -205,6 +242,16 @@ macro_rules! access {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ident!($module, $name).into(),
+            access_type: AccessType::Index(Box::new(int!($idx))),
+            offset: 0,
+            ty: Some($ty),
+        })
+    };
+
+    ($module:ident, $name:ident [ $idx:expr ], $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ident!($module, $name).into(),
             access_type: AccessType::Index($idx),
             offset: 0,
             ty: Some($ty),
@@ -212,6 +259,16 @@ macro_rules! access {
     };
 
     ($module:ident, $name:ident [ $row:literal ] [ $col:literal ], $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ident!($module, $name).into(),
+            access_type: AccessType::Matrix(Box::new(int!($row)), Box::new(int!($col))),
+            offset: 0,
+            ty: Some($ty),
+        })
+    };
+
+    ($module:ident, $name:ident [ $row:expr ] [ $col:expr ], $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ident!($module, $name).into(),
@@ -225,12 +282,31 @@ macro_rules! access {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
+            AccessType::Index(Box::new(int!($idx))),
+            $offset,
+        ))
+    };
+
+    ($name:ident [ $idx:expr ], $offset:literal) => {
+        ScalarExpr::SymbolAccess(SymbolAccess::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            ident!($name),
             AccessType::Index($idx),
             $offset,
         ))
     };
 
     ($name:ident [ $idx:literal ], $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ResolvableIdentifier::Local(ident!($name)),
+            access_type: AccessType::Index(Box::new(int!($idx))),
+            offset: 0,
+            ty: Some($ty),
+        })
+    };
+
+    ($name:ident [ $idx:expr ], $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
@@ -244,13 +320,32 @@ macro_rules! access {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
-            access_type: AccessType::Index($idx),
+            access_type: AccessType::Index(Box::new(int!($idx))),
+            offset: $offset,
+            ty: Some($ty),
+        })
+    };
+
+    ($name:ident [ $idx:literal ], $offset:literal, $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ResolvableIdentifier::Local(ident!($name)),
+            access_type: AccessType::Index(Box::new(int!($idx))),
             offset: $offset,
             ty: Some($ty),
         })
     };
 
     ($name:literal [ $idx:literal ], $offset:literal) => {
+        ScalarExpr::SymbolAccess(SymbolAccess::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            ident!($name),
+            AccessType::Index(Box::new(int!($idx))),
+            $offset,
+        ))
+    };
+
+    ($name:literal [ $idx:expr ], $offset:literal) => {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
@@ -322,7 +417,7 @@ macro_rules! bounded_access {
             SymbolAccess::new(
                 miden_diagnostics::SourceSpan::UNKNOWN,
                 ident!($name),
-                AccessType::Index($idx),
+                AccessType::Index(Box::new(int!($idx))),
                 0,
             ),
             $bound,
@@ -335,7 +430,7 @@ macro_rules! bounded_access {
             SymbolAccess {
                 span: miden_diagnostics::SourceSpan::UNKNOWN,
                 name: ResolvableIdentifier::Local(ident!($name)),
-                access_type: AccessType::Index($idx),
+                access_type: AccessType::Index(Box::new(int!($idx))),
                 offset: 0,
                 ty: Some($ty),
             },
@@ -657,6 +752,7 @@ mod arithmetic_ops;
 mod boundary_constraints;
 mod buses;
 mod calls;
+mod computed_indices;
 mod constant_propagation;
 mod constants;
 mod evaluators;

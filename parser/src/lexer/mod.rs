@@ -644,9 +644,10 @@ where
 
         match num.parse::<u64>() {
             Ok(i) => Token::Num(i),
-            Err(err) => {
-                Token::Error(LexicalError::InvalidInt { span: self.span(), reason: *err.kind() })
-            },
+            Err(err) => Token::Error(LexicalError::InvalidInt {
+                span: self.span(),
+                reason: err.kind().clone(),
+            }),
         }
     }
 }

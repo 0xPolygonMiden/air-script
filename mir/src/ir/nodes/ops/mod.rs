@@ -15,7 +15,7 @@ mod sub;
 mod value;
 mod vector;
 
-pub use accessor::Accessor;
+pub use accessor::{Accessor, MirAccessType};
 pub use add::Add;
 pub use boundary::Boundary;
 pub use bus_op::{BusOp, BusOpKind};

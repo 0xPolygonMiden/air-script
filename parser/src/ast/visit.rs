@@ -26,7 +26,7 @@ use crate::ast;
 ///
 /// use miden_diagnostics::{Span, Spanned};
 ///
-/// use air_parser::ast::{self, visit};
+/// use air_parser::ast::{self, visit, ScalarExpr};
 ///
 /// /// A simple visitor which replaces accesses to constant values with the values themselves,
 /// /// evaluates constant expressions (i.e. expressions whose operands are constant), and propagates
@@ -59,19 +59,13 @@ use crate::ast;
 ///                         core::mem::replace(expr, ast::ScalarExpr::Const(Span::new(span, value)));
 ///                     }
 ///                     Some((span, ast::ConstantExpr::Vector(value))) => {
-///                         match sym.access_type {
-///                             ast::AccessType::Index(idx) => {
-///                                 core::mem::replace(expr, ast::ScalarExpr::Const(Span::new(span, value[idx])));
-///                             }
-///                             _ => panic!("invalid constant reference, expected scalar access"),
+///                         if let ast::AccessType::Index(idx) = sym.access_type.clone() && let ScalarExpr::Const(idx) = *idx {
+///                             core::mem::replace(expr, ast::ScalarExpr::Const(Span::new(span, value[idx.item as usize])));
 ///                         }
 ///                     }
 ///                     Some((span, ast::ConstantExpr::Matrix(value))) => {
-///                         match sym.access_type {
-///                             ast::AccessType::Matrix(row, col) => {
-///                                 core::mem::replace(expr, ast::ScalarExpr::Const(Span::new(span, value[row][col])));
-///                             }
-///                             _ => panic!("invalid constant reference, expected scalar access"),
+///                         if let ast::AccessType::Matrix(row, col) = sym.access_type.clone() && let ScalarExpr::Const(row) = *row && let ScalarExpr::Const(col) = *col {
+///                             core::mem::replace(expr, ast::ScalarExpr::Const(Span::new(span, value[row.item as usize][col.item as usize])));
 ///                         }
 ///                     }
 ///                 }
@@ -703,8 +697,11 @@ where
     V: ?Sized + VisitMut<T>,
 {
     match expr {
-        ast::AccessType::Default | ast::AccessType::Index(_) | ast::AccessType::Matrix(..) => {
-            ControlFlow::Continue(())
+        ast::AccessType::Default => ControlFlow::Continue(()),
+        ast::AccessType::Index(index) => visitor.visit_mut_scalar_expr(index),
+        ast::AccessType::Matrix(row, col) => {
+            visitor.visit_mut_scalar_expr(row)?;
+            visitor.visit_mut_scalar_expr(col)
         },
         ast::AccessType::Slice(range) => {
             visitor.visit_mut_range_bound(&mut range.start)?;
@@ -740,6 +737,7 @@ pub fn visit_mut_symbol_access<V, T>(
 where
     V: ?Sized + VisitMut<T>,
 {
+    visitor.visit_mut_access_type(&mut expr.access_type)?;
     visitor.visit_mut_resolvable_identifier(&mut expr.name)
 }
 
