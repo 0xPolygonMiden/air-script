@@ -111,6 +111,28 @@ fn bitwise() {
     expected.assert_eq(&generated_air);
 }
 
+
+#[test]
+fn computed_indices_complex() {
+    let generated_air =
+        Test::new("tests/computed_indices/computed_indices_complex.air".to_string())
+            .transpile(Target::Plonky3)
+            .unwrap();
+
+    let expected = expect_file!["../computed_indices/computed_indices_complex_plonky3.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn computed_indices_simple() {
+    let generated_air = Test::new("tests/computed_indices/computed_indices_simple.air".to_string())
+        .transpile(Target::Plonky3)
+        .unwrap();
+
+    let expected = expect_file!["../computed_indices/computed_indices_simple_plonky3.rs"];
+    expected.assert_eq(&generated_air);
+}
+
 #[test]
 fn constants() {
     let generated_air = Test::new("tests/constants/constants.air".to_string())
