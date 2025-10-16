@@ -210,11 +210,15 @@ impl<'a> MatchOptimizer<'a> {
                             Some(Add::create(cur_condition.unwrap(), condition.clone(), span));
                     }
                 }
-                let new_node = Mul::create(
-                    cur_condition.unwrap(),
-                    equivalent_constraints.first().unwrap().1.clone(),
-                    span,
-                );
+                // Multiply the combined selector by the inner expression of the representative
+                // constraint. If the representative is an Enf node, unwrap to its inner expr.
+                let repr = equivalent_constraints.first().unwrap().1.clone();
+                let multiplicand = if let Some(enf_ref) = repr.as_enf() {
+                    enf_ref.expr.clone()
+                } else {
+                    repr
+                };
+                let new_node = Mul::create(cur_condition.unwrap(), multiplicand, span);
 
                 cur_node = match cur_node {
                     Some(existing) => Some(Add::create(existing, new_node, span)),
