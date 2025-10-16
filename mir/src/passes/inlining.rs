@@ -557,8 +557,32 @@ fn check_evaluator_argument_sizes(
                     _ => unreachable!("expected felt or vector, got {:?}", ty),
                 };
                 trace_segments_arg_vector_len += size;
+            } else if let Some(vector) = child.as_vector() {
+                // This can happen when slices are used in nested evaluator calls
+                assert!(
+                    vector.children().borrow().iter().all(|c| {
+                        let c = extract_accessor(c.clone());
+                        if let Some(param) = c.as_parameter() {
+                            param.ty == MirType::Felt
+                        } else if let Some(value) = c.as_value() {
+                            matches!(
+                                value.value,
+                                SpannedMirValue {
+                                    value: MirValue::Constant(_) | MirValue::TraceAccess(_),
+                                    ..
+                                }
+                            )
+                        } else {
+                            false
+                        }
+                    }),
+                    "expected vector of Felts, got {:#?}",
+                    vector
+                );
+                let vector_len = vector.children().borrow().len();
+                trace_segments_arg_vector_len += vector_len;
             } else {
-                unreachable!("expected value or parameter, got {:?}", child);
+                unreachable!("expected value or parameter, got {:#?}", child);
             }
         }
 
@@ -695,6 +719,28 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                     args_unpacked.push(arg.clone());
                 } else {
                     unreachable!("expected value or parameter (or accessor on one), got {:?}", arg);
+                }
+            } else if let Some(vector) = arg.as_vector() {
+                // This can happen when slices are used in nested evaluator calls
+                for c in vector.children().borrow().iter() {
+                    let c = extract_accessor(c.clone());
+                    if c.as_parameter().is_some() {
+                        args_unpacked.push(c.clone());
+                    } else if let Some(value) = c.as_value() {
+                        let SpannedMirValue {
+                            value: MirValue::Constant(_) | MirValue::TraceAccess(_),
+                            ..
+                        } = value.value
+                        else {
+                            unreachable!("expected constant or trace access, got {:?}", value);
+                        };
+                        args_unpacked.push(c.clone());
+                    } else {
+                        unreachable!(
+                            "expected value or parameter (or accessor on one), got {:?}",
+                            c
+                        );
+                    }
                 }
             } else {
                 unreachable!("expected value or parameter (or accessor on one), got {:?}", arg);

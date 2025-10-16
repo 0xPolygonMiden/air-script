@@ -1,4 +1,4 @@
-def EvaluatorsMultiAir
+def EvaluatorsSliceAir
 
 ev is_binary([x]) {
     enf x^2 = x;

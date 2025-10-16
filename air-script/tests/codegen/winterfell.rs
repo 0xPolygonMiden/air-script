@@ -153,6 +153,16 @@ fn evaluators() {
 }
 
 #[test]
+fn evaluators_slice() {
+    let generated_air = Test::new("tests/evaluators/evaluators_slice.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["../evaluators/evaluators_slice.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
 fn fibonacci() {
     let generated_air = Test::new("tests/fibonacci/fibonacci.air".to_string())
         .transpile(Target::Winterfell)
