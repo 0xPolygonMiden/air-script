@@ -539,6 +539,9 @@ fn check_evaluator_argument_sizes(
         let children = trace_segments_arg_vector.children();
         let mut trace_segments_arg_vector_len = 0;
         for child in children.borrow().deref() {
+            // We need to extract the outermost accessors, if any.
+            // This can happen when slices are used to rebind
+            // trace bindings in nested evaluator calls
             let child = extract_accessor(child.clone());
             if let Some(value) = child.as_value() {
                 let Value { value: SpannedMirValue { value, .. }, .. } = value.deref();
@@ -558,7 +561,12 @@ fn check_evaluator_argument_sizes(
                 };
                 trace_segments_arg_vector_len += size;
             } else if let Some(vector) = child.as_vector() {
-                // This can happen when slices are used in nested evaluator calls
+                // When slices are used to rebind trace bindings in nested evaluator calls,
+                // translation from Ast to Mir inserts a Vector of
+                // Accessor(MirAccessType::Index), representing the unwrapped
+                // slice.
+                // We need to make sure that this vector is a vector of Felts
+                // and to add its length to the total length of arguments
                 assert!(
                     vector.children().borrow().iter().all(|c| {
                         let c = extract_accessor(c.clone());
@@ -614,6 +622,8 @@ fn check_evaluator_argument_sizes(
     Ok(())
 }
 
+/// Helper function to recursively extract the outermost accessors
+/// if the op is an accessor, otherwise return the op unchanged
 fn extract_accessor(op: Link<Op>) -> Link<Op> {
     let Some(accessor) = op.as_accessor() else {
         return op;
@@ -660,6 +670,9 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
         );
         let children = trace_segment_vec.children();
         for arg in children.borrow().deref() {
+            // We need to extract the outermost accessors, if any.
+            // This can happen when slices are used to rebind
+            // trace bindings in nested evaluator calls
             let arg = extract_accessor(arg.clone());
             if let Some(value) = arg.as_value() {
                 let Value {
@@ -721,7 +734,12 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                     unreachable!("expected value or parameter (or accessor on one), got {:?}", arg);
                 }
             } else if let Some(vector) = arg.as_vector() {
-                // This can happen when slices are used in nested evaluator calls
+                // When slices are used to rebind trace bindings in nested evaluator calls,
+                // translation from Ast to Mir inserts a Vector of
+                // Accessor(MirAccessType::Index), representing the unwrapped
+                // slice.
+                // We need to unpack all the elements of this vector and add them
+                // to the arguments
                 for c in vector.children().borrow().iter() {
                     let c = extract_accessor(c.clone());
                     if c.as_parameter().is_some() {

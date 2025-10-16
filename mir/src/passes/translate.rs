@@ -1053,6 +1053,10 @@ impl<'a> MirBuilder<'a> {
         Ok(node)
     }
 
+    // If an [ast::AccessType] is a slice, we need to
+    // translate it into a vector of MirAccessType::Index.
+    // If it is not a slice, return None.
+    // This is used to completely eliminate slice accesses in MIR
     fn translate_potential_slice(
         &mut self,
         access_expr: &Link<Op>,
@@ -1241,6 +1245,8 @@ impl<'a> MirBuilder<'a> {
             {
                 param.ty = self.translate_type(access_ty);
             }
+            // If it's a slice access, we need to return its translation.
+            // This eliminates the case of [ast::AccessType::Slice] in MIR
             if let Some(slice) = self.translate_potential_slice(&let_bound_access_expr, access) {
                 return Ok(slice);
             }
@@ -1321,6 +1327,8 @@ impl<'a> MirBuilder<'a> {
                             value: MirValue::PublicInput(public_input_access),
                         })
                         .build();
+                    // If it's a slice access, we need to return its translation.
+                    // This eliminates the case of [ast::AccessType::Slice] in MIR
                     if let Some(slice) = self.translate_potential_slice(&value, access) {
                         return Ok(Some(slice));
                     }
@@ -1425,6 +1433,8 @@ impl<'a> MirBuilder<'a> {
                             value: MirValue::TraceAccess(ta),
                         })
                         .build();
+                    // If it's a slice access, we need to return its translation.
+                    // This eliminates the case of [ast::AccessType::Slice] in MIR
                     if let Some(slice) = self.translate_potential_slice(&value, access) {
                         return Ok(Some(slice));
                     }
@@ -1481,6 +1491,8 @@ impl<'a> MirBuilder<'a> {
                     value: MirValue::TraceAccess(ta),
                 })
                 .build();
+            // If it's a slice access, we need to return its translation.
+            // This eliminates the case of [ast::AccessType::Slice] in MIR
             if let Some(slice) = self.translate_potential_slice(&value, access) {
                 return Ok(slice);
             }
