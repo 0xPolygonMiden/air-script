@@ -11,6 +11,7 @@
 - Removed `TraceSegmentId::index()` and replaced segment indexing with `TraceShape<T>`/`FullTraceShape<T>` across ACE codegen, MIR-to-AIR pass, and constraints (#442).
 - Allow computed indices (#444).
 - Fix regressions on MIR and list_comprehensions (#449).
+- Fix evaluator argument vector slice expansion (#495).
 
 ## 0.4.0 (2025-06-20)
 
