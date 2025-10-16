@@ -7,9 +7,10 @@ use super::{duplicate_node_or_replace, visitor::Visitor};
 use crate::{
     CompileError,
     ir::{
-        Accessor, Graph, Link, Mir, MirType, MirValue, Node, Op, Parameter, Parent, Root,
-        SpannedMirValue, TraceAccessBinding, Value, Vector,
+        Accessor, Graph, Link, Mir, MirAccessType, MirType, MirValue, Node, Op, Parameter, Parent,
+        Root, SpannedMirValue, TraceAccessBinding, Value, Vector,
     },
+    passes::constant_propagation::get_inner_const,
 };
 
 /// This pass handles inlining of `Call` nodes at their call sites.
@@ -538,6 +539,7 @@ fn check_evaluator_argument_sizes(
         let children = trace_segments_arg_vector.children();
         let mut trace_segments_arg_vector_len = 0;
         for child in children.borrow().deref() {
+            let child = extract_accessor(child.clone());
             if let Some(value) = child.as_value() {
                 let Value { value: SpannedMirValue { value, .. }, .. } = value.deref();
 
@@ -555,29 +557,6 @@ fn check_evaluator_argument_sizes(
                     _ => unreachable!("expected felt or vector, got {:?}", ty),
                 };
                 trace_segments_arg_vector_len += size;
-            } else if let Some(accessor) = child.as_accessor() {
-                let Accessor { indexable, .. } = accessor.deref();
-
-                if let Some(value) = indexable.as_value() {
-                    let Value { value: SpannedMirValue { value, .. }, .. } = value.deref();
-
-                    let param_size = match value {
-                        MirValue::TraceAccessBinding(tab) => tab.size,
-                        MirValue::TraceAccess(_) => 1,
-                        _ => unreachable!("expected trace access binding, got {:?}", value),
-                    };
-                    trace_segments_arg_vector_len += param_size;
-                } else if let Some(parameter) = indexable.as_parameter() {
-                    let Parameter { ty, .. } = parameter.deref();
-                    let size = match ty {
-                        MirType::Felt => 1,
-                        MirType::Vector(len) => *len,
-                        _ => unreachable!("expected felt or vector, got {:?}", ty),
-                    };
-                    trace_segments_arg_vector_len += size;
-                } else {
-                    unreachable!("expected value or parameter, got {:?}", child);
-                }
             } else {
                 unreachable!("expected value or parameter, got {:?}", child);
             }
@@ -611,6 +590,43 @@ fn check_evaluator_argument_sizes(
     Ok(())
 }
 
+fn extract_accessor(op: Link<Op>) -> Link<Op> {
+    let Some(accessor) = op.as_accessor() else {
+        return op;
+    };
+    let mut indexable = accessor.indexable.clone();
+    match &accessor.access_type {
+        MirAccessType::Default => accessor.indexable.clone(),
+        MirAccessType::Index(idx_op) => {
+            let idx =
+                get_inner_const(idx_op).expect("expected constant index, got {idx_op:#?}") as usize;
+            while indexable.clone().as_accessor().is_some() {
+                indexable = extract_accessor(indexable.clone());
+            }
+            match indexable.borrow().deref() {
+                Op::Vector(v) => v.children().borrow()[idx].clone(),
+                Op::Matrix(m) => m.children().borrow()[idx].clone(),
+                _ => unreachable!("expected vector or matrix, got {:#?}", indexable),
+            }
+        },
+        MirAccessType::Matrix(row, col) => {
+            let row = get_inner_const(row).expect("expected constant row, got {row:#?}") as usize;
+            let col =
+                get_inner_const(col).expect("expected constant column, got {col:#?}") as usize;
+            while indexable.clone().as_accessor().is_some() {
+                indexable = extract_accessor(indexable.clone());
+            }
+            match indexable.borrow().deref() {
+                Op::Matrix(m) => {
+                    m.children().borrow()[row].clone().as_matrix().unwrap().children().borrow()[col]
+                        .clone()
+                },
+                _ => unreachable!("expected matrix, got {:#?}", indexable),
+            }
+        },
+    }
+}
+
 /// Helper function to unpack the arguments of a call to an evaluator
 fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
     let mut args_unpacked = Vec::new();
@@ -620,6 +636,7 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
         );
         let children = trace_segment_vec.children();
         for arg in children.borrow().deref() {
+            let arg = extract_accessor(arg.clone());
             if let Some(value) = arg.as_value() {
                 let Value {
                     value: SpannedMirValue { span, value, .. },
