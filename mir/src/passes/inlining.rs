@@ -589,7 +589,7 @@ fn check_evaluator_argument_sizes(
                             );
                         }
                     },
-                    MirAccessType::Index(_) | MirAccessType::Matrix(_, _) => {
+                    MirAccessType::Index(_) | MirAccessType::Matrix(..) => {
                         trace_segments_arg_vector_len += 1;
                     },
                 }
@@ -693,7 +693,7 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                             args_unpacked.push(arg.clone());
                         }
                     },
-                    MirAccessType::Index(_) | MirAccessType::Matrix(_, _) => {
+                    MirAccessType::Index(_) | MirAccessType::Matrix(..) => {
                         args_unpacked.push(arg.clone());
                     },
                 }
