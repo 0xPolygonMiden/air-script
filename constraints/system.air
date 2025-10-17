@@ -17,18 +17,91 @@
 # │   4-7   │ fn_hash - Current function digest (4 elements)                       │
 # └─────────┴──────────────────────────────────────────────────────────────────────┘
 #
-# CONTEXT SWITCHING OPERATIONS:
-# ┌──────────┬─────────┬─────────┬──────────────┬──────────────────────────────┐
-# │ Operation│   ctx'  │   fmp'  │   fn_hash'   │         Purpose              │
-# ├──────────┼─────────┼─────────┼──────────────┼──────────────────────────────┤
-# │ CALL     │ clk + 1 │  2^30   │ Load new     │ Call known procedure         │
-# │ SYSCALL  │    0    │  2^31   │ Preserve     │ Call kernel (root context)   │
-# │ DYNCALL  │ clk + 1 │  2^30   │ Load new     │ Call with runtime hash       │
-# └──────────┴─────────┴─────────┴──────────────┴──────────────────────────────┘
-# - CALL: Target hash in program MAST (compile-time known)
-# - SYSCALL: Target verified in kernel ROM, preserves caller hash for `caller` instruction
-# - DYNCALL: Target hash loaded from memory at address s0 (runtime determined)
-# - All three reset stack to depth 16, but only DYNCALL shifts stack elements left
+# PROCEDURE EXECUTION MODES:
+#
+# The Miden VM supports five different ways to execute procedures, each with distinct
+# semantics for context management, memory isolation, and caller identification:
+#
+# ┌──────────┬─────────┬─────────┬──────────────┬─────────────┬──────────────────────┐
+# │ Operation│   ctx'  │   fmp'  │   fn_hash'   │ in_syscall' │      Purpose         │
+# ├──────────┼─────────┼─────────┼──────────────┼─────────────┼──────────────────────┤
+# │ EXEC     │   ctx   │   fmp   │   fn_hash    │ in_syscall  │ Inline execution     │
+# │ CALL     │ clk + 1 │  2^30   │ Load new     │      0      │ Call known procedure │
+# │ SYSCALL  │    0    │  2^31   │ **PRESERVE** │      1      │ Call kernel          │
+# │ DYN      │   ctx   │   fmp   │ **PRESERVE** │ in_syscall  │ Dynamic inline exec  │
+# │ DYNCALL  │ clk + 1 │  2^30   │ Load new     │      0      │ Dynamic call         │
+# └──────────┴─────────┴─────────┴──────────────┴─────────────┴──────────────────────┘
+#
+# DETAILED SEMANTICS:
+#
+# 1. EXEC (no opcode, handled by MASM assembler):
+#    - Inline execution: procedure code is inserted directly into caller
+#    - No context switch, no register changes
+#    - Behaves like a macro expansion at compile time
+#    - Not enforced by AIR constraints (happens during assembly)
+#
+# 2. CALL (opcode 108: 110_1100):
+#    - Creates NEW execution context (ctx' = clk + 1)
+#    - Resets memory pointer to user space (fmp' = 2^30)
+#    - Loads NEW function hash (fn_hash' = target procedure hash)
+#    - Target hash known at compile time (in program MAST)
+#    - Used for calling procedures within same account/program
+#
+# 3. SYSCALL (opcode 104: 110_1000):
+#    - Jumps to ROOT CONTEXT (ctx' = 0, the kernel context)
+#    - Resets memory pointer to kernel space (fmp' = 2^31)
+#    - **PRESERVES** caller's fn_hash (fn_hash' = fn_hash)
+#    - Sets in_syscall flag (in_syscall' = 1)
+#    - Target verified in kernel ROM at runtime
+#    - **CRITICAL**: Preserving fn_hash enables kernel to authenticate caller via
+#      the `caller` instruction, which returns fn_hash of calling procedure
+#
+# 4. DYN (opcode 88: 101_1000):
+#    - **NO CONTEXT SWITCH** (ctx' = ctx, remains in current context)
+#    - Memory pointer UNCHANGED (fmp' = fmp)
+#    - **PRESERVES** caller's fn_hash (fn_hash' = fn_hash)
+#    - in_syscall flag UNCHANGED (in_syscall' = in_syscall)
+#    - Target hash loaded from memory at address s0 (runtime determined)
+#    - Used by kernel for dynamic procedure dispatch (e.g., exec_kernel_proc)
+#    - **CRITICAL**: Because DYN preserves fn_hash, the authentication chain works:
+#      User procedure → SYSCALL (preserves fn_hash) → DYN (preserves fn_hash)
+#      → kernel can use `caller` to get original user procedure hash
+#
+# 5. DYNCALL (opcode 92: 101_1100):
+#    - Creates NEW execution context (ctx' = clk + 1)
+#    - Resets memory pointer to user space (fmp' = 2^30)
+#    - Loads NEW function hash (fn_hash' = target procedure hash)
+#    - Target hash loaded from memory at address s0 (runtime determined)
+#    - Used for calling procedures whose hash is only known at runtime
+#    - Example: note scripts, transaction scripts
+#
+# AUTHENTICATION FLOW EXAMPLE:
+#
+# Consider this call chain in a Miden transaction where a note script tries to add assets:
+#   1. Note script (fn_hash = H_note) executes via DYNCALL (ctx > 0)
+#   2. Note script calls account procedure (fn_hash = H_account_proc) via CALL (new ctx)
+#   3. Account procedure calls kernel via SYSCALL (fn_hash still = H_account_proc, ctx → 0)
+#   4. Kernel uses DYN to dispatch to kernel procedure (fn_hash still = H_account_proc)
+#   5. Kernel procedure uses `caller` instruction → returns H_account_proc
+#   6. Kernel looks up H_account_proc in the account's procedure table (stored at address 8224
+#      in root context memory) → if found, authenticated! If not found, reject.
+#
+# The account's procedure table contains hashes of all authorized procedures (up to 256).
+# Only procedures in this table can modify the account's state through kernel calls.
+# This ensures only authorized account code can modify account state, never untrusted scripts.
+#
+# STACK BEHAVIOR:
+# - CALL, SYSCALL: Reset stack depth to 16, preserving top 16 elements
+# - DYNCALL: Resets stack depth to 16 AND shifts elements left by 1 position
+#   (the target hash is loaded from memory at address s0, not consumed from stack).
+#   The bottom element (s15') is pulled from the overflow table if available, or 0 if empty.
+# - EXEC, DYN: No stack depth changes
+#
+# CONSTRAINT ENFORCEMENT:
+# - EXEC: Not enforced (assembler-level transformation)
+# - CALL, SYSCALL, DYNCALL: Enforced by system constraints (ctx, fmp, fn_hash transitions)
+# - DYN: Enforced by DEFAULT constraints (all registers preserved except hasher)
+# - END: Restores ctx and fmp from block stack, handles fn_hash restoration
 #
 # STATUS: Partially implemented (missing bus integration)
 #
@@ -94,6 +167,16 @@ ev system_transition([system[8], decoder[24]]) {
     ####################################################################################
     # FREE MEMORY POINTER CONSTRAINTS
     ####################################################################################
+    #
+    # Free memory pointer (fmp) marks the boundary of procedure-local memory:
+    # - fmp = 2^30 (1073741824): User context memory region
+    # - fmp = 2^31 (2147483648): Kernel context memory region
+    #
+    # Note: DYN preserves fmp, maintaining the current memory boundary.
+    # This is essential for kernel dynamic dispatch, allowing the kernel to call
+    # different procedures while sharing the same memory space.
+    #
+    ####################################################################################
 
     # CALL/DYNCALL: Reset FMP to 2^30 (procedure local memory region start)
     enf fmp' = 2^30 when (f_call + f_dyncall);
@@ -101,11 +184,22 @@ ev system_transition([system[8], decoder[24]]) {
     # SYSCALL: Reset FMP to 2^31 (syscall local memory region start)
     enf fmp' = 2^31 when f_syscall;
 
-    # Default is FMP remains unchanged (except for FMPUPDATE handled by stack, and END handled by decoder bus)
+    # Default: FMP unchanged for all other operations (including DYN)
+    # NOTE: FMPUPDATE is handled by stack, END is handled by decoder bus
     enf fmp' = fmp when !(f_call + f_syscall + f_dyncall + f_fmpupdate + f_end);
 
     ####################################################################################
     # EXECUTION CONTEXT CONSTRAINTS
+    ####################################################################################
+    #
+    # Execution context (ctx) determines memory isolation boundaries:
+    # - ctx = 0: Kernel/root context
+    # - ctx > 0: User contexts (one per CALL/DYNCALL)
+    #
+    # Note: DYN preserves ctx, meaning it executes in the current context without
+    # creating a new one. This enables kernel dynamic dispatch while maintaining
+    # the same memory space and execution environment.
+    #
     ####################################################################################
 
     # CALL/DYNCALL: Create new context with ID = current_clk + 1
@@ -114,7 +208,8 @@ ev system_transition([system[8], decoder[24]]) {
     # SYSCALL: Return to root context (ID = 0)
     enf ctx' = 0 when f_syscall;
 
-    # Default is context remains unchanged (except END which is handled by block stack table)
+    # Default: Context unchanged for all other operations (including DYN)
+    # NOTE: END is handled by block stack table (restores previous ctx)
     enf ctx' = ctx when !(f_call + f_syscall + f_dyncall + f_end);
 
     ####################################################################################
@@ -130,11 +225,26 @@ ev system_transition([system[8], decoder[24]]) {
     # END: Clear flag if currently in syscall
     enf in_syscall' = 0 when f_end & in_syscall;
 
-    # Default is flag remains unchanged for all other operations (except SYSCALL and END-in-syscall)
+    # Default: flag remains unchanged for all other operations (except SYSCALL and END-in-syscall)
     enf in_syscall' = in_syscall when !(f_syscall + (f_end & in_syscall));
 
     ####################################################################################
     # FUNCTION HASH CONSTRAINTS
+    ####################################################################################
+    #
+    # The function hash (fn_hash) identifies the currently executing procedure and is
+    # critical for authorization. The `caller` instruction reads fn_hash to determine if
+    # the calling procedure is authorized to perform kernel actions.
+    #
+    # Only three types of operations modify fn_hash:
+    # 1. CALL/DYNCALL: Load new hash (enter new procedure context)
+    # 2. SYSCALL: Preserve hash (enables kernel to authenticate caller)
+    # 3. END: Restore hash from block stack (return to caller)
+    #
+    # Note: DYN falls into the "default" case where fn_hash is preserved.
+    # In the context of procedure invocation authentication, SYSCALL → DYN maintains the caller's
+    # identity through dynamic dispatch, allowing `caller` to return the original procedure hash.
+    #
     ####################################################################################
 
     # CALL: Load function hash from decoder h0-h3
@@ -155,7 +265,7 @@ ev system_transition([system[8], decoder[24]]) {
     enf fn_hash_2' = decoder_h2 when f_dyncall;
     enf fn_hash_3' = decoder_h3 when f_dyncall;
 
-    # Default: Function hash unchanged for all other operations
+    # Default: function hash remains unchanged for all other operations (including DYN)
     enf fn_hash_0' = fn_hash_0 when !(f_call + f_syscall + f_dyncall + f_end);
     enf fn_hash_1' = fn_hash_1 when !(f_call + f_syscall + f_dyncall + f_end);
     enf fn_hash_2' = fn_hash_2 when !(f_call + f_syscall + f_dyncall + f_end);
