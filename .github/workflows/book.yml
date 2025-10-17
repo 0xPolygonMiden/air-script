@@ -61,7 +61,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           # We specify multiple [output] sections in our book.toml which causes mdbook to create separate folders for each. This moves the generated `html` into its own `html` subdirectory.
-          path: ./docs/book/html
+          path: ./docs/target/book/html
 
   # Deployment job only runs on push to next.
   deploy:

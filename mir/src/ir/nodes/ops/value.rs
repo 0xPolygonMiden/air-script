@@ -21,6 +21,12 @@ impl Value {
     pub fn create(value: SpannedMirValue) -> Link<Op> {
         Op::Value(Self { value, ..Default::default() }).into()
     }
+    pub fn get_inner_const(&self) -> Option<u64> {
+        match &self.value.value {
+            MirValue::Constant(ConstantValue::Felt(v)) => Some(*v),
+            _ => None,
+        }
+    }
 }
 
 impl From<i64> for Value {
