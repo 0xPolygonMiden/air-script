@@ -21,7 +21,8 @@ boundary_constraints {
 integrity_constraints {
     let state = a;
     let expected = [3, 5, 7];
-    enf apply_mds(state) = expected;
+    let result = apply_mds(state);
+    enf result = expected for (expected, result) in (expected, result);
 }
 
 fn apply_mds(state: felt[2]) -> felt[3] {

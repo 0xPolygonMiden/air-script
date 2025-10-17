@@ -28,14 +28,19 @@ fn double_with_add(a: felt) -> felt {
     return a+a;
 }
 
-# Note: we want the following constraints values to be equivalent:
-# a = c = e
-# g = i
-
-# Then we expect to get three constraints:
-# a * (s0 + s1) + s2 * h = 0
-# g * (s1 + s2) + s0 * b = 0
-# s0 * d + s1 * f = 0
+# Note: If the constraints `a, b, ..., i` verify the following equivalency:
+#   a = c = e
+#   g = i
+# Then the match statement:
+#   enf match {
+#     case s0: {a, b, c, d},
+#     case s1: {e, f, g},
+#     case s2: {h, i},
+#   };
+# Is expected to get be reduced to only three constraints:
+#   a * (s0 + s1) + s2 * h = 0
+#   g * (s1 + s2) + s0 * b = 0
+#   s0 * d + s1 * f = 0
 
 ev ev_s0([a, b, c]) {
     enf a = double_with_mult(R[0]); #a
