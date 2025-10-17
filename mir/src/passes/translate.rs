@@ -1068,9 +1068,20 @@ impl<'a> MirBuilder<'a> {
                 let col_node = self.translate_scalar_expr(col)?;
                 MirAccessType::Matrix(row_node, col_node)
             },
-            AccessType::Slice(_range_expr) => unreachable!(
-                "Slices should have been transformed into vector operations during constant propagation"
-            ),
+            AccessType::Slice(range_expr) => {
+                // Slices for trace bindings are handled separately in trace_access_binding,
+                // but slices for other symbol accesses should have been transformed by constant
+                // propagation. If we reach here, it means a slice wasn't properly handled.
+                self.diagnostics
+                    .diagnostic(miden_diagnostics::Severity::Error)
+                    .with_message("slice access not properly handled during constant propagation")
+                    .with_primary_label(
+                        range_expr.span,
+                        "slice access should have been transformed to vector operations",
+                    )
+                    .emit();
+                return Err(CompileError::Failed);
+            },
         };
         Ok(mir_access_type)
     }
@@ -1212,6 +1223,29 @@ impl<'a> MirBuilder<'a> {
             {
                 param.ty = self.translate_type(access_ty);
             }
+
+            // Handle slice access by expanding it into a vector of individual accesses
+            if let AccessType::Slice(range_expr) = &access.access_type {
+                let range = range_expr.to_slice_range();
+                let mut elements = Vec::new();
+                for i in range {
+                    let index_value = Value::create(SpannedMirValue {
+                        span: range_expr.span,
+                        value: MirValue::Constant(ConstantValue::Felt(i as u64)),
+                    });
+                    let index_access_type = MirAccessType::Index(index_value);
+                    let element_accessor = Accessor::create(
+                        duplicate_node(let_bound_access_expr.clone(), &mut Default::default()),
+                        index_access_type,
+                        access.offset,
+                        access.span(),
+                    );
+                    elements.push(element_accessor);
+                }
+                let vector_node = Vector::create(elements, access.span());
+                return Ok(vector_node);
+            }
+
             let mir_access_type = self.translate_access_type(&access.access_type)?;
             let accessor: Link<Op> = Accessor::create(
                 duplicate_node(let_bound_access_expr, &mut Default::default()),
