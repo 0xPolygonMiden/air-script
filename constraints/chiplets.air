@@ -63,13 +63,13 @@ ev chiplets_transition([chiplets[20]]) {
     };
 
     # Memory chiplet requires special handling for initialization and transition constraints
-    let flag_next_row_first_row_memory = flag_next_row_first_row_memory(s0, s1, s2);   # Transitioning into memory chiplet
-    let flag_memory_active_not_last_row = flag_memory_active_not_last_row(s0, s1, s2); # Active in memory, not exiting
 
     # Apply initialization constraints when entering memory chiplet
+    let flag_next_row_first_row_memory = flag_next_row_first_row_memory(s0, s1, s2);   # Transitioning into memory chiplet
     enf memory_chiplet_constraints_first_row([chiplets[3..18]]) when flag_next_row_first_row_memory;
 
     # Apply transition constraints while active in memory chiplet (excluding final row)
+    let flag_memory_active_not_last_row = flag_memory_active_not_last_row(s0, s1, s2); # Active in memory, not exiting
     enf memory_chiplet_constraints_all_rows_except_last([chiplets[3..18]]) when flag_memory_active_not_last_row;
 
 }
