@@ -7,20 +7,20 @@
 # element access and optimized word-aligned batch operations (4 elements per word).
 #
 # MEMORY TABLE LAYOUT:
-# ┌─────────┬──────────────────────────────────────────────────────────────────────────┐
-# │ Column  │                               Purpose                                    │
-# ├─────────┼──────────────────────────────────────────────────────────────────────────┤
-# │ is_read │ Read/write selector: 1=read, 0=write                                     │
-# │is_word_access│ Element/word access selector: 0=element, 1=word                          │
-# │   ctx   │ Context ID for execution context separation                              │
-# │ w_addr  │ Word address (must be divisible by 4 for aligned access)                 │
-# │ idx0/1  │ Element index within word [0,3] - binary decomposition of low 2 bits     │
-# │   clk   │ Clock cycle when operation occurred                                      │
-# │ v0-v3   │ Four field elements stored in memory word                                │
-# │ d0/d1   │ Delta tracking columns for monotonicity verification                     │
-# │  d_inv  │ Inverse delta column for consecutive transitions                         │
-# │ f_scw   │ Same context/word address flag for sequential access optimization        │
-# └─────────┴──────────────────────────────────────────────────────────────────────────┘
+# ┌─────────────────┬────────────────────────────────────────────────────────────────┐
+# │     Column      │                            Purpose                             │
+# ├─────────────────┼────────────────────────────────────────────────────────────────┤
+# │    is_read      │ Read/write selector: 1=read, 0=write                           │
+# │ is_word_access  │ Element/word access selector: 0=element, 1=word                │
+# │      ctx        │ Context ID for execution context separation                    │
+# │      addr       │ Memory address (word-aligned for word access)                  │
+# │    idx0/1       │ Element index within word [0,3] - binary decomposition         │
+# │      clk        │ Clock cycle when operation occurred                            │
+# │     v0-v3       │ Four field elements stored in memory word                      │
+# │     d0/d1       │ Delta tracking columns for monotonicity verification           │
+# │     d_inv       │ Inverse delta column for consecutive transitions               │
+# │     f_scw       │ Same context/word flag for sequential access optimization      │
+# └─────────────────┴────────────────────────────────────────────────────────────────┘
 #
 # STATUS: Partially implemented (missing bus integration)
 #
@@ -49,25 +49,7 @@ ev memory_chiplet_constraints_first_row([memory[15]]) {
     let v2 = memory[9];             # Memory value 2
     let v3 = memory[10];            # Memory value 3
 
-    # Element selection flags: f[i] = 1 when element index (2*idx1 + idx0) equals i
-    let is_accessed_0 = binary_not(idx1') * binary_not(idx0');
-    let is_accessed_1 = binary_not(idx1') * idx0';
-    let is_accessed_2 = idx1' * binary_not(idx0');
-    let is_accessed_3 = idx1' * idx0';
-
-    # is_constrainted_value_i is set to 1 when `v'[i]` is not written to, and 0 otherwise.
-    #
-    # In other words, is_constrainted_value_i is set to 1 when `v'[i]` needs to be constrained (to either 0 or `v[i]`).
-    #
-    # Note that `is_constrainted_value_i` only uses values in the "next" row. This is because it must be used to
-    # constrain the first row of the memory chiplet, where that row sits in the "next" position of
-    # the frame, and the "current" row belongs to the previous chiplet (and hence the "current" row
-    # must not be accessed).
-    #
-    # As a result, `is_constrainted_value_i` does not include the constraint of being in the memory chiplet, or in the
-    # same context and word - these must be enforced separately.
-    let is_accessed = [is_accessed_0, is_accessed_1, is_accessed_2, is_accessed_3];
-    let is_constrained_value = [compute_constrained_values(is_accessed_i, is_read', is_word_access') for is_accessed_i in is_accessed];
+    let is_constrained_value = compute_element_access_flags(idx0', idx1', is_read', is_word_access');
 
     # Enforce that when v'[i] is not written to, then v'[i] must be 0.
     enf v0' = 0 when is_constrained_value[0];
@@ -126,7 +108,7 @@ ev memory_chiplet_constraints_all_rows_except_last([memory[15]]) {
     enf enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]);
 
     # Same context/word/addr/clock access constraints
-    enf enforce_same_context_word_addr_and_clock([is_read, ctx, clk, d_inv]);
+    enf enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]);
 
     # Memory value constraints
     enf enforce_values_consistency([is_read, is_word_access, idx0, idx1, v0, v1, v2, v3, f_scw]);
@@ -140,20 +122,20 @@ ev memory_chiplet_constraints_all_rows_except_last([memory[15]]) {
 ev enforce_d_inv([ctx, addr, clk, d0, d1, d_inv]) {
     let ctx_delta = ctx' - ctx;
     let addr_delta = addr' - addr;
-    let n0 = ctx_delta * d_inv';
-    let n1 = addr_delta * d_inv';
+    let is_ctx_changed = ctx_delta * d_inv';
+    let is_addr_changed = addr_delta * d_inv';
 
-    # n0 is binary
-    enf binary_constraint(n0) = 0;
+    # is_ctx_changed is binary
+    enf binary_constraint(is_ctx_changed) = 0;
 
-    # When context changes, n0 must be 1
-    enf ctx_delta = 0 when !n0;
+    # When context changes, is_ctx_changed must be 1
+    enf ctx_delta = 0 when !is_ctx_changed;
 
-    # When n0 is 0 then n1 is binary
-    enf binary_not(n0) * binary_constraint(n1) = 0;
+    # When is_ctx_changed is 0 then is_addr_changed is binary
+    enf binary_constraint(is_addr_changed) = 0 when !is_ctx_changed;
 
-    # When n0 and n1 are both 0, then address must not change
-    enf binary_not(n0) * binary_not(n1) * addr_delta = 0;
+    # When is_ctx_changed and is_addr_changed are both 0, then address must not change
+    enf addr_delta = 0 when binary_not(is_ctx_changed) * binary_not(is_addr_changed);
 }
 
 # Enforces monotonicity constraints for context, address, and clock transitions
@@ -162,20 +144,20 @@ ev enforce_delta([ctx, addr, clk, d0, d1, d_inv]) {
     let addr_delta = addr' - addr;
     let clk_delta = clk' - clk;
     let delta_next = d1' * 2^16 + d0';
-    let n0 = ctx_delta * d_inv';
-    let n1 = addr_delta * d_inv';
+    let is_ctx_changed = ctx_delta * d_inv';
+    let is_addr_changed = addr_delta * d_inv';
 
-    enf n0 * ctx_delta + binary_not(n0) * (n1 * addr_delta + binary_not(n1) * clk_delta) = delta_next;
+    enf is_ctx_changed * ctx_delta + binary_not(is_ctx_changed) * (is_addr_changed * addr_delta + binary_not(is_addr_changed) * clk_delta) = delta_next;
 }
 
 # Enforces correct f_scw flag computation
 ev enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]) {
     let ctx_delta = ctx' - ctx;
     let addr_delta = addr' - addr;
-    let n0 = ctx_delta * d_inv';
-    let n1 = addr_delta * d_inv';
+    let is_ctx_changed = ctx_delta * d_inv';
+    let is_addr_changed = addr_delta * d_inv';
 
-    enf f_scw' = binary_not(n0) * binary_not(n1);
+    enf f_scw' = binary_not(is_ctx_changed) * binary_not(is_addr_changed);
 }
 
 # Enforces that accesses to same context, word address, and clock must be reads
@@ -188,25 +170,7 @@ ev enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]) {
 
 # Enforces memory value consistency, and proper read/write semantics
 ev enforce_values_consistency([is_read, is_word_access, idx0, idx1, v0, v1, v2, v3, f_scw]) {
-    # Element selection flags: f[i] = 1 when element index (2*idx1 + idx0) equals i
-    let is_accessed_0 = binary_not(idx1') * binary_not(idx0');
-    let is_accessed_1 = binary_not(idx1') * idx0';
-    let is_accessed_2 = idx1' * binary_not(idx0');
-    let is_accessed_3 = idx1' * idx0';
-
-    # is_constrainted_value_i is set to 1 when `v'[i]` is not written to, and 0 otherwise.
-    #
-    # In other words, is_constrainted_value_i is set to 1 when `v'[i]` needs to be constrained (to either 0 or `v[i]`).
-    #
-    # Note that `is_constrainted_value_i` only uses values in the "next" row. This is because it must be used to
-    # constrain the first row of the memory chiplet, where that row sits in the "next" position of
-    # the frame, and the "current" row belongs to the previous chiplet (and hence the "current" row
-    # must not be accessed).
-    #
-    # As a result, `is_constrainted_value_i` does not include the constraint of being in the memory chiplet, or in the
-    # same context and word - these must be enforced separately.
-    let is_accessed = [is_accessed_0, is_accessed_1, is_accessed_2, is_accessed_3];
-    let is_constrained_value = [compute_constrained_values(is_accessed_i, is_read', is_word_access') for is_accessed_i in is_accessed];
+    let is_constrained_value = compute_element_access_flags(idx0', idx1', is_read', is_word_access');
 
     # Non-first row constraints: if v[i]' is not written to and,
     # - (f_scw' = 1) then its value needs to be copied over from the previous row,
@@ -245,4 +209,29 @@ fn flag_next_row_first_row_memory(s0: felt, s1: felt, s2: felt) -> felt {
 fn compute_constrained_values(is_accessed_i: felt, is_read_next: felt, is_word_access_next: felt) -> felt {
     let z_i = binary_not(is_word_access_next) * binary_not(is_accessed_i);
     return is_read_next + binary_not(is_read_next) * z_i;
+}
+
+# Computes which memory elements need to be constrained based on access pattern
+# Returns array of 4 flags indicating whether each element (v0-v3) needs constraining
+#
+# is_constrainted_value_i is set to 1 when `v'[i]` is not written to, and 0 otherwise.
+#
+# In other words, is_constrainted_value_i is set to 1 when `v'[i]` needs to be constrained (to either 0 or `v[i]`).
+#
+# Note that `is_constrainted_value_i` only uses values in the "next" row. This is because it must be used to
+# constrain the first row of the memory chiplet, where that row sits in the "next" position of
+# the frame, and the "current" row belongs to the previous chiplet (and hence the "current" row
+# must not be accessed).
+#
+# As a result, `is_constrainted_value_i` does not include the constraint of being in the memory chiplet, or in the
+# same context and word - these must be enforced separately.
+fn compute_element_access_flags(idx0_next: felt, idx1_next: felt, is_read_next: felt, is_word_access_next: felt) -> felt[4] {
+    # Element selection flags: is_accessed[i] = 1 when element index (2*idx1 + idx0) equals i
+    let is_accessed_0 = binary_not(idx1_next) * binary_not(idx0_next);
+    let is_accessed_1 = binary_not(idx1_next) * idx0_next;
+    let is_accessed_2 = idx1_next * binary_not(idx0_next);
+    let is_accessed_3 = idx1_next * idx0_next;
+
+    let is_accessed = [is_accessed_0, is_accessed_1, is_accessed_2, is_accessed_3];
+    return [compute_constrained_values(is_accessed_i, is_read_next, is_word_access_next) for is_accessed_i in is_accessed];
 }
