@@ -76,6 +76,30 @@ ev stack_general_constraints([s15, b0, b1, h0, decoder_b0, decoder_b1, decoder_b
     # 4. LEFT SHIFT ZERO INSERTION CONSTRAINT
     enf left_shift_zero_insertion([s15, b0, h0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
                                   decoder_h5, decoder_e0, decoder_e1]);
+
+    ####################################################################################
+    # BUS OPERATIONS - STACK OVERFLOW TABLE (bus_3_stack_p1)
+    ####################################################################################
+    # The overflow table stores values beyond the top 16 stack elements.
+    # Format: (address, value, prev_address)
+    ####################################################################################
+
+    # Compute operation flags and overflow flag
+    let op_bits = [decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6];
+    let fshr = flag_shr(op_bits, decoder_e0, decoder_e1);
+    let fshl = flag_shl(op_bits, decoder_h5, decoder_e0, decoder_e1);
+    let fdyncall = flag_dyncall(op_bits, decoder_e0);
+    let depth_excess = b0 - 16;
+    let fov = depth_excess * h0;
+
+    # Right shift: insert s15 into overflow table
+    bus_3_stack_p1.insert(b1', s15, b1) when fshr;
+
+    # Left shift with overflow: remove from overflow table and restore to s15'
+    bus_3_stack_p1.remove(b1, s15', b1') when fshl * fov;
+
+    # DYNCALL with overflow: uses decoder_h5 as prev_address (b1' reset to 0 in new context)
+    bus_3_stack_p1.remove(b1, s15', decoder_h5) when fdyncall * fov;
 }
 
 # Stack overflow flag constraint
