@@ -175,8 +175,9 @@ integrity_constraints {
     # System state transitions (needs decoder columns for operation flags)
     enf system_transition([system[0..8], decoder[0..24]]);
 
-    # Decoder constraints - Program execution and operation decoding (needs stack top s0-s2, system clk and ctx)
-    enf decoder([decoder, stack[0], stack[1], stack[2], system[0], system[2]]);
+    # Decoder constraints - Program execution and operation decoding
+    # Requires: stack top (s0-s2), system (clk, ctx, fmp, fn_hash), overflow registers (b0, b1)
+    enf decoder([decoder, stack[0], stack[1], stack[2], system[0], system[2], system[1], stack[16], stack[17], system[4], system[5], system[6], system[7]]);
 
     # Stack constraints - Operand stack operations and overflow handling
     enf stack([stack[0..19], decoder[0..24], system[0], system[1], system[2], system[4], system[5], system[6], system[7]]);

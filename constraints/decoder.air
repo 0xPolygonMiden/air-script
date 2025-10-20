@@ -40,8 +40,12 @@ use utils::*;
 ##########################################################################################
 
 # Main decoder constraint evaluator
-# Note: Decoder needs access to stack top (s0-s2) for operation constraints and general constraints, and system clk/ctx for bus operations
-ev decoder([addr, b0, b1, b2, b3, b4, b5, b6, h0, h1, h2, h3, h4, h5, h6, h7, sp, gc, ox, c0, c1, c2, e0, e1, s0, s1, s2, system_clk, system_ctx]) {
+# Note: Decoder needs access to:
+# - stack top (s0-s2) for operation constraints and general constraints
+# - system clk/ctx for bus operations
+# - frame pointer (fmp) and overflow registers (stack_b0, stack_b1) for block stack table
+# - function hash (fn_hash[0..3]) for CALL/SYSCALL/DYNCALL operations
+ev decoder([addr, b0, b1, b2, b3, b4, b5, b6, h0, h1, h2, h3, h4, h5, h6, h7, sp, gc, ox, c0, c1, c2, e0, e1, s0, s1, s2, system_clk, system_ctx, fmp, stack_b0, stack_b1, fn_hash_0, fn_hash_1, fn_hash_2, fn_hash_3]) {
     ####################################################################################
     # TRANSITION CONSTRAINTS
     ####################################################################################
@@ -80,38 +84,140 @@ ev decoder([addr, b0, b1, b2, b3, b4, b5, b6, h0, h1, h2, h3, h4, h5, h6, h7, sp
     # Opcode value for domain separation: d = Σ(bi·2^i)
     let opcode = b0 + 2 * b1 + 4 * b2 + 8 * b3 + 16 * b4 + 32 * b5 + 64 * b6;
 
-    # Memory operations: DYN/DYNCALL read target hash from memory
-    # The callee hash is read into h0'-h3' for bookkeeping, but the hash computation
-    # itself operates on [ZERO; 8] to compute the block hash
-    bus_6_chiplets_bus.insert(MEMREADWORD, system_ctx, s0, system_clk, h0', h1', h2', h3') when (fdyn + fdyncall);
+    # DYN/DYNCALL: Read target hash from memory (h0-h3) and hash zeros to compute block hash
+    bus_6_chiplets_bus.insert(MEMREADWORD, system_ctx, s0, system_clk, h0, h1, h2, h3) when (fdyn + fdyncall);
     bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', 0, 0, 0, 0, 0, 0, 0, 0) when (fdyn + fdyncall);
 
-    # Kernel ROM: SYSCALL validates kernel procedure and computes block hash
-    # SYSCALL hashes: hash_control_block(kernel_proc_hash, EMPTY_WORD, domain, digest)
-    # The kernel procedure hash is in h0-h3, second child is zeros (no second child)
+    # SYSCALL: Validate kernel procedure and hash control block
     bus_6_chiplets_bus.insert(KERNELPROCCALL, h0, h1, h2, h3) when fsyscall;
     bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, 0, 0, 0, 0, opcode) when fsyscall;
 
-    # ACE chiplet: EVALCIRCUIT initializes arithmetic circuit evaluation
-    # Stack layout for EVALCIRCUIT: [ptr, nread, neval, ...]
-    # Message format: (ACE_INIT, ctx, ptr, clk, nread, neval)
-    let ace_ptr = s0;     # Memory pointer to first input variable (word-aligned)
-    let ace_nread = s1;   # Number of input and constant elements
-    let ace_neval = s2;   # Number of arithmetic operations
+    # EVALCIRCUIT: Initialize arithmetic circuit evaluation (stack: [ptr, nread, neval, ...])
+    let ace_ptr = s0;     # Memory pointer to first input
+    let ace_nread = s1;   # Number of input elements
+    let ace_neval = s2;   # Number of operations
     bus_6_chiplets_bus.insert(ACEINIT, system_ctx, ace_ptr, system_clk, ace_nread, ace_neval) when fevalcircuit;
 
-    # Basic block hashing: SPAN/RESPAN/END operations
+    # SPAN/RESPAN/END: Basic block hashing operations
     bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, h4, h5, h6, h7) when fspan;
     bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, h4, h5, h6, h7) when frespan;
-    bus_6_chiplets_bus.insert(HASHERRETURNHASH, addr + 7, h0', h1', h2', h3') when fend;
+    bus_6_chiplets_bus.insert(HASHERRETURNHASH, addr + 7, h0, h1, h2, h3) when fend;
 
-    # Control flow with opcode domain separation: JOIN/SPLIT/LOOP/CALL
-    # JOIN/SPLIT hash two children: hash_control_block(child1, child2, domain, digest)
+    # JOIN/SPLIT: Hash two children with opcode domain separation
     bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, h4, h5, h6, h7, opcode) when fjoin;
     bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, h4, h5, h6, h7, opcode) when fsplit;
-    # LOOP/CALL hash one child + zeros: hash_control_block(child, EMPTY_WORD, domain, digest)
+    # LOOP/CALL: Hash one child with opcode domain separation
     bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, 0, 0, 0, 0, opcode) when floop;
     bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, 0, 0, 0, 0, opcode) when fcall;
+
+    ####################################################################################
+    # BUS OPERATIONS - DECODER VIRTUAL TABLES
+    ####################################################################################
+
+    ####################################################################################
+    # BUS 0: BLOCK STACK TABLE (bus_0_decoder_p1)
+    ####################################################################################
+    # Tracks block execution contexts during control flow.
+    # Format: (blk_id, parent_id, is_loop, ctx, fmp, b0, b1, fn_hash[0..3])
+    # Context fields (ctx, fmp, b0, b1, fn_hash) are populated only for CALL/SYSCALL.
+    ####################################################################################
+
+    # JOIN/SPLIT/SPAN/DYN: Simple control flow without context
+    bus_0_decoder_p1.insert(addr', addr, 0, 0, 0, 0, 0, 0, 0, 0, 0) when fjoin;
+    bus_0_decoder_p1.insert(addr', addr, 0, 0, 0, 0, 0, 0, 0, 0, 0) when fsplit;
+    bus_0_decoder_p1.insert(addr', addr, 0, 0, 0, 0, 0, 0, 0, 0, 0) when fspan;
+    bus_0_decoder_p1.insert(addr', addr, 0, 0, 0, 0, 0, 0, 0, 0, 0) when fdyn;
+
+    # LOOP: is_loop flag equals stack top
+    bus_0_decoder_p1.insert(addr', addr, s0, 0, 0, 0, 0, 0, 0, 0, 0) when floop;
+
+    # RESPAN: Update parent block ID
+    bus_0_decoder_p1.remove(addr, h1', 0, 0, 0, 0, 0, 0, 0, 0, 0) when frespan;
+    bus_0_decoder_p1.insert(addr', h1', 0, 0, 0, 0, 0, 0, 0, 0, 0) when frespan;
+
+    # CALL/SYSCALL: Save execution context
+    bus_0_decoder_p1.insert(addr', addr, 0, system_ctx, fmp, stack_b0, stack_b1, h0, h1, h2, h3) when fcall;
+    bus_0_decoder_p1.insert(addr', addr, 0, system_ctx, fmp, stack_b0, stack_b1, h0, h1, h2, h3) when fsyscall;
+
+    # DYNCALL: Save context with h4/h5 (post-shift stack state)
+    bus_0_decoder_p1.insert(addr', addr, 0, system_ctx, fmp, h4, h5, fn_hash_0, fn_hash_1, fn_hash_2, fn_hash_3) when fdyncall;
+
+    # END: Remove block from stack (restore context if call/syscall)
+    let is_call_or_syscall = h6 + h7;
+    let is_simple_end = 1 - is_call_or_syscall;
+    bus_0_decoder_p1.remove(addr, h1', is_call_or_syscall * h5, h2', h3', h4', h5', h0', h1', h2', h3') when fend * is_call_or_syscall;
+    bus_0_decoder_p1.remove(addr, h1', 0, 0, 0, 0, 0, 0, 0, 0, 0) when fend * is_simple_end;
+
+    ####################################################################################
+    # BUS 1: BLOCK HASH TABLE (bus_1_decoder_p2)
+    ####################################################################################
+    # Tracks parent-child relationships in control flow.
+    # Format: (parent_id, child_hash[0..3], is_first_child, is_loop_body)
+    ####################################################################################
+
+    # JOIN: Insert both children (parent is next row's address)
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 1, 0) when fjoin;
+    bus_1_decoder_p2.insert(addr', h4, h5, h6, h7, 0, 0) when fjoin;
+
+    # SPLIT: Insert selected branch based on s0
+    let split_h0 = s0 * h0 + (1 - s0) * h4;
+    let split_h1 = s0 * h1 + (1 - s0) * h5;
+    let split_h2 = s0 * h2 + (1 - s0) * h6;
+    let split_h3 = s0 * h3 + (1 - s0) * h7;
+    bus_1_decoder_p2.insert(addr', split_h0, split_h1, split_h2, split_h3, 0, 0) when fsplit;
+
+    # LOOP: Insert loop body only if s0=1
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 1) when floop * s0;
+
+    # REPEAT: Insert loop body for re-execution
+    let frepeat = flag_repeat([b0, b1, b2, b3, b4, b5, b6], e1);
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 1) when frepeat;
+
+    # DYN/DYNCALL/CALL/SYSCALL: Insert callee hash
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when fdyn;
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when fdyncall;
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when fcall;
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when fsyscall;
+
+    # END: Remove child hash (h6 indicates first child of JOIN)
+    bus_1_decoder_p2.remove(h1', h0', h1', h2', h3', h6, h5) when fend;
+
+    ####################################################################################
+    # BUS 2: OP GROUP TABLE (bus_2_decoder_p3)
+    ####################################################################################
+    # Tracks operation groups during basic block execution.
+    # Note: h0 is decoded immediately, only h1-h7 are inserted.
+    ####################################################################################
+
+    # Batch size flags
+    let fg1 = (1 - c0) * c1 * (1 - c2);
+    let fg2 = (1 - c0) * (1 - c1) * c2;
+    let fg4 = (1 - c0) * c1 * c2;
+    let fg8 = c0;
+
+    # 2-group batch: Insert h1
+    bus_2_decoder_p3.insert(addr', gc - 1, h1) when (fspan + frespan) * fg2;
+
+    # 4-group batch: Insert h1-h3
+    bus_2_decoder_p3.insert(addr', gc - 1, h1) when (fspan + frespan) * fg4;
+    bus_2_decoder_p3.insert(addr', gc - 2, h2) when (fspan + frespan) * fg4;
+    bus_2_decoder_p3.insert(addr', gc - 3, h3) when (fspan + frespan) * fg4;
+
+    # 8-group batch: Insert h1-h7
+    bus_2_decoder_p3.insert(addr', gc - 1, h1) when (fspan + frespan) * fg8;
+    bus_2_decoder_p3.insert(addr', gc - 2, h2) when (fspan + frespan) * fg8;
+    bus_2_decoder_p3.insert(addr', gc - 3, h3) when (fspan + frespan) * fg8;
+    bus_2_decoder_p3.insert(addr', gc - 4, h4) when (fspan + frespan) * fg8;
+    bus_2_decoder_p3.insert(addr', gc - 5, h5) when (fspan + frespan) * fg8;
+    bus_2_decoder_p3.insert(addr', gc - 6, h6) when (fspan + frespan) * fg8;
+    bus_2_decoder_p3.insert(addr', gc - 7, h7) when (fspan + frespan) * fg8;
+
+    # Remove group when decoding (PUSH uses s0' as immediate value)
+    let fpush = flag_push([b0, b1, b2, b3, b4, b5, b6], e0);
+    let op_next = b0' + 2 * b1' + 4 * b2' + 8 * b3' + 16 * b4' + 32 * b5' + 64 * b6';
+    let decoded_op_value = (h0' * 2^7 + op_next) * (1 - fpush) + s0' * fpush;
+    let is_decrementing_gc = sp * (gc - gc');
+    bus_2_decoder_p3.remove(addr, gc, decoded_op_value) when is_decrementing_gc;
 }
 
 ##########################################################################################
