@@ -567,26 +567,30 @@ fn check_evaluator_argument_sizes(
                 // slice.
                 // We need to make sure that this vector is a vector of Felts
                 // and to add its length to the total length of arguments
-                assert!(
-                    vector.children().borrow().iter().all(|c| {
-                        let c = extract_accessor(c.clone());
-                        if let Some(param) = c.as_parameter() {
-                            param.ty == MirType::Felt
-                        } else if let Some(value) = c.as_value() {
+                for child in vector.children().borrow().iter() {
+                    let child = extract_accessor(child.clone());
+                    if let Some(param) = child.as_parameter() {
+                        assert!(
+                            param.ty == MirType::Felt,
+                            "expected parameter of type Felt, got {:#?}",
+                            param
+                        );
+                    } else if let Some(value) = child.as_value() {
+                        assert!(
                             matches!(
                                 value.value,
                                 SpannedMirValue {
                                     value: MirValue::Constant(_) | MirValue::TraceAccess(_),
                                     ..
                                 }
-                            )
-                        } else {
-                            false
-                        }
-                    }),
-                    "expected vector of Felts, got {:#?}",
-                    vector
-                );
+                            ),
+                            "expected value or parameter, got {:#?}",
+                            value
+                        );
+                    } else {
+                        unreachable!("expected value or parameter, got {:#?}", child);
+                    }
+                }
                 let vector_len = vector.children().borrow().len();
                 trace_segments_arg_vector_len += vector_len;
             } else {
@@ -646,10 +650,10 @@ fn extract_accessor(op: Link<Op>) -> Link<Op> {
         },
         MirAccessType::Matrix(row, col) => {
             let row = get_inner_const(row)
-                .unwrap_or_else(|| panic!("expected constant row, got {row:#?}"))
+                .unwrap_or_else(|| panic!("expected constant row, got {:#?}", row))
                 as usize;
             let col = get_inner_const(col)
-                .unwrap_or_else(|| panic!("expected constant column, got {col:#?}"))
+                .unwrap_or_else(|| panic!("expected constant column, got {:#?}", col))
                 as usize;
             while indexable.clone().as_accessor().is_some() {
                 indexable = extract_accessor(indexable.clone());
