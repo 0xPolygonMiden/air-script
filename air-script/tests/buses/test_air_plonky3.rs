@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use p3_challenger::{HashChallenger, SerializingChallenger64};
 use p3_circle::CirclePcs;
 use p3_commit::ExtensionMmcs;
-use p3_field::{PrimeField64, extension::BinomialExtensionField};
+use p3_field::{PrimeCharacteristicRing, PrimeField64, extension::BinomialExtensionField};
 use p3_fri::create_benchmark_fri_params;
 use p3_goldilocks::Goldilocks;
 use p3_matrix::dense::RowMajorMatrix;
@@ -51,6 +51,5 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<
 fn generate_inputs() -> Vec<u32> {
     vec![1; 2]
 }
-use p3_field::PrimeCharacteristicRing;
 
 generate_air_plonky3_test!(test_air_plonky3, BusesAir);
