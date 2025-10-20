@@ -633,7 +633,7 @@ fn extract_accessor(op: Link<Op>) -> Link<Op> {
         MirAccessType::Default => accessor.indexable.clone(),
         MirAccessType::Index(idx_op) => {
             let idx =
-                get_inner_const(idx_op).expect("expected constant index, got {idx_op:#?}") as usize;
+                get_inner_const(idx_op).unwrap_or_else(|| panic!("expected constant index, got {idx_op:#?}", idx_op)) as usize;
             while indexable.clone().as_accessor().is_some() {
                 indexable = extract_accessor(indexable.clone());
             }
@@ -644,9 +644,9 @@ fn extract_accessor(op: Link<Op>) -> Link<Op> {
             }
         },
         MirAccessType::Matrix(row, col) => {
-            let row = get_inner_const(row).expect("expected constant row, got {row:#?}") as usize;
+            let row = get_inner_const(row).unwrap_or_else(|| panic!("expected constant row, got {row:#?}")) as usize;
             let col =
-                get_inner_const(col).expect("expected constant column, got {col:#?}") as usize;
+                get_inner_const(col).unwrap_or_else(|| panic!("expected constant column, got {col:#?}")) as usize;
             while indexable.clone().as_accessor().is_some() {
                 indexable = extract_accessor(indexable.clone());
             }
