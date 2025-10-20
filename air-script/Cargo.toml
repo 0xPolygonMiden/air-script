@@ -38,7 +38,7 @@ p3-field = { package = "p3-field", version = "0.3", default-features = false }
 p3-fri = { package = "p3-fri", version = "0.3", default-features = false }
 p3-matrix = { package = "p3-matrix", version = "0.3", default-features = false }
 p3-merkle-tree = { package = "p3-merkle-tree", version = "0.3", default-features = false }
-p3-mersenne-31 = { package = "p3-mersenne-31", version = "0.3", default-features = false }
+p3-goldilocks = { package = "p3-goldilocks", version = "0.3", default-features = false }
 p3-sha256 = { package = "p3-sha256", version = "0.3", default-features = false }
 p3-symmetric = { package = "p3-symmetric", version = "0.3", default-features = false }
 p3-uni-stark = { package = "p3-uni-stark", version = "0.3.0", default-features = false }

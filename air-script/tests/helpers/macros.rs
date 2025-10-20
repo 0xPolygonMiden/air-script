@@ -40,7 +40,7 @@ macro_rules! generate_air_plonky3_test {
     ($test_name:ident, $air_name:ident) => {
         #[test]
         fn $test_name() {
-            type Val = Mersenne31;
+            type Val = Goldilocks;
             type Challenge = BinomialExtensionField<Val, 3>;
 
             type ByteHash = Sha256;
@@ -48,7 +48,7 @@ macro_rules! generate_air_plonky3_test {
             type MyCompress = CompressionFunctionFromHasher<ByteHash, 2, 32>;
             type ValMmcs = MerkleTreeMmcs<Val, u8, FieldHash, MyCompress, 32>;
             type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
-            type Challenger = SerializingChallenger32<Val, HashChallenger<u8, ByteHash, 32>>;
+            type Challenger = SerializingChallenger64<Val, HashChallenger<u8, ByteHash, 32>>;
             type Pcs = CirclePcs<Val, ValMmcs, ChallengeMmcs>;
             type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
 
@@ -67,18 +67,18 @@ macro_rules! generate_air_plonky3_test {
             let config = MyConfig::new(pcs, challenger);
 
             let inputs = generate_inputs();
-            let inputs_m31: Vec<Val> =
-                inputs.iter().map(|&x| Val::new_checked(x).unwrap()).collect();
+            let inputs_goldilocks: Vec<Val> =
+                inputs.iter().map(|&x| Val::from_u32(x)).collect();
 
             let trace = generate_trace_rows::<Val>(inputs);
 
-            check_constraints_with_periodic_columns(&$air_name {}, &trace, &inputs_m31);
+            check_constraints_with_periodic_columns(&$air_name {}, &trace, &inputs_goldilocks);
 
-            /*let prove_with_periodic_columns = prove_with_periodic_columns(&config, &BitwiseAir {}, trace, &inputs_m31);
-            verify_with_periodic_columns(&config, &BitwiseAir {}, &prove_with_periodic_columns, &inputs_m31).expect("Verification failed");*/
+            /*let prove_with_periodic_columns = prove_with_periodic_columns(&config, &BitwiseAir {}, trace, &inputs_goldilocks);
+            verify_with_periodic_columns(&config, &BitwiseAir {}, &prove_with_periodic_columns, &inputs_goldilocks).expect("Verification failed");*/
 
-            /*let proof = prove(&config, &BitwiseAir {}, trace, &inputs_m31);
-            verify(&config, &BitwiseAir {}, &proof, &inputs_m31).expect("Verification failed");*/
+            /*let proof = prove(&config, &BitwiseAir {}, trace, &inputs_goldilocks);
+            verify(&config, &BitwiseAir {}, &proof, &inputs_goldilocks).expect("Verification failed");*/
         }
     };
 }
