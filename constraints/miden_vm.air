@@ -18,7 +18,6 @@ def MidenVM
 use chiplets::chiplets_constraints;
 use decoder::decoder;
 use bitwise::*;
-use hasher::*;
 use range_checker::*;
 use stack::stack;
 use system::*;
@@ -176,14 +175,14 @@ integrity_constraints {
     # System state transitions (needs decoder columns for operation flags)
     enf system_transition([system[0..8], decoder[0..24]]);
 
-    # Decoder constraints - Program execution and operation decoding (needs stack top s0)
-    enf decoder([decoder, stack[0]]);
+    # Decoder constraints - Program execution and operation decoding (needs stack top s0-s2, system clk and ctx)
+    enf decoder([decoder, stack[0], stack[1], stack[2], system[0], system[2]]);
 
     # Stack constraints - Operand stack operations and overflow handling
-    enf stack([stack[0..19], decoder[0..24], system[0], system[1], system[4], system[5], system[6], system[7]]);  # Pass decoder columns, system clock, fmp, and fn_hash for operations
+    enf stack([stack[0..19], decoder[0..24], system[0], system[1], system[2], system[4], system[5], system[6], system[7]]);
 
     # Chiplet constraints - Hash, bitwise, ACE, memory operations, and kernel ROM
-    enf chiplets_constraints([chiplets[0..20]]);
+    enf chiplets_constraints([chiplets[0..20], system[0]]);
 
     ####################################################################################
     # BUS CONSTRAINTS

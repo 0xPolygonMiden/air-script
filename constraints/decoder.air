@@ -40,9 +40,11 @@ use utils::*;
 ##########################################################################################
 
 # Main decoder constraint evaluator
-# Note: Decoder needs access to stack top (s0) for general constraints
-ev decoder([addr, b0, b1, b2, b3, b4, b5, b6, h0, h1, h2, h3, h4, h5, h6, h7, sp, gc, ox, c0, c1, c2, e0, e1, s0]) {
-    # DECODING
+# Note: Decoder needs access to stack top (s0-s2) for operation constraints and general constraints, and system clk/ctx for bus operations
+ev decoder([addr, b0, b1, b2, b3, b4, b5, b6, h0, h1, h2, h3, h4, h5, h6, h7, sp, gc, ox, c0, c1, c2, e0, e1, s0, s1, s2, system_clk, system_ctx]) {
+    ####################################################################################
+    # TRANSITION CONSTRAINTS
+    ####################################################################################
 
     # GENERAL DECODER CONSTRAINTS
     enf general_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, h4, h5, h6, h7, addr, sp, s0]);
@@ -53,19 +55,63 @@ ev decoder([addr, b0, b1, b2, b3, b4, b5, b6, h0, h1, h2, h3, h4, h5, h6, h7, sp
     # OPERATION BATCH FLAGS CONSTRAINTS
     enf op_batch_flags_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, h4, h5, h6, h7, c0, c1, c2]);
 
-    # OP FLAGS BITS
-
-    # U32 OPERATIONS BIT CONSTRAINTS
-    # Force b0 = 0 for all u32 operations (100_xxx0 pattern)
+    # OP FLAGS BITS CONSTRAINTS
     enf u32_bit_constraints([b0, b1, b2, b3, b4, b5, b6]);
-
-    # HIGH-DEGREE OPERATIONS BIT CONSTRAINTS
-    # Define degree reduction: e0 = b6 * (1-b5) * b4 for 101-prefix group
     enf high_degree_bit_constraints([b0, b1, b2, b3, b4, b5, b6, e0]);
-
-    # VERY HIGH-DEGREE OPERATIONS BIT CONSTRAINTS
-    # Define degree reduction and force last 2 bits to be 0 for 11-prefix groups
     enf very_high_degree_bit_constraints([b0, b1, b2, b3, b4, b5, b6, e1]);
+
+    ####################################################################################
+    # BUS OPERATIONS - CHIPLETS COMMUNICATION
+    ####################################################################################
+
+    # Compute operation flags once for all bus operations
+    let fdyn = flag_dyn([b0, b1, b2, b3, b4, b5, b6], e0);
+    let fdyncall = flag_dyncall([b0, b1, b2, b3, b4, b5, b6], e0);
+    let fsyscall = flag_syscall([b0, b1, b2, b3, b4, b5, b6], e1);
+    let fevalcircuit = flag_evalcircuit([b0, b1, b2, b3, b4, b5, b6], e0);
+    let fspan = flag_span([b0, b1, b2, b3, b4, b5, b6], e0);
+    let frespan = flag_respan([b0, b1, b2, b3, b4, b5, b6], e1);
+    let fend = flag_end([b0, b1, b2, b3, b4, b5, b6], e1);
+    let fjoin = flag_join([b0, b1, b2, b3, b4, b5, b6], e0);
+    let fsplit = flag_split([b0, b1, b2, b3, b4, b5, b6], e0);
+    let floop = flag_loop([b0, b1, b2, b3, b4, b5, b6], e0);
+    let fcall = flag_call([b0, b1, b2, b3, b4, b5, b6], e1);
+
+    # Opcode value for domain separation: d = Σ(bi·2^i)
+    let opcode = b0 + 2 * b1 + 4 * b2 + 8 * b3 + 16 * b4 + 32 * b5 + 64 * b6;
+
+    # Memory operations: DYN/DYNCALL read target hash from memory
+    # The callee hash is read into h0'-h3' for bookkeeping, but the hash computation
+    # itself operates on [ZERO; 8] to compute the block hash
+    bus_6_chiplets_bus.insert(MEMREADWORD, system_ctx, s0, system_clk, h0', h1', h2', h3') when (fdyn + fdyncall);
+    bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', 0, 0, 0, 0, 0, 0, 0, 0) when (fdyn + fdyncall);
+
+    # Kernel ROM: SYSCALL validates kernel procedure and computes block hash
+    # SYSCALL hashes: hash_control_block(kernel_proc_hash, EMPTY_WORD, domain, digest)
+    # The kernel procedure hash is in h0-h3, second child is zeros (no second child)
+    bus_6_chiplets_bus.insert(KERNELPROCCALL, h0, h1, h2, h3) when fsyscall;
+    bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, 0, 0, 0, 0, opcode) when fsyscall;
+
+    # ACE chiplet: EVALCIRCUIT initializes arithmetic circuit evaluation
+    # Stack layout for EVALCIRCUIT: [ptr, nread, neval, ...]
+    # Message format: (ACE_INIT, ctx, ptr, clk, nread, neval)
+    let ace_ptr = s0;     # Memory pointer to first input variable (word-aligned)
+    let ace_nread = s1;   # Number of input and constant elements
+    let ace_neval = s2;   # Number of arithmetic operations
+    bus_6_chiplets_bus.insert(ACEINIT, system_ctx, ace_ptr, system_clk, ace_nread, ace_neval) when fevalcircuit;
+
+    # Basic block hashing: SPAN/RESPAN/END operations
+    bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, h4, h5, h6, h7) when fspan;
+    bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, h4, h5, h6, h7) when frespan;
+    bus_6_chiplets_bus.insert(HASHERRETURNHASH, addr + 7, h0', h1', h2', h3') when fend;
+
+    # Control flow with opcode domain separation: JOIN/SPLIT/LOOP/CALL
+    # JOIN/SPLIT hash two children: hash_control_block(child1, child2, domain, digest)
+    bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, h4, h5, h6, h7, opcode) when fjoin;
+    bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, h4, h5, h6, h7, opcode) when fsplit;
+    # LOOP/CALL hash one child + zeros: hash_control_block(child, EMPTY_WORD, domain, digest)
+    bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, 0, 0, 0, 0, opcode) when floop;
+    bus_6_chiplets_bus.insert(HASHERLINEARHASH, addr', h0, h1, h2, h3, 0, 0, 0, 0, opcode) when fcall;
 }
 
 ##########################################################################################

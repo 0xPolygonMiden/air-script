@@ -140,3 +140,36 @@ fn binary_xor(a: felt, b: felt) -> felt {
 fn select(condition: felt, if_true: felt, if_false: felt) -> felt {
     return condition * (if_true - if_false) + if_false;
 }
+
+##########################################################################################
+# OPERATION LABELS
+##########################################################################################
+
+# Operation labels for bus communication
+#
+##########################################################################################
+
+# Hasher Chiplet Operation Labels
+const HASHERLINEARHASH = 3;        # Linear hash of n elements
+const HASHERMPVERIFY = 11;         # Merkle path verification
+const HASHERMRUPDATEOLD = 7;       # Merkle root update (old path)
+const HASHERMRUPDATENEW = 15;      # Merkle root update (new path)
+const HASHERRETURNHASH = 1;        # Return hash result (positions 4-7)
+const HASHERRETURNSTATE = 9;       # Return full state (all 12 elements)
+
+# Bitwise Chiplet Operation Labels
+const BITWISEAND = 2;              # Bitwise AND of two u32 values
+const BITWISEXOR = 6;              # Bitwise XOR of two u32 values
+
+# Memory Chiplet Operation Labels
+const MEMWRITEELEMENT = 4;         # Element write operation (1 element)
+const MEMREADELEMENT = 12;         # Element read operation (1 element)
+const MEMWRITEWORD = 20;           # Word write operation (4 elements)
+const MEMREADWORD = 28;            # Word read operation (4 elements)
+
+# ACE Chiplet Operation Labels (uses bus_7_wiring_bus, not bus_6_chiplets_bus)
+const ACEINIT = 8;                 # ACE circuit initialization
+
+# Kernel ROM Chiplet Operation Labels
+const KERNELPROCCALL = 16;         # Kernel procedure call
+const KERNELPROCINIT = 48;         # Kernel procedure initialization

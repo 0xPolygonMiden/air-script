@@ -14,7 +14,7 @@
 # │  5-19   │ Chiplet-specific data (hasher, bitwise ops, memory, ACE, kernel ROM) │
 # └─────────┴──────────────────────────────────────────────────────────────────────┘
 #
-# STATUS: Not fully implemented
+# STATUS: Fully implemented
 #
 # REFERENCES:
 # - Chiplets Design: https://0xmiden.github.io/miden-vm/design/chiplets/main.html
@@ -26,6 +26,8 @@ use ace::ace_chiplet_constraints_all_rows;
 use ace::ace_chiplet_constraints_first_row;
 
 use bitwise::bitwise_chiplet_constraints;
+
+use hasher::hash_chiplet;
 
 use memory::memory_chiplet_constraints_all_rows;
 use memory::memory_chiplet_constraints_all_rows_except_last;
@@ -42,7 +44,7 @@ use utils::*;
 # CHIPLETS CONSTRAINTS
 ##########################################################################################
 
-ev chiplets_constraints([chiplets[20]]) {
+ev chiplets_constraints([chiplets[20], system_clk]) {
     # Chiplets' flag constraints
     let s0 = chiplets[0];
     let s1 = chiplets[1];
@@ -66,7 +68,7 @@ ev chiplets_constraints([chiplets[20]]) {
 
     # Apply chiplet-specific constraints based on selectors.
     enf match {
-        #case hash_active: hash_chiplet_constraints([chiplets[1..20]]),
+        case hash_active: hash_chiplet([chiplets[0..16], system_clk]),
         case bitwise_active: bitwise_chiplet_constraints([chiplets[2..15]]),
         case memory_active: memory_chiplet_constraints_all_rows([chiplets[3..18]]),
         case ace_active: ace_chiplet_constraints_all_rows([chiplets[3..20]]),

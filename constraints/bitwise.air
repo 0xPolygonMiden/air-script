@@ -8,7 +8,7 @@
 #
 # Each bitwise operation spans exactly 8 rows, with limbs processed in little-endian order.
 #
-# STATUS: Partially implemented (missing bus constraints)
+# STATUS: Fully implemented (core constraints + bus responses complete)
 #
 # REFERENCES:
 # - Bitwise Chiplet: https://0xmiden.github.io/miden-vm/design/chiplets/bitwise.html
@@ -41,9 +41,38 @@ periodic_columns {
 #
 # Max constraint degree: 4
 ev bitwise_chiplet_constraints([op_flag, a, b, a_limb[4], b_limb[4], zp, z]) {
+    ####################################################################################
+    # TRANSITION CONSTRAINTS
+    ####################################################################################
+
     enf bitwise_op_flag([op_flag]);
     enf input_decomposition([a, b, a_limb, b_limb]);
     enf output_aggregation([op_flag, a, b, a_limb, b_limb, zp, z]);
+
+    ####################################################################################
+    # BUS OPERATIONS - CHIPLETS COMMUNICATION
+    ####################################################################################
+    # The bitwise chiplet provides responses to bitwise operation requests via the
+    # chiplets bus. Each operation spans 8 rows, and the response is removed on the
+    # LAST row of the cycle (when k_transition = 0).
+    #
+    # OPERATIONS:
+    # - BITWISEAND (label = 2): AND operation (op_flag = 0)
+    # - BITWISEXOR (label = 6): XOR operation (op_flag = 1)
+    #
+    # Response format: (operation_label, a, b, z)
+    # where a, b are 32-bit operands and z is the result.
+    ####################################################################################
+
+    # Compute operation flags
+    let is_and = binary_not(op_flag);
+    let is_xor = op_flag;
+
+    # Remove bus responses on the last row of the 8-row cycle
+    let is_last_row = binary_not(k_transition);
+
+    bus_6_chiplets_bus.remove(BITWISEAND, a, b, z) when (is_and * is_last_row);
+    bus_6_chiplets_bus.remove(BITWISEXOR, a, b, z) when (is_xor * is_last_row);
 }
 
 ##########################################################################################

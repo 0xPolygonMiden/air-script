@@ -22,7 +22,7 @@
 # │ f_scw   │ Same context/word address flag for sequential access optimization        │
 # └─────────┴──────────────────────────────────────────────────────────────────────────┘
 #
-# STATUS: Partially implemented (missing bus integration)
+# STATUS: Fully implemented with chiplets bus integration
 #
 # REFERENCES:
 # - Memory Design: https://0xmiden.github.io/miden-vm/design/chiplets/memory.html
@@ -33,7 +33,7 @@ mod memory
 use utils::*;
 
 ##########################################################################################
-# MEMORY CHIPLET CONSTRAINTS
+# MEMORY CHIPLET TRANSITION CONSTRAINTS
 ##########################################################################################
 
 # Enforces proper memory initialization when entering memory chiplet
@@ -89,7 +89,7 @@ ev memory_chiplet_constraints_all_rows([memory[15]]) {
 }
 
 # Enforces memory state transition constraints for all rows except the final row
-# Includes monotonicity, value consistency, and proper read/write semantics
+# Includes monotonicity, value consistency, proper read/write semantics, and bus interactions
 ev memory_chiplet_constraints_all_rows_except_last([memory[15]]) {
     let is_read = memory[0];        # Read(1)/Write(0) selector
     let is_word_access = memory[1]; # Element(0)/Word(1) access selector
@@ -117,10 +117,44 @@ ev memory_chiplet_constraints_all_rows_except_last([memory[15]]) {
     enf enforce_flag_same_context_and_word([ctx, addr, d_inv, f_scw]);
 
     # Same context/word/addr/clock access constraints
-    enf enforce_same_context_word_addr_and_clock([is_read, ctx, clk, d_inv]);
+    enf enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]);
 
     # Memory value constraints
     enf enforce_values_consistency([is_read, is_word_access, idx0, idx1, v0, v1, v2, v3, f_scw]);
+
+    ####################################################################################
+    # BUS OPERATIONS
+    ####################################################################################
+    # The memory chiplet provides responses to memory operation requests via the
+    # chiplets bus.
+    #
+    # OPERATIONS:
+    # - MEMREADWORD (label = 28): Read 4-element word from memory
+    # - MEMWRITEWORD (label = 20): Write 4-element word to memory
+    # - MEMREADELEMENT (label = 12): Read single element from memory
+    # - MEMWRITEELEMENT (label = 4): Write single element to memory
+    #
+    # All operations include context, address, and clock cycle
+    ####################################################################################
+
+    # Compute operation flags
+    let is_word_read = is_read * is_word_access;
+    let is_word_write = binary_not(is_read) * is_word_access;
+    let is_element_read = is_read * binary_not(is_word_access);
+    let is_element_write = binary_not(is_read) * binary_not(is_word_access);
+
+    # For element operations, compute which element is being accessed
+    let f0_bus = binary_not(idx1) * binary_not(idx0);
+    let f1_bus = binary_not(idx1) * idx0;
+    let f2_bus = idx1 * binary_not(idx0);
+    let f3_bus = idx1 * idx0;
+    let element_value = f0_bus * v0 + f1_bus * v1 + f2_bus * v2 + f3_bus * v3;
+
+    # Remove responses from bus when operations occur
+    bus_6_chiplets_bus.remove(MEMREADWORD, ctx, addr, clk, v0, v1, v2, v3) when is_word_read;
+    bus_6_chiplets_bus.remove(MEMWRITEWORD, ctx, addr, clk, v0, v1, v2, v3) when is_word_write;
+    bus_6_chiplets_bus.remove(MEMREADELEMENT, ctx, addr, clk, element_value) when is_element_read;
+    bus_6_chiplets_bus.remove(MEMWRITEELEMENT, ctx, addr, clk, element_value) when is_element_write;
 }
 
 ##########################################################################################
@@ -252,3 +286,4 @@ fn compute_c_i(f_i: felt, is_read_next: felt, is_word_access_next: felt) -> felt
     let z_i = binary_not(is_word_access_next) * binary_not(f_i);
     return is_read_next + binary_not(is_read_next) * z_i;
 }
+

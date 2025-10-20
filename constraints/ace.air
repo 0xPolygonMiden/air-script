@@ -75,7 +75,11 @@ ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
 
     let flag_ace_next = flag_ace_current_and_next(s3');
     let flag_ace_last = flag_ace_last(s3');
-        
+
+    ####################################################################################
+    # TRANSITION CONSTRAINTS
+    ####################################################################################
+
     # Section and block flags constraints
     enf section_block_flags_constraints([s3, sstart, sstart', sblock, id0, n_eval]);
 
@@ -91,6 +95,29 @@ ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
     # Finalization constraints
     let f_end = binary_or(binary_and(flag_ace_next, sstart'), flag_ace_last);
     enf finalization_constraints([id0, v0_0, v0_1]) when f_end;
+
+    ####################################################################################
+    # BUS RESPONSE - ACE INITIALIZATION
+    ####################################################################################
+    # The ACE chiplet provides a response to the decoder's ACE_INIT request via the
+    # chiplets bus. The response is sent when a new section starts (sstart = 1).
+    #
+    # Message format: (ACE_INIT, ctx, ptr, clk, nread, neval)
+    # where:
+    # - ctx, clk: Memory access context and clock cycle
+    # - ptr: Word-aligned pointer to first input variable
+    # - nread: Total count of input and constant elements (computed as id0 + 1 - neval)
+    # - neval: Total number of arithmetic operations
+    #
+    # Note: Since id0 = nread + neval - 1 in the first row, we have nread = id0 - neval + 1
+    ####################################################################################
+
+    # Compute nread from id0 and n_eval
+    # Since id0 = nread + neval - 1 in first row, then: nread = id0 - neval + 1
+    let nread = id0 + 1 - n_eval;
+
+    # Remove ACE INIT response when a section starts
+    bus_6_chiplets_bus.remove(ACEINIT, ctx, ptr, clk, nread, n_eval) when sstart;
 }
 
 # Enforces that on the first row of ACE chiplet we should have sstart' = 1
