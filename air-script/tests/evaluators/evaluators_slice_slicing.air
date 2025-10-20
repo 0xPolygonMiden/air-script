@@ -21,7 +21,8 @@ integrity_constraints {
 }
 
 ev chiplets_constraints([chiplets[20]]) {
-    enf chiplet_selectors([chiplets[5..10][0..5]]);  # Should expand slice to 5 args
+    let sub_slice = chiplets[0..5];
+    enf chiplet_selectors([sub_slice[0..5]]);  # Should expand slice to 5 args
 }
 
 ev chiplet_selectors([s[5]]) { # Expects 5 individual parameters
