@@ -118,6 +118,24 @@ ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
 
     # Remove ACE INIT response when a section starts
     bus_6_chiplets_bus.remove(ACEINIT, ctx, ptr, clk, nread, n_eval) when sstart;
+
+    ####################################################################################
+    # BUS REQUESTS - ACE MEMORY ACCESS
+    ####################################################################################
+    # ACE requests memory via virtual table (memory responds via bus_6_chiplets_bus).
+    #
+    # READ: word-aligned read (MEMREADWORD, ctx, ptr, clk, v0_0, v0_1, v1_0, v1_1)
+    # EVAL: encoded instruction (MEMREADELEMENT, ctx, ptr, clk, instruction)
+    #       where instruction = id1 + id2 * 2^30 + (op + 1) * 2^60
+    ####################################################################################
+
+    let is_read_block = binary_not(sblock);
+    let is_eval_block = sblock;
+
+    bus_5_v_table.remove(MEMREADWORD, ctx, ptr, clk, v0_0, v0_1, v1_0, v1_1) when is_read_block;
+
+    let instruction = id1 + id2 * ACEINSTRUCTIONIDONEOFFSET + (op + 1) * ACEINSTRUCTIONIDTWOOFFSET;
+    bus_5_v_table.remove(MEMREADELEMENT, ctx, ptr, clk, instruction) when is_eval_block;
 }
 
 # Enforces that on the first row of ACE chiplet we should have sstart' = 1

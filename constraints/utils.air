@@ -167,9 +167,17 @@ const MEMREADELEMENT = 12;         # Element read operation (1 element)
 const MEMWRITEWORD = 20;           # Word write operation (4 elements)
 const MEMREADWORD = 28;            # Word read operation (4 elements)
 
-# ACE Chiplet Operation Labels (uses bus_7_wiring_bus, not bus_6_chiplets_bus)
-const ACEINIT = 8;                 # ACE circuit initialization
+# ACE Chiplet Operation Labels
+const ACEINIT = 8;                 # ACE circuit initialization (uses bus_6_chiplets_bus)
 
 # Kernel ROM Chiplet Operation Labels
 const KERNELPROCCALL = 16;         # Kernel procedure call
 const KERNELPROCINIT = 48;         # Kernel procedure initialization
+
+##########################################################################################
+# GENERAL CONSTANTS
+##########################################################################################
+
+# ACE instruction encoding offsets
+const ACEINSTRUCTIONIDONEOFFSET = 1073741824;  # 2^30
+const ACEINSTRUCTIONIDTWOOFFSET = 1152921504606846976;  # 2^60
