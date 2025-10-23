@@ -1064,12 +1064,27 @@ impl<'a> MirBuilder<'a> {
     ) -> Option<Link<Op>> {
         // If it's a slice access, we need to create a vector of MirAccessType::Index
         if let AccessType::Slice(ast::RangeExpr { start, end, .. }) = &access.access_type {
-            let ast::RangeBound::Const(Span { item: start, .. }) = start else {
-                unreachable!("expected constant start in slice access, got: {:#?}", start);
+            let (
+                ast::RangeBound::Const(Span { item: start, .. }),
+                ast::RangeBound::Const(Span { item: end, .. }),
+            ) = (start, end)
+            else {
+                unreachable!(
+                    "Slice expressions must use constant integer bounds (as in arr[0..5]), found: {:#?}). Dynamic bounds such as variables or expressions are not supported.",
+                    access.access_type
+                );
             };
-            let ast::RangeBound::Const(Span { item: end, .. }) = end else {
-                unreachable!("expected constant end in slice access, got: {:#?}", end);
-            };
+            if start >= end {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("Slice is empty (start >= end)")
+                    .with_primary_label(
+                        access.span(),
+                        format!("Slice start: {start}, Slice end: {end}"),
+                    )
+                    .emit();
+                return None;
+            }
             let mut vector = Vector::builder().size(end - start).span(access.span());
             for i in *start..*end {
                 let mir_access_type = MirAccessType::Index(Link::<Op>::from(i));
