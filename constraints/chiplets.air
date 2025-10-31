@@ -91,7 +91,7 @@ ev chiplets_constraints([chiplets[20]]) {
 
     ### Apply ACE chiplet initialization constraints at the transition point
     let next_row_first_ace = binary_and(memory_active, s2');   # Transitioning into ACE chiplet
-    enf ace_chiplet_constraints_first_row([chiplets[3..20]]) when next_row_first_ace;
+    enf ace_chiplet_constraints_first_row([chiplets[4..20]]) when next_row_first_ace;
 
 }
 
