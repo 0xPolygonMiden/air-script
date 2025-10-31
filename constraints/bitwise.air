@@ -40,7 +40,7 @@ periodic_columns {
 # Enforces the constraints on the bitwise chiplet given its columns.
 #
 # Max constraint degree: 4
-ev bitwise_chiplet([op_flag, a, b, a_limb[4], b_limb[4], zp, z]) {
+ev bitwise_chiplet_constraints([op_flag, a, b, a_limb[4], b_limb[4], zp, z]) {
     enf bitwise_op_flag([op_flag]);
     enf input_decomposition([a, b, a_limb, b_limb]);
     enf output_aggregation([op_flag, a, b, a_limb, b_limb, zp, z]);

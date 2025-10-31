@@ -589,12 +589,16 @@ fn check_evaluator_argument_sizes(
                             );
                         }
                     },
-                    MirAccessType::Index(_) | MirAccessType::Matrix(_, _) => {
+                    MirAccessType::Index(_) | MirAccessType::Matrix(..) => {
                         trace_segments_arg_vector_len += 1;
                     },
                 }
+            } else if let Some(vector) = child.as_vector() {
+                // Handle vectors created by slice expansion
+                let size = vector.children().borrow().len();
+                trace_segments_arg_vector_len += size;
             } else {
-                unreachable!("expected value or parameter, got {:?}", child);
+                unreachable!("expected value, parameter, accessor, or vector, got {:?}", child);
             }
         }
 
@@ -689,12 +693,17 @@ fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
                             args_unpacked.push(arg.clone());
                         }
                     },
-                    MirAccessType::Index(_) | MirAccessType::Matrix(_, _) => {
+                    MirAccessType::Index(_) | MirAccessType::Matrix(..) => {
                         args_unpacked.push(arg.clone());
                     },
                 }
+            } else if let Some(vector) = arg.as_vector() {
+                // Handle vectors created by slice expansion - unpack them into individual elements
+                for child in vector.children().borrow().iter() {
+                    args_unpacked.push(child.clone());
+                }
             } else {
-                unreachable!("expected value or parameter (or accessor on one), got {:?}", arg);
+                unreachable!("expected value, parameter, accessor, or vector, got {:?}", arg);
             }
         }
     }

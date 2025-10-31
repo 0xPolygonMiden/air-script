@@ -68,6 +68,18 @@ fn binary_not(a: felt) -> felt {
     return 1 - a;
 }
 
+# Binary constraint helper - returns 0 if input is binary (0 or 1), non-zero otherwise
+#
+# This function computes flag² - flag, which equals:
+# - 0 when flag = 0 (since 0² - 0 = 0)
+# - 0 when flag = 1 (since 1² - 1 = 0)
+# - non-zero for any other value
+#
+# Usage: enf binary_constraint(x) = 0; // constrains x to be 0 or 1
+fn binary_constraint(flag: felt) -> felt {
+    return flag^2 - flag;
+}
+
 ##########################################################################################
 # BOOLEAN ALGEBRA OPERATIONS
 ##########################################################################################

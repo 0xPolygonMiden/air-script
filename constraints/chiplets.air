@@ -22,29 +22,56 @@
 
 mod chiplets
 
+use bitwise::bitwise_chiplet_constraints;
+use memory::memory_chiplet_constraints_all_rows;
+use memory::memory_chiplet_constraints_all_rows_except_last;
+use memory::flag_memory_active_not_last_row;
+use memory::flag_next_row_first_row_memory;
+use memory::memory_chiplet_constraints_first_row;
+
 use utils::*;
 
 ##########################################################################################
 # CHIPLETS CONSTRAINTS
 ##########################################################################################
 
-ev chiplets_constraints([chiplets[20]]) {
-    enf chiplet_selectors([chiplets[0..5]]);
+ev chiplets_transition([chiplets[20]]) {
+    # Chiplets' flag constraints
 
-    let hash_active = hasher_chiplet_flag(chiplets[0]);
-    let bitwise_active= bitwise_chiplet_flag(chiplets[0], chiplets[1]);
-    let memory_active = memory_chiplet_flag(chiplets[0], chiplets[1], chiplets[2]);
-    let ace_active = ace_chiplet_flag(chiplets[0], chiplets[1], chiplets[2], chiplets[3]);
-    let ker_rom_active = ker_rom_chiplet_flag(chiplets[0], chiplets[1], chiplets[2], chiplets[3], chiplets[4]);
+    let s0 = chiplets[0];
+    let s1 = chiplets[1];
+    let s2 = chiplets[2];
+    let s3 = chiplets[3];
+    let s4 = chiplets[4];
 
-    enf chiplets[0] = 0;
-    #enf match {
+    enf chiplet_selectors([s0, s1, s2, s3, s4]);
+
+    # Compute chiplet activation flags from hierarchical selector states
+    let hash_active = hasher_chiplet_flag(s0);            # Active when: !s0
+    let bitwise_active = bitwise_chiplet_flag(s0, s1);    # Active when: s0 * !s1
+    let memory_active = memory_chiplet_flag(s0, s1, s2);  # Active when: s0 * s1 * !s2
+    let ace_active = ace_chiplet_flag(s0, s1, s2, s3);    # Active when: s0 * s1 * s2 * !s3
+    let ker_rom_active = ker_rom_chiplet_flag(s0, s1, s2, s3, s4); # Active when: s0 * s1 * s2 * s3 * !s4
+
+    # Apply chiplet-specific constraints based on which chiplet is active
+    enf match {
         #case hash_active: hash_chiplet_constraints([chiplets[1..20]]),
-        #case bitwise_active: bitwise_chiplet_constraints([chiplets[2..20]]),
-        #case memory_active: memory_chiplet_constraints([chiplets[0..18]]),
-        #case ace_active: ace_chiplet_constraints([chiplets[0], chiplets[1], chiplets[2], chiplets[3], chiplets[4..20]]),
+        case bitwise_active: bitwise_chiplet_constraints([chiplets[2..15]]),
+        case memory_active: memory_chiplet_constraints_all_rows([chiplets[3..18]]),
+        #case ace_active: ace_chiplet_constraints([chiplets[4..20]]),
         #case ker_rom_active: ker_rom_chiplet_constraints([chiplets[5..20]]),
-    #};
+    };
+
+    # Memory chiplet requires special handling for initialization and transition constraints
+
+    # Apply initialization constraints when entering memory chiplet
+    let flag_next_row_first_row_memory = flag_next_row_first_row_memory(s0, s1, s2);   # Transitioning into memory chiplet
+    enf memory_chiplet_constraints_first_row([chiplets[3..18]]) when flag_next_row_first_row_memory;
+
+    # Apply transition constraints while active in memory chiplet (excluding final row)
+    let flag_memory_active_not_last_row = flag_memory_active_not_last_row(s0, s1, s2); # Active in memory, not exiting
+    enf memory_chiplet_constraints_all_rows_except_last([chiplets[3..18]]) when flag_memory_active_not_last_row;
+
 }
 
 ##########################################################################################
@@ -81,30 +108,33 @@ ev chiplet_selectors([s[5]]) {
 }
 
 ##########################################################################################
-# CHIPLET FLAG COMPUTING
+# CHIPLET ACTIVATION FUNCTIONS
 ##########################################################################################
 
-# Hasher chiplet identification function
+# These functions decode the hierarchical selector pattern to identify active chiplets.
+# Each chiplet activates when its selector pattern matches and the next level is inactive.
+
+# Hasher chiplet: Active when root selector is inactive
 fn hasher_chiplet_flag(s_0: felt) -> felt {
     return !s_0;
 }
 
-# Bitwise chiplet identification function
+# Bitwise chiplet: Active when s0=1, s1=0
 fn bitwise_chiplet_flag(s_0: felt, s_1: felt) -> felt {
     return s_0 * !s_1;
 }
 
-# Memory chiplet identification function
+# Memory chiplet: Active when s0=1, s1=1, s2=0
 fn memory_chiplet_flag(s_0: felt, s_1: felt, s_2: felt) -> felt {
     return s_0 * s_1 * !s_2;
 }
 
-# ACE chiplet identification function
+# ACE chiplet: Active when s0=1, s1=1, s2=1, s3=0
 fn ace_chiplet_flag(s_0: felt, s_1: felt, s_2: felt, s_3: felt) -> felt {
     return s_0 * s_1 * s_2 * !s_3;
 }
 
-# Kernel ROM chiplet identification function
+# Kernel ROM chiplet: Active when s0=1, s1=1, s2=1, s3=1, s4=0
 fn ker_rom_chiplet_flag(s_0: felt, s_1: felt, s_2: felt, s_3: felt, s_4: felt) -> felt {
     return s_0 * s_1 * s_2 * s_3 * !s_4;
 }
