@@ -43,28 +43,41 @@ ev enforce_rpo_round([h[12]]){
 ##########################################################################################
 
 fn apply_mds(state: felt[12]) -> felt[12]{
-    return [sum([s * m for (s, m) in (state, mds_row)]) for mds_row in MDS];
+    # Compute dot product of state vector with each MDS row
+    let result0 = sum([s * m for (s, m) in (state, MDSROWA)]);
+    let result1 = sum([s * m for (s, m) in (state, MDSROWB)]);
+    let result2 = sum([s * m for (s, m) in (state, MDSROWC)]);
+    let result3 = sum([s * m for (s, m) in (state, MDSROWD)]);
+    let result4 = sum([s * m for (s, m) in (state, MDSROWE)]);
+    let result5 = sum([s * m for (s, m) in (state, MDSROWF)]);
+    let result6 = sum([s * m for (s, m) in (state, MDSROWG)]);
+    let result7 = sum([s * m for (s, m) in (state, MDSROWH)]);
+    let result8 = sum([s * m for (s, m) in (state, MDSROWI)]);
+    let result9 = sum([s * m for (s, m) in (state, MDSROWJ)]);
+    let result10 = sum([s * m for (s, m) in (state, MDSROWK)]);
+    let result11 = sum([s * m for (s, m) in (state, MDSROWL)]);
+
+    return [result0, result1, result2, result3, result4, result5,
+            result6, result7, result8, result9, result10, result11];
 }
 
 ##########################################################################################
 # CONSTANTS AND PERIODIC COLUMNS
 ##########################################################################################
 
-# MDS matrix used for computing the linear layer in a RPO round
-const MDS = [
-    [7, 23, 8, 26, 13, 10, 9, 7, 6, 22, 21, 8],
-    [8, 7, 23, 8, 26, 13, 10, 9, 7, 6, 22, 21],
-    [21, 8, 7, 23, 8, 26, 13, 10, 9, 7, 6, 22],
-    [22, 21, 8, 7, 23, 8, 26, 13, 10, 9, 7, 6],
-    [6, 22, 21, 8, 7, 23, 8, 26, 13, 10, 9, 7],
-    [7, 6, 22, 21, 8, 7, 23, 8, 26, 13, 10, 9],
-    [9, 7, 6, 22, 21, 8, 7, 23, 8, 26, 13, 10],
-    [10, 9, 7, 6, 22, 21, 8, 7, 23, 8, 26, 13],
-    [13, 10, 9, 7, 6, 22, 21, 8, 7, 23, 8, 26],
-    [26, 13, 10, 9, 7, 6, 22, 21, 8, 7, 23, 8],
-    [8, 26, 13, 10, 9, 7, 6, 22, 21, 8, 7, 23],
-    [23, 8, 26, 13, 10, 9, 7, 6, 22, 21, 8, 7]
-];
+# MDS matrix rows used for computing the linear layer in a RPO round
+const MDSROWA = [7, 23, 8, 26, 13, 10, 9, 7, 6, 22, 21, 8];
+const MDSROWB = [8, 7, 23, 8, 26, 13, 10, 9, 7, 6, 22, 21];
+const MDSROWC = [21, 8, 7, 23, 8, 26, 13, 10, 9, 7, 6, 22];
+const MDSROWD = [22, 21, 8, 7, 23, 8, 26, 13, 10, 9, 7, 6];
+const MDSROWE = [6, 22, 21, 8, 7, 23, 8, 26, 13, 10, 9, 7];
+const MDSROWF = [7, 6, 22, 21, 8, 7, 23, 8, 26, 13, 10, 9];
+const MDSROWG = [9, 7, 6, 22, 21, 8, 7, 23, 8, 26, 13, 10];
+const MDSROWH = [10, 9, 7, 6, 22, 21, 8, 7, 23, 8, 26, 13];
+const MDSROWI = [13, 10, 9, 7, 6, 22, 21, 8, 7, 23, 8, 26];
+const MDSROWJ = [26, 13, 10, 9, 7, 6, 22, 21, 8, 7, 23, 8];
+const MDSROWK = [8, 26, 13, 10, 9, 7, 6, 22, 21, 8, 7, 23];
+const MDSROWL = [23, 8, 26, 13, 10, 9, 7, 6, 22, 21, 8, 7];
 
 periodic_columns{
     # Round constants added to the hasher state in the first half of the RPO round
