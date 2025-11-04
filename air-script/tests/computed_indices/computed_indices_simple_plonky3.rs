@@ -37,14 +37,14 @@ impl<AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns> Air<AB> for
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero::<_>(main_current[0].into());
-        builder.assert_zero::<_>(main_current[0].into());
-        builder.assert_zero::<_>(main_current[1].into() - AB::Expr::from_u64(2));
-        builder.assert_zero::<_>(main_current[2].into() - AB::Expr::from_u64(4));
-        builder.assert_zero::<_>(main_current[3].into() - AB::Expr::from_u64(6));
-        builder.when_transition().assert_zero::<_>(main_next[4].into());
-        builder.when_transition().assert_zero::<_>(main_next[5].into() - main_current[5].into().double());
-        builder.when_transition().assert_zero::<_>(main_next[6].into() - AB::Expr::from_u64(6) * main_current[6].into());
-        builder.when_transition().assert_zero::<_>(main_next[7].into() - AB::Expr::from_u64(12) * main_current[7].into());
+        builder.when_first_row().assert_zero::<_>(main_current[0].clone().into());
+        builder.assert_zero::<_>(main_current[0].clone().into());
+        builder.assert_zero::<_>(main_current[1].clone().into() - AB::Expr::from_u64(2));
+        builder.assert_zero::<_>(main_current[2].clone().into() - AB::Expr::from_u64(4));
+        builder.assert_zero::<_>(main_current[3].clone().into() - AB::Expr::from_u64(6));
+        builder.when_transition().assert_zero::<_>(main_next[4].clone().into());
+        builder.when_transition().assert_zero::<_>(main_next[5].clone().into() - main_current[5].clone().into().double());
+        builder.when_transition().assert_zero::<_>(main_next[6].clone().into() - AB::Expr::from_u64(6) * main_current[6].clone().into());
+        builder.when_transition().assert_zero::<_>(main_next[7].clone().into() - AB::Expr::from_u64(12) * main_current[7].clone().into());
     }
 }

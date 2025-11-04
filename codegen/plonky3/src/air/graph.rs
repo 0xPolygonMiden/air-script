@@ -14,10 +14,10 @@ impl Codegen for TraceAccess {
         let frame = self.segment.to_string();
         let row_offset = match self.row_offset {
             0 => {
-                format!("current[{}].into()", self.column)
+                format!("current[{}].clone().into()", self.column)
             },
             1 => {
-                format!("next[{}].into()", self.column)
+                format!("next[{}].clone().into()", self.column)
             },
             _ => panic!("Plonky3 doesn't support row offsets greater than 1."),
         };
