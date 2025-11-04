@@ -12,6 +12,7 @@
 - Allow computed indices (#444).
 - Fix regressions on MIR and list_comprehensions (#449).
 - Fixed a vector unrolling issue in nested match evaluations (#491).
+-  Support importing hierarchical modules (#507).
 
 ## 0.4.0 (2025-06-20)
 
