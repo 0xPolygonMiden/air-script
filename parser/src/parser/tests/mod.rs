@@ -37,6 +37,42 @@ macro_rules! module_ident {
             miden_diagnostics::SourceSpan::UNKNOWN,
         )
     };
+
+    ($($names:ident),+) => {
+        ModuleId::new(
+            vec![
+                $(
+                    Identifier::new(
+                        miden_diagnostics::SourceSpan::UNKNOWN,
+                        crate::Symbol::intern(stringify!($names)),
+                    )
+                ),+
+            ],
+            miden_diagnostics::SourceSpan::UNKNOWN,
+        )
+    };
+}
+
+macro_rules! import_all {
+    ($module:ident) => {
+        Import::All { module: module_ident!($module) }
+    };
+    ($($names:ident),+) => {
+        Import::All { module: module_ident!($($names),+) }
+    };
+}
+
+macro_rules! import {
+    ($module:ident, $item:ident) => {{
+        let mut items: std::collections::HashSet<Identifier> = std::collections::HashSet::default();
+        items.insert(ident!($item));
+        Import::Partial { module: module_ident!($module), items }
+    }};
+    (($($names:ident),+), $item:ident) => {{
+        let mut items: std::collections::HashSet<Identifier> = std::collections::HashSet::default();
+        items.insert(ident!($item));
+        Import::Partial { module: module_ident!($($names),+), items }
+    }};
 }
 
 macro_rules! ident {
@@ -67,6 +103,12 @@ macro_rules! function_ident {
     ($module:ident, $name:ident) => {
         QualifiedIdentifier::new(
             module_ident!($module),
+            NamespacedIdentifier::Function(ident!($name)),
+        )
+    };
+    (($($modules:ident),+), $name:ident) => {
+        QualifiedIdentifier::new(
+            module_ident!($($modules),+),
             NamespacedIdentifier::Function(ident!($name)),
         )
     };
@@ -491,7 +533,17 @@ macro_rules! call {
             args: vec![$($param),+],
             ty: None,
         })
-    }
+    };
+
+    (($($modules:ident),+) :: $callee:ident ($($param:expr),+)) => {
+        ScalarExpr::Call(Call {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            callee: ResolvableIdentifier::Resolved(function_ident!(($($modules),+), $callee)),
+            args: vec![$($param),+],
+            ty: None,
+        })
+    };
+
 }
 
 macro_rules! trace_segment {
@@ -750,20 +802,6 @@ macro_rules! exp {
             $rhs,
         ))
     };
-}
-
-macro_rules! import_all {
-    ($module:ident) => {
-        Import::All { module: module_ident!($module) }
-    };
-}
-
-macro_rules! import {
-    ($module:ident, $item:ident) => {{
-        let mut items: std::collections::HashSet<Identifier> = std::collections::HashSet::default();
-        items.insert(ident!($item));
-        Import::Partial { module: module_ident!($module), items }
-    }};
 }
 
 mod arithmetic_ops;
