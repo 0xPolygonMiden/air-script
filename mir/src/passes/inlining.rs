@@ -7,8 +7,8 @@ use super::{duplicate_node_or_replace, visitor::Visitor};
 use crate::{
     CompileError,
     ir::{
-        Graph, Link, Mir, MirAccessType, MirType, MirValue, Node, Op, Parameter, Parent,
-        Root, SpannedMirValue, TraceAccessBinding, Value, Vector,
+        Graph, Link, Mir, MirAccessType, MirType, MirValue, Node, Op, Parameter, Parent, Root,
+        SpannedMirValue, TraceAccessBinding, Value, Vector,
     },
     passes::constant_propagation::get_inner_const,
 };
