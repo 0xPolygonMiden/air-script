@@ -15,7 +15,7 @@ fn fn_def_with_scalars() {
         return a + b;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.functions.insert(
         ident!(fn_with_scalars),
         Function::new(
@@ -38,7 +38,7 @@ fn fn_def_with_vectors() {
         return [x + y for (x, y) in (a, b)];
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.functions.insert(
         ident!(fn_with_vectors),
         Function::new(
@@ -78,7 +78,7 @@ fn fn_use_scalars_and_vectors() {
             enf a' = fn_with_scalars_and_vectors(a, b);
         }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(fn_with_scalars_and_vectors),
@@ -145,7 +145,7 @@ fn fn_call_in_fn() {
         enf a' = fold_scalar_and_vec(a, b);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(fold_vec),
@@ -227,7 +227,7 @@ fn fn_call_in_ev() {
         enf evaluator(a, b);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(fold_vec),
@@ -312,7 +312,7 @@ fn fn_as_lc_iterables() {
         enf a' = sum([operation(x, y) for (x, y) in (a, b)]);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(operation),
@@ -383,7 +383,7 @@ fn fn_call_in_binary_ops() {
         enf b[0]' = b[0] * operation(a, b);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(operation),
@@ -459,7 +459,7 @@ fn fn_call_in_vector_def() {
         enf b[0]' = d[1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(operation),

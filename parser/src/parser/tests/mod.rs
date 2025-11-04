@@ -27,6 +27,18 @@ macro_rules! assert_module_error {
     };
 }
 
+macro_rules! module_ident {
+    ($name:ident) => {
+        ModuleId::new(
+            vec![Identifier::new(
+                miden_diagnostics::SourceSpan::UNKNOWN,
+                crate::Symbol::intern(stringify!($name)),
+            )],
+            miden_diagnostics::SourceSpan::UNKNOWN,
+        )
+    };
+}
+
 macro_rules! ident {
     ($name:ident) => {
         Identifier::new(
@@ -40,7 +52,10 @@ macro_rules! ident {
     };
 
     ($module:ident, $name:ident) => {
-        QualifiedIdentifier::new(ident!($module), NamespacedIdentifier::Binding(ident!($name)))
+        QualifiedIdentifier::new(
+            module_ident!($module),
+            NamespacedIdentifier::Binding(ident!($name)),
+        )
     };
 }
 
@@ -50,7 +65,10 @@ macro_rules! function_ident {
     };
 
     ($module:ident, $name:ident) => {
-        QualifiedIdentifier::new(ident!($module), NamespacedIdentifier::Function(ident!($name)))
+        QualifiedIdentifier::new(
+            module_ident!($module),
+            NamespacedIdentifier::Function(ident!($name)),
+        )
     };
 }
 
@@ -736,7 +754,7 @@ macro_rules! exp {
 
 macro_rules! import_all {
     ($module:ident) => {
-        Import::All { module: ident!($module) }
+        Import::All { module: module_ident!($module) }
     };
 }
 
@@ -744,7 +762,7 @@ macro_rules! import {
     ($module:ident, $item:ident) => {{
         let mut items: std::collections::HashSet<Identifier> = std::collections::HashSet::default();
         items.insert(ident!($item));
-        Import::Partial { module: ident!($module), items }
+        Import::Partial { module: module_ident!($module), items }
     }};
 }
 

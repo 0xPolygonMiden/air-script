@@ -10,8 +10,8 @@ fn use_declaration() {
 
     use foo::*;
     ";
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
-    expected.imports.insert(ident!(foo), import_all!(foo));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
+    expected.imports.insert(module_ident!(foo), import_all!(foo));
     ParseTest::new().expect_module_ast(source, expected);
 }
 
@@ -22,8 +22,8 @@ fn import_declaration() {
 
     use foo::bar;
     ";
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
-    expected.imports.insert(ident!(foo), import!(foo, bar));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
+    expected.imports.insert(module_ident!(foo), import!(foo, bar));
     ParseTest::new().expect_module_ast(source, expected);
 }
 
