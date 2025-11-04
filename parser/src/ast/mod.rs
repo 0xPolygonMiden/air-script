@@ -501,7 +501,7 @@ impl Library {
             // importing module, if it was parsed from disk. If no path is available,
             // we default to the current working directory.
 
-            let source_dir = match codemap.name(module.span().source_id()) {
+            let source_dir = match codemap.name(imports.first().unwrap().span().source_id()) {
                 // If we have no source span, default to the current working directory
                 Err(_) => cwd.clone(),
                 // If the file is virtual, then we've either already parsed imports for this module,
