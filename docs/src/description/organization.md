@@ -44,7 +44,7 @@ Library modules can be used to split integrity constraint descriptions across mu
 mod example_module
 ```
 where the name of the module must:
-- Be the same as the name of the file in which the library module is defined (e.g., the above module must be located in `example_module.air` file).
+- Be the same as the name of the file in which the library module is defined (e.g., the above module must be located in `example_module.air` file, or alternatively in example_module/mod.air).
 - Be a string consisting of alphanumeric characters and underscores.
 - Start with a letter.
 - End with a newline.

@@ -496,22 +496,23 @@ impl Library {
         // to modules in the library. If the module is already in the library, we proceed,
         // if it isn't, then we must parse the desired module from disk, and add it to the
         // library, visiting any of its imports as well.
-        while let Some((module, mut imports)) = worklist.pop_front() {
+        while let Some((_module, mut imports)) = worklist.pop_front() {
             // We attempt to resolve imports on disk relative to the file path of the
             // importing module, if it was parsed from disk. If no path is available,
             // we default to the current working directory.
 
-            let source_dir = match codemap.name(imports.first().unwrap().span().source_id()) {
-                // If we have no source span, default to the current working directory
-                Err(_) => cwd.clone(),
-                // If the file is virtual, then we've either already parsed imports for this module,
-                // or we have to fall back to the current working directory, but we have no relative
-                // path from which to base our search.
-                Ok(FileName::Virtual(_)) => cwd.clone(),
-                Ok(FileName::Real(path)) => {
-                    path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
-                },
-            };
+            let (real_path, source_dir) =
+                match codemap.name(imports.first().unwrap().span().source_id()) {
+                    // If we have no source span, default to the current working directory
+                    Err(_) => (false, cwd.clone()),
+                    // If the file is virtual, then we've either already parsed imports for this module,
+                    // or we have to fall back to the current working directory, but we have no relative
+                    // path from which to base our search.
+                    Ok(FileName::Virtual(_)) => (false, cwd.clone()),
+                    Ok(FileName::Real(path)) => {
+                        (true, path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf())
+                    },
+                };
 
             // For each module imported, try to load the module from the library, if it is
             // unavailable we must do extra work to load it into the library, as
@@ -519,12 +520,23 @@ impl Library {
             for import in imports.drain(..) {
                 if !lib.modules.contains_key(&import.clone()) {
                     let mut filename = source_dir.clone();
+                    let mut use_default_mod = false;
                     let items = &import.0.item;
                     if let Some((last, parents)) = items.split_last() {
                         for part in parents {
                             filename = filename.join(part.as_str());
                         }
-                        filename = filename.join(format!("{}.air", last.as_str()));
+                        let path_exist = {
+                            let mut check_path = filename.clone();
+                            check_path = check_path.join(format!("{}.air", last.as_str()));
+                            check_path.exists()
+                        };
+                        if path_exist || !real_path {
+                            filename = filename.join(format!("{}.air", last.as_str()));
+                        } else {
+                            filename = filename.join(last.as_str()).join("mod.air");
+                            use_default_mod = true;
+                        }
                     }
 
                     // Check if the module exists in the codemap first, so that we can add files
@@ -543,15 +555,18 @@ impl Library {
                             // We must check if the file we parsed actually contains a module with
                             // the same name as our import, if not, that's an error
 
-                            let last_import_part = import.0.item.last().unwrap();
-                            let module_name_parts = imported_module.path.0.item.last().unwrap();
-                            if module_name_parts != last_import_part {
-                                diagnostics.diagnostic(Severity::Error)
-                                    .with_message("invalid module declaration")
-                                    .with_primary_label(imported_module.path.span(), "module names must be the same as the name of the file they are defined in")
-                                    .emit();
-                                return Err(SemanticAnalysisError::ImportFailed(import.span()));
+                            if !use_default_mod {
+                                let last_import_part = import.0.item.last().unwrap();
+                                let module_name_parts = imported_module.path.0.item.last().unwrap();
+                                if module_name_parts != last_import_part {
+                                    diagnostics.diagnostic(Severity::Error)
+                                        .with_message("invalid module declaration")
+                                        .with_primary_label(imported_module.path.span(), "module names must be the same as the name of the file they are defined in")
+                                        .emit();
+                                    return Err(SemanticAnalysisError::ImportFailed(import.span()));
+                                }
                             }
+
                             imported_module.path = import.clone();
 
                             // We parsed the module successfully, so add it to the library
