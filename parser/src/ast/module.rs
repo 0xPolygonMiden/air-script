@@ -7,7 +7,8 @@ use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned}
 
 use crate::{ast::*, sema::SemanticAnalysisError};
 
-/// This is a type alias used to clarify that an identifier refers to a module
+/// This is a type alias used to clarify that a module is referenced by a sequence of identifiers
+/// representing its path in the module hierarchy (e.g., `foo::bar::baz`).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Spanned)]
 pub struct ModuleId(pub Span<Vec<Identifier>>);
 
