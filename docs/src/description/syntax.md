@@ -6,6 +6,7 @@ This page specifies the basic syntax and types.
 
 - `:` is used as a delimiter when declaring [source sections](./organization.md#source-sections) and [types](./declarations.md)
 - `.` is used to access a boundary on a trace column or a bus, e.g. `a.first` or `a.last`
+- `..` is used to define ranges used in [constraint descriptions](./constraints.md).
 - `[` and `]` are used for defining arrays in [type declarations](./declarations.md) and for indexing in [constraint descriptions](./constraints.md)
 - `,` is used as a delimiter for defining arrays in [type declarations](./declarations.md), as well as a separator in when declaring [source sections](./organization.md#source-sections)
 - `;` is used as a statement terminator in [constraint descriptions](./constraints.md) and [variable declarations](./variables.md)
@@ -50,6 +51,15 @@ The following is not allowed:
 ```air
 a^(2 + 3)
 ```
+
+### Slice expressions
+
+Slice expressions may be used in [constraint descriptions](./constraints.md) to create sub-arrays from arrays. The syntax for slice expressions is `array_name[start_index..end_index]`, where `start_index` is inclusive and `end_index` is exclusive.
+
+Requirements for slice expressions:
+- Both `start_index` and `end_index` must be non-negative constants integer literals or [named constant](./declarations.md#constants-const) of scalar type.
+- `start_index` must be less than or equal to `end_index`.
+- [nested slices are only supported through evaluator calls](./evaluators.md#slice-expressions-in-evaluator-calls).
 
 ## Section-specific accessors
 
