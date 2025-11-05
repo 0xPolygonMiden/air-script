@@ -1,7 +1,7 @@
-use p3_air::{Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, BaseAirWithPublicValues};
+use p3_air::{Air, BaseAir, BaseAirWithPublicValues, ExtensionBuilder};
 use p3_matrix::Matrix;
-use p3_field::PrimeCharacteristicRing;
-use crate::helpers::{AirBuilderWithPeriodicColumns, BaseAirWithPeriodicColumns};
+use p3_field::{Field, PrimeCharacteristicRing};
+use crate::helpers::{AirScriptAir, AirScriptBuilder};
 
 pub const NUM_COLUMNS: usize = 4;
 
@@ -21,28 +21,38 @@ impl<F> BaseAirWithPublicValues<F> for VariablesAir {
     }
 }
 
-impl<F: PrimeCharacteristicRing> BaseAirWithPeriodicColumns<F> for VariablesAir {
-    fn get_periodic_columns(&self) -> Vec<Vec<F>> {
+impl<F: Field> AirScriptAir<F> for VariablesAir {
+     const MAIN_WIDTH: usize = NUM_COLUMNS;
+     const AUX_WIDTH: usize = 0;
+     const PERIOD: usize = 0;
+     const NUM_ALPHA_CHALLENGES: usize = 0;
+    fn periodic_table(&self) -> Vec<Vec<F>> {
         vec![
             vec![F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(0)],
         ]
     }
-}
 
-impl<AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns> Air<AB> for VariablesAir {
-    fn eval(&self, builder: &mut AB) {
+    fn eval<AB>(&self, builder: &mut AB)
+    where AB: AirScriptBuilder<F = F>,
+    {
         let main = builder.main();
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
-        let periodic_values = builder.periodic_columns();
+        let periodic_values = builder.periodic_evals().to_vec();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero::<_>(main_current[1].clone().into());
-        builder.when_last_row().assert_zero::<_>(main_current[1].clone().into() - AB::Expr::ONE);
-        builder.assert_zero::<_>(main_current[0].clone().into() * main_current[0].clone().into() - main_current[0].clone().into());
-        builder.when_transition().assert_zero::<_>(periodic_values[0].into() * (main_next[0].clone().into() - main_current[0].clone().into()));
-        builder.assert_zero::<_>((AB::Expr::ONE - main_current[0].clone().into()) * (main_current[3].clone().into() - main_current[1].clone().into() - main_current[2].clone().into()) - (AB::Expr::from_u64(6) - (AB::Expr::from_u64(7) - main_current[0].clone().into())));
-        builder.when_transition().assert_zero::<_>(main_current[0].clone().into() * (main_current[3].clone().into() - main_current[1].clone().into() * main_current[2].clone().into()) - (AB::Expr::ONE - main_next[0].clone().into()));
+        builder.when_first_row().assert_zero_ext::<_>(main_current[1].clone().into());
+        builder.when_last_row().assert_zero_ext::<_>(main_current[1].clone().into() - AB::Expr::ONE);
+        builder.assert_zero_ext::<_>(main_current[0].clone().into() * main_current[0].clone().into() - main_current[0].clone().into());
+        builder.when_transition().assert_zero_ext::<_>(periodic_values[0].into() * (main_next[0].clone().into() - main_current[0].clone().into()));
+        builder.assert_zero_ext::<_>((AB::Expr::ONE - main_current[0].clone().into()) * (main_current[3].clone().into() - main_current[1].clone().into() - main_current[2].clone().into()) - (AB::Expr::from_u64(6) - (AB::Expr::from_u64(7) - main_current[0].clone().into())));
+        builder.when_transition().assert_zero_ext::<_>(main_current[0].clone().into() * (main_current[3].clone().into() - main_current[1].clone().into() * main_current[2].clone().into()) - (AB::Expr::ONE - main_next[0].clone().into()));
+    }
+}
+
+impl<AB: AirScriptBuilder> Air<AB> for VariablesAir {
+    fn eval(&self, builder: &mut AB) {
+        <Self as AirScriptAir<AB::F>>::eval(self, builder);
     }
 }

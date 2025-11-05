@@ -4,12 +4,12 @@ use super::Scope;
 pub(super) fn add_imports(scope: &mut Scope) {
     // add plonky3 imports
     scope.import("p3_air", "Air");
-    scope.import("p3_air", "AirBuilder");
-    scope.import("p3_air", "AirBuilderWithPublicValues");
     scope.import("p3_air", "BaseAir");
     scope.import("p3_air", "BaseAirWithPublicValues");
+    scope.import("p3_air", "ExtensionBuilder");
     scope.import("p3_matrix", "Matrix");
+    scope.import("p3_field", "Field");
     scope.import("p3_field", "PrimeCharacteristicRing");
-    scope.import("crate::helpers", "AirBuilderWithPeriodicColumns");
-    scope.import("crate::helpers", "BaseAirWithPeriodicColumns");
+    scope.import("crate::helpers", "AirScriptAir");
+    scope.import("crate::helpers", "AirScriptBuilder");
 }

@@ -13,8 +13,8 @@ use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
 use p3_uni_stark::StarkConfig;
 
 use crate::{
-    generate_air_plonky3_test,
-    helpers::check_constraints_with_periodic_columns,
+    generate_air_plonky3_test_with_airscript_traits,
+    helpers::check_constraints_with_airscript_traits,
     indexed_trace_access::indexed_trace_access_plonky3::{NUM_COLUMNS, TraceAccessAir},
 };
 
@@ -54,4 +54,4 @@ fn generate_inputs() -> Vec<u32> {
     vec![1; 16]
 }
 
-generate_air_plonky3_test!(test_air_plonky3, TraceAccessAir);
+generate_air_plonky3_test_with_airscript_traits!(test_air_plonky3, TraceAccessAir);

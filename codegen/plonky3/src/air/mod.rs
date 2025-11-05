@@ -22,8 +22,11 @@ pub(super) fn add_air(scope: &mut Scope, ir: &Air) {
     // add the Air struct and its base implementation.
     add_air_struct(scope, ir, name);
 
+    // add AirScriptAir trait implementation for the provided AirIR.
+    add_air_script_trait(scope, ir, name);
+
     // add Plonky3 AirBuilder trait implementation for the provided AirIR.
-    add_air_trait(scope, ir, name);
+    add_air_trait(scope, name);
 }
 
 /// Updates the provided scope with a custom Air struct.
@@ -49,42 +52,47 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         .arg_ref_self()
         .ret("usize")
         .line("NUM_PUBLIC_VALUES");
+}
 
-    // add the custom BaseAirWithPeriodicColumns implementation block
-    let base_air_with_periodic_columns_impl = scope
-        .new_impl(name)
-        .generic("F: PrimeCharacteristicRing")
-        .impl_trait("BaseAirWithPeriodicColumns<F>");
-    let base_air_with_periodic_columns_impl_func = base_air_with_periodic_columns_impl
-        .new_fn("get_periodic_columns")
+fn add_air_script_trait(scope: &mut Scope, ir: &Air, name: &str) {
+    // add the custom AirScriptAir implementation block
+    let air_script_impl = scope.new_impl(name).generic("F: Field").impl_trait("AirScriptAir<F>");
+    air_script_impl.associate_const("MAIN_WIDTH", "usize", "NUM_COLUMNS", "");
+    air_script_impl.associate_const("AUX_WIDTH", "usize", "0", "");
+    air_script_impl.associate_const("PERIOD", "usize", "0", "");
+    let num_alpha_challenges = ir.num_random_values;
+    air_script_impl.associate_const(
+        "NUM_ALPHA_CHALLENGES",
+        "usize",
+        format!("{num_alpha_challenges}"),
+        "",
+    );
+
+    let periodic_table_func = air_script_impl
+        .new_fn("periodic_table")
         .arg_ref_self()
+        //.ret("&'static [&'static [Self::F]]");
         .ret("Vec<Vec<F>>");
-    base_air_with_periodic_columns_impl_func.line("vec![");
-
+    periodic_table_func.line("vec![");
     for col in ir.periodic_columns() {
         let values_str = col.values
             .iter()
             .map(|v| format!("F::from_u64({v})")) // or use a custom formatter if needed
             .collect::<Vec<_>>()
             .join(", ");
-        base_air_with_periodic_columns_impl_func.line(format!("    vec![{values_str}],"));
+        periodic_table_func.line(format!("    vec![{values_str}],"));
     }
-    base_air_with_periodic_columns_impl_func.line("]");
-}
+    periodic_table_func.line("]");
 
-/// Updates the provided scope with the custom Air struct and an Air trait implementation based on
-/// the provided AirIR.
-fn add_air_trait(scope: &mut Scope, ir: &Air, name: &str) {
-    // add the implementation block for the Air trait.
-    let air_impl = scope
-        .new_impl(name)
-        .generic("AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns")
-        .impl_trait("Air<AB>");
-
-    let eval_func = air_impl.new_fn("eval").arg_ref_self().arg("builder", "&mut AB");
+    let eval_func = air_script_impl
+        .new_fn("eval")
+        .generic("AB")
+        .arg_ref_self()
+        .arg("builder", "&mut AB")
+        .bound("AB", "AirScriptBuilder<F = F>");
     eval_func.line("let main = builder.main();");
     eval_func.line("let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect(\"Wrong number of public values\");");
-    eval_func.line("let periodic_values = builder.periodic_columns();");
+    eval_func.line("let periodic_values = builder.periodic_evals().to_vec();");
     eval_func.line("let (main_current, main_next) = (");
     eval_func.line("    main.row_slice(0).unwrap(),");
     eval_func.line("    main.row_slice(1).unwrap(),");
@@ -93,4 +101,14 @@ fn add_air_trait(scope: &mut Scope, ir: &Air, name: &str) {
     add_main_boundary_constraints(eval_func, ir);
 
     add_main_integrity_constraints(eval_func, ir);
+}
+
+/// Updates the provided scope with the custom Air struct and an Air trait implementation based on
+/// the provided AirIR.
+fn add_air_trait(scope: &mut Scope, name: &str) {
+    // add the implementation block for the Air trait.
+    let air_impl = scope.new_impl(name).generic("AB: AirScriptBuilder").impl_trait("Air<AB>");
+
+    let eval_func = air_impl.new_fn("eval").arg_ref_self().arg("builder", "&mut AB");
+    eval_func.line("<Self as AirScriptAir<AB::F>>::eval(self, builder);");
 }

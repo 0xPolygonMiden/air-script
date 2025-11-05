@@ -1,7 +1,7 @@
-use p3_air::{Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, BaseAirWithPublicValues};
+use p3_air::{Air, BaseAir, BaseAirWithPublicValues, ExtensionBuilder};
 use p3_matrix::Matrix;
-use p3_field::PrimeCharacteristicRing;
-use crate::helpers::{AirBuilderWithPeriodicColumns, BaseAirWithPeriodicColumns};
+use p3_field::{Field, PrimeCharacteristicRing};
+use crate::helpers::{AirScriptAir, AirScriptBuilder};
 
 pub const NUM_COLUMNS: usize = 6;
 
@@ -21,25 +21,35 @@ impl<F> BaseAirWithPublicValues<F> for SelectorsAir {
     }
 }
 
-impl<F: PrimeCharacteristicRing> BaseAirWithPeriodicColumns<F> for SelectorsAir {
-    fn get_periodic_columns(&self) -> Vec<Vec<F>> {
+impl<F: Field> AirScriptAir<F> for SelectorsAir {
+     const MAIN_WIDTH: usize = NUM_COLUMNS;
+     const AUX_WIDTH: usize = 0;
+     const PERIOD: usize = 0;
+     const NUM_ALPHA_CHALLENGES: usize = 3;
+    fn periodic_table(&self) -> Vec<Vec<F>> {
         vec![
         ]
     }
-}
 
-impl<AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns> Air<AB> for SelectorsAir {
-    fn eval(&self, builder: &mut AB) {
+    fn eval<AB>(&self, builder: &mut AB)
+    where AB: AirScriptBuilder<F = F>,
+    {
         let main = builder.main();
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
-        let periodic_values = builder.periodic_columns();
+        let periodic_values = builder.periodic_evals().to_vec();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero::<_>(main_current[5].clone().into());
-        builder.assert_zero::<_>((main_current[0].clone().into() + (AB::Expr::ONE - main_current[0].clone().into()) * main_current[1].clone().into()) * (main_current[3].clone().into() - AB::Expr::from_u64(16)) + (AB::Expr::ONE - main_current[0].clone().into()) * (AB::Expr::ONE - main_current[1].clone().into()) * (main_current[4].clone().into() - AB::Expr::from_u64(5)));
-        builder.assert_zero::<_>((AB::Expr::ONE - main_current[0].clone().into()) * (main_current[5].clone().into() - AB::Expr::from_u64(5)) + main_current[0].clone().into() * (main_current[4].clone().into() - AB::Expr::from_u64(4)));
-        builder.assert_zero::<_>(main_current[0].clone().into() * (main_current[5].clone().into() - AB::Expr::from_u64(20)) + (AB::Expr::ONE - main_current[0].clone().into()) * main_current[1].clone().into() * (main_current[4].clone().into() - AB::Expr::from_u64(31)));
+        builder.when_first_row().assert_zero_ext::<_>(main_current[5].clone().into());
+        builder.assert_zero_ext::<_>((main_current[0].clone().into() + (AB::Expr::ONE - main_current[0].clone().into()) * main_current[1].clone().into()) * (main_current[3].clone().into() - AB::Expr::from_u64(16)) + (AB::Expr::ONE - main_current[0].clone().into()) * (AB::Expr::ONE - main_current[1].clone().into()) * (main_current[4].clone().into() - AB::Expr::from_u64(5)));
+        builder.assert_zero_ext::<_>((AB::Expr::ONE - main_current[0].clone().into()) * (main_current[5].clone().into() - AB::Expr::from_u64(5)) + main_current[0].clone().into() * (main_current[4].clone().into() - AB::Expr::from_u64(4)));
+        builder.assert_zero_ext::<_>(main_current[0].clone().into() * (main_current[5].clone().into() - AB::Expr::from_u64(20)) + (AB::Expr::ONE - main_current[0].clone().into()) * main_current[1].clone().into() * (main_current[4].clone().into() - AB::Expr::from_u64(31)));
+    }
+}
+
+impl<AB: AirScriptBuilder> Air<AB> for SelectorsAir {
+    fn eval(&self, builder: &mut AB) {
+        <Self as AirScriptAir<AB::F>>::eval(self, builder);
     }
 }

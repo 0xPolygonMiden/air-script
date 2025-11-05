@@ -1,7 +1,7 @@
-use p3_air::{Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, BaseAirWithPublicValues};
+use p3_air::{Air, BaseAir, BaseAirWithPublicValues, ExtensionBuilder};
 use p3_matrix::Matrix;
-use p3_field::PrimeCharacteristicRing;
-use crate::helpers::{AirBuilderWithPeriodicColumns, BaseAirWithPeriodicColumns};
+use p3_field::{Field, PrimeCharacteristicRing};
+use crate::helpers::{AirScriptAir, AirScriptBuilder};
 
 pub const NUM_COLUMNS: usize = 17;
 
@@ -21,26 +21,36 @@ impl<F> BaseAirWithPublicValues<F> for ListFoldingAir {
     }
 }
 
-impl<F: PrimeCharacteristicRing> BaseAirWithPeriodicColumns<F> for ListFoldingAir {
-    fn get_periodic_columns(&self) -> Vec<Vec<F>> {
+impl<F: Field> AirScriptAir<F> for ListFoldingAir {
+     const MAIN_WIDTH: usize = NUM_COLUMNS;
+     const AUX_WIDTH: usize = 0;
+     const PERIOD: usize = 0;
+     const NUM_ALPHA_CHALLENGES: usize = 0;
+    fn periodic_table(&self) -> Vec<Vec<F>> {
         vec![
         ]
     }
-}
 
-impl<AB: AirBuilderWithPublicValues + AirBuilderWithPeriodicColumns> Air<AB> for ListFoldingAir {
-    fn eval(&self, builder: &mut AB) {
+    fn eval<AB>(&self, builder: &mut AB)
+    where AB: AirScriptBuilder<F = F>,
+    {
         let main = builder.main();
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
-        let periodic_values = builder.periodic_columns();
+        let periodic_values = builder.periodic_evals().to_vec();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero::<_>(main_current[11].clone().into());
-        builder.when_transition().assert_zero::<_>(main_next[5].clone().into() - (main_current[9].clone().into() + main_current[10].clone().into() + main_current[11].clone().into() + main_current[12].clone().into() + main_current[13].clone().into() * main_current[14].clone().into() * main_current[15].clone().into() * main_current[16].clone().into()));
-        builder.when_transition().assert_zero::<_>(main_next[6].clone().into() - (main_current[9].clone().into() + main_current[10].clone().into() + main_current[11].clone().into() + main_current[12].clone().into() + main_current[13].clone().into() * main_current[14].clone().into() * main_current[15].clone().into() * main_current[16].clone().into()));
-        builder.when_transition().assert_zero::<_>(main_next[7].clone().into() - (main_current[9].clone().into() * main_current[13].clone().into() + main_current[10].clone().into() * main_current[14].clone().into() + main_current[11].clone().into() * main_current[15].clone().into() + main_current[12].clone().into() * main_current[16].clone().into() + (main_current[9].clone().into() + main_current[13].clone().into()) * (main_current[10].clone().into() + main_current[14].clone().into()) * (main_current[11].clone().into() + main_current[15].clone().into()) * (main_current[12].clone().into() + main_current[16].clone().into())));
-        builder.when_transition().assert_zero::<_>(main_next[8].clone().into() - (main_current[1].clone().into() + main_current[9].clone().into() * main_current[13].clone().into() + main_current[10].clone().into() * main_current[14].clone().into() + main_current[11].clone().into() * main_current[15].clone().into() + main_current[12].clone().into() * main_current[16].clone().into() + main_current[9].clone().into() * main_current[13].clone().into() + main_current[10].clone().into() * main_current[14].clone().into() + main_current[11].clone().into() * main_current[15].clone().into() + main_current[12].clone().into() * main_current[16].clone().into()));
+        builder.when_first_row().assert_zero_ext::<_>(main_current[11].clone().into());
+        builder.when_transition().assert_zero_ext::<_>(main_next[5].clone().into() - (main_current[9].clone().into() + main_current[10].clone().into() + main_current[11].clone().into() + main_current[12].clone().into() + main_current[13].clone().into() * main_current[14].clone().into() * main_current[15].clone().into() * main_current[16].clone().into()));
+        builder.when_transition().assert_zero_ext::<_>(main_next[6].clone().into() - (main_current[9].clone().into() + main_current[10].clone().into() + main_current[11].clone().into() + main_current[12].clone().into() + main_current[13].clone().into() * main_current[14].clone().into() * main_current[15].clone().into() * main_current[16].clone().into()));
+        builder.when_transition().assert_zero_ext::<_>(main_next[7].clone().into() - (main_current[9].clone().into() * main_current[13].clone().into() + main_current[10].clone().into() * main_current[14].clone().into() + main_current[11].clone().into() * main_current[15].clone().into() + main_current[12].clone().into() * main_current[16].clone().into() + (main_current[9].clone().into() + main_current[13].clone().into()) * (main_current[10].clone().into() + main_current[14].clone().into()) * (main_current[11].clone().into() + main_current[15].clone().into()) * (main_current[12].clone().into() + main_current[16].clone().into())));
+        builder.when_transition().assert_zero_ext::<_>(main_next[8].clone().into() - (main_current[1].clone().into() + main_current[9].clone().into() * main_current[13].clone().into() + main_current[10].clone().into() * main_current[14].clone().into() + main_current[11].clone().into() * main_current[15].clone().into() + main_current[12].clone().into() * main_current[16].clone().into() + main_current[9].clone().into() * main_current[13].clone().into() + main_current[10].clone().into() * main_current[14].clone().into() + main_current[11].clone().into() * main_current[15].clone().into() + main_current[12].clone().into() * main_current[16].clone().into()));
+    }
+}
+
+impl<AB: AirScriptBuilder> Air<AB> for ListFoldingAir {
+    fn eval(&self, builder: &mut AB) {
+        <Self as AirScriptAir<AB::F>>::eval(self, builder);
     }
 }

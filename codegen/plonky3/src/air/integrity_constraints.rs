@@ -12,9 +12,9 @@ pub(super) fn add_main_integrity_constraints(eval_func: &mut Function, ir: &Air)
         // If the constraint is a transition constraint (depends on the next row), we do not
         // evaluate it in the last row, with the `when_transition` method.
         let assertion = if let ConstraintDomain::EveryFrame(_) = constraint.domain() {
-            format!("builder.when_transition().assert_zero::<_>({expr_root_string});")
+            format!("builder.when_transition().assert_zero_ext::<_>({expr_root_string});")
         } else {
-            format!("builder.assert_zero::<_>({expr_root_string});")
+            format!("builder.assert_zero_ext::<_>({expr_root_string});")
         };
 
         eval_func.line(assertion);

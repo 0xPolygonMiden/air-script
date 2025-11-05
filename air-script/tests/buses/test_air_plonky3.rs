@@ -14,8 +14,8 @@ use p3_uni_stark::StarkConfig;
 
 use crate::{
     buses::buses_complex_plonky3::{BusesAir, NUM_COLUMNS},
-    generate_air_plonky3_test,
-    helpers::check_constraints_with_periodic_columns,
+    generate_air_plonky3_test_with_airscript_traits,
+    helpers::check_constraints_with_airscript_traits,
 };
 
 pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<F> {
@@ -52,4 +52,4 @@ fn generate_inputs() -> Vec<u32> {
     vec![1; 2]
 }
 
-generate_air_plonky3_test!(test_air_plonky3, BusesAir);
+generate_air_plonky3_test_with_airscript_traits!(test_air_plonky3, BusesAir);
