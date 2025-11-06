@@ -15,7 +15,7 @@ impl AirTester for BusesAirTester {
     type PubInputs = PublicInputs;
 
     fn build_main_trace(&self, length: usize) -> MyTraceTable {
-        let trace_width = 5;
+        let trace_width = 7;
         let start = Felt::new(0);
         let mut trace = TraceTable::new(trace_width, length);
 
@@ -26,6 +26,8 @@ impl AirTester for BusesAirTester {
                 state[2] = start;
                 state[3] = start;
                 state[4] = start;
+                state[5] = start;
+                state[6] = start;
             },
             |_, state| {
                 state[0] = Felt::new(1) - state[0];
@@ -33,6 +35,8 @@ impl AirTester for BusesAirTester {
                 state[2] = Felt::new(1) - state[2];
                 state[3] = Felt::new(1) - state[3];
                 state[4] = Felt::new(1) - state[4];
+                state[5] = Felt::new(1) - state[4];
+                state[6] = Felt::new(1) - state[4];
             },
         );
 
