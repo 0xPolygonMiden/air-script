@@ -3,15 +3,18 @@ use p3_matrix::Matrix;
 use p3_field::{Field, PrimeCharacteristicRing};
 use crate::helpers::{AirScriptAir, AirScriptBuilder};
 
-pub const NUM_COLUMNS: usize = 17;
-
+pub const MAIN_WIDTH: usize = 17;
+pub const AUX_WIDTH: usize = 0;
+pub const NUM_PERIODIC_VALUES: usize = 0;
+pub const PERIOD: usize = 0;
 pub const NUM_PUBLIC_VALUES: usize = 16;
+pub const NUM_ALPHA_CHALLENGES: usize = 0;
 
 pub struct ListFoldingAir;
 
 impl<F> BaseAir<F> for ListFoldingAir {
     fn width(&self) -> usize {
-        NUM_COLUMNS
+        MAIN_WIDTH
     }
 }
 
@@ -21,22 +24,23 @@ impl<F> BaseAirWithPublicValues<F> for ListFoldingAir {
     }
 }
 
-impl<F: Field> AirScriptAir<F> for ListFoldingAir {
-     const MAIN_WIDTH: usize = NUM_COLUMNS;
-     const AUX_WIDTH: usize = 0;
-     const PERIOD: usize = 0;
-     const NUM_ALPHA_CHALLENGES: usize = 0;
-    fn periodic_table(&self) -> Vec<Vec<F>> {
-        vec![
-        ]
+impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for ListFoldingAir {
+    fn aux_width(&self) -> usize {
+        AUX_WIDTH
     }
 
-    fn eval<AB>(&self, builder: &mut AB)
-    where AB: AirScriptBuilder<F = F>,
-    {
+    fn num_alpha_challenges(&self) -> usize {
+        NUM_ALPHA_CHALLENGES
+    }
+
+    fn periodic_table(&self) -> Vec<Vec<F>> {
+        vec![]
+    }
+
+    fn eval(&self, builder: &mut AB) {
         let main = builder.main();
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
-        let periodic_values = builder.periodic_evals().to_vec();
+        let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect("Wrong number of periodic values");
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
@@ -51,6 +55,6 @@ impl<F: Field> AirScriptAir<F> for ListFoldingAir {
 
 impl<AB: AirScriptBuilder> Air<AB> for ListFoldingAir {
     fn eval(&self, builder: &mut AB) {
-        <Self as AirScriptAir<AB::F>>::eval(self, builder);
+        <Self as AirScriptAir<AB::F, AB>>::eval(self, builder);
     }
 }

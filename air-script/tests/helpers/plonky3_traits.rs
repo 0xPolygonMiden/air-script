@@ -9,21 +9,23 @@ use p3_matrix::{
 };
 
 /// Miden/AirScript-specific AIR. Replaces BaseAir for this forked target.
-pub trait AirScriptAir<F: Field> {
-    /// Compile-time shape for this AIR.
-    const MAIN_WIDTH: usize;
-    const AUX_WIDTH: usize; // EF aux columns used by buses/perm args
-    const PERIOD: usize; // 0 == no periodic columns
-    const NUM_ALPHA_CHALLENGES: usize; // alpha_powers().len()
+pub trait AirScriptAir<F: Field, AB: AirScriptBuilder<F = F>> {
+    /// Auxiliary width of the AIR.
+    fn aux_width(&self) -> usize {
+        0
+    }
+
+    /// Number of alpha challenges used in the AIR.
+    fn num_alpha_challenges(&self) -> usize {
+        0
+    }
 
     /// Periodic constants (base-field) backing periodic_evals().
-    //fn periodic_table(&self) -> &'static [&'static [F]];
+    // fn periodic_table(&self) -> &'static [&'static [F]];
     fn periodic_table(&self) -> Vec<Vec<F>>;
 
     /// Single entrypoint: encodes main + aux + boundary constraints.
-    fn eval<AB>(&self, builder: &mut AB)
-    where
-        AB: AirScriptBuilder<F = F>;
+    fn eval(&self, builder: &mut AB);
 }
 
 /// Target trait for AirScript codegen. Implemented by the prover.
@@ -257,7 +259,7 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
     F: Field,
     EF: ExtensionField<F>,
     A: for<'a> Air<DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>>,
-    A: AirScriptAir<F>,
+    A: for<'a> AirScriptAir<F, DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>>,
 {
     let height = main.height();
 
@@ -274,7 +276,7 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             air.periodic_table().iter().map(|col| col[i % col.len()]).collect();
         let periodic_columns: Vec<EF> =
             periodic_columns_base.iter().map(|&v| EF::from(v)).collect();
-        let aux_bus_boundary_values: Vec<_> = (0..A::AUX_WIDTH).map(|_| EF::GENERATOR).collect();
+        let aux_bus_boundary_values: Vec<_> = (0..air.aux_width()).map(|_| EF::GENERATOR).collect();
         let alpha = EF::GENERATOR; // TODO
         let beta = EF::GENERATOR; // TODO
 
@@ -288,7 +290,7 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             periodic_columns,
             alpha,
             beta,
-            alpha_powers: (0..A::NUM_ALPHA_CHALLENGES)
+            alpha_powers: (0..air.num_alpha_challenges())
                 .map(|power| alpha.exp_u64(power as u64))
                 .collect(),
             aux_bus_boundary_values,

@@ -13,20 +13,20 @@ use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
 use p3_uni_stark::StarkConfig;
 
 use crate::{
-    constants::constants_plonky3::{ConstantsAir, NUM_COLUMNS},
+    constants::constants_plonky3::{ConstantsAir, MAIN_WIDTH},
     generate_air_plonky3_test_with_airscript_traits,
     helpers::check_constraints_with_airscript_traits,
 };
 
 pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<F> {
     let num_rows = 32;
-    let trace_length = num_rows * NUM_COLUMNS;
+    let trace_length = num_rows * MAIN_WIDTH;
 
     let mut long_trace = F::zero_vec(trace_length);
 
-    let mut trace = RowMajorMatrix::new(long_trace, NUM_COLUMNS);
+    let mut trace = RowMajorMatrix::new(long_trace, MAIN_WIDTH);
 
-    let (prefix, rows, suffix) = unsafe { trace.values.align_to_mut::<[F; NUM_COLUMNS]>() };
+    let (prefix, rows, suffix) = unsafe { trace.values.align_to_mut::<[F; MAIN_WIDTH]>() };
     assert!(prefix.is_empty(), "Alignment should match");
     assert!(suffix.is_empty(), "Alignment should match");
     assert_eq!(rows.len(), num_rows);
