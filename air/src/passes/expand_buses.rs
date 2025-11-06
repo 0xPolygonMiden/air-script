@@ -234,8 +234,11 @@ impl<'a> BusOpExpand<'a> {
         // 6. Create the resulting constraint and insert it into the graph
         let root = graph.insert_node(Operation::Sub(p_prod, p_prime_prod));
 
-        ir.constraints
-            .insert_constraint(TraceSegmentId::Aux, root, ConstraintDomain::EveryRow);
+        ir.constraints.insert_constraint(
+            TraceSegmentId::Aux,
+            root,
+            ConstraintDomain::EveryFrame(2),
+        );
     }
 
     /// Helper function to expand the integrity constraint of a logup bus
@@ -372,7 +375,10 @@ impl<'a> BusOpExpand<'a> {
 
         // 5. Create the resulting constraint
         let root = graph.insert_node(Operation::Sub(q_term, q_prime_term));
-        ir.constraints
-            .insert_constraint(TraceSegmentId::Aux, root, ConstraintDomain::EveryRow);
+        ir.constraints.insert_constraint(
+            TraceSegmentId::Aux,
+            root,
+            ConstraintDomain::EveryFrame(2),
+        );
     }
 }

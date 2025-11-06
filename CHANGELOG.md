@@ -13,6 +13,7 @@
 - Fix regressions on MIR and list_comprehensions (#449).
 - Add Plonky3 codegen backend (#461).
 - Fixed a vector unrolling issue in nested match evaluations (#491).
+- In Plonky3 codegen, use AirScriptAir and AirScriptBuilder traits, and generate aux constraints (#508).
 
 ## 0.4.0 (2025-06-20)
 

@@ -1,15 +1,20 @@
 mod boundary_constraints;
 mod graph;
-use graph::Codegen;
 mod integrity_constraints;
 
 use air_ir::Air;
 
 use super::Scope;
 use crate::air::{
-    boundary_constraints::add_main_boundary_constraints,
-    integrity_constraints::add_main_integrity_constraints,
+    boundary_constraints::{add_aux_boundary_constraints, add_main_boundary_constraints},
+    integrity_constraints::{add_aux_integrity_constraints, add_main_integrity_constraints},
 };
+
+#[derive(Debug, Clone, Copy)]
+pub enum ElemType {
+    Base,
+    Ext,
+}
 
 // HELPERS TO GENERATE AN IMPLEMENTATION OF THE PLONKY3 AIR TRAIT
 // ================================================================================================
@@ -41,7 +46,7 @@ fn add_constants(scope: &mut Scope, ir: &Air) {
     let period = ir.periodic_columns().map(|col| col.period()).max().unwrap_or(0);
     let num_public_values =
         ir.public_inputs().map(|public_input| public_input.size()).sum::<usize>();
-    let num_alpha_challenges = ir.num_random_values;
+    let num_alpha_challenges = ir.num_random_values.saturating_sub(1);
 
     let constants = [
         format!("pub const MAIN_WIDTH: usize = {main_width};"),
@@ -119,21 +124,33 @@ fn add_air_script_trait(scope: &mut Scope, ir: &Air, name: &str) {
 
     // add the eval function
     let eval_func = air_script_impl.new_fn("eval").arg_ref_self().arg("builder", "&mut AB");
-    eval_func.line("let main = builder.main();");
     eval_func.line("let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect(\"Wrong number of public values\");");
     eval_func.line("let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect(\"Wrong number of periodic values\");");
+    eval_func.line("let main = builder.main();");
     eval_func.line("let (main_current, main_next) = (");
     eval_func.line("    main.row_slice(0).unwrap(),");
     eval_func.line("    main.row_slice(1).unwrap(),");
     eval_func.line(");");
 
-    eval_func.line("");
-    eval_func.line("// Main boundary constraints");
+    // Only had aux if there are random values
+    if ir.num_random_values > 0 {
+        eval_func.line("let alpha_challenges: [_; NUM_ALPHA_CHALLENGES] = builder.alpha_powers().try_into().expect(\"Wrong number of alpha challenges\");");
+        eval_func.line("let beta = builder.beta();");
+        eval_func.line("let aux_bus_boundary_values: [_; AUX_WIDTH] = builder.aux_bus_boundary_values().try_into().expect(\"Wrong number of aux bus boundary values\");");
+        eval_func.line("let aux = builder.permutation();");
+        eval_func.line("let (aux_current, aux_next) = (");
+        eval_func.line("    aux.row_slice(0).unwrap(),");
+        eval_func.line("    aux.row_slice(1).unwrap(),");
+        eval_func.line(");");
+    }
+
     add_main_boundary_constraints(eval_func, ir);
 
-    eval_func.line("");
-    eval_func.line("// Main integrity/transition constraints");
     add_main_integrity_constraints(eval_func, ir);
+
+    add_aux_boundary_constraints(eval_func, ir);
+
+    add_aux_integrity_constraints(eval_func, ir);
 }
 
 /// Updates the provided scope with the custom Air struct and an Air trait implementation based on

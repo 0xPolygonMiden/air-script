@@ -1,4 +1,4 @@
-use p3_air::{Air, BaseAir, BaseAirWithPublicValues, ExtensionBuilder};
+use p3_air::{Air, BaseAir, BaseAirWithPublicValues, AirBuilder, ExtensionBuilder};
 use p3_matrix::Matrix;
 use p3_field::{Field, PrimeCharacteristicRing};
 use crate::helpers::{AirScriptAir, AirScriptBuilder};
@@ -38,15 +38,19 @@ impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for ConstantInRa
     }
 
     fn eval(&self, builder: &mut AB) {
-        let main = builder.main();
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
         let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect("Wrong number of periodic values");
+        let main = builder.main();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        builder.when_first_row().assert_zero_ext::<_>(main_current[6].clone().into());
-        builder.assert_zero_ext::<_>(main_current[0].clone().into() - (main_current[1].clone().into() - main_current[4].clone().into() - main_current[8].clone().into() + AB::Expr::ONE + main_current[2].clone().into() - main_current[5].clone().into() - main_current[9].clone().into() + AB::Expr::from_u64(2) + main_current[3].clone().into() - main_current[6].clone().into() - main_current[10].clone().into()));
+
+        // Main boundary constraints
+        builder.when_first_row().assert_zero(main_current[6].clone().into());
+
+        // Main integrity/transition constraints
+        builder.assert_zero(main_current[0].clone().into() - (main_current[1].clone().into() - main_current[4].clone().into() - main_current[8].clone().into() + AB::Expr::ONE + main_current[2].clone().into() - main_current[5].clone().into() - main_current[9].clone().into() + AB::Expr::from_u64(2) + main_current[3].clone().into() - main_current[6].clone().into() - main_current[10].clone().into()));
     }
 }
 
