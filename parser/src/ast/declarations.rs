@@ -166,7 +166,7 @@ impl PartialEq for Constant {
 pub enum ConstantExpr {
     Scalar(u64),
     Vector(Vec<u64>),
-    Matrix(Vec<Vec<u64>>),
+    Matrix(crate::ast::Matrix),
 }
 impl ConstantExpr {
     /// Gets the type of this expression
@@ -174,10 +174,9 @@ impl ConstantExpr {
         match self {
             Self::Scalar(_) => Type::Felt,
             Self::Vector(elems) => Type::Vector(elems.len()),
-            Self::Matrix(rows) => {
-                let num_rows = rows.len();
-                let num_cols = rows.first().unwrap().len();
-                Type::Matrix(num_rows, num_cols)
+            Self::Matrix(matrix) => {
+                let (rows, cols) = matrix.dimensions();
+                Type::Matrix(rows, cols)
             },
         }
     }
@@ -194,13 +193,26 @@ impl fmt::Display for ConstantExpr {
             Self::Vector(values) => {
                 write!(f, "{}", DisplayList(values.as_slice()))
             },
-            Self::Matrix(values) => write!(
-                f,
-                "{}",
-                DisplayBracketed(DisplayCsv::new(
-                    values.iter().map(|vs| DisplayList(vs.as_slice()))
-                ))
-            ),
+            Self::Matrix(matrix) => {
+                let (rows, cols) = matrix.dimensions();
+                let slice = matrix.as_slice();
+                // For display purposes, format as nested vectors
+                write!(f, "[")?;
+                for i in 0..rows {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "[")?;
+                    for j in 0..cols {
+                        if j > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", slice[i * cols + j])?;
+                    }
+                    write!(f, "]")?;
+                }
+                write!(f, "]")
+            },
         }
     }
 }

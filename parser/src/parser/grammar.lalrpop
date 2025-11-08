@@ -133,7 +133,13 @@ Constant: Constant = {
 ConstExpr: ConstantExpr = {
     <Num_u64> => ConstantExpr::Scalar(<>),
     <Vector<Num_u64>> => ConstantExpr::Vector(<>),
-    <Matrix<Num_u64>> => ConstantExpr::Matrix(<>),
+    <data:Matrix<Num_u64>> =>? {
+        crate::ast::Matrix::new(data)
+            .map(ConstantExpr::Matrix)
+            .ok_or(lalrpop_util::ParseError::User {
+                error: crate::ParseError::InvalidMatrix
+            })
+    },
 }
 
 // PUBLIC INPUTS

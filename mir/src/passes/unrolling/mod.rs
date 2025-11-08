@@ -201,14 +201,17 @@ fn unroll_constant_vector(constant_vector: &Vec<u64>, span: SourceSpan) -> Link<
 }
 
 /// Unrolls a constant matrix into a `Matrix<Vector<ConstantValue::Felt>>`
-fn unroll_constant_matrix(constant_matrix: &Vec<Vec<u64>>, span: SourceSpan) -> Link<Op> {
+fn unroll_constant_matrix(constant_matrix: &air_parser::ast::Matrix, span: SourceSpan) -> Link<Op> {
     let mut res_m = vec![];
-    for row in constant_matrix {
+    let (rows, cols) = constant_matrix.dimensions();
+    let slice = constant_matrix.as_slice();
+
+    for i in 0..rows {
         let mut res_row = vec![];
-        for val in row {
+        for j in 0..cols {
             let val = Value::create(SpannedMirValue {
                 span,
-                value: MirValue::Constant(ConstantValue::Felt(*val)),
+                value: MirValue::Constant(ConstantValue::Felt(slice[i * cols + j])),
             });
             res_row.push(val);
         }

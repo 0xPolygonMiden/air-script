@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic};
+use super::compile;
 
 #[test]
 fn boundary_constraint_with_constants() {
@@ -66,5 +66,6 @@ fn invalid_matrix_constant() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(source, "invalid matrix literal: mismatched dimensions");
+    // Validation now happens at parse time (issue #274)
+    assert!(compile(source).is_err());
 }

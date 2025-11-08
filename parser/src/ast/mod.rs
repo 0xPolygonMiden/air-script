@@ -2,6 +2,7 @@ mod declarations;
 mod display;
 mod errors;
 mod expression;
+mod matrix;
 mod module;
 mod statement;
 mod trace;
@@ -21,7 +22,8 @@ use miden_diagnostics::{
 
 pub(crate) use self::display::*;
 pub use self::{
-    declarations::*, errors::*, expression::*, module::*, statement::*, trace::*, types::*,
+    declarations::*, errors::*, expression::*, matrix::*, module::*, statement::*, trace::*,
+    types::*,
 };
 use crate::{
     Symbol,

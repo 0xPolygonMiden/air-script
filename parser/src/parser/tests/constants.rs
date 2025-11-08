@@ -55,36 +55,22 @@ fn constants_matrices() {
     const B = [[5, 6], [7, 8]];";
 
     let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
-    expected.constants.insert(
-        ident!(A),
-        Constant::new(
-            SourceSpan::UNKNOWN,
-            ident!(A),
-            ConstantExpr::Matrix(vec![vec![1, 2], vec![3, 4]]),
-        ),
-    );
-    expected.constants.insert(
-        ident!(B),
-        Constant::new(
-            SourceSpan::UNKNOWN,
-            ident!(B),
-            ConstantExpr::Matrix(vec![vec![5, 6], vec![7, 8]]),
-        ),
-    );
+    expected.constants.insert(ident!(A), constant!(A = [[1, 2], [3, 4]]));
+    expected.constants.insert(ident!(B), constant!(B = [[5, 6], [7, 8]]));
     ParseTest::new().expect_module_ast(source, expected);
 }
 
 #[test]
 fn err_const_matrix_unequal_number_of_cols() {
-    // This is invalid since the number of columns for the two rows are unequal. However this
-    // validation happens at the IR level.
+    // This is invalid since the number of columns for the two rows are unequal.
+    // Validation now happens at parse time (issue #274).
     let source = "
     mod test
 
     const A = [[1, 2], [3, 4, 5]];";
 
-    ParseTest::new()
-        .expect_module_diagnostic(source, "invalid matrix literal: mismatched dimensions");
+    // Parsing should fail with invalid matrix error
+    assert!(ParseTest::new().parse_module(source).is_err());
 }
 
 #[test]

@@ -112,7 +112,7 @@ impl BusAccess {
 pub enum ConstantValue {
     Felt(u64),
     Vector(Vec<u64>),
-    Matrix(Vec<Vec<u64>>),
+    Matrix(air_parser::ast::Matrix),
 }
 
 /// [TraceAccess] is like SymbolAccess, but is used to describe an access to a specific trace

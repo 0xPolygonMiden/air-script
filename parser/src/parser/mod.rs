@@ -52,6 +52,8 @@ pub enum ParseError {
     },
     #[error("extraneous token '{token}'")]
     ExtraToken { span: SourceSpan, token: Token },
+    #[error("invalid matrix: all rows must have the same length")]
+    InvalidMatrix,
     #[error("parsing failed, see diagnostics for details")]
     Failed,
 }
@@ -72,6 +74,7 @@ impl PartialEq for ParseError {
                 Self::UnrecognizedToken { token: rt, expected: r, .. },
             ) => lt == rt && l == r,
             (Self::ExtraToken { token: l, .. }, Self::ExtraToken { token: r, .. }) => l == r,
+            (Self::InvalidMatrix, Self::InvalidMatrix) => true,
             (Self::Failed, Self::Failed) => true,
             _ => false,
         }
@@ -142,6 +145,11 @@ impl ToDiagnostic for ParseError {
             Self::ExtraToken { span, .. } => Diagnostic::error()
                 .with_message("extraneous token")
                 .with_labels(vec![Label::primary(span.source_id(), span)]),
+            Self::InvalidMatrix => {
+                Diagnostic::error().with_message("invalid matrix").with_notes(vec![
+                    "Matrix constants must have the same number of columns in each row".to_string(),
+                ])
+            },
             err => Diagnostic::error().with_message(err.to_string()),
         }
     }

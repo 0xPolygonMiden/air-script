@@ -238,9 +238,8 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         ConstantExpr::Matrix(value) => match sym.access_type.clone() {
                             AccessType::Matrix(row, col) => match (*row, *col) {
                                 (ScalarExpr::Const(row), ScalarExpr::Const(col)) => {
-                                    if row.item >= value.len() as u64
-                                        || col.item >= value[row.item as usize].len() as u64
-                                    {
+                                    let (rows, cols) = value.dimensions();
+                                    if row.item >= rows as u64 || col.item >= cols as u64 {
                                         self.diagnostics.diagnostic(miden_diagnostics::Severity::Error)
                                             .with_message("attempted to access an index which is out of bounds")
                                             .with_primary_label(span, "index out of bounds")
@@ -399,14 +398,14 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                             },
                             AccessType::Slice(range) => {
                                 let range = range.to_slice_range();
-                                let matrix = value[range].to_vec();
+                                let matrix = value.slice_rows(range);
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Matrix(matrix)));
                             },
                             AccessType::Index(idx) => match *idx {
                                 ScalarExpr::Const(idx) => {
                                     *expr = Expr::Const(Span::new(
                                         span,
-                                        ConstantExpr::Vector(value[idx.item as usize].clone()),
+                                        ConstantExpr::Vector(value[idx.item as usize].to_vec()),
                                     ));
                                 },
                                 _ => {
@@ -514,8 +513,8 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                                 })
                                 .collect(),
                         ),
-                        Type::Matrix(..) => ConstantExpr::Matrix(
-                            vector
+                        Type::Matrix(..) => {
+                            let rows: Vec<Vec<u64>> = vector
                                 .iter()
                                 .map(|expr| match expr {
                                     Expr::Const(Span {
@@ -523,8 +522,11 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                                     }) => vs.clone(),
                                     _ => unreachable!(),
                                 })
-                                .collect(),
-                        ),
+                                .collect();
+                            ConstantExpr::Matrix(
+                                Matrix::new(rows).expect("Matrix dimensions should be valid"),
+                            )
+                        },
                         _ => unreachable!(),
                     };
                     *expr = Expr::Const(Span::new(span, new_expr));
@@ -541,18 +543,19 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                     }
                 }
                 if is_constant {
+                    let rows: Vec<Vec<u64>> = matrix
+                        .iter()
+                        .map(|row| {
+                            row.iter()
+                                .map(|col| match col {
+                                    ScalarExpr::Const(elem) => elem.item,
+                                    _ => unreachable!(),
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .collect();
                     let matrix = ConstantExpr::Matrix(
-                        matrix
-                            .iter()
-                            .map(|row| {
-                                row.iter()
-                                    .map(|col| match col {
-                                        ScalarExpr::Const(elem) => elem.item,
-                                        _ => unreachable!(),
-                                    })
-                                    .collect::<Vec<_>>()
-                            })
-                            .collect(),
+                        Matrix::new(rows).expect("Matrix dimensions should be valid"),
                     );
                     *expr = Expr::Const(Span::new(span, matrix));
                 }
@@ -606,7 +609,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                                 self.local.insert(binding, Span::new(span, value));
                             },
                             Expr::Const(Span { item: ConstantExpr::Matrix(elems), .. }) => {
-                                let value = ConstantExpr::Vector(elems[step].clone());
+                                let value = ConstantExpr::Vector(elems[step].to_vec());
                                 self.local.insert(binding, Span::new(span, value));
                             },
                             Expr::Range(range) => {

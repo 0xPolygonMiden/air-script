@@ -498,7 +498,14 @@ macro_rules! constant {
     };
 
     ($name:ident = [$([$($value:literal),+]),+]) => {
-        Constant::new(SourceSpan::UNKNOWN, ident!($name), ConstantExpr::Matrix(vec![$(vec![$($value),+]),+]))
+        {
+            let data = vec![$(vec![$($value),+]),+];
+            Constant::new(
+                SourceSpan::UNKNOWN,
+                ident!($name),
+                ConstantExpr::Matrix(Matrix::new(data).expect("Invalid matrix in test"))
+            )
+        }
     };
 }
 

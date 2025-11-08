@@ -1194,7 +1194,7 @@ impl<'a> MirBuilder<'a> {
         match c {
             ast::ConstantExpr::Scalar(s) => self.translate_scalar_const(*s, span),
             ast::ConstantExpr::Vector(v) => self.translate_vector_const(v.clone(), span),
-            ast::ConstantExpr::Matrix(m) => self.translate_matrix_const(m.clone(), span),
+            ast::ConstantExpr::Matrix(m) => self.translate_matrix_const(m, span),
         }
     }
 
@@ -1213,12 +1213,17 @@ impl<'a> MirBuilder<'a> {
 
     fn translate_matrix_const(
         &mut self,
-        m: Vec<Vec<u64>>,
+        m: &air_parser::ast::Matrix,
         span: SourceSpan,
     ) -> Result<Link<Op>, CompileError> {
-        let mut node = Matrix::builder().size(m.len()).span(span);
-        for row in m.iter() {
-            let row_node = self.translate_vector_const(row.clone(), span)?;
+        let (rows, cols) = m.dimensions();
+        let mut node = Matrix::builder().size(rows).span(span);
+        let slice = m.as_slice();
+
+        for i in 0..rows {
+            let start = i * cols;
+            let end = start + cols;
+            let row_node = self.translate_vector_const(slice[start..end].to_vec(), span)?;
             node = node.elements(row_node);
         }
         let node = node.build();

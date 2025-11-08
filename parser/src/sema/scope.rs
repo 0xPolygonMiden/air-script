@@ -22,9 +22,10 @@ pub type Env<K, V> = Box<HashMap<K, V>>;
 /// When searching for keys, the search begins in the current scope, and searches upwards
 /// in the scope tree until either the root is reached and the search terminates, or the
 /// key is found in some intervening scope.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum LexicalScope<K, V> {
     /// An empty scope, this is the default state in which all [LexicalScope] start
+    #[default]
     Empty,
     /// Represents a non-empty, top-level (root) scope
     Root(Env<K, V>),
@@ -43,11 +44,6 @@ where
             Self::Root(scope) => Self::Root(scope.clone()),
             Self::Nested(parent, scope) => Self::Nested(Rc::clone(parent), scope.clone()),
         }
-    }
-}
-impl<K, V> Default for LexicalScope<K, V> {
-    fn default() -> Self {
-        Self::Empty
     }
 }
 impl<K, V> LexicalScope<K, V> {

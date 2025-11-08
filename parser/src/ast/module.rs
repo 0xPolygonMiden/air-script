@@ -333,27 +333,6 @@ impl Module {
             return Err(SemanticAnalysisError::NameConflict(constant.name.span()));
         }
 
-        // Validate constant expression
-        if let ConstantExpr::Matrix(matrix) = &constant.value {
-            let expected_len =
-                matrix.first().expect("expected matrix to have at least one row").len();
-            for vector in matrix.iter().skip(1) {
-                if expected_len != vector.len() {
-                    diagnostics
-                        .diagnostic(Severity::Error)
-                        .with_message("invalid constant")
-                        .with_primary_label(
-                            constant.span(),
-                            "invalid matrix literal: mismatched dimensions",
-                        )
-                        .with_note(
-                            "Matrix constants must have the same number of columns in each row",
-                        )
-                        .emit();
-                    return Err(SemanticAnalysisError::Invalid);
-                }
-            }
-        }
         assert_eq!(self.constants.insert(constant.name, constant), None);
 
         Ok(())
