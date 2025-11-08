@@ -104,6 +104,23 @@ impl Matrix {
         &self.storage
     }
 
+    /// Returns an iterator over the elements of a specific column across all rows
+    pub fn column_iter(&self, col: usize) -> impl Iterator<Item = u64> + '_ {
+        assert!(col < self.cols, "column index out of bounds");
+        (0..self.rows).map(move |row| self.get(row, col))
+    }
+
+    /// Returns the number of elements in the specified row
+    pub fn row_len(&self, row: usize) -> usize {
+        assert!(row < self.rows, "row index out of bounds");
+        self.cols
+    }
+
+    /// Returns the number of elements in the specified column
+    pub fn column_len(&self, _col: usize) -> usize {
+        self.rows
+    }
+
     /// Returns a specific element by row and column
     ///
     /// # Panics
@@ -141,6 +158,19 @@ impl Matrix {
     /// Consumes the matrix and returns the flat storage
     pub fn into_vec(self) -> Vec<u64> {
         self.storage
+    }
+
+    /// Returns an iterator over the columns of a specific row
+    pub fn row_iter(&self, row: usize) -> std::slice::Iter<'_, u64> {
+        assert!(row < self.rows, "row index out of bounds");
+        let start = row * self.cols;
+        let end = start + self.cols;
+        self.storage[start..end].iter()
+    }
+
+    /// Returns an iterator over all rows as slices
+    pub fn rows_iter(&self) -> impl Iterator<Item = &[u64]> {
+        self.storage.chunks_exact(self.cols)
     }
 }
 
@@ -269,5 +299,208 @@ mod tests {
         assert_eq!(matrix.cols(), 3);
         assert_eq!(matrix[0][0], 1);
         assert_eq!(matrix[1][2], 6);
+    }
+
+    #[test]
+    fn test_slice_rows_full_range() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]];
+        let matrix = Matrix::new(data).unwrap();
+        let sliced = matrix.slice_rows(0..3);
+
+        assert_eq!(sliced.rows(), 3);
+        assert_eq!(sliced.cols(), 3);
+        assert_eq!(sliced[0][0], 1);
+        assert_eq!(sliced[2][2], 9);
+    }
+
+    #[test]
+    fn test_slice_rows_partial_range() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]];
+        let matrix = Matrix::new(data).unwrap();
+        let sliced = matrix.slice_rows(1..3);
+
+        assert_eq!(sliced.rows(), 2);
+        assert_eq!(sliced.cols(), 3);
+        assert_eq!(sliced[0][0], 4);
+        assert_eq!(sliced[0][2], 6);
+        assert_eq!(sliced[1][0], 7);
+        assert_eq!(sliced[1][2], 9);
+    }
+
+    #[test]
+    fn test_slice_rows_single_row() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]];
+        let matrix = Matrix::new(data).unwrap();
+        let sliced = matrix.slice_rows(1..2);
+
+        assert_eq!(sliced.rows(), 1);
+        assert_eq!(sliced.cols(), 3);
+        assert_eq!(sliced[0][0], 4);
+        assert_eq!(sliced[0][2], 6);
+    }
+
+    #[test]
+    fn test_slice_rows_empty_range() {
+        let data = vec![vec![1, 2], vec![3, 4]];
+        let matrix = Matrix::new(data).unwrap();
+        // Empty ranges are valid (just produce empty results)
+        let sliced = matrix.slice_rows(1..1);
+        assert_eq!(sliced.rows(), 0);
+        assert_eq!(sliced.cols(), 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Range end out of bounds")]
+    fn test_slice_rows_out_of_bounds() {
+        let data = vec![vec![1, 2], vec![3, 4]];
+        let matrix = Matrix::new(data).unwrap();
+        let _sliced = matrix.slice_rows(1..3);
+    }
+
+    #[test]
+    #[should_panic(expected = "row index out of bounds")]
+    fn test_index_row_out_of_bounds() {
+        let data = vec![vec![1, 2], vec![3, 4]];
+        let matrix = Matrix::new(data).unwrap();
+        let _ = matrix[2];
+    }
+
+    #[test]
+    #[should_panic(expected = "index out of bounds")]
+    fn test_index_column_out_of_bounds() {
+        let data = vec![vec![1, 2], vec![3, 4]];
+        let matrix = Matrix::new(data).unwrap();
+        let _ = matrix[0][2];
+    }
+
+    #[test]
+    #[should_panic(expected = "row index out of bounds")]
+    fn test_get_row_out_of_bounds() {
+        let data = vec![vec![1, 2], vec![3, 4]];
+        let matrix = Matrix::new(data).unwrap();
+        matrix.get(2, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "column index out of bounds")]
+    fn test_get_column_out_of_bounds() {
+        let data = vec![vec![1, 2], vec![3, 4]];
+        let matrix = Matrix::new(data).unwrap();
+        matrix.get(0, 2);
+    }
+
+    #[test]
+    fn test_matrix_row_len() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6]];
+        let matrix = Matrix::new(data).unwrap();
+
+        assert_eq!(matrix[0].len(), 3);
+        assert_eq!(matrix[1].len(), 3);
+    }
+
+    #[test]
+    fn test_matrix_row_is_empty() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6]];
+        let matrix = Matrix::new(data).unwrap();
+
+        assert!(!matrix[0].is_empty());
+    }
+
+    #[test]
+    fn test_matrix_row_to_vec() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6]];
+        let matrix = Matrix::new(data).unwrap();
+
+        assert_eq!(matrix[0].to_vec(), vec![1, 2, 3]);
+        assert_eq!(matrix[1].to_vec(), vec![4, 5, 6]);
+    }
+
+    #[test]
+    fn test_row_iter() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6]];
+        let matrix = Matrix::new(data).unwrap();
+
+        let row0: Vec<_> = matrix.row_iter(0).copied().collect();
+        let row1: Vec<_> = matrix.row_iter(1).copied().collect();
+
+        assert_eq!(row0, vec![1, 2, 3]);
+        assert_eq!(row1, vec![4, 5, 6]);
+    }
+
+    #[test]
+    #[should_panic(expected = "row index out of bounds")]
+    fn test_row_iter_out_of_bounds() {
+        let data = vec![vec![1, 2], vec![3, 4]];
+        let matrix = Matrix::new(data).unwrap();
+        let _ = matrix.row_iter(2);
+    }
+
+    #[test]
+    fn test_rows_iter() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]];
+        let matrix = Matrix::new(data).unwrap();
+
+        let rows: Vec<Vec<_>> = matrix.rows_iter().map(|row| row.to_vec()).collect();
+
+        assert_eq!(rows, vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]]);
+    }
+
+    #[test]
+    fn test_column_iter() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]];
+        let matrix = Matrix::new(data).unwrap();
+
+        let col0: Vec<_> = matrix.column_iter(0).collect();
+        let col1: Vec<_> = matrix.column_iter(1).collect();
+        let col2: Vec<_> = matrix.column_iter(2).collect();
+
+        assert_eq!(col0, vec![1, 4, 7]);
+        assert_eq!(col1, vec![2, 5, 8]);
+        assert_eq!(col2, vec![3, 6, 9]);
+    }
+
+    #[test]
+    #[should_panic(expected = "column index out of bounds")]
+    fn test_column_iter_out_of_bounds() {
+        let data = vec![vec![1, 2], vec![3, 4]];
+        let matrix = Matrix::new(data).unwrap();
+        let _ = matrix.column_iter(2);
+    }
+
+    #[test]
+    fn test_row_len() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6]];
+        let matrix = Matrix::new(data).unwrap();
+
+        assert_eq!(matrix.row_len(0), 3);
+        assert_eq!(matrix.row_len(1), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "row index out of bounds")]
+    fn test_row_len_out_of_bounds() {
+        let data = vec![vec![1, 2], vec![3, 4]];
+        let matrix = Matrix::new(data).unwrap();
+        matrix.row_len(2);
+    }
+
+    #[test]
+    fn test_column_len() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]];
+        let matrix = Matrix::new(data).unwrap();
+
+        assert_eq!(matrix.column_len(0), 3);
+        assert_eq!(matrix.column_len(1), 3);
+    }
+
+    #[test]
+    fn test_column_len_different_column() {
+        let data = vec![vec![1, 2, 3], vec![4, 5, 6]];
+        let matrix = Matrix::new(data).unwrap();
+
+        // column_len should return the number of rows for any valid column
+        assert_eq!(matrix.column_len(0), 2);
+        assert_eq!(matrix.column_len(1), 2);
+        assert_eq!(matrix.column_len(2), 2);
     }
 }
