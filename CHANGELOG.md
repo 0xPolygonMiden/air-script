@@ -13,6 +13,7 @@
 - Fix regressions on MIR and list_comprehensions (#449).
 - Fixed a vector unrolling issue in nested match evaluations (#491).
 - Fix evaluator argument vector slice expansion (#495).
+- replace Vec<Vec<u64>> with dense strided Matrix representation (#510).
 
 ## 0.4.0 (2025-06-20)
 
