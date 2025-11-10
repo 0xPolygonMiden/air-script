@@ -33,6 +33,9 @@ pub struct RandomInputs {
 impl RandomInputs {
     /// Evaluates a given algebraic graph node at random points.
     pub fn eval(&mut self, graph: &AlgebraicGraph, node_index: &NodeIndex) -> QuadFelt {
+        if let Some(cached) = self.evals_map.get(node_index) {
+            return *cached;
+        }
         let op = graph.node(node_index).op();
         match op {
             Operation::Add(lhs, rhs) => {
