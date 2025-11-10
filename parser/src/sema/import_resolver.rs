@@ -70,14 +70,16 @@ impl VisitMut<SemanticAnalysisError> for ImportResolver<'_> {
                         Ok(value) => value,
                         Err(err) => return ControlFlow::Break(err),
                     };
-                    for export in imported_from.exports() {
-                        let name = export.name();
-                        // We fetch the item from the set, rather than simply
-                        // check for containment, because we want the span associated
-                        // with the item in the set, not the span associated with the
-                        // export.
-                        if let Some(item) = items.get(&name) {
-                            self.import(module, *from, *item, export)?;
+                    for item in items.iter() {
+                        match imported_from.get(item) {
+                            Some(export) => {
+                                self.import(module, *from, *item, export)?;
+                            },
+                            None => {
+                                return ControlFlow::Break(SemanticAnalysisError::ImportUndefined(
+                                    *from,
+                                ));
+                            },
                         }
                     }
                 },
