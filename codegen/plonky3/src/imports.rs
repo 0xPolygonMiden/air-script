@@ -11,6 +11,6 @@ pub(super) fn add_imports(scope: &mut Scope) {
     scope.import("p3_matrix", "Matrix");
     scope.import("p3_field", "Field");
     scope.import("p3_field", "PrimeCharacteristicRing");
-    scope.import("crate::helpers", "AirScriptAir");
-    scope.import("crate::helpers", "AirScriptBuilder");
+    scope.import("crate::test_utils::plonky3_traits", "AirScriptAir");
+    scope.import("crate::test_utils::plonky3_traits", "AirScriptBuilder");
 }
