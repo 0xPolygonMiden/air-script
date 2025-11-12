@@ -105,7 +105,6 @@ fn add_air_script_trait(scope: &mut Scope, ir: &Air, name: &str) {
     let periodic_table_func = air_script_impl
         .new_fn("periodic_table")
         .arg_ref_self()
-        //.ret("&'static [&'static [F]]");
         .ret("Vec<Vec<F>>");
     if ir.periodic_columns().count() == 0 {
         periodic_table_func.line("vec![]");
