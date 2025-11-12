@@ -95,9 +95,10 @@ fn computed_indices_complex() {
 
 #[test]
 fn computed_indices_simple() {
-    let generated_air = Test::new("src/tests/computed_indices/computed_indices_simple.air".to_string())
-        .transpile(Target::Winterfell)
-        .unwrap();
+    let generated_air =
+        Test::new("src/tests/computed_indices/computed_indices_simple.air".to_string())
+            .transpile(Target::Winterfell)
+            .unwrap();
 
     let expected = expect_file!["computed_indices/computed_indices_simple.rs"];
     expected.assert_eq(&generated_air);
@@ -207,9 +208,10 @@ fn indexed_trace_access() {
 
 #[test]
 fn list_comprehension() {
-    let generated_air = Test::new("src/tests/list_comprehension/list_comprehension.air".to_string())
-        .transpile(Target::Winterfell)
-        .unwrap();
+    let generated_air =
+        Test::new("src/tests/list_comprehension/list_comprehension.air".to_string())
+            .transpile(Target::Winterfell)
+            .unwrap();
 
     let expected = expect_file!["list_comprehension/list_comprehension.rs"];
     expected.assert_eq(&generated_air);

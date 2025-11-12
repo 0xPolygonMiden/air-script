@@ -94,9 +94,10 @@ fn computed_indices_complex() {
 
 #[test]
 fn computed_indices_simple() {
-    let generated_air = Test::new("src/tests/computed_indices/computed_indices_simple.air".to_string())
-        .transpile(Target::Plonky3)
-        .unwrap();
+    let generated_air =
+        Test::new("src/tests/computed_indices/computed_indices_simple.air".to_string())
+            .transpile(Target::Plonky3)
+            .unwrap();
 
     let expected = expect_file!["computed_indices/computed_indices_simple_plonky3.rs"];
     expected.assert_eq(&generated_air);
@@ -198,9 +199,10 @@ fn list_comprehension_nested() {
 
 #[test]
 fn list_comprehension() {
-    let generated_air = Test::new("src/tests/list_comprehension/list_comprehension.air".to_string())
-        .transpile(Target::Plonky3)
-        .unwrap();
+    let generated_air =
+        Test::new("src/tests/list_comprehension/list_comprehension.air".to_string())
+            .transpile(Target::Plonky3)
+            .unwrap();
 
     let expected = expect_file!["list_comprehension/list_comprehension_plonky3.rs"];
     expected.assert_eq(&generated_air);
@@ -258,9 +260,10 @@ fn selectors_combine_simple() {
 
 #[test]
 fn selectors_combine_with_list_comprehensions() {
-    let generated_air = Test::new("src/tests/selectors/selectors_combine_with_list_comprehensions.air".to_string())
-        .transpile(Target::Plonky3)
-        .unwrap();
+    let generated_air =
+        Test::new("src/tests/selectors/selectors_combine_with_list_comprehensions.air".to_string())
+            .transpile(Target::Plonky3)
+            .unwrap();
 
     let expected = expect_file!["selectors/selectors_combine_with_list_comprehensions_plonky3.rs"];
     expected.assert_eq(&generated_air);

@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use crate::compile;
 use air_ir::{CodeGenerator, CompileError};
 use miden_diagnostics::{
     CodeMap, DefaultEmitter, DiagnosticsHandler, term::termcolor::ColorChoice,
 };
+
+use crate::compile;
 
 pub enum Target {
     Winterfell,

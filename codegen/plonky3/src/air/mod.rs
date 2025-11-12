@@ -102,10 +102,8 @@ fn add_air_script_trait(scope: &mut Scope, ir: &Air, name: &str) {
         .line("NUM_ALPHA_CHALLENGES");
 
     // add the periodic_table function
-    let periodic_table_func = air_script_impl
-        .new_fn("periodic_table")
-        .arg_ref_self()
-        .ret("Vec<Vec<F>>");
+    let periodic_table_func =
+        air_script_impl.new_fn("periodic_table").arg_ref_self().ret("Vec<Vec<F>>");
     if ir.periodic_columns().count() == 0 {
         periodic_table_func.line("vec![]");
     } else {
