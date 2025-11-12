@@ -15,8 +15,8 @@ pub trait AirScriptAir<F: Field, AB: AirScriptBuilder<F = F>> {
         0
     }
 
-    /// Number of alpha challenges used in the AIR.
-    fn num_alpha_challenges(&self) -> usize {
+    /// Number of beta challenges used in the AIR.
+    fn num_beta_challenges(&self) -> usize {
         0
     }
 
@@ -39,8 +39,8 @@ where
 
     /// Global challenges in EF. (We can provide defaults; details not important here.)
     fn alpha(&self) -> <Self as ExtensionBuilder>::VarEF;
-    fn alpha_powers(&self) -> &[<Self as ExtensionBuilder>::VarEF];
     fn beta(&self) -> <Self as ExtensionBuilder>::VarEF;
+    fn beta_powers(&self) -> &[<Self as ExtensionBuilder>::VarEF];
 
     /// Aux bus boundary values: EF finals, one per aux/bus column, carried in the proof.
     fn aux_bus_boundary_values(&self) -> &[<Self as ExtensionBuilder>::VarEF];
@@ -70,10 +70,12 @@ pub struct DebugConstraintBuilderWithAirScriptTraits<'a, F: Field, EF: Extension
     periodic_columns: Vec<EF>,
     /// The alpha challenge in the extension field.
     alpha: EF,
-    /// The alpha powers in the extension field.
-    alpha_powers: Vec<EF>,
     /// The beta challenge in the extension field.
     beta: EF,
+    /// The beta powers in the extension field.
+    beta_powers: Vec<EF>,
+    /// The permutation randomness in the extension field.
+    permutation_randomness: Vec<EF>,
     /// The aux bus boundary values in the extension field.
     aux_bus_boundary_values: Vec<EF>,
 }
@@ -171,7 +173,7 @@ where
     }
 
     fn permutation_randomness(&self) -> &[Self::RandomVar] {
-        self.alpha_powers.as_slice()
+        self.permutation_randomness.as_slice()
     }
 }
 
@@ -188,8 +190,8 @@ where
         self.alpha
     }
 
-    fn alpha_powers(&self) -> &[<Self as ExtensionBuilder>::VarEF] {
-        self.alpha_powers.as_slice()
+    fn beta_powers(&self) -> &[<Self as ExtensionBuilder>::VarEF] {
+        self.beta_powers.as_slice()
     }
 
     fn beta(&self) -> <Self as ExtensionBuilder>::VarEF {
@@ -203,8 +205,8 @@ where
 
 fn compute_aux_transition<F, EF>(
     main: VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>,
-    alpha_challenges: Vec<EF>,
-    beta: EF,
+    alpha: EF,
+    beta_challenges: Vec<EF>,
     aux_current: [EF; 2],
 ) -> [EF; 2]
 where
@@ -216,28 +218,28 @@ where
 
     // First bus: multiset
     // p' * multiset_removals = p * multiset_inserts
-    let multiset_inserts: EF = ((beta
-        + alpha_challenges[0]
-        + (EF::from_u64(3) + EF::from(main_current[1].clone())) * alpha_challenges[1]
-        + EF::from(main_current[0].clone()) * alpha_challenges[2])
+    let multiset_inserts: EF = ((alpha
+        + beta_challenges[0]
+        + (EF::from_u64(3) + EF::from(main_current[1].clone())) * beta_challenges[1]
+        + EF::from(main_current[0].clone()) * beta_challenges[2])
         * EF::from(main_current[2].clone())
         + EF::ONE
         - EF::from(main_current[2].clone()))
-        * ((beta
-            + alpha_challenges[0].double()
-            + EF::from(main_current[1].clone()) * alpha_challenges[1])
+        * ((alpha
+            + beta_challenges[0].double()
+            + EF::from(main_current[1].clone()) * beta_challenges[1])
             * (EF::ONE - EF::from(main_current[2].clone()))
             + EF::from(main_current[2].clone()));
-    let multiset_removals: EF = ((beta
-        + alpha_challenges[0]
-        + (EF::from_u64(3) + EF::from(main_current[1].clone())) * alpha_challenges[1]
-        + EF::from(main_current[1].clone()) * alpha_challenges[2])
+    let multiset_removals: EF = ((alpha
+        + beta_challenges[0]
+        + (EF::from_u64(3) + EF::from(main_current[1].clone())) * beta_challenges[1]
+        + EF::from(main_current[1].clone()) * beta_challenges[2])
         * EF::from(main_current[3].clone())
         + EF::ONE
         - EF::from(main_current[3].clone()))
-        * ((beta
-            + alpha_challenges[0].double()
-            + EF::from(main_current[0].clone()) * alpha_challenges[1])
+        * ((alpha
+            + beta_challenges[0].double()
+            + EF::from(main_current[0].clone()) * beta_challenges[1])
             * (EF::ONE - EF::from(main_current[3].clone()))
             + EF::from(main_current[3].clone()));
     let multiset_current = EF::from(aux_current[0].clone());
@@ -245,44 +247,44 @@ where
 
     // Second bus: logup
     // 0 = A * q + B + C - D * q' - E;
-    let a: EF = (beta
-        + EF::from_u64(3) * alpha_challenges[0]
-        + EF::from(main_current[0].clone()) * alpha_challenges[1])
-        * (beta
-            + EF::from_u64(3) * alpha_challenges[0]
-            + EF::from(main_current[0].clone()) * alpha_challenges[1])
-        * (beta
-            + EF::from_u64(3) * alpha_challenges[0]
-            + EF::from(main_current[1].clone()) * alpha_challenges[1]);
-    let b: EF = (beta
-        + EF::from_u64(3) * alpha_challenges[0]
-        + EF::from(main_current[0].clone()) * alpha_challenges[1])
-        * (beta
-            + EF::from_u64(3) * alpha_challenges[0]
-            + EF::from(main_current[1].clone()) * alpha_challenges[1])
+    let a: EF = (alpha
+        + EF::from_u64(3) * beta_challenges[0]
+        + EF::from(main_current[0].clone()) * beta_challenges[1])
+        * (alpha
+            + EF::from_u64(3) * beta_challenges[0]
+            + EF::from(main_current[0].clone()) * beta_challenges[1])
+        * (alpha
+            + EF::from_u64(3) * beta_challenges[0]
+            + EF::from(main_current[1].clone()) * beta_challenges[1]);
+    let b: EF = (alpha
+        + EF::from_u64(3) * beta_challenges[0]
+        + EF::from(main_current[0].clone()) * beta_challenges[1])
+        * (alpha
+            + EF::from_u64(3) * beta_challenges[0]
+            + EF::from(main_current[1].clone()) * beta_challenges[1])
         * EF::from(main_current[4].clone());
-    let c: EF = (beta
-        + EF::from_u64(3) * alpha_challenges[0]
-        + EF::from(main_current[0].clone()) * alpha_challenges[1])
-        * (beta
-            + EF::from_u64(3) * alpha_challenges[0]
-            + EF::from(main_current[1].clone()) * alpha_challenges[1])
+    let c: EF = (alpha
+        + EF::from_u64(3) * beta_challenges[0]
+        + EF::from(main_current[0].clone()) * beta_challenges[1])
+        * (alpha
+            + EF::from_u64(3) * beta_challenges[0]
+            + EF::from(main_current[1].clone()) * beta_challenges[1])
         * EF::from(main_current[5].clone());
-    let d: EF = (beta
-        + EF::from_u64(3) * alpha_challenges[0]
-        + EF::from(main_current[0].clone()) * alpha_challenges[1])
-        * (beta
-            + EF::from_u64(3) * alpha_challenges[0]
-            + EF::from(main_current[0].clone()) * alpha_challenges[1])
-        * (beta
-            + EF::from_u64(3) * alpha_challenges[0]
-            + EF::from(main_current[1].clone()) * alpha_challenges[1]);
-    let e: EF = (beta
-        + EF::from_u64(3) * alpha_challenges[0]
-        + EF::from(main_current[0].clone()) * alpha_challenges[1])
-        * (beta
-            + EF::from_u64(3) * alpha_challenges[0]
-            + EF::from(main_current[0].clone()) * alpha_challenges[1])
+    let d: EF = (alpha
+        + EF::from_u64(3) * beta_challenges[0]
+        + EF::from(main_current[0].clone()) * beta_challenges[1])
+        * (alpha
+            + EF::from_u64(3) * beta_challenges[0]
+            + EF::from(main_current[0].clone()) * beta_challenges[1])
+        * (alpha
+            + EF::from_u64(3) * beta_challenges[0]
+            + EF::from(main_current[1].clone()) * beta_challenges[1]);
+    let e: EF = (alpha
+        + EF::from_u64(3) * beta_challenges[0]
+        + EF::from(main_current[0].clone()) * beta_challenges[1])
+        * (alpha
+            + EF::from_u64(3) * beta_challenges[0]
+            + EF::from(main_current[0].clone()) * beta_challenges[1])
         * EF::from(main_current[6].clone());
     let logup_current = EF::from(aux_current[1].clone());
     let logup_next = (a * logup_current + b + c - e) * d.inverse();
@@ -307,9 +309,12 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
     let alpha_f: Vec<F> = (0..5).map(|i| F::from_u64(123456789 * i)).collect(); // Dummy alpha in F
     let alpha = EF::from_basis_coefficients_iter(alpha_f.iter().cloned()).unwrap();
     let beta = EF::from_u64(987654321);
-    let alpha_powers: Vec<EF> = (0..air.num_alpha_challenges())
+    let beta_powers: Vec<EF> = (0..air.num_beta_challenges())
         .map(|power| alpha.exp_u64(power as u64))
         .collect();
+    let mut permutation_randomness = Vec::with_capacity(1 + beta_powers.len());
+    permutation_randomness.push(alpha);
+    permutation_randomness.extend_from_slice(beta_powers.as_slice());
 
     let initial_aux = [EF::ONE, EF::ZERO];
 
@@ -333,7 +338,7 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
         let aux_local = current_aux_values;
         if air.aux_width() > 0 && i != height - 1 {
             current_aux_values =
-                compute_aux_transition::<F, EF>(main, alpha_powers.clone(), beta, aux_local);
+                compute_aux_transition::<F, EF>(main, alpha, beta_powers.clone(), aux_local);
         }
         let aux_next = current_aux_values;
         let aux = VerticalPair::new(
@@ -354,7 +359,8 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             periodic_columns,
             alpha,
             beta,
-            alpha_powers: alpha_powers.clone(),
+            beta_powers: beta_powers.clone(),
+            permutation_randomness: permutation_randomness.clone(),
             aux_bus_boundary_values: aux_bus_boundary_values.clone(),
         };
 

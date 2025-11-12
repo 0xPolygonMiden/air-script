@@ -8,7 +8,7 @@ pub const AUX_WIDTH: usize = 2;
 pub const NUM_PERIODIC_VALUES: usize = 0;
 pub const PERIOD: usize = 0;
 pub const NUM_PUBLIC_VALUES: usize = 2;
-pub const NUM_ALPHA_CHALLENGES: usize = 2;
+pub const NUM_BETA_CHALLENGES: usize = 2;
 
 pub struct BusesAir;
 
@@ -29,8 +29,8 @@ impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for BusesAir {
         AUX_WIDTH
     }
 
-    fn num_alpha_challenges(&self) -> usize {
-        NUM_ALPHA_CHALLENGES
+    fn num_beta_challenges(&self) -> usize {
+        NUM_BETA_CHALLENGES
     }
 
     fn periodic_table(&self) -> Vec<Vec<F>> {
@@ -45,8 +45,8 @@ impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for BusesAir {
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        let alpha_challenges: [_; NUM_ALPHA_CHALLENGES] = builder.alpha_powers().try_into().expect("Wrong number of alpha challenges");
-        let beta = builder.beta();
+        let alpha = builder.alpha();
+        let beta_challenges: [_; NUM_BETA_CHALLENGES] = builder.beta_powers().try_into().expect("Wrong number of beta challenges");
         let aux_bus_boundary_values: [_; AUX_WIDTH] = builder.aux_bus_boundary_values().try_into().expect("Wrong number of aux bus boundary values");
         let aux = builder.permutation();
         let (aux_current, aux_next) = (
@@ -65,8 +65,8 @@ impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for BusesAir {
         builder.when_last_row().assert_zero_ext(AB::ExprEF::from(aux_current[1].clone().into()) - aux_bus_boundary_values[1].into());
 
         // Aux integrity/transition constraints
-        builder.when_transition().assert_zero_ext(((beta.into() + alpha_challenges[0].into()) * AB::ExprEF::from(main_current[0].clone().into()) + AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into())) * AB::ExprEF::from(aux_current[0].clone().into()) - ((beta.into() + alpha_challenges[0].into()) * (AB::ExprEF::from(main_current[0].clone().into()) - AB::ExprEF::ONE) + AB::ExprEF::ONE - (AB::ExprEF::from(main_current[0].clone().into()) - AB::ExprEF::ONE)) * AB::ExprEF::from(aux_next[0].clone().into()));
-        builder.when_transition().assert_zero_ext((beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * (beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * (beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * AB::ExprEF::from(aux_current[1].clone().into()) + (beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * (beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * AB::ExprEF::from(main_current[0].clone().into()) + (beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * (beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * AB::ExprEF::from(main_current[0].clone().into()) - ((beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * (beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * (beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * AB::ExprEF::from(aux_next[1].clone().into()) + (beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()) * (beta.into() + alpha_challenges[0].into() + alpha_challenges[1].into().double()).double()));
+        builder.when_transition().assert_zero_ext(((alpha.into() + beta_challenges[0].into()) * AB::ExprEF::from(main_current[0].clone().into()) + AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into())) * AB::ExprEF::from(aux_current[0].clone().into()) - ((alpha.into() + beta_challenges[0].into()) * (AB::ExprEF::from(main_current[0].clone().into()) - AB::ExprEF::ONE) + AB::ExprEF::ONE - (AB::ExprEF::from(main_current[0].clone().into()) - AB::ExprEF::ONE)) * AB::ExprEF::from(aux_next[0].clone().into()));
+        builder.when_transition().assert_zero_ext((alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(aux_current[1].clone().into()) + (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(main_current[0].clone().into()) + (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(main_current[0].clone().into()) - ((alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(aux_next[1].clone().into()) + (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()).double()));
     }
 }
 

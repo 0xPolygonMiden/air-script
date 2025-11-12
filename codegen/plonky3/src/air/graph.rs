@@ -90,9 +90,9 @@ impl Codegen for Value {
             },
             Value::RandomValue(idx) => {
                 if *idx == 0 {
-                    format!("beta.into()")
+                    format!("alpha.into()")
                 } else {
-                    format!("alpha_challenges[{}].into()", idx - 1)
+                    format!("beta_challenges[{}].into()", idx - 1)
                 }
             },
         }
