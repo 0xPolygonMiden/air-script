@@ -346,8 +346,6 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             RowMajorMatrixView::new_row(&aux_next),
         );
 
-        println!("Evaluating aux current row {}: {:?}", i, aux_local);
-
         let mut builder = DebugConstraintBuilderWithAirScriptTraits {
             row_index: i,
             main,
