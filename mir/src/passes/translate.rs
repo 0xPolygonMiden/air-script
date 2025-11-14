@@ -96,7 +96,7 @@ impl<'a> MirBuilder<'a> {
         self.mir.public_inputs = self.program.public_inputs.clone();
         for (qual_ident, ast_bus) in buses.iter() {
             let bus = self.translate_bus_definition(ast_bus)?;
-            self.mir.constraint_graph_mut().insert_bus(*qual_ident, bus)?;
+            self.mir.constraint_graph_mut().insert_bus(qual_ident.clone(), bus)?;
         }
 
         for (ident, function) in &self.program.functions {
@@ -172,7 +172,7 @@ impl<'a> MirBuilder<'a> {
 
         set_all_ref_nodes(all_params_flatten.clone(), ev.as_owner());
 
-        self.mir.constraint_graph_mut().insert_evaluator(*ident, ev.clone())?;
+        self.mir.constraint_graph_mut().insert_evaluator(ident.clone(), ev.clone())?;
 
         Ok(ev)
     }
@@ -250,7 +250,7 @@ impl<'a> MirBuilder<'a> {
         let func = func.return_type(ret).build();
         set_all_ref_nodes(params.clone(), func.as_owner());
 
-        self.mir.constraint_graph_mut().insert_function(*ident, func.clone())?;
+        self.mir.constraint_graph_mut().insert_function(ident.clone(), func.clone())?;
 
         Ok(func)
     }
@@ -691,7 +691,7 @@ impl<'a> MirBuilder<'a> {
         &mut self,
         access: &'a ast::SymbolAccess,
     ) -> Result<Link<Op>, CompileError> {
-        match access.name {
+        match &access.name {
             // At this point during compilation, fully-qualified identifiers can only possibly refer
             // to a periodic column, as all functions have been inlined, and constants propagated.
             ast::ResolvableIdentifier::Resolved(qual_ident) => {
@@ -700,7 +700,7 @@ impl<'a> MirBuilder<'a> {
                         .value(SpannedMirValue {
                             span: access.span(),
                             value: MirValue::PeriodicColumn(crate::ir::PeriodicColumnAccess::new(
-                                qual_ident,
+                                qual_ident.clone(),
                                 pc.period(),
                             )),
                         })

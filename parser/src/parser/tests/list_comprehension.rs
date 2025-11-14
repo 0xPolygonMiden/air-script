@@ -30,7 +30,7 @@ fn bc_one_iterable_identifier_lc() {
         enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -76,7 +76,7 @@ fn bc_identifier_and_range_lc() {
         enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.constants.insert(ident!(THREE), constant!(THREE = 3));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
@@ -121,7 +121,7 @@ fn bc_iterable_slice_lc() {
         enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -163,7 +163,7 @@ fn bc_two_iterable_identifier_lc() {
         enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -207,7 +207,7 @@ fn bc_multiple_iterables_lc() {
         enf a.first = x[0] + x[1] + x[2] + x[3];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -256,7 +256,7 @@ fn ic_one_iterable_identifier_lc() {
         enf a = x[0] + x[1] + x[2] + x[3];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -303,7 +303,7 @@ fn ic_iterable_identifier_range_lc() {
         enf a = x[0] + x[1] + x[2] + x[3];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -349,7 +349,7 @@ fn ic_iterable_slice_lc() {
         enf a = x[0] + x[1] + x[2] + x[3];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -393,7 +393,7 @@ fn ic_two_iterable_identifier_lc() {
         enf a = x[0] + x[1] + x[2] + x[3];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -439,7 +439,7 @@ fn ic_multiple_iterables_lc() {
         enf a = x[0] + x[1] + x[2] + x[3];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",

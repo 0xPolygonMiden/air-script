@@ -52,7 +52,7 @@ integrity_constraints {
 ///
 /// This is used as a common base for most tests in this module
 fn test_module() -> Module {
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));

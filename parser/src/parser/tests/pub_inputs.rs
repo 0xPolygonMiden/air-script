@@ -28,7 +28,7 @@ fn public_inputs_vec() {
         enf clk = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
@@ -71,7 +71,7 @@ fn public_inputs_table() {
         enf clk = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
