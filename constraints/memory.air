@@ -165,7 +165,9 @@ ev enforce_same_context_word_addr_and_clock([is_read, clk, f_scw, d_inv]) {
     let clk_delta = clk' - clk;
     let clk_no_change = binary_not(clk_delta * d_inv');
 
-    enf f_scw' * clk_no_change * binary_not(is_read) * binary_not(is_read') = 0;
+    # When same context/word and clock hasn't changed, both current and next operations must be reads
+    enf f_scw' * clk_no_change * binary_not(is_read) = 0;
+    enf f_scw' * clk_no_change * binary_not(is_read') = 0;
 }
 
 # Enforces memory value consistency, and proper read/write semantics
