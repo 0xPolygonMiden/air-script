@@ -740,15 +740,22 @@ impl Link<Op> {
     }
 }
 
-impl From<i64> for Link<Op> {
-    fn from(value: i64) -> Self {
-        Op::Value(Value {
-            value: SpannedMirValue {
-                value: MirValue::Constant(ConstantValue::Felt(value as u64)),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .into()
-    }
+macro_rules! impl_from_integer_for_op {
+    ($($ty:ty),*) => {
+        $(
+            impl From<$ty> for Link<Op> {
+                fn from(value: $ty) -> Self {
+                    Op::Value(Value {
+                        value: SpannedMirValue {
+                            value: MirValue::Constant(ConstantValue::Felt(value as u64)),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    })
+                    .into()
+                }
+            }
+        )*
+    };
 }
+impl_from_integer_for_op!(u8, u16, u32, u64, usize, i8, i16, i32, i64, isize);

@@ -26,7 +26,7 @@ fn single_selector() {
     integrity_constraints {
         enf clk' = clk when n1;
     }"#;
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1), (n1, 1)]));
@@ -64,7 +64,7 @@ fn chained_selectors() {
     integrity_constraints {
         enf clk' = clk when (n1 & !n2) | !n3;
     }"#;
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",

@@ -113,5 +113,18 @@ integrity_constraints {
 }
 ```
 
+#### Slice expressions in evaluator calls
+
+Slice expressions can be used in evaluator arguments to automatically expand ranges into individual parameters:
+
+```air
+ev chiplet_selectors([s[5]]) { /* expects 5 individual params */ }
+
+ev constraints([chiplets[20]]) {
+    // chiplets[0..5] automatically expands to 5 individual arguments
+    enf chiplet_selectors([chiplets[0..5]]);
+}
+```
+
 ### Using in conditional constraints
 Evaluators can also be used in [conditional constraints](./convenience.md#conditional-evaluators). The combination of evaluator and selector syntax is especially powerful as it enables describing complex constraints in a simple and modular way.

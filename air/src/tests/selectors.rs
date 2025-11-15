@@ -188,3 +188,106 @@ fn selectors_inside_match() {
 
     assert!(compile_from_source(source).is_ok());
 }
+
+/// This test ensures that nested selectors are well handled during compilation by the
+/// MatchOptimizer pass.
+#[test]
+fn selectors_nested() {
+    let source = "
+    def test
+    trace_columns {
+        main: [s[3], a, b, c],
+    }
+
+    public_inputs {
+        stack_inputs: [1],
+    }
+
+    boundary_constraints {
+        enf c.first = 0;
+    }
+
+    # Simple evaluator functions
+    ev ev_dummy_0([b]) {
+        enf b' = b + 1;
+    }
+
+    ev ev_dummy_1([b]) {
+        enf b' = b;
+    }
+    
+    # Evaluator functions with match statements
+    ev ev_match_0([s, b]) {
+        enf match {
+            case s: ev_dummy_0([b]),
+            case !s: ev_dummy_1([b]),
+        };
+    }
+
+    ev ev_match_1([s, b]) {
+        # Here we invert the cases
+        enf match {
+            case s: ev_dummy_1([b]),
+            case !s: ev_dummy_0([b]),
+        };
+    }
+    
+    # Evaluator functions with nested match statements
+    ev ev_nested_0([s0, s1, b]) {
+        enf match {
+            case s0: ev_match_0([s1, b]),
+            case !s0: ev_match_1([s1, b]),
+        };
+    }
+
+    ev ev_nested_1([s0, s1, b]) {
+        # Here we invert the cases
+        enf match {
+            case s0: ev_match_1([s1, b]),
+            case !s0: ev_match_0([s1, b]),
+        };
+    }
+
+    # Evaluator with doubly-nested match statements
+    ev ev_s1([s, a, b, c]) {
+        enf a * (a - 1) = 0;
+        enf b = 31;
+        enf c = 5;
+
+        # This creates Vector nodes with Enf operations
+        enf match {
+            case a: ev_nested_0([a, s, b]),
+            case !a: ev_nested_1([a, s, b]),
+        };
+    }
+
+    # Other evaluators for the outer match statement
+    ev ev_s0([a, b, c]) {
+        enf a' = a + 1;
+        enf b' = b + 1;
+        enf c' = c + 1;
+    }
+
+    ev ev_s2([a, b, c]) {
+        enf a' = a + 2;
+        enf b' = b + 2;
+        enf c' = c + 2;
+    }
+
+    # Main constraint with nested evaluator calls
+    integrity_constraints {
+        let s0 = s[0];
+        let s1 = !s[0] & s[1];
+        let s2 = !s[0] & !s[1];
+
+        # This pattern creates the problematic Vector structures
+        # if we don't flatten the constraints correctly
+        enf match {
+            case s0: ev_s0([a, b, c]),
+            case s1: ev_s1([s[2], a, b, c]), # ← This call creates deeply-nested Vector->Enf structures
+            case s2: ev_s2([a, b, c]),
+        };
+    }";
+
+    assert!(compile_from_source(source).is_ok());
+}

@@ -1,11 +1,60 @@
-use std::collections::{BTreeMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashSet},
+    ops::Index,
+};
 
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
 use crate::{ast::*, sema::SemanticAnalysisError};
 
-/// This is a type alias used to clarify that an identifier refers to a module
-pub type ModuleId = Identifier;
+/// This is a type alias used to clarify that a module is referenced by a sequence of identifiers
+/// representing its path in the module hierarchy (e.g., `foo::bar::baz`).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Spanned)]
+pub struct ModuleId(pub Span<Vec<Identifier>>);
+
+impl ModuleId {
+    pub fn new(identifiers: Vec<Identifier>, span: SourceSpan) -> Self {
+        Self(Span::new(span, identifiers))
+    }
+
+    /// Returns the span of this module identifier
+    pub fn span(&self) -> SourceSpan {
+        self.0.span()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.item.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.item.is_empty()
+    }
+
+    /// Returns true if this module identifier is a submodule of another module identifier.
+    /// For example, `foo::bar` is a submodule of `foo`. Note that a module is considered a
+    /// submodule of itself.
+    pub fn is_submodule_of(&self, parent_module: &ModuleId) -> bool {
+        if self.len() < parent_module.len() {
+            return false;
+        }
+        self.0.item.iter().zip(parent_module.0.item.iter()).all(|(a, b)| a == b)
+    }
+}
+
+impl Index<usize> for ModuleId {
+    type Output = Identifier;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0.item[index]
+    }
+}
+
+impl std::fmt::Display for ModuleId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let names: Vec<&str> = self.0.item.iter().map(|id| id.as_str()).collect();
+        write!(f, "{}", names.join("::"))
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ModuleType {
@@ -48,7 +97,7 @@ pub enum ModuleType {
 pub struct Module {
     #[span]
     pub span: SourceSpan,
-    pub name: ModuleId,
+    pub path: ModuleId,
     pub ty: ModuleType,
     pub imports: BTreeMap<ModuleId, Import>,
     pub constants: BTreeMap<Identifier, Constant>,
@@ -71,10 +120,10 @@ impl Module {
     /// the caller to guarantee that they construct a valid module that upholds those
     /// guarantees, otherwise it is expected that compilation will panic at some point down
     /// the line.
-    pub fn new(ty: ModuleType, span: SourceSpan, name: ModuleId) -> Self {
+    pub fn new(ty: ModuleType, span: SourceSpan, path: ModuleId) -> Self {
         Self {
             span,
-            name,
+            path,
             ty,
             imports: Default::default(),
             constants: Default::default(),
@@ -99,10 +148,10 @@ impl Module {
         diagnostics: &DiagnosticsHandler,
         ty: ModuleType,
         span: SourceSpan,
-        name: Identifier,
+        path: ModuleId,
         mut declarations: Vec<Declaration>,
     ) -> Result<Self, SemanticAnalysisError> {
-        let mut module = Self::new(ty, span, name);
+        let mut module = Self::new(ty, span, path);
 
         // Keep track of named items in this module while building it from
         // the set of declarations we received. We want to produce modules
@@ -198,12 +247,13 @@ impl Module {
         use std::collections::btree_map::Entry;
 
         let span = import.span();
-        match import.item {
-            Import::All { module: name } => {
-                if name == self.name {
-                    return Err(SemanticAnalysisError::ImportSelf(name.span()));
+        match import.item.clone() {
+            Import::All { module: path } => {
+                if path == self.path {
+                    return Err(SemanticAnalysisError::ImportSelf(path.span()));
                 }
-                match self.imports.entry(name) {
+
+                match self.imports.entry(path.clone()) {
                     Entry::Occupied(mut entry) => {
                         let first = entry.key().span();
                         match entry.get_mut() {
@@ -222,7 +272,7 @@ impl Module {
                                         .with_message("redundant item import")
                                         .with_primary_label(item.span(), "this import is redundant")
                                         .with_secondary_label(
-                                            name.span(),
+                                            path.span(),
                                             "because this import imports all items already",
                                         )
                                         .emit();
@@ -238,17 +288,17 @@ impl Module {
 
                 Ok(())
             },
-            Import::Partial { module: name, mut items } => {
-                if name == self.name {
-                    return Err(SemanticAnalysisError::ImportSelf(name.span()));
+            Import::Partial { module: path, mut items } => {
+                if path == self.path {
+                    return Err(SemanticAnalysisError::ImportSelf(path.span()));
                 }
-                match self.imports.entry(name) {
+                match self.imports.entry(path.clone()) {
                     Entry::Occupied(mut entry) => match entry.get_mut() {
                         Import::All { module: prev } => {
                             diagnostics
                                 .diagnostic(Severity::Warning)
                                 .with_message("redundant module import")
-                                .with_primary_label(name.span(), "this import is redundant")
+                                .with_primary_label(path.span(), "this import is redundant")
                                 .with_secondary_label(
                                     prev.span(),
                                     "because this import includes all items already",
@@ -304,7 +354,7 @@ impl Module {
                                 return Err(SemanticAnalysisError::NameConflict(item.span()));
                             }
                         }
-                        entry.insert(Import::Partial { module: name, items });
+                        entry.insert(Import::Partial { module: path, items });
                     },
                 }
 
@@ -385,6 +435,8 @@ impl Module {
             conflicting_declaration(diagnostics, "function", prev.span(), function.name.span());
             return Err(SemanticAnalysisError::NameConflict(function.name.span()));
         }
+
+        println!("Declared function: {:?}", function.name);
 
         self.functions.insert(function.name, function);
 
@@ -593,7 +645,7 @@ impl Module {
 impl Eq for Module {}
 impl PartialEq for Module {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
+        self.path == other.path
             && self.ty == other.ty
             && self.imports == other.imports
             && self.constants == other.constants

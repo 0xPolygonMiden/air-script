@@ -44,7 +44,7 @@ Library modules can be used to split integrity constraint descriptions across mu
 mod example_module
 ```
 where the name of the module must:
-- Be the same as the name of the file in which the library module is defined (e.g., the above module must be located in `example_module.air` file).
+- Be the same as the name of the file in which the library module is defined (e.g., the above module must be located in `example_module.air` file, or alternatively in example_module/mod.air).
 - Be a string consisting of alphanumeric characters and underscores.
 - Start with a letter.
 - End with a newline.
@@ -56,19 +56,22 @@ Library modules inherit buses declarations of the root module. That is, evaluato
 ## Importing evaluators
 A module can import constants and evaluators from library modules via a `use` statement. For example:
 ```air
-use my_module::my_evaluator
-use my_module::my_constant
+use my_module::my_evaluator;
+use my_module::my_constant;
+use utils::my_second_module::my_second_evaluator;
 ```
 where:
 - `my_module` is a library module located in the same directory as the importing module.
+- `my_second_module` is a library module located in the `./utils` directory compared to the importing module.
 - `my_evaluator` and `my_constant` is an evaluator and a constant defined in `my_module`.
+- `my_second_evaluator` is an evaluator defined in `my_second_module`.
 
 Once an evaluator or a constant is imported, it can be used in the same way as evaluators and constants defined in the importing module.
 
-To import multiple evaluators and constants, multiple `use` statements must be used:
+To import multiple evaluators and constants, multiple `use` statements can be used, or a wildcard can import all the exported symbols:
 ```air
-use my_module::foo
-use my_module::bar
-use my_other_module::baz
+use my_module::foo;
+use my_module::bar;
+use my_other_module::*;
 ```
 `use` statements can appear anywhere in the module file.

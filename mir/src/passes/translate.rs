@@ -96,7 +96,7 @@ impl<'a> MirBuilder<'a> {
         self.mir.public_inputs = self.program.public_inputs.clone();
         for (qual_ident, ast_bus) in buses.iter() {
             let bus = self.translate_bus_definition(ast_bus)?;
-            self.mir.constraint_graph_mut().insert_bus(*qual_ident, bus)?;
+            self.mir.constraint_graph_mut().insert_bus(qual_ident.clone(), bus)?;
         }
 
         for (ident, function) in &self.program.functions {
@@ -172,7 +172,7 @@ impl<'a> MirBuilder<'a> {
 
         set_all_ref_nodes(all_params_flatten.clone(), ev.as_owner());
 
-        self.mir.constraint_graph_mut().insert_evaluator(*ident, ev.clone())?;
+        self.mir.constraint_graph_mut().insert_evaluator(ident.clone(), ev.clone())?;
 
         Ok(ev)
     }
@@ -250,7 +250,7 @@ impl<'a> MirBuilder<'a> {
         let func = func.return_type(ret).build();
         set_all_ref_nodes(params.clone(), func.as_owner());
 
-        self.mir.constraint_graph_mut().insert_function(*ident, func.clone())?;
+        self.mir.constraint_graph_mut().insert_function(ident.clone(), func.clone())?;
 
         Ok(func)
     }
@@ -691,7 +691,7 @@ impl<'a> MirBuilder<'a> {
         &mut self,
         access: &'a ast::SymbolAccess,
     ) -> Result<Link<Op>, CompileError> {
-        match access.name {
+        match &access.name {
             // At this point during compilation, fully-qualified identifiers can only possibly refer
             // to a periodic column, as all functions have been inlined, and constants propagated.
             ast::ResolvableIdentifier::Resolved(qual_ident) => {
@@ -700,7 +700,7 @@ impl<'a> MirBuilder<'a> {
                         .value(SpannedMirValue {
                             span: access.span(),
                             value: MirValue::PeriodicColumn(crate::ir::PeriodicColumnAccess::new(
-                                qual_ident,
+                                qual_ident.clone(),
                                 pc.period(),
                             )),
                         })
@@ -1053,6 +1053,54 @@ impl<'a> MirBuilder<'a> {
         Ok(node)
     }
 
+    // If an [ast::AccessType] is a slice, we need to
+    // translate it into a vector of MirAccessType::Index.
+    // If it is not a slice, return None.
+    // This is used to completely eliminate slice accesses in MIR
+    fn translate_potential_slice(
+        &mut self,
+        access_expr: &Link<Op>,
+        access: &'a ast::SymbolAccess,
+    ) -> Option<Link<Op>> {
+        // If it's a slice access, we need to create a vector of MirAccessType::Index
+        if let AccessType::Slice(ast::RangeExpr { start, end, .. }) = &access.access_type {
+            let (
+                ast::RangeBound::Const(Span { item: start, .. }),
+                ast::RangeBound::Const(Span { item: end, .. }),
+            ) = (start, end)
+            else {
+                unreachable!(
+                    "Slice expressions must use constant integer bounds (as in arr[0..5]), found: {:#?}). Dynamic bounds such as variables or expressions are not supported.",
+                    access.access_type
+                );
+            };
+            if start >= end {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("Slice is empty (start >= end)")
+                    .with_primary_label(
+                        access.span(),
+                        format!("Slice start: {start}, Slice end: {end}"),
+                    )
+                    .emit();
+                return None;
+            }
+            let mut vector = Vector::builder().size(end - start).span(access.span());
+            for i in *start..*end {
+                let mir_access_type = MirAccessType::Index(Link::<Op>::from(i));
+                let inner_accessor = Accessor::builder()
+                    .indexable(duplicate_node(access_expr.clone(), &mut Default::default()))
+                    .access_type(mir_access_type)
+                    .offset(access.offset)
+                    .span(access.span())
+                    .build();
+                vector = vector.elements(inner_accessor);
+            }
+            let vector = vector.build();
+            return Some(vector);
+        };
+        None
+    }
     fn translate_access_type(
         &mut self,
         access_type: &'a ast::AccessType,
@@ -1223,29 +1271,11 @@ impl<'a> MirBuilder<'a> {
             {
                 param.ty = self.translate_type(access_ty);
             }
-
-            // Handle slice access by expanding it into a vector of individual accesses
-            if let AccessType::Slice(range_expr) = &access.access_type {
-                let range = range_expr.to_slice_range();
-                let mut elements = Vec::new();
-                for i in range {
-                    let index_value = Value::create(SpannedMirValue {
-                        span: range_expr.span,
-                        value: MirValue::Constant(ConstantValue::Felt(i as u64)),
-                    });
-                    let index_access_type = MirAccessType::Index(index_value);
-                    let element_accessor = Accessor::create(
-                        duplicate_node(let_bound_access_expr.clone(), &mut Default::default()),
-                        index_access_type,
-                        access.offset,
-                        access.span(),
-                    );
-                    elements.push(element_accessor);
-                }
-                let vector_node = Vector::create(elements, access.span());
-                return Ok(vector_node);
+            // If it's a slice access, we need to return its translation.
+            // This eliminates the case of [ast::AccessType::Slice] in MIR
+            if let Some(slice) = self.translate_potential_slice(&let_bound_access_expr, access) {
+                return Ok(slice);
             }
-
             let mir_access_type = self.translate_access_type(&access.access_type)?;
             let accessor: Link<Op> = Accessor::create(
                 duplicate_node(let_bound_access_expr, &mut Default::default()),
@@ -1323,6 +1353,11 @@ impl<'a> MirBuilder<'a> {
                             value: MirValue::PublicInput(public_input_access),
                         })
                         .build();
+                    // If it's a slice access, we need to return its translation.
+                    // This eliminates the case of [ast::AccessType::Slice] in MIR
+                    if let Some(slice) = self.translate_potential_slice(&value, access) {
+                        return Ok(Some(slice));
+                    }
                     let mir_access_type = self.translate_access_type(&access.access_type)?;
                     let accessor =
                         Accessor::create(value, mir_access_type, access.offset, access.span());
@@ -1424,6 +1459,11 @@ impl<'a> MirBuilder<'a> {
                             value: MirValue::TraceAccess(ta),
                         })
                         .build();
+                    // If it's a slice access, we need to return its translation.
+                    // This eliminates the case of [ast::AccessType::Slice] in MIR
+                    if let Some(slice) = self.translate_potential_slice(&value, access) {
+                        return Ok(Some(slice));
+                    }
                     let mir_binding_access = self.translate_access_type(&binding.access)?;
                     let accessor = Accessor::create(value, mir_binding_access, 0, access.span());
                     Ok(Some(accessor))
@@ -1477,6 +1517,11 @@ impl<'a> MirBuilder<'a> {
                     value: MirValue::TraceAccess(ta),
                 })
                 .build();
+            // If it's a slice access, we need to return its translation.
+            // This eliminates the case of [ast::AccessType::Slice] in MIR
+            if let Some(slice) = self.translate_potential_slice(&value, access) {
+                return Ok(slice);
+            }
             let mir_access_type = self.translate_access_type(&access.access_type)?;
             Ok(Accessor::create(value, mir_access_type, 0, access.span()))
         }

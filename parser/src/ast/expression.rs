@@ -132,7 +132,7 @@ impl fmt::Display for NamespacedIdentifier {
 /// Represents an identifier qualified with both its parent module and namespace.
 ///
 /// This represents a globally-unique identity for a declaration
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Spanned)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Spanned)]
 pub struct QualifiedIdentifier {
     pub module: ModuleId,
     #[span]
@@ -157,7 +157,7 @@ impl QualifiedIdentifier {
     pub fn is_builtin(&self) -> bool {
         use crate::symbols;
 
-        if self.module.name() == "$builtin" {
+        if self.module.len() == 1 && self.module[0].name() == "$builtin" {
             match self.item {
                 NamespacedIdentifier::Function(id) => {
                     matches!(id.name(), symbols::Sum | symbols::Prod)
@@ -182,7 +182,7 @@ impl fmt::Display for QualifiedIdentifier {
 }
 
 /// Represents an identifier which requires name resolution at some stage during lowering.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Spanned)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Spanned)]
 pub enum ResolvableIdentifier {
     /// This identifier is resolved to a local binding (i.e. function parameter or let-bound var)
     Local(#[span] Identifier),
@@ -226,7 +226,7 @@ impl ResolvableIdentifier {
     /// resolved/unresolved states
     pub fn module(&self) -> Option<ModuleId> {
         match self {
-            Self::Resolved(qid) => Some(*qid.as_ref()),
+            Self::Resolved(qid) => Some(qid.module.clone()),
             _ => None,
         }
     }
@@ -234,14 +234,14 @@ impl ResolvableIdentifier {
     /// Obtains a [NamespacedIdentifier] from this identifier
     #[inline]
     pub fn namespaced(&self) -> NamespacedIdentifier {
-        (*self).into()
+        self.clone().into()
     }
 
     /// Gets the [QualifiedIdentifier] if this identifier is of type `Resolved`
     #[inline]
     pub fn resolved(&self) -> Option<QualifiedIdentifier> {
         match self {
-            Self::Resolved(qid) => Some(*qid),
+            Self::Resolved(qid) => Some(qid.clone()),
             _ => None,
         }
     }
@@ -1397,7 +1397,10 @@ impl Call {
     }
 
     fn new_builtin(span: SourceSpan, name: &str, args: Vec<Expr>, ty: Type) -> Self {
-        let builtin_module = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("$builtin"));
+        let builtin_module = ModuleId::new(
+            vec![Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("$builtin"))],
+            SourceSpan::UNKNOWN,
+        );
         let name = Identifier::new(span, Symbol::intern(name));
         let id = QualifiedIdentifier::new(builtin_module, NamespacedIdentifier::Function(name));
         Self {

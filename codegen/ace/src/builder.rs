@@ -163,7 +163,7 @@ impl CircuitBuilder {
                 self.mul(node_l, node_r)
             },
         };
-        self.air_node_cache.insert(*air_op, node);
+        self.air_node_cache.insert(air_op.clone(), node);
         node
     }
 
@@ -265,7 +265,7 @@ impl CircuitBuilder {
         air: &Air,
         periodic_column: &PeriodicColumnAccess,
     ) -> Option<Node> {
-        let ident = periodic_column.name;
+        let ident = periodic_column.name.clone();
 
         // Check if we have already computed this column's value
         if let Some(node) = self.periodic_columns_cache.get(&ident) {

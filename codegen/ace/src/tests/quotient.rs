@@ -37,7 +37,7 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
             winter_math::fft::interpolate_poly(&mut poly, &twiddles);
 
             let eval = poly_eval(&poly, z_col);
-            (*ident, QuadFelt::from(eval))
+            (ident.clone(), QuadFelt::from(eval))
         })
         .collect();
 
@@ -62,7 +62,7 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
     for node_idx in 0..num_nodes {
         let node: NodeIndex = node_idx.into();
         let op = graph.node(&node).op();
-        let eval = match *op {
+        let eval = match op.clone() {
             Operation::Value(v) => match v {
                 Value::Constant(c) => QuadFelt::from(Felt::new(c)),
                 Value::TraceAccess(access) => {

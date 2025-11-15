@@ -27,7 +27,7 @@ fn integrity_constraints() {
         enf clk' = clk + 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
@@ -76,7 +76,7 @@ fn integrity_constraints_with_buses() {
         q.remove(1, 2) with 2;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
@@ -180,7 +180,7 @@ fn multiple_integrity_constraints() {
         enf clk' - clk = 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
@@ -226,7 +226,7 @@ fn integrity_constraint_with_periodic_col() {
         enf k0 + b = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(b, 1)]));
@@ -272,7 +272,7 @@ fn integrity_constraint_with_constants() {
         enf clk + A = B[1] + C[1][1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
@@ -320,7 +320,7 @@ fn integrity_constraint_with_variables() {
         enf clk + a = b[1] + c[1][1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
@@ -362,7 +362,7 @@ fn integrity_constraint_with_indexed_trace_access() {
         enf $main[0]' = $main[1] + 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(a, 1), (b, 1)]));
@@ -404,7 +404,7 @@ fn ic_comprehension_one_iterable_identifier() {
         enf x = a + b for x in c;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -447,7 +447,7 @@ fn ic_comprehension_one_iterable_range() {
         enf x = a + b for x in (1..4);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -490,7 +490,7 @@ fn ic_comprehension_with_selectors() {
         enf x = a + b for x in c when s[0] & s[1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -537,7 +537,7 @@ fn ic_comprehension_with_evaluator_call() {
         enf is_binary([x]) for x in c;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -593,7 +593,7 @@ fn ic_comprehension_with_evaluator_and_selectors() {
         enf is_binary([x]) for x in c when s[0] & s[1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -652,7 +652,7 @@ fn ic_match_constraint() {
         };
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",

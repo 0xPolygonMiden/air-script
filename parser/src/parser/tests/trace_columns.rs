@@ -26,7 +26,7 @@ fn trace_columns() {
     integrity_constraints {
         enf clk = 0;
     }"#;
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -65,7 +65,7 @@ fn trace_columns_groups() {
         enf a[1]' = 1;
         enf clk' = clk - 1;
     }"#;
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
