@@ -15,7 +15,7 @@
 
 def MidenVM
 
-use chiplets::chiplets_transition;
+use chiplets::chiplets_constraints;
 use bitwise::*;
 use hasher::*;
 use range_checker::*;
@@ -167,7 +167,7 @@ integrity_constraints {
     # enf stack_constraints([stack]);
 
     # TODO: Chiplet constraints - Hash, bitwise, ACE, memory operations, and kernel ROM
-    enf chiplets_transition([chiplets[0..20]]);
+    enf chiplets_constraints([chiplets[0..20]]);
 
     ####################################################################################
     # BUS CONSTRAINTS
