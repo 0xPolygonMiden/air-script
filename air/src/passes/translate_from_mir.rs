@@ -188,17 +188,13 @@ fn add_row_offset_if_trace_access(node: &Link<Op>, offset: usize) -> Link<Op> {
 }
 
 /// Helper function to remove the vector wrapper from a scalar operation
-/// This should only be called on expression contexts, not constraint contexts
+/// Will panic if the node is a vector of size > 1 (should not happen after unrolling)
 fn vec_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
     if let Some(vector) = mir_node.as_vector() {
         let size = vector.size;
         let children = vector.elements.borrow().deref().clone();
         if size != 1 {
-            eprintln!(
-                "INFO: Multi-element Vector (len={}) in expression context. Processing first element. This may indicate incomplete constraint unrolling.",
-                size
-            );
-            // Instead of panicking, process the first element
+            panic!("Vector of len >1 after unrolling: {mir_node:?}");
         }
         let child = children.first().unwrap();
         let child = vec_to_scalar(child);
@@ -409,9 +405,7 @@ impl AirBuilder<'_> {
                     _ => unreachable!(),
                 };
 
-                    // Recursively process the complex expression
-                    self.insert_mir_operation(&child)
-                }
+                Ok(self.insert_op(Operation::Value(value)))
             },
             _ => panic!("Should not have Mir op in graph: {mir_node:?}"),
         }
