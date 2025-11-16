@@ -363,8 +363,9 @@ impl AirBuilder<'_> {
                 let child = accessor.indexable.clone();
                 let child = accessor_to_scalar(&child);
 
-                let value = child.as_value().expect("Expected value in accessor");
-                let mir_value = &value.value.value;
+                // If accessor_to_scalar returns a value, process it
+                if let Some(value) = child.as_value() {
+                    let mir_value = &value.value.value;
 
                 let value = match mir_value {
                     MirValue::Constant(constant_value) => {
@@ -404,6 +405,17 @@ impl AirBuilder<'_> {
                     },
                     _ => unreachable!(),
                 };
+
+                    Ok(self.insert_op(Operation::Value(value)))
+                } else {
+                    // Handle complex expressions by recursively processing them
+                    // If offset is non-zero, we need to apply it somehow, but for complex
+                    // expressions the offset handling becomes tricky. For now,
+                    // if offset is non-zero, we'll panic to identify cases that
+                    // need special handling.
+                    if offset != 0 {
+                        panic!("Cannot apply offset {} to complex expression: {:?}", offset, child);
+                    }
 
                 Ok(self.insert_op(Operation::Value(value)))
             },

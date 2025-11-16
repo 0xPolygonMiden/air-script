@@ -1116,9 +1116,20 @@ impl<'a> MirBuilder<'a> {
                 let col_node = self.translate_scalar_expr(col)?;
                 MirAccessType::Matrix(row_node, col_node)
             },
-            AccessType::Slice(_range_expr) => unreachable!(
-                "Slices should have been transformed into vector operations during constant propagation"
-            ),
+            AccessType::Slice(range_expr) => {
+                // Slices for trace bindings are handled separately in trace_access_binding,
+                // but slices for other symbol accesses should have been transformed by constant
+                // propagation. If we reach here, it means a slice wasn't properly handled.
+                self.diagnostics
+                    .diagnostic(miden_diagnostics::Severity::Error)
+                    .with_message("slice access not properly handled during constant propagation")
+                    .with_primary_label(
+                        range_expr.span,
+                        "slice access should have been transformed to vector operations",
+                    )
+                    .emit();
+                return Err(CompileError::Failed);
+            },
         };
         Ok(mir_access_type)
     }

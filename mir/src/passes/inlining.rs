@@ -1,6 +1,5 @@
 use std::{collections::HashMap, ops::Deref};
 
-use air_parser::ast::{AccessType, RangeBound, RangeExpr};
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Spanned};
 
@@ -599,32 +598,6 @@ fn check_evaluator_argument_sizes(
         }
     }
     Ok(())
-}
-
-/// Calculate the size of a slice from a RangeExpr
-/// For example: [0..5] returns 5 (5 - 0 = 5)
-/// Returns an error for non-constant bounds that cannot be resolved at compile time
-fn calculate_slice_size(range_expr: &RangeExpr) -> Result<usize, CompileError> {
-    let start = match &range_expr.start {
-        RangeBound::Const(spanned) => spanned.item,
-        RangeBound::SymbolAccess(_) => {
-            // For non-constant bounds, we can't determine the size at compile time
-            // TODO: Implement constant resolution for SymbolAccess
-            return Err(CompileError::Failed);
-        },
-    };
-
-    let end = match &range_expr.end {
-        RangeBound::Const(spanned) => spanned.item,
-        RangeBound::SymbolAccess(_) => {
-            // For non-constant bounds, we can't determine the size at compile time
-            // TODO: Implement constant resolution for SymbolAccess
-            return Err(CompileError::Failed);
-        },
-    };
-
-    // Range is exclusive at the end, so size = end - start
-    Ok(end - start)
 }
 
 /// Helper function to unpack the arguments of a call to an evaluator
