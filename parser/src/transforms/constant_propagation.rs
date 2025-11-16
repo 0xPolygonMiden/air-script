@@ -64,7 +64,8 @@ impl<'a> ConstantPropagation<'a> {
         // Record all of the constant declarations
         for (name, constant) in program.constants.iter() {
             assert_eq!(
-                self.global.insert(*name, Span::new(constant.span(), constant.value.clone())),
+                self.global
+                    .insert(name.clone(), Span::new(constant.span(), constant.value.clone())),
                 None
             );
         }

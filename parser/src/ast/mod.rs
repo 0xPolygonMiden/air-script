@@ -15,9 +15,8 @@ use std::{
     sync::Arc,
 };
 
-use miden_diagnostics::{
-    CodeMap, DiagnosticsHandler, FileName, Severity, SourceSpan, Span, Spanned,
-};
+use miden_diagnostics::{CodeMap, DiagnosticsHandler, FileName, Severity, SourceSpan, Span};
+use petgraph::visit::EdgeRef;
 
 pub(crate) use self::display::*;
 pub use self::{
@@ -131,7 +130,16 @@ impl Program {
 
         use crate::sema::DependencyType;
 
-        let mut program = Program::new(root);
+        if root.len() != 1 {
+            diagnostics
+                .diagnostic(Severity::Error)
+                .with_message("root module must be a single identifier")
+                .emit();
+            return Err(SemanticAnalysisError::MissingRoot);
+        }
+        let root_name = root[0];
+
+        let mut program = Program::new(root_name);
 
         // Validate that the root module is contained in the library
         if !library.contains(&root) {
@@ -144,7 +152,10 @@ impl Program {
             mem::swap(&mut program.public_inputs, &mut root_module.public_inputs);
             mem::swap(&mut program.trace_columns, &mut root_module.trace_columns);
             program.buses = BTreeMap::from_iter(root_module.buses.iter().map(|(k, v)| {
-                (QualifiedIdentifier::new(root, NamespacedIdentifier::Binding(*k)), v.clone())
+                (
+                    QualifiedIdentifier::new(root.clone(), NamespacedIdentifier::Binding(*k)),
+                    v.clone(),
+                )
             }));
         }
 
@@ -152,22 +163,27 @@ impl Program {
         let mut modgraph = sema::ModuleGraph::new();
         let mut visited = HashSet::<ModuleId>::default();
         let mut worklist = VecDeque::new();
-        worklist.push_back(root);
+        let mut nodes = BTreeMap::<ModuleId, petgraph::graph::NodeIndex>::new();
+        worklist.push_back(root.clone());
         while let Some(module_name) = worklist.pop_front() {
             // If we haven't visited the imported module yet, add it's imports to the graph
-            if visited.insert(module_name) {
-                modgraph.add_node(module_name);
-
+            if visited.insert(module_name.clone()) {
+                let module_node_index =
+                    get_node_index_or_add(&mut modgraph, &mut nodes, &module_name);
                 if let Some(module) = library.get(&module_name) {
                     for import in module.imports.values() {
-                        let import_module = modgraph.add_node(import.module());
+                        let import_module_node_index =
+                            get_node_index_or_add(&mut modgraph, &mut nodes, &import.module());
                         // If an attempt is made to import the root module, raise an error
-                        if import_module == root {
-                            return Err(SemanticAnalysisError::RootImport(import.module().span()));
+                        if import.module() == root {
+                            return Err(SemanticAnalysisError::RootImport(root.span()));
                         }
 
-                        assert_eq!(modgraph.add_edge(module_name, import_module, ()), None);
-                        worklist.push_back(import_module);
+                        assert!(
+                            !modgraph.contains_edge(module_node_index, import_module_node_index)
+                        );
+                        modgraph.add_edge(module_node_index, import_module_node_index, ());
+                        worklist.push_back(import.module());
                     }
                 } else {
                     return Err(SemanticAnalysisError::MissingModule(module_name));
@@ -181,28 +197,47 @@ impl Program {
         // In each dependency module, we resolve all identifiers in that module to
         // their fully-qualified form, and add edges in the dependency graph which
         // represent what items are referenced from the functions/constraints in that module.
-        let mut deps = sema::DependencyGraph::new();
-        let mut visitor = DfsPostOrder::new(&modgraph, root);
-        while let Some(module_name) = visitor.next(&modgraph) {
+        let mut deps_graph = sema::DependencyGraph::new();
+        let mut deps_nodes = BTreeMap::<QualifiedIdentifier, petgraph::graph::NodeIndex>::new();
+        let root_node_index = get_node_index_or_add(&mut modgraph, &mut nodes, &root);
+        let mut visitor = DfsPostOrder::new(&modgraph, root_node_index);
+        while let Some(module_name_node_index) = visitor.next(&modgraph) {
+            let module_name = modgraph
+                .node_weight(module_name_node_index)
+                .expect("Did not find module in graph");
+
             // Remove the module from the library temporarily, so that we
             // can look up other modules in the library while we modify it
             //
             // NOTE: This will always succeed, or we would have raised an error
             // during semantic analysis
-            let mut module = library.modules.remove(&module_name).unwrap();
+            let mut module = library.modules.remove(module_name).unwrap();
 
             // Resolve imports
             let resolver = sema::ImportResolver::new(diagnostics, &library);
             let imported = resolver.run(&mut module)?;
 
-            // Perform semantic analysis on the module, updating the
-            // dependency graph with information gathered from this module
-            let analysis =
-                sema::SemanticAnalysis::new(diagnostics, &program, &library, &mut deps, imported);
+            // Perform semantic analysis on the module, updating the dependency graph with
+            // information gathered from this module. The dependency graph is built up
+            // incrementally as we analyze each module, each node is a fully-qualified identifier
+            // representing an item in the program, and edges represent dependencies between those
+            // items (e.g. a constant is used in a function).
+            //
+            // NOTE: nodes are stored in `deps_nodes` and accessed/added to the graph as needed
+            // through `NodeIndex` type to reference them (as QualifiedIdentifier does not implement
+            // Copy).
+            let analysis = sema::SemanticAnalysis::new(
+                diagnostics,
+                &program,
+                &library,
+                &mut deps_graph,
+                &mut deps_nodes,
+                imported,
+            );
             analysis.run(&mut module)?;
 
             // Put the module back
-            library.modules.insert(module.name, module);
+            library.modules.insert(module.path.clone(), module);
         }
 
         // Now that we have a dependency graph for each function/constraint in the root module,
@@ -211,7 +246,7 @@ impl Program {
         // from the boundary_constraints and integrity_constraints sections, or any of the functions
         // in the root module.
         let root_node = QualifiedIdentifier::new(
-            program.name,
+            ModuleId::new(vec![program.name], SourceSpan::UNKNOWN),
             NamespacedIdentifier::Binding(Identifier::new(
                 SourceSpan::UNKNOWN,
                 Symbol::intern("$$root"),
@@ -230,7 +265,7 @@ impl Program {
             }
             for evaluator in root_module.evaluators.values() {
                 root_nodes.push_back(QualifiedIdentifier::new(
-                    root,
+                    root.clone(),
                     NamespacedIdentifier::Function(evaluator.name),
                 ));
             }
@@ -238,40 +273,49 @@ impl Program {
 
         let mut visited = HashSet::<QualifiedIdentifier>::default();
         while let Some(node) = root_nodes.pop_front() {
-            for (_, referenced, dep_type) in
-                deps.edges_directed(node, petgraph::Direction::Outgoing)
-            {
+            let node_index = deps_graph
+                .node_indices()
+                .find(|i| deps_graph.node_weight(*i).unwrap() == &node)
+                .expect("Did not find node in graph");
+            for edges in deps_graph.edges_directed(node_index, petgraph::Direction::Outgoing) {
+                let dep_type = edges.weight();
+                let referenced_node_index = edges.target();
+                let referenced = deps_graph
+                    .node_weight(referenced_node_index)
+                    .expect("Did not find node in graph")
+                    .clone();
+
                 // Avoid spinning infinitely in dependency cycles
-                if !visited.insert(referenced) {
+                if !visited.insert(referenced.clone()) {
                     continue;
                 }
 
                 // Add dependency to program
                 let referenced_module = library.get(&referenced.module).unwrap();
-                let id = referenced.item.id();
+                let id = referenced.clone().item.id();
                 match dep_type {
                     DependencyType::Constant => {
                         program
                             .constants
-                            .entry(referenced)
+                            .entry(referenced.clone())
                             .or_insert_with(|| referenced_module.constants[&id].clone());
                     },
                     DependencyType::Evaluator => {
                         program
                             .evaluators
-                            .entry(referenced)
+                            .entry(referenced.clone())
                             .or_insert_with(|| referenced_module.evaluators[&id].clone());
                     },
                     DependencyType::Function => {
                         program
                             .functions
-                            .entry(referenced)
+                            .entry(referenced.clone())
                             .or_insert_with(|| referenced_module.functions[&id].clone());
                     },
                     DependencyType::PeriodicColumn => {
                         program
                             .periodic_columns
-                            .entry(referenced)
+                            .entry(referenced.clone())
                             .or_insert_with(|| referenced_module.periodic_columns[&id].clone());
                     },
                 }
@@ -319,7 +363,7 @@ impl fmt::Display for Program {
         if !self.periodic_columns.is_empty() {
             writeln!(f, "periodic_columns {{")?;
             for (qid, column) in self.periodic_columns.iter() {
-                if qid.module == self.name {
+                if qid.module.0.item == vec![self.name] {
                     writeln!(f, "    {}: {}", &qid.item, DisplayList(column.values.as_slice()))?;
                 } else {
                     writeln!(f, "    {}: {}", qid, DisplayList(column.values.as_slice()))?;
@@ -331,7 +375,7 @@ impl fmt::Display for Program {
 
         if !self.constants.is_empty() {
             for (qid, constant) in self.constants.iter() {
-                if qid.module == self.name {
+                if qid.module.0.item == vec![self.name] {
                     writeln!(f, "const {} = {}", &qid.item, &constant.value)?;
                 } else {
                     writeln!(f, "const {} = {}", qid, &constant.value)?;
@@ -356,7 +400,7 @@ impl fmt::Display for Program {
 
         for (qid, evaluator) in self.evaluators.iter() {
             f.write_str("ev ")?;
-            if qid.module == self.name {
+            if qid.module.0.item == vec![self.name] {
                 writeln!(f, "{}{}", &qid.item, DisplayTuple(evaluator.params.as_slice()))?;
             } else {
                 writeln!(f, "{}{}", qid, DisplayTuple(evaluator.params.as_slice()))?;
@@ -371,7 +415,7 @@ impl fmt::Display for Program {
 
         for (qid, function) in self.functions.iter() {
             f.write_str("fn ")?;
-            if qid.module == self.name {
+            if qid.module.0.item == vec![self.name] {
                 writeln!(f, "{}{}", &qid.item, DisplayTypedTuple(function.params.as_slice()))?;
             } else {
                 writeln!(f, "{}{}", qid, DisplayTypedTuple(function.params.as_slice()))?;
@@ -403,7 +447,7 @@ impl Library {
     ) -> Result<Self, SemanticAnalysisError> {
         use std::collections::hash_map::Entry;
 
-        let mut lib = Library::default();
+        let mut lib: Library = Library::default();
 
         if modules.is_empty() {
             return Ok(lib);
@@ -412,18 +456,17 @@ impl Library {
         // Register all parsed modules first
         let mut found_duplicate = None;
         for module in modules.drain(..) {
-            match lib.modules.entry(module.name) {
+            match lib.modules.entry(module.path.clone()) {
                 Entry::Occupied(entry) => {
-                    let prev_span = entry.key().span();
-                    found_duplicate = Some(prev_span);
+                    found_duplicate = Some(entry.key().span());
                     diagnostics
                         .diagnostic(Severity::Error)
                         .with_message("conflicting module definitions")
                         .with_primary_label(
-                            module.name.span(),
+                            module.path.span(),
                             "this module name is already in use",
                         )
-                        .with_secondary_label(prev_span, "originally defined here")
+                        .with_secondary_label(entry.key().span(), "originally defined here")
                         .emit();
                 },
                 Entry::Vacant(entry) => {
@@ -447,11 +490,10 @@ impl Library {
                     None
                 } else {
                     let imports = module.imports.values().map(|i| i.module()).collect::<Vec<_>>();
-                    Some((*name, imports))
+                    Some((name.clone(), imports))
                 }
             })
             .collect::<VecDeque<_>>();
-
         // Cache the current working directory for use in constructing file paths in case
         // we need to parse referenced modules from disk, and do not have a file path associated
         // with the importing module with which to derive the import path.
@@ -461,19 +503,22 @@ impl Library {
         // to modules in the library. If the module is already in the library, we proceed,
         // if it isn't, then we must parse the desired module from disk, and add it to the
         // library, visiting any of its imports as well.
-        while let Some((module, mut imports)) = worklist.pop_front() {
+        while let Some((_module, mut imports)) = worklist.pop_front() {
             // We attempt to resolve imports on disk relative to the file path of the
             // importing module, if it was parsed from disk. If no path is available,
             // we default to the current working directory.
-            let source_dir = match codemap.name(module.span().source_id()) {
+
+            let (real_path, source_dir) = match codemap
+                .name(imports.first().unwrap().span().source_id())
+            {
                 // If we have no source span, default to the current working directory
-                Err(_) => cwd.clone(),
+                Err(_) => (false, cwd.clone()),
                 // If the file is virtual, then we've either already parsed imports for this module,
                 // or we have to fall back to the current working directory, but we have no relative
                 // path from which to base our search.
-                Ok(FileName::Virtual(_)) => cwd.clone(),
+                Ok(FileName::Virtual(_)) => (false, cwd.clone()),
                 Ok(FileName::Real(path)) => {
-                    path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
+                    (true, path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf())
                 },
             };
 
@@ -481,8 +526,27 @@ impl Library {
             // unavailable we must do extra work to load it into the library, as
             // described above.
             for import in imports.drain(..) {
-                if let Entry::Vacant(entry) = lib.modules.entry(import) {
-                    let filename = source_dir.join(format!("{}.air", import.as_str()));
+                if !lib.modules.contains_key(&import.clone()) {
+                    let mut filename = source_dir.clone();
+                    let mut use_default_mod = false;
+                    let items = &import.0.item;
+                    if let Some((last, parents)) = items.split_last() {
+                        for part in parents {
+                            filename = filename.join(part.as_str());
+                        }
+                        let path_exist = {
+                            let mut check_path = filename.clone();
+                            check_path = check_path.join(format!("{}.air", last.as_str()));
+                            check_path.exists()
+                        };
+                        if path_exist || !real_path {
+                            filename = filename.join(format!("{}.air", last.as_str()));
+                        } else {
+                            filename = filename.join(last.as_str()).join("mod.air");
+                            use_default_mod = true;
+                        }
+                    }
+
                     // Check if the module exists in the codemap first, so that we can add files
                     // directly to the codemap during testing for convenience
                     let result = match codemap.get_by_name(&FileName::Real(filename.clone())) {
@@ -491,28 +555,38 @@ impl Library {
                             crate::parse_module_from_file(diagnostics, codemap.clone(), &filename)
                         },
                     };
+
                     match result {
                         Ok(imported_module) => {
+                            let mut imported_module = imported_module;
+
                             // We must check if the file we parsed actually contains a module with
                             // the same name as our import, if not, that's an error
-                            if imported_module.name != import {
-                                diagnostics.diagnostic(Severity::Error)
-                                    .with_message("invalid module declaration")
-                                    .with_primary_label(imported_module.name.span(), "module names must be the same as the name of the file they are defined in")
-                                    .emit();
-                                return Err(SemanticAnalysisError::ImportFailed(import.span()));
-                            } else {
-                                // We parsed the module successfully, so add it to the library
-                                if !imported_module.imports.is_empty() {
-                                    let imports = imported_module
-                                        .imports
-                                        .values()
-                                        .map(|i| i.module())
-                                        .collect::<Vec<_>>();
-                                    worklist.push_back((imported_module.name, imports));
+
+                            if !use_default_mod {
+                                let last_import_part = import.0.item.last().unwrap();
+                                let module_name_parts = imported_module.path.0.item.last().unwrap();
+                                if module_name_parts != last_import_part {
+                                    diagnostics.diagnostic(Severity::Error)
+                                        .with_message("invalid module declaration")
+                                        .with_primary_label(imported_module.path.span(), "module names must be the same as the name of the file they are defined in")
+                                        .emit();
+                                    return Err(SemanticAnalysisError::ImportFailed(import.span()));
                                 }
-                                entry.insert(imported_module);
                             }
+
+                            imported_module.path = import.clone();
+
+                            // We parsed the module successfully, so add it to the library
+                            if !imported_module.imports.is_empty() {
+                                let imports = imported_module
+                                    .imports
+                                    .values()
+                                    .map(|i| i.module())
+                                    .collect::<Vec<_>>();
+                                worklist.push_back((imported_module.path.clone(), imports));
+                            }
+                            lib.modules.insert(imported_module.path.clone(), imported_module);
                         },
                         Err(ParseError::Failed) => {
                             // Nothing interesting to emit as a diagnostic here, so just return an
@@ -553,4 +627,22 @@ impl Library {
     pub fn get_mut(&mut self, module: &ModuleId) -> Option<&mut Module> {
         self.modules.get_mut(module)
     }
+
+    pub fn get_submodules_of(&self, module: &ModuleId) -> Vec<ModuleId> {
+        self.modules.keys().filter(|m| m.is_submodule_of(module)).cloned().collect()
+    }
+}
+
+/// Adds the given module to the module graph if it does not already exist,
+/// returning the corresponding node index.
+fn get_node_index_or_add(
+    modgraph: &mut sema::ModuleGraph,
+    nodes: &mut BTreeMap<ModuleId, petgraph::graph::NodeIndex>,
+    module_name: &ModuleId,
+) -> petgraph::graph::NodeIndex {
+    nodes.get(module_name).cloned().unwrap_or_else(|| {
+        let index = modgraph.add_node(module_name.clone());
+        nodes.insert(module_name.clone(), index);
+        index
+    })
 }

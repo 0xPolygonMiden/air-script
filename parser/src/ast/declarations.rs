@@ -205,6 +205,12 @@ impl fmt::Display for ConstantExpr {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImportLimb {
+    Star,
+    Ident(Identifier),
+}
+
 /// An import declaration
 ///
 /// There can be multiple of these in a given module
@@ -221,7 +227,7 @@ pub enum Import {
 impl Import {
     pub fn module(&self) -> ModuleId {
         match self {
-            Self::All { module } | Self::Partial { module, .. } => *module,
+            Self::All { module } | Self::Partial { module, .. } => module.clone(),
         }
     }
 }
