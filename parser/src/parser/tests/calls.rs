@@ -14,7 +14,7 @@ fn call_fold_identifier() {
         enf a = x + y;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     let body = vec![let_!(x = expr!(call!(sum(expr!(access!(c))))) =>
                   let_!(y = expr!(call!(prod(expr!(access!(c))))) =>
                         enforce!(eq!(access!(a), add!(access!(x), access!(y))))))];
@@ -42,7 +42,7 @@ fn call_fold_vector_literal() {
         enf a = x + y;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     let body = vec![let_!(x = expr!(call!(sum(vector!(access!(a), access!(b), access!(c[0]))))) =>
                   let_!(y = expr!(call!(prod(vector!(access!(a), access!(b), access!(c[0]))))) =>
                         enforce!(eq!(access!(a), add!(access!(x), access!(y))))))];
@@ -70,7 +70,7 @@ fn call_fold_list_comprehension() {
         enf a = x + y;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     let body = vec![
         let_!(x = expr!(call!(sum(lc!(((col, expr!(access!(c)))) => exp!(access!(col), int!(7))).into()))) =>
                   let_!(y = expr!(call!(prod(lc!(((col, expr!(access!(c)))) => exp!(access!(col), int!(7))).into()))) =>

@@ -135,9 +135,7 @@ impl Visitor for UnrollingSecondPass<'_> {
 
         // visit_node is called on all the nodes in the body of a `For` node, they should never be
         // Root nodes
-        let Some(op) = node.clone().as_op() else {
-            unreachable!("UnrollingSecondPass::visit_node on a non-Op node: {:?}", node);
-        };
+        let op = node.clone().as_op().expect("UnrollingSecondPass::visit_node on a non-Op node");
 
         // Will duplicate the body of the `For` node, replacing the corresponding `For` node's
         // Parameters by the values taken by iterators. Other Parameters will not be

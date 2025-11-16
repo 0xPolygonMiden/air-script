@@ -132,7 +132,7 @@ impl fmt::Display for NamespacedIdentifier {
 /// Represents an identifier qualified with both its parent module and namespace.
 ///
 /// This represents a globally-unique identity for a declaration
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Spanned)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Spanned)]
 pub struct QualifiedIdentifier {
     pub module: ModuleId,
     #[span]
@@ -157,7 +157,7 @@ impl QualifiedIdentifier {
     pub fn is_builtin(&self) -> bool {
         use crate::symbols;
 
-        if self.module.name() == "$builtin" {
+        if self.module.len() == 1 && self.module[0].name() == "$builtin" {
             match self.item {
                 NamespacedIdentifier::Function(id) => {
                     matches!(id.name(), symbols::Sum | symbols::Prod)
@@ -182,7 +182,7 @@ impl fmt::Display for QualifiedIdentifier {
 }
 
 /// Represents an identifier which requires name resolution at some stage during lowering.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Spanned)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Spanned)]
 pub enum ResolvableIdentifier {
     /// This identifier is resolved to a local binding (i.e. function parameter or let-bound var)
     Local(#[span] Identifier),
@@ -226,7 +226,7 @@ impl ResolvableIdentifier {
     /// resolved/unresolved states
     pub fn module(&self) -> Option<ModuleId> {
         match self {
-            Self::Resolved(qid) => Some(*qid.as_ref()),
+            Self::Resolved(qid) => Some(qid.module.clone()),
             _ => None,
         }
     }
@@ -234,14 +234,14 @@ impl ResolvableIdentifier {
     /// Obtains a [NamespacedIdentifier] from this identifier
     #[inline]
     pub fn namespaced(&self) -> NamespacedIdentifier {
-        (*self).into()
+        self.clone().into()
     }
 
     /// Gets the [QualifiedIdentifier] if this identifier is of type `Resolved`
     #[inline]
     pub fn resolved(&self) -> Option<QualifiedIdentifier> {
         match self {
-            Self::Resolved(qid) => Some(*qid),
+            Self::Resolved(qid) => Some(qid.clone()),
             _ => None,
         }
     }
@@ -859,7 +859,7 @@ impl fmt::Display for Boundary {
 }
 
 /// Represents the way an identifier is accessed/referenced in the source.
-#[derive(Hash, Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub enum AccessType {
     /// Access refers to the entire bound value
     #[default]
@@ -869,9 +869,9 @@ pub enum AccessType {
     /// Access binds the value at a specific index of an aggregate value (i.e. vector or matrix)
     ///
     /// The result type may be either a scalar or a vector, depending on the type of the aggregate
-    Index(usize),
+    Index(Box<ScalarExpr>),
     /// Access binds the value at a specific row and column of a matrix value
-    Matrix(usize, usize),
+    Matrix(Box<ScalarExpr>, Box<ScalarExpr>),
 }
 impl fmt::Display for AccessType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -960,7 +960,7 @@ impl SymbolAccess {
             AccessType::Slice(base_range) => {
                 self.access_slice(base_range.to_slice_range(), access_type)
             },
-            AccessType::Index(base_idx) => self.access_index(*base_idx, access_type),
+            AccessType::Index(base_idx) => self.access_index(base_idx.clone(), access_type),
             AccessType::Matrix(..) => match access_type {
                 AccessType::Default => Ok(self.clone()),
                 _ => Err(InvalidAccessError::IndexIntoScalar),
@@ -974,13 +974,11 @@ impl SymbolAccess {
             AccessType::Default => Ok(self.clone()),
             AccessType::Index(idx) => match ty {
                 Type::Felt => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Vector(len) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Vector(_) => Ok(Self {
                     access_type: AccessType::Index(idx),
                     ty: Some(Type::Felt),
                     ..self.clone()
                 }),
-                Type::Matrix(rows, _) if idx >= rows => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Matrix(_, cols) => Ok(Self {
                     access_type: AccessType::Index(idx),
                     ty: Some(Type::Vector(cols)),
@@ -1012,9 +1010,6 @@ impl SymbolAccess {
             },
             AccessType::Matrix(row, col) => match ty {
                 Type::Felt | Type::Vector(_) => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Matrix(rows, cols) if row >= rows || col >= cols => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                },
                 Type::Matrix(..) => Ok(Self {
                     access_type: AccessType::Matrix(row, col),
                     ty: Some(Type::Felt),
@@ -1034,15 +1029,29 @@ impl SymbolAccess {
             AccessType::Default => Ok(self.clone()),
             AccessType::Index(idx) => match ty {
                 Type::Felt => unreachable!(),
-                Type::Vector(len) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Vector(_) => Ok(Self {
-                    access_type: AccessType::Index(base_range.start + idx),
+                    access_type: AccessType::Index(Box::new(ScalarExpr::Binary(BinaryExpr {
+                        span: self.span(),
+                        op: BinaryOp::Add,
+                        lhs: Box::new(ScalarExpr::Const(Span::new(
+                            self.span(),
+                            base_range.start as u64,
+                        ))),
+                        rhs: idx.clone(),
+                    }))),
                     ty: Some(Type::Felt),
                     ..self.clone()
                 }),
-                Type::Matrix(rows, _) if idx >= rows => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Matrix(_, cols) => Ok(Self {
-                    access_type: AccessType::Index(base_range.start + idx),
+                    access_type: AccessType::Index(Box::new(ScalarExpr::Binary(BinaryExpr {
+                        span: self.span(),
+                        op: BinaryOp::Add,
+                        lhs: Box::new(ScalarExpr::Const(Span::new(
+                            self.span(),
+                            base_range.start as u64,
+                        ))),
+                        rhs: idx.clone(),
+                    }))),
                     ty: Some(Type::Vector(cols)),
                     ..self.clone()
                 }),
@@ -1080,9 +1089,6 @@ impl SymbolAccess {
             },
             AccessType::Matrix(row, col) => match ty {
                 Type::Felt | Type::Vector(_) => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Matrix(rows, cols) if row >= rows || col >= cols => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                },
                 Type::Matrix(..) => Ok(Self {
                     access_type: AccessType::Matrix(row, col),
                     ty: Some(Type::Felt),
@@ -1094,7 +1100,7 @@ impl SymbolAccess {
 
     fn access_index(
         &self,
-        base_idx: usize,
+        base_idx: Box<ScalarExpr>,
         access_type: AccessType,
     ) -> Result<Self, InvalidAccessError> {
         let ty = self.ty.unwrap();
@@ -1102,13 +1108,11 @@ impl SymbolAccess {
             AccessType::Default => Ok(self.clone()),
             AccessType::Index(idx) => match ty {
                 Type::Felt => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Vector(len) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Vector(_) => Ok(Self {
                     access_type: AccessType::Matrix(base_idx, idx),
                     ty: Some(Type::Felt),
                     ..self.clone()
                 }),
-                Type::Matrix(rows, _) if idx >= rows => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Matrix(_, cols) => Ok(Self {
                     access_type: AccessType::Matrix(base_idx, idx),
                     ty: Some(Type::Vector(cols)),
@@ -1393,7 +1397,10 @@ impl Call {
     }
 
     fn new_builtin(span: SourceSpan, name: &str, args: Vec<Expr>, ty: Type) -> Self {
-        let builtin_module = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("$builtin"));
+        let builtin_module = ModuleId::new(
+            vec![Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("$builtin"))],
+            SourceSpan::UNKNOWN,
+        );
         let name = Identifier::new(span, Symbol::intern(name));
         let id = QualifiedIdentifier::new(builtin_module, NamespacedIdentifier::Function(name));
         Self {

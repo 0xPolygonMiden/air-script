@@ -38,7 +38,7 @@ pub Source: Source = {
 
 pub Program: Program = {
     <root:Root> <modules:Module*> =>? {
-        let root_name = root.name;
+        let root_name = root.path.clone();
         let mut modules = modules;
         modules.push(root);
         let library = match Library::new(diagnostics, codemap.clone(), modules) {
@@ -57,14 +57,14 @@ pub AnyModule: Module = {
 
 Root: Module = {
     <l:@L> "def" <name:Identifier> <decls:Declaration*> <r:@R> =>? {
-        Module::from_declarations(diagnostics, ModuleType::Root, span!(l, r), name, decls)
+        Module::from_declarations(diagnostics, ModuleType::Root, span!(l, r), ModuleId::new(vec![name], name.span()), decls)
             .map_err(|err| ParseError::Analysis(err).into())
     }
 }
 
 Module: Module = {
     <l:@L> "mod" <name:Identifier> <decls:Declaration*> <r:@R> =>? {
-        Module::from_declarations(diagnostics, ModuleType::Library, span!(l, r), name, decls)
+        Module::from_declarations(diagnostics, ModuleType::Library, span!(l, r), ModuleId::new(vec![name], name.span()), decls)
             .map_err(|err| ParseError::Analysis(err).into())
     }
 }
@@ -82,13 +82,51 @@ Declaration: Declaration = {
     <IntegrityConstraints> => Declaration::IntegrityConstraints(<>),
 }
 
+// Import parses a Vec<ImportLimb> separated by '::', where ImportLimb is Identifier or '*' (only as last limb)
 Import: Span<Import> = {
-    <l:@L> "use" <module:Identifier> "::" "*" ";" <r:@R> => Span::new(span!(l, r), Import::All { module: Identifier::new(span!(l, r), module.name()) }),
-    <l:@L> "use" <module:Identifier> "::" <item:Identifier> ";" <r:@R> => {
-        let mut items: HashSet<Identifier> = HashSet::default();
-        items.insert(item);
-        Span::new(span!(l, r), Import::Partial { module, items })
+    <l:@L> "use" <limbs:ImportPath> ";" <r:@R> => {
+        let (last_limb, parents) = limbs.split_last().expect("Imports need at least one path limb");
+        match last_limb {
+            ImportLimb::Star => {
+                let mut limbs_ident = vec![];
+                for parent in parents {
+                    match parent {
+                        ImportLimb::Star => unreachable!(),
+                        ImportLimb::Ident(ident) => limbs_ident.push(*ident)
+                    }
+                }
+                Span::new(span!(l, r), Import::All { module: ModuleId::new(limbs_ident, span!(l, r)) })
+            }
+            ImportLimb::Ident(item) => {
+                let mut limbs_ident = vec![];
+                for parent in parents {
+                    match parent {
+                        ImportLimb::Star => unreachable!(),
+                        ImportLimb::Ident(ident) => limbs_ident.push(*ident)
+                    }
+                }
+                let mut items: HashSet<Identifier> = HashSet::default();
+                items.insert(*item);
+                Span::new(span!(l, r), Import::Partial { module: ModuleId::new(limbs_ident, span!(l, r)), items })
+            }
+        }
     }
+}
+
+// ImportPath: Vec<ImportLimb> separated by '::' (single right-recursive rule)
+ImportPath: Vec<ImportLimb> = {
+    <head:ImportLimb> => vec![head],
+    <head:ImportLimb> "::" <tail:ImportPath> => {
+        let mut v = vec![head];
+        v.extend(tail);
+        v
+    }
+}
+
+// ImportLimb: either an identifier or '*', but '*' only allowed as last limb
+ImportLimb: ImportLimb = {
+    "*" => ImportLimb::Star,
+    <id:Identifier> => ImportLimb::Ident(id),
 }
 
 // TRACE COLUMNS
@@ -614,8 +652,8 @@ Size: u64 = {
     "[" <Num_u64> "]" => <>
 }
 
-Index: usize = {
-    "[" <idx: Num_u64> "]" => idx as usize
+Index: Box<ScalarExpr> = {
+    "[" <idx: ScalarExpr> "]" => Box::new(idx)
 }
 
 TableSize: u64 = {

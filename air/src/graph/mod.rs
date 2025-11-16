@@ -187,7 +187,7 @@ impl AlgebraicGraph {
                 | Value::RandomValue(_) => 0,
                 Value::TraceAccess(_) => 1,
                 Value::PeriodicColumn(pc) => {
-                    cycles.insert(pc.name, pc.cycle);
+                    cycles.insert(pc.name.clone(), pc.cycle);
                     0
                 },
             },

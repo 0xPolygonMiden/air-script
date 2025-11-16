@@ -8,9 +8,10 @@ use super::{duplicate_node_or_replace, visitor::Visitor};
 use crate::{
     CompileError,
     ir::{
-        Accessor, Graph, Link, Mir, MirType, MirValue, Node, Op, Parameter, Parent, Root,
+        Graph, Link, Mir, MirAccessType, MirType, MirValue, Node, Op, Parameter, Parent, Root,
         SpannedMirValue, TraceAccessBinding, Value, Vector,
     },
+    passes::constant_propagation::get_inner_const,
 };
 
 /// This pass handles inlining of `Call` nodes at their call sites.
@@ -30,6 +31,59 @@ pub struct Inlining<'a> {
 impl<'a> Inlining<'a> {
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self { diagnostics }
+    }
+
+    /// Runs the Inlining pass once (with both InliningFirstPass and InliningSecondPass)
+    ///
+    /// Returns true if any calls were inlined, false otherwise, to let the caller know if any
+    /// changes were made or if we reached a fixed point.
+    fn run_once(&mut self, ir: &mut Mir) -> Result<bool, CompileError> {
+        // The first pass only identifies the call graph dependencies and the needed calls to inline
+        let mut first_pass = InliningFirstPass::new(self.diagnostics);
+        Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
+
+        // We then create the inlining order (inlining first the functions and evaluators that do
+        // not call other functions or evaluators)
+        let func_eval_inlining_order =
+            create_inlining_order(self.diagnostics, first_pass.func_eval_dependency_graph.clone())?;
+
+        // The second pass actually inlines the calls
+        let mut second_pass = InliningSecondPass::new(
+            self.diagnostics,
+            func_eval_inlining_order.clone(),
+            first_pass.func_eval_nodes_where_called.clone(),
+        );
+        Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
+
+        Ok(second_pass.had_calls)
+    }
+}
+
+// If we have to run the inlining algorithm `INLINING_LIMIT`, we return an error
+const INLINING_LIMIT: usize = 10;
+
+impl Pass for Inlining<'_> {
+    type Input<'a> = Mir;
+    type Output<'a> = Mir;
+    type Error = CompileError;
+
+    fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
+        let mut had_calls = true;
+        let mut iterations = 0;
+
+        while had_calls && iterations < INLINING_LIMIT {
+            had_calls = self.run_once(&mut ir)?;
+            iterations += 1;
+        }
+
+        if had_calls {
+            self.diagnostics.error(
+                "Inlining call depth limit reached, some calls may not have been inlined. Aborting.".to_string(),
+            );
+            return Err(CompileError::Failed);
+        }
+
+        Ok(ir)
     }
 }
 
@@ -87,6 +141,7 @@ pub struct InliningSecondPass<'a> {
 
     // HashMap<CaleePtr, (Callee, Vec<Call nodes where called>)>
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
+    had_calls: bool,
 }
 
 impl<'a> InliningSecondPass<'a> {
@@ -103,34 +158,8 @@ impl<'a> InliningSecondPass<'a> {
             params_for_ref_node: HashMap::new(),
             func_eval_nodes_where_called,
             func_eval_inlining_order,
+            had_calls: false,
         }
-    }
-}
-
-impl Pass for Inlining<'_> {
-    type Input<'a> = Mir;
-    type Output<'a> = Mir;
-    type Error = CompileError;
-
-    fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
-        // The first pass only identifies the call graph dependencies and the needed calls to inline
-        let mut first_pass = InliningFirstPass::new(self.diagnostics);
-        Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
-
-        // We then create the inlining order (inlining first the functions and evaluators that do
-        // not call other functions or evaluators)
-        let func_eval_inlining_order =
-            create_inlining_order(self.diagnostics, first_pass.func_eval_dependency_graph.clone())?;
-
-        // The second pass actually inlines the calls
-        let mut second_pass = InliningSecondPass::new(
-            self.diagnostics,
-            func_eval_inlining_order.clone(),
-            first_pass.func_eval_nodes_where_called.clone(),
-        );
-        Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
-
-        Ok(ir)
     }
 }
 
@@ -284,7 +313,10 @@ impl Visitor for InliningSecondPass<'_> {
         call_nodes_to_inline_in_order
     }
     fn run(&mut self, graph: &mut Graph) -> Result<(), CompileError> {
-        for root_node in self.root_nodes_to_visit(graph).iter() {
+        let root_nodes_to_visit = self.root_nodes_to_visit(graph);
+        self.had_calls = !root_nodes_to_visit.is_empty();
+
+        for root_node in root_nodes_to_visit {
             let mut updated_op = None;
 
             if let Some(op) = root_node.as_op() {
@@ -409,9 +441,10 @@ impl Visitor for InliningSecondPass<'_> {
     }
 
     fn visit_call(&mut self, _graph: &mut Graph, _call: Link<Op>) -> Result<(), CompileError> {
-        let Some(context) = self.call_inlining_context.clone() else {
-            unreachable!("InliningSecondPass::visit_node: call_inlining_context is None");
-        };
+        let context = self
+            .call_inlining_context
+            .clone()
+            .expect("InliningSecondPass::visit_node: call_inlining_context is None");
         if context.pure_function {
             // Instead of scanning all the body, we only scan the last node,
             // which represents the return value of the function
@@ -492,6 +525,49 @@ impl Visitor for InliningSecondPass<'_> {
     }
 }
 
+/// Helper function to recursively extract the outermost accessors
+/// if the op is an accessor, otherwise return the op unchanged
+fn extract_accessor(op: Link<Op>) -> Link<Op> {
+    let Some(accessor) = op.as_accessor() else {
+        return op;
+    };
+    let mut indexable = accessor.indexable.clone();
+    match &accessor.access_type {
+        MirAccessType::Default => accessor.indexable.clone(),
+        MirAccessType::Index(idx_op) => {
+            let idx = get_inner_const(idx_op)
+                .unwrap_or_else(|| panic!("expected constant index, got {:#?}", idx_op))
+                as usize;
+            while indexable.clone().as_accessor().is_some() {
+                indexable = extract_accessor(indexable.clone());
+            }
+            match indexable.borrow().deref() {
+                Op::Vector(v) => v.children().borrow()[idx].clone(),
+                Op::Matrix(m) => m.children().borrow()[idx].clone(),
+                _ => unreachable!("expected vector or matrix, got {:#?}", indexable),
+            }
+        },
+        MirAccessType::Matrix(row, col) => {
+            let row = get_inner_const(row)
+                .unwrap_or_else(|| panic!("expected constant row, got {:#?}", row))
+                as usize;
+            let col = get_inner_const(col)
+                .unwrap_or_else(|| panic!("expected constant column, got {:#?}", col))
+                as usize;
+            while indexable.clone().as_accessor().is_some() {
+                indexable = extract_accessor(indexable.clone());
+            }
+            match indexable.borrow().deref() {
+                Op::Matrix(m) => {
+                    m.children().borrow()[row].clone().as_matrix().unwrap().children().borrow()[col]
+                        .clone()
+                },
+                _ => unreachable!("expected matrix, got {:#?}", indexable),
+            }
+        },
+    }
+}
+
 /// Helper function to check, for each trace segment, that the total size of arguments is correct
 fn check_evaluator_argument_sizes(
     args: &[Link<Op>],
@@ -501,105 +577,11 @@ fn check_evaluator_argument_sizes(
     for ((trace_segment_id, trace_segments_params), trace_segments_arg) in
         callee_params.iter().enumerate().zip(args.iter())
     {
-        let Some(trace_segments_arg_vector) = trace_segments_arg.as_vector() else {
-            unreachable!("expected vector, got {:?}", trace_segments_arg);
-        };
+        let trace_segments_arg_vector = trace_segments_arg
+            .as_vector()
+            .unwrap_or_else(|| panic!("expected vector, got {trace_segments_arg:?}"));
         let children = trace_segments_arg_vector.children();
-        let mut trace_segments_arg_vector_len = 0;
-        for child in children.borrow().deref() {
-            if let Some(value) = child.as_value() {
-                let Value { value: SpannedMirValue { value, .. }, .. } = value.deref();
-
-                let param_size = match value {
-                    MirValue::TraceAccessBinding(tab) => tab.size,
-                    MirValue::TraceAccess(_) => 1,
-                    _ => unreachable!("expected trace access binding, got {:?}", value),
-                };
-                trace_segments_arg_vector_len += param_size;
-            } else if let Some(parameter) = child.as_parameter() {
-                let Parameter { ty, .. } = parameter.deref();
-                let size = match ty {
-                    MirType::Felt => 1,
-                    MirType::Vector(len) => *len,
-                    _ => unreachable!("expected felt or vector, got {:?}", ty),
-                };
-                trace_segments_arg_vector_len += size;
-            } else if let Some(accessor) = child.as_accessor() {
-                let Accessor { indexable, access_type, .. } = accessor.deref();
-
-                // Handle slice access like chiplets[3..18] - count as expanded elements
-                if let air_parser::ast::AccessType::Slice(range) = access_type {
-                    use std::ops::Range;
-                    let range_bounds: Range<usize> = match range.try_into() {
-                        Ok(range) => range,
-                        Err(_) => {
-                            eprintln!("Failed to convert range expression in argument counting");
-                            trace_segments_arg_vector_len += 1;
-                            continue;
-                        },
-                    };
-                    trace_segments_arg_vector_len += range_bounds.len();
-                    continue;
-                }
-
-                // Check access type FIRST to determine how many elements this accessor represents
-                match access_type {
-                    AccessType::Index(_) => {
-                        // Index access (like system[0]) always results in 1 element regardless of
-                        // underlying type
-                        trace_segments_arg_vector_len += 1;
-                    },
-                    AccessType::Default => {
-                        // Default access - size depends on the underlying type
-                        if let Some(value) = indexable.as_value() {
-                            let Value { value: SpannedMirValue { value, .. }, .. } = value.deref();
-
-                            let param_size = match value {
-                                MirValue::TraceAccessBinding(tab) => tab.size,
-                                MirValue::TraceAccess(_) => 1,
-                                _ => unreachable!("expected trace access binding, got {:?}", value),
-                            };
-                            trace_segments_arg_vector_len += param_size;
-                        } else if let Some(parameter) = indexable.as_parameter() {
-                            let Parameter { ty, .. } = parameter.deref();
-                            let size = match ty {
-                                MirType::Felt => 1,
-                                MirType::Vector(len) => *len,
-                                _ => unreachable!("expected felt or vector, got {:?}", ty),
-                            };
-                            trace_segments_arg_vector_len += size;
-                        } else if let Some(vector) = indexable.as_vector() {
-                            let size = vector.children().borrow().len();
-                            trace_segments_arg_vector_len += size;
-                        } else if let Some(_nested_accessor) = indexable.as_accessor() {
-                            trace_segments_arg_vector_len += 1; // fallback
-                        } else {
-                            unreachable!(
-                                "expected value, parameter, vector, or accessor in default access, got {:?}",
-                                indexable
-                            );
-                        }
-                    },
-                    AccessType::Slice(range_expr) => {
-                        // Slice access - calculate the size from the range
-                        match calculate_slice_size(range_expr) {
-                            Ok(size) => trace_segments_arg_vector_len += size,
-                            Err(_) => {
-                                // TODO: Add proper diagnostic for non-constant range bounds
-                                return Err(CompileError::Failed);
-                            },
-                        }
-                    },
-                    _ => {
-                        // Other access types - fallback to 1
-                        trace_segments_arg_vector_len += 1;
-                    },
-                }
-            } else {
-                unreachable!("expected value or parameter, got {:?}", child);
-            }
-        }
-
+        let (trace_segments_arg_vector_len, _) = process_evaluator_arg_children(children.clone());
         if trace_segments_params.len() != trace_segments_arg_vector_len {
             // Instead of emitting a diagnostic that fails, just return an error
             // The FileMissing error suggests the diagnostics system can't handle
@@ -646,178 +628,102 @@ fn calculate_slice_size(range_expr: &RangeExpr) -> Result<usize, CompileError> {
 fn unpack_evaluator_arguments(args: &[Link<Op>]) -> Vec<Link<Op>> {
     let mut args_unpacked = Vec::new();
     for args_for_trace_segment in args.iter() {
-        let Some(trace_segment_vec) = args_for_trace_segment.as_vector() else {
-            unreachable!(
-                "Arguments of a Call node to Evaluator should be a Vectors for each trace segment"
-            );
-        };
+        let trace_segment_vec = args_for_trace_segment.as_vector().expect(
+            "Arguments of a Call node to Evaluator should be a Vector for each trace segment",
+        );
         let children = trace_segment_vec.children();
-        for arg in children.borrow().deref() {
-            // Check if this argument is a slice accessor that needs expansion
-            if let Some(accessor) = arg.as_accessor() {
-                let Accessor { indexable, access_type, .. } = accessor.deref();
-
-                // Handle slice access like chiplets[3..18]
-                if let air_parser::ast::AccessType::Slice(range) = access_type {
-                    use std::ops::Range;
-                    let range_bounds: Range<usize> = match range.try_into() {
-                        Ok(range) => range,
-                        Err(_) => {
-                            eprintln!(
-                                "Failed to convert range expression to concrete range in vector context"
-                            );
-                            args_unpacked.push(arg.clone());
-                            continue;
-                        },
-                    };
-
-                    // Generate individual accessor nodes for each index in the range
-                    for index in range_bounds {
-                        let index_accessor = Accessor::create(
-                            indexable.clone(),
-                            air_parser::ast::AccessType::Index(index),
-                            0, // offset
-                            SourceSpan::UNKNOWN,
-                        );
-                        args_unpacked.push(index_accessor);
-                    }
-                    continue;
-                }
-            }
-
-            if let Some(value) = arg.as_value() {
-                let Value {
-                    value: SpannedMirValue { span, value, .. },
-                    ..
-                } = value.deref();
-
-                match value {
-                    MirValue::TraceAccessBinding(tab) => {
-                        if tab.size > 1 {
-                            for index in 0..tab.size {
-                                let new_arg = Value::create(SpannedMirValue {
-                                    value: MirValue::TraceAccessBinding(TraceAccessBinding {
-                                        size: 1,
-                                        segment: tab.segment,
-                                        offset: tab.offset + index,
-                                    }),
-                                    span: *span,
-                                });
-                                args_unpacked.push(new_arg);
-                            }
-                        } else {
-                            args_unpacked.push(arg.clone());
-                        }
-                    },
-                    MirValue::TraceAccess(_ta) => {
-                        args_unpacked.push(arg.clone());
-                    },
-                    _ => unreachable!(
-                        "expected trace access binding or trace access, got {:?}",
-                        value
-                    ),
-                };
-            } else if let Some(_parameter) = arg.as_parameter() {
-                args_unpacked.push(arg.clone());
-            } else if let Some(accessor) = arg.as_accessor() {
-                let Accessor { indexable, access_type, .. } = accessor.deref();
-
-                // Handle slice access like chiplets[0..5] or chiplets[3..18]
-                if let air_parser::ast::AccessType::Slice(range) = access_type {
-                    // Extract range bounds
-                    use std::ops::Range;
-                    let range_bounds: Range<usize> = match range.try_into() {
-                        Ok(range) => range,
-                        Err(_) => {
-                            eprintln!("Failed to convert range expression to concrete range");
-                            args_unpacked.push(arg.clone());
-                            continue;
-                        },
-                    };
-
-                    // Generate individual accessor nodes for each index in the range
-                    for index in range_bounds {
-                        let index_accessor = Accessor::create(
-                            indexable.clone(),
-                            air_parser::ast::AccessType::Index(index),
-                            0, // offset
-                            SourceSpan::UNKNOWN,
-                        );
-                        args_unpacked.push(index_accessor);
-                    }
-                } else if let Some(value) = indexable.as_value() {
-                    let Value { value: SpannedMirValue { value, .. }, .. } = value.deref();
-
-                    let _param_size = match value {
-                        MirValue::TraceAccessBinding(tab) => tab.size,
-                        MirValue::TraceAccess(_) => 1,
-                        _ => unreachable!("expected trace access binding, got {:?}", value),
-                    };
-
-                    args_unpacked.push(indexable.clone());
-                } else if let Some(parameter) = indexable.as_parameter() {
-                    let Parameter { ty, .. } = parameter.deref();
-                    let _size = match ty {
-                        MirType::Felt => 1,
-                        MirType::Vector(len) => *len,
-                        _ => unreachable!("expected felt or vector, got {:?}", ty),
-                    };
-
-                    args_unpacked.push(indexable.clone());
-                } else if let Some(vector) = indexable.as_vector() {
-                    // Flatten vector children instead of pushing the vector node
-                    for child in vector.children().borrow().iter() {
-                        args_unpacked.push(child.clone());
-                    }
-                } else if let Some(_nested_accessor) = indexable.as_accessor() {
-                    // Handle nested accessor: Accessor(Accessor(...))
-                    // Recursively resolve the nested accessor structure
-                    fn resolve_nested_accessor(accessor_node: &Link<Op>) -> Vec<Link<Op>> {
-                        if let Some(accessor) = accessor_node.as_accessor() {
-                            let Accessor { indexable, access_type, .. } = accessor.deref();
-
-                            // Handle slice access in nested accessors
-                            if let air_parser::ast::AccessType::Slice(range) = access_type {
-                                use std::ops::Range;
-                                let range_bounds: Range<usize> = match range.try_into() {
-                                    Ok(range) => range,
-                                    Err(_) => {
-                                        eprintln!(
-                                            "Failed to convert nested range expression to concrete range"
-                                        );
-                                        return vec![accessor_node.clone()];
-                                    },
-                                };
-
-                                // Generate individual accessor nodes for each index in the range
-                                let mut expanded = Vec::new();
-                                for index in range_bounds {
-                                    let index_accessor = Accessor::create(
-                                        indexable.clone(),
-                                        air_parser::ast::AccessType::Index(index),
-                                        0, // offset
-                                        SourceSpan::UNKNOWN,
-                                    );
-                                    expanded.push(index_accessor);
-                                }
-                                return expanded;
-                            }
-                        }
-                        vec![accessor_node.clone()]
-                    }
-
-                    let resolved = resolve_nested_accessor(&indexable);
-                    args_unpacked.extend(resolved);
-                } else {
-                    unreachable!(
-                        "expected value, parameter, vector, or accessor (or nested accessor on one), got {:?}",
-                        arg
-                    );
-                }
-            } else {
-                unreachable!("expected value or parameter (or accessor on one), got {:?}", arg);
-            }
-        }
+        let (_, unpacked_children) = process_evaluator_arg_children(children.clone());
+        args_unpacked.extend(unpacked_children);
     }
     args_unpacked
+}
+
+fn process_evaluator_arg_children(children: Link<Vec<Link<Op>>>) -> (usize, Vec<Link<Op>>) {
+    let mut trace_segments_arg_vector_len = 0;
+    let mut args_unpacked = Vec::new();
+    for child in children.borrow().deref() {
+        // We need to extract the outermost accessors, if any.
+        // This can happen when slices are used to rebind
+        // trace bindings in nested evaluator calls
+        let child = extract_accessor(child.clone());
+        if let Some(value) = child.as_value() {
+            let Value {
+                value: SpannedMirValue { value, span }, ..
+            } = value.deref();
+
+            let param_size = match value {
+                MirValue::TraceAccessBinding(tab) => {
+                    if tab.size > 1 {
+                        for index in 0..tab.size {
+                            let new_arg = Value::create(SpannedMirValue {
+                                value: MirValue::TraceAccessBinding(TraceAccessBinding {
+                                    size: 1,
+                                    segment: tab.segment,
+                                    offset: tab.offset + index,
+                                }),
+                                span: *span,
+                            });
+                            args_unpacked.push(new_arg);
+                        }
+                    } else {
+                        args_unpacked.push(child.clone());
+                    }
+                    tab.size
+                },
+                MirValue::TraceAccess(_ta) => {
+                    args_unpacked.push(child.clone());
+                    1
+                },
+                _ => unreachable!("expected trace access binding or trace access, got {:?}", value),
+            };
+            trace_segments_arg_vector_len += param_size;
+        } else if let Some(parameter) = child.as_parameter() {
+            args_unpacked.push(child.clone());
+            let Parameter { ty, .. } = parameter.deref();
+            let size = match ty {
+                MirType::Felt => 1,
+                MirType::Vector(len) => *len,
+                _ => unreachable!("expected felt or vector, got {:?}", ty),
+            };
+            trace_segments_arg_vector_len += size;
+        } else if let Some(vector) = child.as_vector() {
+            // When slices are used to rebind trace bindings in nested evaluator calls,
+            // translation from Ast to Mir inserts a Vector of
+            // Accessor(MirAccessType::Index), representing the unwrapped
+            // slice.
+            // We need to unpack all the elements of this vector and add them
+            // to the arguments
+            // We also need to make sure that this vector is a vector of Felts
+            // and to add its length to the total length of arguments
+            for c in vector.children().borrow().iter() {
+                let c = extract_accessor(c.clone());
+                if let Some(param) = c.as_parameter() {
+                    assert!(
+                        param.ty == MirType::Felt,
+                        "expected parameter of type Felt, got {:#?}",
+                        param
+                    );
+                    args_unpacked.push(c.clone());
+                } else if let Some(value) = c.as_value() {
+                    let SpannedMirValue {
+                        value: MirValue::Constant(_) | MirValue::TraceAccess(_),
+                        ..
+                    } = value.value
+                    else {
+                        unreachable!("expected constant or trace access, got {:?}", value);
+                    };
+                    args_unpacked.push(c.clone());
+                } else {
+                    unreachable!("expected value or parameter (or accessor on one), got {:?}", c);
+                }
+            }
+            let vector_len = vector.children().borrow().len();
+            trace_segments_arg_vector_len += vector_len;
+        } else if let Some(_accessor) = child.as_accessor() {
+            unreachable!("accessors should have been extracted already");
+        } else {
+            unreachable!("expected value, parameter, or vector of them, got {:#?}", child);
+        }
+    }
+    (trace_segments_arg_vector_len, args_unpacked)
 }

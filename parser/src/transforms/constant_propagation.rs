@@ -64,7 +64,8 @@ impl<'a> ConstantPropagation<'a> {
         // Record all of the constant declarations
         for (name, constant) in program.constants.iter() {
             assert_eq!(
-                self.global.insert(*name, Span::new(constant.span(), constant.value.clone())),
+                self.global
+                    .insert(name.clone(), Span::new(constant.span(), constant.value.clone())),
                 None
             );
         }
@@ -190,6 +191,8 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
             // Need to check if this access is to a constant value, and transform to a constant if
             // so
             ScalarExpr::SymbolAccess(sym) => {
+                self.visit_mut_access_type(&mut sym.access_type)?;
+
                 let constant_value = match sym.name {
                     // Possibly a reference to a constant declaration
                     ResolvableIdentifier::Resolved(ref qid) => {
@@ -208,9 +211,24 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                             assert_eq!(sym.access_type, AccessType::Default);
                             *expr = ScalarExpr::Const(Span::new(span, value));
                         },
-                        ConstantExpr::Vector(value) => match sym.access_type {
-                            AccessType::Index(idx) => {
-                                *expr = ScalarExpr::Const(Span::new(span, value[idx]));
+                        ConstantExpr::Vector(value) => match sym.access_type.clone() {
+                            AccessType::Index(idx) => match *idx {
+                                ScalarExpr::Const(idx) => {
+                                    if idx.item >= value.len() as u64 {
+                                        self.diagnostics.diagnostic(miden_diagnostics::Severity::Error)
+                                            .with_message("attempted to access an index which is out of bounds")
+                                            .with_primary_label(span, "index out of bounds")
+                                            .emit();
+                                        return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                                    }
+                                    *expr = ScalarExpr::Const(Span::new(
+                                        span,
+                                        value[idx.item as usize],
+                                    ));
+                                },
+                                _ => {
+                                    self.live.insert(*sym.name.as_ref());
+                                },
                             },
                             // This access cannot be resolved here, so we need to record the fact
                             // that there are still live uses of this binding
@@ -218,9 +236,26 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                                 self.live.insert(*sym.name.as_ref());
                             },
                         },
-                        ConstantExpr::Matrix(value) => match sym.access_type {
-                            AccessType::Matrix(row, col) => {
-                                *expr = ScalarExpr::Const(Span::new(span, value[row][col]));
+                        ConstantExpr::Matrix(value) => match sym.access_type.clone() {
+                            AccessType::Matrix(row, col) => match (*row, *col) {
+                                (ScalarExpr::Const(row), ScalarExpr::Const(col)) => {
+                                    if row.item >= value.len() as u64
+                                        || col.item >= value[row.item as usize].len() as u64
+                                    {
+                                        self.diagnostics.diagnostic(miden_diagnostics::Severity::Error)
+                                            .with_message("attempted to access an index which is out of bounds")
+                                            .with_primary_label(span, "index out of bounds")
+                                            .emit();
+                                        return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                                    }
+                                    *expr = ScalarExpr::Const(Span::new(
+                                        span,
+                                        value[row.item as usize][col.item as usize],
+                                    ));
+                                },
+                                _ => {
+                                    self.live.insert(*sym.name.as_ref());
+                                },
                             },
                             // This access cannot be resolved here, so we need to record the fact
                             // that there are still live uses of this binding
@@ -315,6 +350,8 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
             //
             // We deal with symbol accesses directly, as they may evaluate to an aggregate constant
             Expr::SymbolAccess(access) => {
+                self.visit_mut_access_type(&mut access.access_type)?;
+
                 let constant_value = match access.name {
                     // Possibly a reference to a constant declaration
                     ResolvableIdentifier::Resolved(ref qid) => {
@@ -342,9 +379,16 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                                 let vector = value[range].to_vec();
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Vector(vector)));
                             },
-                            AccessType::Index(idx) => {
-                                *expr =
-                                    Expr::Const(Span::new(span, ConstantExpr::Scalar(value[idx])));
+                            AccessType::Index(idx) => match *idx {
+                                ScalarExpr::Const(idx) => {
+                                    *expr = Expr::Const(Span::new(
+                                        span,
+                                        ConstantExpr::Scalar(value[idx.item as usize]),
+                                    ));
+                                },
+                                _ => {
+                                    self.live.insert(*access.name.as_ref());
+                                },
                             },
                             ref ty => panic!(
                                 "invalid constant reference, expected scalar access, got {ty:?}",
@@ -359,17 +403,29 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                                 let matrix = value[range].to_vec();
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Matrix(matrix)));
                             },
-                            AccessType::Index(idx) => {
-                                *expr = Expr::Const(Span::new(
-                                    span,
-                                    ConstantExpr::Vector(value[idx].clone()),
-                                ));
+                            AccessType::Index(idx) => match *idx {
+                                ScalarExpr::Const(idx) => {
+                                    *expr = Expr::Const(Span::new(
+                                        span,
+                                        ConstantExpr::Vector(value[idx.item as usize].clone()),
+                                    ));
+                                },
+                                _ => {
+                                    self.live.insert(*access.name.as_ref());
+                                },
                             },
-                            AccessType::Matrix(row, col) => {
-                                *expr = Expr::Const(Span::new(
-                                    span,
-                                    ConstantExpr::Scalar(value[row][col]),
-                                ));
+                            AccessType::Matrix(row, col) => match (*row, *col) {
+                                (ScalarExpr::Const(row), ScalarExpr::Const(col)) => {
+                                    *expr = Expr::Const(Span::new(
+                                        span,
+                                        ConstantExpr::Scalar(
+                                            value[row.item as usize][col.item as usize],
+                                        ),
+                                    ));
+                                },
+                                _ => {
+                                    self.live.insert(*access.name.as_ref());
+                                },
                             },
                         },
                     }

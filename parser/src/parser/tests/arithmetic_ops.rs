@@ -16,7 +16,7 @@ fn single_addition() {
         enf clk' + clk = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -39,7 +39,7 @@ fn multi_addition() {
         enf clk' + clk + 2 = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -62,7 +62,7 @@ fn single_subtraction() {
         enf clk' - clk = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -85,7 +85,7 @@ fn multi_subtraction() {
         enf clk' - clk - 1 = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -108,7 +108,7 @@ fn single_multiplication() {
         enf clk' * clk = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -131,7 +131,7 @@ fn multi_multiplication() {
         enf clk' * clk * 2 = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -154,7 +154,7 @@ fn unit_with_parens() {
         enf (2) + 1 = 3;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -177,7 +177,7 @@ fn ops_with_parens() {
         enf (clk' + clk) * 2 = 4;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -200,7 +200,7 @@ fn const_exponentiation() {
         enf clk'^2 = 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -223,7 +223,7 @@ fn non_const_exponentiation() {
         enf clk'^(clk + 2) = 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -270,7 +270,7 @@ fn multi_arithmetic_ops_same_precedence() {
         enf clk' - clk - 2 + 1 = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -302,7 +302,7 @@ fn multi_arithmetic_ops_different_precedence() {
     // 3. Addition/Subtraction
     // These operations are evaluated in the order of decreasing precedence.
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
@@ -334,7 +334,7 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
     // 3. Multiplication
     // 4. Addition/Subtraction
     // These operations are evaluated in the order of decreasing precedence.
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(

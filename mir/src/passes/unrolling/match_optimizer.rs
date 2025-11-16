@@ -88,11 +88,8 @@ impl<'a> MatchOptimizer<'a> {
         let expr = match_arm.expr.clone();
 
         // 1.1. Get all the individual constraints corresponding to this arm
-        let all_constraints = if let Op::Vector(expr_vector) = expr.borrow().deref() {
-            expr_vector.children().borrow().deref().clone()
-        } else {
-            vec![expr.clone()]
-        };
+        let all_constraints = flatten_constraints(&expr);
+
         let mut constraints_to_eval = Vec::new();
         let mut bus_related_constraints_for_match_arm = Vec::new();
 
@@ -120,12 +117,11 @@ impl<'a> MatchOptimizer<'a> {
                 Some(index) => {
                     // If the eval is already in the list, we use its index in the
                     // node_evals vec
-                    let Some(constraints_vec) = self.constraints_evaluation_indices.get_mut(&index)
-                    else {
-                        unreachable!(
-                            "Error: Reference to an evaluation index not found in constraints_evaluation_indices"
+                    let constraints_vec =
+                        self.constraints_evaluation_indices.get_mut(&index).expect(
+                            "Error: An evaluation index was not in constraints_evaluation_indices",
                         );
-                    };
+
                     // We add the constraint to the corresponding vector only if the
                     // condition is not already present
                     // to remove duplicate constraints for the same selector
@@ -283,4 +279,15 @@ fn have_disjoint_conditions(
         }
     }
     true
+}
+
+/// Flattens a constraint expression (potentially containing nested vectors) into a vector of
+/// individual constraints.
+fn flatten_constraints(op: &Link<Op>) -> Vec<Link<Op>> {
+    match op.borrow().deref() {
+        Op::Vector(vec) => {
+            vec.children().borrow().deref().iter().flat_map(flatten_constraints).collect()
+        },
+        _ => vec![op.clone()],
+    }
 }

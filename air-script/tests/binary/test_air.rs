@@ -3,7 +3,8 @@ use winter_math::fields::f64::BaseElement as Felt;
 use winterfell::{Trace, TraceTable};
 
 use crate::{
-    binary::binary::{BinaryAir, PublicInputs},
+    binary::binary::PublicInputs,
+    generate_air_test,
     helpers::{AirTester, MyTraceTable},
 };
 
@@ -38,17 +39,4 @@ impl AirTester for BinaryAirTester {
     }
 }
 
-#[test]
-fn test_binary_air() {
-    let air_tester = Box::new(BinaryAirTester {});
-    let length = 1024;
-
-    let main_trace = air_tester.build_main_trace(length);
-    let aux_trace = air_tester.build_aux_trace(length);
-    let pub_inputs = air_tester.public_inputs();
-    let trace_info = air_tester.build_trace_info(length);
-    let options = air_tester.build_proof_options();
-
-    let air = BinaryAir::new(trace_info, pub_inputs, options);
-    main_trace.validate::<BinaryAir, Felt>(&air, aux_trace.as_ref());
-}
+generate_air_test!(test_binary_air, crate::binary::binary::BinaryAir, BinaryAirTester, 1024);

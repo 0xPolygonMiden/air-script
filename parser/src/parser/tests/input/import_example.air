@@ -6,6 +6,9 @@ use foo::*;
 # Import just `bar_constraint` from bar
 use bar::bar_constraint;
 
+# Import just `are_all_binary` from utils/binary
+use utils::binary::are_all_binary;
+
 trace_columns {
     main: [clk, fmp, ctx],
 }
@@ -17,6 +20,8 @@ public_inputs {
 integrity_constraints {
     enf foo_constraint([clk]);
     enf bar_constraint([clk]);
+    enf are_all_binary([clk, fmp, ctx]);
+
 }
 
 boundary_constraints {
