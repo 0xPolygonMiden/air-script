@@ -532,7 +532,10 @@ fn extract_accessor(op: Link<Op>) -> Link<Op> {
     };
     let mut indexable = accessor.indexable.clone();
     match &accessor.access_type {
-        MirAccessType::Default => accessor.indexable.clone(),
+        MirAccessType::Default => {
+            // Recursively extract accessors from the indexable
+            extract_accessor(accessor.indexable.clone())
+        },
         MirAccessType::Index(idx_op) => {
             let idx = get_inner_const(idx_op)
                 .unwrap_or_else(|| panic!("expected constant index, got {:#?}", idx_op))
