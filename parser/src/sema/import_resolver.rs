@@ -105,6 +105,7 @@ impl ImportResolver<'_> {
         match export {
             Export::Constant(_) => self.import_constant(module, from, item),
             Export::Evaluator(_) => self.import_evaluator(module, from, item),
+            Export::Function(_) => self.import_function(module, from, item),
         }
     }
 
@@ -168,6 +169,55 @@ impl ImportResolver<'_> {
 
         let namespaced_name = NamespacedIdentifier::Function(item);
         match module.evaluators.get(&item) {
+            Some(exists) => ControlFlow::Break(SemanticAnalysisError::ImportConflict {
+                item,
+                prev: exists.name.span(),
+            }),
+            None => {
+                match self.imported.entry(namespaced_name) {
+                    Entry::Occupied(entry) => {
+                        let id = entry.key();
+                        let originally_imported_from = entry.get();
+                        if originally_imported_from == &from {
+                            // Warn about redundant import
+                            self.diagnostics
+                                .diagnostic(Severity::Warning)
+                                .with_message("redundant import")
+                                .with_primary_label(item.span(), "this import is unnecessary")
+                                .with_secondary_label(
+                                    id.span(),
+                                    "because it was already imported here",
+                                )
+                                .emit();
+                            ControlFlow::Continue(())
+                        } else {
+                            // Conflict is with another import, raise an error
+                            ControlFlow::Break(SemanticAnalysisError::ImportConflict {
+                                item,
+                                prev: id.span(),
+                            })
+                        }
+                    },
+                    Entry::Vacant(entry) => {
+                        entry.insert(from);
+                        ControlFlow::Continue(())
+                    },
+                }
+            },
+        }
+    }
+
+    /// Imports a function into the current module
+    fn import_function(
+        &mut self,
+        module: &mut Module,
+        from: ModuleId,
+        item: Identifier,
+    ) -> ControlFlow<SemanticAnalysisError> {
+        use std::collections::hash_map::Entry;
+
+        let namespaced_name = NamespacedIdentifier::Function(item);
+        match module.functions.get(&item) {
             Some(exists) => ControlFlow::Break(SemanticAnalysisError::ImportConflict {
                 item,
                 prev: exists.name.span(),

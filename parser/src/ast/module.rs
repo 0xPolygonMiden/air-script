@@ -627,6 +627,7 @@ impl Module {
             .values()
             .map(Export::Constant)
             .chain(self.evaluators.values().map(Export::Evaluator))
+            .chain(self.functions.values().map(Export::Function))
     }
 
     /// Get the export with the given identifier, if it can be found
@@ -635,6 +636,7 @@ impl Module {
             self.constants.get(id).map(Export::Constant)
         } else {
             self.evaluators.get(id).map(Export::Evaluator)
+                .or_else(|| self.functions.get(id).map(Export::Function))
         }
     }
 }
