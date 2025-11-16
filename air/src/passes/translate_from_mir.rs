@@ -371,44 +371,44 @@ impl AirBuilder<'_> {
                 if let Some(value) = child.as_value() {
                     let mir_value = &value.value.value;
 
-                let value = match mir_value {
-                    MirValue::Constant(constant_value) => {
-                        if let ConstantValue::Felt(felt) = constant_value {
-                            crate::ir::Value::Constant(*felt)
-                        } else {
-                            unreachable!()
-                        }
-                    },
-                    MirValue::TraceAccess(trace_access) => {
-                        crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: trace_access.segment,
-                            column: trace_access.column,
-                            row_offset: offset,
-                        })
-                    },
-                    MirValue::BusAccess(bus_access) => {
-                        let name = bus_access.bus.borrow().deref().name();
-                        let column = self.bus_bindings_map.get(&name).unwrap();
-                        crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: TraceSegmentId::Aux,
-                            column: *column,
-                            row_offset: offset,
-                        })
-                    },
-                    MirValue::PeriodicColumn(periodic_column_access) => {
-                        crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
-                            name: periodic_column_access.name.clone(),
-                            cycle: periodic_column_access.cycle,
-                        })
-                    },
-                    MirValue::PublicInput(public_input_access) => {
-                        crate::ir::Value::PublicInput(crate::ir::PublicInputAccess {
-                            name: public_input_access.name,
-                            index: public_input_access.index,
-                        })
-                    },
-                    _ => unreachable!(),
-                };
+                    let value = match mir_value {
+                        MirValue::Constant(constant_value) => {
+                            if let ConstantValue::Felt(felt) = constant_value {
+                                crate::ir::Value::Constant(*felt)
+                            } else {
+                                unreachable!()
+                            }
+                        },
+                        MirValue::TraceAccess(trace_access) => {
+                            crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+                                segment: trace_access.segment,
+                                column: trace_access.column,
+                                row_offset: offset,
+                            })
+                        },
+                        MirValue::BusAccess(bus_access) => {
+                            let name = bus_access.bus.borrow().deref().name();
+                            let column = self.bus_bindings_map.get(&name).unwrap();
+                            crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+                                segment: TraceSegmentId::Aux,
+                                column: *column,
+                                row_offset: offset,
+                            })
+                        },
+                        MirValue::PeriodicColumn(periodic_column_access) => {
+                            crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
+                                name: periodic_column_access.name.clone(),
+                                cycle: periodic_column_access.cycle,
+                            })
+                        },
+                        MirValue::PublicInput(public_input_access) => {
+                            crate::ir::Value::PublicInput(crate::ir::PublicInputAccess {
+                                name: public_input_access.name,
+                                index: public_input_access.index,
+                            })
+                        },
+                        _ => unreachable!(),
+                    };
 
                     Ok(self.insert_op(Operation::Value(value)))
                 } else {
