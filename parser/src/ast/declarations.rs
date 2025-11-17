@@ -253,12 +253,14 @@ impl PartialEq for Import {
 pub enum Export<'a> {
     Constant(&'a crate::ast::Constant),
     Evaluator(&'a EvaluatorFunction),
+    Function(&'a Function),
 }
 impl Export<'_> {
     pub fn name(&self) -> Identifier {
         match self {
             Self::Constant(item) => item.name,
             Self::Evaluator(item) => item.name,
+            Self::Function(item) => item.name,
         }
     }
 
@@ -270,6 +272,7 @@ impl Export<'_> {
         match self {
             Self::Constant(item) => Some(item.ty()),
             Self::Evaluator(_) => None,
+            Self::Function(item) => Some(item.return_type),
         }
     }
 }
