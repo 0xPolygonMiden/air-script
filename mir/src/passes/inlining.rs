@@ -574,7 +574,7 @@ fn extract_accessor(op: Link<Op>) -> Link<Op> {
 fn check_evaluator_argument_sizes(
     args: &[Link<Op>],
     callee_params: Vec<Vec<Link<Op>>>,
-    _diagnostics: &DiagnosticsHandler,
+    diagnostics: &DiagnosticsHandler,
 ) -> Result<(), CompileError> {
     for ((trace_segment_id, trace_segments_params), trace_segments_arg) in
         callee_params.iter().enumerate().zip(args.iter())
@@ -585,15 +585,27 @@ fn check_evaluator_argument_sizes(
         let children = trace_segments_arg_vector.children();
         let (trace_segments_arg_vector_len, _) = process_evaluator_arg_children(children.clone());
         if trace_segments_params.len() != trace_segments_arg_vector_len {
-            // Instead of emitting a diagnostic that fails, just return an error
-            // The FileMissing error suggests the diagnostics system can't handle
-            // SourceSpan::UNKNOWN
-            eprintln!(
-                "Argument count mismatch: expected {} arguments in trace segment {}, but got {}",
-                trace_segments_params.len(),
-                trace_segment_id,
-                trace_segments_arg_vector_len
-            );
+            diagnostics
+                .diagnostic(Severity::Error)
+                .with_message("argument count mismatch")
+                .with_primary_label(
+                    SourceSpan::UNKNOWN,
+                    format!(
+                        "expected call to have {} arguments in trace segment {}, but got {}",
+                        trace_segments_params.len(),
+                        trace_segment_id,
+                        trace_segments_arg_vector_len
+                    ),
+                )
+                .with_secondary_label(
+                    SourceSpan::UNKNOWN,
+                    format!(
+                        "this functions has {} parameters in trace segment {}",
+                        trace_segments_params.len(),
+                        trace_segment_id
+                    ),
+                )
+                .emit();
             return Err(CompileError::Failed);
         }
     }
