@@ -21,6 +21,8 @@ mod evaluators;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod fibonacci;
 #[allow(unused_variables, dead_code, unused_mut)]
+mod function_import;
+#[allow(unused_variables, dead_code, unused_mut)]
 mod functions;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod indexed_trace_access;

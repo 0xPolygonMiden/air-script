@@ -3,7 +3,7 @@ use std::{collections::HashMap, ops::ControlFlow};
 use miden_diagnostics::{DiagnosticsHandler, Severity, Spanned};
 
 use crate::{
-    ast::{visit::VisitMut, *},
+    ast::{Export, visit::VisitMut, *},
     sema::SemanticAnalysisError,
 };
 
@@ -222,36 +222,31 @@ impl ImportResolver<'_> {
                 item,
                 prev: exists.name.span(),
             }),
-            None => {
-                match self.imported.entry(namespaced_name) {
-                    Entry::Occupied(entry) => {
-                        let id = entry.key();
-                        let originally_imported_from = entry.get();
-                        if originally_imported_from == &from {
-                            // Warn about redundant import
-                            self.diagnostics
-                                .diagnostic(Severity::Warning)
-                                .with_message("redundant import")
-                                .with_primary_label(item.span(), "this import is unnecessary")
-                                .with_secondary_label(
-                                    id.span(),
-                                    "because it was already imported here",
-                                )
-                                .emit();
-                            ControlFlow::Continue(())
-                        } else {
-                            // Conflict is with another import, raise an error
-                            ControlFlow::Break(SemanticAnalysisError::ImportConflict {
-                                item,
-                                prev: id.span(),
-                            })
-                        }
-                    },
-                    Entry::Vacant(entry) => {
-                        entry.insert(from);
+            None => match self.imported.entry(namespaced_name) {
+                Entry::Occupied(entry) => {
+                    let id = entry.key();
+                    let originally_imported_from = entry.get();
+                    if originally_imported_from == &from {
+                        // Warn about redundant import
+                        self.diagnostics
+                            .diagnostic(Severity::Warning)
+                            .with_message("redundant import")
+                            .with_primary_label(item.span(), "this import is unnecessary")
+                            .with_secondary_label(id.span(), "because it was already imported here")
+                            .emit();
                         ControlFlow::Continue(())
-                    },
-                }
+                    } else {
+                        // Conflict is with another import, raise an error
+                        ControlFlow::Break(SemanticAnalysisError::ImportConflict {
+                            item,
+                            prev: id.span(),
+                        })
+                    }
+                },
+                Entry::Vacant(entry) => {
+                    entry.insert(from);
+                    ControlFlow::Continue(())
+                },
             },
         }
     }
