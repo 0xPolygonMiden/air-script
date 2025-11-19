@@ -78,7 +78,7 @@ impl Codegen for Value {
             Value::PeriodicColumn(pc) => {
                 let index =
                     ir.periodic_columns.iter().position(|(qid, _)| qid == &pc.name).unwrap();
-                format!("periodic_values[{index}].into()")
+                format!("AB::ExprEF::from(periodic_values[{index}].clone().into())")
             },
             Value::PublicInputTable(public_input_table_access) => {
                 let idx = ir

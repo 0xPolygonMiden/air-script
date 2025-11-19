@@ -1,7 +1,7 @@
-use p3_air::{Air, BaseAir, BaseAirWithPublicValues, AirBuilder, ExtensionBuilder};
+use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
-use p3_field::{Field, PrimeCharacteristicRing};
-use crate::test_utils::plonky3_traits::{AirScriptAir, AirScriptBuilder};
+use p3_miden_air::{MidenAir, MidenAirBuilder};
+use crate::test_utils::plonky3_traits::AirScriptAir;
 
 pub const MAIN_WIDTH: usize = 1;
 pub const AUX_WIDTH: usize = 2;
@@ -12,41 +12,27 @@ pub const NUM_BETA_CHALLENGES: usize = 2;
 
 pub struct BusesAir;
 
-impl<F> BaseAir<F> for BusesAir {
+impl<F, EF> MidenAir<F, EF> for BusesAir
+where F: Field,
+      EF: ExtensionField<F>,
+{
     fn width(&self) -> usize {
         MAIN_WIDTH
     }
-}
 
-impl<F> BaseAirWithPublicValues<F> for BusesAir {
-    fn num_public_values(&self) -> usize {
-        NUM_PUBLIC_VALUES
-    }
-}
-
-impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for BusesAir {
-    fn aux_width(&self) -> usize {
-        AUX_WIDTH
-    }
-
-    fn num_beta_challenges(&self) -> usize {
-        NUM_BETA_CHALLENGES
-    }
-
-    fn periodic_table(&self) -> Vec<Vec<F>> {
-        vec![]
-    }
-
-    fn eval(&self, builder: &mut AB) {
+    fn eval<AB>(&self, builder: &mut AB)
+    where AB: MidenAirBuilder<F = F, EF = EF>,
+    {
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
-        let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect("Wrong number of periodic values");
+        let preprocessed = builder.preprocessed();
+        let periodic_values = preprocessed.row_slice(0).unwrap();
         let main = builder.main();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        let alpha = builder.alpha();
-        let beta_challenges: [_; NUM_BETA_CHALLENGES] = builder.beta_powers().try_into().expect("Wrong number of beta challenges");
+        let (alpha, beta_challenges) = builder.permutation_randomness().split_first().unwrap();
+        let beta_challenges: [_; NUM_BETA_CHALLENGES] = beta_challenges.try_into().expect("Wrong number of beta challenges");
         let aux_bus_boundary_values: [_; AUX_WIDTH] = builder.aux_bus_boundary_values().try_into().expect("Wrong number of aux bus boundary values");
         let aux = builder.permutation();
         let (aux_current, aux_next) = (
@@ -69,8 +55,12 @@ impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for BusesAir {
     }
 }
 
-impl<AB: AirScriptBuilder> Air<AB> for BusesAir {
-    fn eval(&self, builder: &mut AB) {
-        <Self as AirScriptAir<AB::F, AB>>::eval(self, builder);
+impl<F: Field, EF: ExtensionField<F>> AirScriptAir<F, EF> for BusesAir {
+    fn num_beta_challenges(&self) -> usize {
+        NUM_BETA_CHALLENGES
+    }
+
+    fn periodic_table(&self) -> Vec<Vec<F>> {
+        vec![]
     }
 }

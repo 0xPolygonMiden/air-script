@@ -28,13 +28,13 @@ pub(super) fn add_air(scope: &mut Scope, ir: &Air) {
     add_constants(scope, ir);
 
     // add the Air struct and its base implementation.
-    add_air_struct(scope, name);
+    add_air_struct(scope, ir, name);
 
     // add AirScriptAir trait implementation for the provided AirIR.
     add_air_script_trait(scope, ir, name);
 
     // add Plonky3 AirBuilder trait implementation for the provided AirIR.
-    add_air_trait(scope, name);
+    /* add_air_trait(scope, name); */
 }
 
 /// Updates the provided scope with constants needed for the custom Air struct and trait
@@ -61,15 +61,22 @@ fn add_constants(scope: &mut Scope, ir: &Air) {
 }
 
 /// Updates the provided scope with a custom Air struct.
-fn add_air_struct(scope: &mut Scope, name: &str) {
+fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     // define the custom Air struct.
     scope.new_struct(name).vis("pub");
 
-    // add the custom BaseAir implementation block
-    let base_air_impl = scope.new_impl(name).generic("F").impl_trait("BaseAir<F>");
-    base_air_impl.new_fn("width").arg_ref_self().ret("usize").line("MAIN_WIDTH");
+    // add the custom MidenAir implementation block
+    let miden_air_impl = scope
+        .new_impl(name)
+        .generic("F")
+        .generic("EF")
+        .bound("F", "Field")
+        .bound("EF", "ExtensionField<F>")
+        .impl_trait("MidenAir<F, EF>");
 
-    // add the custom BaseAirWithPublicValues implementation block
+    miden_air_impl.new_fn("width").arg_ref_self().ret("usize").line("MAIN_WIDTH");
+
+    /*// add the custom BaseAirWithPublicValues implementation block
     let base_air_with_public_values_impl =
         scope.new_impl(name).generic("F").impl_trait("BaseAirWithPublicValues<F>");
     base_air_with_public_values_impl
@@ -77,6 +84,46 @@ fn add_air_struct(scope: &mut Scope, name: &str) {
         .arg_ref_self()
         .ret("usize")
         .line("NUM_PUBLIC_VALUES");
+    */
+
+    // add the eval function
+    let eval_func = miden_air_impl
+        .new_fn("eval")
+        .generic("AB")
+        .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
+        .arg_ref_self()
+        .arg("builder", "&mut AB");
+    eval_func.line("let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect(\"Wrong number of public values\");");
+    //eval_func.line("let periodic_values: [_; NUM_PERIODIC_VALUES] =
+    // builder.periodic_evals().try_into().expect(\"Wrong number of periodic values\");");
+    eval_func.line("let preprocessed = builder.preprocessed();");
+    eval_func.line("let periodic_values = preprocessed.row_slice(0).unwrap();");
+
+    eval_func.line("let main = builder.main();");
+    eval_func.line("let (main_current, main_next) = (");
+    eval_func.line("    main.row_slice(0).unwrap(),");
+    eval_func.line("    main.row_slice(1).unwrap(),");
+    eval_func.line(");");
+
+    // Only had aux if there are random values
+    if ir.num_random_values > 0 {
+        eval_func.line("let (alpha, beta_challenges) = builder.permutation_randomness().split_first().unwrap();");
+        eval_func.line("let beta_challenges: [_; NUM_BETA_CHALLENGES] = beta_challenges.try_into().expect(\"Wrong number of beta challenges\");");
+        eval_func.line("let aux_bus_boundary_values: [_; AUX_WIDTH] = builder.aux_bus_boundary_values().try_into().expect(\"Wrong number of aux bus boundary values\");");
+        eval_func.line("let aux = builder.permutation();");
+        eval_func.line("let (aux_current, aux_next) = (");
+        eval_func.line("    aux.row_slice(0).unwrap(),");
+        eval_func.line("    aux.row_slice(1).unwrap(),");
+        eval_func.line(");");
+    }
+
+    add_main_boundary_constraints(eval_func, ir);
+
+    add_main_integrity_constraints(eval_func, ir);
+
+    add_aux_boundary_constraints(eval_func, ir);
+
+    add_aux_integrity_constraints(eval_func, ir);
 }
 
 fn add_air_script_trait(scope: &mut Scope, ir: &Air, name: &str) {
@@ -84,15 +131,8 @@ fn add_air_script_trait(scope: &mut Scope, ir: &Air, name: &str) {
     let air_script_impl = scope
         .new_impl(name)
         .generic("F: Field")
-        .generic("AB: AirScriptBuilder<F = F>")
-        .impl_trait("AirScriptAir<F, AB>");
-
-    // add the aux_width function
-    air_script_impl
-        .new_fn("aux_width")
-        .arg_ref_self()
-        .ret("usize")
-        .line("AUX_WIDTH");
+        .generic("EF: ExtensionField<F>")
+        .impl_trait("AirScriptAir<F, EF>");
 
     // add the num_beta_challenges function
     air_script_impl
@@ -118,44 +158,4 @@ fn add_air_script_trait(scope: &mut Scope, ir: &Air, name: &str) {
         }
         periodic_table_func.line("]");
     }
-
-    // add the eval function
-    let eval_func = air_script_impl.new_fn("eval").arg_ref_self().arg("builder", "&mut AB");
-    eval_func.line("let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect(\"Wrong number of public values\");");
-    eval_func.line("let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect(\"Wrong number of periodic values\");");
-    eval_func.line("let main = builder.main();");
-    eval_func.line("let (main_current, main_next) = (");
-    eval_func.line("    main.row_slice(0).unwrap(),");
-    eval_func.line("    main.row_slice(1).unwrap(),");
-    eval_func.line(");");
-
-    // Only had aux if there are random values
-    if ir.num_random_values > 0 {
-        eval_func.line("let alpha = builder.alpha();");
-        eval_func.line("let beta_challenges: [_; NUM_BETA_CHALLENGES] = builder.beta_powers().try_into().expect(\"Wrong number of beta challenges\");");
-        eval_func.line("let aux_bus_boundary_values: [_; AUX_WIDTH] = builder.aux_bus_boundary_values().try_into().expect(\"Wrong number of aux bus boundary values\");");
-        eval_func.line("let aux = builder.permutation();");
-        eval_func.line("let (aux_current, aux_next) = (");
-        eval_func.line("    aux.row_slice(0).unwrap(),");
-        eval_func.line("    aux.row_slice(1).unwrap(),");
-        eval_func.line(");");
-    }
-
-    add_main_boundary_constraints(eval_func, ir);
-
-    add_main_integrity_constraints(eval_func, ir);
-
-    add_aux_boundary_constraints(eval_func, ir);
-
-    add_aux_integrity_constraints(eval_func, ir);
-}
-
-/// Updates the provided scope with the custom Air struct and an Air trait implementation based on
-/// the provided AirIR.
-fn add_air_trait(scope: &mut Scope, name: &str) {
-    // add the implementation block for the Air trait.
-    let air_impl = scope.new_impl(name).generic("AB: AirScriptBuilder").impl_trait("Air<AB>");
-
-    let eval_func = air_impl.new_fn("eval").arg_ref_self().arg("builder", "&mut AB");
-    eval_func.line("<Self as AirScriptAir<AB::F, AB>>::eval(self, builder);");
 }

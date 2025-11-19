@@ -1,20 +1,13 @@
-use p3_air::{
-    Air, AirBuilder, AirBuilderWithPublicValues, ExtensionBuilder, PermutationAirBuilder,
-};
 use p3_field::{ExtensionField, Field};
 use p3_matrix::{
     Matrix,
-    dense::{RowMajorMatrix, RowMajorMatrixView},
+    dense::{DenseMatrix, RowMajorMatrix, RowMajorMatrixView},
     stack::VerticalPair,
 };
+use p3_miden_air::{MidenAir, MidenAirBuilder, impl_p3_air_builder_traits};
 
-/// Miden/AirScript-specific AIR. Replaces BaseAir for this forked target.
-pub trait AirScriptAir<F: Field, AB: AirScriptBuilder<F = F>> {
-    /// Auxiliary width of the AIR.
-    fn aux_width(&self) -> usize {
-        0
-    }
-
+/// Additional trait for AirScript AIRs.
+pub trait AirScriptAir<F: Field, EF: ExtensionField<F>>: MidenAir<F, EF> {
     /// Number of beta challenges used in the AIR.
     fn num_beta_challenges(&self) -> usize {
         0
@@ -22,28 +15,24 @@ pub trait AirScriptAir<F: Field, AB: AirScriptBuilder<F = F>> {
 
     /// Periodic constants (base-field) backing periodic_evals().
     fn periodic_table(&self) -> Vec<Vec<F>>;
-
-    /// Single entrypoint: encodes main + aux + boundary constraints.
-    fn eval(&self, builder: &mut AB);
 }
 
 /// Target trait for AirScript codegen. Implemented by the prover.
-pub trait AirScriptBuilder:
-    AirBuilder + AirBuilderWithPublicValues + ExtensionBuilder + PermutationAirBuilder
+pub trait AirScriptBuilder: MidenAirBuilder
 where
-    <Self as AirBuilder>::F: Field,
+    <Self as MidenAirBuilder>::F: Field,
 {
     /// EF evaluations of periodic columns at the AIR’s random point (z). Order defined by
     /// AirScript.
-    fn periodic_evals(&self) -> &[<Self as ExtensionBuilder>::VarEF];
+    fn periodic_evals(&self) -> &[<Self as MidenAirBuilder>::VarEF];
 
     /// Global challenges in EF. (We can provide defaults; details not important here.)
-    fn alpha(&self) -> <Self as ExtensionBuilder>::VarEF;
-    fn beta(&self) -> <Self as ExtensionBuilder>::VarEF;
-    fn beta_powers(&self) -> &[<Self as ExtensionBuilder>::VarEF];
+    fn alpha(&self) -> <Self as MidenAirBuilder>::VarEF;
+    fn beta(&self) -> <Self as MidenAirBuilder>::VarEF;
+    fn beta_powers(&self) -> &[<Self as MidenAirBuilder>::VarEF];
 
     /// Aux bus boundary values: EF finals, one per aux/bus column, carried in the proof.
-    fn aux_bus_boundary_values(&self) -> &[<Self as ExtensionBuilder>::VarEF];
+    fn aux_bus_boundary_values(&self) -> &[<Self as MidenAirBuilder>::VarEF];
 }
 
 /// A builder that runs constraint assertions during testing.
@@ -56,6 +45,8 @@ pub struct DebugConstraintBuilderWithAirScriptTraits<'a, F: Field, EF: Extension
     row_index: usize,
     /// A view of the current and next main row as a vertical pair.
     main: VerticalPair<RowMajorMatrixView<'a, F>, RowMajorMatrixView<'a, F>>,
+    /// A view of the current and next preprocessed row as a vertical pair.
+    preprocessed: VerticalPair<RowMajorMatrixView<'a, F>, RowMajorMatrixView<'a, F>>,
     /// A view of the current and next aux row as a vertical pair.
     aux: VerticalPair<RowMajorMatrixView<'a, EF>, RowMajorMatrixView<'a, EF>>,
     /// The public values provided for constraint validation (e.g. inputs or outputs).
@@ -80,7 +71,7 @@ pub struct DebugConstraintBuilderWithAirScriptTraits<'a, F: Field, EF: Extension
     aux_bus_boundary_values: Vec<EF>,
 }
 
-impl<'a, F, EF> AirBuilder for DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>
+impl<'a, F, EF> MidenAirBuilder for DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>
 where
     F: Field,
     EF: ExtensionField<F>,
@@ -88,7 +79,13 @@ where
     type F = F;
     type Expr = F;
     type Var = F;
-    type M = VerticalPair<RowMajorMatrixView<'a, F>, RowMajorMatrixView<'a, F>>;
+    type M = VerticalPair<DenseMatrix<F, &'a [F]>, DenseMatrix<F, &'a [F]>>;
+    type PublicVar = F;
+    type EF = EF;
+    type ExprEF = EF;
+    type VarEF = EF;
+    type MP = VerticalPair<DenseMatrix<EF, &'a [EF]>, DenseMatrix<EF, &'a [EF]>>;
+    type RandomVar = EF;
 
     fn main(&self) -> Self::M {
         self.main
@@ -102,8 +99,6 @@ where
         self.is_last_row
     }
 
-    /// # Panics
-    /// This function panics if `size` is not `2`.
     fn is_transition_window(&self, size: usize) -> Self::Expr {
         if size == 2 {
             self.is_transition
@@ -116,35 +111,13 @@ where
         assert_eq!(x.into(), F::ZERO, "constraints had nonzero value on row {}", self.row_index);
     }
 
-    fn assert_eq<I1: Into<Self::Expr>, I2: Into<Self::Expr>>(&mut self, x: I1, y: I2) {
-        let x = x.into();
-        let y = y.into();
-        assert_eq!(x, y, "values didn't match on row {}: {} != {}", self.row_index, x, y);
-    }
-}
-
-impl<'a, F, EF> AirBuilderWithPublicValues for DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>
-where
-    F: Field,
-    EF: ExtensionField<F>,
-{
-    type PublicVar = Self::F;
-
-    fn public_values(&self) -> &[Self::F] {
+    fn public_values(&self) -> &[Self::PublicVar] {
         self.public_values
     }
-}
 
-impl<'a, F, EF> ExtensionBuilder for DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>
-where
-    F: Field,
-    EF: ExtensionField<F>,
-{
-    type EF = EF;
-
-    type ExprEF = EF;
-
-    type VarEF = EF;
+    fn preprocessed(&self) -> Self::M {
+        self.preprocessed
+    }
 
     fn assert_zero_ext<I>(&mut self, x: I)
     where
@@ -157,16 +130,6 @@ where
             self.row_index
         );
     }
-}
-
-impl<'a, F, EF> PermutationAirBuilder for DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>
-where
-    F: Field,
-    EF: ExtensionField<F>,
-{
-    type MP = VerticalPair<RowMajorMatrixView<'a, EF>, RowMajorMatrixView<'a, EF>>;
-
-    type RandomVar = EF;
 
     fn permutation(&self) -> Self::MP {
         self.aux
@@ -177,28 +140,30 @@ where
     }
 }
 
+impl_p3_air_builder_traits!(DebugConstraintBuilderWithAirScriptTraits<'a, F, EF> where F: Field, EF: ExtensionField<F>);
+
 impl<'a, F, EF> AirScriptBuilder for DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>
 where
     F: Field + Into<Self::Expr>,
     EF: ExtensionField<F>,
 {
-    fn periodic_evals(&self) -> &[<Self as ExtensionBuilder>::VarEF] {
+    fn periodic_evals(&self) -> &[<Self as MidenAirBuilder>::VarEF] {
         self.periodic_columns.as_slice()
     }
 
-    fn alpha(&self) -> <Self as ExtensionBuilder>::VarEF {
+    fn alpha(&self) -> <Self as MidenAirBuilder>::VarEF {
         self.alpha
     }
 
-    fn beta_powers(&self) -> &[<Self as ExtensionBuilder>::VarEF] {
+    fn beta_powers(&self) -> &[<Self as MidenAirBuilder>::VarEF] {
         self.beta_powers.as_slice()
     }
 
-    fn beta(&self) -> <Self as ExtensionBuilder>::VarEF {
+    fn beta(&self) -> <Self as MidenAirBuilder>::VarEF {
         self.beta
     }
 
-    fn aux_bus_boundary_values(&self) -> &[<Self as ExtensionBuilder>::VarEF] {
+    fn aux_bus_boundary_values(&self) -> &[<Self as MidenAirBuilder>::VarEF] {
         self.aux_bus_boundary_values.as_slice()
     }
 }
@@ -300,8 +265,8 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
 ) where
     F: Field,
     EF: ExtensionField<F>,
-    A: for<'a> Air<DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>>,
-    A: for<'a> AirScriptAir<F, DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>>,
+    A: MidenAir<F, EF>,
+    A: for<'a> AirScriptAir<F, EF>,
 {
     let height = main.height();
 
@@ -349,6 +314,7 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
         let mut builder = DebugConstraintBuilderWithAirScriptTraits {
             row_index: i,
             main,
+            preprocessed: main,
             aux,
             public_values,
             is_first_row: F::from_bool(i == 0),
@@ -362,6 +328,6 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             aux_bus_boundary_values: aux_bus_boundary_values.clone(),
         };
 
-        AirScriptAir::eval(air, &mut builder);
+        air.eval(&mut builder);
     });
 }
