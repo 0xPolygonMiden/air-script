@@ -8,6 +8,7 @@ pub(super) fn add_imports(scope: &mut Scope) {
     scope.import("p3_field", "PrimeCharacteristicRing");
     scope.import("p3_matrix", "Matrix");
     scope.import("p3_matrix::dense", "RowMajorMatrixView");
+    scope.import("p3_matrix::stack", "VerticalPair");
     scope.import("p3_miden_air", "MidenAir");
     scope.import("p3_miden_air", "MidenAirBuilder");
     scope.import("p3_miden_air", "RowMajorMatrix");

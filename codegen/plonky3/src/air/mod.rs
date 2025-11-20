@@ -119,8 +119,54 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         miden_air_impl.new_fn("aux_width").arg_ref_self().ret("usize").line("AUX_WIDTH");
     }
 
-    // For now, don't provide the build_aux_trace and with_aux_builder functions.
-    // TODO: add them
+    // add the build_aux_trace function if needed
+    if ir.num_random_values > 0 {
+        let build_aux_trace_func = miden_air_impl
+            .new_fn("build_aux_trace")
+            .generic("AB")
+            .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
+            .arg_ref_self()
+            .arg("_main", "&RowMajorMatrix<F>")
+            .arg("_challenges", "&[EF]")
+            .ret("Option<RowMajorMatrix<EF>>");
+
+        build_aux_trace_func.line("let num_rows = _main.height();");
+        build_aux_trace_func.line("let trace_length = num_rows * AUX_WIDTH;");
+        build_aux_trace_func.line("let mut long_trace = EF::zero_vec(trace_length);");
+        build_aux_trace_func.line("let mut trace = RowMajorMatrix::new(long_trace, AUX_WIDTH);");
+        build_aux_trace_func.line("let (prefix, rows, suffix) = unsafe { trace.values.align_to_mut::<[EF; AUX_WIDTH]>() };");
+        build_aux_trace_func.line("assert!(prefix.is_empty(), \"Alignment should match\");");
+        build_aux_trace_func.line("assert!(suffix.is_empty(), \"Alignment should match\");");
+        build_aux_trace_func.line("assert_eq!(rows.len(), num_rows);");
+        build_aux_trace_func.line("// Initialize first row");
+        build_aux_trace_func
+            .line("let initial_values = Self::buses_initial_values::<F, EF, AB>();");
+        build_aux_trace_func.line("for j in 0..AUX_WIDTH {");
+        build_aux_trace_func.line("    rows[0][j] = initial_values[j];");
+        build_aux_trace_func.line("}");
+        build_aux_trace_func.line("// Fill subsequent rows using direct access to the rows array");
+        build_aux_trace_func.line("for i in 0..num_rows-1 {");
+        build_aux_trace_func.line("    let i_next = (i + 1) % num_rows;");
+        build_aux_trace_func.line("    let main_local = _main.row_slice(i).unwrap(); // i < height so unwrap should never fail.");
+        build_aux_trace_func.line("    let main_next = _main.row_slice(i_next).unwrap(); // i_next < height so unwrap should never fail.");
+        build_aux_trace_func.line("    let main = VerticalPair::new(");
+        build_aux_trace_func.line("        RowMajorMatrixView::new_row(&*main_local),");
+        build_aux_trace_func.line("        RowMajorMatrixView::new_row(&*main_next),");
+        build_aux_trace_func.line("    );");
+        build_aux_trace_func.line(format!("    let periodic_values: [_; NUM_PERIODIC_VALUES] = <{name} as MidenAir<F, EF>>::periodic_table(self).iter().map(|col| col[i % col.len()]).collect::<Vec<_>>().try_into().expect(\"Wrong number of periodic values\");"));
+        build_aux_trace_func.line("    let prev_row = &rows[i];");
+        build_aux_trace_func.line("    let next_row = Self::buses_transitions::<F, EF, AB>(");
+        build_aux_trace_func.line("        &main,");
+        build_aux_trace_func.line("        _challenges,");
+        build_aux_trace_func.line("        &periodic_values,");
+        build_aux_trace_func.line("        prev_row,");
+        build_aux_trace_func.line("    );");
+        build_aux_trace_func.line("    for j in 0..AUX_WIDTH {");
+        build_aux_trace_func.line("        rows[i+1][j] = next_row[j];");
+        build_aux_trace_func.line("    }");
+        build_aux_trace_func.line("}");
+        build_aux_trace_func.line("Some(trace)");
+    }
 
     // add the eval function
     let eval_func = miden_air_impl
@@ -139,7 +185,7 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     eval_func.line("    main.row_slice(1).unwrap(),");
     eval_func.line(");");
 
-    // Only had aux if there are random values
+    // Only add aux if there are random values
     if ir.num_random_values > 0 {
         eval_func.line("let (&alpha, beta_challenges) = builder.permutation_randomness().split_first().unwrap();");
         eval_func.line("let beta_challenges: [_; NUM_BETA_CHALLENGES] = beta_challenges.try_into().expect(\"Wrong number of randomness\");");
@@ -173,10 +219,10 @@ fn add_aux_trace_utils(scope: &mut Scope, ir: &Air, name: &str) {
         .bound("F", "Field")
         .bound("EF", "ExtensionField<F>")
         .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
-        .ret("Vec<AB::ExprEF>");
+        .ret("Vec<AB::EF>");
     buses_initial_values_func.line("vec![");
     for (_bus_id, value) in ir.buses_initial_values.iter() {
-        let value_str = value.to_string(ir, ElemType::Ext);
+        let value_str = value.to_string(ir, ElemType::ExtFieldElem);
 
         buses_initial_values_func.line(format!("    {},", value_str));
     }
@@ -191,17 +237,16 @@ fn add_aux_trace_utils(scope: &mut Scope, ir: &Air, name: &str) {
         .bound("F", "Field")
         .bound("EF", "ExtensionField<F>")
         .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
-        .arg("main", "&RowMajorMatrix<F>")
+        .arg("main", "&VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>")
         .arg("challenges", "&[EF]")
         .arg("periodic_evals", "&[F]")
-        .arg("aux_current", "RowMajorMatrixView<EF>")
+        .arg("aux_current", "&[EF]")
         .ret("Vec<EF>");
 
     buses_transitions_func.line("let (main_current, main_next) = (");
     buses_transitions_func.line("    main.row_slice(0).unwrap(),");
     buses_transitions_func.line("    main.row_slice(1).unwrap(),");
     buses_transitions_func.line(");");
-    buses_transitions_func.line("let aux_current = aux_current.row_slice(0).unwrap();");
     buses_transitions_func
         .line("let (&alpha, beta_challenges) = challenges.split_first().unwrap();");
     buses_transitions_func.line("let beta_challenges: [_; NUM_BETA_CHALLENGES] = beta_challenges.try_into().expect(\"Wrong number of randomness\");");
@@ -213,7 +258,7 @@ fn add_aux_trace_utils(scope: &mut Scope, ir: &Air, name: &str) {
 
         let aux_next_value_str = if let Some(denom) = denominator {
             let denominator_str = denom.to_string(ir, ElemType::ExtFieldElem);
-            format!("{} * ({}).inverse()", numerator_str, denominator_str)
+            format!("({}) * ({}).inverse()", numerator_str, denominator_str)
         } else {
             numerator_str
         };

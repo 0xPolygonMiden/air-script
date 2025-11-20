@@ -37,7 +37,7 @@ pub struct DebugConstraintBuilderWithAirScriptTraits<'a, F: Field, EF: Extension
     /// A view of the current and next preprocessed row as a vertical pair.
     preprocessed: VerticalPair<RowMajorMatrixView<'a, F>, RowMajorMatrixView<'a, F>>,
     /// A view of the current and next aux row as a vertical pair.
-    aux: VerticalPair<RowMajorMatrixView<'a, EF>, RowMajorMatrixView<'a, EF>>,
+    aux: Option<VerticalPair<RowMajorMatrixView<'a, EF>, RowMajorMatrixView<'a, EF>>>,
     /// The public values provided for constraint validation (e.g. inputs or outputs).
     public_values: &'a [F],
     /// A flag indicating whether this is the first row.
@@ -119,7 +119,7 @@ where
     }
 
     fn permutation(&self) -> Self::MP {
-        self.aux
+        self.aux.unwrap()
     }
 
     fn permutation_randomness(&self) -> &[Self::RandomVar] {
@@ -132,96 +132,6 @@ where
 }
 
 impl_p3_air_builder_traits!(DebugConstraintBuilderWithAirScriptTraits<'a, F, EF> where F: Field, EF: ExtensionField<F>);
-
-fn compute_aux_transition<F, EF>(
-    main: VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>,
-    alpha: EF,
-    beta_challenges: Vec<EF>,
-    aux_current: [EF; 2],
-) -> [EF; 2]
-where
-    F: Field,
-    EF: ExtensionField<F>,
-{
-    let main_current = &main.row_slice(0).unwrap();
-    let _main_next = &main.row_slice(1).unwrap();
-
-    // First bus: multiset
-    // p' * multiset_removals = p * multiset_inserts
-    let multiset_inserts: EF = ((alpha
-        + beta_challenges[0]
-        + (EF::from_u64(3) + EF::from(main_current[1].clone())) * beta_challenges[1]
-        + EF::from(main_current[0].clone()) * beta_challenges[2])
-        * EF::from(main_current[2].clone())
-        + EF::ONE
-        - EF::from(main_current[2].clone()))
-        * ((alpha
-            + beta_challenges[0].double()
-            + EF::from(main_current[1].clone()) * beta_challenges[1])
-            * (EF::ONE - EF::from(main_current[2].clone()))
-            + EF::from(main_current[2].clone()));
-    let multiset_removals: EF = ((alpha
-        + beta_challenges[0]
-        + (EF::from_u64(3) + EF::from(main_current[1].clone())) * beta_challenges[1]
-        + EF::from(main_current[1].clone()) * beta_challenges[2])
-        * EF::from(main_current[3].clone())
-        + EF::ONE
-        - EF::from(main_current[3].clone()))
-        * ((alpha
-            + beta_challenges[0].double()
-            + EF::from(main_current[0].clone()) * beta_challenges[1])
-            * (EF::ONE - EF::from(main_current[3].clone()))
-            + EF::from(main_current[3].clone()));
-    let multiset_current = EF::from(aux_current[0].clone());
-    let multiset_next = multiset_current * multiset_inserts * multiset_removals.inverse();
-
-    // Second bus: logup
-    // 0 = A * q + B + C - D * q' - E;
-    let a: EF = (alpha
-        + EF::from_u64(3) * beta_challenges[0]
-        + EF::from(main_current[0].clone()) * beta_challenges[1])
-        * (alpha
-            + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[0].clone()) * beta_challenges[1])
-        * (alpha
-            + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[1].clone()) * beta_challenges[1]);
-    let b: EF = (alpha
-        + EF::from_u64(3) * beta_challenges[0]
-        + EF::from(main_current[0].clone()) * beta_challenges[1])
-        * (alpha
-            + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[1].clone()) * beta_challenges[1])
-        * EF::from(main_current[4].clone());
-    let c: EF = (alpha
-        + EF::from_u64(3) * beta_challenges[0]
-        + EF::from(main_current[0].clone()) * beta_challenges[1])
-        * (alpha
-            + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[1].clone()) * beta_challenges[1])
-        * EF::from(main_current[5].clone());
-    let d: EF = (alpha
-        + EF::from_u64(3) * beta_challenges[0]
-        + EF::from(main_current[0].clone()) * beta_challenges[1])
-        * (alpha
-            + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[0].clone()) * beta_challenges[1])
-        * (alpha
-            + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[1].clone()) * beta_challenges[1]);
-    let e: EF = (alpha
-        + EF::from_u64(3) * beta_challenges[0]
-        + EF::from(main_current[0].clone()) * beta_challenges[1])
-        * (alpha
-            + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[0].clone()) * beta_challenges[1])
-        * EF::from(main_current[6].clone());
-    let logup_current = EF::from(aux_current[1].clone());
-    let logup_next = (a * logup_current + b + c - e) * d.inverse();
-
-    // Dummy implementation for illustration purposes.
-    [multiset_next, logup_next]
-}
 
 pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
     air: &A,
@@ -245,9 +155,10 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
     permutation_randomness.push(alpha);
     permutation_randomness.extend_from_slice(beta_powers.as_slice());
 
-    let initial_aux = [EF::ONE, EF::ZERO];
-
-    let mut current_aux_values = initial_aux.clone();
+    let aux_trace = air.build_aux_trace::<DebugConstraintBuilderWithAirScriptTraits<'_, F, EF>>(
+        main,
+        &permutation_randomness,
+    );
 
     (0..height).for_each(|i| {
         let i_next = (i + 1) % height;
@@ -262,22 +173,11 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
         let periodic_columns: Vec<_> =
             air.periodic_table().iter().map(|col| col[i % col.len()]).collect();
 
-        let aux_local = current_aux_values;
-        if air.aux_width() > 0 && i != height - 1 {
-            current_aux_values =
-                compute_aux_transition::<F, EF>(main, alpha, beta_powers.clone(), aux_local);
-        }
-        let aux_next = current_aux_values;
-        let aux = VerticalPair::new(
-            RowMajorMatrixView::new_row(&aux_local),
-            RowMajorMatrixView::new_row(&aux_next),
-        );
-
         let mut builder = DebugConstraintBuilderWithAirScriptTraits {
             row_index: i,
             main,
             preprocessed: main,
-            aux,
+            aux: None,
             public_values,
             is_first_row: F::from_bool(i == 0),
             is_last_row: F::from_bool(i == height - 1),
@@ -287,6 +187,17 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             aux_bus_boundary_values: aux_bus_boundary_values.clone(),
         };
 
-        air.eval(&mut builder);
+        if let Some(aux_trace) = &aux_trace {
+            let aux_local = aux_trace.row_slice(i).unwrap(); // i < height so unwrap should never fail.
+            let aux_next = aux_trace.row_slice(i_next).unwrap(); // i_next < height so unwrap should never fail.
+            let aux = Some(VerticalPair::new(
+                RowMajorMatrixView::new_row(&*aux_local),
+                RowMajorMatrixView::new_row(&*aux_next),
+            ));
+            builder.aux = aux;
+            air.eval(&mut builder);
+        } else {
+            air.eval(&mut builder);
+        }
     });
 }
