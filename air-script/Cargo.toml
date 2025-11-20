@@ -54,6 +54,7 @@ p3-field = { package = "p3-field", git="https://github.com/massalabs/Plonky3", r
 p3-fri = { package = "p3-fri", git="https://github.com/massalabs/Plonky3", rev = "3bb26e1011e00afc2a07eb0b019a0e351dbfbd19", default-features = false }
 p3-matrix = { package = "p3-matrix", git="https://github.com/massalabs/Plonky3", rev = "3bb26e1011e00afc2a07eb0b019a0e351dbfbd19", default-features = false }
 p3-merkle-tree = { package = "p3-merkle-tree", git="https://github.com/massalabs/Plonky3", rev = "3bb26e1011e00afc2a07eb0b019a0e351dbfbd19", default-features = false }
+p3-miden-air = { package = "miden-air", git="https://github.com/massalabs/Plonky3", rev = "3bb26e1011e00afc2a07eb0b019a0e351dbfbd19", default-features = false }
 p3-goldilocks = { package = "p3-goldilocks", git="https://github.com/massalabs/Plonky3", rev = "3bb26e1011e00afc2a07eb0b019a0e351dbfbd19", default-features = false }
 p3-sha256 = { package = "p3-sha256", git="https://github.com/massalabs/Plonky3", rev = "3bb26e1011e00afc2a07eb0b019a0e351dbfbd19", default-features = false }
 p3-symmetric = { package = "p3-symmetric", git="https://github.com/massalabs/Plonky3", rev = "3bb26e1011e00afc2a07eb0b019a0e351dbfbd19", default-features = false }
