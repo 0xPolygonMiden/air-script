@@ -78,7 +78,7 @@ impl Codegen for Value {
             Value::PeriodicColumn(pc) => {
                 let index =
                     ir.periodic_columns.iter().position(|(qid, _)| qid == &pc.name).unwrap();
-                format!("AB::ExprEF::from(periodic_values[{index}].clone().into())")
+                format!("periodic_values[{index}].clone().into()")
             },
             Value::PublicInputTable(public_input_table_access) => {
                 let idx = ir
@@ -149,7 +149,7 @@ pub fn needs_extension_field(ir: &Air, expr_root: NodeIndex) -> bool {
         Operation::Value(value) => match value {
             Value::TraceAccess(trace_access) => trace_access.segment == TraceSegmentId::Aux,
             Value::Constant(_) => false,
-            Value::PeriodicColumn(_) => true,
+            Value::PeriodicColumn(_) => false,
             Value::PublicInput(_) => false,
             Value::PublicInputTable(_) => true,
             Value::RandomValue(_) => true,

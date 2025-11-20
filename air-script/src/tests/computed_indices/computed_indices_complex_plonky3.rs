@@ -1,7 +1,6 @@
 use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_miden_air::{MidenAir, MidenAirBuilder};
-use crate::test_utils::plonky3_traits::AirScriptAir;
 
 pub const MAIN_WIDTH: usize = 4;
 pub const AUX_WIDTH: usize = 0;
@@ -41,15 +40,5 @@ where F: Field,
         // Aux boundary constraints
 
         // Aux integrity/transition constraints
-    }
-}
-
-impl<F: Field, EF: ExtensionField<F>> AirScriptAir<F, EF> for ComputedIndicesAir {
-    fn num_beta_challenges(&self) -> usize {
-        NUM_BETA_CHALLENGES
-    }
-
-    fn periodic_table(&self) -> Vec<Vec<F>> {
-        vec![]
     }
 }

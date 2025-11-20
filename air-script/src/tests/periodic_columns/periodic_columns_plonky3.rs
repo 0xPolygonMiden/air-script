@@ -1,7 +1,6 @@
 use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_miden_air::{MidenAir, MidenAirBuilder};
-use crate::test_utils::plonky3_traits::AirScriptAir;
 
 pub const MAIN_WIDTH: usize = 3;
 pub const AUX_WIDTH: usize = 0;
@@ -20,6 +19,17 @@ where F: Field,
         MAIN_WIDTH
     }
 
+    fn num_public_values(&self) -> usize {
+        NUM_PUBLIC_VALUES
+    }
+
+    fn periodic_table(&self) -> Vec<Vec<F>> {
+        vec![
+            vec![F::from_u64(1), F::from_u64(0), F::from_u64(0), F::from_u64(0)],
+            vec![F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(0)],
+        ]
+    }
+
     fn eval<AB>(&self, builder: &mut AB)
     where AB: MidenAirBuilder<F = F, EF = EF>,
     {
@@ -36,24 +46,11 @@ where F: Field,
         builder.when_first_row().assert_zero(main_current[0].clone().into());
 
         // Main integrity/transition constraints
-        builder.assert_zero_ext(AB::ExprEF::from(periodic_values[0].clone().into()) * (AB::ExprEF::from(main_current[1].clone().into()) + AB::ExprEF::from(main_current[2].clone().into())));
-        builder.when_transition().assert_zero_ext(AB::ExprEF::from(periodic_values[1].clone().into()) * (AB::ExprEF::from(main_next[0].clone().into()) - AB::ExprEF::from(main_current[0].clone().into())));
+        builder.assert_zero(periodic_values[0].clone().into() * (main_current[1].clone().into() + main_current[2].clone().into()));
+        builder.when_transition().assert_zero(periodic_values[1].clone().into() * (main_next[0].clone().into() - main_current[0].clone().into()));
 
         // Aux boundary constraints
 
         // Aux integrity/transition constraints
-    }
-}
-
-impl<F: Field, EF: ExtensionField<F>> AirScriptAir<F, EF> for PeriodicColumnsAir {
-    fn num_beta_challenges(&self) -> usize {
-        NUM_BETA_CHALLENGES
-    }
-
-    fn periodic_table(&self) -> Vec<Vec<F>> {
-        vec![
-            vec![F::from_u64(1), F::from_u64(0), F::from_u64(0), F::from_u64(0)],
-            vec![F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(1), F::from_u64(0)],
-        ]
     }
 }

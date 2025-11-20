@@ -6,17 +6,6 @@ use p3_matrix::{
 };
 use p3_miden_air::{MidenAir, MidenAirBuilder, impl_p3_air_builder_traits};
 
-/// Additional trait for AirScript AIRs.
-pub trait AirScriptAir<F: Field, EF: ExtensionField<F>>: MidenAir<F, EF> {
-    /// Number of beta challenges used in the AIR.
-    fn num_beta_challenges(&self) -> usize {
-        0
-    }
-
-    /// Periodic constants (base-field) backing periodic_evals().
-    fn periodic_table(&self) -> Vec<Vec<F>>;
-}
-
 /// Target trait for AirScript codegen. Implemented by the prover.
 pub trait AirScriptBuilder: MidenAirBuilder
 where
@@ -58,13 +47,7 @@ pub struct DebugConstraintBuilderWithAirScriptTraits<'a, F: Field, EF: Extension
     /// A flag indicating whether this is a transition row (not the last row).
     is_transition: F,
     /// The periodic columns provided for constraint validation.
-    periodic_columns: Vec<EF>,
-    /// The alpha challenge in the extension field.
-    alpha: EF,
-    /// The beta challenge in the extension field.
-    beta: EF,
-    /// The beta powers in the extension field.
-    beta_powers: Vec<EF>,
+    periodic_columns: Vec<F>,
     /// The permutation randomness in the extension field.
     permutation_randomness: Vec<EF>,
     /// The aux bus boundary values in the extension field.
@@ -115,6 +98,10 @@ where
         self.public_values
     }
 
+    fn periodic_evals(&self) -> &[<Self as MidenAirBuilder>::F] {
+        self.periodic_columns.as_slice()
+    }
+
     fn preprocessed(&self) -> Self::M {
         self.preprocessed
     }
@@ -138,35 +125,13 @@ where
     fn permutation_randomness(&self) -> &[Self::RandomVar] {
         self.permutation_randomness.as_slice()
     }
-}
-
-impl_p3_air_builder_traits!(DebugConstraintBuilderWithAirScriptTraits<'a, F, EF> where F: Field, EF: ExtensionField<F>);
-
-impl<'a, F, EF> AirScriptBuilder for DebugConstraintBuilderWithAirScriptTraits<'a, F, EF>
-where
-    F: Field + Into<Self::Expr>,
-    EF: ExtensionField<F>,
-{
-    fn periodic_evals(&self) -> &[<Self as MidenAirBuilder>::VarEF] {
-        self.periodic_columns.as_slice()
-    }
-
-    fn alpha(&self) -> <Self as MidenAirBuilder>::VarEF {
-        self.alpha
-    }
-
-    fn beta_powers(&self) -> &[<Self as MidenAirBuilder>::VarEF] {
-        self.beta_powers.as_slice()
-    }
-
-    fn beta(&self) -> <Self as MidenAirBuilder>::VarEF {
-        self.beta
-    }
 
     fn aux_bus_boundary_values(&self) -> &[<Self as MidenAirBuilder>::VarEF] {
         self.aux_bus_boundary_values.as_slice()
     }
 }
+
+impl_p3_air_builder_traits!(DebugConstraintBuilderWithAirScriptTraits<'a, F, EF> where F: Field, EF: ExtensionField<F>);
 
 fn compute_aux_transition<F, EF>(
     main: VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>,
@@ -266,18 +231,17 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
     F: Field,
     EF: ExtensionField<F>,
     A: MidenAir<F, EF>,
-    A: for<'a> AirScriptAir<F, EF>,
 {
     let height = main.height();
 
     let aux_bus_boundary_values: Vec<_> = (0..air.aux_width()).map(|_| EF::GENERATOR).collect();
-    let alpha_f: Vec<F> = (0..5).map(|i| F::from_u64(123456789 * i)).collect(); // Dummy alpha in F
+    let alpha_f: Vec<F> = (0..2).map(|i| F::from_u64(123456789 * i)).collect(); // Dummy alpha in F
     let alpha = EF::from_basis_coefficients_iter(alpha_f.iter().cloned()).unwrap();
     let beta = EF::from_u64(987654321);
-    let beta_powers: Vec<EF> = (0..air.num_beta_challenges())
-        .map(|power| alpha.exp_u64(power as u64))
+    let beta_powers: Vec<EF> = (0..(air.num_randomness().saturating_sub(1)))
+        .map(|power| beta.exp_u64(power as u64))
         .collect();
-    let mut permutation_randomness = Vec::with_capacity(1 + beta_powers.len());
+    let mut permutation_randomness = Vec::with_capacity(air.num_randomness());
     permutation_randomness.push(alpha);
     permutation_randomness.extend_from_slice(beta_powers.as_slice());
 
@@ -295,10 +259,8 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             RowMajorMatrixView::new_row(&*main_next),
         );
 
-        let periodic_columns_base: Vec<_> =
+        let periodic_columns: Vec<_> =
             air.periodic_table().iter().map(|col| col[i % col.len()]).collect();
-        let periodic_columns: Vec<EF> =
-            periodic_columns_base.iter().map(|&v| EF::from(v)).collect();
 
         let aux_local = current_aux_values;
         if air.aux_width() > 0 && i != height - 1 {
@@ -321,9 +283,6 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             is_last_row: F::from_bool(i == height - 1),
             is_transition: F::from_bool(i != height - 1),
             periodic_columns,
-            alpha,
-            beta,
-            beta_powers: beta_powers.clone(),
             permutation_randomness: permutation_randomness.clone(),
             aux_bus_boundary_values: aux_bus_boundary_values.clone(),
         };

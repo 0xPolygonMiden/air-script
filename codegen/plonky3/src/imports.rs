@@ -9,5 +9,4 @@ pub(super) fn add_imports(scope: &mut Scope) {
     scope.import("p3_matrix", "Matrix");
     scope.import("p3_miden_air", "MidenAir");
     scope.import("p3_miden_air", "MidenAirBuilder");
-    scope.import("crate::test_utils::plonky3_traits", "AirScriptAir");
 }

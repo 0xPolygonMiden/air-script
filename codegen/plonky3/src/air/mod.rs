@@ -29,12 +29,6 @@ pub(super) fn add_air(scope: &mut Scope, ir: &Air) {
 
     // add the Air struct and its base implementation.
     add_air_struct(scope, ir, name);
-
-    // add AirScriptAir trait implementation for the provided AirIR.
-    add_air_script_trait(scope, ir, name);
-
-    // add Plonky3 AirBuilder trait implementation for the provided AirIR.
-    /* add_air_trait(scope, name); */
 }
 
 /// Updates the provided scope with constants needed for the custom Air struct and trait
@@ -74,17 +68,52 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         .bound("EF", "ExtensionField<F>")
         .impl_trait("MidenAir<F, EF>");
 
+    // add the width function
     miden_air_impl.new_fn("width").arg_ref_self().ret("usize").line("MAIN_WIDTH");
 
-    /*// add the custom BaseAirWithPublicValues implementation block
-    let base_air_with_public_values_impl =
-        scope.new_impl(name).generic("F").impl_trait("BaseAirWithPublicValues<F>");
-    base_air_with_public_values_impl
-        .new_fn("num_public_values")
-        .arg_ref_self()
-        .ret("usize")
-        .line("NUM_PUBLIC_VALUES");
-    */
+    // add the preprocessed_trace_function if needed (for now, never needed)
+    // miden_air_impl.new_fn("preprocessed_trace").arg_ref_self().ret("Option<RowMajorMatrix<F>>").
+    // line("None");
+
+    // add the num_public_values function if needed
+    if ir.periodic_columns().count() > 0 {
+        // add the custom BaseAirWithPublicValues implementation block
+        miden_air_impl
+            .new_fn("num_public_values")
+            .arg_ref_self()
+            .ret("usize")
+            .line("NUM_PUBLIC_VALUES");
+    }
+
+    // add the periodic_table function if needed
+    if ir.periodic_columns().count() > 0 {
+        let periodic_table_func =
+            miden_air_impl.new_fn("periodic_table").arg_ref_self().ret("Vec<Vec<F>>");
+        periodic_table_func.line("vec![");
+        for col in ir.periodic_columns() {
+            let values_str = col.values
+                .iter()
+                .map(|v| format!("F::from_u64({v})")) // or use a custom formatter if needed
+                .collect::<Vec<_>>()
+                .join(", ");
+            periodic_table_func.line(format!("    vec![{values_str}],"));
+        }
+        periodic_table_func.line("]");
+    }
+
+    // add the num_randomness and aux_width functions if needed
+    if ir.num_random_values > 0 {
+        miden_air_impl
+            .new_fn("num_randomness")
+            .arg_ref_self()
+            .ret("usize")
+            .line("1 + NUM_BETA_CHALLENGES");
+
+        miden_air_impl.new_fn("aux_width").arg_ref_self().ret("usize").line("AUX_WIDTH");
+    }
+
+    // For now, don't provide the build_aux_trace and with_aux_builder functions.
+    // TODO: add them
 
     // add the eval function
     let eval_func = miden_air_impl
@@ -107,8 +136,8 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
 
     // Only had aux if there are random values
     if ir.num_random_values > 0 {
-        eval_func.line("let (alpha, beta_challenges) = builder.permutation_randomness().split_first().unwrap();");
-        eval_func.line("let beta_challenges: [_; NUM_BETA_CHALLENGES] = beta_challenges.try_into().expect(\"Wrong number of beta challenges\");");
+        eval_func.line("let (&alpha, beta_challenges) = builder.permutation_randomness().split_first().unwrap();");
+        eval_func.line("let beta_challenges: [_; NUM_BETA_CHALLENGES] = beta_challenges.try_into().expect(\"Wrong number of randomness\");");
         eval_func.line("let aux_bus_boundary_values: [_; AUX_WIDTH] = builder.aux_bus_boundary_values().try_into().expect(\"Wrong number of aux bus boundary values\");");
         eval_func.line("let aux = builder.permutation();");
         eval_func.line("let (aux_current, aux_next) = (");
@@ -124,38 +153,4 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     add_aux_boundary_constraints(eval_func, ir);
 
     add_aux_integrity_constraints(eval_func, ir);
-}
-
-fn add_air_script_trait(scope: &mut Scope, ir: &Air, name: &str) {
-    // add the custom AirScriptAir implementation block
-    let air_script_impl = scope
-        .new_impl(name)
-        .generic("F: Field")
-        .generic("EF: ExtensionField<F>")
-        .impl_trait("AirScriptAir<F, EF>");
-
-    // add the num_beta_challenges function
-    air_script_impl
-        .new_fn("num_beta_challenges")
-        .arg_ref_self()
-        .ret("usize")
-        .line("NUM_BETA_CHALLENGES");
-
-    // add the periodic_table function
-    let periodic_table_func =
-        air_script_impl.new_fn("periodic_table").arg_ref_self().ret("Vec<Vec<F>>");
-    if ir.periodic_columns().count() == 0 {
-        periodic_table_func.line("vec![]");
-    } else {
-        periodic_table_func.line("vec![");
-        for col in ir.periodic_columns() {
-            let values_str = col.values
-                .iter()
-                .map(|v| format!("F::from_u64({v})")) // or use a custom formatter if needed
-                .collect::<Vec<_>>()
-                .join(", ");
-            periodic_table_func.line(format!("    vec![{values_str}],"));
-        }
-        periodic_table_func.line("]");
-    }
 }
