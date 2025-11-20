@@ -28,6 +28,7 @@ impl Codegen for TraceAccess {
         match elem_type {
             ElemType::Base => format!("{frame}_{row_offset}.clone().into()"),
             ElemType::Ext => format!("AB::ExprEF::from({frame}_{row_offset}.clone().into())"),
+            ElemType::ExtFieldElem => format!("AB::EF::from({frame}_{row_offset}.clone())"),
         }
     }
 }
@@ -56,14 +57,17 @@ impl Codegen for Value {
             Value::Constant(0) => match elem_type {
                 ElemType::Base => format!("AB::Expr::ZERO"),
                 ElemType::Ext => format!("AB::ExprEF::ZERO"),
+                ElemType::ExtFieldElem => format!("AB::EF::ZERO"),
             },
             Value::Constant(1) => match elem_type {
                 ElemType::Base => format!("AB::Expr::ONE"),
                 ElemType::Ext => format!("AB::ExprEF::ONE"),
+                ElemType::ExtFieldElem => format!("AB::EF::ONE"),
             },
             Value::Constant(value) => match elem_type {
                 ElemType::Base => format!("AB::Expr::from_u64({value})"),
                 ElemType::Ext => format!("AB::ExprEF::from_u64({value})"),
+                ElemType::ExtFieldElem => format!("AB::EF::from_u64({value})"),
             },
             Value::TraceAccess(trace_access) => trace_access.to_string(ir, elem_type),
             Value::PublicInput(air_ir::PublicInputAccess { name, index }) => {
@@ -78,7 +82,13 @@ impl Codegen for Value {
             Value::PeriodicColumn(pc) => {
                 let index =
                     ir.periodic_columns.iter().position(|(qid, _)| qid == &pc.name).unwrap();
-                format!("periodic_values[{index}].clone().into()")
+                match elem_type {
+                    ElemType::Base => format!("AB::Expr::from(periodic_values[{index}].clone())"),
+                    ElemType::Ext => format!("AB::ExprEF::from(periodic_values[{index}].clone())"),
+                    ElemType::ExtFieldElem => {
+                        format!("AB::EF::from(periodic_values[{index}].clone())")
+                    },
+                }
             },
             Value::PublicInputTable(public_input_table_access) => {
                 let idx = ir
@@ -90,9 +100,17 @@ impl Codegen for Value {
             },
             Value::RandomValue(idx) => {
                 if *idx == 0 {
-                    format!("alpha.into()")
+                    if let ElemType::ExtFieldElem = elem_type {
+                        format!("alpha")
+                    } else {
+                        format!("alpha.into()")
+                    }
                 } else {
-                    format!("beta_challenges[{}].into()", idx - 1)
+                    if let ElemType::ExtFieldElem = elem_type {
+                        format!("beta_challenges[{}]", idx - 1)
+                    } else {
+                        format!("beta_challenges[{}].into()", idx - 1)
+                    }
                 }
             },
         }

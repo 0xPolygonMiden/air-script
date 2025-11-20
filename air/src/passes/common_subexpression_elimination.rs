@@ -32,6 +32,28 @@ impl Pass for CommonSubexpressionElimination<'_> {
         // Update constraints with the new node indices
         ir.constraints.renumber_and_deduplicate_constraints(&renumbering_map);
 
+        // Iterate over all bus transition expression and renumber their node indices
+        for (_, value) in ir.buses_initial_values.iter_mut() {
+            let new_value_index = *renumbering_map
+                .get(value)
+                .expect("Error: cannot find value index in renumbering map");
+            *value = new_value_index;
+        }
+
+        // Iterate over all bus transition expression and renumber their node indices
+        for (_, (numerator, denominator)) in ir.buses_transitions.iter_mut() {
+            let new_numerator_index = *renumbering_map
+                .get(numerator)
+                .expect("Error: cannot find numerator index in renumbering map");
+            *numerator = new_numerator_index;
+            if let Some(denominator) = denominator {
+                let new_denominator_index = *renumbering_map
+                    .get(denominator)
+                    .expect("Error: cannot find denominator index in renumbering map");
+                *denominator = new_denominator_index;
+            }
+        }
+
         Ok(ir)
     }
 }

@@ -7,6 +7,7 @@ use air_ir::Air;
 use super::Scope;
 use crate::air::{
     boundary_constraints::{add_aux_boundary_constraints, add_main_boundary_constraints},
+    graph::Codegen,
     integrity_constraints::{add_aux_integrity_constraints, add_main_integrity_constraints},
 };
 
@@ -14,6 +15,7 @@ use crate::air::{
 pub enum ElemType {
     Base,
     Ext,
+    ExtFieldElem,
 }
 
 // HELPERS TO GENERATE AN IMPLEMENTATION OF THE PLONKY3 AIR TRAIT
@@ -29,6 +31,11 @@ pub(super) fn add_air(scope: &mut Scope, ir: &Air) {
 
     // add the Air struct and its base implementation.
     add_air_struct(scope, ir, name);
+
+    // add the aux trace generation utils if needed
+    if ir.num_random_values > 0 {
+        add_aux_trace_utils(scope, ir, name);
+    }
 }
 
 /// Updates the provided scope with constants needed for the custom Air struct and trait
@@ -123,10 +130,8 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         .arg_ref_self()
         .arg("builder", "&mut AB");
     eval_func.line("let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect(\"Wrong number of public values\");");
-    //eval_func.line("let periodic_values: [_; NUM_PERIODIC_VALUES] =
-    // builder.periodic_evals().try_into().expect(\"Wrong number of periodic values\");");
+    eval_func.line("let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect(\"Wrong number of periodic values\");");
     eval_func.line("let preprocessed = builder.preprocessed();");
-    eval_func.line("let periodic_values = preprocessed.row_slice(0).unwrap();");
 
     eval_func.line("let main = builder.main();");
     eval_func.line("let (main_current, main_next) = (");
@@ -153,4 +158,67 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     add_aux_boundary_constraints(eval_func, ir);
 
     add_aux_integrity_constraints(eval_func, ir);
+}
+
+/// Updates the provided scope with aux trace generation utilities.
+fn add_aux_trace_utils(scope: &mut Scope, ir: &Air, name: &str) {
+    let aux_generation_impl = scope.new_impl(name);
+
+    // add the bus_initial_values function
+    let buses_initial_values_func = aux_generation_impl
+        .new_fn("buses_initial_values")
+        .generic("F")
+        .generic("EF")
+        .generic("AB")
+        .bound("F", "Field")
+        .bound("EF", "ExtensionField<F>")
+        .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
+        .ret("Vec<AB::ExprEF>");
+    buses_initial_values_func.line("vec![");
+    for (_bus_id, value) in ir.buses_initial_values.iter() {
+        let value_str = value.to_string(ir, ElemType::Ext);
+
+        buses_initial_values_func.line(format!("    {},", value_str));
+    }
+    buses_initial_values_func.line("]");
+
+    // add the bus_transitions function
+    let buses_transitions_func = aux_generation_impl
+        .new_fn("buses_transitions")
+        .generic("F")
+        .generic("EF")
+        .generic("AB")
+        .bound("F", "Field")
+        .bound("EF", "ExtensionField<F>")
+        .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
+        .arg("main", "&RowMajorMatrix<F>")
+        .arg("challenges", "&[EF]")
+        .arg("periodic_evals", "&[F]")
+        .arg("aux_current", "RowMajorMatrixView<EF>")
+        .ret("Vec<EF>");
+
+    buses_transitions_func.line("let (main_current, main_next) = (");
+    buses_transitions_func.line("    main.row_slice(0).unwrap(),");
+    buses_transitions_func.line("    main.row_slice(1).unwrap(),");
+    buses_transitions_func.line(");");
+    buses_transitions_func.line("let aux_current = aux_current.row_slice(0).unwrap();");
+    buses_transitions_func
+        .line("let (&alpha, beta_challenges) = challenges.split_first().unwrap();");
+    buses_transitions_func.line("let beta_challenges: [_; NUM_BETA_CHALLENGES] = beta_challenges.try_into().expect(\"Wrong number of randomness\");");
+    buses_transitions_func.line("let periodic_values: [_; NUM_PERIODIC_VALUES] = periodic_evals.try_into().expect(\"Wrong number of periodic values\");");
+
+    buses_transitions_func.line("vec![");
+    for (_bus_id, (numerator, denominator)) in ir.buses_transitions.iter() {
+        let numerator_str = numerator.to_string(ir, ElemType::ExtFieldElem);
+
+        let aux_next_value_str = if let Some(denom) = denominator {
+            let denominator_str = denom.to_string(ir, ElemType::ExtFieldElem);
+            format!("{} * ({}).inverse()", numerator_str, denominator_str)
+        } else {
+            numerator_str
+        };
+
+        buses_transitions_func.line(format!("    {},", aux_next_value_str));
+    }
+    buses_transitions_func.line("]");
 }

@@ -1,6 +1,7 @@
 use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
-use p3_miden_air::{MidenAir, MidenAirBuilder};
+use p3_matrix::dense::RowMajorMatrixView;
+use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 14;
 pub const AUX_WIDTH: usize = 0;
@@ -34,8 +35,8 @@ where F: Field,
     where AB: MidenAirBuilder<F = F, EF = EF>,
     {
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
+        let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect("Wrong number of periodic values");
         let preprocessed = builder.preprocessed();
-        let periodic_values = preprocessed.row_slice(0).unwrap();
         let main = builder.main();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
@@ -47,7 +48,7 @@ where F: Field,
 
         // Main integrity/transition constraints
         builder.assert_zero(main_current[0].clone().into() * main_current[0].clone().into() - main_current[0].clone().into());
-        builder.when_transition().assert_zero(periodic_values[1].clone().into() * (main_next[0].clone().into() - main_current[0].clone().into()));
+        builder.when_transition().assert_zero(AB::Expr::from(periodic_values[1].clone()) * (main_next[0].clone().into() - main_current[0].clone().into()));
         builder.assert_zero(main_current[3].clone().into() * main_current[3].clone().into() - main_current[3].clone().into());
         builder.assert_zero(main_current[4].clone().into() * main_current[4].clone().into() - main_current[4].clone().into());
         builder.assert_zero(main_current[5].clone().into() * main_current[5].clone().into() - main_current[5].clone().into());
@@ -56,12 +57,12 @@ where F: Field,
         builder.assert_zero(main_current[8].clone().into() * main_current[8].clone().into() - main_current[8].clone().into());
         builder.assert_zero(main_current[9].clone().into() * main_current[9].clone().into() - main_current[9].clone().into());
         builder.assert_zero(main_current[10].clone().into() * main_current[10].clone().into() - main_current[10].clone().into());
-        builder.assert_zero(periodic_values[0].clone().into() * (main_current[1].clone().into() - (main_current[3].clone().into() + main_current[4].clone().into().double() + AB::Expr::from_u64(4) * main_current[5].clone().into() + AB::Expr::from_u64(8) * main_current[6].clone().into())));
-        builder.assert_zero(periodic_values[0].clone().into() * (main_current[2].clone().into() - (main_current[7].clone().into() + main_current[8].clone().into().double() + AB::Expr::from_u64(4) * main_current[9].clone().into() + AB::Expr::from_u64(8) * main_current[10].clone().into())));
-        builder.when_transition().assert_zero(periodic_values[1].clone().into() * (main_next[1].clone().into() - (main_current[1].clone().into() * AB::Expr::from_u64(16) + main_current[3].clone().into() + main_current[4].clone().into().double() + AB::Expr::from_u64(4) * main_current[5].clone().into() + AB::Expr::from_u64(8) * main_current[6].clone().into())));
-        builder.when_transition().assert_zero(periodic_values[1].clone().into() * (main_next[2].clone().into() - (main_current[2].clone().into() * AB::Expr::from_u64(16) + main_current[7].clone().into() + main_current[8].clone().into().double() + AB::Expr::from_u64(4) * main_current[9].clone().into() + AB::Expr::from_u64(8) * main_current[10].clone().into())));
-        builder.assert_zero(periodic_values[0].clone().into() * main_current[11].clone().into());
-        builder.when_transition().assert_zero(periodic_values[1].clone().into() * (main_current[12].clone().into() - main_next[11].clone().into()));
+        builder.assert_zero(AB::Expr::from(periodic_values[0].clone()) * (main_current[1].clone().into() - (main_current[3].clone().into() + main_current[4].clone().into().double() + AB::Expr::from_u64(4) * main_current[5].clone().into() + AB::Expr::from_u64(8) * main_current[6].clone().into())));
+        builder.assert_zero(AB::Expr::from(periodic_values[0].clone()) * (main_current[2].clone().into() - (main_current[7].clone().into() + main_current[8].clone().into().double() + AB::Expr::from_u64(4) * main_current[9].clone().into() + AB::Expr::from_u64(8) * main_current[10].clone().into())));
+        builder.when_transition().assert_zero(AB::Expr::from(periodic_values[1].clone()) * (main_next[1].clone().into() - (main_current[1].clone().into() * AB::Expr::from_u64(16) + main_current[3].clone().into() + main_current[4].clone().into().double() + AB::Expr::from_u64(4) * main_current[5].clone().into() + AB::Expr::from_u64(8) * main_current[6].clone().into())));
+        builder.when_transition().assert_zero(AB::Expr::from(periodic_values[1].clone()) * (main_next[2].clone().into() - (main_current[2].clone().into() * AB::Expr::from_u64(16) + main_current[7].clone().into() + main_current[8].clone().into().double() + AB::Expr::from_u64(4) * main_current[9].clone().into() + AB::Expr::from_u64(8) * main_current[10].clone().into())));
+        builder.assert_zero(AB::Expr::from(periodic_values[0].clone()) * main_current[11].clone().into());
+        builder.when_transition().assert_zero(AB::Expr::from(periodic_values[1].clone()) * (main_current[12].clone().into() - main_next[11].clone().into()));
         builder.assert_zero((AB::Expr::ONE - main_current[0].clone().into()) * (main_current[12].clone().into() - (main_current[11].clone().into() * AB::Expr::from_u64(16) + main_current[3].clone().into() * main_current[7].clone().into() + main_current[4].clone().into().double() * main_current[8].clone().into() + AB::Expr::from_u64(4) * main_current[5].clone().into() * main_current[9].clone().into() + AB::Expr::from_u64(8) * main_current[6].clone().into() * main_current[10].clone().into())) + main_current[0].clone().into() * (main_current[12].clone().into() - (main_current[11].clone().into() * AB::Expr::from_u64(16) + main_current[3].clone().into() + main_current[7].clone().into() - main_current[3].clone().into().double() * main_current[7].clone().into() + (main_current[4].clone().into() + main_current[8].clone().into() - main_current[4].clone().into().double() * main_current[8].clone().into()).double() + AB::Expr::from_u64(4) * (main_current[5].clone().into() + main_current[9].clone().into() - main_current[5].clone().into().double() * main_current[9].clone().into()) + AB::Expr::from_u64(8) * (main_current[6].clone().into() + main_current[10].clone().into() - main_current[6].clone().into().double() * main_current[10].clone().into()))));
 
         // Aux boundary constraints
