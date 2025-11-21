@@ -1,7 +1,6 @@
 use miden_air::{Felt, FieldElement, trace::main_trace::MainTrace};
 use miden_processor::{
-    ColMatrix, Kernel, PrecompileTranscriptState, QuadExtension,
-    chiplets::{ace::AceHints, aux_trace::AuxTraceBuilder},
+    AceHints, AuxTraceBuilder, ColMatrix, Kernel, PrecompileTranscriptState, QuadExtension,
 };
 use p3_field::{ExtensionField, Field, PrimeField64};
 use p3_matrix::Matrix;
