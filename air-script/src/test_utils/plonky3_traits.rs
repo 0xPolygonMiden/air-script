@@ -29,7 +29,7 @@ pub struct DebugConstraintBuilderWithAirScriptTraits<'a, F: Field, EF: Extension
     /// A flag indicating whether this is a transition row (not the last row).
     is_transition: F,
     /// The periodic columns provided for constraint validation.
-    periodic_columns: Vec<F>,
+    periodic_columns: Vec<EF>,
     /// The permutation randomness in the extension field.
     permutation_randomness: Vec<EF>,
     /// The aux bus boundary values in the extension field.
@@ -46,6 +46,7 @@ where
     type Var = F;
     type M = VerticalPair<DenseMatrix<F, &'a [F]>, DenseMatrix<F, &'a [F]>>;
     type PublicVar = F;
+    type PeriodicVal = EF;
     type EF = EF;
     type ExprEF = EF;
     type VarEF = EF;
@@ -80,7 +81,7 @@ where
         self.public_values
     }
 
-    fn periodic_evals(&self) -> &[<Self as MidenAirBuilder>::F] {
+    fn periodic_evals(&self) -> &[<Self as MidenAirBuilder>::PeriodicVal] {
         self.periodic_columns.as_slice()
     }
 
@@ -153,8 +154,10 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             RowMajorMatrixView::new(&[], 0),
         );
 
-        let periodic_columns: Vec<_> =
+        let periodic_columns_base: Vec<_> =
             air.periodic_table().iter().map(|col| col[i % col.len()]).collect();
+        let periodic_columns: Vec<EF> =
+            periodic_columns_base.iter().map(|&v| EF::from(v)).collect();
 
         let mut builder = DebugConstraintBuilderWithAirScriptTraits {
             row_index: i,

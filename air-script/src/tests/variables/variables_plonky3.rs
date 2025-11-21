@@ -49,7 +49,7 @@ where F: Field,
 
         // Main integrity/transition constraints
         builder.assert_zero(main_current[0].clone().into() * main_current[0].clone().into() - main_current[0].clone().into());
-        builder.when_transition().assert_zero(AB::Expr::from(periodic_values[0].clone()) * (main_next[0].clone().into() - main_current[0].clone().into()));
+        builder.when_transition().assert_zero_ext(AB::ExprEF::from(periodic_values[0].clone().into()) * (AB::ExprEF::from(main_next[0].clone().into()) - AB::ExprEF::from(main_current[0].clone().into())));
         builder.assert_zero((AB::Expr::ONE - main_current[0].clone().into()) * (main_current[3].clone().into() - main_current[1].clone().into() - main_current[2].clone().into()) - (AB::Expr::from_u64(6) - (AB::Expr::from_u64(7) - main_current[0].clone().into())));
         builder.when_transition().assert_zero(main_current[0].clone().into() * (main_current[3].clone().into() - main_current[1].clone().into() * main_current[2].clone().into()) - (AB::Expr::ONE - main_next[0].clone().into()));
 

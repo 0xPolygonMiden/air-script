@@ -48,8 +48,8 @@ where F: Field,
         builder.when_first_row().assert_zero(main_current[0].clone().into());
 
         // Main integrity/transition constraints
-        builder.assert_zero(AB::Expr::from(periodic_values[0].clone()) * (main_current[1].clone().into() + main_current[2].clone().into()));
-        builder.when_transition().assert_zero(AB::Expr::from(periodic_values[1].clone()) * (main_next[0].clone().into() - main_current[0].clone().into()));
+        builder.assert_zero_ext(AB::ExprEF::from(periodic_values[0].clone().into()) * (AB::ExprEF::from(main_current[1].clone().into()) + AB::ExprEF::from(main_current[2].clone().into())));
+        builder.when_transition().assert_zero_ext(AB::ExprEF::from(periodic_values[1].clone().into()) * (AB::ExprEF::from(main_next[0].clone().into()) - AB::ExprEF::from(main_current[0].clone().into())));
 
         // Aux boundary constraints
 
