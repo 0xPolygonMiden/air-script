@@ -1,0 +1,36 @@
+def CrossModuleTest
+
+# Import functions from test_utils module using cross-module syntax
+use test_utils::*;
+
+trace_columns {
+    main: [a, b, c, d],
+}
+
+public_inputs {
+    x: [1],
+}
+
+# Test function that uses cross-module calls
+fn test_cross_module_calls(x: felt, y: felt) -> felt {
+    # Direct calls to imported functions
+    let and_result = binary_and(x, y);
+    let or_result = binary_or(x, y);
+    let not_result = binary_not(x);
+
+    # Call function that returns array from test_utils
+    let flags = compute_flags(x, y);
+    let flag_a = flags[0];
+    let flag_b = flags[1];
+
+    return and_result + or_result + not_result + flag_a + flag_b;
+}
+
+boundary_constraints {
+    enf a.first = 0;
+}
+
+integrity_constraints {
+    # Use the cross-module function in constraints
+    enf a = test_cross_module_calls(b, c);
+}
