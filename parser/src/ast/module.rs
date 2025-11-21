@@ -635,7 +635,9 @@ impl Module {
         if id.is_uppercase() {
             self.constants.get(id).map(Export::Constant)
         } else {
-            self.evaluators.get(id).map(Export::Evaluator)
+            self.evaluators
+                .get(id)
+                .map(Export::Evaluator)
                 .or_else(|| self.functions.get(id).map(Export::Function))
         }
     }

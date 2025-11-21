@@ -1983,7 +1983,7 @@ impl SemanticAnalysis<'_> {
                             f.span(),
                             BindingType::Function(FunctionType::Function(
                                 f.param_types(),
-                                f.return_type
+                                f.return_type,
                             )),
                         )
                     })
