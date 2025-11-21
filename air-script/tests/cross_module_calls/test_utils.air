@@ -1,0 +1,20 @@
+# Utility module for cross-module testing
+mod test_utils
+
+fn binary_and(a: felt, b: felt) -> felt {
+    return a * b;
+}
+
+fn binary_or(a: felt, b: felt) -> felt {
+    return a + b - a * b;
+}
+
+fn binary_not(a: felt) -> felt {
+    return 1 - a;
+}
+
+fn compute_flags(x: felt, y: felt) -> felt[2] {
+    let flag_a = binary_and(x, y);
+    let flag_b = binary_or(x, y);
+    return [flag_a, flag_b];
+}
