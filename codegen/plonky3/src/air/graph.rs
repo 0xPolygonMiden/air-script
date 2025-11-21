@@ -84,7 +84,9 @@ impl Codegen for Value {
                     ir.periodic_columns.iter().position(|(qid, _)| qid == &pc.name).unwrap();
                 match elem_type {
                     ElemType::Base => format!("AB::Expr::from(periodic_values[{index}].clone())"),
-                    ElemType::Ext => format!("AB::ExprEF::from(periodic_values[{index}].clone().into())"),
+                    ElemType::Ext => {
+                        format!("AB::ExprEF::from(periodic_values[{index}].clone().into())")
+                    },
                     ElemType::ExtFieldElem => {
                         format!("AB::EF::from(periodic_values[{index}].clone())")
                     },
