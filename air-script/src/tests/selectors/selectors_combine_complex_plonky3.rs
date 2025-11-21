@@ -29,9 +29,7 @@ where F: Field,
         AUX_WIDTH
     }
 
-    fn build_aux_trace<AB>(&self, _main: &RowMajorMatrix<F>, _challenges: &[EF]) -> Option<RowMajorMatrix<EF>>
-    where AB: MidenAirBuilder<F = F, EF = EF>,
-    {
+    fn build_aux_trace(&self, _main: &RowMajorMatrix<F>, _challenges: &[EF]) -> Option<RowMajorMatrix<EF>> {
         let num_rows = _main.height();
         let trace_length = num_rows * AUX_WIDTH;
         let mut long_trace = EF::zero_vec(trace_length);
@@ -41,7 +39,7 @@ where F: Field,
         assert!(suffix.is_empty(), "Alignment should match");
         assert_eq!(rows.len(), num_rows);
         // Initialize first row
-        let initial_values = Self::buses_initial_values::<F, EF, AB>();
+        let initial_values = Self::buses_initial_values::<F, EF>();
         for j in 0..AUX_WIDTH {
             rows[0][j] = initial_values[j];
         }
@@ -56,7 +54,7 @@ where F: Field,
             );
             let periodic_values: [_; NUM_PERIODIC_VALUES] = <SelectorsAir as MidenAir<F, EF>>::periodic_table(self).iter().map(|col| col[i % col.len()]).collect::<Vec<_>>().try_into().expect("Wrong number of periodic values");
             let prev_row = &rows[i];
-            let next_row = Self::buses_transitions::<F, EF, AB>(
+            let next_row = Self::buses_transitions::<F, EF>(
                 &main,
                 _challenges,
                 &periodic_values,
@@ -107,20 +105,18 @@ where F: Field,
 }
 
 impl SelectorsAir {
-    fn buses_initial_values<F, EF, AB>() -> Vec<AB::EF>
+    fn buses_initial_values<F, EF>() -> Vec<EF>
     where F: Field,
           EF: ExtensionField<F>,
-          AB: MidenAirBuilder<F = F, EF = EF>,
     {
         vec![
-            AB::EF::ONE,
+            EF::ONE,
         ]
     }
 
-    fn buses_transitions<F, EF, AB>(main: &VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>, challenges: &[EF], periodic_evals: &[F], aux_current: &[EF]) -> Vec<EF>
+    fn buses_transitions<F, EF>(main: &VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>, challenges: &[EF], periodic_evals: &[F], aux_current: &[EF]) -> Vec<EF>
     where F: Field,
           EF: ExtensionField<F>,
-          AB: MidenAirBuilder<F = F, EF = EF>,
     {
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
@@ -130,7 +126,7 @@ impl SelectorsAir {
         let beta_challenges: [_; NUM_BETA_CHALLENGES] = beta_challenges.try_into().expect("Wrong number of randomness");
         let periodic_values: [_; NUM_PERIODIC_VALUES] = periodic_evals.try_into().expect("Wrong number of periodic values");
         vec![
-            (((alpha + beta_challenges[0] + beta_challenges[1].double()) * AB::EF::from(main_current[0].clone()) * AB::EF::from(main_current[5].clone()) + AB::EF::ONE - AB::EF::from(main_current[0].clone()) * AB::EF::from(main_current[5].clone())) * ((alpha + beta_challenges[0] + beta_challenges[1].double()) * (AB::EF::ONE - AB::EF::from(main_current[0].clone())) * AB::EF::from(main_current[1].clone()) * AB::EF::from(main_current[5].clone()) + AB::EF::ONE - (AB::EF::ONE - AB::EF::from(main_current[0].clone())) * AB::EF::from(main_current[1].clone()) * AB::EF::from(main_current[5].clone())) * AB::EF::from(aux_current[0].clone())) * ((alpha + AB::EF::from_u64(3) * beta_challenges[0] + AB::EF::from_u64(4) * beta_challenges[1]) * (AB::EF::ONE - AB::EF::from(main_current[0].clone())) * (AB::EF::ONE - AB::EF::from(main_current[1].clone())) * AB::EF::from(main_current[4].clone()) + AB::EF::ONE - (AB::EF::ONE - AB::EF::from(main_current[0].clone())) * (AB::EF::ONE - AB::EF::from(main_current[1].clone())) * AB::EF::from(main_current[4].clone())).inverse(),
+            (((alpha + beta_challenges[0] + beta_challenges[1].double()) * EF::from(main_current[0].clone()) * EF::from(main_current[5].clone()) + EF::ONE - EF::from(main_current[0].clone()) * EF::from(main_current[5].clone())) * ((alpha + beta_challenges[0] + beta_challenges[1].double()) * (EF::ONE - EF::from(main_current[0].clone())) * EF::from(main_current[1].clone()) * EF::from(main_current[5].clone()) + EF::ONE - (EF::ONE - EF::from(main_current[0].clone())) * EF::from(main_current[1].clone()) * EF::from(main_current[5].clone())) * EF::from(aux_current[0].clone())) * ((alpha + EF::from_u64(3) * beta_challenges[0] + EF::from_u64(4) * beta_challenges[1]) * (EF::ONE - EF::from(main_current[0].clone())) * (EF::ONE - EF::from(main_current[1].clone())) * EF::from(main_current[4].clone()) + EF::ONE - (EF::ONE - EF::from(main_current[0].clone())) * (EF::ONE - EF::from(main_current[1].clone())) * EF::from(main_current[4].clone())).inverse(),
         ]
     }
 }

@@ -123,13 +123,10 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     if ir.num_random_values > 0 {
         let build_aux_trace_func = miden_air_impl
             .new_fn("build_aux_trace")
-            .generic("AB")
-            .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
             .arg_ref_self()
             .arg("_main", "&RowMajorMatrix<F>")
             .arg("_challenges", "&[EF]")
             .ret("Option<RowMajorMatrix<EF>>");
-
         build_aux_trace_func.line("let num_rows = _main.height();");
         build_aux_trace_func.line("let trace_length = num_rows * AUX_WIDTH;");
         build_aux_trace_func.line("let mut long_trace = EF::zero_vec(trace_length);");
@@ -139,8 +136,7 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         build_aux_trace_func.line("assert!(suffix.is_empty(), \"Alignment should match\");");
         build_aux_trace_func.line("assert_eq!(rows.len(), num_rows);");
         build_aux_trace_func.line("// Initialize first row");
-        build_aux_trace_func
-            .line("let initial_values = Self::buses_initial_values::<F, EF, AB>();");
+        build_aux_trace_func.line("let initial_values = Self::buses_initial_values::<F, EF>();");
         build_aux_trace_func.line("for j in 0..AUX_WIDTH {");
         build_aux_trace_func.line("    rows[0][j] = initial_values[j];");
         build_aux_trace_func.line("}");
@@ -155,7 +151,7 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         build_aux_trace_func.line("    );");
         build_aux_trace_func.line(format!("    let periodic_values: [_; NUM_PERIODIC_VALUES] = <{name} as MidenAir<F, EF>>::periodic_table(self).iter().map(|col| col[i % col.len()]).collect::<Vec<_>>().try_into().expect(\"Wrong number of periodic values\");"));
         build_aux_trace_func.line("    let prev_row = &rows[i];");
-        build_aux_trace_func.line("    let next_row = Self::buses_transitions::<F, EF, AB>(");
+        build_aux_trace_func.line("    let next_row = Self::buses_transitions::<F, EF>(");
         build_aux_trace_func.line("        &main,");
         build_aux_trace_func.line("        _challenges,");
         build_aux_trace_func.line("        &periodic_values,");
@@ -215,11 +211,9 @@ fn add_aux_trace_utils(scope: &mut Scope, ir: &Air, name: &str) {
         .new_fn("buses_initial_values")
         .generic("F")
         .generic("EF")
-        .generic("AB")
         .bound("F", "Field")
         .bound("EF", "ExtensionField<F>")
-        .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
-        .ret("Vec<AB::EF>");
+        .ret("Vec<EF>");
     buses_initial_values_func.line("vec![");
     for (_bus_id, value) in ir.buses_initial_values.iter() {
         let value_str = value.to_string(ir, ElemType::ExtFieldElem);
@@ -233,10 +227,8 @@ fn add_aux_trace_utils(scope: &mut Scope, ir: &Air, name: &str) {
         .new_fn("buses_transitions")
         .generic("F")
         .generic("EF")
-        .generic("AB")
         .bound("F", "Field")
         .bound("EF", "ExtensionField<F>")
-        .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
         .arg("main", "&VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>")
         .arg("challenges", "&[EF]")
         .arg("periodic_evals", "&[F]")

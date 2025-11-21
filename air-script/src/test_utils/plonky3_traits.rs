@@ -6,24 +6,6 @@ use p3_matrix::{
 };
 use p3_miden_air::{MidenAir, MidenAirBuilder, impl_p3_air_builder_traits};
 
-/// Target trait for AirScript codegen. Implemented by the prover.
-pub trait AirScriptBuilder: MidenAirBuilder
-where
-    <Self as MidenAirBuilder>::F: Field,
-{
-    /// EF evaluations of periodic columns at the AIR’s random point (z). Order defined by
-    /// AirScript.
-    fn periodic_evals(&self) -> &[<Self as MidenAirBuilder>::VarEF];
-
-    /// Global challenges in EF. (We can provide defaults; details not important here.)
-    fn alpha(&self) -> <Self as MidenAirBuilder>::VarEF;
-    fn beta(&self) -> <Self as MidenAirBuilder>::VarEF;
-    fn beta_powers(&self) -> &[<Self as MidenAirBuilder>::VarEF];
-
-    /// Aux bus boundary values: EF finals, one per aux/bus column, carried in the proof.
-    fn aux_bus_boundary_values(&self) -> &[<Self as MidenAirBuilder>::VarEF];
-}
-
 /// A builder that runs constraint assertions during testing.
 ///
 /// Used in conjunction with [`check_constraints`] to simulate
@@ -119,7 +101,7 @@ where
     }
 
     fn permutation(&self) -> Self::MP {
-        self.aux.unwrap()
+        self.aux.expect("No aux trace available for this Air")
     }
 
     fn permutation_randomness(&self) -> &[Self::RandomVar] {
@@ -155,10 +137,7 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
     permutation_randomness.push(alpha);
     permutation_randomness.extend_from_slice(beta_powers.as_slice());
 
-    let aux_trace = air.build_aux_trace::<DebugConstraintBuilderWithAirScriptTraits<'_, F, EF>>(
-        main,
-        &permutation_randomness,
-    );
+    let aux_trace = air.build_aux_trace(main, &permutation_randomness);
 
     (0..height).for_each(|i| {
         let i_next = (i + 1) % height;
@@ -169,6 +148,10 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             RowMajorMatrixView::new_row(&*main_local),
             RowMajorMatrixView::new_row(&*main_next),
         );
+        let preprocessed = VerticalPair::new::<F>(
+            RowMajorMatrixView::new(&[], 0),
+            RowMajorMatrixView::new(&[], 0),
+        );
 
         let periodic_columns: Vec<_> =
             air.periodic_table().iter().map(|col| col[i % col.len()]).collect();
@@ -176,7 +159,7 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
         let mut builder = DebugConstraintBuilderWithAirScriptTraits {
             row_index: i,
             main,
-            preprocessed: main,
+            preprocessed,
             aux: None,
             public_values,
             is_first_row: F::from_bool(i == 0),

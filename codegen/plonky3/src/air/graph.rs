@@ -28,7 +28,7 @@ impl Codegen for TraceAccess {
         match elem_type {
             ElemType::Base => format!("{frame}_{row_offset}.clone().into()"),
             ElemType::Ext => format!("AB::ExprEF::from({frame}_{row_offset}.clone().into())"),
-            ElemType::ExtFieldElem => format!("AB::EF::from({frame}_{row_offset}.clone())"),
+            ElemType::ExtFieldElem => format!("EF::from({frame}_{row_offset}.clone())"),
         }
     }
 }
@@ -57,17 +57,17 @@ impl Codegen for Value {
             Value::Constant(0) => match elem_type {
                 ElemType::Base => format!("AB::Expr::ZERO"),
                 ElemType::Ext => format!("AB::ExprEF::ZERO"),
-                ElemType::ExtFieldElem => format!("AB::EF::ZERO"),
+                ElemType::ExtFieldElem => format!("EF::ZERO"),
             },
             Value::Constant(1) => match elem_type {
                 ElemType::Base => format!("AB::Expr::ONE"),
                 ElemType::Ext => format!("AB::ExprEF::ONE"),
-                ElemType::ExtFieldElem => format!("AB::EF::ONE"),
+                ElemType::ExtFieldElem => format!("EF::ONE"),
             },
             Value::Constant(value) => match elem_type {
                 ElemType::Base => format!("AB::Expr::from_u64({value})"),
                 ElemType::Ext => format!("AB::ExprEF::from_u64({value})"),
-                ElemType::ExtFieldElem => format!("AB::EF::from_u64({value})"),
+                ElemType::ExtFieldElem => format!("EF::from_u64({value})"),
             },
             Value::TraceAccess(trace_access) => trace_access.to_string(ir, elem_type),
             Value::PublicInput(air_ir::PublicInputAccess { name, index }) => {
