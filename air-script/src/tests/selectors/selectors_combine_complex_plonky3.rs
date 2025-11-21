@@ -30,6 +30,8 @@ where F: Field,
     }
 
     fn build_aux_trace(&self, _main: &RowMajorMatrix<F>, _challenges: &[EF]) -> Option<RowMajorMatrix<EF>> {
+        // Note: consider using Some(build_aux_trace_with_miden_vm::<F, EF>(_main, _challenges))
+
         let num_rows = _main.height();
         let trace_length = num_rows * AUX_WIDTH;
         let mut long_trace = EF::zero_vec(trace_length);

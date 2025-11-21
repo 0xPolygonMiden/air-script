@@ -60,6 +60,10 @@ p3-sha256 = { package = "p3-sha256", git="https://github.com/massalabs/Plonky3",
 p3-symmetric = { package = "p3-symmetric", git="https://github.com/massalabs/Plonky3", rev = "064a1a5d2c5701ecf1dc38602c307beb50ed2baa", default-features = false }
 p3-uni-stark = { package = "p3-uni-stark", git="https://github.com/massalabs/Plonky3", rev = "064a1a5d2c5701ecf1dc38602c307beb50ed2baa", default-features = false }
 
+# Path dependency to change the visibility of some structs
+miden-processor = { package = "miden-processor", path = "../../miden-vm/processor", default-features = false }
+miden-air = { package = "miden-air", path = "../../miden-vm/air", default-features = false }
+
 winter-air = { package = "winter-air", version = "0.12", default-features = false }
 winter-math = { package = "winter-math", version = "0.12", default-features = false }
 winter-utils = { package = "winter-utils", version = "0.12", default-features = false }
