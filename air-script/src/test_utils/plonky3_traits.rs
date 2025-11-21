@@ -19,7 +19,7 @@ pub struct DebugConstraintBuilderWithAirScriptTraits<'a, F: Field, EF: Extension
     /// A view of the current and next preprocessed row as a vertical pair.
     preprocessed: VerticalPair<RowMajorMatrixView<'a, F>, RowMajorMatrixView<'a, F>>,
     /// A view of the current and next aux row as a vertical pair.
-    aux: Option<VerticalPair<RowMajorMatrixView<'a, EF>, RowMajorMatrixView<'a, EF>>>,
+    aux: VerticalPair<RowMajorMatrixView<'a, EF>, RowMajorMatrixView<'a, EF>>,
     /// The public values provided for constraint validation (e.g. inputs or outputs).
     public_values: &'a [F],
     /// A flag indicating whether this is the first row.
@@ -102,7 +102,7 @@ where
     }
 
     fn permutation(&self) -> Self::MP {
-        self.aux.expect("No aux trace available for this Air")
+        self.aux
     }
 
     fn permutation_randomness(&self) -> &[Self::RandomVar] {
@@ -138,7 +138,9 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
     permutation_randomness.push(alpha);
     permutation_randomness.extend_from_slice(beta_powers.as_slice());
 
-    let aux_trace = air.build_aux_trace(main, &permutation_randomness);
+    let aux_trace = air
+        .build_aux_trace(main, &permutation_randomness)
+        .unwrap_or(DenseMatrix::default(0, height));
 
     (0..height).for_each(|i| {
         let i_next = (i + 1) % height;
@@ -148,6 +150,14 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
         let main = VerticalPair::new(
             RowMajorMatrixView::new_row(&*main_local),
             RowMajorMatrixView::new_row(&*main_next),
+        );
+        let aux_local_ref = aux_trace.row_slice(i);
+        let aux_next_ref = aux_trace.row_slice(i_next);
+        let aux_local = aux_local_ref.as_deref().unwrap_or_default();
+        let aux_next = aux_next_ref.as_deref().unwrap_or_default();
+        let aux = VerticalPair::new(
+            RowMajorMatrixView::new_row(&*aux_local),
+            RowMajorMatrixView::new_row(&*aux_next),
         );
         let preprocessed = VerticalPair::new::<F>(
             RowMajorMatrixView::new(&[], 0),
@@ -163,7 +173,7 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             row_index: i,
             main,
             preprocessed,
-            aux: None,
+            aux,
             public_values,
             is_first_row: F::from_bool(i == 0),
             is_last_row: F::from_bool(i == height - 1),
@@ -172,18 +182,6 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
             permutation_randomness: permutation_randomness.clone(),
             aux_bus_boundary_values: aux_bus_boundary_values.clone(),
         };
-
-        if let Some(aux_trace) = &aux_trace {
-            let aux_local = aux_trace.row_slice(i).unwrap(); // i < height so unwrap should never fail.
-            let aux_next = aux_trace.row_slice(i_next).unwrap(); // i_next < height so unwrap should never fail.
-            let aux = Some(VerticalPair::new(
-                RowMajorMatrixView::new_row(&*aux_local),
-                RowMajorMatrixView::new_row(&*aux_next),
-            ));
-            builder.aux = aux;
-            air.eval(&mut builder);
-        } else {
-            air.eval(&mut builder);
-        }
+        air.eval(&mut builder);
     });
 }
