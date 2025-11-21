@@ -1,0 +1,22 @@
+def FunctionImportTest
+
+use utils::add;
+use utils::multiply;
+
+trace_columns {
+    main: [a, b, c],
+}
+
+public_inputs {
+    x: [1],
+}
+
+boundary_constraints {
+    enf a.first = 0;
+}
+
+integrity_constraints {
+    # Use imported pure functions
+    enf a = add(b, c);
+    enf b = multiply(a, c);
+}
