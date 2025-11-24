@@ -236,10 +236,8 @@ impl PartialEq for Import {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::All { module: l }, Self::All { module: r }) => l == r,
-            (Self::Partial { module: l, items: ls }, Self::Partial { module: r, items: rs })
-                if l == r =>
-            {
-                ls.difference(rs).next().is_none()
+            (Self::Partial { module: l, items: ls }, Self::Partial { module: r, items: rs }) => {
+                l == r && ls == rs
             },
             _ => false,
         }
@@ -436,5 +434,56 @@ impl PartialEq for Function {
             && self.params == other.params
             && self.return_type == other.return_type
             && self.body == other.body
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use miden_diagnostics::SourceSpan;
+
+    use super::*;
+    use crate::symbols::Symbol;
+
+    fn ident(name: &str) -> Identifier {
+        Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(name))
+    }
+
+    fn module_id(parts: &[&str]) -> ModuleId {
+        let ids = parts.iter().map(|p| ident(p)).collect::<Vec<_>>();
+        ModuleId::new(ids, SourceSpan::UNKNOWN)
+    }
+
+    #[test]
+    fn import_partial_subset_is_not_equal_either_direction() {
+        let module = module_id(&["m"]);
+        let mut set_a: HashSet<Identifier> = HashSet::default();
+        set_a.insert(ident("a"));
+        let import_a = Import::Partial { module: module.clone(), items: set_a };
+
+        let mut set_ab: HashSet<Identifier> = HashSet::default();
+        set_ab.insert(ident("a"));
+        set_ab.insert(ident("b"));
+        let import_ab = Import::Partial { module: module.clone(), items: set_ab };
+
+        assert!(import_a != import_ab);
+        assert!(import_ab != import_a);
+    }
+
+    #[test]
+    fn import_partial_identical_sets_are_equal() {
+        let module = module_id(&["m"]);
+        let mut set1: HashSet<Identifier> = HashSet::default();
+        set1.insert(ident("a"));
+        set1.insert(ident("b"));
+        let mut set2: HashSet<Identifier> = HashSet::default();
+        set2.insert(ident("b"));
+        set2.insert(ident("a"));
+
+        let import1 = Import::Partial { module: module.clone(), items: set1 };
+        let import2 = Import::Partial { module: module.clone(), items: set2 };
+
+        assert_eq!(import1, import2);
     }
 }
