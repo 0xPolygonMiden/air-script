@@ -41,7 +41,7 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
         #[test]
         fn $test_name() {
             type Val = Goldilocks;
-            type Challenge = BinomialExtensionField<Val, 5>;
+            type Challenge = BinomialExtensionField<Val, 2>;
 
             type ByteHash = Sha256;
             type FieldHash = SerializingHasher<ByteHash>;
