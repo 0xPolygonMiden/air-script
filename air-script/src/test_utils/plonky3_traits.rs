@@ -310,8 +310,10 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
     let height = main.height();
 
     let aux_bus_boundary_values: Vec<_> = (0..air.aux_width()).map(|_| EF::GENERATOR).collect();
-    let alpha_f: Vec<F> = (0..2).map(|i| F::from_u64(123456789 * i)).collect(); // Dummy alpha in F
-    let alpha = EF::from_basis_coefficients_iter(alpha_f.iter().cloned()).unwrap();
+    let alpha = EF::from_basis_coefficients_iter(
+        (0..EF::DIMENSION).map(|i| F::from_u64(123456789 * (i as u64 + 1))),
+    )
+    .unwrap();
     let beta = EF::from_u64(987654321);
     let beta_powers: Vec<EF> = (0..air.max_beta_challenge_power())
         .map(|power| alpha.exp_u64(power as u64))
