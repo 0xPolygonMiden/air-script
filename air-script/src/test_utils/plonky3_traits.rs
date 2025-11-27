@@ -37,21 +37,22 @@ where
 {
     /// EF evaluations of periodic columns at the AIR’s random point (z). Order defined by
     /// AirScript.
+    /// TODO: clarify usage of (z) here.
     fn periodic_evals(&self) -> &[<Self as ExtensionBuilder>::VarEF];
 
-    /// Global challenges in EF. (We can provide defaults; details not important here.)
+    /// Global challenges in EF.
     fn alpha(&self) -> <Self as ExtensionBuilder>::VarEF;
     fn beta(&self) -> <Self as ExtensionBuilder>::VarEF;
     fn beta_powers(&self) -> &[<Self as ExtensionBuilder>::VarEF];
 
-    /// Aux bus boundary values: EF finals, one per aux/bus column, carried in the proof.
+    /// Auxiliary buses boundary values, one per bus column, attached to the proof.
     fn aux_bus_boundary_values(&self) -> &[<Self as ExtensionBuilder>::VarEF];
 }
 
 /// A builder that runs constraint assertions during testing.
 ///
-/// Used in conjunction with [`check_constraints`] to simulate
-/// an execution trace and verify that the AIR logic enforces all constraints.
+/// Used in conjunction with [`check_constraints`] to simulate an execution trace
+/// and verify that the AIR logic enforces all constraints.
 #[derive(Debug)]
 pub struct DebugConstraintBuilderWithAirScriptTraits<'a, F: Field, EF: ExtensionField<F>> {
     /// The index of the row currently being evaluated.
@@ -292,6 +293,7 @@ where
     let logup_next = (a * logup_current + b + c - e) * d.inverse();
 
     // Dummy implementation for illustration purposes.
+    // TODO: replace with actual aux transition logic.
     [multiset_next, logup_next]
 }
 
