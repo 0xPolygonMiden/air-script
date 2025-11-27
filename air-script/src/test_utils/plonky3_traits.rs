@@ -15,7 +15,9 @@ pub trait AirScriptAir<F: Field, AB: AirScriptBuilder<F = F>> {
         0
     }
 
-    /// Number of beta challenges used in the AIR.
+    /// Maximum number of beta challenge powers needed.
+    /// This number corresponds to the largest tuple of Field elements
+    /// that are inserted into/removed from a bus.
     fn num_beta_challenges(&self) -> usize {
         0
     }
