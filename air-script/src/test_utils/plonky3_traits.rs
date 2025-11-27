@@ -223,73 +223,69 @@ where
     // p' * multiset_removals = p * multiset_inserts
     let multiset_inserts: EF = ((alpha
         + beta_challenges[0]
-        + (EF::from_u64(3) + EF::from(main_current[1].clone())) * beta_challenges[1]
-        + EF::from(main_current[0].clone()) * beta_challenges[2])
-        * EF::from(main_current[2].clone())
+        + (EF::from_u64(3) + EF::from(main_current[1])) * beta_challenges[1]
+        + EF::from(main_current[0]) * beta_challenges[2])
+        * EF::from(main_current[2])
         + EF::ONE
-        - EF::from(main_current[2].clone()))
-        * ((alpha
-            + beta_challenges[0].double()
-            + EF::from(main_current[1].clone()) * beta_challenges[1])
-            * (EF::ONE - EF::from(main_current[2].clone()))
-            + EF::from(main_current[2].clone()));
+        - EF::from(main_current[2]))
+        * ((alpha + beta_challenges[0].double() + EF::from(main_current[1]) * beta_challenges[1])
+            * (EF::ONE - EF::from(main_current[2]))
+            + EF::from(main_current[2]));
     let multiset_removals: EF = ((alpha
         + beta_challenges[0]
-        + (EF::from_u64(3) + EF::from(main_current[1].clone())) * beta_challenges[1]
-        + EF::from(main_current[1].clone()) * beta_challenges[2])
-        * EF::from(main_current[3].clone())
+        + (EF::from_u64(3) + EF::from(main_current[1])) * beta_challenges[1]
+        + EF::from(main_current[1]) * beta_challenges[2])
+        * EF::from(main_current[3])
         + EF::ONE
-        - EF::from(main_current[3].clone()))
-        * ((alpha
-            + beta_challenges[0].double()
-            + EF::from(main_current[0].clone()) * beta_challenges[1])
-            * (EF::ONE - EF::from(main_current[3].clone()))
-            + EF::from(main_current[3].clone()));
-    let multiset_current = EF::from(aux_current[0].clone());
+        - EF::from(main_current[3]))
+        * ((alpha + beta_challenges[0].double() + EF::from(main_current[0]) * beta_challenges[1])
+            * (EF::ONE - EF::from(main_current[3]))
+            + EF::from(main_current[3]));
+    let multiset_current = aux_current[0];
     let multiset_next = multiset_current * multiset_inserts * multiset_removals.inverse();
 
     // Second bus: logup
     // 0 = A * q + B + C - D * q' - E;
     let a: EF = (alpha
         + EF::from_u64(3) * beta_challenges[0]
-        + EF::from(main_current[0].clone()) * beta_challenges[1])
+        + EF::from(main_current[0]) * beta_challenges[1])
         * (alpha
             + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[0].clone()) * beta_challenges[1])
+            + EF::from(main_current[0]) * beta_challenges[1])
         * (alpha
             + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[1].clone()) * beta_challenges[1]);
+            + EF::from(main_current[1]) * beta_challenges[1]);
     let b: EF = (alpha
         + EF::from_u64(3) * beta_challenges[0]
-        + EF::from(main_current[0].clone()) * beta_challenges[1])
+        + EF::from(main_current[0]) * beta_challenges[1])
         * (alpha
             + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[1].clone()) * beta_challenges[1])
-        * EF::from(main_current[4].clone());
+            + EF::from(main_current[1]) * beta_challenges[1])
+        * EF::from(main_current[4]);
     let c: EF = (alpha
         + EF::from_u64(3) * beta_challenges[0]
-        + EF::from(main_current[0].clone()) * beta_challenges[1])
+        + EF::from(main_current[0]) * beta_challenges[1])
         * (alpha
             + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[1].clone()) * beta_challenges[1])
-        * EF::from(main_current[5].clone());
+            + EF::from(main_current[1]) * beta_challenges[1])
+        * EF::from(main_current[5]);
     let d: EF = (alpha
         + EF::from_u64(3) * beta_challenges[0]
-        + EF::from(main_current[0].clone()) * beta_challenges[1])
+        + EF::from(main_current[0]) * beta_challenges[1])
         * (alpha
             + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[0].clone()) * beta_challenges[1])
+            + EF::from(main_current[0]) * beta_challenges[1])
         * (alpha
             + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[1].clone()) * beta_challenges[1]);
+            + EF::from(main_current[1]) * beta_challenges[1]);
     let e: EF = (alpha
         + EF::from_u64(3) * beta_challenges[0]
-        + EF::from(main_current[0].clone()) * beta_challenges[1])
+        + EF::from(main_current[0]) * beta_challenges[1])
         * (alpha
             + EF::from_u64(3) * beta_challenges[0]
-            + EF::from(main_current[0].clone()) * beta_challenges[1])
-        * EF::from(main_current[6].clone());
-    let logup_current = EF::from(aux_current[1].clone());
+            + EF::from(main_current[0]) * beta_challenges[1])
+        * EF::from(main_current[6]);
+    let logup_current = aux_current[1];
     let logup_next = (a * logup_current + b + c - e) * d.inverse();
 
     // Dummy implementation for illustration purposes.
@@ -324,7 +320,7 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
 
     let initial_aux = [EF::ONE, EF::ZERO];
 
-    let mut current_aux_values = initial_aux.clone();
+    let mut current_aux_values = initial_aux;
 
     (0..height).for_each(|i| {
         let i_next = (i + 1) % height;
