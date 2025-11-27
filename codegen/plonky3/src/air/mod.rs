@@ -46,7 +46,7 @@ fn add_constants(scope: &mut Scope, ir: &Air) {
     let period = ir.periodic_columns().map(|col| col.period()).max().unwrap_or(0);
     let num_public_values =
         ir.public_inputs().map(|public_input| public_input.size()).sum::<usize>();
-    let num_beta_challenges = ir.num_random_values.saturating_sub(1);
+    let max_beta_challenge_power = ir.num_random_values.saturating_sub(1);
 
     let constants = [
         format!("pub const MAIN_WIDTH: usize = {main_width};"),
@@ -54,7 +54,7 @@ fn add_constants(scope: &mut Scope, ir: &Air) {
         format!("pub const NUM_PERIODIC_VALUES: usize = {num_periodic_values};"),
         format!("pub const PERIOD: usize = {period};"),
         format!("pub const NUM_PUBLIC_VALUES: usize = {num_public_values};"),
-        format!("pub const NUM_BETA_CHALLENGES: usize = {num_beta_challenges};"),
+        format!("pub const MAX_BETA_CHALLENGE_POWER: usize = {max_beta_challenge_power};"),
     ];
 
     scope.raw(constants.join("\n"));
@@ -94,12 +94,12 @@ fn add_air_script_trait(scope: &mut Scope, ir: &Air, name: &str) {
         .ret("usize")
         .line("AUX_WIDTH");
 
-    // add the num_beta_challenges function
+    // add the max_beta_challenge_power function
     air_script_impl
-        .new_fn("num_beta_challenges")
+        .new_fn("max_beta_challenge_power")
         .arg_ref_self()
         .ret("usize")
-        .line("NUM_BETA_CHALLENGES");
+        .line("MAX_BETA_CHALLENGE_POWER");
 
     // add the periodic_table function
     let periodic_table_func =
@@ -132,7 +132,7 @@ fn add_air_script_trait(scope: &mut Scope, ir: &Air, name: &str) {
     // Only had aux if there are random values
     if ir.num_random_values > 0 {
         eval_func.line("let alpha = builder.alpha();");
-        eval_func.line("let beta_challenges: [_; NUM_BETA_CHALLENGES] = builder.beta_powers().try_into().expect(\"Wrong number of beta challenges\");");
+        eval_func.line("let beta_challenges: [_; MAX_BETA_CHALLENGE_POWER] = builder.beta_powers().try_into().expect(\"Wrong number of beta challenges\");");
         eval_func.line("let aux_bus_boundary_values: [_; AUX_WIDTH] = builder.aux_bus_boundary_values().try_into().expect(\"Wrong number of aux bus boundary values\");");
         eval_func.line("let aux = builder.permutation();");
         eval_func.line("let (aux_current, aux_next) = (");

@@ -8,7 +8,7 @@ pub const AUX_WIDTH: usize = 2;
 pub const NUM_PERIODIC_VALUES: usize = 0;
 pub const PERIOD: usize = 0;
 pub const NUM_PUBLIC_VALUES: usize = 2;
-pub const NUM_BETA_CHALLENGES: usize = 2;
+pub const MAX_BETA_CHALLENGE_POWER: usize = 2;
 
 pub struct BusesAir;
 
@@ -29,8 +29,8 @@ impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for BusesAir {
         AUX_WIDTH
     }
 
-    fn num_beta_challenges(&self) -> usize {
-        NUM_BETA_CHALLENGES
+    fn max_beta_challenge_power(&self) -> usize {
+        MAX_BETA_CHALLENGE_POWER
     }
 
     fn periodic_table(&self) -> Vec<Vec<F>> {
@@ -46,7 +46,7 @@ impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for BusesAir {
             main.row_slice(1).unwrap(),
         );
         let alpha = builder.alpha();
-        let beta_challenges: [_; NUM_BETA_CHALLENGES] = builder.beta_powers().try_into().expect("Wrong number of beta challenges");
+        let beta_challenges: [_; MAX_BETA_CHALLENGE_POWER] = builder.beta_powers().try_into().expect("Wrong number of beta challenges");
         let aux_bus_boundary_values: [_; AUX_WIDTH] = builder.aux_bus_boundary_values().try_into().expect("Wrong number of aux bus boundary values");
         let aux = builder.permutation();
         let (aux_current, aux_next) = (

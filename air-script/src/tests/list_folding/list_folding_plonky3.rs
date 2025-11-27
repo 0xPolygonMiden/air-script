@@ -8,7 +8,7 @@ pub const AUX_WIDTH: usize = 0;
 pub const NUM_PERIODIC_VALUES: usize = 0;
 pub const PERIOD: usize = 0;
 pub const NUM_PUBLIC_VALUES: usize = 16;
-pub const NUM_BETA_CHALLENGES: usize = 0;
+pub const MAX_BETA_CHALLENGE_POWER: usize = 0;
 
 pub struct ListFoldingAir;
 
@@ -29,8 +29,8 @@ impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for ListFoldingA
         AUX_WIDTH
     }
 
-    fn num_beta_challenges(&self) -> usize {
-        NUM_BETA_CHALLENGES
+    fn max_beta_challenge_power(&self) -> usize {
+        MAX_BETA_CHALLENGE_POWER
     }
 
     fn periodic_table(&self) -> Vec<Vec<F>> {

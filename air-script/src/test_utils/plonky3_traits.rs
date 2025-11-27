@@ -18,7 +18,7 @@ pub trait AirScriptAir<F: Field, AB: AirScriptBuilder<F = F>> {
     /// Maximum number of beta challenge powers needed.
     /// This number corresponds to the largest tuple of Field elements
     /// that are inserted into/removed from a bus.
-    fn num_beta_challenges(&self) -> usize {
+    fn max_beta_challenge_power(&self) -> usize {
         0
     }
 
@@ -311,7 +311,7 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
     let alpha_f: Vec<F> = (0..2).map(|i| F::from_u64(123456789 * i)).collect(); // Dummy alpha in F
     let alpha = EF::from_basis_coefficients_iter(alpha_f.iter().cloned()).unwrap();
     let beta = EF::from_u64(987654321);
-    let beta_powers: Vec<EF> = (0..air.num_beta_challenges())
+    let beta_powers: Vec<EF> = (0..air.max_beta_challenge_power())
         .map(|power| alpha.exp_u64(power as u64))
         .collect();
     let mut permutation_randomness = Vec::with_capacity(1 + beta_powers.len());
