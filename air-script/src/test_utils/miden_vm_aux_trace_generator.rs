@@ -1,28 +1,69 @@
+use std::collections::BTreeMap;
+
 use miden_air::{Felt, FieldElement, trace::main_trace::MainTrace};
 use miden_processor::{
-    AceHints, AuxTraceBuilder, ColMatrix, Kernel, PrecompileTranscriptState, QuadExtension,
+    ColMatrix, Kernel, PrecompileTranscriptState, QuadExtension,
+    chiplets::{AceHints, AuxTraceBuilder as ChipletsAuxTraceBuilder},
+    decoder::AuxTraceBuilder as DecoderAuxTraceBuilder,
+    range::AuxTraceBuilder as RangeAuxTraceBuilder,
+    stack::AuxTraceBuilder as StackAuxTraceBuilder,
 };
 use p3_field::{ExtensionField, Field, PrimeField64};
 use p3_matrix::Matrix;
 use p3_miden_air::RowMajorMatrix;
 
+pub enum MidenModule {
+    Chiplets,
+    Decoder,
+    Stack,
+    Range,
+}
+
+impl MidenModule {
+    fn build_aux_columns<EF: FieldElement<BaseField = Felt>>(
+        &self,
+        main_trace: &MainTrace,
+        rand_elements: &[EF],
+    ) -> Vec<Vec<EF>> {
+        match self {
+            MidenModule::Chiplets => {
+                let kernel = Kernel::new(&[]).unwrap();
+                let ace_hints = AceHints::new(0, vec![]);
+                let final_transcript_state = PrecompileTranscriptState::default();
+                let aux_trace_builder =
+                    ChipletsAuxTraceBuilder::new(kernel, ace_hints, final_transcript_state);
+                aux_trace_builder.build_aux_columns(main_trace, rand_elements).to_vec()
+            },
+            MidenModule::Decoder => {
+                let aux_trace_builder = DecoderAuxTraceBuilder {};
+                aux_trace_builder.build_aux_columns(main_trace, rand_elements)
+            },
+            MidenModule::Stack => {
+                let aux_trace_builder = StackAuxTraceBuilder {};
+                aux_trace_builder.build_aux_columns(main_trace, rand_elements)
+            },
+            MidenModule::Range => {
+                let lookup_values = vec![];
+                let cycle_lookups = BTreeMap::new();
+                let values_start = 0;
+                let aux_trace_builder =
+                    RangeAuxTraceBuilder::new(lookup_values, cycle_lookups, values_start);
+                aux_trace_builder.build_aux_columns(main_trace, rand_elements)
+            },
+        }
+    }
+}
+
 /// Builds the Miden VM auxiliary trace using the provided main trace and challenges.
 pub fn build_aux_trace_with_miden_vm<F, EF>(
     main: &RowMajorMatrix<F>,
     challenges: &[EF],
+    module: MidenModule,
 ) -> RowMajorMatrix<EF>
 where
     F: Field + PrimeField64,
     EF: ExtensionField<F>,
 {
-    const AUX_WIDTH: usize = 3;
-
-    // Create an AuxTraceBuilder
-    let kernel = Kernel::new(&[]).unwrap();
-    let ace_hints = AceHints::new(0, vec![]);
-    let final_transcript_state = PrecompileTranscriptState::default();
-    let aux_trace_builder = AuxTraceBuilder::new(kernel, ace_hints, final_transcript_state);
-
     // Convert main trace to Miden format
     let mut main_trace_vec_vec = Vec::new();
     for row_index in 0..main.height() {
@@ -32,7 +73,7 @@ where
         main_trace_vec_vec.push(row_felt);
     }
     let transposed_main_trace_vec_vec: Vec<Vec<_>> = (0..main_trace_vec_vec[0].len())
-        .map(|i| main_trace_vec_vec.iter().map(|row| row[i].clone()).collect())
+        .map(|i| main_trace_vec_vec.iter().map(|row| row[i]).collect())
         .collect();
     let col_matrix = ColMatrix::new(transposed_main_trace_vec_vec);
     let last_program_row = main.height().into();
@@ -51,19 +92,16 @@ where
     }
 
     // Build aux trace using Miden VM AuxTraceBuilder
-    let aux_trace_miden = aux_trace_builder.build_aux_columns(&main_trace, &rand_elements);
+    let aux_trace_miden = module.build_aux_columns(&main_trace, &rand_elements);
+    let aux_width = aux_trace_miden.len();
 
     // Convert aux trace back to RowMajorMatrix<EF>
     let num_rows = main.height();
-    let trace_length = num_rows * AUX_WIDTH;
+    let trace_length = num_rows * aux_width;
     let long_trace = EF::zero_vec(trace_length);
-    let mut aux_trace = RowMajorMatrix::new(long_trace, AUX_WIDTH);
-    let (prefix, rows, suffix) = unsafe { aux_trace.values.align_to_mut::<[EF; AUX_WIDTH]>() };
-    assert!(prefix.is_empty(), "Alignment should match");
-    assert!(suffix.is_empty(), "Alignment should match");
-    assert_eq!(rows.len(), num_rows);
+    let mut aux_trace = RowMajorMatrix::new(long_trace, aux_width);
 
-    for j in 0..AUX_WIDTH {
+    for j in 0..aux_width {
         let col = aux_trace_miden.get(j).unwrap();
         for i in 0..num_rows {
             let value_felt = col[i];
@@ -73,7 +111,7 @@ where
                 .map(|x| F::from_canonical_checked(x.as_int()).unwrap())
                 .collect();
             let value_ef = EF::from_basis_coefficients_iter(coeffs_f.iter().cloned()).unwrap();
-            rows[i][j] = value_ef;
+            aux_trace.row_mut(i)[j] = value_ef;
         }
     }
 

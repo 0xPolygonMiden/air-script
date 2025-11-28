@@ -127,7 +127,7 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
             .arg("_main", "&RowMajorMatrix<F>")
             .arg("_challenges", "&[EF]")
             .ret("Option<RowMajorMatrix<EF>>");
-        build_aux_trace_func.line("// Note: consider using Some(build_aux_trace_with_miden_vm::<F, EF>(_main, _challenges))");
+        build_aux_trace_func.line("// Note: consider using Some(build_aux_trace_with_miden_vm::<F, EF>(_main, _challenges, module)) if you want to build the aux trace using Miden VM aux trace builders.");
         build_aux_trace_func.line("");
         build_aux_trace_func.line("let num_rows = _main.height();");
         build_aux_trace_func.line("let trace_length = num_rows * AUX_WIDTH;");

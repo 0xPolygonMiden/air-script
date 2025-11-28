@@ -30,7 +30,7 @@ where F: Field,
     }
 
     fn build_aux_trace(&self, _main: &RowMajorMatrix<F>, _challenges: &[EF]) -> Option<RowMajorMatrix<EF>> {
-        // Note: consider using Some(build_aux_trace_with_miden_vm::<F, EF>(_main, _challenges))
+        // Note: consider using Some(build_aux_trace_with_miden_vm::<F, EF>(_main, _challenges, module)) if you want to build the aux trace using Miden VM aux trace builders.
 
         let num_rows = _main.height();
         let trace_length = num_rows * AUX_WIDTH;

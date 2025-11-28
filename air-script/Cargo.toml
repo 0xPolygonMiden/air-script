@@ -47,8 +47,8 @@ p3-symmetric = { package = "p3-symmetric", git="https://github.com/0xMiden/Plonk
 p3-uni-stark = { package = "p3-uni-stark", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
 
 # MassaLabs fork
-miden-processor = { package = "miden-processor", git="https://github.com/massalabs/miden-vm", rev = "918d6acba1a5a91612b0497709d58824f849f8e3", default-features = false }
-miden-air = { package = "miden-air", git="https://github.com/massalabs/miden-vm", rev = "918d6acba1a5a91612b0497709d58824f849f8e3", default-features = false }
+miden-processor = { package = "miden-processor", git="https://github.com/massalabs/miden-vm", rev = "bc553af69a2543a0789830e8508b019694528181", default-features = false }
+miden-air = { package = "miden-air", git="https://github.com/massalabs/miden-vm", rev = "bc553af69a2543a0789830e8508b019694528181", default-features = false }
 
 winter-air = { package = "winter-air", version = "0.12", default-features = false }
 winter-math = { package = "winter-math", version = "0.12", default-features = false }
