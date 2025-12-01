@@ -67,13 +67,12 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     scope.new_struct(name).vis("pub");
 
     // add the custom MidenAir implementation block
-    let miden_air_impl = scope
-        .new_impl(name)
-        .generic("F")
-        .generic("EF")
-        .bound("F", "Field")
-        .bound("EF", "ExtensionField<F>")
-        .impl_trait("MidenAir<F, EF>");
+    let miden_air_impl =
+        scope.new_impl(name).generic("F").generic("EF").impl_trait("MidenAir<F, EF>");
+
+    if ir.num_random_values > 0 || ir.periodic_columns().count() > 0 {
+        miden_air_impl.bound("F", "Field").bound("EF", "ExtensionField<F>");
+    }
 
     // add the width function
     miden_air_impl.new_fn("width").arg_ref_self().ret("usize").line("MAIN_WIDTH");

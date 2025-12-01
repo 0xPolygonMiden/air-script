@@ -13,10 +13,7 @@ pub const MAX_BETA_CHALLENGE_POWER: usize = 0;
 
 pub struct ComputedIndicesAir;
 
-impl<F, EF> MidenAir<F, EF> for ComputedIndicesAir
-where F: Field,
-      EF: ExtensionField<F>,
-{
+impl<F, EF> MidenAir<F, EF> for ComputedIndicesAir {
     fn width(&self) -> usize {
         MAIN_WIDTH
     }

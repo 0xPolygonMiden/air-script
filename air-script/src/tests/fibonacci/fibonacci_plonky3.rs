@@ -13,10 +13,7 @@ pub const MAX_BETA_CHALLENGE_POWER: usize = 0;
 
 pub struct FibonacciAir;
 
-impl<F, EF> MidenAir<F, EF> for FibonacciAir
-where F: Field,
-      EF: ExtensionField<F>,
-{
+impl<F, EF> MidenAir<F, EF> for FibonacciAir {
     fn width(&self) -> usize {
         MAIN_WIDTH
     }

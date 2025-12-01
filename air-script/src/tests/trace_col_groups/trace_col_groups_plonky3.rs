@@ -13,10 +13,7 @@ pub const MAX_BETA_CHALLENGE_POWER: usize = 0;
 
 pub struct TraceColGroupAir;
 
-impl<F, EF> MidenAir<F, EF> for TraceColGroupAir
-where F: Field,
-      EF: ExtensionField<F>,
-{
+impl<F, EF> MidenAir<F, EF> for TraceColGroupAir {
     fn width(&self) -> usize {
         MAIN_WIDTH
     }

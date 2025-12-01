@@ -13,10 +13,7 @@ pub const MAX_BETA_CHALLENGE_POWER: usize = 0;
 
 pub struct SystemAir;
 
-impl<F, EF> MidenAir<F, EF> for SystemAir
-where F: Field,
-      EF: ExtensionField<F>,
-{
+impl<F, EF> MidenAir<F, EF> for SystemAir {
     fn width(&self) -> usize {
         MAIN_WIDTH
     }
