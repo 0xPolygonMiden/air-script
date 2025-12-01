@@ -34,8 +34,8 @@ expect-test = "1.4"
 # 0xMiden Plonky3 Fork
 p3-air = { package = "p3-air", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
 p3-challenger = { package = "p3-challenger", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-circle = { package = "p3-circle", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
 p3-commit = { package = "p3-commit", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
+p3-dft = { package = "p3-dft", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
 p3-field = { package = "p3-field", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
 p3-fri = { package = "p3-fri", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
 p3-matrix = { package = "p3-matrix", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
