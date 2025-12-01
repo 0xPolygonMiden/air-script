@@ -9,7 +9,7 @@ pub const AUX_WIDTH: usize = 0;
 pub const NUM_PERIODIC_VALUES: usize = 0;
 pub const PERIOD: usize = 0;
 pub const NUM_PUBLIC_VALUES: usize = 16;
-pub const NUM_BETA_CHALLENGES: usize = 0;
+pub const MAX_BETA_CHALLENGE_POWER: usize = 0;
 
 pub struct SelectorsAir;
 

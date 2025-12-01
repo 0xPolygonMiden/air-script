@@ -8,8 +8,8 @@ use p3_miden_air::{MidenAir, MidenAirBuilder, impl_p3_air_builder_traits};
 
 /// A builder that runs constraint assertions during testing.
 ///
-/// Used in conjunction with [`check_constraints`] to simulate
-/// an execution trace and verify that the AIR logic enforces all constraints.
+/// Used in conjunction with [`check_constraints`] to simulate an execution trace
+/// and verify that the AIR logic enforces all constraints.
 #[derive(Debug)]
 pub struct DebugConstraintBuilderWithAirScriptTraits<'a, F: Field, EF: ExtensionField<F>> {
     /// The index of the row currently being evaluated.
@@ -128,8 +128,10 @@ pub(crate) fn check_constraints_with_airscript_traits<F, EF, A>(
     let height = main.height();
 
     let aux_bus_boundary_values: Vec<_> = (0..air.aux_width()).map(|_| EF::GENERATOR).collect();
-    let alpha_f: Vec<F> = (0..2).map(|i| F::from_u64(123456789 * i)).collect(); // Dummy alpha in F
-    let alpha = EF::from_basis_coefficients_iter(alpha_f.iter().cloned()).unwrap();
+    let alpha = EF::from_basis_coefficients_iter(
+        (0..EF::DIMENSION).map(|i| F::from_u64(123456789 * (i as u64 + 1))),
+    )
+    .unwrap();
     let beta = EF::from_u64(987654321);
     let beta_powers: Vec<EF> = (0..(air.num_randomness().saturating_sub(1)))
         .map(|power| beta.exp_u64(power as u64))

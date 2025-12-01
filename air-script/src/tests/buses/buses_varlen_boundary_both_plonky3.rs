@@ -9,7 +9,7 @@ pub const AUX_WIDTH: usize = 2;
 pub const NUM_PERIODIC_VALUES: usize = 0;
 pub const PERIOD: usize = 0;
 pub const NUM_PUBLIC_VALUES: usize = 6;
-pub const NUM_BETA_CHALLENGES: usize = 2;
+pub const MAX_BETA_CHALLENGE_POWER: usize = 2;
 
 pub struct BusesAir;
 
@@ -22,7 +22,7 @@ where F: Field,
     }
 
     fn num_randomness(&self) -> usize {
-        1 + NUM_BETA_CHALLENGES
+        1 + MAX_BETA_CHALLENGE_POWER
     }
 
     fn aux_width(&self) -> usize {
@@ -80,8 +80,8 @@ where F: Field,
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        let (&alpha, beta_challenges) = builder.permutation_randomness().split_first().unwrap();
-        let beta_challenges: [_; NUM_BETA_CHALLENGES] = beta_challenges.try_into().expect("Wrong number of randomness");
+        let (&alpha, beta_challenges) = builder.permutation_randomness().split_first().expect("Wrong number of randomness");
+        let beta_challenges: [_; MAX_BETA_CHALLENGE_POWER] = beta_challenges.try_into().expect("Wrong number of randomness");
         let aux_bus_boundary_values: [_; AUX_WIDTH] = builder.aux_bus_boundary_values().try_into().expect("Wrong number of aux bus boundary values");
         let aux = builder.permutation();
         let (aux_current, aux_next) = (
@@ -123,8 +123,8 @@ impl BusesAir {
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        let (&alpha, beta_challenges) = challenges.split_first().unwrap();
-        let beta_challenges: [_; NUM_BETA_CHALLENGES] = beta_challenges.try_into().expect("Wrong number of randomness");
+        let (&alpha, beta_challenges) = challenges.split_first().expect("Wrong number of randomness");
+        let beta_challenges: [_; MAX_BETA_CHALLENGE_POWER] = beta_challenges.try_into().expect("Wrong number of randomness");
         let periodic_values: [_; NUM_PERIODIC_VALUES] = periodic_evals.try_into().expect("Wrong number of periodic values");
         vec![
             (((alpha + beta_challenges[0]) * EF::from(main_current[0].clone()) + EF::ONE - EF::from(main_current[0].clone())) * EF::from(aux_current[0].clone())) * ((alpha + beta_challenges[0]) * (EF::from(main_current[0].clone()) - EF::ONE) + EF::ONE - (EF::from(main_current[0].clone()) - EF::ONE)).inverse(),
