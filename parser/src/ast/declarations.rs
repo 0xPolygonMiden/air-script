@@ -457,15 +457,14 @@ mod tests {
 
     #[test]
     fn import_partial_subset_is_not_equal_either_direction() {
-        let module = module_id(&["m"]);
         let mut set_a: HashSet<Identifier> = HashSet::default();
         set_a.insert(ident("a"));
-        let import_a = Import::Partial { module: module.clone(), items: set_a };
+        let import_a = Import::Partial { module: module_id(&["m"]), items: set_a };
 
         let mut set_ab: HashSet<Identifier> = HashSet::default();
         set_ab.insert(ident("a"));
         set_ab.insert(ident("b"));
-        let import_ab = Import::Partial { module: module.clone(), items: set_ab };
+        let import_ab = Import::Partial { module: module_id(&["m"]), items: set_ab };
 
         assert!(import_a != import_ab);
         assert!(import_ab != import_a);
@@ -473,7 +472,6 @@ mod tests {
 
     #[test]
     fn import_partial_identical_sets_are_equal() {
-        let module = module_id(&["m"]);
         let mut set1: HashSet<Identifier> = HashSet::default();
         set1.insert(ident("a"));
         set1.insert(ident("b"));
@@ -481,8 +479,8 @@ mod tests {
         set2.insert(ident("b"));
         set2.insert(ident("a"));
 
-        let import1 = Import::Partial { module: module.clone(), items: set1 };
-        let import2 = Import::Partial { module: module.clone(), items: set2 };
+        let import1 = Import::Partial { module: module_id(&["m"]), items: set1 };
+        let import2 = Import::Partial { module: module_id(&["m"]), items: set2 };
 
         assert_eq!(import1, import2);
     }
