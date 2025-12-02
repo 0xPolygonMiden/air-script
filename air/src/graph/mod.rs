@@ -94,7 +94,7 @@ impl AlgebraicGraph {
         }
     }
 
-    /// Recursively analyzes a subgraph starting from the specified node and infers the trace 
+    /// Recursively analyzes a subgraph starting from the specified node and infers the trace
     /// segment and constraint domain that the subgraph should be applied to.
     ///
     /// This function performs a bottom-up traversal of the constraint expression graph to determine:
@@ -104,7 +104,7 @@ impl AlgebraicGraph {
     /// # Arguments
     ///
     /// * `index` - The index of the node to analyze
-    /// * `default_domain` - The default constraint domain to use for leaf nodes that don't 
+    /// * `default_domain` - The default constraint domain to use for leaf nodes that don't
     ///   specify their own domain (e.g., constants, public inputs)
     ///
     /// # Returns
