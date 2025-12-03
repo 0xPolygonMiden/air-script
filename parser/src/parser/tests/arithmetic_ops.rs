@@ -1,8 +1,7 @@
 use miden_diagnostics::SourceSpan;
 
-use crate::ast::*;
-
 use super::ParseTest;
+use crate::ast::*;
 
 // EXPRESSIONS
 // ================================================================================================
@@ -17,13 +16,13 @@ fn single_addition() {
         enf clk' + clk = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce!(eq!(add!(access!(clk, 1), access!(clk)), int!(0)))],
         ),
     );
@@ -40,17 +39,14 @@ fn multi_addition() {
         enf clk' + clk + 2 = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
-            vec![enforce!(eq!(
-                add!(add!(access!(clk, 1), access!(clk)), int!(2)),
-                int!(0)
-            ))],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
+            vec![enforce!(eq!(add!(add!(access!(clk, 1), access!(clk)), int!(2)), int!(0)))],
         ),
     );
     ParseTest::new().expect_module_ast(source, expected);
@@ -66,13 +62,13 @@ fn single_subtraction() {
         enf clk' - clk = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce!(eq!(sub!(access!(clk, 1), access!(clk)), int!(0)))],
         ),
     );
@@ -89,17 +85,14 @@ fn multi_subtraction() {
         enf clk' - clk - 1 = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
-            vec![enforce!(eq!(
-                sub!(sub!(access!(clk, 1), access!(clk)), int!(1)),
-                int!(0)
-            ))],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
+            vec![enforce!(eq!(sub!(sub!(access!(clk, 1), access!(clk)), int!(1)), int!(0)))],
         ),
     );
     ParseTest::new().expect_module_ast(source, expected);
@@ -115,13 +108,13 @@ fn single_multiplication() {
         enf clk' * clk = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce!(eq!(mul!(access!(clk, 1), access!(clk)), int!(0)))],
         ),
     );
@@ -138,17 +131,14 @@ fn multi_multiplication() {
         enf clk' * clk * 2 = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
-            vec![enforce!(eq!(
-                mul!(mul!(access!(clk, 1), access!(clk)), int!(2)),
-                int!(0)
-            ))],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
+            vec![enforce!(eq!(mul!(mul!(access!(clk, 1), access!(clk)), int!(2)), int!(0)))],
         ),
     );
     ParseTest::new().expect_module_ast(source, expected);
@@ -164,13 +154,13 @@ fn unit_with_parens() {
         enf (2) + 1 = 3;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce!(eq!(add!(int!(2), int!(1)), int!(3)))],
         ),
     );
@@ -187,17 +177,14 @@ fn ops_with_parens() {
         enf (clk' + clk) * 2 = 4;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
-            vec![enforce!(eq!(
-                mul!(add!(access!(clk, 1), access!(clk)), int!(2)),
-                int!(4)
-            ))],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
+            vec![enforce!(eq!(mul!(add!(access!(clk, 1), access!(clk)), int!(2)), int!(4)))],
         ),
     );
     ParseTest::new().expect_module_ast(source, expected);
@@ -213,13 +200,13 @@ fn const_exponentiation() {
         enf clk'^2 = 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce!(eq!(exp!(access!(clk, 1), int!(2)), int!(1)))],
         ),
     );
@@ -236,17 +223,14 @@ fn non_const_exponentiation() {
         enf clk'^(clk + 2) = 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
-            vec![enforce!(eq!(
-                exp!(access!(clk, 1), add!(access!(clk), int!(2))),
-                int!(1)
-            ))],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
+            vec![enforce!(eq!(exp!(access!(clk, 1), add!(access!(clk), int!(2))), int!(1)))],
         ),
     );
     ParseTest::new().expect_module_ast(source, expected);
@@ -286,13 +270,13 @@ fn multi_arithmetic_ops_same_precedence() {
         enf clk' - clk - 2 + 1 = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce!(eq!(
                 add!(sub!(sub!(access!(clk, 1), access!(clk)), int!(2)), int!(1)),
                 int!(0)
@@ -318,18 +302,15 @@ fn multi_arithmetic_ops_different_precedence() {
     // 3. Addition/Subtraction
     // These operations are evaluated in the order of decreasing precedence.
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce!(eq!(
-                sub!(
-                    sub!(exp!(access!(clk, 1), int!(2)), mul!(access!(clk), int!(2))),
-                    int!(1)
-                ),
+                sub!(sub!(exp!(access!(clk, 1), int!(2)), mul!(access!(clk), int!(2))), int!(1)),
                 int!(0)
             ))],
         ),
@@ -353,18 +334,15 @@ fn multi_arithmetic_ops_different_precedence_w_parens() {
     // 3. Multiplication
     // 4. Addition/Subtraction
     // These operations are evaluated in the order of decreasing precedence.
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce!(eq!(
-                sub!(
-                    access!(clk, 1),
-                    mul!(exp!(access!(clk), int!(2)), sub!(int!(2), int!(1)))
-                ),
+                sub!(access!(clk, 1), mul!(exp!(access!(clk), int!(2)), sub!(int!(2), int!(1)))),
                 int!(0)
             ))],
         ),

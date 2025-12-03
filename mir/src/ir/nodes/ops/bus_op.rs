@@ -1,8 +1,10 @@
-use crate::ir::{BackLink, Builder, Bus, Child, Link, Node, Op, Owner, Parent, Singleton};
-use miden_diagnostics::{SourceSpan, Spanned};
 use std::hash::Hash;
 
-#[derive(Clone, PartialEq, Eq, Debug, Default, Hash)]
+use miden_diagnostics::{SourceSpan, Spanned};
+
+use crate::ir::{BackLink, Builder, Bus, Child, Link, Node, Op, Owner, Parent, Singleton};
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 pub enum BusOpKind {
     #[default]
     Insert,

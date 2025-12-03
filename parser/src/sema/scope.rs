@@ -22,6 +22,7 @@ pub type Env<K, V> = Box<HashMap<K, V>>;
 /// When searching for keys, the search begins in the current scope, and searches upwards
 /// in the scope tree until either the root is reached and the search terminates, or the
 /// key is found in some intervening scope.
+#[derive(Debug)]
 pub enum LexicalScope<K, V> {
     /// An empty scope, this is the default state in which all [LexicalScope] start
     Empty,
@@ -78,7 +79,7 @@ where
             Self::Empty | Self::Root(_) => (),
             Self::Nested(parent, _) => {
                 *self = Rc::unwrap_or_clone(parent);
-            }
+            },
         }
     }
 }
@@ -98,9 +99,9 @@ where
                 env.insert(k, v);
                 *self = Self::Root(env);
                 None
-            }
-            Self::Root(ref mut env) => env.insert(k, v),
-            Self::Nested(_, ref mut env) => env.insert(k, v),
+            },
+            Self::Root(env) => env.insert(k, v),
+            Self::Nested(_, env) => env.insert(k, v),
         }
     }
 
@@ -111,8 +112,8 @@ where
     {
         match self {
             Self::Empty => None,
-            Self::Root(ref env) => env.get(key),
-            Self::Nested(ref parent, ref env) => env.get(key).or_else(|| parent.get(key)),
+            Self::Root(env) => env.get(key),
+            Self::Nested(parent, env) => env.get(key).or_else(|| parent.get(key)),
         }
     }
 
@@ -123,10 +124,10 @@ where
     {
         match self {
             Self::Empty => None,
-            Self::Root(ref mut env) => env.get_mut(key),
-            Self::Nested(ref mut parent, ref mut env) => env
-                .get_mut(key)
-                .or_else(|| Rc::get_mut(parent).and_then(|p| p.get_mut(key))),
+            Self::Root(env) => env.get_mut(key),
+            Self::Nested(parent, env) => {
+                env.get_mut(key).or_else(|| Rc::get_mut(parent).and_then(|p| p.get_mut(key)))
+            },
         }
     }
 
@@ -137,10 +138,10 @@ where
     {
         match self {
             Self::Empty => None,
-            Self::Root(ref env) => env.get_key_value(key),
-            Self::Nested(ref parent, ref env) => {
+            Self::Root(env) => env.get_key_value(key),
+            Self::Nested(parent, env) => {
                 env.get_key_value(key).or_else(|| parent.get_key_value(key))
-            }
+            },
         }
     }
 

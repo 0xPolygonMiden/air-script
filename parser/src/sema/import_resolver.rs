@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::ops::ControlFlow;
+use std::{collections::HashMap, ops::ControlFlow};
 
 use miden_diagnostics::{DiagnosticsHandler, Severity, Spanned};
 
@@ -48,28 +47,28 @@ impl VisitMut<SemanticAnalysisError> for ImportResolver<'_> {
         for import in imports.values_mut() {
             match import {
                 Import::All { module: from } => {
-                    let imported_from = match self
-                        .library
-                        .get(from)
-                        .ok_or(SemanticAnalysisError::ImportUndefined(*from))
-                    {
-                        Ok(value) => value,
-                        Err(err) => return ControlFlow::Break(err),
-                    };
-                    for export in imported_from.exports() {
-                        let name = export.name();
-                        let item = Identifier::new(from.span(), name.name());
-                        self.import(module, *from, item, export)?;
+                    let submodules = self.library.get_submodules_of(from);
+                    for submodule in submodules {
+                        let imported_from = match self
+                            .library
+                            .get(&submodule)
+                            .ok_or(SemanticAnalysisError::ImportUndefined(submodule.clone()))
+                        {
+                            Ok(value) => value,
+                            Err(err) => return ControlFlow::Break(err),
+                        };
+                        for export in imported_from.exports() {
+                            let name = export.name();
+                            let item = Identifier::new(from.span(), name.name());
+                            self.import(module, from.clone(), item, export)?;
+                        }
                     }
-                }
-                Import::Partial {
-                    module: from,
-                    items,
-                } => {
+                },
+                Import::Partial { module: from, items } => {
                     let imported_from = match self
                         .library
                         .get(from)
-                        .ok_or(SemanticAnalysisError::ImportUndefined(*from))
+                        .ok_or(SemanticAnalysisError::ImportUndefined(from.clone()))
                     {
                         Ok(value) => value,
                         Err(err) => return ControlFlow::Break(err),
@@ -81,10 +80,10 @@ impl VisitMut<SemanticAnalysisError> for ImportResolver<'_> {
                         // with the item in the set, not the span associated with the
                         // export.
                         if let Some(item) = items.get(&name) {
-                            self.import(module, *from, *item, export)?;
+                            self.import(module, from.clone(), *item, export)?;
                         }
                     }
-                }
+                },
             }
         }
 
@@ -148,13 +147,13 @@ impl ImportResolver<'_> {
                                 prev: id.span(),
                             })
                         }
-                    }
+                    },
                     Entry::Vacant(entry) => {
                         entry.insert(from);
                         ControlFlow::Continue(())
-                    }
+                    },
                 }
-            }
+            },
         }
     }
 
@@ -197,13 +196,13 @@ impl ImportResolver<'_> {
                                 prev: id.span(),
                             })
                         }
-                    }
+                    },
                     Entry::Vacant(entry) => {
                         entry.insert(from);
                         ControlFlow::Continue(())
-                    }
+                    },
                 }
-            }
+            },
         }
     }
 }

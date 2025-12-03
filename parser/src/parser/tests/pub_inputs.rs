@@ -1,8 +1,7 @@
 use miden_diagnostics::{SourceSpan, Span};
 
-use crate::{ast::*, parser::ParseError};
-
 use super::ParseTest;
+use crate::{ast::*, parser::ParseError};
 
 // PUBLIC INPUTS
 // ================================================================================================
@@ -29,10 +28,10 @@ fn public_inputs_vec() {
         enf clk = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1)]));
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
     expected.public_inputs.insert(
         ident!(program_hash),
         PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(program_hash), 4),
@@ -43,15 +42,10 @@ fn public_inputs_vec() {
     );
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
-    expected.integrity_constraints = Some(Span::new(
-        SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(access!(clk), int!(0)))],
-    ));
+    expected.integrity_constraints =
+        Some(Span::new(SourceSpan::UNKNOWN, vec![enforce!(eq!(access!(clk), int!(0)))]));
     ParseTest::new().expect_module_ast(source, expected);
 }
 
@@ -77,29 +71,22 @@ fn public_inputs_table() {
         enf clk = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1)]));
-    expected.public_inputs.insert(
-        ident!(a),
-        PublicInput::new_table(SourceSpan::UNKNOWN, ident!(a), 4),
-    );
-    expected.public_inputs.insert(
-        ident!(b),
-        PublicInput::new_table(SourceSpan::UNKNOWN, ident!(b), 32),
-    );
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
+    expected
+        .public_inputs
+        .insert(ident!(a), PublicInput::new_table(SourceSpan::UNKNOWN, ident!(a), 4));
+    expected
+        .public_inputs
+        .insert(ident!(b), PublicInput::new_table(SourceSpan::UNKNOWN, ident!(b), 32));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
-    expected.integrity_constraints = Some(Span::new(
-        SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(access!(clk), int!(0)))],
-    ));
+    expected.integrity_constraints =
+        Some(Span::new(SourceSpan::UNKNOWN, vec![enforce!(eq!(access!(clk), int!(0)))]));
     ParseTest::new().expect_module_ast(source, expected);
 }
 

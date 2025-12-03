@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic, Pipeline};
+use super::{compile_from_source, expect_diagnostic};
 
 #[test]
 fn boundary_constraint_with_constants() {
@@ -21,8 +21,7 @@ fn boundary_constraint_with_constants() {
         enf clk' = clk - 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -45,8 +44,7 @@ fn integrity_constraint_with_constants() {
         enf clk' = clk + A + B[1] - C[1][2];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -68,14 +66,5 @@ fn invalid_matrix_constant() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "invalid matrix literal: mismatched dimensions",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "invalid matrix literal: mismatched dimensions",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "invalid matrix literal: mismatched dimensions");
 }

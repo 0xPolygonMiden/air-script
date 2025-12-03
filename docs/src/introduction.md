@@ -6,6 +6,9 @@
 
 Currently, AirScript is on version 0.3, which includes about 95% of features needed to describe Miden VM constraints, and supports generation of constraint evaluation code for the following backends:
 
+- **Winterfell**: Generates Rust code implementing the `Air` trait for the [Winterfell prover](https://github.com/facebook/winterfell)
+- **ACE**: Generates arithmetic circuits for Miden VM's ACE (Arithmetic Circuit Evaluation) chiplet for recursive proof verification
+
 AirScript includes the following features:
 
 - **Trace Columns**: Users can declare trace columns for the main trace as individual columns or groups of columns (e.g. `main: [a, b, c[3], d],` where `a`, `b`, and `d` are single columns and `c` refers to a group of 3 columns)
@@ -43,20 +46,20 @@ There is a command-line interface available for emitting constraint evaluation c
 
 To use the CLI, first run:
 
-```
+```ignore
 cargo build --release
 ```
 
 Then, run the `airc` target with the `transpile` option. For example:
 
-```
+```ignore
 ./target/release/airc transpile examples/example.air
 ```
 This will output constraint evaluation code targeted for the Winterfell prover.
 
 You can use the `help` option to see other available options.
 
-```
+```ignore
 ./target/release/airc transpile --help
 ```
 
@@ -65,13 +68,13 @@ You can use the `help` option to see other available options.
 The following changes are some of the improvements under consideration for future releases.
 
 - more advanced language functionality for better ergonomics and modularity, such as:
-  - support for functions.
-  - specialized expressions for multiset checks.
+  - multi-table constraints.
+  - type system.
 - optimizations, such as:
   - constant folding.
   - removing unnecessary nodes from the `AlgebraicGraph` of boundary and integrity constraints.
   - combining integrity constraints with mutually exclusive selectors to reduce the total number of constraints.
-  - Optimizing constraint evaluation logic for Miden assembly backend.
 - additional language targets for simplifying verifier implementations:
-  - Solidity.
+  - Plonky3 AirBuilder.
+  - JSON-based constraint syntax.
 - formal verification

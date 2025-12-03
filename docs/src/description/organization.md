@@ -12,7 +12,7 @@ All modules must start with a module name declaration followed by a set of sourc
 | [trace columns](./declarations.md#execution-trace-trace_columns)                      | required    | not allowed       |
 | [public inputs](./declarations.md#public-inputs-public_inputs)                        | required    | not allowed       |
 | [periodic columns](./declarations.md#periodic-columns-periodic_columns)               | optional    | optional          |
-| [buses](./declarations.md#buses-buses)                                                | optional    | optional          |
+| [buses](./declarations.md#buses-buses)                                                | optional    | not allowed       |
 | [boundary constraints](./constraints.md#boundary-constraints-boundary_constraints)    | required    | not allowed       |
 | [integrity constraints](./constraints.md#integrity-constraints-integrity_constraints) | required    | not allowed       |
 | [evaluators](./evaluators.md)                                                         | optional    | optional          |
@@ -21,11 +21,11 @@ Note that constants and evaluators are not really distinct sections but rather a
 
 ### Root module
 A root module defines an entrypoint into an AirScript project. It must start with a name declaration which consists of a `def` keyword followed by the name of the AIR project. For example:
-```
+```air
 def ExampleAir
 ```
 where the name of the module must:
-- Be a string consisting of alpha-numeric characters and underscores.
+- Be a string consisting of alphanumeric characters and underscores.
 - Start with a letter.
 - End with a newline.
 
@@ -40,33 +40,38 @@ To aid with boundary and integrity constraint descriptions, a root module may al
 
 ### Library modules
 Library modules can be used to split integrity constraint descriptions across multiple files. A library module must start with a name declaration which consists of a `mod` keyword followed by the name of the module. For example:
-```
+```air
 mod example_module
 ```
 where the name of the module must:
-- Be the same as the name of the file in which the library module is defined (e.g., the above module must be located in `example_module.air` file).
-- Be a string consisting of alpha-numeric characters and underscores.
+- Be the same as the name of the file in which the library module is defined (e.g., the above module must be located in `example_module.air` file, or alternatively in example_module/mod.air).
+- Be a string consisting of alphanumeric characters and underscores.
 - Start with a letter.
 - End with a newline.
 
-Besides the name declaration, library modules may contain definitions of constants, evaluators, and periodic columns. Constants and evaluators defined in a library module may be imported by a root or other library modules.
+Besides the name declaration, library modules my contain definitions of constants, evaluators, and periodic columns. Constants and evaluators defined in a library module may be imported by a root or other library modules.
+
+Library modules inherit buses declarations of the root module. That is, evaluators defined in a library module can reference buses declared in the root module.
 
 ## Importing evaluators
 A module can import constants and evaluators from library modules via a `use` statement. For example:
-```
-use my_module::my_evaluator
-use my_module::my_constant
+```air
+use my_module::my_evaluator;
+use my_module::my_constant;
+use utils::my_second_module::my_second_evaluator;
 ```
 where:
 - `my_module` is a library module located in the same directory as the importing module.
+- `my_second_module` is a library module located in the `./utils` directory compared to the importing module.
 - `my_evaluator` and `my_constant` is an evaluator and a constant defined in `my_module`.
+- `my_second_evaluator` is an evaluator defined in `my_second_module`.
 
 Once an evaluator or a constant is imported, it can be used in the same way as evaluators and constants defined in the importing module.
 
-To import multiple evaluators and constants, multiple `use` statements must be used:
-```
-use my_module::foo
-use my_module::bar
-use my_other_module::baz
+To import multiple evaluators and constants, multiple `use` statements can be used, or a wildcard can import all the exported symbols:
+```air
+use my_module::foo;
+use my_module::bar;
+use my_other_module::*;
 ```
 `use` statements can appear anywhere in the module file.

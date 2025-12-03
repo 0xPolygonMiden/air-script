@@ -3,7 +3,7 @@ use miden_diagnostics::{Diagnostic, Label, SourceSpan, Spanned, ToDiagnostic};
 use crate::ast::{Identifier, InvalidExprError, InvalidTypeError, ModuleId};
 
 /// Represents the various module validation errors we might encounter during semantic analysis.
-#[derive(Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum SemanticAnalysisError {
     #[error("root module is missing")]
     MissingRoot,
@@ -44,7 +44,7 @@ impl PartialEq for SemanticAnalysisError {
             (Self::ImportUndefined(lm), Self::ImportUndefined(rm)) => lm == rm,
             (Self::ImportConflict { item: li, .. }, Self::ImportConflict { item: ri, .. }) => {
                 li == ri
-            }
+            },
             (Self::InvalidExpr(l), Self::InvalidExpr(r)) => l == r,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
@@ -75,7 +75,7 @@ impl ToDiagnostic for SemanticAnalysisError {
             Self::ImportUndefined(from) => Diagnostic::error()
                 .with_message("invalid import")
                 .with_labels(vec![Label::primary(from.span().source_id(), from.span())
-                    .with_message(format!("no such item in '{}'", from))]),
+                    .with_message(format!("no such item in '{from}'"))]),
             Self::ImportSelf(span) => Diagnostic::error()
                 .with_message("invalid import")
                 .with_labels(vec![Label::primary(span.source_id(), span)
@@ -83,7 +83,7 @@ impl ToDiagnostic for SemanticAnalysisError {
             Self::ImportConflict { item, prev } => Diagnostic::error()
                 .with_message("conflicting import")
                 .with_labels(vec![Label::primary(item.span().source_id(), item.span())
-                    .with_message(format!("the item '{}' is imported here", item)),
+                    .with_message(format!("the item '{item}' is imported here")),
                                   Label::secondary(prev.source_id(), prev)
                     .with_message("but it conflicts with an item of the same name here")]),
             Self::ImportFailed(span) => Diagnostic::error()

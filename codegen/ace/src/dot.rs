@@ -1,10 +1,13 @@
-use crate::circuit::{ArithmeticOp, Circuit, Node, OperationNode};
-use crate::layout::StarkVar;
 use std::fmt::{Display, Write};
+
+use crate::{
+    circuit::{ArithmeticOp, Circuit, Node, OperationNode},
+    layout::StarkVar,
+};
 
 impl Circuit {
     /// Serialization to Graphviz Dot format for debugging purposes. Display on
-    /// https://dreampuf.github.io/GraphvizOnline or using `dot -Tsvg tests/regressions/0.dot > 0.svg`
+    /// <https://dreampuf.github.io/GraphvizOnline> or using `dot -Tsvg tests/regressions/0.dot > 0.svg`
     pub fn to_dot(&self) -> Result<String, std::fmt::Error> {
         let mut f = String::new();
         writeln!(f, "digraph G {{")?;
@@ -25,9 +28,8 @@ impl Circuit {
         }
 
         // Random values
-        for (idx, node) in self.layout.random_values.iter_nodes().enumerate() {
-            writeln!(f, "{node} [label=\"R[{idx}]\"]")?;
-        }
+        writeln!(f, "{} [label=\"α\"]", self.layout.random_alpha_node())?;
+        writeln!(f, "{} [label=\"β\"]", self.layout.random_beta_node())?;
 
         // Main
         for (idx, node) in self.layout.trace_segments[0][0].iter_nodes().enumerate() {
@@ -61,10 +63,7 @@ impl Circuit {
         for (op_idx, op_node) in self.operations.iter().enumerate() {
             let OperationNode { op, node_l, node_r } = op_node;
             let op_node = Node::Operation(op_idx);
-            writeln!(
-                f,
-                "{op_node} [label=\"{op_node}\\n{node_l} {op} {node_r}\"]"
-            )?;
+            writeln!(f, "{op_node} [label=\"{op_node}\\n{node_l} {op} {node_r}\"]")?;
             writeln!(f, "{node_l} -> {op_node}")?;
             writeln!(f, "{node_r} -> {op_node}")?;
         }
@@ -84,7 +83,7 @@ impl Display for StarkVar {
             Self::ZMaxCycle => "zᵐᵃˣ",
             Self::Alpha => "⍺",
         };
-        write!(f, "{}", str)
+        write!(f, "{str}")
     }
 }
 
@@ -93,13 +92,13 @@ impl Display for Node {
         match self {
             Node::Input(idx) => {
                 write!(f, "input{idx}")
-            }
+            },
             Node::Constant(idx) => {
                 write!(f, "const{idx}")
-            }
+            },
             Node::Operation(idx) => {
                 write!(f, "op{idx}")
-            }
+            },
         }
     }
 }
@@ -111,6 +110,6 @@ impl Display for ArithmeticOp {
             ArithmeticOp::Mul => "×",
             ArithmeticOp::Add => "+",
         };
-        write!(f, "{}", str)
+        write!(f, "{str}")
     }
 }

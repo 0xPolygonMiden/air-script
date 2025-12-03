@@ -47,7 +47,7 @@ impl Air for FunctionsAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(5), TransitionConstraintDegree::new(5), TransitionConstraintDegree::new(4), TransitionConstraintDegree::new(5), TransitionConstraintDegree::new(5), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(5), TransitionConstraintDegree::new(1)];
+        let main_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(5), TransitionConstraintDegree::new(5), TransitionConstraintDegree::new(4), TransitionConstraintDegree::new(5), TransitionConstraintDegree::new(5), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1)];
         let aux_degrees = vec![];
         let num_main_assertions = 1;
         let num_aux_assertions = 0;
@@ -89,8 +89,7 @@ impl Air for FunctionsAir {
         result[4] = main_current[0] * main_current[4] * main_current[5] * main_current[6] * main_current[7] - E::ONE;
         result[5] = main_current[1] + (main_current[4] + main_current[5] + main_current[6] + main_current[7]) * main_current[4] * main_current[5] * main_current[6] * main_current[7] - E::ONE;
         result[6] = main_current[4] + main_current[5] + main_current[6] + main_current[7] - E::ONE;
-        result[7] = (main_current[4] + main_current[5] + main_current[6] + main_current[7]) * main_current[4] * main_current[5] * main_current[6] * main_current[7] - E::ONE;
-        result[8] = (main_current[4] + main_current[5] + main_current[6] + main_current[7]) * E::from(Felt::new(4_u64)) - E::ONE;
+        result[7] = (main_current[4] + main_current[5] + main_current[6] + main_current[7]) * E::from(Felt::new(4_u64)) - E::ONE;
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxRandElements<E>, result: &mut [E])

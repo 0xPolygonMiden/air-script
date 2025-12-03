@@ -8,14 +8,39 @@ mod sema;
 pub mod symbols;
 pub mod transforms;
 
-pub use self::parser::{ParseError, Parser};
-pub use self::sema::{LexicalScope, SemanticAnalysisError};
-pub use self::symbols::Symbol;
+use std::{path::Path, sync::Arc};
 
-use std::path::Path;
-use std::sync::Arc;
-
+use air_pass::Pass;
 use miden_diagnostics::{CodeMap, DiagnosticsHandler};
+
+pub use self::{
+    parser::{ParseError, Parser},
+    sema::{LexicalScope, SemanticAnalysisError},
+    symbols::Symbol,
+};
+use crate::ast::Program;
+
+/// Abstracts the various passes done on the AST representation of the program.
+pub struct AstPasses<'a> {
+    diagnostics: &'a DiagnosticsHandler,
+}
+
+impl<'a> AstPasses<'a> {
+    pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
+        Self { diagnostics }
+    }
+}
+
+impl Pass for AstPasses<'_> {
+    type Input<'a> = Program;
+    type Output<'a> = Program;
+    type Error = SemanticAnalysisError;
+
+    fn run<'a>(&mut self, input: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
+        let mut passes = transforms::ConstantPropagation::new(self.diagnostics);
+        passes.run(input)
+    }
+}
 
 /// Parses the provided source and returns the AST.
 pub fn parse(
@@ -29,7 +54,7 @@ pub fn parse(
         Err(ParseError::Lexer(err)) => {
             diagnostics.emit(err);
             Err(ParseError::Failed)
-        }
+        },
         Err(err) => Err(err),
     }
 }
@@ -46,7 +71,7 @@ pub fn parse_file<P: AsRef<Path>>(
         Err(ParseError::Lexer(err)) => {
             diagnostics.emit(err);
             Err(ParseError::Failed)
-        }
+        },
         Err(err) => Err(err),
     }
 }
@@ -56,7 +81,7 @@ pub fn parse_file<P: AsRef<Path>>(
 /// This is primarily provided for use in tests, you should generally prefer [parse]
 pub fn parse_str(source: &str) -> Result<ast::Program, ParseError> {
     use miden_diagnostics::{
-        term::termcolor::ColorChoice, DefaultEmitter, DiagnosticsConfig, Verbosity,
+        DefaultEmitter, DiagnosticsConfig, Verbosity, term::termcolor::ColorChoice,
     };
 
     let codemap = Arc::new(CodeMap::new());
@@ -85,7 +110,7 @@ pub(crate) fn parse_module_from_file<P: AsRef<Path>>(
         Err(ParseError::Lexer(err)) => {
             diagnostics.emit(err);
             Err(ParseError::Failed)
-        }
+        },
         err @ Err(_) => err,
     }
 }
@@ -104,7 +129,7 @@ pub(crate) fn parse_module(
         Err(ParseError::Lexer(err)) => {
             diagnostics.emit(err);
             Err(ParseError::Failed)
-        }
+        },
         err @ Err(_) => err,
     }
 }

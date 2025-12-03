@@ -5,7 +5,26 @@ use miden_diagnostics::{SourceSpan, Spanned};
 use super::*;
 
 /// The id of a trace segment is its index in the trace_columns declaration
-pub type TraceSegmentId = usize;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum TraceSegmentId {
+    Main = 0,
+    Aux = 1,
+}
+
+impl fmt::Display for TraceSegmentId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TraceSegmentId::Main => write!(f, "main"),
+            TraceSegmentId::Aux => write!(f, "aux"),
+        }
+    }
+}
+
+impl From<TraceSegmentId> for usize {
+    fn from(value: TraceSegmentId) -> Self {
+        value as usize
+    }
+}
 
 /// The index of a column in a particular trace segment
 pub type TraceColumnIndex = usize;
@@ -29,7 +48,8 @@ pub struct TraceSegment {
     pub boundary_constrained: Vec<Span<ColumnBoundaryFlags>>,
 }
 impl TraceSegment {
-    /// Constructs a new [TraceSegment] given a span, segment id, name, and a vector of (Identifier, size) pairs.
+    /// Constructs a new [TraceSegment] given a span, segment id, name, and a vector of (Identifier,
+    /// size) pairs.
     pub fn new(
         span: SourceSpan,
         id: TraceSegmentId,
@@ -44,14 +64,7 @@ impl TraceSegment {
                 1 => Type::Felt,
                 n => Type::Vector(n),
             };
-            bindings.push(TraceBinding::new(
-                binding.span(),
-                name,
-                id,
-                offset,
-                size,
-                ty,
-            ));
+            bindings.push(TraceBinding::new(binding.span(), name, id, offset, size, ty));
             offset += size;
         }
 
@@ -108,10 +121,7 @@ impl fmt::Debug for TraceSegment {
             .field("name", &self.name)
             .field("size", &self.size)
             .field("bindings", &self.bindings)
-            .field(
-                "boundary_constrained",
-                &FormatConstrainedFlags(&self.boundary_constrained),
-            )
+            .field("boundary_constrained", &FormatConstrainedFlags(&self.boundary_constrained))
             .finish()
     }
 }
@@ -119,7 +129,7 @@ impl fmt::Display for TraceSegment {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.name.is_generated() {
             if let Some(name) = self.name.as_str().strip_prefix('$') {
-                write!(f, "{}: ", name)?;
+                write!(f, "{name}: ")?;
             } else {
                 write!(f, "{}: ", self.name)?;
             }
@@ -195,16 +205,14 @@ impl std::ops::BitAnd<Boundary> for ColumnBoundaryFlags {
 struct FormatConstrainedFlags<'a>(&'a [Span<ColumnBoundaryFlags>]);
 impl fmt::Debug for FormatConstrainedFlags<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_list()
-            .entries(self.0.iter().map(|c| c.item))
-            .finish()
+        f.debug_list().entries(self.0.iter().map(|c| c.item)).finish()
     }
 }
 
 /// [TraceBinding] is used to represent one or more columns in the execution trace that are bound to
 /// a name. For single columns, the size is 1. For groups, the size is the number of columns in the
 /// group. The offset is the column index in the trace where the first column of the binding starts.
-#[derive(Copy, Clone, Spanned)]
+#[derive(Clone, Spanned)]
 pub struct TraceBinding {
     #[span]
     pub span: SourceSpan,
@@ -218,6 +226,8 @@ pub struct TraceBinding {
     pub size: usize,
     /// The effective type of this binding
     pub ty: Type,
+    /// The access type associated to this TraceBinding
+    pub access: AccessType,
 }
 impl TraceBinding {
     /// Creates a new trace binding.
@@ -236,53 +246,77 @@ impl TraceBinding {
             offset,
             size,
             ty,
+            access: AccessType::Default,
         }
     }
 
     /// Returns a [Type] that describes what type of value this binding represents
     #[inline]
     pub fn ty(&self) -> Type {
-        self.ty
+        match self.access.clone() {
+            AccessType::Default => self.ty,
+            AccessType::Slice(range_expr) => Type::Vector(range_expr.to_slice_range().len()),
+            AccessType::Index(_) => Type::Felt,
+            AccessType::Matrix(..) => {
+                unreachable!("matrix access not supported on trace bindings")
+            },
+        }
     }
 
     #[inline]
     pub fn is_scalar(&self) -> bool {
-        self.ty.is_scalar()
+        self.ty().is_scalar()
+    }
+
+    /// Returns the size of the trace binding, taking into account how it is accessed
+    pub fn tb_size(&self) -> usize {
+        match self.ty() {
+            Type::Vector(len) => len,
+            Type::Felt => 1,
+            _ => self.size,
+        }
     }
 
     /// Derive a new [TraceBinding] derived from the current one given an [AccessType]
     pub fn access(&self, access_type: AccessType) -> Result<Self, InvalidAccessError> {
-        match access_type {
-            AccessType::Default => Ok(*self),
-            AccessType::Slice(_) if self.is_scalar() => Err(InvalidAccessError::SliceOfScalar),
-            AccessType::Slice(range) => {
-                let slice_range = range.to_slice_range();
-                if slice_range.end > self.size {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                } else {
-                    let offset = self.offset + slice_range.start;
-                    let size = slice_range.len();
-                    Ok(Self {
-                        offset,
-                        size,
-                        ty: Type::Vector(size),
-                        ..*self
-                    })
-                }
-            }
-            AccessType::Index(_) if self.is_scalar() => Err(InvalidAccessError::IndexIntoScalar),
-            AccessType::Index(idx) if idx >= self.size => Err(InvalidAccessError::IndexOutOfBounds),
-            AccessType::Index(idx) => {
-                let offset = self.offset + idx;
-                Ok(Self {
-                    offset,
-                    size: 1,
-                    ty: Type::Felt,
-                    ..*self
-                })
-            }
-            AccessType::Matrix(_, _) => Err(InvalidAccessError::IndexIntoScalar),
+        let combined_access = match (self.access.clone(), access_type.clone()) {
+            (AccessType::Default, _) => access_type,
+            (_, AccessType::Default) => self.access.clone(),
+            (AccessType::Slice(range_expr), AccessType::Slice(range_expr1)) => {
+                let range_expr = range_expr.to_slice_range();
+                let range_expr1 = range_expr1.to_slice_range();
+                let combined_range =
+                    (range_expr.start + range_expr1.start)..(range_expr.end + range_expr1.end);
+                AccessType::Slice(combined_range.into())
+            },
+            (AccessType::Slice(range_expr), AccessType::Index(index_expr)) => {
+                let range_expr_usize = range_expr.to_slice_range();
+                let new_expr = ScalarExpr::Binary(BinaryExpr::new(
+                    self.span(),
+                    BinaryOp::Add,
+                    ScalarExpr::Const(Span::new(range_expr.span(), range_expr_usize.start as u64)),
+                    *index_expr,
+                ));
+                AccessType::Index(Box::new(new_expr))
+            },
+            (AccessType::Index(_), AccessType::Index(_)) => {
+                return Err(InvalidAccessError::IndexIntoScalar);
+            },
+            (AccessType::Matrix(..), _) | (_, AccessType::Matrix(..)) => {
+                return Err(InvalidAccessError::IndexIntoScalar);
+            },
+            (expression::AccessType::Index(_), expression::AccessType::Slice(_)) => {
+                return Err(InvalidAccessError::SliceOfScalar);
+            },
+        };
+
+        if let AccessType::Index(idx) = combined_access.clone()
+            && let ScalarExpr::Const(value) = *idx
+            && value.item as usize >= self.size
+        {
+            return Err(InvalidAccessError::IndexOutOfBounds);
         }
+        Ok(Self { access: combined_access, ..*self })
     }
 }
 impl Eq for TraceBinding {}
@@ -309,18 +343,9 @@ impl fmt::Debug for TraceBinding {
 impl fmt::Display for TraceBinding {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.size == 1 {
-            write!(
-                f,
-                "{}",
-                self.name.as_ref().map(|n| n.as_str()).unwrap_or("?")
-            )
+            write!(f, "{}", self.name.as_ref().map(|n| n.as_str()).unwrap_or("?"))
         } else {
-            write!(
-                f,
-                "{}[{}]",
-                self.name.as_ref().map(|n| n.as_str()).unwrap_or("?"),
-                self.size
-            )
+            write!(f, "{}[{}]", self.name.as_ref().map(|n| n.as_str()).unwrap_or("?"), self.size)
         }
     }
 }

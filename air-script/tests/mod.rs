@@ -9,6 +9,8 @@ mod bitwise;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod buses;
 #[allow(unused_variables, dead_code, unused_mut)]
+mod computed_indices;
+#[allow(unused_variables, dead_code, unused_mut)]
 mod constant_in_range;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod constants;
@@ -38,3 +40,5 @@ mod system;
 mod trace_col_groups;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod variables;
+
+mod docs_sync;

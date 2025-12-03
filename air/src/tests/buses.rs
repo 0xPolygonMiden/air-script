@@ -1,4 +1,4 @@
-use super::{compile, expect_diagnostic, Pipeline};
+use super::{compile_from_source, expect_diagnostic};
 
 #[test]
 fn buses_in_boundary_constraints() {
@@ -29,12 +29,7 @@ fn buses_in_boundary_constraints() {
         enf a = 0;
     }";
 
-    expect_diagnostic(
-        source,
-        "buses are not implemented for this Pipeline",
-        Pipeline::WithoutMIR,
-    );
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -60,7 +55,7 @@ fn buses_in_integrity_constraints() {
     }
 
     boundary_constraints {
-        enf p.first = null;
+        enf p.first = unconstrained;
         enf q.first = null;
         enf p.last = inputs;
         enf q.last = inputs;
@@ -74,12 +69,7 @@ fn buses_in_integrity_constraints() {
         q.remove(1, 2) with 2;
     }";
 
-    expect_diagnostic(
-        source,
-        "buses are not implemented for this Pipeline",
-        Pipeline::WithoutMIR,
-    );
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 // Tests that should return errors
@@ -110,8 +100,7 @@ fn err_buses_boundaries_to_const() {
         enf a = 0;
     }";
 
-    expect_diagnostic(source, "error: invalid constraint", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "error: invalid constraint", Pipeline::WithMIR);
+    expect_diagnostic(source, "error: invalid constraint");
 }
 
 #[test]
@@ -140,6 +129,36 @@ fn err_trace_columns_constrained_with_null() {
         enf a = 0;
     }";
 
-    expect_diagnostic(source, "error: invalid constraint", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "error: invalid constraint", Pipeline::WithMIR);
+    expect_diagnostic(source, "error: invalid constraint");
+}
+
+#[test]
+fn err_buses_unconstrained() {
+    let source = "
+        def test
+
+    trace_columns {
+        main: [a],
+    }
+
+    buses {
+        multiset p,
+        logup q,
+    }
+
+    public_inputs {
+        inputs: [2],
+    }
+
+    boundary_constraints {
+        enf p.first = null;
+        enf p.last = null;
+        enf q.first = null;
+    }
+
+    integrity_constraints {
+        enf a = 0;
+    }";
+
+    expect_diagnostic(source, "error: invalid bus boundary");
 }

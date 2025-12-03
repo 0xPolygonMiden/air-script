@@ -13,9 +13,8 @@ use std::{convert::AsRef, fmt};
 
 use miden_diagnostics::{SourceSpan, Span, Spanned};
 
-use crate::symbols::Symbol;
-
 use super::*;
+use crate::symbols::Symbol;
 
 /// A range literal, equivalent to the interval `[start, end)`.
 pub type Range = std::ops::Range<usize>;
@@ -67,9 +66,7 @@ impl PartialEq<&Identifier> for Identifier {
 }
 impl fmt::Debug for Identifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Identifier")
-            .field(&format!("{}", &self.0.item))
-            .finish()
+        f.debug_tuple("Identifier").field(&format!("{}", &self.0.item)).finish()
     }
 }
 impl fmt::Display for Identifier {
@@ -91,8 +88,8 @@ impl From<ResolvableIdentifier> for Identifier {
 /// Represents an identifier qualified with its namespace.
 ///
 /// Identifiers in AirScript are separated into two namespaces: one for functions,
-/// and one for buses and bindings. This is because functions cannot be bound, added to or remove from,
-/// while buses and bindings cannot be called.
+/// and one for buses and bindings. This is because functions cannot be bound, added to or remove
+/// from, while buses and bindings cannot be called.
 /// So we can always disambiguate identifiers based on its usage.
 ///
 /// It is still probably best practice to avoid having name conflicts between functions,
@@ -112,7 +109,7 @@ impl NamespacedIdentifier {
 impl AsRef<Identifier> for NamespacedIdentifier {
     fn as_ref(&self) -> &Identifier {
         match self {
-            Self::Function(ref ident) | Self::Binding(ref ident) => ident,
+            Self::Function(ident) | Self::Binding(ident) => ident,
         }
     }
 }
@@ -135,7 +132,7 @@ impl fmt::Display for NamespacedIdentifier {
 /// Represents an identifier qualified with both its parent module and namespace.
 ///
 /// This represents a globally-unique identity for a declaration
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Spanned)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Spanned)]
 pub struct QualifiedIdentifier {
     pub module: ModuleId,
     #[span]
@@ -160,11 +157,11 @@ impl QualifiedIdentifier {
     pub fn is_builtin(&self) -> bool {
         use crate::symbols;
 
-        if self.module.name() == "$builtin" {
+        if self.module.len() == 1 && self.module[0].name() == "$builtin" {
             match self.item {
                 NamespacedIdentifier::Function(id) => {
                     matches!(id.name(), symbols::Sum | symbols::Prod)
-                }
+                },
                 _ => false,
             }
         } else {
@@ -185,13 +182,14 @@ impl fmt::Display for QualifiedIdentifier {
 }
 
 /// Represents an identifier which requires name resolution at some stage during lowering.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Spanned)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Spanned)]
 pub enum ResolvableIdentifier {
     /// This identifier is resolved to a local binding (i.e. function parameter or let-bound var)
     Local(#[span] Identifier),
     /// This identifier is resolved to a global binding
     Global(#[span] Identifier),
-    /// This identifier is resolved to a non-local item (i.e. module-level declaration or imported item)
+    /// This identifier is resolved to a non-local item (i.e. module-level declaration or imported
+    /// item)
     Resolved(#[span] QualifiedIdentifier),
     /// This identifier is not yet resolved or is undefined in the current scope
     Unresolved(#[span] NamespacedIdentifier),
@@ -228,7 +226,7 @@ impl ResolvableIdentifier {
     /// resolved/unresolved states
     pub fn module(&self) -> Option<ModuleId> {
         match self {
-            Self::Resolved(ref qid) => Some(*qid.as_ref()),
+            Self::Resolved(qid) => Some(qid.module.clone()),
             _ => None,
         }
     }
@@ -236,14 +234,14 @@ impl ResolvableIdentifier {
     /// Obtains a [NamespacedIdentifier] from this identifier
     #[inline]
     pub fn namespaced(&self) -> NamespacedIdentifier {
-        (*self).into()
+        self.clone().into()
     }
 
     /// Gets the [QualifiedIdentifier] if this identifier is of type `Resolved`
     #[inline]
     pub fn resolved(&self) -> Option<QualifiedIdentifier> {
         match self {
-            Self::Resolved(qid) => Some(*qid),
+            Self::Resolved(qid) => Some(qid.clone()),
             _ => None,
         }
     }
@@ -252,20 +250,20 @@ impl AsRef<Identifier> for ResolvableIdentifier {
     #[inline]
     fn as_ref(&self) -> &Identifier {
         match self {
-            Self::Local(ref id) => id,
-            Self::Global(ref id) => id,
-            Self::Resolved(ref qid) => qid.item.as_ref(),
-            Self::Unresolved(ref nid) => nid.as_ref(),
+            Self::Local(id) => id,
+            Self::Global(id) => id,
+            Self::Resolved(qid) => qid.item.as_ref(),
+            Self::Unresolved(nid) => nid.as_ref(),
         }
     }
 }
 impl fmt::Display for ResolvableIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Local(id) => write!(f, "{}", id),
-            Self::Global(id) => write!(f, "{}", id),
-            Self::Resolved(qid) => write!(f, "{}", qid),
-            Self::Unresolved(nid) => write!(f, "{}", nid),
+            Self::Local(id) => write!(f, "{id}"),
+            Self::Global(id) => write!(f, "{id}"),
+            Self::Resolved(qid) => write!(f, "{qid}"),
+            Self::Unresolved(nid) => write!(f, "{nid}"),
         }
     }
 }
@@ -306,6 +304,8 @@ pub enum Expr {
     BusOperation(BusOperation),
     /// An empty bus
     Null(Span<()>),
+    /// An unconstrained bus
+    Unconstrained(Span<()>),
 }
 impl Expr {
     /// Returns true if this expression is constant
@@ -334,42 +334,43 @@ impl Expr {
                 let rows = matrix.len();
                 let cols = matrix[0].len();
                 Some(Type::Matrix(rows, cols))
-            }
-            Self::SymbolAccess(ref access) => access.ty,
+            },
+            Self::SymbolAccess(access) => access.ty,
             Self::Binary(_) => Some(Type::Felt),
-            Self::Call(ref call) => call.ty,
-            Self::ListComprehension(ref lc) => lc.ty,
-            Self::Let(ref let_expr) => let_expr.ty(),
-            Self::BusOperation(_) | Self::Null(_) => Some(Type::Felt),
+            Self::Call(call) => call.ty,
+            Self::ListComprehension(lc) => lc.ty,
+            Self::Let(let_expr) => let_expr.ty(),
+            Self::BusOperation(_) | Self::Null(_) | Self::Unconstrained(_) => Some(Type::Felt),
         }
     }
 }
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Const(ref expr) => f.debug_tuple("Const").field(&expr.item).finish(),
-            Self::Range(ref expr) => f.debug_tuple("Range").field(&expr).finish(),
-            Self::Vector(ref expr) => f.debug_tuple("Vector").field(&expr.item).finish(),
-            Self::Matrix(ref expr) => f.debug_tuple("Matrix").field(&expr.item).finish(),
-            Self::SymbolAccess(ref expr) => f.debug_tuple("SymbolAccess").field(expr).finish(),
-            Self::Binary(ref expr) => f.debug_tuple("Binary").field(expr).finish(),
-            Self::Call(ref expr) => f.debug_tuple("Call").field(expr).finish(),
-            Self::ListComprehension(ref expr) => {
+            Self::Const(expr) => f.debug_tuple("Const").field(&expr.item).finish(),
+            Self::Range(expr) => f.debug_tuple("Range").field(&expr).finish(),
+            Self::Vector(expr) => f.debug_tuple("Vector").field(&expr.item).finish(),
+            Self::Matrix(expr) => f.debug_tuple("Matrix").field(&expr.item).finish(),
+            Self::SymbolAccess(expr) => f.debug_tuple("SymbolAccess").field(expr).finish(),
+            Self::Binary(expr) => f.debug_tuple("Binary").field(expr).finish(),
+            Self::Call(expr) => f.debug_tuple("Call").field(expr).finish(),
+            Self::ListComprehension(expr) => {
                 f.debug_tuple("ListComprehension").field(expr).finish()
-            }
-            Self::Let(ref let_expr) => write!(f, "{let_expr:#?}"),
-            Self::BusOperation(ref expr) => f.debug_tuple("BusOp").field(expr).finish(),
-            Self::Null(ref expr) => f.debug_tuple("Null").field(expr).finish(),
+            },
+            Self::Let(let_expr) => write!(f, "{let_expr:#?}"),
+            Self::BusOperation(expr) => f.debug_tuple("BusOp").field(expr).finish(),
+            Self::Null(expr) => f.debug_tuple("Null").field(expr).finish(),
+            Self::Unconstrained(expr) => f.debug_tuple("Unconstrained").field(expr).finish(),
         }
     }
 }
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Const(ref expr) => write!(f, "{}", &expr),
-            Self::Range(ref range) => write!(f, "{}", range),
-            Self::Vector(ref expr) => write!(f, "{}", DisplayList(expr.as_slice())),
-            Self::Matrix(ref expr) => {
+            Self::Const(expr) => write!(f, "{}", &expr),
+            Self::Range(range) => write!(f, "{range}"),
+            Self::Vector(expr) => write!(f, "{}", DisplayList(expr.as_slice())),
+            Self::Matrix(expr) => {
                 f.write_str("[")?;
                 for (i, col) in expr.iter().enumerate() {
                     if i > 0 {
@@ -378,21 +379,22 @@ impl fmt::Display for Expr {
                     write!(f, "{}", DisplayList(col.as_slice()))?;
                 }
                 f.write_str("]")
-            }
-            Self::SymbolAccess(ref expr) => write!(f, "{}", expr),
-            Self::Binary(ref expr) => write!(f, "{}", expr),
-            Self::Call(ref expr) => write!(f, "{}", expr),
-            Self::ListComprehension(ref expr) => write!(f, "{}", DisplayBracketed(expr)),
-            Self::Let(ref let_expr) => {
+            },
+            Self::SymbolAccess(expr) => write!(f, "{expr}"),
+            Self::Binary(expr) => write!(f, "{expr}"),
+            Self::Call(expr) => write!(f, "{expr}"),
+            Self::ListComprehension(expr) => write!(f, "{}", DisplayBracketed(expr)),
+            Self::Let(let_expr) => {
                 let display = DisplayLet {
                     let_expr,
                     indent: 0,
                     in_expr_position: true,
                 };
                 write!(f, "{display}")
-            }
-            Self::BusOperation(ref expr) => write!(f, "{}", expr),
-            Self::Null(ref _expr) => write!(f, "null"),
+            },
+            Self::BusOperation(expr) => write!(f, "{expr}"),
+            Self::Null(_expr) => write!(f, "null"),
+            Self::Unconstrained(_expr) => write!(f, "unconstrained"),
         }
     }
 }
@@ -443,19 +445,19 @@ impl TryFrom<ScalarExpr> for Expr {
     #[inline]
     fn try_from(expr: ScalarExpr) -> Result<Self, Self::Error> {
         match expr {
-            ScalarExpr::Const(spanned) => Ok(Self::Const(Span::new(
-                spanned.span(),
-                ConstantExpr::Scalar(spanned.item),
-            ))),
+            ScalarExpr::Const(spanned) => {
+                Ok(Self::Const(Span::new(spanned.span(), ConstantExpr::Scalar(spanned.item))))
+            },
             ScalarExpr::SymbolAccess(access) => Ok(Self::SymbolAccess(access)),
             ScalarExpr::Binary(expr) => Ok(Self::Binary(expr)),
             ScalarExpr::Call(expr) => Ok(Self::Call(expr)),
             ScalarExpr::BoundedSymbolAccess(_) => {
                 Err(InvalidExprError::BoundedSymbolAccess(expr.span()))
-            }
+            },
             ScalarExpr::Let(expr) => Ok(Self::Let(expr)),
             ScalarExpr::BusOperation(expr) => Ok(Self::BusOperation(expr)),
             ScalarExpr::Null(spanned) => Ok(Self::Null(spanned)),
+            ScalarExpr::Unconstrained(spanned) => Ok(Self::Unconstrained(spanned)),
         }
     }
 }
@@ -482,7 +484,8 @@ pub enum ScalarExpr {
     ///
     /// NOTE: Symbol accesses in a `ScalarExpr` context must produce scalar values.
     SymbolAccess(SymbolAccess),
-    /// A reference to a trace column on a particular boundary of the trace, which must produce a scalar
+    /// A reference to a trace column on a particular boundary of the trace, which must produce a
+    /// scalar
     ///
     /// NOTE: This is only a valid expression in boundary constraints
     BoundedSymbolAccess(BoundedSymbolAccess),
@@ -493,8 +496,8 @@ pub enum ScalarExpr {
     /// NOTE: This is only a valid scalar expression when one of the following hold:
     ///
     /// 1. The call is the top-level expression of a constraint, and is to an evaluator function
-    /// 2. The call is not the top-level expression of a constraint, and is to a pure function
-    ///    that produces a scalar value type.
+    /// 2. The call is not the top-level expression of a constraint, and is to a pure function that
+    ///    produces a scalar value type.
     ///
     /// If neither of the above are true, the call is invalid in a `ScalarExpr` context
     Call(Call),
@@ -508,6 +511,8 @@ pub enum ScalarExpr {
     BusOperation(BusOperation),
     /// An empty bus
     Null(Span<()>),
+    /// An unconstrained bus
+    Unconstrained(Span<()>),
 }
 impl ScalarExpr {
     /// Returns true if this is a constant value
@@ -515,10 +520,11 @@ impl ScalarExpr {
         matches!(self, Self::Const(_))
     }
 
-    /// Returns true if this scalar expression could expand to a block, e.g. due to a function call being inlined.
+    /// Returns true if this scalar expression could expand to a block, e.g. due to a function call
+    /// being inlined.
     pub fn has_block_like_expansion(&self) -> bool {
         match self {
-            Self::Binary(ref expr) => expr.has_block_like_expansion(),
+            Self::Binary(expr) => expr.has_block_like_expansion(),
             Self::Call(_) | Self::Let(_) => true,
             _ => false,
         }
@@ -533,16 +539,18 @@ impl ScalarExpr {
     pub fn ty(&self) -> Result<Option<Type>, SourceSpan> {
         match self {
             Self::Const(_) => Ok(Some(Type::Felt)),
-            Self::SymbolAccess(ref sym) => Ok(sym.ty),
-            Self::BoundedSymbolAccess(ref sym) => Ok(sym.column.ty),
-            Self::Binary(ref expr) => match (expr.lhs.ty()?, expr.rhs.ty()?) {
+            Self::SymbolAccess(sym) => Ok(sym.ty),
+            Self::BoundedSymbolAccess(sym) => Ok(sym.column.ty),
+            Self::Binary(expr) => match (expr.lhs.ty()?, expr.rhs.ty()?) {
                 (None, _) | (_, None) => Ok(None),
                 (Some(lty), Some(rty)) if lty == rty => Ok(Some(lty)),
                 _ => Err(expr.span()),
             },
-            Self::Call(ref expr) => Ok(expr.ty),
-            Self::Let(ref expr) => Ok(expr.ty()),
-            Self::BusOperation(_) | ScalarExpr::Null(_) => Ok(Some(Type::Felt)),
+            Self::Call(expr) => Ok(expr.ty),
+            Self::Let(expr) => Ok(expr.ty()),
+            Self::BusOperation(_) | ScalarExpr::Null(_) | ScalarExpr::Unconstrained(_) => {
+                Ok(Some(Type::Felt))
+            },
         }
     }
 }
@@ -557,7 +565,7 @@ impl TryFrom<Expr> for ScalarExpr {
                     ConstantExpr::Scalar(v) => Ok(Self::Const(Span::new(span, v))),
                     _ => Err(InvalidExprError::InvalidScalarExpr(span)),
                 }
-            }
+            },
             Expr::SymbolAccess(sym) => Ok(Self::SymbolAccess(sym)),
             Expr::Binary(bin) => Ok(Self::Binary(bin)),
             Expr::Call(call) => Ok(Self::Call(call)),
@@ -567,7 +575,7 @@ impl TryFrom<Expr> for ScalarExpr {
                 } else {
                     Ok(Self::Let(let_expr))
                 }
-            }
+            },
             invalid => Err(InvalidExprError::InvalidScalarExpr(invalid.span())),
         }
     }
@@ -592,36 +600,38 @@ impl fmt::Debug for ScalarExpr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Const(i) => f.debug_tuple("Const").field(&i.item).finish(),
-            Self::SymbolAccess(ref expr) => f.debug_tuple("SymbolAccess").field(expr).finish(),
-            Self::BoundedSymbolAccess(ref expr) => {
+            Self::SymbolAccess(expr) => f.debug_tuple("SymbolAccess").field(expr).finish(),
+            Self::BoundedSymbolAccess(expr) => {
                 f.debug_tuple("BoundedSymbolAccess").field(expr).finish()
-            }
-            Self::Binary(ref expr) => f.debug_tuple("Binary").field(expr).finish(),
-            Self::Call(ref expr) => f.debug_tuple("Call").field(expr).finish(),
-            Self::Let(ref expr) => write!(f, "{:#?}", expr),
-            Self::BusOperation(ref expr) => f.debug_tuple("BusOp").field(expr).finish(),
-            Self::Null(ref expr) => f.debug_tuple("Null").field(expr).finish(),
+            },
+            Self::Binary(expr) => f.debug_tuple("Binary").field(expr).finish(),
+            Self::Call(expr) => f.debug_tuple("Call").field(expr).finish(),
+            Self::Let(expr) => write!(f, "{expr:#?}"),
+            Self::BusOperation(expr) => f.debug_tuple("BusOp").field(expr).finish(),
+            Self::Null(expr) => f.debug_tuple("Null").field(expr).finish(),
+            Self::Unconstrained(expr) => f.debug_tuple("Unconstrained").field(expr).finish(),
         }
     }
 }
 impl fmt::Display for ScalarExpr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Const(ref value) => write!(f, "{}", value),
-            Self::SymbolAccess(ref expr) => write!(f, "{}", expr),
-            Self::BoundedSymbolAccess(ref expr) => write!(f, "{}.{}", &expr.column, &expr.boundary),
-            Self::Binary(ref expr) => write!(f, "{}", expr),
-            Self::Call(ref call) => write!(f, "{}", call),
-            Self::Let(ref let_expr) => {
+            Self::Const(value) => write!(f, "{value}"),
+            Self::SymbolAccess(expr) => write!(f, "{expr}"),
+            Self::BoundedSymbolAccess(expr) => write!(f, "{}.{}", &expr.column, &expr.boundary),
+            Self::Binary(expr) => write!(f, "{expr}"),
+            Self::Call(call) => write!(f, "{call}"),
+            Self::Let(let_expr) => {
                 let display = DisplayLet {
                     let_expr,
                     indent: 0,
                     in_expr_position: true,
                 };
                 write!(f, "{display}")
-            }
-            Self::BusOperation(ref expr) => write!(f, "{}", expr),
-            Self::Null(ref _value) => write!(f, "null"),
+            },
+            Self::BusOperation(expr) => write!(f, "{expr}"),
+            Self::Null(_value) => write!(f, "null"),
+            Self::Unconstrained(_value) => write!(f, "unconstrained"),
         }
     }
 }
@@ -697,7 +707,7 @@ impl RangeExpr {
         match (&self.start, &self.end) {
             (RangeBound::Const(start), RangeBound::Const(end)) => {
                 Some(Type::Vector(end.item.abs_diff(start.item)))
-            }
+            },
             _ => None,
         }
     }
@@ -777,7 +787,8 @@ impl BinaryExpr {
         }
     }
 
-    /// Returns true if this binary expression could expand to a block, e.g. due to a function call being inlined.
+    /// Returns true if this binary expression could expand to a block, e.g. due to a function call
+    /// being inlined.
     #[inline]
     pub fn has_block_like_expansion(&self) -> bool {
         self.lhs.has_block_like_expansion() || self.rhs.has_block_like_expansion()
@@ -848,7 +859,7 @@ impl fmt::Display for Boundary {
 }
 
 /// Represents the way an identifier is accessed/referenced in the source.
-#[derive(Hash, Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub enum AccessType {
     /// Access refers to the entire bound value
     #[default]
@@ -858,19 +869,17 @@ pub enum AccessType {
     /// Access binds the value at a specific index of an aggregate value (i.e. vector or matrix)
     ///
     /// The result type may be either a scalar or a vector, depending on the type of the aggregate
-    Index(usize),
+    Index(Box<ScalarExpr>),
     /// Access binds the value at a specific row and column of a matrix value
-    Matrix(usize, usize),
+    Matrix(Box<ScalarExpr>, Box<ScalarExpr>),
 }
 impl fmt::Display for AccessType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Default => write!(f, "direct reference by name"),
-            Self::Slice(range) => write!(
-                f,
-                "slice of elements at indices {}..{}",
-                range.start, range.end
-            ),
+            Self::Slice(range) => {
+                write!(f, "slice of elements at indices {}..{}", range.start, range.end)
+            },
             Self::Index(idx) => write!(f, "reference to element at index {idx}"),
             Self::Matrix(row, col) => write!(f, "reference to value in matrix at [{row}][{col}]"),
         }
@@ -950,9 +959,9 @@ impl SymbolAccess {
             AccessType::Default => self.access_default(access_type),
             AccessType::Slice(base_range) => {
                 self.access_slice(base_range.to_slice_range(), access_type)
-            }
-            AccessType::Index(base_idx) => self.access_index(*base_idx, access_type),
-            AccessType::Matrix(_, _) => match access_type {
+            },
+            AccessType::Index(base_idx) => self.access_index(base_idx.clone(), access_type),
+            AccessType::Matrix(..) => match access_type {
                 AccessType::Default => Ok(self.clone()),
                 _ => Err(InvalidAccessError::IndexIntoScalar),
             },
@@ -965,13 +974,11 @@ impl SymbolAccess {
             AccessType::Default => Ok(self.clone()),
             AccessType::Index(idx) => match ty {
                 Type::Felt => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Vector(len) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Vector(_) => Ok(Self {
                     access_type: AccessType::Index(idx),
                     ty: Some(Type::Felt),
                     ..self.clone()
                 }),
-                Type::Matrix(rows, _) if idx >= rows => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Matrix(_, cols) => Ok(Self {
                     access_type: AccessType::Index(idx),
                     ty: Some(Type::Vector(cols)),
@@ -985,7 +992,7 @@ impl SymbolAccess {
                     Type::Felt => Err(InvalidAccessError::IndexIntoScalar),
                     Type::Vector(len) if slice_range.end > len => {
                         Err(InvalidAccessError::IndexOutOfBounds)
-                    }
+                    },
                     Type::Vector(_) => Ok(Self {
                         access_type: AccessType::Slice(range),
                         ty: Some(Type::Vector(rlen)),
@@ -993,20 +1000,17 @@ impl SymbolAccess {
                     }),
                     Type::Matrix(rows, _) if slice_range.end > rows => {
                         Err(InvalidAccessError::IndexOutOfBounds)
-                    }
+                    },
                     Type::Matrix(_, cols) => Ok(Self {
                         access_type: AccessType::Slice(range),
                         ty: Some(Type::Matrix(rlen, cols)),
                         ..self.clone()
                     }),
                 }
-            }
+            },
             AccessType::Matrix(row, col) => match ty {
                 Type::Felt | Type::Vector(_) => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Matrix(rows, cols) if row >= rows || col >= cols => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                }
-                Type::Matrix(_, _) => Ok(Self {
+                Type::Matrix(..) => Ok(Self {
                     access_type: AccessType::Matrix(row, col),
                     ty: Some(Type::Felt),
                     ..self.clone()
@@ -1025,15 +1029,29 @@ impl SymbolAccess {
             AccessType::Default => Ok(self.clone()),
             AccessType::Index(idx) => match ty {
                 Type::Felt => unreachable!(),
-                Type::Vector(len) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Vector(_) => Ok(Self {
-                    access_type: AccessType::Index(base_range.start + idx),
+                    access_type: AccessType::Index(Box::new(ScalarExpr::Binary(BinaryExpr {
+                        span: self.span(),
+                        op: BinaryOp::Add,
+                        lhs: Box::new(ScalarExpr::Const(Span::new(
+                            self.span(),
+                            base_range.start as u64,
+                        ))),
+                        rhs: idx.clone(),
+                    }))),
                     ty: Some(Type::Felt),
                     ..self.clone()
                 }),
-                Type::Matrix(rows, _) if idx >= rows => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Matrix(_, cols) => Ok(Self {
-                    access_type: AccessType::Index(base_range.start + idx),
+                    access_type: AccessType::Index(Box::new(ScalarExpr::Binary(BinaryExpr {
+                        span: self.span(),
+                        op: BinaryOp::Add,
+                        lhs: Box::new(ScalarExpr::Const(Span::new(
+                            self.span(),
+                            base_range.start as u64,
+                        ))),
+                        rhs: idx.clone(),
+                    }))),
                     ty: Some(Type::Vector(cols)),
                     ..self.clone()
                 }),
@@ -1053,7 +1071,7 @@ impl SymbolAccess {
                     Type::Felt => unreachable!(),
                     Type::Vector(_) if slice_range.end > blen => {
                         Err(InvalidAccessError::IndexOutOfBounds)
-                    }
+                    },
                     Type::Vector(_) => Ok(Self {
                         access_type: AccessType::Slice(shifted),
                         ty: Some(Type::Vector(rlen)),
@@ -1061,20 +1079,17 @@ impl SymbolAccess {
                     }),
                     Type::Matrix(rows, _) if slice_range.end > rows => {
                         Err(InvalidAccessError::IndexOutOfBounds)
-                    }
+                    },
                     Type::Matrix(_, cols) => Ok(Self {
                         access_type: AccessType::Slice(shifted),
                         ty: Some(Type::Matrix(rlen, cols)),
                         ..self.clone()
                     }),
                 }
-            }
+            },
             AccessType::Matrix(row, col) => match ty {
                 Type::Felt | Type::Vector(_) => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Matrix(rows, cols) if row >= rows || col >= cols => {
-                    Err(InvalidAccessError::IndexOutOfBounds)
-                }
-                Type::Matrix(_, _) => Ok(Self {
+                Type::Matrix(..) => Ok(Self {
                     access_type: AccessType::Matrix(row, col),
                     ty: Some(Type::Felt),
                     ..self.clone()
@@ -1085,7 +1100,7 @@ impl SymbolAccess {
 
     fn access_index(
         &self,
-        base_idx: usize,
+        base_idx: Box<ScalarExpr>,
         access_type: AccessType,
     ) -> Result<Self, InvalidAccessError> {
         let ty = self.ty.unwrap();
@@ -1093,13 +1108,11 @@ impl SymbolAccess {
             AccessType::Default => Ok(self.clone()),
             AccessType::Index(idx) => match ty {
                 Type::Felt => Err(InvalidAccessError::IndexIntoScalar),
-                Type::Vector(len) if idx >= len => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Vector(_) => Ok(Self {
                     access_type: AccessType::Matrix(base_idx, idx),
                     ty: Some(Type::Felt),
                     ..self.clone()
                 }),
-                Type::Matrix(rows, _) if idx >= rows => Err(InvalidAccessError::IndexOutOfBounds),
                 Type::Matrix(_, cols) => Ok(Self {
                     access_type: AccessType::Matrix(base_idx, idx),
                     ty: Some(Type::Vector(cols)),
@@ -1107,7 +1120,7 @@ impl SymbolAccess {
                 }),
             },
             AccessType::Slice(_) => Err(InvalidAccessError::SliceOfMatrix),
-            AccessType::Matrix(_, _) => Err(InvalidAccessError::IndexIntoScalar),
+            AccessType::Matrix(..) => Err(InvalidAccessError::IndexIntoScalar),
         }
     }
 }
@@ -1135,9 +1148,9 @@ impl fmt::Display for SymbolAccess {
         write!(f, "{}", self.name)?;
         match &self.access_type {
             AccessType::Default => (),
-            AccessType::Index(idx) => write!(f, "[{}]", idx)?,
+            AccessType::Index(idx) => write!(f, "[{idx}]")?,
             AccessType::Slice(range) => write!(f, "[{}..{}]", range.start, range.end)?,
-            AccessType::Matrix(row, col) => write!(f, "[{}][{}]", row, col)?,
+            AccessType::Matrix(row, col) => write!(f, "[{row}][{col}]")?,
         }
         // TODO: When we change the syntax to support arbitrary offsets, we'll need to update this
         for _ in 0..self.offset {
@@ -1161,11 +1174,7 @@ pub struct BoundedSymbolAccess {
 }
 impl BoundedSymbolAccess {
     pub const fn new(span: SourceSpan, column: SymbolAccess, boundary: Boundary) -> Self {
-        Self {
-            span,
-            boundary,
-            column,
-        }
+        Self { span, boundary, column }
     }
 }
 impl Eq for BoundedSymbolAccess {}
@@ -1252,17 +1261,14 @@ impl fmt::Debug for ListComprehension {
             .field("iterables", &self.iterables)
             .field("body", self.body.as_ref())
             .field("selector", &self.selector)
+            .field("ty", &self.ty)
             .finish()
     }
 }
 impl fmt::Display for ListComprehension {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.bindings.len() == 1 {
-            write!(
-                f,
-                "{} for {} in {}",
-                &self.body, &self.bindings[0], &self.iterables[0]
-            )?;
+            write!(f, "{} for {} in {}", &self.body, &self.bindings[0], &self.iterables[0])?;
         } else {
             write!(
                 f,
@@ -1274,7 +1280,7 @@ impl fmt::Display for ListComprehension {
         }
 
         if let Some(selector) = self.selector.as_ref() {
-            write!(f, " when {}", selector)
+            write!(f, " when {selector}")
         } else {
             Ok(())
         }
@@ -1318,13 +1324,7 @@ impl fmt::Debug for BusOperation {
 }
 impl fmt::Display for BusOperation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}{}{}",
-            self.bus,
-            self.op,
-            DisplayTuple(self.args.as_slice())
-        )
+        write!(f, "{}{}{}", self.bus, self.op, DisplayTuple(self.args.as_slice()))
     }
 }
 
@@ -1357,9 +1357,9 @@ pub struct Call {
     /// The reason this field is an `Option` is two-fold:
     ///
     /// * Calls to evaluators produce no value, and thus have no type
-    /// * When parsed, the callee has not yet been resolved, so we don't know the
-    ///   type of the function being called. During semantic analysis, the callee is
-    ///   resolved and this field is set to the result type of that function.
+    /// * When parsed, the callee has not yet been resolved, so we don't know the type of the
+    ///   function being called. During semantic analysis, the callee is resolved and this field is
+    ///   set to the result type of that function.
     pub ty: Option<Type>,
 }
 impl Call {
@@ -1397,7 +1397,10 @@ impl Call {
     }
 
     fn new_builtin(span: SourceSpan, name: &str, args: Vec<Expr>, ty: Type) -> Self {
-        let builtin_module = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("$builtin"));
+        let builtin_module = ModuleId::new(
+            vec![Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("$builtin"))],
+            SourceSpan::UNKNOWN,
+        );
         let name = Identifier::new(span, Symbol::intern(name));
         let id = QualifiedIdentifier::new(builtin_module, NamespacedIdentifier::Function(name));
         Self {

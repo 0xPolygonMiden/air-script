@@ -37,10 +37,10 @@ impl BusesAir {
         self.trace_length() - self.context().num_transition_exemptions()
     }
 
-    pub fn bus_multiset_boundary_varlen<'a, const N: usize, I: IntoIterator<Item = &'a [Felt; N]> + Clone, E: FieldElement<BaseField = Felt>>(aux_rand_elements: &AuxRandElements<E>, public_inputs: &I) -> E {
+    pub fn bus_multiset_boundary_varlen<'a, const N: usize, I: IntoIterator<Item = &'a [Felt; N]>, E: FieldElement<BaseField = Felt>>(aux_rand_elements: &AuxRandElements<E>, public_inputs: I) -> E {
         let mut bus_p_last: E = E::ONE;
         let rand = aux_rand_elements.rand_elements();
-        for row in public_inputs.clone().into_iter() {
+        for row in public_inputs {
             let mut p_last = rand[0];
             for (c, p_i) in row.iter().enumerate() {
                 p_last += E::from(*p_i) * rand[c + 1];
@@ -50,10 +50,10 @@ impl BusesAir {
         bus_p_last
     }
 
-    pub fn bus_logup_boundary_varlen<'a, const N: usize, I: IntoIterator<Item = &'a [Felt; N]> + Clone, E: FieldElement<BaseField = Felt>>(aux_rand_elements: &AuxRandElements<E>, public_inputs: &I) -> E {
+    pub fn bus_logup_boundary_varlen<'a, const N: usize, I: IntoIterator<Item = &'a [Felt; N]>, E: FieldElement<BaseField = Felt>>(aux_rand_elements: &AuxRandElements<E>, public_inputs: I) -> E {
         let mut bus_q_last = E::ZERO;
         let rand = aux_rand_elements.rand_elements();
-        for row in public_inputs.clone().into_iter() {
+        for row in public_inputs {
             let mut q_last = rand[0];
             for (c, p_i) in row.iter().enumerate() {
                 let p_i = *p_i;
@@ -102,9 +102,11 @@ impl Air for BusesAir {
 
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
-        result.push(Assertion::single(0, 0, Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.inputs.iter())));
-        result.push(Assertion::single(1, 0, Self::bus_logup_boundary_varlen(aux_rand_elements, &self.inputs.iter())));
+        let reduced_inputs_multiset = Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.inputs);
+        let reduced_inputs_logup = Self::bus_logup_boundary_varlen(aux_rand_elements, &self.inputs);
+        result.push(Assertion::single(0, 0, reduced_inputs_multiset));
         result.push(Assertion::single(0, self.last_step(), E::ONE));
+        result.push(Assertion::single(1, 0, reduced_inputs_logup));
         result.push(Assertion::single(1, self.last_step(), E::ZERO));
         result
     }
@@ -122,7 +124,7 @@ impl Air for BusesAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
-        result[0] = ((aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1]) * E::from(main_current[0]) + E::ONE - E::from(main_current[0])) * aux_current[0] - ((aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1]) * (E::from(main_current[0]) - E::ONE) + E::ONE - (E::from(main_current[0]) - E::ONE)) * aux_next[0];
-        result[1] = (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * aux_current[1] + (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * E::from(main_current[0]) + (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * E::from(main_current[0]) - ((aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * aux_next[1] + (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + E::ONE * aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * E::from(Felt::new(2_u64)));
+        result[0] = ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1]) * E::from(main_current[0]) + E::ONE - E::from(main_current[0])) * aux_current[0] - ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1]) * (E::from(main_current[0]) - E::ONE) + E::ONE - (E::from(main_current[0]) - E::ONE)) * aux_next[0];
+        result[1] = (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * aux_current[1] + (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * E::from(main_current[0]) + (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * E::from(main_current[0]) - ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * aux_next[1] + (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * E::from(Felt::new(2_u64)));
     }
 }

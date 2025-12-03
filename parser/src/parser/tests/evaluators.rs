@@ -1,8 +1,7 @@
 use miden_diagnostics::{SourceSpan, Span};
 
-use crate::ast::*;
-
 use super::ParseTest;
+use crate::ast::*;
 
 // EVALUATOR FUNCTIONS
 // ================================================================================================
@@ -16,13 +15,13 @@ fn ev_fn_main_cols() {
         enf clk' = clk + 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(advance_clock),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(advance_clock),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             vec![enforce!(eq!(access!(clk, 1), add!(access!(clk), int!(1))))],
         ),
     );
@@ -50,14 +49,13 @@ fn ev_fn_call_simple() {
         enf advance_clock([clk]);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
         vec![enforce!(eq!(bounded_access!(a, Boundary::First), int!(0)))],
@@ -91,14 +89,15 @@ fn ev_fn_call() {
         enf advance_clock([a, b[1..3], c[2..4]]);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(a, 2), (b, 4), (c, 6)]
+    ));
     expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 2), (b, 4), (c, 6)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
         vec![enforce!(eq!(bounded_access!(a, Boundary::First), int!(0)))],
@@ -124,14 +123,14 @@ fn ev_fn_call_inside_ev_fn() {
         enf advance_clock([clk]);
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     let body = vec![enforce!(call!(advance_clock(vector!(access!(clk)))))];
     expected.evaluators.insert(
         ident!(ev_func),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(ev_func),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
             body,
         ),
     );
@@ -160,14 +159,15 @@ fn ev_fn_call_with_more_than_two_args() {
         enf advance_clock([a], [b], [c]);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(a, 1), (b, 1), (c, 1)]
+    ));
     expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 1), (b, 1), (c, 1)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
         vec![enforce!(eq!(bounded_access!(a, Boundary::First), int!(0)))],
@@ -188,11 +188,23 @@ fn ev_fn_call_with_more_than_two_args() {
 // ================================================================================================
 
 #[test]
-fn ev_fn_def_with_empty_final_arg() {
+fn ev_fn_def_with_multiple_args() {
     let source = "
     mod test
 
-    ev ev_func([clk], []) {
+    ev ev_func([clk], [a, b]) {
+        enf clk' = clk + 1
+    }";
+    ParseTest::new()
+        .expect_module_diagnostic(source, "evaluators must have exactly one trace segment");
+}
+
+#[test]
+fn ev_fn_def_with_empty_arg() {
+    let source = "
+    mod test
+
+    ev ev_func([]) {
         enf clk' = clk + 1
     }";
     ParseTest::new().expect_module_diagnostic(source, "the last trace segment cannot be empty");

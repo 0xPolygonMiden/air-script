@@ -1,0 +1,33 @@
+def EvaluatorsSliceAir
+
+ev is_binary([x]) {
+    enf x^2 = x;
+}
+
+trace_columns {
+    main: [a[20]],
+}
+
+public_inputs {
+    stack_inputs: [16],
+}
+
+boundary_constraints {
+    enf a.first = 0 for a in a;
+}
+
+integrity_constraints {
+    enf chiplets_constraints([a]);
+}
+
+ev chiplets_constraints([chiplets[20]]) {
+    enf chiplet_selectors([chiplets[0..5]]);  # Should expand slice to 5 args
+}
+
+ev chiplet_selectors([s[5]]) { # Expects 5 individual parameters
+    enf is_binary([s[0]]);
+    enf is_binary([s[1]]) when s[0];
+    enf is_binary([s[2]]) when s[0] & s[1];
+    enf is_binary([s[3]]) when s[0] & s[1] & s[2];
+    enf is_binary([s[4]]) when s[0] & s[1] & s[2] & s[3];
+}

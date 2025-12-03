@@ -1,4 +1,4 @@
-use super::{expect_diagnostic, Pipeline};
+use super::expect_diagnostic;
 
 #[test]
 fn err_trace_cols_empty() {
@@ -13,16 +13,7 @@ fn err_trace_cols_empty() {
     integrity_constraints {
         enf clk' = clk + 1";
 
-    expect_diagnostic(
-        source,
-        "missing 'main' declaration in this section",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "missing 'main' declaration in this section",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "missing 'main' declaration in this section");
 }
 
 #[test]
@@ -40,12 +31,7 @@ fn err_trace_cols_omitted() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "missing trace_columns section",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(source, "missing trace_columns section", Pipeline::WithMIR);
+    expect_diagnostic(source, "missing trace_columns section");
 }
 
 #[test]
@@ -64,12 +50,7 @@ fn err_pub_inputs_empty() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "expected one of: 'identifier'",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(source, "expected one of: 'identifier'", Pipeline::WithMIR);
+    expect_diagnostic(source, "expected one of: 'identifier'");
 }
 
 #[test]
@@ -87,16 +68,7 @@ fn err_pub_inputs_omitted() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "root module must contain a public_inputs section",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "root module must contain a public_inputs section",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "root module must contain a public_inputs section");
 }
 
 #[test]
@@ -115,16 +87,7 @@ fn err_bc_empty() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "expected one of: '\"enf\"', '\"let\"'",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "expected one of: '\"enf\"', '\"let\"'",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
 }
 
 #[test]
@@ -145,12 +108,6 @@ fn err_bc_omitted() {
     expect_diagnostic(
         source,
         "root module must contain both boundary_constraints and integrity_constraints sections",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "root module must contain both boundary_constraints and integrity_constraints sections",
-        Pipeline::WithMIR,
     );
 }
 
@@ -170,16 +127,7 @@ fn err_ic_empty() {
     }
     integrity_constraints {}";
 
-    expect_diagnostic(
-        source,
-        "expected one of: '\"enf\"', '\"let\"'",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "expected one of: '\"enf\"', '\"let\"'",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
 }
 
 #[test]
@@ -200,11 +148,5 @@ fn err_ic_omitted() {
     expect_diagnostic(
         source,
         "root module must contain both boundary_constraints and integrity_constraints sections",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "root module must contain both boundary_constraints and integrity_constraints sections",
-        Pipeline::WithMIR,
     );
 }

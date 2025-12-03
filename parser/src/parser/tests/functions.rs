@@ -1,8 +1,7 @@
 use miden_diagnostics::{SourceSpan, Span};
 
-use crate::ast::*;
-
 use super::ParseTest;
+use crate::ast::*;
 
 // PURE FUNCTIONS
 // ================================================================================================
@@ -16,7 +15,7 @@ fn fn_def_with_scalars() {
         return a + b;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.functions.insert(
         ident!(fn_with_scalars),
         Function::new(
@@ -39,7 +38,7 @@ fn fn_def_with_vectors() {
         return [x + y for (x, y) in (a, b)];
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.functions.insert(
         ident!(fn_with_vectors),
         Function::new(
@@ -47,10 +46,8 @@ fn fn_def_with_vectors() {
             function_ident!(fn_with_vectors),
             vec![(ident!(a), Type::Vector(12)), (ident!(b), Type::Vector(12))],
             Type::Vector(12),
-            vec![return_!(expr!(
-                lc!(((x, expr!(access!(a))), (y, expr!(access!(b)))) =>
-                add!(access!(x), access!(y)))
-            ))],
+            vec![return_!(expr!(lc!(((x, expr!(access!(a))), (y, expr!(access!(b)))) =>
+                add!(access!(x), access!(y)))))],
         ),
     );
     ParseTest::new().expect_module_ast(source, expected);
@@ -81,7 +78,7 @@ fn fn_use_scalars_and_vectors() {
             enf a' = fn_with_scalars_and_vectors(a, b);
         }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(fn_with_scalars_and_vectors),
@@ -98,7 +95,7 @@ fn fn_use_scalars_and_vectors() {
 
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 1), (b, 12)]));
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(a, 1), (b, 12)]));
 
     expected.public_inputs.insert(
         ident!(stack_inputs),
@@ -113,10 +110,7 @@ fn fn_use_scalars_and_vectors() {
         SourceSpan::UNKNOWN,
         vec![enforce!(eq!(
             access!(a, 1),
-            call!(fn_with_scalars_and_vectors(
-                expr!(access!(a)),
-                expr!(access!(b))
-            ))
+            call!(fn_with_scalars_and_vectors(expr!(access!(a)), expr!(access!(b))))
         ))],
     ));
     ParseTest::new().expect_module_ast(source, expected);
@@ -151,7 +145,7 @@ fn fn_call_in_fn() {
         enf a' = fold_scalar_and_vec(a, b);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(fold_vec),
@@ -160,9 +154,7 @@ fn fn_call_in_fn() {
             function_ident!(fold_vec),
             vec![(ident!(a), Type::Vector(12))],
             Type::Felt,
-            vec![return_!(expr!(call!(sum(expr!(
-                lc!(((x, expr!(access!(a)))) => access!(x))
-            )))))],
+            vec![return_!(expr!(call!(sum(expr!(lc!(((x, expr!(access!(a)))) => access!(x)))))))],
         ),
     );
 
@@ -173,16 +165,13 @@ fn fn_call_in_fn() {
             function_ident!(fold_scalar_and_vec),
             vec![(ident!(a), Type::Felt), (ident!(b), Type::Vector(12))],
             Type::Felt,
-            vec![return_!(expr!(add!(
-                access!(a),
-                call!(fold_vec(expr!(access!(b))))
-            )))],
+            vec![return_!(expr!(add!(access!(a), call!(fold_vec(expr!(access!(b)))))))],
         ),
     );
 
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 1), (b, 12)]));
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(a, 1), (b, 12)]));
 
     expected.public_inputs.insert(
         ident!(stack_inputs),
@@ -238,7 +227,7 @@ fn fn_call_in_ev() {
         enf evaluator(a, b);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(fold_vec),
@@ -247,9 +236,7 @@ fn fn_call_in_ev() {
             function_ident!(fold_vec),
             vec![(ident!(a), Type::Vector(12))],
             Type::Felt,
-            vec![return_!(expr!(call!(sum(expr!(
-                lc!(((x, expr!(access!(a)))) => access!(x))
-            )))))],
+            vec![return_!(expr!(call!(sum(expr!(lc!(((x, expr!(access!(a)))) => access!(x)))))))],
         ),
     );
 
@@ -260,10 +247,7 @@ fn fn_call_in_ev() {
             function_ident!(fold_scalar_and_vec),
             vec![(ident!(a), Type::Felt), (ident!(b), Type::Vector(12))],
             Type::Felt,
-            vec![return_!(expr!(add!(
-                access!(a),
-                call!(fold_vec(expr!(access!(b))))
-            )))],
+            vec![return_!(expr!(add!(access!(a), call!(fold_vec(expr!(access!(b)))))))],
         ),
     );
 
@@ -272,7 +256,7 @@ fn fn_call_in_ev() {
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(evaluator),
-            vec![trace_segment!(0, "%0", [(a, 1), (b, 12)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(a, 1), (b, 12)])],
             vec![enforce!(eq!(
                 access!(a, 1),
                 call!(fold_scalar_and_vec(expr!(access!(a)), expr!(access!(b))))
@@ -282,7 +266,7 @@ fn fn_call_in_ev() {
 
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 1), (b, 12)]));
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(a, 1), (b, 12)]));
 
     expected.public_inputs.insert(
         ident!(stack_inputs),
@@ -296,10 +280,7 @@ fn fn_call_in_ev() {
 
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(call!(evaluator(
-            expr!(access!(a)),
-            expr!(access!(b))
-        )))],
+        vec![enforce!(call!(evaluator(expr!(access!(a)), expr!(access!(b)))))],
     ));
 
     ParseTest::new().expect_module_ast(source, expected);
@@ -331,7 +312,7 @@ fn fn_as_lc_iterables() {
         enf a' = sum([operation(x, y) for (x, y) in (a, b)]);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(operation),
@@ -340,16 +321,14 @@ fn fn_as_lc_iterables() {
             function_ident!(operation),
             vec![(ident!(a), Type::Felt), (ident!(b), Type::Felt)],
             Type::Felt,
-            vec![
-                let_!(x = expr!(add!(exp!(access!(a), access!(b)), int!(1))) =>
-                return_!(expr!(exp!(access!(b), access!(x))))),
-            ],
+            vec![let_!(x = expr!(add!(exp!(access!(a), access!(b)), int!(1))) =>
+                return_!(expr!(exp!(access!(b), access!(x)))))],
         ),
     );
 
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 12), (b, 12)]));
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(a, 12), (b, 12)]));
 
     expected.public_inputs.insert(
         ident!(stack_inputs),
@@ -404,7 +383,7 @@ fn fn_call_in_binary_ops() {
         enf b[0]' = b[0] * operation(a, b);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(operation),
@@ -424,7 +403,7 @@ fn fn_call_in_binary_ops() {
 
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 12), (b, 12)]));
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(a, 12), (b, 12)]));
 
     expected.public_inputs.insert(
         ident!(stack_inputs),
@@ -433,10 +412,7 @@ fn fn_call_in_binary_ops() {
 
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(a[0], Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(a[0], Boundary::First), int!(0)))],
     ));
 
     expected.integrity_constraints = Some(Span::new(
@@ -444,17 +420,11 @@ fn fn_call_in_binary_ops() {
         vec![
             enforce!(eq!(
                 access!(a[0], 1),
-                mul!(
-                    access!(a[0], 0),
-                    call!(operation(expr!(access!(a)), expr!(access!(b))))
-                )
+                mul!(access!(a[0], 0), call!(operation(expr!(access!(a)), expr!(access!(b)))))
             )),
             enforce!(eq!(
                 access!(b[0], 1),
-                mul!(
-                    access!(b[0], 0),
-                    call!(operation(expr!(access!(a)), expr!(access!(b))))
-                )
+                mul!(access!(b[0], 0), call!(operation(expr!(access!(a)), expr!(access!(b)))))
             )),
         ],
     ));
@@ -489,7 +459,7 @@ fn fn_call_in_vector_def() {
         enf b[0]' = d[1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(root));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(root));
 
     expected.functions.insert(
         ident!(operation),
@@ -498,18 +468,16 @@ fn fn_call_in_vector_def() {
             function_ident!(operation),
             vec![(ident!(a), Type::Vector(12)), (ident!(b), Type::Vector(12))],
             Type::Vector(12),
-            vec![return_!(expr!(
-                lc!(((x, expr!(access!(a))), (y, expr!(access!(b)))) => add!(
-                    access!(x),
-                    access!(y)
-                ))
-            ))],
+            vec![return_!(expr!(lc!(((x, expr!(access!(a))), (y, expr!(access!(b)))) => add!(
+                access!(x),
+                access!(y)
+            ))))],
         ),
     );
 
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 12), (b, 12)]));
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(a, 12), (b, 12)]));
 
     expected.public_inputs.insert(
         ident!(stack_inputs),
@@ -518,10 +486,7 @@ fn fn_call_in_vector_def() {
 
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(a[0], Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(a[0], Boundary::First), int!(0)))],
     ));
 
     expected.integrity_constraints = Some(Span::new(

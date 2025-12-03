@@ -6,8 +6,8 @@ use std::{
 use miden_diagnostics::{SourceSpan, Spanned};
 
 use crate::ir::{
-    get_inner, get_inner_mut, BackLink, Evaluator, Function, Link, Node, Op, Owner, Parent,
-    Singleton,
+    BackLink, Evaluator, Function, Link, Node, Op, Owner, Parent, Singleton, get_inner,
+    get_inner_mut,
 };
 
 /// The root nodes of the MIR Graph
@@ -40,8 +40,8 @@ impl Parent for Root {
 impl Link<Root> {
     pub fn debug(&self) -> String {
         match self.borrow().deref() {
-            Root::Function(f) => format!("Root::Function: {:#?}", f),
-            Root::Evaluator(e) => format!("Root::Evaluator: {:#?}", e),
+            Root::Function(f) => format!("Root::Function: {f:#?}"),
+            Root::Evaluator(e) => format!("Root::Evaluator: {e:#?}"),
             Root::None(_) => "Root::None".to_string(),
         }
     }
@@ -58,24 +58,18 @@ impl Link<Root> {
     pub fn as_node(&self) -> Link<Node> {
         let back: BackLink<Root> = self.clone().into();
         match self.borrow_mut().deref_mut() {
-            Root::Function(Function {
-                _node: Singleton(Some(link)),
-                ..
-            }) => link.clone(),
-            Root::Function(ref mut f) => {
+            Root::Function(Function { _node: Singleton(Some(link)), .. }) => link.clone(),
+            Root::Function(f) => {
                 let node: Link<Node> = Node::Function(back).into();
                 f._node = Singleton::from(node.clone());
                 node
-            }
-            Root::Evaluator(Evaluator {
-                _node: Singleton(Some(link)),
-                ..
-            }) => link.clone(),
-            Root::Evaluator(ref mut e) => {
+            },
+            Root::Evaluator(Evaluator { _node: Singleton(Some(link)), .. }) => link.clone(),
+            Root::Evaluator(e) => {
                 let node: Link<Node> = Node::Evaluator(back).into();
                 e._node = Singleton::from(node.clone());
                 node
-            }
+            },
             Root::None(span) => Node::None(*span).into(),
         }
     }
@@ -84,30 +78,24 @@ impl Link<Root> {
     pub fn as_owner(&self) -> Link<Owner> {
         let back: BackLink<Root> = self.clone().into();
         match self.borrow_mut().deref_mut() {
-            Root::Function(Function {
-                _owner: Singleton(Some(link)),
-                ..
-            }) => link.clone(),
-            Root::Function(ref mut f) => {
+            Root::Function(Function { _owner: Singleton(Some(link)), .. }) => link.clone(),
+            Root::Function(f) => {
                 let owner: Link<Owner> = Owner::Function(back).into();
                 f._owner = Singleton::from(owner.clone());
                 owner
-            }
-            Root::Evaluator(Evaluator {
-                _owner: Singleton(Some(link)),
-                ..
-            }) => link.clone(),
-            Root::Evaluator(ref mut e) => {
+            },
+            Root::Evaluator(Evaluator { _owner: Singleton(Some(link)), .. }) => link.clone(),
+            Root::Evaluator(e) => {
                 let owner: Link<Owner> = Owner::Evaluator(back).into();
                 e._owner = Singleton::from(owner.clone());
                 owner
-            }
+            },
             Root::None(span) => Owner::None(*span).into(),
         }
     }
     /// Try getting the current [Root]'s inner [Function].
     /// Returns None if the current [Root] is not a [Function] or the Rc count is zero
-    pub fn as_function(&self) -> Option<Ref<Function>> {
+    pub fn as_function(&self) -> Option<Ref<'_, Function>> {
         get_inner(self.borrow(), |root| match root {
             Root::Function(f) => Some(f),
             _ => None,
@@ -115,7 +103,7 @@ impl Link<Root> {
     }
     /// Try getting the current [Root]'s inner [Function], borrowing mutably.
     /// Returns None if the current [Root] is not a [Function] or the Rc count is zero
-    pub fn as_function_mut(&self) -> Option<RefMut<Function>> {
+    pub fn as_function_mut(&self) -> Option<RefMut<'_, Function>> {
         get_inner_mut(self.borrow_mut(), |root| match root {
             Root::Function(f) => Some(f),
             _ => None,
@@ -123,7 +111,7 @@ impl Link<Root> {
     }
     /// Try getting the current [Root]'s inner [Evaluator].
     /// Returns None if the current [Root] is not an [Evaluator] or the Rc count is zero
-    pub fn as_evaluator(&self) -> Option<Ref<Evaluator>> {
+    pub fn as_evaluator(&self) -> Option<Ref<'_, Evaluator>> {
         get_inner(self.borrow(), |root| match root {
             Root::Evaluator(e) => Some(e),
             _ => None,
@@ -131,7 +119,7 @@ impl Link<Root> {
     }
     /// Try getting the current [Root]'s inner [Evaluator], borrowing mutably.
     /// Returns None if the current [Root] is not an [Evaluator] or the Rc count is zero
-    pub fn as_evaluator_mut(&self) -> Option<RefMut<Evaluator>> {
+    pub fn as_evaluator_mut(&self) -> Option<RefMut<'_, Evaluator>> {
         get_inner_mut(self.borrow_mut(), |root| match root {
             Root::Evaluator(e) => Some(e),
             _ => None,

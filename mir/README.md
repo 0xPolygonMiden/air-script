@@ -2,7 +2,7 @@
 
 This crate contains the middle intermediate representation for AirScript, `MIR`.
 
-The purpose of the `MIR` is to provide a representation of an AirScript program that allows for optimization and translation to `AirIR` containing the `AlgebraicGraph`
+The purpose of the `MIR` is to provide a representation of an AirScript program that allows for optimization and translation to `AirIR` containing the `AlgebraicGraph`.
 
 ## Generating the MIR
 
@@ -37,3 +37,7 @@ Although generation of an `AirIR` uses a symbol table while processing the sourc
   - a directed acyclic graph (DAG) without duplicate nodes.
   - a vector of `ConstraintRoot` for each trace segment (e.g. main), where `ConstraintRoot` contains the node index in the graph where each of the constraint starts and the constraint domain which specifies the row(s) accessed by each of the constraints.
   - contains both boundary and integrity constraints.
+
+## License
+
+This project is [MIT licensed](../LICENSE).

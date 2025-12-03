@@ -1,10 +1,11 @@
-use crate::{ir, CompileError};
 use std::{
     cell::{Ref, RefMut},
     collections::BTreeMap,
 };
 
 use air_parser::ast::QualifiedIdentifier;
+
+use crate::{CompileError, ir};
 
 /// The constraints graph for the Mir.
 ///
@@ -41,7 +42,7 @@ impl Graph {
                 } else {
                     Err(CompileError::Failed)
                 }
-            }
+            },
         }
     }
 
@@ -51,7 +52,7 @@ impl Graph {
     }
 
     /// Queries a given function as a [ir::Function]
-    pub fn get_function(&self, ident: &QualifiedIdentifier) -> Option<Ref<ir::Function>> {
+    pub fn get_function(&self, ident: &QualifiedIdentifier) -> Option<Ref<'_, ir::Function>> {
         // Unwrap is safe as we ensure the type is correct before inserting
         self.functions.get(ident).map(|n| n.as_function().unwrap())
     }
@@ -60,11 +61,9 @@ impl Graph {
     pub fn get_function_mut(
         &mut self,
         ident: &QualifiedIdentifier,
-    ) -> Option<RefMut<ir::Function>> {
+    ) -> Option<RefMut<'_, ir::Function>> {
         // Unwrap is safe as we ensure the type is correct before inserting
-        self.functions
-            .get_mut(ident)
-            .map(|n| n.as_function_mut().unwrap())
+        self.functions.get_mut(ident).map(|n| n.as_function_mut().unwrap())
     }
 
     /// Queries all function nodes
@@ -72,8 +71,8 @@ impl Graph {
         self.functions.values().cloned().collect()
     }
 
-    /// Inserts an evaluator into the graph, returning an error if the root is not an [ir::Evaluator],
-    /// or if the evaluator already exists (declaration conflict).
+    /// Inserts an evaluator into the graph, returning an error if the root is not an
+    /// [ir::Evaluator], or if the evaluator already exists (declaration conflict).
     pub fn insert_evaluator(
         &mut self,
         ident: QualifiedIdentifier,
@@ -90,7 +89,7 @@ impl Graph {
                 } else {
                     Err(CompileError::Failed)
                 }
-            }
+            },
         }
     }
 
@@ -100,22 +99,18 @@ impl Graph {
     }
 
     /// Queries a given evaluator as a mutable [ir::Evaluator]
-    pub fn get_evaluator(&self, ident: &QualifiedIdentifier) -> Option<Ref<ir::Evaluator>> {
+    pub fn get_evaluator(&self, ident: &QualifiedIdentifier) -> Option<Ref<'_, ir::Evaluator>> {
         // Unwrap is safe as we ensure the type is correct before inserting
-        self.evaluators
-            .get(ident)
-            .map(|n| n.as_evaluator().unwrap())
+        self.evaluators.get(ident).map(|n| n.as_evaluator().unwrap())
     }
 
     /// Queries a given evaluator as a mutable [ir::Evaluator]
     pub fn get_evaluator_mut(
         &mut self,
         ident: &QualifiedIdentifier,
-    ) -> Option<RefMut<ir::Evaluator>> {
+    ) -> Option<RefMut<'_, ir::Evaluator>> {
         // Unwrap is safe as we ensure the type is correct before inserting
-        self.evaluators
-            .get_mut(ident)
-            .map(|n| n.as_evaluator_mut().unwrap())
+        self.evaluators.get_mut(ident).map(|n| n.as_evaluator_mut().unwrap())
     }
 
     /// Queries all evaluator nodes
@@ -126,33 +121,25 @@ impl Graph {
     /// Inserts a boundary constraint into the graph, if it does not already exist.
     pub fn insert_boundary_constraints_root(&mut self, root: ir::Link<ir::Op>) {
         if !self.boundary_constraints_roots.borrow().contains(&root) {
-            self.boundary_constraints_roots
-                .borrow_mut()
-                .push(root.clone());
+            self.boundary_constraints_roots.borrow_mut().push(root.clone());
         }
     }
 
     /// Removes a boundary constraint from the graph.
     pub fn remove_boundary_constraints_root(&mut self, root: ir::Link<ir::Op>) {
-        self.boundary_constraints_roots
-            .borrow_mut()
-            .retain(|n| *n != root);
+        self.boundary_constraints_roots.borrow_mut().retain(|n| *n != root);
     }
 
     /// Inserts an integrity constraint into the graph, if it does not already exist.
     pub fn insert_integrity_constraints_root(&mut self, root: ir::Link<ir::Op>) {
         if !self.integrity_constraints_roots.borrow().contains(&root) {
-            self.integrity_constraints_roots
-                .borrow_mut()
-                .push(root.clone());
+            self.integrity_constraints_roots.borrow_mut().push(root.clone());
         }
     }
 
     /// Removes an integrity constraint from the graph.
     pub fn remove_integrity_constraints_root(&mut self, root: ir::Link<ir::Op>) {
-        self.boundary_constraints_roots
-            .borrow_mut()
-            .retain(|n| *n != root);
+        self.integrity_constraints_roots.borrow_mut().retain(|n| *n != root);
     }
 
     /// Inserts a bus into the graph, returning an error
@@ -162,9 +149,7 @@ impl Graph {
         ident: QualifiedIdentifier,
         bus: ir::Link<ir::Bus>,
     ) -> Result<(), CompileError> {
-        self.buses
-            .insert(ident, bus)
-            .map_or(Ok(()), |_| Err(CompileError::Failed))
+        self.buses.insert(ident, bus).map_or(Ok(()), |_| Err(CompileError::Failed))
     }
 
     /// Queries a given bus, returning a [ir::Link<ir::Bus>] if it exists.
@@ -172,12 +157,12 @@ impl Graph {
         self.buses.get(ident).cloned()
     }
     /// Queries a given bus, returning a reference to the bus if it exists.
-    pub fn get_bus(&self, ident: &QualifiedIdentifier) -> Option<Ref<ir::Bus>> {
+    pub fn get_bus(&self, ident: &QualifiedIdentifier) -> Option<Ref<'_, ir::Bus>> {
         self.buses.get(ident).map(|n| n.borrow())
     }
 
     /// Queries a given bus, returning a mutable reference to the bus if it exists.
-    pub fn get_bus_mut(&mut self, ident: &QualifiedIdentifier) -> Option<RefMut<ir::Bus>> {
+    pub fn get_bus_mut(&mut self, ident: &QualifiedIdentifier) -> Option<RefMut<'_, ir::Bus>> {
         self.buses.get_mut(ident).map(|n| n.borrow_mut())
     }
 

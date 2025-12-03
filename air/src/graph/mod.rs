@@ -2,11 +2,13 @@ use std::collections::BTreeMap;
 
 use crate::ir::*;
 
+mod cse;
+
 /// A unique identifier for a node in an [AlgebraicGraph]
 ///
 /// The raw value of this identifier is an index in the `nodes` vector
 /// of the [AlgebraicGraph] struct.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeIndex(usize);
 impl core::ops::Add<usize> for NodeIndex {
     type Output = NodeIndex;
@@ -134,23 +136,30 @@ impl AlgebraicGraph {
         // recursively walk the subgraph and infer the trace segment and domain
         match self.node(index).op() {
             Operation::Value(value) => match value {
-                Value::Constant(_) => Ok((DEFAULT_SEGMENT, default_domain)),
+                Value::Constant(_) => Ok((TraceSegmentId::Main, default_domain)),
+                Value::RandomValue(_) => Ok((TraceSegmentId::Aux, default_domain)),
                 Value::PeriodicColumn(_) => {
                     assert!(
                         !default_domain.is_boundary(),
                         "unexpected access to periodic column in boundary constraint"
                     );
                     // the default domain for [IntegrityConstraints] is `EveryRow`
-                    Ok((DEFAULT_SEGMENT, ConstraintDomain::EveryRow))
-                }
-                Value::PublicInput(_) | Value::PublicInputTable(_) => {
+                    Ok((TraceSegmentId::Main, ConstraintDomain::EveryRow))
+                },
+                Value::PublicInput(_) => {
                     assert!(
                         !default_domain.is_integrity(),
                         "unexpected access to public input in integrity constraint"
                     );
-                    Ok((DEFAULT_SEGMENT, default_domain))
-                }
-                Value::RandomValue(_) => Ok((AUX_SEGMENT, default_domain)),
+                    Ok((TraceSegmentId::Main, default_domain))
+                },
+                Value::PublicInputTable(_) => {
+                    assert!(
+                        !default_domain.is_integrity(),
+                        "unexpected access to public input table in integrity constraint"
+                    );
+                    Ok((TraceSegmentId::Main, default_domain))
+                },
                 Value::TraceAccess(trace_access) => {
                     let domain = if default_domain.is_boundary() {
                         assert_eq!(
@@ -163,7 +172,7 @@ impl AlgebraicGraph {
                     };
 
                     Ok((trace_access.segment, domain))
-                }
+                },
             },
             Operation::Add(lhs, rhs) | Operation::Sub(lhs, rhs) | Operation::Mul(lhs, rhs) => {
                 let (lhs_segment, lhs_domain) = self.node_details(lhs, default_domain)?;
@@ -173,7 +182,7 @@ impl AlgebraicGraph {
                 let domain = lhs_domain.merge(rhs_domain)?;
 
                 Ok((trace_segment, domain))
-            }
+            },
         }
     }
 
@@ -195,7 +204,7 @@ impl AlgebraicGraph {
     }
 
     /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.
-    fn accumulate_degree(
+    pub fn accumulate_degree(
         &self,
         cycles: &mut BTreeMap<QualifiedIdentifier, usize>,
         index: &NodeIndex,
@@ -204,30 +213,30 @@ impl AlgebraicGraph {
         match self.node(index).op() {
             Operation::Value(value) => match value {
                 Value::Constant(_)
-                | Value::RandomValue(_)
                 | Value::PublicInput(_)
-                | Value::PublicInputTable(_) => 0,
+                | Value::PublicInputTable(_)
+                | Value::RandomValue(_) => 0,
                 Value::TraceAccess(_) => 1,
                 Value::PeriodicColumn(pc) => {
-                    cycles.insert(pc.name, pc.cycle);
+                    cycles.insert(pc.name.clone(), pc.cycle);
                     0
-                }
+                },
             },
             Operation::Add(lhs, rhs) => {
                 let lhs_base = self.accumulate_degree(cycles, lhs);
                 let rhs_base = self.accumulate_degree(cycles, rhs);
                 lhs_base.max(rhs_base)
-            }
+            },
             Operation::Sub(lhs, rhs) => {
                 let lhs_base = self.accumulate_degree(cycles, lhs);
                 let rhs_base = self.accumulate_degree(cycles, rhs);
                 lhs_base.max(rhs_base)
-            }
+            },
             Operation::Mul(lhs, rhs) => {
                 let lhs_base = self.accumulate_degree(cycles, lhs);
                 let rhs_base = self.accumulate_degree(cycles, rhs);
                 lhs_base + rhs_base
-            }
+            },
         }
     }
 }

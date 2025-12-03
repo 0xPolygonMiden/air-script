@@ -4,6 +4,7 @@ members = [
     "parser",
     "pass",
     "mir",
+    "mir/derive-ir",
     "air",
     "codegen/winterfell",
     "codegen/ace",
@@ -11,5 +12,13 @@ members = [
 resolver = "2"
 
 [workspace.package]
-edition = "2021"
-rust-version = "1.78"
+authors = ["miden contributors"]
+license = "MIT"
+repository = "https://github.com/0xMiden/air-script"
+edition = "2024"
+rust-version = "1.90"
+
+[workspace.dependencies]
+anyhow = "1.0"
+miden-diagnostics = "0.1"
+thiserror = "2.0"

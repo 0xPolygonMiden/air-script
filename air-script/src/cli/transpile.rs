@@ -1,11 +1,9 @@
 use std::{fs, path::PathBuf, sync::Arc};
 
-use air_ir::{CodeGenerator, CompileError};
-use air_pass::Pass;
-
+use air_ir::{CodeGenerator, CompileError, compile};
 use clap::{Args, ValueEnum};
 use miden_diagnostics::{
-    term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
+    CodeMap, DefaultEmitter, DiagnosticsHandler, term::termcolor::ColorChoice,
 };
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -18,11 +16,6 @@ impl Target {
             Self::Winterfell => "rs",
         }
     }
-}
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-pub enum Pipeline {
-    WithMIR,
-    WithoutMIR,
 }
 
 #[derive(Args)]
@@ -37,19 +30,8 @@ pub struct Transpile {
     )]
     output: Option<PathBuf>,
 
-    #[arg(
-        short,
-        long,
-        help = "Defines the target language, defaults to Winterfell"
-    )]
+    #[arg(short, long, help = "Defines the target language, defaults to Winterfell")]
     target: Option<Target>,
-
-    #[arg(
-        short,
-        long,
-        help = "Defines the compilation pipeline (WithMIR or WithoutMIR), defaults to WithMIR"
-    )]
-    pipeline: Option<Pipeline>,
 }
 
 impl Transpile {
@@ -62,37 +44,10 @@ impl Transpile {
         let emitter = Arc::new(DefaultEmitter::new(ColorChoice::Auto));
         let diagnostics = DiagnosticsHandler::new(Default::default(), codemap.clone(), emitter);
 
-        let pipeline = self.pipeline.unwrap_or(Pipeline::WithMIR);
         // Parse from file to internal representation
-        let air = match pipeline {
-            Pipeline::WithMIR => {
-                println!("Transpiling with Mir pipeline...");
-                air_parser::parse_file(&diagnostics, codemap, input_path)
-                    .map_err(CompileError::Parse)
-                    .and_then(|ast| {
-                        let mut pipeline =
-                            air_parser::transforms::ConstantPropagation::new(&diagnostics)
-                                .chain(mir::passes::AstToMir::new(&diagnostics))
-                                .chain(mir::passes::Inlining::new(&diagnostics))
-                                .chain(mir::passes::Unrolling::new(&diagnostics))
-                                .chain(mir::passes::BusOpExpand::new(&diagnostics))
-                                .chain(air_ir::passes::MirToAir::new(&diagnostics));
-                        pipeline.run(ast)
-                    })
-            }
-            Pipeline::WithoutMIR => {
-                println!("Transpiling without Mir pipeline...");
-                air_parser::parse_file(&diagnostics, codemap, input_path)
-                    .map_err(CompileError::Parse)
-                    .and_then(|ast| {
-                        let mut pipeline =
-                            air_parser::transforms::ConstantPropagation::new(&diagnostics)
-                                .chain(air_parser::transforms::Inlining::new(&diagnostics))
-                                .chain(air_ir::passes::AstToAir::new(&diagnostics));
-                        pipeline.run(ast)
-                    })
-            }
-        };
+        let air = air_parser::parse_file(&diagnostics, codemap, input_path)
+            .map_err(CompileError::Parse)
+            .and_then(|program| compile(&diagnostics, program));
 
         match air {
             Ok(air) => {
@@ -109,9 +64,10 @@ impl Transpile {
                         let mut path = input_path.clone();
                         path.set_extension(target.extension());
                         path
-                    }
+                    },
                 };
-                let code = backend.generate(&air).expect("code generation failed");
+                let code =
+                    backend.generate(&air).map_err(|e| format!("code generation failed: {e}"))?;
                 if let Err(err) = fs::write(&output_path, code) {
                     return Err(format!("{err:?}"));
                 }
@@ -120,11 +76,11 @@ impl Transpile {
                 println!("============================================================");
 
                 Ok(())
-            }
+            },
             Err(err) => {
                 diagnostics.emit(err);
                 Err("compilation failed".into())
-            }
+            },
         }
     }
 }

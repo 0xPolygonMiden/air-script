@@ -1,8 +1,7 @@
 use miden_diagnostics::{SourceSpan, Span};
 
-use crate::ast::*;
-
 use super::ParseTest;
+use crate::ast::*;
 
 // INTEGRITY STATEMENTS
 // ================================================================================================
@@ -28,20 +27,16 @@ fn integrity_constraints() {
         enf clk' = clk + 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
@@ -81,14 +76,13 @@ fn integrity_constraints_with_buses() {
         q.remove(1, 2) with 2;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
         vec![
@@ -96,14 +90,12 @@ fn integrity_constraints_with_buses() {
             enforce!(eq!(bounded_access!(q, Boundary::Last), null!())),
         ],
     ));
-    expected.buses.insert(
-        ident!(p),
-        Bus::new(SourceSpan::UNKNOWN, ident!(p), BusType::Multiset),
-    );
-    expected.buses.insert(
-        ident!(q),
-        Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup),
-    );
+    expected
+        .buses
+        .insert(ident!(p), Bus::new(SourceSpan::UNKNOWN, ident!(p), BusType::Multiset));
+    expected
+        .buses
+        .insert(ident!(q), Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup));
 
     let mut bus_enforces = Vec::new();
 
@@ -188,20 +180,16 @@ fn multiple_integrity_constraints() {
         enf clk' - clk = 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
@@ -238,24 +226,19 @@ fn integrity_constraint_with_periodic_col() {
         enf k0 + b = 0;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(b, 1)]));
-    expected.periodic_columns.insert(
-        ident!(k0),
-        PeriodicColumn::new(SourceSpan::UNKNOWN, ident!(k0), vec![1, 0]),
-    );
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(b, 1)]));
+    expected
+        .periodic_columns
+        .insert(ident!(k0), PeriodicColumn::new(SourceSpan::UNKNOWN, ident!(k0), vec![1, 0]));
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
@@ -289,25 +272,19 @@ fn integrity_constraint_with_constants() {
         enf clk + A = B[1] + C[1][1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1)]));
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
     expected.constants.insert(ident!(A), constant!(A = 0));
     expected.constants.insert(ident!(B), constant!(B = [0, 1]));
+    expected.constants.insert(ident!(C), constant!(C = [[0, 1], [1, 0]]));
     expected
-        .constants
-        .insert(ident!(C), constant!(C = [[0, 1], [1, 0]]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
@@ -343,20 +320,16 @@ fn integrity_constraint_with_variables() {
         enf clk + a = b[1] + c[1][1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
@@ -389,24 +362,20 @@ fn integrity_constraint_with_indexed_trace_access() {
         enf $main[0]' = $main[1] + 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 1), (b, 1)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .push(trace_segment!(TraceSegmentId::Main, "$main", [(a, 1), (b, 1)]));
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
         vec![enforce!(eq!(bounded_access!(a, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            access!("$main"[0], 1),
-            add!(access!("$main"[1]), int!(1))
-        ))],
+        vec![enforce!(eq!(access!("$main"[0], 1), add!(access!("$main"[1]), int!(1))))],
     ));
     ParseTest::new().expect_module_ast(source, expected);
 }
@@ -435,20 +404,18 @@ fn ic_comprehension_one_iterable_identifier() {
         enf x = a + b for x in c;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(a, 1), (b, 1), (c, 4)]
+    ));
     expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 1), (b, 1), (c, 4)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
@@ -480,20 +447,18 @@ fn ic_comprehension_one_iterable_range() {
         enf x = a + b for x in (1..4);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(a, 1), (b, 1), (c, 4)]
+    ));
     expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 1), (b, 1), (c, 4)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
@@ -525,20 +490,18 @@ fn ic_comprehension_with_selectors() {
         enf x = a + b for x in c when s[0] & s[1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(s, 2), (a, 1), (b, 1), (c, 4)]
+    ));
     expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(s, 2), (a, 1), (b, 1), (c, 4)]));
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
@@ -574,29 +537,27 @@ fn ic_comprehension_with_evaluator_call() {
         enf is_binary([x]) for x in c;
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
-    expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(a, 1), (b, 1), (c, 4), (d, 4)]));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(a, 1), (b, 1), (c, 4), (d, 4)]
+    ));
     expected.evaluators.insert(
         ident!(is_binary),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(is_binary),
-            vec![trace_segment!(0, "%0", [(x, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(x, 1)])],
             vec![enforce!(eq!(exp!(access!(x), int!(2)), access!(x)))],
         ),
     );
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
@@ -632,9 +593,9 @@ fn ic_comprehension_with_evaluator_and_selectors() {
         enf is_binary([x]) for x in c when s[0] & s[1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
-        0,
+        TraceSegmentId::Main,
         "$main",
         [(s, 2), (a, 1), (b, 1), (c, 4), (d, 4)]
     ));
@@ -643,20 +604,16 @@ fn ic_comprehension_with_evaluator_and_selectors() {
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(is_binary),
-            vec![trace_segment!(0, "%0", [(x, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(x, 1)])],
             vec![enforce!(eq!(exp!(access!(x), int!(2)), access!(x)))],
         ),
     );
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
@@ -695,9 +652,9 @@ fn ic_match_constraint() {
         };
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
-        0,
+        TraceSegmentId::Main,
         "$main",
         [(s, 2), (a, 1), (b, 1), (c, 4), (d, 4)]
     ));
@@ -706,31 +663,26 @@ fn ic_match_constraint() {
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(is_binary),
-            vec![trace_segment!(0, "%0", [(x, 1)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(x, 1)])],
             vec![enforce!(eq!(exp!(access!(x), int!(2)), access!(x)))],
         ),
     );
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![enforce!(eq!(
-            bounded_access!(clk, Boundary::First),
-            int!(0)
-        ))],
+        vec![enforce!(eq!(bounded_access!(clk, Boundary::First), int!(0)))],
     ));
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
-        vec![
-            enforce_all!(
-                lc!((("%1", range!(0..1))) => call!(is_binary(vector!(access!(c[0])))), when and!(access!(s[0]), access!(s[1])))
+        vec![enforce_if!(
+            match_arm!(
+                call!(is_binary(vector!(access!(c[0])))),
+                and!(access!(s[0]), access!(s[1]))
             ),
-            enforce_all!(
-                lc!((("%2", range!(0..1))) => eq!(access!(c[1]), access!(c[2])), when access!(s[0]))
-            ),
-        ],
+            match_arm!(eq!(access!(c[1]), access!(c[2])), access!(s[0]))
+        )],
     ));
     ParseTest::new().expect_module_ast(source, expected);
 }

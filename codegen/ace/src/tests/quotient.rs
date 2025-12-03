@@ -1,9 +1,13 @@
-use crate::inputs::{AceVars, StarkInputs};
-use crate::QuadFelt;
-use air_ir::{Air, ConstraintDomain, NodeIndex, Operation, Value};
-use miden_core::Felt;
 use std::collections::BTreeMap;
+
+use air_ir::{Air, ConstraintDomain, NodeIndex, Operation, TraceSegmentId, Value};
+use miden_core::Felt;
 use winter_math::FieldElement;
+
+use crate::{
+    QuadFelt,
+    inputs::{AceVars, StarkInputs},
+};
 
 /// Evaluates the quotient polynomial of the Air.
 pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadFelt {
@@ -27,27 +31,25 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
             let z_col_pow = trace_len / col.values.len();
             let z_col = z.exp_vartime(z_col_pow as u64);
 
-            let mut poly: Vec<_> = col
-                .values
-                .iter()
-                .copied()
-                .map(Felt::new)
-                .map(QuadFelt::from)
-                .collect();
+            let mut poly: Vec<_> =
+                col.values.iter().copied().map(Felt::new).map(QuadFelt::from).collect();
             let twiddles = winter_math::fft::get_inv_twiddles::<Felt>(poly.len());
             winter_math::fft::interpolate_poly(&mut poly, &twiddles);
 
             let eval = poly_eval(&poly, z_col);
-            (*ident, QuadFelt::from(eval))
+            (ident.clone(), QuadFelt::from(eval))
         })
         .collect();
 
     // Map public inputs from identifier to index matching the AirLayout format
-    let public: BTreeMap<_, _> = air
-        .public_inputs
-        .keys()
+    let public: BTreeMap<_, _> =
+        air.public_inputs.keys().enumerate().map(|(i, ident)| (*ident, i)).collect();
+
+    let reduced_tables: BTreeMap<_, _> = air
+        .reduced_public_input_table_accesses()
+        .into_iter()
         .enumerate()
-        .map(|(i, ident)| (*ident, i))
+        .map(|(i, access)| (access, i))
         .collect();
 
     // Prepare a vector containing evaluations of all nodes in the Air graph.
@@ -60,19 +62,29 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
     for node_idx in 0..num_nodes {
         let node: NodeIndex = node_idx.into();
         let op = graph.node(&node).op();
-        let eval = match *op {
+        let eval = match op.clone() {
             Operation::Value(v) => match v {
                 Value::Constant(c) => QuadFelt::from(Felt::new(c)),
                 Value::TraceAccess(access) => {
                     ace_vars.segments[access.row_offset][access.segment][access.column]
-                }
+                },
                 Value::PeriodicColumn(access) => periodic[&access.name],
                 Value::PublicInput(access) => {
                     let idx = public[&access.name];
                     ace_vars.public[idx][access.index]
-                }
-                Value::PublicInputTable(_) => unimplemented!(),
-                Value::RandomValue(idx) => ace_vars.rand[idx],
+                },
+                Value::PublicInputTable(access) => {
+                    let idx = reduced_tables[&access];
+                    ace_vars.reduced_tables[idx]
+                },
+                Value::RandomValue(idx) => {
+                    if idx == 0 {
+                        ace_vars.random_alpha
+                    } else {
+                        let beta_power = idx - 1;
+                        ace_vars.random_beta.exp_vartime(beta_power as u64)
+                    }
+                },
             },
             Operation::Add(l, r) => evals[usize::from(l)] + evals[usize::from(r)],
             Operation::Sub(l, r) => evals[usize::from(l)] - evals[usize::from(r)],
@@ -82,32 +94,26 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
     }
 
     // Iterator for all powers of alpha
-    let mut alpha_pow_iter = std::iter::successors(Some(QuadFelt::ONE), move |alpha_prev| {
-        Some(*alpha_prev * alpha)
-    });
+    let mut alpha_pow_iter =
+        std::iter::successors(Some(QuadFelt::ONE), move |alpha_prev| Some(*alpha_prev * alpha));
 
     // Evaluate linear-combination of integrity constraints.
-    let integrity: QuadFelt = [0, 1]
+    let integrity: QuadFelt = [TraceSegmentId::Main, TraceSegmentId::Aux]
         .into_iter()
         .flat_map(|segment| {
-            air.constraints
-                .integrity_constraints(segment)
-                .iter()
-                .map(|c| {
-                    // TODO(Issue #392): Technically we should separate the transition from
-                    //                   all-row constraints
-                    // assert_eq!(c.domain(), ConstraintDomain::EveryFrame(2));
-                    let idx = usize::from(*c.node_index());
-                    evals[idx]
-                })
+            air.constraints.integrity_constraints(segment).iter().map(|c| {
+                // TODO(Issue #392): Technically we should separate the transition from
+                //                   all-row constraints
+                // assert_eq!(c.domain(), ConstraintDomain::EveryFrame(2));
+                let idx = usize::from(*c.node_index());
+                evals[idx]
+            })
         })
         .zip(alpha_pow_iter.by_ref())
-        .fold(QuadFelt::ZERO, |acc, (eval, alpha_pow)| {
-            acc + eval * alpha_pow
-        });
+        .fold(QuadFelt::ZERO, |acc, (eval, alpha_pow)| acc + eval * alpha_pow);
 
     // Evaluate linear-combination of integrity constraints for the first row
-    let boundary_first = [0, 1]
+    let boundary_first = [TraceSegmentId::Main, TraceSegmentId::Aux]
         .into_iter()
         .flat_map(|segment| {
             air.constraints
@@ -120,12 +126,10 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
                 })
         })
         .zip(alpha_pow_iter.by_ref())
-        .fold(QuadFelt::ZERO, |acc, (eval, alpha_pow)| {
-            acc + eval * alpha_pow
-        });
+        .fold(QuadFelt::ZERO, |acc, (eval, alpha_pow)| acc + eval * alpha_pow);
 
     // Evaluate linear-combination of integrity constraints for the last row
-    let boundary_last = [0, 1]
+    let boundary_last = [TraceSegmentId::Main, TraceSegmentId::Aux]
         .into_iter()
         .flat_map(|segment| {
             air.constraints
@@ -138,9 +142,7 @@ pub fn eval_quotient(air: &Air, ace_vars: &AceVars, log_trace_len: u32) -> QuadF
                 })
         })
         .zip(alpha_pow_iter.by_ref())
-        .fold(QuadFelt::ZERO, |acc, (eval, alpha_pow)| {
-            acc + eval * alpha_pow
-        });
+        .fold(QuadFelt::ZERO, |acc, (eval, alpha_pow)| acc + eval * alpha_pow);
 
     // z-1 = z − g⁰
     let vanishing_first = z - QuadFelt::ONE;

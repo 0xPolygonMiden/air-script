@@ -1,6 +1,5 @@
 use air_ir::{
-    Air, BusType, Identifier, IntegrityConstraintDegree, NodeIndex, Operation, TraceAccess,
-    TraceSegmentId, Value,
+    Air, IntegrityConstraintDegree, NodeIndex, Operation, TraceAccess, TraceSegmentId, Value,
 };
 
 use super::ElemType;
@@ -26,28 +25,24 @@ impl Codegen for IntegrityConstraintDegree {
                 .map(|cycle_len| cycle_len.to_string())
                 .collect::<Vec<String>>()
                 .join(", ");
-            format!(
-                "TransitionConstraintDegree::with_cycles({}, vec![{}])",
-                self.base(),
-                cycles
-            )
+            format!("TransitionConstraintDegree::with_cycles({}, vec![{}])", self.base(), cycles)
         }
     }
 }
 
 impl Codegen for TraceAccess {
     fn to_string(&self, _ir: &Air, _elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
-        let frame = if self.segment == 0 { "main" } else { "aux" };
+        let frame = self.segment.to_string();
         let row_offset = match self.row_offset {
             0 => {
                 format!("current[{}]", self.column)
-            }
+            },
             1 => {
                 format!("next[{}]", self.column)
-            }
+            },
             _ => panic!("Winterfell doesn't support row offsets greater than 1."),
         };
-        if self.segment == 0 && self.segment != trace_segment {
+        if self.segment == TraceSegmentId::Main && self.segment != trace_segment {
             format!("E::from({frame}_{row_offset})")
         } else {
             format!("{frame}_{row_offset}")
@@ -66,9 +61,9 @@ impl Codegen for Operation {
     fn to_string(&self, ir: &Air, elem_type: ElemType, trace_segment: TraceSegmentId) -> String {
         match self {
             Operation::Value(value) => value.to_string(ir, elem_type, trace_segment),
-            Operation::Add(_, _) => binary_op_to_string(ir, self, elem_type, trace_segment),
-            Operation::Sub(_, _) => binary_op_to_string(ir, self, elem_type, trace_segment),
-            Operation::Mul(_, _) => binary_op_to_string(ir, self, elem_type, trace_segment),
+            Operation::Add(..) => binary_op_to_string(ir, self, elem_type, trace_segment),
+            Operation::Sub(..) => binary_op_to_string(ir, self, elem_type, trace_segment),
+            Operation::Mul(..) => binary_op_to_string(ir, self, elem_type, trace_segment),
         }
     }
 }
@@ -91,26 +86,25 @@ impl Codegen for Value {
             },
             Value::TraceAccess(trace_access) => {
                 trace_access.to_string(ir, elem_type, trace_segment)
-            }
+            },
             Value::PeriodicColumn(pc) => {
-                let index = ir
-                    .periodic_columns
-                    .iter()
-                    .position(|(qid, _)| qid == &pc.name)
-                    .unwrap();
+                let index =
+                    ir.periodic_columns.iter().position(|(qid, _)| qid == &pc.name).unwrap();
                 format!("periodic_values[{index}]")
-            }
+            },
             Value::PublicInput(air_ir::PublicInputAccess { name, index }) => {
                 format!("self.{name}[{index}]")
-            }
+            },
             Value::PublicInputTable(air_ir::PublicInputTableAccess {
-                bus_name,
                 table_name,
-                ..
-            }) => call_bus_boundary_varlen_pubinput(ir, *bus_name, *table_name),
+                bus_type,
+                num_cols: _,
+            }) => {
+                format!("reduced_{table_name}_{bus_type}")
+            },
             Value::RandomValue(idx) => {
                 format!("aux_rand_elements.rand_elements()[{idx}]")
-            }
+            },
         }
     }
 }
@@ -127,7 +121,7 @@ fn binary_op_to_string(
             let lhs = l_idx.to_string(ir, elem_type, trace_segment);
             let rhs = r_idx.to_string(ir, elem_type, trace_segment);
             format!("{lhs} + {rhs}")
-        }
+        },
         Operation::Sub(l_idx, r_idx) => {
             let lhs = l_idx.to_string(ir, elem_type, trace_segment);
             let rhs = if ir.constraint_graph().node(r_idx).op().precedence() <= op.precedence() {
@@ -136,7 +130,7 @@ fn binary_op_to_string(
                 r_idx.to_string(ir, elem_type, trace_segment)
             };
             format!("{lhs} - {rhs}")
-        }
+        },
         Operation::Mul(l_idx, r_idx) => {
             let lhs = if ir.constraint_graph().node(l_idx).op().precedence() < op.precedence() {
                 format!("({})", l_idx.to_string(ir, elem_type, trace_segment))
@@ -149,25 +143,7 @@ fn binary_op_to_string(
                 r_idx.to_string(ir, elem_type, trace_segment)
             };
             format!("{lhs} * {rhs}")
-        }
+        },
         _ => panic!("unsupported operation"),
-    }
-}
-
-fn call_bus_boundary_varlen_pubinput(
-    ir: &Air,
-    bus_name: Identifier,
-    table_name: Identifier,
-) -> String {
-    let bus = ir.buses.get(&bus_name).expect("bus not found");
-    match bus.bus_type {
-        BusType::Multiset => format!(
-            "Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.{}.iter())",
-            table_name
-        ),
-        BusType::Logup => format!(
-            "Self::bus_logup_boundary_varlen(aux_rand_elements, &self.{}.iter())",
-            table_name
-        ),
     }
 }

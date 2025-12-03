@@ -1,8 +1,7 @@
 use miden_diagnostics::SourceSpan;
 
-use crate::ast::*;
-
 use super::ParseTest;
+use crate::ast::*;
 
 #[test]
 fn periodic_columns() {
@@ -14,18 +13,14 @@ fn periodic_columns() {
         k1: [0, 0, 0, 0, 0, 0, 0, 1],
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.periodic_columns.insert(
         ident!(k0),
         PeriodicColumn::new(SourceSpan::UNKNOWN, ident!(k0), vec![1, 0, 0, 0]),
     );
     expected.periodic_columns.insert(
         ident!(k1),
-        PeriodicColumn::new(
-            SourceSpan::UNKNOWN,
-            ident!(k1),
-            vec![0, 0, 0, 0, 0, 0, 0, 1],
-        ),
+        PeriodicColumn::new(SourceSpan::UNKNOWN, ident!(k1), vec![0, 0, 0, 0, 0, 0, 0, 1]),
     );
     ParseTest::new().expect_module_ast(source, expected);
 }
@@ -37,7 +32,7 @@ fn empty_periodic_columns() {
 
     periodic_columns{}";
 
-    let expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     ParseTest::new().expect_module_ast(source, expected);
 }
 

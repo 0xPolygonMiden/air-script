@@ -6,7 +6,7 @@ Constants can be optionally declared with the const keyword at the top of an Air
 
 Each constant is defined by an identifier and a value in the following format:
 
-```
+```air
 const FOO = 123;
 const BAR = [1, 2, 3];
 const BAZ = [[1, 2, 3], [4, 5, 6]];
@@ -24,7 +24,7 @@ The `main` declarations define the shape of the main execution trace and define 
 
 The following is a valid `trace_columns` source section:
 
-```
+```air
 trace_columns {
     main: [a, b, c[3], d],
 }
@@ -36,17 +36,17 @@ In the above example, the main execution trace for the AIR has 6 columns with 4 
 
 A `public_inputs` section contains declarations for public inputs. Currently, each public input must be provided as a vector of a fixed size, but there is no limit to how many of them can be declared within the `public_inputs` section.
 
-**Public inputs are required.** There must be at least one pubic input declared.
+**Public inputs are required.** There must be at least one public input declared.
 
 Each public input is described by an identifier and an array length (`n`) in the following format:
 
-```
+```air
 identifier: [n]
 ```
 
 The following is an example of a valid `public_inputs` source section:
 
-```
+```air
 public_inputs {
     program_hash: [4],
     stack_inputs: [16],
@@ -68,7 +68,7 @@ There is no limit to how many of them can be declared within the `periodic_colum
 
 Each periodic column is described by an identifier and an array of integers in the following format. These integers are the periodic values.
 
-```
+```air
 identifier: [i, j, k, n],
 ```
 
@@ -76,7 +76,7 @@ The length of each of the array must be a power of two which is greater than or 
 
 The following is an example of a valid `periodic_columns` source section:
 
-```
+```air
 periodic_columns {
     k0: [0, 0, 0, 1],
     k1: [1, 1, 1, 1, 1, 1, 1, 0],
@@ -95,7 +95,7 @@ A `buses` section contains declarations for buses used in the description and ev
 
 The following is an example of a valid `buses` source section:
 
-```
+```air
 buses {
     multiset p,
     logup q,

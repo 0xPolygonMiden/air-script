@@ -1,0 +1,10 @@
+
+mod binary
+
+ev is_binary([x]) {
+    enf x^2 = x;
+}
+
+ev are_all_binary([c[3]]) {
+    enf is_binary([c]) for c in c;
+}

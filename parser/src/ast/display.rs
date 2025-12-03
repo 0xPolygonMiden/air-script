@@ -19,6 +19,7 @@ impl<T: fmt::Display> fmt::Display for DisplayList<'_, T> {
 }
 
 /// Displays an item surrounded by parentheses, e.g. `(foo)`
+#[allow(dead_code)]
 pub struct DisplayParenthesized<T>(pub T);
 impl<T: fmt::Display> fmt::Display for DisplayParenthesized<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -39,11 +40,7 @@ impl<T: fmt::Display> fmt::Display for DisplayTuple<'_, T> {
 pub struct DisplayTypedTuple<'a, V, T>(pub &'a [(V, T)]);
 impl<V: fmt::Display, T: fmt::Display> fmt::Display for DisplayTypedTuple<'_, V, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "({})",
-            DisplayCsv::new(self.0.iter().map(|(v, t)| format!("{}: {}", v, t)))
-        )
+        write!(f, "({})", DisplayCsv::new(self.0.iter().map(|(v, t)| format!("{v}: {t}"))))
     }
 }
 
@@ -69,7 +66,7 @@ where
             if i > 0 {
                 f.write_str(", ")?;
             }
-            write!(f, "{}", item)?;
+            write!(f, "{item}")?;
         }
         Ok(())
     }
@@ -93,25 +90,25 @@ impl fmt::Display for DisplayStatement<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.write_indent(f)?;
         match self.statement {
-            Statement::Let(ref expr) => {
+            Statement::Let(expr) => {
                 let display = DisplayLet {
                     let_expr: expr,
                     indent: self.indent,
                     in_expr_position: false,
                 };
                 write!(f, "{display}")
-            }
-            Statement::Enforce(ref expr) => {
-                write!(f, "enf {}", expr)
-            }
-            Statement::EnforceIf(ref expr, ref selector) => {
-                write!(f, "enf {} when {}", expr, selector)
-            }
-            Statement::EnforceAll(ref expr) => {
-                write!(f, "enf {}", expr)
-            }
-            Statement::Expr(ref expr) => write!(f, "return {}", expr),
-            Statement::BusEnforce(ref expr) => write!(f, "enf {}", expr),
+            },
+            Statement::Enforce(expr) => {
+                write!(f, "enf {expr}")
+            },
+            Statement::EnforceIf(match_expr) => {
+                write!(f, "enf {match_expr}")
+            },
+            Statement::EnforceAll(expr) => {
+                write!(f, "enf {expr}")
+            },
+            Statement::Expr(expr) => write!(f, "return {expr}"),
+            Statement::BusEnforce(expr) => write!(f, "enf {expr}"),
         }
     }
 }
@@ -151,7 +148,7 @@ impl fmt::Display for DisplayLet<'_> {
                 } else {
                     f.write_str("}\n")?;
                 }
-            }
+            },
             value => {
                 write!(f, "let {} = {}", self.let_expr.name, value)?;
                 if self.in_expr_position {
@@ -159,7 +156,7 @@ impl fmt::Display for DisplayLet<'_> {
                 } else {
                     f.write_char('\n')?;
                 }
-            }
+            },
         }
         for stmt in self.let_expr.body.iter() {
             writeln!(f, "{}", stmt.display(self.indent + 1))?;

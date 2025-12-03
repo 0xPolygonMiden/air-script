@@ -38,7 +38,7 @@ pub Source: Source = {
 
 pub Program: Program = {
     <root:Root> <modules:Module*> =>? {
-        let root_name = root.name;
+        let root_name = root.path.clone();
         let mut modules = modules;
         modules.push(root);
         let library = match Library::new(diagnostics, codemap.clone(), modules) {
@@ -57,14 +57,14 @@ pub AnyModule: Module = {
 
 Root: Module = {
     <l:@L> "def" <name:Identifier> <decls:Declaration*> <r:@R> =>? {
-        Module::from_declarations(diagnostics, ModuleType::Root, span!(l, r), name, decls)
+        Module::from_declarations(diagnostics, ModuleType::Root, span!(l, r), ModuleId::new(vec![name], name.span()), decls)
             .map_err(|err| ParseError::Analysis(err).into())
     }
 }
 
 Module: Module = {
     <l:@L> "mod" <name:Identifier> <decls:Declaration*> <r:@R> =>? {
-        Module::from_declarations(diagnostics, ModuleType::Library, span!(l, r), name, decls)
+        Module::from_declarations(diagnostics, ModuleType::Library, span!(l, r), ModuleId::new(vec![name], name.span()), decls)
             .map_err(|err| ParseError::Analysis(err).into())
     }
 }
@@ -82,13 +82,51 @@ Declaration: Declaration = {
     <IntegrityConstraints> => Declaration::IntegrityConstraints(<>),
 }
 
+// Import parses a Vec<ImportLimb> separated by '::', where ImportLimb is Identifier or '*' (only as last limb)
 Import: Span<Import> = {
-    <l:@L> "use" <module:Identifier> "::" "*" ";" <r:@R> => Span::new(span!(l, r), Import::All { module: Identifier::new(span!(l, r), module.name()) }),
-    <l:@L> "use" <module:Identifier> "::" <item:Identifier> ";" <r:@R> => {
-        let mut items: HashSet<Identifier> = HashSet::default();
-        items.insert(item);
-        Span::new(span!(l, r), Import::Partial { module, items })
+    <l:@L> "use" <limbs:ImportPath> ";" <r:@R> => {
+        let (last_limb, parents) = limbs.split_last().expect("Imports need at least one path limb");
+        match last_limb {
+            ImportLimb::Star => {
+                let mut limbs_ident = vec![];
+                for parent in parents {
+                    match parent {
+                        ImportLimb::Star => unreachable!(),
+                        ImportLimb::Ident(ident) => limbs_ident.push(*ident)
+                    }
+                }
+                Span::new(span!(l, r), Import::All { module: ModuleId::new(limbs_ident, span!(l, r)) })
+            }
+            ImportLimb::Ident(item) => {
+                let mut limbs_ident = vec![];
+                for parent in parents {
+                    match parent {
+                        ImportLimb::Star => unreachable!(),
+                        ImportLimb::Ident(ident) => limbs_ident.push(*ident)
+                    }
+                }
+                let mut items: HashSet<Identifier> = HashSet::default();
+                items.insert(*item);
+                Span::new(span!(l, r), Import::Partial { module: ModuleId::new(limbs_ident, span!(l, r)), items })
+            }
+        }
     }
+}
+
+// ImportPath: Vec<ImportLimb> separated by '::' (single right-recursive rule)
+ImportPath: Vec<ImportLimb> = {
+    <head:ImportLimb> => vec![head],
+    <head:ImportLimb> "::" <tail:ImportPath> => {
+        let mut v = vec![head];
+        v.extend(tail);
+        v
+    }
+}
+
+// ImportLimb: either an identifier or '*', but '*' only allowed as last limb
+ImportLimb: ImportLimb = {
+    "*" => ImportLimb::Star,
+    <id:Identifier> => ImportLimb::Ident(id),
 }
 
 // TRACE COLUMNS
@@ -114,7 +152,7 @@ MainSegmentId: Identifier = {
 
 MainTraceBindings: TraceSegment = {
     <l:@L> <name:MainSegmentId> ":" <bindings: Vector<TraceBinding>> "," <r:@R> =>
-        TraceSegment::new(span!(l, r), 0, name, bindings),
+        TraceSegment::new(span!(l, r), TraceSegmentId::Main, name, bindings),
 }
 
 TraceBinding: Span<(Identifier, usize)> = {
@@ -195,14 +233,22 @@ EvaluatorFunction: EvaluatorFunction = {
 
 EvaluatorBindings: Vec<TraceSegment> = {
     <l:@L> <trace: Comma<EvaluatorSegmentBindings>> <r:@R> =>? {
-        let mut segments = Vec::with_capacity(trace.len());
+        if trace.len() != 1 {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid evaluator function definition")
+                .with_primary_label(span!(l, r), "evaluators must have exactly one trace segment")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
 
-        for (segment, (span, bindings)) in trace.into_iter().enumerate() {
+        let mut segments = Vec::with_capacity(trace.len());
+        
+        if let Some((span, bindings)) = trace.into_iter().next() {
             // We generate a name for these segments to distinguish them from direct references
             // to the actual main columns. This is useful during the inlining phase
             let segment_name = Identifier::new(span, Symbol::intern(format!("%{}", *next_var)));
             *next_var += 1;
-            segments.push(TraceSegment::new(span, segment, segment_name, bindings));
+            segments.push(TraceSegment::new(span, TraceSegmentId::Main, segment_name, bindings));
         }
 
         // the last segment of trace columns cannot be empty.
@@ -305,7 +351,10 @@ ConstraintStatements: Vec<Statement> = {
 }
 
 ConstraintStatement: Vec<Statement> = {
-    "enf" "match" "{" <MatchArm+> "}" ";" => <>,
+    <l:@L> "enf" "match" "{" <arms: MatchArm+> "}" ";" <r:@R> => {
+        let match_expr = Match::new(span!(l, r), arms);
+        vec![Statement::EnforceIf(match_expr)]
+    },
     "enf" <ConstraintExpr> ";" => vec![<>],
     <BusConstraintExpr> ";" => vec![<>],
 }
@@ -314,13 +363,9 @@ ReturnStatement: Expr = {
     <l:@L> "return" <expr: Expr> ";" <r:@R> => expr,
 }
 
-MatchArm: Statement = {
+MatchArm: MatchArm = {
     <l:@L> "case" <selector:ScalarExpr> ":" <constraint:ScalarConstraintExpr> "," <r:@R> => {
-        let generated_name = format!("%{}", *next_var);
-        *next_var += 1;
-        let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
-        let context = vec![(generated_binding, Expr::Range(RangeExpr::from(0..1)))];
-        Statement::EnforceAll(ListComprehension::new(span!(l, r), constraint, context, Some(selector)))
+        MatchArm::new(span!(l, r), constraint, selector)
     }
 }
 
@@ -360,12 +405,8 @@ ConstraintExpr: Statement = {
         } else {
             // If we didn't parse this as a comprehension, but a selector is present, the constraint is in form 3,
             // so transform it into form 1. Otherwise, if no selector is present, this is form 4, i.e. simple.
-            if selector.is_some() {
-                let generated_name = format!("%{}", *next_var);
-                *next_var += 1;
-                let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
-                let context = vec![(generated_binding, Expr::Range(RangeExpr::from(0..1)))];
-                Statement::EnforceAll(ListComprehension::new(span!(l, r), expr, context, selector))
+            if let Some(selector) = selector {
+                Statement::EnforceIf(Match::new(span!(l,r), vec![MatchArm::new(span!(l,r), expr, selector)]))
             } else {
                 Statement::Enforce(expr)
             }
@@ -464,6 +505,7 @@ ScalarExprBase: ScalarExpr = {
     SymbolAccess,
     <Int> => ScalarExpr::Const(<>),
     <l:@L> "null" <r:@R> => ScalarExpr::Null(Span::new(span!(l, r), ())),
+    <l:@L> "unconstrained" <r:@R> => ScalarExpr::Unconstrained(Span::new(span!(l, r), ())),
     "(" <ScalarExpr> ")",
 
     #[precedence(level="1")]
@@ -610,8 +652,8 @@ Size: u64 = {
     "[" <Num_u64> "]" => <>
 }
 
-Index: usize = {
-    "[" <idx: Num_u64> "]" => idx as usize
+Index: Box<ScalarExpr> = {
+    "[" <idx: ScalarExpr> "]" => Box::new(idx)
 }
 
 TableSize: u64 = {
@@ -665,6 +707,7 @@ extern {
         "multiset" => Token::Multiset,
         "logup" => Token::Logup,
         "null" => Token::Null,
+        "unconstrained" => Token::Unconstrained,
         "insert" => Token::Insert,
         "remove" => Token::Remove,
         "boundary_constraints" => Token::BoundaryConstraints,

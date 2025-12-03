@@ -4,19 +4,20 @@ This crate aggregates all components of the AirScript compiler into a single pla
 
 ## Basic Usage
 
-An in-depth description of AirScript is available in the full AirScript [documentation](https://0xpolygonmiden.github.io/air-script/).
+An in-depth description of AirScript is available in the full AirScript [documentation](https://0xmiden.github.io/air-script/).
 
-The compiler has three stages, which can be imported and used independently or together.
+The compiler has four stages, which can be imported and used independently or together.
 
 1. [Parser](../parser/): scans and parses AirScript files and builds an AST
-2. [IR](../ir/): produces an intermediate representation from an AirScript AST
-3. [Code generation](../codegen/): translate an `AirIR` into a specific target language
+2. [MIR](../mir/): produces a middle intermediate representation from the AirScript AST
+3. [AIR](../air/): produces an intermediate representation from an AirScript MIR
+4. [Code generation](../codegen/): translate an `AirIR` into a specific target language
    - [Winterfell Code Generator](../codegen/winterfell/): generates Rust code targeting the [Winterfell prover](https://github.com/novifinancial/winterfell).
 
 Example usage:
 
 ```Rust
-use air_script::{Air, parse, passes, Pass, transforms, WinterfellCodeGenerator};
+use air_script::{parse, compile, WinterfellCodeGenerator};
 use miden_diagnostics::{
     term::termcolor::ColorChoice, CodeMap, DefaultEmitter, DiagnosticsHandler,
 };
@@ -28,21 +29,17 @@ let diagnostics = DiagnosticsHandler::new(Default::default(), codemap.clone(), e
 
 // Parse into AST
 let ast = parse(&diagnostics, codemap, source.as_str()).expect("parsing failed");
-// Lower to IR
-let air = {
-   let mut pipeline = transforms::ConstantPropagation::new(&diagnostics)
-      .chain(transforms::Inlining::new(&diagnostics))
-      .chain(passes::AstToAir::new(&diagnostics));
-   pipeline.run(ast).expect("lowering failed")
-};
+
+// Compile AST into AIR
+let air = compile(&diagnostics, ast).expect("compilation failed");
 
 // Generate Rust code targeting the Winterfell prover
-let code = WinterfellCodeGenerator::new(&ir).generate().expect("codegen failed");
+let code = WinterfellCodeGenerator.generate(&air).expect("codegen failed");
 ```
 
 An example of an AIR defined in AirScript can be found in the `examples/` directory.
 
-To run the full transpilation pipeline, the CLI can be used for convenience.
+To run the full transpilation the CLI can be used for convenience.
 
 ## Command-Line Interface (CLI)
 
