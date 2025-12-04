@@ -2,7 +2,9 @@
 pub mod air_tester_macros;
 /// Code generation for tests/**/*.air files.
 pub mod codegen;
-/// Plonky3-specific traits, to be moved to 0xMiden/Plonky3 once stabilized.
+/// Miden VM auxiliary trace generator
+pub mod miden_vm_aux_trace_generator;
+/// Plonky3-specific Debug constraint builder implementation
 pub mod plonky3_traits;
 /// Winterfell-specific traits
 pub mod winterfell_traits;

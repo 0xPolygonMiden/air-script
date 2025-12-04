@@ -1,7 +1,8 @@
-use p3_air::{Air, BaseAir, BaseAirWithPublicValues, AirBuilder, ExtensionBuilder};
+use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
-use p3_field::{Field, PrimeCharacteristicRing};
-use crate::test_utils::plonky3_traits::{AirScriptAir, AirScriptBuilder};
+use p3_matrix::dense::RowMajorMatrixView;
+use p3_matrix::stack::VerticalPair;
+use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 3;
 pub const AUX_WIDTH: usize = 0;
@@ -12,34 +13,17 @@ pub const MAX_BETA_CHALLENGE_POWER: usize = 0;
 
 pub struct SystemAir;
 
-impl<F> BaseAir<F> for SystemAir {
+impl<F, EF> MidenAir<F, EF> for SystemAir {
     fn width(&self) -> usize {
         MAIN_WIDTH
     }
-}
 
-impl<F> BaseAirWithPublicValues<F> for SystemAir {
-    fn num_public_values(&self) -> usize {
-        NUM_PUBLIC_VALUES
-    }
-}
-
-impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for SystemAir {
-    fn aux_width(&self) -> usize {
-        AUX_WIDTH
-    }
-
-    fn max_beta_challenge_power(&self) -> usize {
-        MAX_BETA_CHALLENGE_POWER
-    }
-
-    fn periodic_table(&self) -> Vec<Vec<F>> {
-        vec![]
-    }
-
-    fn eval(&self, builder: &mut AB) {
+    fn eval<AB>(&self, builder: &mut AB)
+    where AB: MidenAirBuilder<F = F, EF = EF>,
+    {
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
         let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect("Wrong number of periodic values");
+        let preprocessed = builder.preprocessed();
         let main = builder.main();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
@@ -55,11 +39,5 @@ impl<F: Field, AB: AirScriptBuilder<F = F>> AirScriptAir<F, AB> for SystemAir {
         // Aux boundary constraints
 
         // Aux integrity/transition constraints
-    }
-}
-
-impl<AB: AirScriptBuilder> Air<AB> for SystemAir {
-    fn eval(&self, builder: &mut AB) {
-        <Self as AirScriptAir<AB::F, AB>>::eval(self, builder);
     }
 }

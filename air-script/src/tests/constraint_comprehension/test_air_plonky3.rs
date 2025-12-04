@@ -1,16 +1,5 @@
-use std::marker::PhantomData;
-
-use p3_challenger::{HashChallenger, SerializingChallenger64};
-use p3_circle::CirclePcs;
-use p3_commit::ExtensionMmcs;
-use p3_field::{PrimeCharacteristicRing, PrimeField64, extension::BinomialExtensionField};
-use p3_fri::create_benchmark_fri_params;
-use p3_goldilocks::Goldilocks;
-use p3_matrix::dense::RowMajorMatrix;
-use p3_merkle_tree::MerkleTreeMmcs;
-use p3_sha256::Sha256;
-use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
-use p3_uni_stark::StarkConfig;
+use p3_field::PrimeField64;
+use p3_miden_air::RowMajorMatrix;
 
 use crate::{
     generate_air_plonky3_test_with_airscript_traits,

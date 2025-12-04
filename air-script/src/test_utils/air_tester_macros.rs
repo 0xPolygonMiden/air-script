@@ -40,38 +40,41 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
     ($test_name:ident, $air_name:ident) => {
         #[test]
         fn $test_name() {
-            type Val = Goldilocks;
-            type Challenge = BinomialExtensionField<Val, 2>;
-
-            type ByteHash = Sha256;
-            type FieldHash = SerializingHasher<ByteHash>;
-            type MyCompress = CompressionFunctionFromHasher<ByteHash, 2, 32>;
-            type ValMmcs = MerkleTreeMmcs<Val, u8, FieldHash, MyCompress, 32>;
-            type ChallengeMmcs = ExtensionMmcs<Val, Challenge, ValMmcs>;
-            type Challenger = SerializingChallenger64<Val, HashChallenger<u8, ByteHash, 32>>;
-            type Pcs = CirclePcs<Val, ValMmcs, ChallengeMmcs>;
-            type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
+            type Val = p3_goldilocks::Goldilocks;
+            type Challenge = p3_field::extension::BinomialExtensionField<Val, 2>;
+            type ByteHash = p3_sha256::Sha256;
+            type FieldHash = p3_symmetric::SerializingHasher<ByteHash>;
+            type MyCompress = p3_symmetric::CompressionFunctionFromHasher<ByteHash, 2, 32>;
+            type ValMmcs = p3_merkle_tree::MerkleTreeMmcs<Val, u8, FieldHash, MyCompress, 32>;
+            type ChallengeMmcs = p3_commit::ExtensionMmcs<Val, Challenge, ValMmcs>;
+            type Challenger = p3_challenger::SerializingChallenger64<
+                Val,
+                p3_challenger::HashChallenger<u8, ByteHash, 32>,
+            >;
+            type Dft = p3_dft::Radix2DitParallel<Val>;
+            type Pcs = p3_fri::TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
+            type MyConfig = p3_uni_stark::StarkConfig<Pcs, Challenge, Challenger>;
 
             let byte_hash = ByteHash {};
-            let field_hash = FieldHash::new(Sha256);
+            let field_hash = FieldHash::new(p3_sha256::Sha256);
             let compress = MyCompress::new(byte_hash);
             let val_mmcs = ValMmcs::new(field_hash, compress);
             let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
             let challenger = Challenger::from_hasher(vec![], byte_hash);
-            let fri_params = create_benchmark_fri_params(challenge_mmcs);
-            let pcs = Pcs {
-                mmcs: val_mmcs,
-                fri_params,
-                _phantom: PhantomData,
-            };
+            let dft = Dft::default();
+            let fri_params = p3_fri::create_benchmark_fri_params(challenge_mmcs);
+            let pcs = Pcs::new(dft, val_mmcs, fri_params);
             let config = MyConfig::new(pcs, challenger);
 
             let inputs = generate_inputs();
-            let inputs_goldilocks: Vec<Val> = inputs.iter().map(|&x| Val::from_u32(x)).collect();
+            let inputs_goldilocks: Vec<Val> = inputs
+                .iter()
+                .map(|&x| <Val as p3_field::PrimeCharacteristicRing>::from_u32(x))
+                .collect();
 
             let trace = generate_trace_rows::<Val>(inputs);
 
-            check_constraints_with_airscript_traits::<Goldilocks, Challenge, $air_name>(
+            check_constraints_with_airscript_traits::<Val, Challenge, $air_name>(
                 &$air_name {},
                 &trace,
                 &inputs_goldilocks,
