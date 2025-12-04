@@ -64,18 +64,14 @@ where
     F: Field + PrimeField64,
     EF: ExtensionField<F>,
 {
-    // Convert main trace to Miden format
-    let mut main_trace_vec_vec = Vec::new();
-    for row_index in 0..main.height() {
-        let row_f: Vec<F> = main.row_slice(row_index).unwrap().to_vec();
-        let row_felt =
-            row_f.into_iter().map(|x| Felt::new(x.as_canonical_u64())).collect::<Vec<_>>();
-        main_trace_vec_vec.push(row_felt);
+    // Convert main trace to Miden format: transposed to column-major and use `BaseElement` instead of `F``
+    let main_transposed = main.transpose();
+    let mut felt_columns_vec = Vec::new();
+    for row in main_transposed.rows() {
+        let col_felt = row.map(|x| Felt::new(x.as_canonical_u64())).collect::<Vec<_>>();
+        felt_columns_vec.push(col_felt);
     }
-    let transposed_main_trace_vec_vec: Vec<Vec<_>> = (0..main_trace_vec_vec[0].len())
-        .map(|i| main_trace_vec_vec.iter().map(|row| row[i]).collect())
-        .collect();
-    let col_matrix = ColMatrix::new(transposed_main_trace_vec_vec);
+    let col_matrix = ColMatrix::new(felt_columns_vec);
     let last_program_row = main.height().into();
     let main_trace = MainTrace::new(col_matrix, last_program_row);
 
