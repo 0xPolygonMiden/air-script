@@ -64,7 +64,8 @@ where
     F: Field + PrimeField64,
     EF: ExtensionField<F>,
 {
-    // Convert main trace to Miden format: transposed to column-major and use `BaseElement` instead of `F``
+    // Convert main trace to Miden format: transposed to column-major and use `BaseElement` instead
+    // of `F``
     let main_transposed = main.transpose();
     let mut felt_columns_vec = Vec::new();
     for row in main_transposed.rows() {
