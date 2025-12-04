@@ -1,22 +1,24 @@
-use air_ir::{Air, ConstraintDomain, TraceSegmentId};
+use air_ir::{Air, TraceSegmentId};
 use codegen::Function;
 
-use super::Codegen;
+use crate::air::graph::constraint_to_string;
 
 /// Adds the main integrity constraints to the generated code.
 pub(super) fn add_main_integrity_constraints(eval_func: &mut Function, ir: &Air) {
+    eval_func.line("");
+    eval_func.line("// Main integrity/transition constraints");
     for constraint in ir.integrity_constraints(TraceSegmentId::Main) {
-        let expr_root = constraint.node_index();
-        let expr_root_string = expr_root.to_string(ir);
+        let assertion = constraint_to_string(ir, constraint, false);
+        eval_func.line(assertion);
+    }
+}
 
-        // If the constraint is a transition constraint (depends on the next row), we do not
-        // evaluate it in the last row, with the `when_transition` method.
-        let assertion = if let ConstraintDomain::EveryFrame(_) = constraint.domain() {
-            format!("builder.when_transition().assert_zero::<_>({expr_root_string});")
-        } else {
-            format!("builder.assert_zero::<_>({expr_root_string});")
-        };
-
+/// Adds the aux integrity constraints to the generated code.
+pub(super) fn add_aux_integrity_constraints(eval_func: &mut Function, ir: &Air) {
+    eval_func.line("");
+    eval_func.line("// Aux integrity/transition constraints");
+    for constraint in ir.integrity_constraints(TraceSegmentId::Aux) {
+        let assertion = constraint_to_string(ir, constraint, false);
         eval_func.line(assertion);
     }
 }

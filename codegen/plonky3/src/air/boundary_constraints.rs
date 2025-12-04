@@ -1,24 +1,28 @@
 use air_ir::{Air, TraceSegmentId};
 use codegen::Function;
 
-use super::Codegen;
+use crate::air::graph::constraint_to_string;
 
 /// Adds the main boundary constraints to the generated code.
 pub(super) fn add_main_boundary_constraints(eval_func: &mut Function, ir: &Air) {
+    eval_func.line("");
+    eval_func.line("// Main boundary constraints");
     for constraint in ir.boundary_constraints(TraceSegmentId::Main) {
-        let expr_root = constraint.node_index();
-
-        let expr_root_string = expr_root.to_string(ir);
-
-        let assertion = match constraint.domain() {
-            air_ir::ConstraintDomain::FirstRow => {
-                format!("builder.when_first_row().assert_zero::<_>({expr_root_string});")
-            },
-            air_ir::ConstraintDomain::LastRow => {
-                format!("builder.when_last_row().assert_zero::<_>({expr_root_string});")
-            },
-            _ => unreachable!("Boundary constraints can only be applied to the first or last row"),
-        };
+        let assertion = constraint_to_string(ir, constraint, true);
         eval_func.line(assertion);
+    }
+}
+
+/// Adds the aux boundary constraints to the generated code.
+pub(super) fn add_aux_boundary_constraints(eval_func: &mut Function, ir: &Air) {
+    eval_func.line("");
+    eval_func.line("// Aux boundary constraints");
+    for constraint in ir.boundary_constraints(TraceSegmentId::Aux) {
+        let assertion = constraint_to_string(ir, constraint, true);
+        eval_func.line(assertion);
+
+        // TODO: better check assumptions on aux boundary constraints:
+        // - start only with empty buses,
+        // - end with values derived from builder.aux_bus_boundary_value()
     }
 }
