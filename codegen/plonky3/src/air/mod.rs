@@ -171,7 +171,7 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         .arg("builder", "&mut AB");
     eval_func.line("let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect(\"Wrong number of public values\");");
     eval_func.line("let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect(\"Wrong number of periodic values\");");
-    
+
     eval_func.line("// Note: for now, we do not have any preprocessed values");
     eval_func.line("// let preprocessed = builder.preprocessed();");
 
