@@ -53,7 +53,7 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
             >;
             type Dft = p3_dft::Radix2DitParallel<Val>;
             type Pcs = p3_fri::TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
-            type MyConfig = p3_uni_stark::StarkConfig<Pcs, Challenge, Challenger>;
+            type MyConfig = p3_miden_prover::StarkConfig<Pcs, Challenge, Challenger>;
 
             let byte_hash = ByteHash {};
             let field_hash = FieldHash::new(p3_sha256::Sha256);
