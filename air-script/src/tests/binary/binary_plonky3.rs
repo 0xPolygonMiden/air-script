@@ -19,11 +19,12 @@ impl<F, EF> MidenAir<F, EF> for BinaryAir {
     }
 
     fn eval<AB>(&self, builder: &mut AB)
-    where AB: MidenAirBuilder<F = F, EF = EF>,
+    where AB: MidenAirBuilder<F = F>,
     {
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
         let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect("Wrong number of periodic values");
-        let preprocessed = builder.preprocessed();
+        // Note: for now, we do not have any preprocessed values
+        // let preprocessed = builder.preprocessed();
         let main = builder.main();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),

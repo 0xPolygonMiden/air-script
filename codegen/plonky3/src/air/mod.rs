@@ -121,7 +121,7 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
             .arg_ref_self()
             .arg("_main", "&RowMajorMatrix<F>")
             .arg("_challenges", "&[EF]")
-            .ret("Option<RowMajorMatrix<EF>>");
+            .ret("Option<RowMajorMatrix<F>>");
         build_aux_trace_func.line("// Note: consider using Some(build_aux_trace_with_miden_vm::<F, EF>(_main, _challenges, module)) if you want to build the aux trace using Miden VM aux trace builders.");
         build_aux_trace_func.line("");
         build_aux_trace_func.line("let num_rows = _main.height();");
@@ -158,19 +158,22 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         build_aux_trace_func.line("        rows[i+1][j] = next_row[j];");
         build_aux_trace_func.line("    }");
         build_aux_trace_func.line("}");
-        build_aux_trace_func.line("Some(trace)");
+        build_aux_trace_func.line("let trace_f = trace.flatten_to_base();");
+        build_aux_trace_func.line("Some(trace_f)");
     }
 
     // add the eval function
     let eval_func = miden_air_impl
         .new_fn("eval")
         .generic("AB")
-        .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
+        .bound("AB", "MidenAirBuilder<F = F>")
         .arg_ref_self()
         .arg("builder", "&mut AB");
     eval_func.line("let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect(\"Wrong number of public values\");");
     eval_func.line("let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect(\"Wrong number of periodic values\");");
-    eval_func.line("let preprocessed = builder.preprocessed();");
+    
+    eval_func.line("// Note: for now, we do not have any preprocessed values");
+    eval_func.line("// let preprocessed = builder.preprocessed();");
 
     eval_func.line("let main = builder.main();");
     eval_func.line("let (main_current, main_next) = (");

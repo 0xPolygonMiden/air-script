@@ -3,12 +3,11 @@ use p3_miden_air::RowMajorMatrix;
 
 use crate::{
     generate_air_plonky3_test_with_airscript_traits,
-    test_utils::plonky3_traits::check_constraints_with_airscript_traits,
     tests::fibonacci::fibonacci_plonky3::{FibonacciAir, MAIN_WIDTH},
 };
 
 pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<F> {
-    let num_rows = 31;
+    let num_rows = 32;
     let trace_length = num_rows * MAIN_WIDTH;
 
     let mut long_trace = F::zero_vec(trace_length);
@@ -38,9 +37,10 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<
 }
 
 fn generate_inputs() -> Vec<u32> {
+    let zero = 0;
     let one = 1;
     let last = 2178309; // 32nd Fibonacci number
-    vec![one, one, last]
+    vec![zero, one, last]
 }
 
 generate_air_plonky3_test_with_airscript_traits!(test_air_plonky3, FibonacciAir);

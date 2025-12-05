@@ -3,7 +3,6 @@ use p3_miden_air::RowMajorMatrix;
 
 use crate::{
     generate_air_plonky3_test_with_airscript_traits,
-    test_utils::plonky3_traits::check_constraints_with_airscript_traits,
     tests::periodic_columns::periodic_columns_plonky3::{MAIN_WIDTH, PeriodicColumnsAir},
 };
 

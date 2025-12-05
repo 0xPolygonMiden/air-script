@@ -3,12 +3,11 @@ use p3_miden_air::RowMajorMatrix;
 
 use crate::{
     generate_air_plonky3_test_with_airscript_traits,
-    test_utils::plonky3_traits::check_constraints_with_airscript_traits,
     tests::functions::functions_complex_plonky3::{FunctionsAir, MAIN_WIDTH},
 };
 
 pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<F> {
-    let num_rows = 32;
+    let num_rows = 512;
     let trace_length = num_rows * MAIN_WIDTH;
 
     let mut long_trace = F::zero_vec(trace_length);

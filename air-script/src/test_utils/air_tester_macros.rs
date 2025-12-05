@@ -74,11 +74,9 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
 
             let trace = generate_trace_rows::<Val>(inputs);
 
-            check_constraints_with_airscript_traits::<Val, Challenge, $air_name>(
-                &$air_name {},
-                &trace,
-                &inputs_goldilocks,
-            );
+            let proof = p3_miden_prover::prove(&config, &$air_name {}, &trace, &inputs_goldilocks);
+            p3_miden_prover::verify(&config, &$air_name {}, &proof, &inputs_goldilocks)
+                .expect("Verification failed");
         }
     };
 }

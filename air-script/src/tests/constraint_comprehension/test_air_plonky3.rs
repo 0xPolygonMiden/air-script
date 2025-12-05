@@ -3,7 +3,6 @@ use p3_miden_air::RowMajorMatrix;
 
 use crate::{
     generate_air_plonky3_test_with_airscript_traits,
-    test_utils::plonky3_traits::check_constraints_with_airscript_traits,
     tests::constraint_comprehension::constraint_comprehension_plonky3::{
         ConstraintComprehensionAir, MAIN_WIDTH,
     },

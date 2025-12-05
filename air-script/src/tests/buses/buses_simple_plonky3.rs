@@ -29,7 +29,7 @@ where F: Field,
         AUX_WIDTH
     }
 
-    fn build_aux_trace(&self, _main: &RowMajorMatrix<F>, _challenges: &[EF]) -> Option<RowMajorMatrix<EF>> {
+    fn build_aux_trace(&self, _main: &RowMajorMatrix<F>, _challenges: &[EF]) -> Option<RowMajorMatrix<F>> {
         // Note: consider using Some(build_aux_trace_with_miden_vm::<F, EF>(_main, _challenges, module)) if you want to build the aux trace using Miden VM aux trace builders.
 
         let num_rows = _main.height();
@@ -66,15 +66,17 @@ where F: Field,
                 rows[i+1][j] = next_row[j];
             }
         }
-        Some(trace)
+        let trace_f = trace.flatten_to_base();
+        Some(trace_f)
     }
 
     fn eval<AB>(&self, builder: &mut AB)
-    where AB: MidenAirBuilder<F = F, EF = EF>,
+    where AB: MidenAirBuilder<F = F>,
     {
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
         let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect("Wrong number of periodic values");
-        let preprocessed = builder.preprocessed();
+        // Note: for now, we do not have any preprocessed values
+        // let preprocessed = builder.preprocessed();
         let main = builder.main();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
