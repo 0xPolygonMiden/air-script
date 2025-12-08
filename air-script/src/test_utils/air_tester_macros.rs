@@ -62,7 +62,8 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
             let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
             let challenger = Challenger::from_hasher(vec![], byte_hash);
             let dft = Dft::default();
-            let fri_params = p3_fri::create_benchmark_fri_params(challenge_mmcs);
+            let mut fri_params = p3_fri::create_benchmark_fri_params(challenge_mmcs);
+            fri_params.log_blowup = 4; // Use a higher blowup than default for degree 9 constraints
             let pcs = Pcs::new(dft, val_mmcs, fri_params);
             let config = MyConfig::new(pcs, challenger);
 
