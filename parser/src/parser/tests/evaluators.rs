@@ -15,7 +15,7 @@ fn ev_fn_main_cols() {
         enf clk' = clk + 1;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.evaluators.insert(
         ident!(advance_clock),
         EvaluatorFunction::new(
@@ -49,7 +49,7 @@ fn ev_fn_call_simple() {
         enf advance_clock([clk]);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected
         .trace_columns
         .push(trace_segment!(TraceSegmentId::Main, "$main", [(clk, 1)]));
@@ -89,7 +89,7 @@ fn ev_fn_call() {
         enf advance_clock([a, b[1..3], c[2..4]]);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -123,7 +123,7 @@ fn ev_fn_call_inside_ev_fn() {
         enf advance_clock([clk]);
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     let body = vec![enforce!(call!(advance_clock(vector!(access!(clk)))))];
     expected.evaluators.insert(
         ident!(ev_func),
@@ -159,7 +159,7 @@ fn ev_fn_call_with_more_than_two_args() {
         enf advance_clock([a], [b], [c]);
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",

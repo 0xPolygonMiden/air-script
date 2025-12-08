@@ -56,7 +56,7 @@ fn buses() {
     "
     );
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     add_base_expectations(&mut expected);
     add_base_boundary_expectation(&mut expected);
     add_base_integrity_expectation(&mut expected);
@@ -91,7 +91,7 @@ fn boundary_constraints_buses() {
     "
     );
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     add_base_expectations(&mut expected);
     add_base_integrity_expectation(&mut expected);
     expected
@@ -135,7 +135,7 @@ fn integrity_constraints_buses() {
     "
     );
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     add_base_expectations(&mut expected);
     add_base_boundary_expectation(&mut expected);
     expected

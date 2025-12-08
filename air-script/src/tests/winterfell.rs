@@ -144,6 +144,40 @@ fn constraint_comprehension() {
 }
 
 #[test]
+fn evaluators_nested_slice_call() {
+    let generated_air =
+        Test::new("src/tests/evaluators/evaluators_nested_slice_call.air".to_string())
+            .transpile(Target::Winterfell)
+            .unwrap();
+
+    let expected = expect_file!["evaluators/evaluators_nested_slice_call.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+// TODO: add support for nested slicing in general expressions.
+//
+// #[test]
+// fn evaluators_slice_slicing() {
+//     let generated_air =
+// Test::new("src/tests/evaluators/evaluators_slice_slicing.air".to_string())
+//         .transpile(Target::Winterfell)
+//         .unwrap();
+//
+//     let expected = expect_file!["evaluators/evaluators_slice_slicing.rs"];
+//     expected.assert_eq(&generated_air);
+// }
+
+#[test]
+fn evaluators_slice() {
+    let generated_air = Test::new("src/tests/evaluators/evaluators_slice.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["evaluators/evaluators_slice.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
 fn evaluators() {
     let generated_air = Test::new("src/tests/evaluators/evaluators.air".to_string())
         .transpile(Target::Winterfell)

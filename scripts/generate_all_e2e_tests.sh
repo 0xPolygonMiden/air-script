@@ -19,6 +19,8 @@ cargo build --release
 ./target/release/airc transpile --target winterfell ./air-script/src/tests/constant_in_range/constant_in_range.air
 ./target/release/airc transpile --target winterfell ./air-script/src/tests/constants/constants.air
 ./target/release/airc transpile --target winterfell ./air-script/src/tests/constraint_comprehension/constraint_comprehension.air
+./target/release/airc transpile --target winterfell ./air-script/src/tests/evaluators/evaluators_nested_slice_call.air
+./target/release/airc transpile --target winterfell ./air-script/src/tests/evaluators/evaluators_slice.air
 ./target/release/airc transpile --target winterfell ./air-script/src/tests/evaluators/evaluators.air
 ./target/release/airc transpile --target winterfell ./air-script/src/tests/fibonacci/fibonacci.air
 ./target/release/airc transpile --target winterfell ./air-script/src/tests/functions/functions_simple.air
@@ -52,6 +54,8 @@ cargo build --release
 ./target/release/airc transpile --target plonky3 ./air-script/src/tests/constant_in_range/constant_in_range.air
 ./target/release/airc transpile --target plonky3 ./air-script/src/tests/constants/constants.air
 ./target/release/airc transpile --target plonky3 ./air-script/src/tests/constraint_comprehension/constraint_comprehension.air
+./target/release/airc transpile --target plonky3 ./air-script/src/tests/evaluators/evaluators_nested_slice_call.air
+./target/release/airc transpile --target plonky3 ./air-script/src/tests/evaluators/evaluators_slice.air
 ./target/release/airc transpile --target plonky3 ./air-script/src/tests/evaluators/evaluators.air
 ./target/release/airc transpile --target plonky3 ./air-script/src/tests/fibonacci/fibonacci.air
 ./target/release/airc transpile --target plonky3 ./air-script/src/tests/functions/functions_simple.air

@@ -226,7 +226,7 @@ impl Visitor for StripSpansVisitor {
             MirValue::Constant(_) => {},
             MirValue::TraceAccess(_) => {},
             MirValue::PeriodicColumn(v) => {
-                v.name.module.0 = Span::new(SourceSpan::default(), v.name.module.0.item);
+                v.name.module.0 = Span::new(SourceSpan::default(), v.name.module.0.item.clone());
                 match v.name.item {
                     NamespacedIdentifier::Function(f) => {
                         v.name.item = NamespacedIdentifier::Function(Identifier::new(
