@@ -508,18 +508,19 @@ impl Library {
             // importing module, if it was parsed from disk. If no path is available,
             // we default to the current working directory.
 
-            let (real_path, source_dir) =
-                match codemap.name(imports.first().unwrap().span().source_id()) {
-                    // If we have no source span, default to the current working directory
-                    Err(_) => (false, cwd.clone()),
-                    // If the file is virtual, then we've either already parsed imports for this module,
-                    // or we have to fall back to the current working directory, but we have no relative
-                    // path from which to base our search.
-                    Ok(FileName::Virtual(_)) => (false, cwd.clone()),
-                    Ok(FileName::Real(path)) => {
-                        (true, path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf())
-                    },
-                };
+            let (real_path, source_dir) = match codemap
+                .name(imports.first().unwrap().span().source_id())
+            {
+                // If we have no source span, default to the current working directory
+                Err(_) => (false, cwd.clone()),
+                // If the file is virtual, then we've either already parsed imports for this module,
+                // or we have to fall back to the current working directory, but we have no relative
+                // path from which to base our search.
+                Ok(FileName::Virtual(_)) => (false, cwd.clone()),
+                Ok(FileName::Real(path)) => {
+                    (true, path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf())
+                },
+            };
 
             // For each module imported, try to load the module from the library, if it is
             // unavailable we must do extra work to load it into the library, as
