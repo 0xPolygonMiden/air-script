@@ -125,9 +125,10 @@ fn constants() {
 
 #[test]
 fn evaluators_nested_slice_call() {
-    let generated_air = Test::new("src/tests/evaluators/evaluators_nested_slice_call.air".to_string())
-        .transpile(Target::Plonky3)
-        .unwrap();
+    let generated_air =
+        Test::new("src/tests/evaluators/evaluators_nested_slice_call.air".to_string())
+            .transpile(Target::Plonky3)
+            .unwrap();
 
     let expected = expect_file!["evaluators/evaluators_nested_slice_call_plonky3.rs"];
     expected.assert_eq(&generated_air);
@@ -137,7 +138,8 @@ fn evaluators_nested_slice_call() {
 //
 // #[test]
 // fn evaluators_slice_slicing() {
-//     let generated_air = Test::new("src/tests/evaluators/evaluators_slice_slicing.air".to_string())
+//     let generated_air =
+// Test::new("src/tests/evaluators/evaluators_slice_slicing.air".to_string())
 //         .transpile(Target::Plonky3)
 //         .unwrap();
 //
