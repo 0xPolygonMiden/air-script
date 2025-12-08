@@ -64,7 +64,8 @@ pub struct SemanticAnalysis<'a> {
     diagnostics: &'a DiagnosticsHandler,
     program: &'a Program,
     library: &'a Library,
-    deps: &'a mut DependencyGraph,
+    deps_graph: &'a mut DependencyGraph,
+    deps_nodes: &'a mut BTreeMap<QualifiedIdentifier, petgraph::graph::NodeIndex>,
     imported: Imported,
     globals: HashMap<Identifier, BindingType>,
     constants: BTreeMap<Identifier, ConstantExpr>,
@@ -83,13 +84,15 @@ impl<'a> SemanticAnalysis<'a> {
         program: &'a Program,
         library: &'a Library,
         deps: &'a mut DependencyGraph,
+        deps_nodes: &'a mut BTreeMap<QualifiedIdentifier, petgraph::graph::NodeIndex>,
         imported: Imported,
     ) -> Self {
         Self {
             diagnostics,
             program,
             library,
-            deps,
+            deps_graph: deps,
+            deps_nodes,
             imported,
             globals: Default::default(),
             constants: Default::default(),
@@ -110,21 +113,23 @@ impl<'a> SemanticAnalysis<'a> {
         }
 
         // If this is the root module, we may have top-level dependencies
-        if module.name == self.program.name {
+        if module.path.0.item == vec![self.program.name] {
             // Update the dependency graph with the collected information
             //
             // We use a special node to represent the references which occur in
             // the top-level boundary_constraints and integrity_constraints sections
             let root_node = QualifiedIdentifier::new(
-                self.program.name,
+                ModuleId::new(vec![self.program.name], self.program.name.span()),
                 NamespacedIdentifier::Binding(Identifier::new(
                     SourceSpan::UNKNOWN,
                     Symbol::intern("$$root"),
                 )),
             );
-            for (referenced_item, ref_type) in self.referenced.iter() {
-                let referenced_item = self.deps.add_node(*referenced_item);
-                self.deps.add_edge(root_node, referenced_item, *ref_type);
+            let root_node_index = self.get_node_index_or_add(&root_node);
+            for (referenced_item, ref_type) in self.referenced.clone().iter() {
+                let referenced_item_node_index =
+                    self.get_node_index_or_add(&referenced_item.clone());
+                self.deps_graph.add_edge(root_node_index, referenced_item_node_index, *ref_type);
             }
         } else {
             // We should never have top-level dependencies here
@@ -140,7 +145,7 @@ impl<'a> SemanticAnalysis<'a> {
 
 impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
     fn visit_mut_module(&mut self, module: &mut Module) -> ControlFlow<SemanticAnalysisError> {
-        self.current_module = Some(module.name);
+        self.current_module = Some(module.path.clone());
 
         // Collect the values of all named constants that can be referenced in range declarations
         self.constants
@@ -366,12 +371,17 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
 
         // Update the dependency graph for this function
         let current_item = QualifiedIdentifier::new(
-            self.current_module.unwrap(),
+            self.current_module.clone().unwrap(),
             NamespacedIdentifier::Function(function.name),
         );
-        for (referenced_item, ref_type) in self.referenced.iter() {
-            let referenced_item = self.deps.add_node(*referenced_item);
-            self.deps.add_edge(current_item, referenced_item, *ref_type);
+        let current_item_node_index = self.get_node_index_or_add(&current_item);
+        for (referenced_item, ref_type) in self.referenced.clone().iter() {
+            let referenced_item_node_index = self.get_node_index_or_add(referenced_item);
+            self.deps_graph.add_edge(
+                current_item_node_index,
+                referenced_item_node_index,
+                *ref_type,
+            );
         }
 
         // Restore the original references metadata
@@ -409,12 +419,17 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
 
         // Update the dependency graph for this function
         let current_item = QualifiedIdentifier::new(
-            self.current_module.unwrap(),
+            self.current_module.clone().unwrap(),
             NamespacedIdentifier::Function(function.name),
         );
+        let current_item_node_index = self.deps_graph.add_node(current_item);
         for (referenced_item, ref_type) in self.referenced.iter() {
-            let referenced_item = self.deps.add_node(*referenced_item);
-            self.deps.add_edge(current_item, referenced_item, *ref_type);
+            let referenced_item_node_index = self.deps_graph.add_node(referenced_item.clone());
+            self.deps_graph.add_edge(
+                current_item_node_index,
+                referenced_item_node_index,
+                *ref_type,
+            );
         }
 
         // Restore the original references metadata
@@ -939,7 +954,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
             // Update the dependency graph
             if let Some(dep_type) = dep_type {
                 // If the item is already in the referenced set, it should have the same type
-                let prev = self.referenced.insert(*qid, dep_type);
+                let prev = self.referenced.insert(qid.clone(), dep_type);
                 if prev.is_some() {
                     assert_eq!(prev, Some(dep_type));
                 }
@@ -991,7 +1006,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         &mut self,
         expr: &mut ResolvableIdentifier,
     ) -> ControlFlow<SemanticAnalysisError> {
-        let current_module = self.current_module.unwrap();
+        let current_module = self.current_module.clone().unwrap();
         match expr {
             // If already resolved, and referencing a local variable, there is nothing to do
             ResolvableIdentifier::Local(_) => ControlFlow::Continue(()),
@@ -1036,7 +1051,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                             // We use the program name to resolve the bus, as it is a globally
                             // defined item in the root module
                             *expr = ResolvableIdentifier::Resolved(QualifiedIdentifier::new(
-                                self.program.name,
+                                ModuleId::new(vec![self.program.name], self.program.name.span()),
                                 namespaced_id,
                             ));
                         },
@@ -1055,7 +1070,8 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                 if let Some((imported_id, imported_from)) =
                     self.imported.get_key_value(&namespaced_id)
                 {
-                    let qualified_id = QualifiedIdentifier::new(*imported_from, *imported_id);
+                    let qualified_id =
+                        QualifiedIdentifier::new(imported_from.clone(), *imported_id);
                     *expr = ResolvableIdentifier::Resolved(qualified_id);
 
                     return ControlFlow::Continue(());
@@ -1590,7 +1606,7 @@ impl SemanticAnalysis<'_> {
                 // Check that the call references an evaluator
                 //
                 // If unresolved, we've already raised a diagnostic for the invalid call
-                match expr.callee {
+                match &expr.callee {
                     ResolvableIdentifier::Resolved(callee) => {
                         match callee.id() {
                             id @ NamespacedIdentifier::Function(_) => {
@@ -1642,7 +1658,7 @@ impl SemanticAnalysis<'_> {
                 // Check that the call references an evaluator
                 //
                 // If unresolved, we've already raised a diagnostic for the invalid call
-                match expr.bus {
+                match &expr.bus {
                     ResolvableIdentifier::Resolved(bus) => {
                         match bus.id() {
                             id @ NamespacedIdentifier::Binding(_) => {
@@ -1876,7 +1892,7 @@ impl SemanticAnalysis<'_> {
         &self,
         qid: &QualifiedIdentifier,
     ) -> Result<Span<BindingType>, InvalidAccessError> {
-        if qid.module == self.program.name {
+        if qid.module.0.item == vec![self.program.name] {
             // This is the root module, so the value will be in either locals or globals
             self.locals
                 .get_key_value(&qid.item)
@@ -1887,7 +1903,7 @@ impl SemanticAnalysis<'_> {
                         .map(|(k, v)| Span::new(k.span(), v.clone()))
                 })
                 .ok_or(InvalidAccessError::UndefinedVariable)
-        } else if qid.module == self.current_module.unwrap() {
+        } else if qid.module == self.current_module.clone().unwrap() {
             // This is a reference to a module-local declaration
             self.locals
                 .get_key_value(&qid.item)
@@ -1928,6 +1944,16 @@ impl SemanticAnalysis<'_> {
                 })
                 .ok_or(InvalidAccessError::UndefinedVariable)
         }
+    }
+
+    /// Adds the given module to the module graph if it does not already exist,
+    /// returning the corresponding node index.
+    fn get_node_index_or_add(&mut self, qid: &QualifiedIdentifier) -> petgraph::graph::NodeIndex {
+        self.deps_nodes.get(qid).cloned().unwrap_or_else(|| {
+            let index = self.deps_graph.add_node(qid.clone());
+            self.deps_nodes.insert(qid.clone(), index);
+            index
+        })
     }
 }
 

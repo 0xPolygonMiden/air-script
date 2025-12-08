@@ -48,7 +48,7 @@ impl AlgebraicGraph {
                 let new_op = match op {
                     Operation::Value(_) => {
                         // Values do not need renumbering, they are leaf nodes
-                        *op
+                        op.clone()
                     },
                     // Note: for Add, Sub, and Mul operations, we assume it's children have already
                     // been handled. This holds because when building the graph, we always insert

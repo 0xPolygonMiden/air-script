@@ -339,7 +339,7 @@ impl AirBuilder<'_> {
                     },
                     MirValue::PeriodicColumn(periodic_column_access) => {
                         crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
-                            name: periodic_column_access.name,
+                            name: periodic_column_access.name.clone(),
                             cycle: periodic_column_access.cycle,
                         })
                     },
@@ -392,7 +392,7 @@ impl AirBuilder<'_> {
                     },
                     MirValue::PeriodicColumn(periodic_column_access) => {
                         crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
-                            name: periodic_column_access.name,
+                            name: periodic_column_access.name.clone(),
                             cycle: periodic_column_access.cycle,
                         })
                     },

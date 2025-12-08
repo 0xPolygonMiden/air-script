@@ -4,7 +4,7 @@ use super::*;
 ///
 /// Values are either constant, or evaluated at runtime using the context
 /// provided to an AirScript program (i.e. random values, public inputs, etc.).
-#[derive(Debug, Eq, PartialEq, Copy, Clone, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, Clone, PartialOrd, Ord)]
 pub enum Value {
     /// A constant value.
     Constant(u64),
@@ -23,7 +23,7 @@ pub enum Value {
 }
 
 /// Represents an access of a [PeriodicColumn], similar in nature to [TraceAccess]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PeriodicColumnAccess {
     pub name: QualifiedIdentifier,
     pub cycle: usize,

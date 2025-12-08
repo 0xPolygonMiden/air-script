@@ -26,7 +26,7 @@ fn basic_computed_indices() {
         enf a = x[1 + 1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -72,7 +72,7 @@ fn basic_computed_indices_in_lc() {
         enf a = y[1 + 1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",
@@ -119,7 +119,7 @@ fn computed_indices_in_lc() {
         enf a = y[1 + 1];
     }";
 
-    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     expected.trace_columns.push(trace_segment!(
         TraceSegmentId::Main,
         "$main",

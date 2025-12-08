@@ -174,7 +174,7 @@ impl From<ast::Type> for MirType {
 }
 
 /// Represents an access of a PeriodicColumn, similar in nature to [TraceAccess].
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct PeriodicColumnAccess {
     pub name: QualifiedIdentifier,
     pub cycle: usize,
