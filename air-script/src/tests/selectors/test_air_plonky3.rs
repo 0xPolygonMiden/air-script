@@ -6,8 +6,8 @@ use crate::{
     tests::selectors::selectors_with_evaluators_plonky3::{MAIN_WIDTH, SelectorsAir},
 };
 
-pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<F> {
-    let num_rows = 32;
+pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u64>) -> RowMajorMatrix<F> {
+    let num_rows = 512;
     let trace_length = num_rows * MAIN_WIDTH;
 
     let mut long_trace = F::zero_vec(trace_length);
@@ -42,7 +42,7 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<
     trace
 }
 
-fn generate_inputs() -> Vec<u32> {
+fn generate_inputs() -> Vec<u64> {
     vec![1; 16]
 }
 

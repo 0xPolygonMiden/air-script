@@ -62,15 +62,14 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
             let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
             let challenger = Challenger::from_hasher(vec![], byte_hash);
             let dft = Dft::default();
-            let mut fri_params = p3_fri::create_benchmark_fri_params(challenge_mmcs);
-            fri_params.log_blowup = 4; // Use a higher blowup than default for degree 9 constraints
+            let mut fri_params = p3_fri::create_miden_fri_params(challenge_mmcs);
             let pcs = Pcs::new(dft, val_mmcs, fri_params);
             let config = MyConfig::new(pcs, challenger);
 
             let inputs = generate_inputs();
             let inputs_goldilocks: Vec<Val> = inputs
                 .iter()
-                .map(|&x| <Val as p3_field::PrimeCharacteristicRing>::from_u32(x))
+                .map(|&x| <Val as p3_field::PrimeCharacteristicRing>::from_u64(x))
                 .collect();
 
             let trace = generate_trace_rows::<Val>(inputs);

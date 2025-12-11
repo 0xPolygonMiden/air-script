@@ -6,8 +6,8 @@ use crate::{
     tests::fibonacci::fibonacci_plonky3::{FibonacciAir, MAIN_WIDTH},
 };
 
-pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<F> {
-    let num_rows = 32;
+pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u64>) -> RowMajorMatrix<F> {
+    let num_rows = 512;
     let trace_length = num_rows * MAIN_WIDTH;
 
     let mut long_trace = F::zero_vec(trace_length);
@@ -36,11 +36,40 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u32>) -> RowMajorMatrix<
     trace
 }
 
-fn generate_inputs() -> Vec<u32> {
+fn generate_inputs() -> Vec<u64> {
     let zero = 0;
     let one = 1;
-    let last = 2178309; // 32nd Fibonacci number
+    let last = 12556846397060607923; // 512nd Fibonacci number in Goldilock's field
     vec![zero, one, last]
+}
+
+#[test]
+fn fibo() {
+    type F = p3_goldilocks::Goldilocks;
+    let f_32 = fibonacci::<F>(32);
+    let f_512 = fibonacci::<F>(512);
+    assert_eq!(f_32, F::new(2178309));
+    println!("Fibonacci(512) = {}", f_512);
+}
+
+pub fn fibonacci<F: PrimeField64>(n: i32) -> F {
+    if n < 0 {
+        panic!("{} is negative!", n);
+    } else if n == 0 {
+        panic!("zero is not a right argument to fibonacci()!");
+        } else if n == 1 {
+            return F::ONE;
+    }
+
+    let mut sum = F::ZERO;
+    let mut last = F::ZERO;
+    let mut curr = F::ONE;
+    for _i in 1..n {
+        sum = last + curr;
+        last = curr;
+        curr = sum;
+    }
+    sum
 }
 
 generate_air_plonky3_test_with_airscript_traits!(test_air_plonky3, FibonacciAir);
