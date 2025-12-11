@@ -39,26 +39,17 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u64>) -> RowMajorMatrix<
 fn generate_inputs() -> Vec<u64> {
     let zero = 0;
     let one = 1;
-    let last = 12556846397060607923; // 512nd Fibonacci number in Goldilock's field
+    let last = fibonacci_field::<p3_goldilocks::Goldilocks>(512).as_canonical_u64(); // 512nd Fibonacci number in Goldilock's field
     vec![zero, one, last]
 }
 
-#[test]
-fn fibo() {
-    type F = p3_goldilocks::Goldilocks;
-    let f_32 = fibonacci::<F>(32);
-    let f_512 = fibonacci::<F>(512);
-    assert_eq!(f_32, F::new(2178309));
-    println!("Fibonacci(512) = {}", f_512);
-}
-
-pub fn fibonacci<F: PrimeField64>(n: i32) -> F {
+fn fibonacci_field<F: PrimeField64>(n: i32) -> F {
     if n < 0 {
         panic!("{} is negative!", n);
     } else if n == 0 {
-        panic!("zero is not a right argument to fibonacci()!");
-        } else if n == 1 {
-            return F::ONE;
+        return F::ZERO;
+    } else if n == 1 {
+        return F::ONE;
     }
 
     let mut sum = F::ZERO;
@@ -70,6 +61,15 @@ pub fn fibonacci<F: PrimeField64>(n: i32) -> F {
         curr = sum;
     }
     sum
+}
+
+#[test]
+fn test_goldilocks_fibonacci_computation() {
+    type F = p3_goldilocks::Goldilocks;
+    let f_32 = fibonacci_field::<F>(32);
+    let f_512 = fibonacci_field::<F>(512);
+    assert_eq!(f_32, F::new(2178309));
+    assert_eq!(f_512, F::new(12556846397060607923));
 }
 
 generate_air_plonky3_test_with_airscript_traits!(test_air_plonky3, FibonacciAir);
