@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    ops::Deref,
-};
+use std::{collections::HashMap, ops::Deref};
 
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Spanned};
