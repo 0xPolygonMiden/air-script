@@ -2,7 +2,7 @@ use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
+use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 7;
 pub const AUX_WIDTH: usize = 2;
@@ -27,6 +27,13 @@ where F: Field,
 
     fn aux_width(&self) -> usize {
         AUX_WIDTH
+    }
+
+    fn bus_types(&self) -> Vec<BusType> {
+        vec![
+            BusType::Multiset,
+            BusType::Logup,
+        ]
     }
 
     fn build_aux_trace(&self, _main: &RowMajorMatrix<F>, _challenges: &[EF]) -> Option<RowMajorMatrix<F>> {

@@ -112,6 +112,17 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
             .line("1 + MAX_BETA_CHALLENGE_POWER");
 
         miden_air_impl.new_fn("aux_width").arg_ref_self().ret("usize").line("AUX_WIDTH");
+
+        let bus_types_fn = miden_air_impl.new_fn("bus_types").arg_ref_self().ret("Vec<BusType>");
+        bus_types_fn.line("vec![");
+        for (_id, bus) in &ir.buses {
+            let bus_type_str = match bus.bus_type {
+                air_ir::BusType::Multiset => "BusType::Multiset",
+                air_ir::BusType::Logup => "BusType::Logup",
+            };
+            bus_types_fn.line(format!("    {bus_type_str},"));
+        }
+        bus_types_fn.line("]");
     }
 
     // add the build_aux_trace function if needed
