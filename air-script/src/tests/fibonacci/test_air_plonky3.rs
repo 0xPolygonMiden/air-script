@@ -72,4 +72,8 @@ fn test_goldilocks_fibonacci_computation() {
     assert_eq!(f_512, F::new(12556846397060607923));
 }
 
+fn generate_var_len_pub_inputs<'a>() -> Vec<Vec<Vec<u64>>> {
+    vec![]
+}
+
 generate_air_plonky3_test_with_airscript_traits!(test_air_plonky3, FibonacciAir);

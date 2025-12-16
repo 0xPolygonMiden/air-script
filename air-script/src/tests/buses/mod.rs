@@ -36,4 +36,5 @@ mod buses_varlen_boundary_first_plonky3;
 mod buses_varlen_boundary_last_plonky3;
 
 mod test_air_plonky3;
+mod test_air_plonky3_varlen_boundary_last;
 mod test_air_winterfell;

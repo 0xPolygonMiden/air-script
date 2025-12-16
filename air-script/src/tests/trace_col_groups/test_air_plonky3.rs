@@ -61,4 +61,8 @@ fn generate_inputs() -> Vec<u64> {
     vec![1; 16]
 }
 
+fn generate_var_len_pub_inputs<'a>() -> Vec<Vec<Vec<u64>>> {
+    vec![]
+}
+
 generate_air_plonky3_test_with_airscript_traits!(test_air_plonky3, TraceColGroupAir);

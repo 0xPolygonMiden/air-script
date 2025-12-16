@@ -3,7 +3,7 @@ use p3_miden_air::RowMajorMatrix;
 
 use crate::{
     generate_air_plonky3_test_with_airscript_traits,
-    tests::buses::buses_complex_plonky3::{BusesAir, MAIN_WIDTH},
+    tests::buses::buses_varlen_boundary_last_plonky3::{BusesAir, MAIN_WIDTH},
 };
 
 pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u64>) -> RowMajorMatrix<F> {
@@ -20,13 +20,11 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u64>) -> RowMajorMatrix<
     assert_eq!(rows.len(), num_rows);
 
     // Initialize first row
-    rows[0][0] = F::ZERO;
+    rows[0][0] = F::ONE;
     rows[0][1] = F::ZERO;
     rows[0][2] = F::ZERO;
     rows[0][3] = F::ZERO;
     rows[0][4] = F::ZERO;
-    rows[0][5] = F::ZERO;
-    rows[0][6] = F::ZERO;
 
     // Fill subsequent rows using direct access to the rows array
     for i in 1..num_rows {
@@ -35,28 +33,32 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u64>) -> RowMajorMatrix<
         let c_prev = rows[i - 1][2];
         let d_prev = rows[i - 1][3];
         let e_prev = rows[i - 1][4];
-        let f_prev = rows[i - 1][5];
-        let g_prev = rows[i - 1][6];
 
         // Update current row based on previous values
-        rows[i][0] = F::ZERO;
-        rows[i][1] = F::ZERO;
-        rows[i][2] = if i > 3 && i < 8 { F::ONE } else { F::ZERO }; // s1 is true 4 times
-        rows[i][3] = if i > 5 && i < 10 { F::ONE } else { F::ZERO }; // s2 is true 4 times
-        rows[i][4] = if i > 4 && i < 10 { F::ONE } else { F::ZERO }; // s3 is true 5 times
-        rows[i][5] = if i > 5 && i < 13 { F::ONE } else { F::ZERO }; // s4 is true 7 times
-        rows[i][6] = if i > 15 && i < 20 { F::from_u64(3) } else { F::ZERO }; // d is set to 3 four times
+        rows[i][0] = F::ONE;
+        rows[i][1] = if i > 3 && i < 8 { F::ONE } else { F::ZERO }; // sp_insert is true 4 times
+        rows[i][2] = if i > 3 && i < 7 { F::ONE } else { F::ZERO }; // sp_remove is true 3 times
+        rows[i][3] = if i > 4 && i < 10 { F::ONE } else { F::ZERO }; // sq_insert_twice is true 5 times
+        rows[i][4] = if i > 5 && i < 10 {
+            F::from_canonical_checked(2).unwrap()
+        } else {
+            F::ZERO
+        }; // sq_remove has value "2" 4 times
     }
 
     trace
 }
 
 fn generate_inputs() -> Vec<u64> {
-    vec![1; 2]
+    vec![]
 }
 
 fn generate_var_len_pub_inputs<'a>() -> Vec<Vec<Vec<u64>>> {
-    vec![vec![], vec![], vec![]]
+    // At the end, the bus p will have the tuple (a) (that equals (1)) inserted once
+    let var_len_p = vec![vec![1]];
+    // At the end, the bus q will have the tuple (2, a) (that equals (2, 1)) inserted twice
+    let var_len_q = vec![vec![2, 1], vec![2, 1]];
+    vec![var_len_p, var_len_q]
 }
 
 generate_air_plonky3_test_with_airscript_traits!(test_air_plonky3, BusesAir);

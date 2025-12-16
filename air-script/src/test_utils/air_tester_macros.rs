@@ -62,7 +62,7 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
             let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
             let challenger = Challenger::from_hasher(vec![], byte_hash);
             let dft = Dft::default();
-            let mut fri_params = p3_fri::create_miden_fri_params(challenge_mmcs);
+            let mut fri_params = p3_fri::create_recursive_miden_fri_params(challenge_mmcs);
             let pcs = Pcs::new(dft, val_mmcs, fri_params);
             let config = MyConfig::new(pcs, challenger);
 
@@ -71,12 +71,38 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
                 .iter()
                 .map(|&x| <Val as p3_field::PrimeCharacteristicRing>::from_u64(x))
                 .collect();
+            let var_len_pub_inputs = generate_var_len_pub_inputs();
+            let mut var_len_pub_inputs_goldilocks_vec: Vec<Vec<Vec<Val>>> = vec![];
+            for arr in var_len_pub_inputs.iter() {
+                let mut goldilocks_arr: Vec<Vec<Val>> = vec![];
+                for slice in arr.iter() {
+                    let goldilocks_slice: Vec<Val> = slice
+                        .iter()
+                        .map(|&x| <Val as p3_field::PrimeCharacteristicRing>::from_u64(x))
+                        .collect();
+                    goldilocks_arr.push(goldilocks_slice);
+                }
+                var_len_pub_inputs_goldilocks_vec.push(goldilocks_arr);
+            }
+            let var_len_pub_inputs_goldilocks_vec_slice: Vec<Vec<&[Val]>> =
+                var_len_pub_inputs_goldilocks_vec
+                    .iter()
+                    .map(|outer| outer.iter().map(|inner| inner.as_slice()).collect())
+                    .collect();
+            let var_len_pub_inputs_goldilocks: Vec<&[&[Val]]> =
+                var_len_pub_inputs_goldilocks_vec_slice.iter().map(|v| v.as_slice()).collect();
 
             let trace = generate_trace_rows::<Val>(inputs);
 
             let proof = p3_miden_prover::prove(&config, &$air_name {}, &trace, &inputs_goldilocks);
-            p3_miden_prover::verify(&config, &$air_name {}, &proof, &inputs_goldilocks)
-                .expect("Verification failed");
+            p3_miden_prover::verify(
+                &config,
+                &$air_name {},
+                &proof,
+                &inputs_goldilocks,
+                &var_len_pub_inputs_goldilocks,
+            )
+            .expect("Verification failed");
         }
     };
 }

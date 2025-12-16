@@ -45,8 +45,13 @@ fn add_constants(scope: &mut Scope, ir: &Air) {
     let aux_width = ir.trace_segment_widths.get(1).cloned().unwrap_or(0);
     let num_periodic_values = ir.periodic_columns().count();
     let period = ir.periodic_columns().map(|col| col.period()).max().unwrap_or(0);
-    let num_public_values =
-        ir.public_inputs().map(|public_input| public_input.size()).sum::<usize>();
+    let num_public_values = ir
+        .public_inputs()
+        .map(|public_input| match public_input {
+            air_ir::PublicInput::Vector { size, .. } => size,
+            air_ir::PublicInput::Table { .. } => &0,
+        })
+        .sum::<usize>();
     let max_beta_challenge_power = ir.num_random_values.saturating_sub(1);
 
     let constants = [
