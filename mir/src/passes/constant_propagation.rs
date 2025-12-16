@@ -91,16 +91,21 @@ impl ConstantPropagation<'_> {
         let lhs = exp_ref.lhs.clone();
         let rhs = exp_ref.rhs.clone();
 
-        if let Some(0) = get_inner_const(&lhs) {
-            Ok(Some(Value::create(SpannedMirValue {
-                value: MirValue::Constant(ConstantValue::Felt(0)),
-                span: exp_ref.span,
-            })))
-        } else if let Some(0) = get_inner_const(&rhs) {
+        // x^0 = 1 (must take precedence, including 0^0)
+        if let Some(0) = get_inner_const(&rhs) {
             Ok(Some(Value::create(SpannedMirValue {
                 value: MirValue::Constant(ConstantValue::Felt(1)),
                 span: exp_ref.span,
             })))
+        } else if let Some(0) = get_inner_const(&lhs) {
+            // 0^k = 0, but only when k is known and non-zero
+            if get_inner_const(&rhs).is_some() {
+                return Ok(Some(Value::create(SpannedMirValue {
+                    value: MirValue::Constant(ConstantValue::Felt(0)),
+                    span: exp_ref.span,
+                })));
+            }
+            Ok(None)
         } else {
             try_fold_const_binary_op(lhs, rhs, exp.clone(), exp_ref.span())
         }

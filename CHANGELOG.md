@@ -14,6 +14,7 @@
 - Fixed a vector unrolling issue in nested match evaluations (#491).
 - Fix evaluator argument vector slice expansion (#495).
 - Support importing hierarchical modules (#507).
+- Fixed MIR's constant propagation to fold 0^0 to 1 (#509)
 
 ## 0.4.0 (2025-06-20)
 
