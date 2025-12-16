@@ -99,15 +99,13 @@ impl ConstantPropagation<'_> {
             })))
         } else if let Some(0) = get_inner_const(&lhs) {
             // 0^k = 0, but only when k is known and non-zero
-            if let Some(k) = get_inner_const(&rhs)
-                && k != 0
-            {
+            if get_inner_const(&rhs).is_some() {
                 return Ok(Some(Value::create(SpannedMirValue {
                     value: MirValue::Constant(ConstantValue::Felt(0)),
                     span: exp_ref.span,
                 })));
             }
-            try_fold_const_binary_op(lhs, rhs, exp.clone(), exp_ref.span())
+            Ok(None)
         } else {
             try_fold_const_binary_op(lhs, rhs, exp.clone(), exp_ref.span())
         }
