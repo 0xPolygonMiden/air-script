@@ -6,12 +6,12 @@ use crate::ast::{ModuleId, QualifiedIdentifier};
 /// The dependency graph is used to construct the final [Program] representation,
 /// containing only those parts of the program which are referenced from the root
 /// module.
-pub type DependencyGraph = petgraph::graphmap::DiGraphMap<QualifiedIdentifier, DependencyType>;
+pub type DependencyGraph = petgraph::graph::DiGraph<QualifiedIdentifier, DependencyType>;
 
 /// Represents the graph of dependencies between modules, with no regard to what
 /// items in those modules are actually used. In other words, this graph tells us
 /// what modules depend on what other modules in the program.
-pub type ModuleGraph = petgraph::graphmap::DiGraphMap<ModuleId, ()>;
+pub type ModuleGraph = petgraph::graph::DiGraph<ModuleId, ()>;
 
 /// Represents the type of edges in the dependency graph
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

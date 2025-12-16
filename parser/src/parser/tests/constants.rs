@@ -14,7 +14,7 @@ fn constants_scalars() {
     const A = 1;
     const B = 2;";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.constants.insert(
         ident!(A),
         Constant::new(SourceSpan::UNKNOWN, ident!(A), ConstantExpr::Scalar(1)),
@@ -34,7 +34,7 @@ fn constants_vectors() {
     const A = [1, 2, 3, 4];
     const B = [5, 6, 7, 8];";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.constants.insert(
         ident!(A),
         Constant::new(SourceSpan::UNKNOWN, ident!(A), ConstantExpr::Vector(vec![1, 2, 3, 4])),
@@ -54,7 +54,7 @@ fn constants_matrices() {
     const A = [[1, 2], [3, 4]];
     const B = [[5, 6], [7, 8]];";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     expected.constants.insert(
         ident!(A),
         Constant::new(
