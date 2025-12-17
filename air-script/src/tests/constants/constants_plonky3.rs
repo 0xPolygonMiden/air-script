@@ -46,8 +46,6 @@ impl<F, EF> MidenAir<F, EF> for ConstantsAir {
         builder.when_transition().assert_zero(main_next[5].clone().into() - (main_current[5].clone().into() + AB::Expr::ONE));
         builder.assert_zero(main_current[4].clone().into() - AB::Expr::ONE);
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

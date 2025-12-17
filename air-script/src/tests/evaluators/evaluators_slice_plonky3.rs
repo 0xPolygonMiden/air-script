@@ -60,8 +60,6 @@ impl<F, EF> MidenAir<F, EF> for EvaluatorsSliceAir {
         builder.assert_zero(main_current[0].clone().into() * main_current[1].clone().into() * main_current[2].clone().into() * (main_current[3].clone().into() * main_current[3].clone().into() - main_current[3].clone().into()));
         builder.assert_zero(main_current[0].clone().into() * main_current[1].clone().into() * main_current[2].clone().into() * main_current[3].clone().into() * (main_current[4].clone().into() * main_current[4].clone().into() - main_current[4].clone().into()));
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

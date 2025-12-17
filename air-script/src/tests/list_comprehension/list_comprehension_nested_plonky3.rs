@@ -39,8 +39,6 @@ impl<F, EF> MidenAir<F, EF> for ListComprehensionAir {
         builder.assert_zero(main_current[0].clone().into().double() + main_current[1].clone().into() * AB::Expr::from_u64(3) - AB::Expr::from_u64(5));
         builder.assert_zero(main_current[0].clone().into() * AB::Expr::from_u64(3) + main_current[1].clone().into() * AB::Expr::from_u64(4) - AB::Expr::from_u64(7));
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

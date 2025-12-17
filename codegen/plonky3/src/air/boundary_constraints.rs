@@ -13,6 +13,7 @@ pub(super) fn add_main_boundary_constraints(eval_func: &mut Function, ir: &Air) 
     }
 }
 
+#[allow(dead_code)]
 /// Adds the aux boundary constraints to the generated code.
 pub(super) fn add_aux_boundary_constraints(eval_func: &mut Function, ir: &Air) {
     eval_func.line("");

@@ -6,7 +6,7 @@ use air_ir::Air;
 
 use super::Scope;
 use crate::air::{
-    boundary_constraints::{add_aux_boundary_constraints, add_main_boundary_constraints},
+    boundary_constraints::add_main_boundary_constraints,
     graph::Codegen,
     integrity_constraints::{add_aux_integrity_constraints, add_main_integrity_constraints},
 };
@@ -213,7 +213,8 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
 
     add_main_integrity_constraints(eval_func, ir);
 
-    add_aux_boundary_constraints(eval_func, ir);
+    // Note: Plonky3 automatically adds aux boundary constraints
+    //add_aux_boundary_constraints(eval_func, ir);
 
     add_aux_integrity_constraints(eval_func, ir);
 }

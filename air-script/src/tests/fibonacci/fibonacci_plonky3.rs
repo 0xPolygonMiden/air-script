@@ -40,8 +40,6 @@ impl<F, EF> MidenAir<F, EF> for FibonacciAir {
         builder.when_transition().assert_zero(main_next[1].clone().into() - (main_current[0].clone().into() + main_current[1].clone().into()));
         builder.when_transition().assert_zero(main_next[0].clone().into() - main_current[1].clone().into());
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

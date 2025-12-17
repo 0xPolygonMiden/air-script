@@ -39,8 +39,6 @@ impl<F, EF> MidenAir<F, EF> for SelectorsAir {
         builder.assert_zero((AB::Expr::ONE - main_current[0].clone().into()) * (main_current[5].clone().into() - AB::Expr::from_u64(8)) + main_current[0].clone().into() * (main_current[4].clone().into() - AB::Expr::from_u64(2)));
         builder.assert_zero(main_current[0].clone().into() * (main_current[5].clone().into() - AB::Expr::from_u64(4)) + (AB::Expr::ONE - main_current[0].clone().into()) * main_current[1].clone().into() * (main_current[4].clone().into() - AB::Expr::from_u64(6)));
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

@@ -102,12 +102,6 @@ where F: Field,
 
         // Main integrity/transition constraints
 
-        // Aux boundary constraints
-        builder.when_first_row().assert_zero_ext(AB::ExprEF::from(aux_current[0].clone().into()) - aux_bus_boundary_values[0].into());
-        builder.when_last_row().assert_zero_ext(AB::ExprEF::from(aux_current[0].clone().into()) - AB::ExprEF::ONE);
-        builder.when_first_row().assert_zero_ext(AB::ExprEF::from(aux_current[1].clone().into()) - aux_bus_boundary_values[1].into());
-        builder.when_last_row().assert_zero_ext(AB::ExprEF::from(aux_current[1].clone().into()));
-
         // Aux integrity/transition constraints
         builder.when_transition().assert_zero_ext(((alpha.into() + beta_challenges[0].into()) * AB::ExprEF::from(main_current[0].clone().into()) + AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into())) * AB::ExprEF::from(aux_current[0].clone().into()) - ((alpha.into() + beta_challenges[0].into()) * (AB::ExprEF::from(main_current[0].clone().into()) - AB::ExprEF::ONE) + AB::ExprEF::ONE - (AB::ExprEF::from(main_current[0].clone().into()) - AB::ExprEF::ONE)) * AB::ExprEF::from(aux_next[0].clone().into()));
         builder.when_transition().assert_zero_ext((alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(aux_current[1].clone().into()) + (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(main_current[0].clone().into()) + (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(main_current[0].clone().into()) - ((alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(aux_next[1].clone().into()) + (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()).double()));

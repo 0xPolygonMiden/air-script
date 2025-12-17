@@ -37,8 +37,6 @@ impl<F, EF> MidenAir<F, EF> for ConstantInRangeAir {
         // Main integrity/transition constraints
         builder.assert_zero(main_current[0].clone().into() - (main_current[1].clone().into() - main_current[4].clone().into() - main_current[8].clone().into() + AB::Expr::ONE + main_current[2].clone().into() - main_current[5].clone().into() - main_current[9].clone().into() + AB::Expr::from_u64(2) + main_current[3].clone().into() - main_current[6].clone().into() - main_current[10].clone().into()));
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

@@ -38,8 +38,6 @@ impl<F, EF> MidenAir<F, EF> for BinaryAir {
         builder.assert_zero(main_current[0].clone().into() * main_current[0].clone().into() - main_current[0].clone().into());
         builder.assert_zero(main_current[1].clone().into() * main_current[1].clone().into() - main_current[1].clone().into());
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

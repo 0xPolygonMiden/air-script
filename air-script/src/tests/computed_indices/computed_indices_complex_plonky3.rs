@@ -37,8 +37,6 @@ impl<F, EF> MidenAir<F, EF> for ComputedIndicesAir {
         // Main integrity/transition constraints
         builder.assert_zero(main_current[2].clone().into() * AB::Expr::from_u64(3) + main_current[3].clone().into() * AB::Expr::from_u64(4));
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }
