@@ -38,8 +38,6 @@ impl<F, EF> MidenAir<F, EF> for TraceColGroupAir {
         builder.when_transition().assert_zero(main_next[2].clone().into() - (main_current[2].clone().into() + AB::Expr::ONE));
         builder.when_transition().assert_zero(main_next[1].clone().into() - (main_current[1].clone().into() - AB::Expr::ONE));
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

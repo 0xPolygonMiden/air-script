@@ -38,8 +38,6 @@ impl<F, EF> MidenAir<F, EF> for SelectorsAir {
         builder.when_transition().assert_zero(main_next[1].clone().into() - main_current[2].clone().into());
         builder.when_transition().assert_zero(main_current[3].clone().into() * (main_next[0].clone().into() - (main_current[0].clone().into() + main_current[1].clone().into())) + (AB::Expr::ONE - main_current[3].clone().into()) * (main_next[0].clone().into() - main_current[0].clone().into() * main_current[1].clone().into()));
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

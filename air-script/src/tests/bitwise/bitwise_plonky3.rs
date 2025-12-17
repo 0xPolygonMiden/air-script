@@ -67,8 +67,6 @@ where F: Field,
         builder.when_transition().assert_zero_ext(AB::ExprEF::from(periodic_values[1].clone().into()) * (AB::ExprEF::from(main_current[12].clone().into()) - AB::ExprEF::from(main_next[11].clone().into())));
         builder.assert_zero((AB::Expr::ONE - main_current[0].clone().into()) * (main_current[12].clone().into() - (main_current[11].clone().into() * AB::Expr::from_u64(16) + main_current[3].clone().into() * main_current[7].clone().into() + main_current[4].clone().into().double() * main_current[8].clone().into() + AB::Expr::from_u64(4) * main_current[5].clone().into() * main_current[9].clone().into() + AB::Expr::from_u64(8) * main_current[6].clone().into() * main_current[10].clone().into())) + main_current[0].clone().into() * (main_current[12].clone().into() - (main_current[11].clone().into() * AB::Expr::from_u64(16) + main_current[3].clone().into() + main_current[7].clone().into() - main_current[3].clone().into().double() * main_current[7].clone().into() + (main_current[4].clone().into() + main_current[8].clone().into() - main_current[4].clone().into().double() * main_current[8].clone().into()).double() + AB::Expr::from_u64(4) * (main_current[5].clone().into() + main_current[9].clone().into() - main_current[5].clone().into().double() * main_current[9].clone().into()) + AB::Expr::from_u64(8) * (main_current[6].clone().into() + main_current[10].clone().into() - main_current[6].clone().into().double() * main_current[10].clone().into()))));
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

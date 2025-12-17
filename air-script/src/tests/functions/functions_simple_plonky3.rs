@@ -44,8 +44,6 @@ impl<F, EF> MidenAir<F, EF> for FunctionsAir {
         builder.assert_zero(main_current[4].clone().into() + main_current[5].clone().into() + main_current[6].clone().into() + main_current[7].clone().into() - AB::Expr::ONE);
         builder.assert_zero((main_current[4].clone().into() + main_current[5].clone().into() + main_current[6].clone().into() + main_current[7].clone().into()) * AB::Expr::from_u64(4) - AB::Expr::ONE);
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

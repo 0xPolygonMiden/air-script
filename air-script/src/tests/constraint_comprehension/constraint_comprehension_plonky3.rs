@@ -40,8 +40,6 @@ impl<F, EF> MidenAir<F, EF> for ConstraintComprehensionAir {
         builder.assert_zero(main_current[8].clone().into() - main_current[12].clone().into());
         builder.assert_zero(main_current[9].clone().into() - main_current[13].clone().into());
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }

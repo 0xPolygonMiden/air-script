@@ -46,8 +46,6 @@ impl<F, EF> MidenAir<F, EF> for EvaluatorsAir {
         builder.assert_zero(main_current[5].clone().into() - AB::Expr::ONE);
         builder.assert_zero(main_current[6].clone().into() - AB::Expr::from_u64(4));
 
-        // Aux boundary constraints
-
         // Aux integrity/transition constraints
     }
 }
