@@ -72,18 +72,7 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
                 .map(|&x| <Val as p3_field::PrimeCharacteristicRing>::from_u64(x))
                 .collect();
             let var_len_pub_inputs = generate_var_len_pub_inputs();
-            let mut var_len_pub_inputs_goldilocks_vec: Vec<Vec<Vec<Val>>> = vec![];
-            for arr in var_len_pub_inputs.iter() {
-                let mut goldilocks_arr: Vec<Vec<Val>> = vec![];
-                for slice in arr.iter() {
-                    let goldilocks_slice: Vec<Val> = slice
-                        .iter()
-                        .map(|&x| <Val as p3_field::PrimeCharacteristicRing>::from_u64(x))
-                        .collect();
-                    goldilocks_arr.push(goldilocks_slice);
-                }
-                var_len_pub_inputs_goldilocks_vec.push(goldilocks_arr);
-            }
+            let var_len_pub_inputs_goldilocks_vec = crate::test_utils::var_len_pub_inputs_conversion_utils::convert_var_len_pub_inputs_to_goldilocks(var_len_pub_inputs);
             let var_len_pub_inputs_goldilocks_vec_slice: Vec<Vec<&[Val]>> =
                 var_len_pub_inputs_goldilocks_vec
                     .iter()
