@@ -2,7 +2,7 @@ use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
+use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 4;
 pub const AUX_WIDTH: usize = 0;
@@ -36,8 +36,6 @@ impl<F, EF> MidenAir<F, EF> for ComputedIndicesAir {
 
         // Main integrity/transition constraints
         builder.assert_zero(main_current[2].clone().into() * AB::Expr::from_u64(3) + main_current[3].clone().into() * AB::Expr::from_u64(4));
-
-        // Aux boundary constraints
 
         // Aux integrity/transition constraints
     }

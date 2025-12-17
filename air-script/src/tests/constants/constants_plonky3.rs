@@ -2,7 +2,7 @@ use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
+use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 7;
 pub const AUX_WIDTH: usize = 0;
@@ -45,8 +45,6 @@ impl<F, EF> MidenAir<F, EF> for ConstantsAir {
         builder.when_transition().assert_zero(main_next[2].clone().into() - main_current[2].clone().into());
         builder.when_transition().assert_zero(main_next[5].clone().into() - (main_current[5].clone().into() + AB::Expr::ONE));
         builder.assert_zero(main_current[4].clone().into() - AB::Expr::ONE);
-
-        // Aux boundary constraints
 
         // Aux integrity/transition constraints
     }

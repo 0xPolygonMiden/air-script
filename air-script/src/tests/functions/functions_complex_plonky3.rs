@@ -2,7 +2,7 @@ use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
+use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 17;
 pub const AUX_WIDTH: usize = 0;
@@ -37,8 +37,6 @@ impl<F, EF> MidenAir<F, EF> for FunctionsAir {
         // Main integrity/transition constraints
         builder.when_transition().assert_zero(main_next[16].clone().into() - main_current[16].clone().into() * ((main_current[3].clone().into() * main_current[3].clone().into() * main_current[3].clone().into() * main_current[3].clone().into() * main_current[3].clone().into() * main_current[1].clone().into() * main_current[2].clone().into() + main_current[3].clone().into() * main_current[3].clone().into() * (AB::Expr::ONE - main_current[1].clone().into()) * main_current[2].clone().into() + main_current[3].clone().into() * main_current[1].clone().into() * (AB::Expr::ONE - main_current[2].clone().into()) + (AB::Expr::ONE - main_current[1].clone().into()) * (AB::Expr::ONE - main_current[2].clone().into())) * main_current[0].clone().into() - main_current[0].clone().into() + AB::Expr::ONE));
         builder.when_transition().assert_zero(main_next[3].clone().into() - (main_current[4].clone().into() + main_current[5].clone().into() + main_current[6].clone().into() + main_current[7].clone().into() + main_current[8].clone().into() + main_current[9].clone().into() + main_current[10].clone().into() + main_current[11].clone().into() + main_current[12].clone().into() + main_current[13].clone().into() + main_current[14].clone().into() + main_current[15].clone().into() + AB::Expr::ONE).double());
-
-        // Aux boundary constraints
 
         // Aux integrity/transition constraints
     }

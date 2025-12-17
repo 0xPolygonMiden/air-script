@@ -2,7 +2,7 @@ use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
+use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 2;
 pub const AUX_WIDTH: usize = 0;
@@ -39,8 +39,6 @@ impl<F, EF> MidenAir<F, EF> for FibonacciAir {
         // Main integrity/transition constraints
         builder.when_transition().assert_zero(main_next[1].clone().into() - (main_current[0].clone().into() + main_current[1].clone().into()));
         builder.when_transition().assert_zero(main_next[0].clone().into() - main_current[1].clone().into());
-
-        // Aux boundary constraints
 
         // Aux integrity/transition constraints
     }

@@ -2,7 +2,7 @@ use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
+use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 9;
 pub const AUX_WIDTH: usize = 0;
@@ -43,8 +43,6 @@ impl<F, EF> MidenAir<F, EF> for FunctionsAir {
         builder.assert_zero(main_current[1].clone().into() + (main_current[4].clone().into() + main_current[5].clone().into() + main_current[6].clone().into() + main_current[7].clone().into()) * main_current[4].clone().into() * main_current[5].clone().into() * main_current[6].clone().into() * main_current[7].clone().into() - AB::Expr::ONE);
         builder.assert_zero(main_current[4].clone().into() + main_current[5].clone().into() + main_current[6].clone().into() + main_current[7].clone().into() - AB::Expr::ONE);
         builder.assert_zero((main_current[4].clone().into() + main_current[5].clone().into() + main_current[6].clone().into() + main_current[7].clone().into()) * AB::Expr::from_u64(4) - AB::Expr::ONE);
-
-        // Aux boundary constraints
 
         // Aux integrity/transition constraints
     }

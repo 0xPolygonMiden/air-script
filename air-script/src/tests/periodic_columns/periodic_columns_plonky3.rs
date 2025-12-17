@@ -2,7 +2,7 @@ use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
+use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 3;
 pub const AUX_WIDTH: usize = 0;
@@ -51,8 +51,6 @@ where F: Field,
         // Main integrity/transition constraints
         builder.assert_zero_ext(AB::ExprEF::from(periodic_values[0].clone().into()) * (AB::ExprEF::from(main_current[1].clone().into()) + AB::ExprEF::from(main_current[2].clone().into())));
         builder.when_transition().assert_zero_ext(AB::ExprEF::from(periodic_values[1].clone().into()) * (AB::ExprEF::from(main_next[0].clone().into()) - AB::ExprEF::from(main_current[0].clone().into())));
-
-        // Aux boundary constraints
 
         // Aux integrity/transition constraints
     }

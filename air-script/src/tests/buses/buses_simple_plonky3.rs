@@ -2,7 +2,7 @@ use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
+use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 1;
 pub const AUX_WIDTH: usize = 2;
@@ -27,6 +27,13 @@ where F: Field,
 
     fn aux_width(&self) -> usize {
         AUX_WIDTH
+    }
+
+    fn bus_types(&self) -> Vec<BusType> {
+        vec![
+            BusType::Multiset,
+            BusType::Logup,
+        ]
     }
 
     fn build_aux_trace(&self, _main: &RowMajorMatrix<F>, _challenges: &[EF]) -> Option<RowMajorMatrix<F>> {
@@ -94,11 +101,6 @@ where F: Field,
         // Main boundary constraints
 
         // Main integrity/transition constraints
-
-        // Aux boundary constraints
-        builder.when_last_row().assert_zero_ext(AB::ExprEF::from(aux_current[0].clone().into()) - AB::ExprEF::ONE);
-        builder.when_first_row().assert_zero_ext(AB::ExprEF::from(aux_current[1].clone().into()));
-        builder.when_last_row().assert_zero_ext(AB::ExprEF::from(aux_current[1].clone().into()));
 
         // Aux integrity/transition constraints
         builder.when_transition().assert_zero_ext(((alpha.into() + beta_challenges[0].into()) * AB::ExprEF::from(main_current[0].clone().into()) + AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into())) * AB::ExprEF::from(aux_current[0].clone().into()) - ((alpha.into() + beta_challenges[0].into()) * (AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into())) + AB::ExprEF::from(main_current[0].clone().into())) * AB::ExprEF::from(aux_next[0].clone().into()));

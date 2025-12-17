@@ -6,7 +6,7 @@ use air_ir::Air;
 
 use super::Scope;
 use crate::air::{
-    boundary_constraints::{add_aux_boundary_constraints, add_main_boundary_constraints},
+    boundary_constraints::add_main_boundary_constraints,
     graph::Codegen,
     integrity_constraints::{add_aux_integrity_constraints, add_main_integrity_constraints},
 };
@@ -45,8 +45,13 @@ fn add_constants(scope: &mut Scope, ir: &Air) {
     let aux_width = ir.trace_segment_widths.get(1).cloned().unwrap_or(0);
     let num_periodic_values = ir.periodic_columns().count();
     let period = ir.periodic_columns().map(|col| col.period()).max().unwrap_or(0);
-    let num_public_values =
-        ir.public_inputs().map(|public_input| public_input.size()).sum::<usize>();
+    let num_public_values = ir
+        .public_inputs()
+        .map(|public_input| match public_input {
+            air_ir::PublicInput::Vector { size, .. } => size,
+            air_ir::PublicInput::Table { .. } => &0,
+        })
+        .sum::<usize>();
     let max_beta_challenge_power = ir.num_random_values.saturating_sub(1);
 
     let constants = [
@@ -112,6 +117,17 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
             .line("1 + MAX_BETA_CHALLENGE_POWER");
 
         miden_air_impl.new_fn("aux_width").arg_ref_self().ret("usize").line("AUX_WIDTH");
+
+        let bus_types_fn = miden_air_impl.new_fn("bus_types").arg_ref_self().ret("Vec<BusType>");
+        bus_types_fn.line("vec![");
+        for (_id, bus) in &ir.buses {
+            let bus_type_str = match bus.bus_type {
+                air_ir::BusType::Multiset => "BusType::Multiset",
+                air_ir::BusType::Logup => "BusType::Logup",
+            };
+            bus_types_fn.line(format!("    {bus_type_str},"));
+        }
+        bus_types_fn.line("]");
     }
 
     // add the build_aux_trace function if needed
@@ -197,7 +213,8 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
 
     add_main_integrity_constraints(eval_func, ir);
 
-    add_aux_boundary_constraints(eval_func, ir);
+    // Note: Plonky3 automatically adds aux boundary constraints
+    //add_aux_boundary_constraints(eval_func, ir);
 
     add_aux_integrity_constraints(eval_func, ir);
 }
