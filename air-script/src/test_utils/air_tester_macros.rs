@@ -73,13 +73,8 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
                 .collect();
             let var_len_pub_inputs = generate_var_len_pub_inputs();
             let var_len_pub_inputs_goldilocks_vec = crate::test_utils::var_len_pub_inputs_conversion_utils::convert_var_len_pub_inputs_to_goldilocks(var_len_pub_inputs);
-            let var_len_pub_inputs_goldilocks_vec_slice: Vec<Vec<&[Val]>> =
-                var_len_pub_inputs_goldilocks_vec
-                    .iter()
-                    .map(|outer| outer.iter().map(|inner| inner.as_slice()).collect())
-                    .collect();
-            let var_len_pub_inputs_goldilocks: Vec<&[&[Val]]> =
-                var_len_pub_inputs_goldilocks_vec_slice.iter().map(|v| v.as_slice()).collect();
+            let var_len_pub_inputs_goldilocks_vec_slice = crate::test_utils::var_len_pub_inputs_conversion_utils::convert_inner_vec_to_slice(&var_len_pub_inputs_goldilocks_vec);
+            let var_len_pub_inputs_goldilocks = crate::test_utils::var_len_pub_inputs_conversion_utils::convert_mid_vec_to_slice(&var_len_pub_inputs_goldilocks_vec_slice);
 
             let trace = generate_trace_rows::<Val>(inputs);
 
