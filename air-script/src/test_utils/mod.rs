@@ -2,9 +2,7 @@
 pub mod air_tester_macros;
 /// Code generation for tests/**/*.air files.
 pub mod codegen;
-/// Miden VM auxiliary trace generator
-pub mod miden_vm_aux_trace_generator;
-/// Plonky3-specific Debug constraint builder implementation
-pub mod plonky3_traits;
+/// Conversion utilities for test inputs (both public inputs and variable-length public inputs).
+pub mod pub_inputs_conversion_utils;
 /// Winterfell-specific traits
 pub mod winterfell_traits;

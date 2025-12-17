@@ -6,7 +6,7 @@ use air_ir::Air;
 
 use super::Scope;
 use crate::air::{
-    boundary_constraints::{add_aux_boundary_constraints, add_main_boundary_constraints},
+    boundary_constraints::add_main_boundary_constraints,
     graph::Codegen,
     integrity_constraints::{add_aux_integrity_constraints, add_main_integrity_constraints},
 };
@@ -45,8 +45,13 @@ fn add_constants(scope: &mut Scope, ir: &Air) {
     let aux_width = ir.trace_segment_widths.get(1).cloned().unwrap_or(0);
     let num_periodic_values = ir.periodic_columns().count();
     let period = ir.periodic_columns().map(|col| col.period()).max().unwrap_or(0);
-    let num_public_values =
-        ir.public_inputs().map(|public_input| public_input.size()).sum::<usize>();
+    let num_public_values = ir
+        .public_inputs()
+        .map(|public_input| match public_input {
+            air_ir::PublicInput::Vector { size, .. } => size,
+            air_ir::PublicInput::Table { .. } => &0,
+        })
+        .sum::<usize>();
     let max_beta_challenge_power = ir.num_random_values.saturating_sub(1);
 
     let constants = [
@@ -112,6 +117,17 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
             .line("1 + MAX_BETA_CHALLENGE_POWER");
 
         miden_air_impl.new_fn("aux_width").arg_ref_self().ret("usize").line("AUX_WIDTH");
+
+        let bus_types_fn = miden_air_impl.new_fn("bus_types").arg_ref_self().ret("Vec<BusType>");
+        bus_types_fn.line("vec![");
+        for (_id, bus) in &ir.buses {
+            let bus_type_str = match bus.bus_type {
+                air_ir::BusType::Multiset => "BusType::Multiset",
+                air_ir::BusType::Logup => "BusType::Logup",
+            };
+            bus_types_fn.line(format!("    {bus_type_str},"));
+        }
+        bus_types_fn.line("]");
     }
 
     // add the build_aux_trace function if needed
@@ -121,7 +137,7 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
             .arg_ref_self()
             .arg("_main", "&RowMajorMatrix<F>")
             .arg("_challenges", "&[EF]")
-            .ret("Option<RowMajorMatrix<EF>>");
+            .ret("Option<RowMajorMatrix<F>>");
         build_aux_trace_func.line("// Note: consider using Some(build_aux_trace_with_miden_vm::<F, EF>(_main, _challenges, module)) if you want to build the aux trace using Miden VM aux trace builders.");
         build_aux_trace_func.line("");
         build_aux_trace_func.line("let num_rows = _main.height();");
@@ -158,19 +174,22 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         build_aux_trace_func.line("        rows[i+1][j] = next_row[j];");
         build_aux_trace_func.line("    }");
         build_aux_trace_func.line("}");
-        build_aux_trace_func.line("Some(trace)");
+        build_aux_trace_func.line("let trace_f = trace.flatten_to_base();");
+        build_aux_trace_func.line("Some(trace_f)");
     }
 
     // add the eval function
     let eval_func = miden_air_impl
         .new_fn("eval")
         .generic("AB")
-        .bound("AB", "MidenAirBuilder<F = F, EF = EF>")
+        .bound("AB", "MidenAirBuilder<F = F>")
         .arg_ref_self()
         .arg("builder", "&mut AB");
     eval_func.line("let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect(\"Wrong number of public values\");");
     eval_func.line("let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect(\"Wrong number of periodic values\");");
-    eval_func.line("let preprocessed = builder.preprocessed();");
+
+    eval_func.line("// Note: for now, we do not have any preprocessed values");
+    eval_func.line("// let preprocessed = builder.preprocessed();");
 
     eval_func.line("let main = builder.main();");
     eval_func.line("let (main_current, main_next) = (");
@@ -194,7 +213,8 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
 
     add_main_integrity_constraints(eval_func, ir);
 
-    add_aux_boundary_constraints(eval_func, ir);
+    // Note: Plonky3 automatically adds aux boundary constraints
+    //add_aux_boundary_constraints(eval_func, ir);
 
     add_aux_integrity_constraints(eval_func, ir);
 }

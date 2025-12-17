@@ -28,27 +28,29 @@ log = { version = "0.4", default-features = false }
 miden-diagnostics = { workspace = true }
 mir = { package = "air-mir", path = "../mir", version = "0.5" }
 
-[dev-dependencies]
-expect-test = "1.4"
-
 # 0xMiden Plonky3 Fork
-p3-air = { package = "p3-air", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-challenger = { package = "p3-challenger", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-commit = { package = "p3-commit", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-dft = { package = "p3-dft", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-field = { package = "p3-field", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-fri = { package = "p3-fri", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-matrix = { package = "p3-matrix", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-merkle-tree = { package = "p3-merkle-tree", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-miden-air = { package = "miden-air", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-goldilocks = { package = "p3-goldilocks", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-sha256 = { package = "p3-sha256", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-symmetric = { package = "p3-symmetric", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
-p3-uni-stark = { package = "p3-uni-stark", git="https://github.com/0xMiden/Plonky3", rev = "5352d47ee57bd1b5d6008a90b64cbb7fe00aa17e", default-features = false }
+p3-matrix = { package = "p3-matrix", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-field = { package = "p3-field", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-miden-air = { package = "miden-air", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
 
 # MassaLabs fork
 miden-processor = { package = "miden-processor", git="https://github.com/massalabs/miden-vm", rev = "bc553af69a2543a0789830e8508b019694528181", default-features = false }
 miden-air = { package = "miden-air", git="https://github.com/massalabs/miden-vm", rev = "bc553af69a2543a0789830e8508b019694528181", default-features = false }
+
+[dev-dependencies]
+expect-test = "1.4"
+
+# 0xMiden Plonky3 Fork
+p3-air = { package = "p3-air", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-challenger = { package = "p3-challenger", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-commit = { package = "p3-commit", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-dft = { package = "p3-dft", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-fri = { package = "p3-fri", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-merkle-tree = { package = "p3-merkle-tree", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-miden-prover = { package = "miden-prover", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-goldilocks = { package = "p3-goldilocks", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-sha256 = { package = "p3-sha256", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
+p3-symmetric = { package = "p3-symmetric", git="https://github.com/0xMiden/Plonky3", rev = "632fb26a9141cc70f903e5378035ca8d5855c490", default-features = false }
 
 winter-air = { package = "winter-air", version = "0.12", default-features = false }
 winter-math = { package = "winter-math", version = "0.12", default-features = false }

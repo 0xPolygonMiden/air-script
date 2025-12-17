@@ -2,7 +2,7 @@ use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
+use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 8;
 pub const AUX_WIDTH: usize = 0;
@@ -19,11 +19,12 @@ impl<F, EF> MidenAir<F, EF> for ComputedIndicesAir {
     }
 
     fn eval<AB>(&self, builder: &mut AB)
-    where AB: MidenAirBuilder<F = F, EF = EF>,
+    where AB: MidenAirBuilder<F = F>,
     {
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
         let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect("Wrong number of periodic values");
-        let preprocessed = builder.preprocessed();
+        // Note: for now, we do not have any preprocessed values
+        // let preprocessed = builder.preprocessed();
         let main = builder.main();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
@@ -42,8 +43,6 @@ impl<F, EF> MidenAir<F, EF> for ComputedIndicesAir {
         builder.when_transition().assert_zero(main_next[5].clone().into() - main_current[5].clone().into().double());
         builder.when_transition().assert_zero(main_next[6].clone().into() - AB::Expr::from_u64(6) * main_current[6].clone().into());
         builder.when_transition().assert_zero(main_next[7].clone().into() - AB::Expr::from_u64(12) * main_current[7].clone().into());
-
-        // Aux boundary constraints
 
         // Aux integrity/transition constraints
     }

@@ -53,7 +53,7 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
             >;
             type Dft = p3_dft::Radix2DitParallel<Val>;
             type Pcs = p3_fri::TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
-            type MyConfig = p3_uni_stark::StarkConfig<Pcs, Challenge, Challenger>;
+            type MyConfig = p3_miden_prover::StarkConfig<Pcs, Challenge, Challenger>;
 
             let byte_hash = ByteHash {};
             let field_hash = FieldHash::new(p3_sha256::Sha256);
@@ -62,23 +62,35 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
             let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
             let challenger = Challenger::from_hasher(vec![], byte_hash);
             let dft = Dft::default();
-            let fri_params = p3_fri::create_benchmark_fri_params(challenge_mmcs);
+            let mut fri_params = p3_fri::create_recursive_miden_fri_params(challenge_mmcs);
             let pcs = Pcs::new(dft, val_mmcs, fri_params);
             let config = MyConfig::new(pcs, challenger);
 
+            // Generate public inputs and convert them to Goldilocks field elements
             let inputs = generate_inputs();
-            let inputs_goldilocks: Vec<Val> = inputs
-                .iter()
-                .map(|&x| <Val as p3_field::PrimeCharacteristicRing>::from_u32(x))
-                .collect();
+            let inputs_goldilocks = crate::test_utils::pub_inputs_conversion_utils::convert_pub_inputs_to_goldilocks(&inputs);
+
+            // Generate variable-length public inputs as a `Vec<Vec<Vec<u64>>>`.
+            // The outer `Vec` represents multiple tables (one for each bus in the AIR)
+            // The middle `Vec` represents the rows of each table
+            // The innermost `Vec` represents the tuple values contained by the bus, that will be combined with randomness into a single field element.
+            let var_len_pub_inputs = generate_var_len_pub_inputs();
+            // Convert variable-length public inputs to Goldilocks field elements
+            let var_len_pub_inputs_goldilocks_vec = crate::test_utils::pub_inputs_conversion_utils::convert_var_len_pub_inputs_to_goldilocks(var_len_pub_inputs);
+            let var_len_pub_inputs_goldilocks_vec_slice = crate::test_utils::pub_inputs_conversion_utils::convert_inner_vec_to_slice(&var_len_pub_inputs_goldilocks_vec);
+            let var_len_pub_inputs_goldilocks = crate::test_utils::pub_inputs_conversion_utils::convert_mid_vec_to_slice(&var_len_pub_inputs_goldilocks_vec_slice);
 
             let trace = generate_trace_rows::<Val>(inputs);
 
-            check_constraints_with_airscript_traits::<Val, Challenge, $air_name>(
+            let proof = p3_miden_prover::prove(&config, &$air_name {}, &trace, &inputs_goldilocks);
+            p3_miden_prover::verify(
+                &config,
                 &$air_name {},
-                &trace,
+                &proof,
                 &inputs_goldilocks,
-            );
+                &var_len_pub_inputs_goldilocks,
+            )
+            .expect("Verification failed");
         }
     };
 }

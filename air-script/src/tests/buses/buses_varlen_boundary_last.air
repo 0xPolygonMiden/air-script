@@ -1,7 +1,7 @@
 def BusesAir
 
 trace_columns {
-    main: [a],
+    main: [a, sp_insert, sp_remove, sq_insert_twice, sq_remove],
 }
 
 buses {
@@ -10,20 +10,21 @@ buses {
 }
 
 public_inputs {
-    outputs: [[2]],
+    outputs_p: [[2]],
+    outputs_q: [[2]],
 }
 
 boundary_constraints {
     enf p.first = null;
     enf q.first = null;
-    enf p.last = outputs;
-    enf q.last = outputs;
+    enf p.last = outputs_p;
+    enf q.last = outputs_q;
 }
 
 integrity_constraints {
-    p.insert(1) when a;
-    p.remove(1) when (a - 1);
-    q.insert(1, 2) when a;
-    q.insert(1, 2) when a;
-    q.remove(1, 2) with 2;
+    p.insert(a) when sp_insert;
+    p.remove(a) when sp_remove;
+    q.insert(2, a) when sq_insert_twice;
+    q.insert(2, a) when sq_insert_twice;
+    q.remove(2, a) with sq_remove;
 }

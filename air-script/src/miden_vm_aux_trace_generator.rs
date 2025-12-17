@@ -59,7 +59,7 @@ pub fn build_aux_trace_with_miden_vm<F, EF>(
     main: &RowMajorMatrix<F>,
     challenges: &[EF],
     module: MidenModule,
-) -> RowMajorMatrix<EF>
+) -> RowMajorMatrix<F>
 where
     F: Field + PrimeField64,
     EF: ExtensionField<F>,
@@ -112,5 +112,6 @@ where
         }
     }
 
-    aux_trace
+    let aux_trace_f = aux_trace.flatten_to_base();
+    aux_trace_f
 }

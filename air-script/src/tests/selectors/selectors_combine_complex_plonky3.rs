@@ -2,7 +2,7 @@ use p3_field::{ExtensionField, Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
-use p3_miden_air::{MidenAir, MidenAirBuilder, RowMajorMatrix};
+use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
 
 pub const MAIN_WIDTH: usize = 6;
 pub const AUX_WIDTH: usize = 1;
@@ -29,7 +29,13 @@ where F: Field,
         AUX_WIDTH
     }
 
-    fn build_aux_trace(&self, _main: &RowMajorMatrix<F>, _challenges: &[EF]) -> Option<RowMajorMatrix<EF>> {
+    fn bus_types(&self) -> Vec<BusType> {
+        vec![
+            BusType::Multiset,
+        ]
+    }
+
+    fn build_aux_trace(&self, _main: &RowMajorMatrix<F>, _challenges: &[EF]) -> Option<RowMajorMatrix<F>> {
         // Note: consider using Some(build_aux_trace_with_miden_vm::<F, EF>(_main, _challenges, module)) if you want to build the aux trace using Miden VM aux trace builders.
 
         let num_rows = _main.height();
@@ -66,15 +72,17 @@ where F: Field,
                 rows[i+1][j] = next_row[j];
             }
         }
-        Some(trace)
+        let trace_f = trace.flatten_to_base();
+        Some(trace_f)
     }
 
     fn eval<AB>(&self, builder: &mut AB)
-    where AB: MidenAirBuilder<F = F, EF = EF>,
+    where AB: MidenAirBuilder<F = F>,
     {
         let public_values: [_; NUM_PUBLIC_VALUES] = builder.public_values().try_into().expect("Wrong number of public values");
         let periodic_values: [_; NUM_PERIODIC_VALUES] = builder.periodic_evals().try_into().expect("Wrong number of periodic values");
-        let preprocessed = builder.preprocessed();
+        // Note: for now, we do not have any preprocessed values
+        // let preprocessed = builder.preprocessed();
         let main = builder.main();
         let (main_current, main_next) = (
             main.row_slice(0).unwrap(),
@@ -96,10 +104,6 @@ where F: Field,
         builder.assert_zero((main_current[0].clone().into() + (AB::Expr::ONE - main_current[0].clone().into()) * main_current[1].clone().into()) * (main_current[3].clone().into() - AB::Expr::from_u64(16)) + (AB::Expr::ONE - main_current[0].clone().into()) * (AB::Expr::ONE - main_current[1].clone().into()) * (main_current[4].clone().into() - AB::Expr::from_u64(5)));
         builder.assert_zero((AB::Expr::ONE - main_current[0].clone().into()) * (main_current[5].clone().into() - AB::Expr::from_u64(5)) + main_current[0].clone().into() * (main_current[4].clone().into() - AB::Expr::from_u64(4)));
         builder.assert_zero(main_current[0].clone().into() * (main_current[5].clone().into() - AB::Expr::from_u64(20)) + (AB::Expr::ONE - main_current[0].clone().into()) * main_current[1].clone().into() * (main_current[4].clone().into() - AB::Expr::from_u64(31)));
-
-        // Aux boundary constraints
-        builder.when_first_row().assert_zero_ext(AB::ExprEF::from(aux_current[0].clone().into()) - AB::ExprEF::ONE);
-        builder.when_last_row().assert_zero_ext(AB::ExprEF::from(aux_current[0].clone().into()) - AB::ExprEF::ONE);
 
         // Aux integrity/transition constraints
         builder.when_transition().assert_zero_ext(((alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(main_current[0].clone().into()) * AB::ExprEF::from(main_current[5].clone().into()) + AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into()) * AB::ExprEF::from(main_current[5].clone().into())) * ((alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into())) * AB::ExprEF::from(main_current[1].clone().into()) * AB::ExprEF::from(main_current[5].clone().into()) + AB::ExprEF::ONE - (AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into())) * AB::ExprEF::from(main_current[1].clone().into()) * AB::ExprEF::from(main_current[5].clone().into())) * AB::ExprEF::from(aux_current[0].clone().into()) - ((alpha.into() + AB::ExprEF::from_u64(3) * beta_challenges[0].into() + AB::ExprEF::from_u64(4) * beta_challenges[1].into()) * (AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into())) * (AB::ExprEF::ONE - AB::ExprEF::from(main_current[1].clone().into())) * AB::ExprEF::from(main_current[4].clone().into()) + AB::ExprEF::ONE - (AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into())) * (AB::ExprEF::ONE - AB::ExprEF::from(main_current[1].clone().into())) * AB::ExprEF::from(main_current[4].clone().into())) * AB::ExprEF::from(aux_next[0].clone().into()));
