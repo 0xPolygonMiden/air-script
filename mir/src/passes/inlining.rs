@@ -471,16 +471,20 @@ impl Visitor for InliningSecondPass<'_> {
 
             // First, check if it's a known `Call` to inline,
             // if so, set the context and scan its body
-            if call_op.clone().as_call().is_some() {
-                if !self.seen_root_call {
-                    self.seen_root_call = true;
-                    self.visit_call(graph, call_op.clone())?;
-                    return Ok(());
-                }
+            if call_op.clone().as_call().is_some() && !self.seen_root_call {
+                self.seen_root_call = true;
+                self.visit_call(graph, call_op.clone())?;
+                // NOTE: Once the call has been processed, we return early to avoid
+                // an infinite loop.
+                // This can happen in some cases when you have nested calls accross
+                // modules.
+                // If there are nested calls, they will be handled via fixed-point
+                // compilation (see [<Inlining<'_> as Pass>::run]).
+                return Ok(());
             }
 
             // Else, we are currently visiting the body of a function or an evaluator of a call
-            // we want to inline We use our helper duplicate_node_or_replace to
+            // we want to inline. We use our helper duplicate_node_or_replace to
             // duplicate the body, while replacing the `Function` or `Evaluator` parameters with
             // the `Call` arguments
             if self.call_inlining_context.clone().unwrap().pure_function {
