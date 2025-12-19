@@ -3,8 +3,6 @@ use crate::tests::compile;
 mod tests {
     use ntest::timeout;
 
-    use crate::tests::Compiler;
-
     use super::*;
 
     //use crate::graph::pretty;
