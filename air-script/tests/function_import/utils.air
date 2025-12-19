@@ -1,0 +1,9 @@
+mod utils
+
+fn add(a: felt, b: felt) -> felt {
+    return a + b;
+}
+
+fn multiply(a: felt, b: felt) -> felt {
+    return a * b;
+}

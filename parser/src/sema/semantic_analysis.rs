@@ -76,6 +76,9 @@ pub struct SemanticAnalysis<'a> {
     has_undefined_variables: bool,
     has_type_errors: bool,
     in_constraint_comprehension: bool,
+    /// Tracks the qualified identifier of the function or evaluator currently being analyzed.
+    /// This is used to build the dependency graph for function-to-function calls.
+    current_function: Option<QualifiedIdentifier>,
 }
 impl<'a> SemanticAnalysis<'a> {
     /// Create a new instance of the semantic analyzer
@@ -103,6 +106,7 @@ impl<'a> SemanticAnalysis<'a> {
             has_undefined_variables: false,
             has_type_errors: false,
             in_constraint_comprehension: false,
+            current_function: None,
         }
     }
 
@@ -338,6 +342,14 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         &mut self,
         function: &mut EvaluatorFunction,
     ) -> ControlFlow<SemanticAnalysisError> {
+        // Set the current function context for dependency tracking
+        let prev_function = self.current_function.clone();
+        let current_item = QualifiedIdentifier::new(
+            self.current_module.clone().unwrap(),
+            NamespacedIdentifier::Function(function.name),
+        );
+        self.current_function = Some(current_item.clone());
+
         // Only allow integrity constraints in this context
         self.constraint_mode = ConstraintMode::Integrity;
         // Start a new lexical scope
@@ -390,6 +402,8 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         self.locals.exit();
         // Disallow constraints
         self.constraint_mode = ConstraintMode::None;
+        // Restore previous function context
+        self.current_function = prev_function;
 
         ControlFlow::Continue(())
     }
@@ -398,6 +412,14 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         &mut self,
         function: &mut Function,
     ) -> ControlFlow<SemanticAnalysisError> {
+        // Set the current function context for dependency tracking
+        let prev_function = self.current_function.clone();
+        let current_item = QualifiedIdentifier::new(
+            self.current_module.clone().unwrap(),
+            NamespacedIdentifier::Function(function.name),
+        );
+        self.current_function = Some(current_item.clone());
+
         // constraints are not allowed in pure functions
         self.constraint_mode = ConstraintMode::None;
 
@@ -436,6 +458,8 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         self.referenced = referenced;
         // Restore the original lexical scope
         self.locals.exit();
+        // Restore previous function context
+        self.current_function = prev_function;
 
         ControlFlow::Continue(())
     }
@@ -695,10 +719,21 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                             FunctionType::Evaluator(_) => DependencyType::Evaluator,
                             _ => DependencyType::Function,
                         };
+
+                        // If we're currently analyzing a function, add a direct dependency edge
+                        // from the current function to the called function. This ensures that
+                        // transitive dependencies across module boundaries are properly tracked.
+                        if let Some(caller) = self.current_function.clone() {
+                            let caller_node = self.get_node_index_or_add(&caller);
+                            let callee_node = self.get_node_index_or_add(&qid);
+                            self.deps_graph.add_edge(caller_node, callee_node, dependency_type);
+                        }
+
                         let prev = self.referenced.insert(qid, dependency_type);
                         if prev.is_some() {
                             assert_eq!(prev, Some(dependency_type));
                         }
+
                         // TODO: When we have non-evaluator functions, we must fetch the type in its
                         // signature here, and store it as the type of the
                         // Call expression
@@ -1939,6 +1974,17 @@ impl SemanticAnalysis<'_> {
                         Span::new(
                             e.span(),
                             BindingType::Function(FunctionType::Evaluator(e.params.clone())),
+                        )
+                    })
+                })
+                .or_else(|| {
+                    imported_from.functions.get(qid.as_ref()).map(|f| {
+                        Span::new(
+                            f.span(),
+                            BindingType::Function(FunctionType::Function(
+                                f.param_types(),
+                                f.return_type,
+                            )),
                         )
                     })
                 })
