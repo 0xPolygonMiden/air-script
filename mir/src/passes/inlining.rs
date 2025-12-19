@@ -476,7 +476,6 @@ impl Visitor for InliningSecondPass<'_> {
                 self.visit_call(graph, call_op.clone())?;
                 // NOTE: Once the call has been processed, we return early to avoid
                 // an infinite loop.
-                // modules.
                 // If there are nested calls, they will be handled via fixed-point
                 // compilation (see [<Inlining<'_> as Pass>::run]).
                 return Ok(());
