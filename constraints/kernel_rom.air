@@ -1,0 +1,77 @@
+##########################################################################################
+# KERNEL ROM CHIPLET
+##########################################################################################
+#
+# The Kernel ROM chiplet is responsible for tracking execution of kernel (system) calls.
+# It maintains a record of all kernel procedure digests and ensures proper initialization
+# of kernel procedures while preserving privacy about call frequency.
+#
+# The chiplet contains digest values for all kernel procedures and enforces contiguity
+# constraints to ensure proper execution tracking.
+#
+# STATUS: Core constraints implemented, bus constraints not implemented
+#
+# REFERENCES:
+# - Kernel ROM Chiplet: https://0xmiden.github.io/miden-vm/design/chiplets/kernel_rom.html
+##########################################################################################
+
+mod kernel_rom
+
+use utils::*;
+
+##########################################################################################
+# KERNEL ROM CHIPLET TRANSITION CONSTRAINTS
+##########################################################################################
+
+# Enforces the constraints on the kernel ROM chiplet given its columns.
+#
+# Parameters:
+# - s4: Chiplet selector flag
+# - sfirst: Section first flag (1 = start of new digest block, 0 = continuation of a given block)
+# - r[4]: Kernel procedure root/digest (4 field elements)
+#
+# Max constraint degree: 3
+ev ker_rom_chiplet_constraints([s4, sfirst, r[4]]) {
+    enf kernel_rom_selector([sfirst]);
+    enf kernel_rom_digest_contiguity([s4, sfirst, r]);
+}
+
+# Enforces initialization constraints for the first row of kernel ROM chiplet execution.
+#
+# According to the official specification, the first row must have sfirst = 1 to ensure
+# proper digest matching and initialization of kernel procedure tracking.
+#
+# Max constraint degree: 1
+ev kernel_rom_chiplet_constraints_first_row([s4, sfirst, r[4]]) {
+    # FIRST ROW INITIALIZATION CONSTRAINT:
+    # The first row of any kernel ROM chiplet execution must have sfirst' = 1
+    # This ensures proper initialization of kernel procedure digest tracking.
+    # Without this, the chiplet could start in an invalid intermediate state.
+    enf sfirst' = 1;
+}
+
+##########################################################################################
+# HELPERS
+##########################################################################################
+
+# Enforces that the kernel ROM selector is valid.
+#
+# Max constraint degree: 2
+ev kernel_rom_selector([sfirst]) {
+    # Enforce that sfirst is binary (0 or 1)
+    enf is_binary([sfirst]);
+}
+
+# Enforces digest contiguity constraints for the kernel ROM.
+#
+# When sfirst' = 0 (not starting a new digest block), the digest values must remain
+# unchanged from the current row to the next row. This ensures contiguous blocks of
+# identical digest values for proper tracking of kernel procedure executions.
+#
+# Max constraint degree: 3
+ev kernel_rom_digest_contiguity([s4, sfirst, r[4]]) {
+    # Constraint is active when:
+    # - sfirst' = 0 (next row is not the start of a new digest block)
+    # - s4' = 0 (next row is still within the kernel ROM chiplet)
+    enf is_unchanged([r_i]) for r_i in r when binary_and(binary_not(s4'), binary_not(sfirst'));
+}
