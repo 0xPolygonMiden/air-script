@@ -1,0 +1,86 @@
+##########################################################################################
+# RANGE CHECKER CONSTRAINTS MODULE
+##########################################################################################
+#
+# The Range Checker provides efficient 16-bit range checking for other VM components
+# using the LogUp protocol with optimized gap handling to minimize the minimal
+# trace length while supporting (practically) unlimited range checks.
+#
+# STATUS: Not fully implemented
+#
+# REFERENCES:
+# - Range Checker Spec: https://0xmiden.github.io/miden-vm/design/range.html
+# - LogUp Protocol: https://0xmiden.github.io/miden-vm/design/lookups/main.html
+##########################################################################################
+
+mod range_checker
+
+use chiplets::*;
+use utils::*;
+
+##########################################################################################
+# RANGE CHECKER BUS CONSTRAINTS
+##########################################################################################
+
+
+ev range_checker_constraints([decoder[24], range_checker[2], chiplets[20]]) {
+
+    ####################################################################################
+    # Components requesting range checks
+    ####################################################################################
+
+    # Stack values requiring 16-bit range checks (from decoder trace)
+    # These correspond to the top 4 operand stack elements during u32 operations
+    let sv0 = decoder[10];  # Stack value 0
+    let sv1 = decoder[11];  # Stack value 1
+    let sv2 = decoder[12];  # Stack value 2
+    let sv3 = decoder[13];  # Stack value 3
+
+    # Memory chiplet values requiring 16-bit range checks
+    let mv0 = chiplets[14]; # Memory value 0
+    let mv1 = chiplets[15]; # Memory value 1
+
+    ####################################################################################
+    # RANGE CHECKER STATE
+    ####################################################################################
+
+    # Core range checker table columns
+    let value = range_checker[1];        # v: Current 16-bit value [0, 65535]
+    let multiplicity = range_checker[0]; # m: Usage count (how many times v is range-checked)
+
+    ####################################################################################
+    # OPERATION FLAGS - Determine when range checks are needed
+    ####################################################################################
+
+    # U32 range check operation flag
+    # Identifies stack operations that require 16-bit range checking
+    let not_4 = binary_not(decoder[5]);
+    let not_5 = binary_not(decoder[6]);
+    let u32_rc_op = decoder[7] * not_4 * not_5;
+
+    # Memory chiplet operation flag
+    # Identifies memory operations that require range checking
+    let s_0 = chiplets[0];
+    let s_1 = chiplets[1];
+    let s_2 = chiplets[2];
+    let chiplets_memory_flag = memory_chiplet_flag(s_0, s_1, s_2);
+
+    ####################################################################################
+    # RANGE CHECKER INTERACTIONS
+    ####################################################################################
+
+    # Each cycle, we insert the current value with its multiplicity
+    bus_4_range_checker.insert(value) with multiplicity;
+
+    # Memory-related range checks
+    # When memory operations occur, verify that memory values are 16-bit
+    bus_4_range_checker.remove(mv0) when chiplets_memory_flag;
+    bus_4_range_checker.remove(mv1) when chiplets_memory_flag;
+
+    # Stack-related range checks
+    # When u32 operations occur, verify that all operand components are 16-bit
+    bus_4_range_checker.remove(sv0) when u32_rc_op;
+    bus_4_range_checker.remove(sv1) when u32_rc_op;
+    bus_4_range_checker.remove(sv2) when u32_rc_op;
+    bus_4_range_checker.remove(sv3) when u32_rc_op;
+}
