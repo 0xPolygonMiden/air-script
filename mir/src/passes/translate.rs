@@ -714,6 +714,10 @@ impl<'a> MirBuilder<'a> {
                         })
                         .build();
                     Ok(node)
+                } else if let Some(constant) = self.program.constants.get(qual_ident) {
+                    // Handle qualified constant references that weren't inlined
+                    // (e.g., constants used in comprehension iterables across modules)
+                    self.translate_const(&constant.value, access.span())
                 } else {
                     // This is a qualified reference that should have been eliminated
                     // during inlining or constant propagation, but somehow slipped through.
