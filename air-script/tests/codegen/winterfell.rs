@@ -365,3 +365,15 @@ fn variables() {
     let expected = expect_file!["../variables/variables.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn cross_module_constants() {
+    // Test that constants used in comprehension iterables work across module boundaries
+    let generated_air =
+        Test::new("tests/cross_module_constants/cross_module_constants.air".to_string())
+            .transpile(Target::Winterfell)
+            .unwrap();
+
+    let expected = expect_file!["../cross_module_constants/cross_module_constants.rs"];
+    expected.assert_eq(&generated_air);
+}

@@ -1,0 +1,21 @@
+mod constants_lib
+
+# Constants used in comprehension iterables
+const WEIGHTS = [1, 2, 3, 4];
+
+# Pure function that uses constants in a comprehension
+fn weighted_sum(values: felt[4]) -> felt {
+    return sum([v * w for (v, w) in (values, WEIGHTS)]);
+}
+
+# Another function that calls the first
+fn compute_result(a: felt, b: felt, c: felt, d: felt) -> felt {
+    let values = [a, b, c, d];
+    return weighted_sum(values);
+}
+
+# Evaluator that uses the chain of functions
+ev apply_computation([cols[5]]) {
+    let result = compute_result(cols[0], cols[1], cols[2], cols[3]);
+    enf cols[4] = result;
+}
