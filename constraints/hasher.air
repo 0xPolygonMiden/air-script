@@ -46,15 +46,15 @@ ev selector_columns([s[3]]) {
     # Enforce that selector columns are binary.
     enf is_binary([selector]) for selector in s;
 
-    # Compute relevant flags
-    let f_abp = get_f_abp(s);
-    let f_mpa = get_f_mpa(s);
-    let f_mva = get_f_mva(s);
-    let f_mua = get_f_mua(s);
-    let f_out = get_f_out(s);
-    let f_out_next = get_f_out_next(s);
+    # Compute relevant flags (passing periodic column values as parameters)
+    let f_abp = get_f_abp(s, cycle_row_7);
+    let f_mpa = get_f_mpa(s, cycle_row_7);
+    let f_mva = get_f_mva(s, cycle_row_7);
+    let f_mua = get_f_mua(s, cycle_row_7);
+    let f_out = get_f_out(s, cycle_row_7);
+    let f_out_next = get_f_out_next(s, cycle_row_6, s[0]', s[1]');
 
-    # Enforce that unless f_out = 1 or f_out' = 1, the values in columns s[1] and s[2] are copied 
+    # Enforce that unless f_out = 1 or f_out' = 1, the values in columns s[1] and s[2] are copied
     # over to the next row.
     # This encodes the fact that we can change the op flags only at the end of a cycle in order
     # to output a result, or at the start of a new cycle to initiate a new operation.
@@ -65,7 +65,7 @@ ev selector_columns([s[3]]) {
     # f_abp, f_mpa, f_mva or f_mua
     let f_comp = f_abp + f_mpa + f_mva + f_mua;
 
-    # Enforce that if any of f_abp, f_mpa, f_mva, f_mua flags is set to 1, the next value of s[0] 
+    # Enforce that if any of f_abp, f_mpa, f_mva, f_mua flags is set to 1, the next value of s[0]
     # is 0.
     # This basically enforces the exclusion of all op which initiate a new op (at the start of a new
     # cycle). Note that f_comp is a flag that is set only on rows which are 1 less than a multiple of 8
@@ -73,23 +73,23 @@ ev selector_columns([s[3]]) {
     enf s[0]' = 0 when f_comp;
 
     # Enforce that no invalid combinations of flags are allowed.
-    # This enforces that if s[0] is 0 then the either f_hout or f_sout is set.§§
+    # This enforces that if s[0] is 0 then the either f_hout or f_sout is set.
     enf s[1] = 0 when binary_and(cycle_row_7, binary_not(s[0]));
 }
 
 # Enforce node index constraints
 ev node_index([s[3], i]) {
-    # Compute relevant flags
-    let f_mp = get_f_mp(s);
-    let f_mv = get_f_mv(s);
-    let f_mu = get_f_mu(s);
-    let f_mpa = get_f_mpa(s);
-    let f_mva = get_f_mva(s);
-    let f_mua = get_f_mua(s);
-    let f_out = get_f_out(s);
+    # Compute relevant flags (passing periodic column values as parameters)
+    let f_mp = get_f_mp(s, cycle_row_0);
+    let f_mv = get_f_mv(s, cycle_row_0);
+    let f_mu = get_f_mu(s, cycle_row_0);
+    let f_mpa = get_f_mpa(s, cycle_row_7);
+    let f_mva = get_f_mva(s, cycle_row_7);
+    let f_mua = get_f_mua(s, cycle_row_7);
+    let f_out = get_f_out(s, cycle_row_7);
 
     # Flag indicating to enforce the constraint that b is binary only when a new node is absorbed into
-    # the hasher state (when the hash operation is either one of Merkle path verification or 
+    # the hasher state (when the hash operation is either one of Merkle path verification or
     # Merkle root update)
     let f_an = f_mp + f_mv + f_mu + f_mpa + f_mva + f_mua;
 
@@ -102,7 +102,7 @@ ev node_index([s[3], i]) {
     # Enforce that when a computation is finished i = 0.
     enf i = 0 when f_out;
 
-    # Enforce that the value in i is copied over to the next row unless we are absorbing a new row 
+    # Enforce that the value in i is copied over to the next row unless we are absorbing a new row
     # or the computation is finished.
     let not_absorbing_nor_comp_finished = 1 - (f_an + f_out);
     enf is_unchanged([i]) when not_absorbing_nor_comp_finished;
@@ -113,10 +113,11 @@ ev hasher_state([s[3], h[12], i]) {
     # Enforce the RPO permutation round constraints
     enf enforce_rpo_round([h]) when !cycle_row_7;
 
-    let f_mp = get_f_mp(s);
-    let f_mv = get_f_mv(s);
-    let f_mu = get_f_mu(s);
-    let f_abp = get_f_abp(s);
+    # Compute relevant flags (passing periodic column values as parameters)
+    let f_mp = get_f_mp(s, cycle_row_0);
+    let f_mv = get_f_mv(s, cycle_row_0);
+    let f_mu = get_f_mu(s, cycle_row_0);
+    let f_abp = get_f_abp(s, cycle_row_7);
 
     # Flag that is true when the performed operation includes absorbing the next node during Merkle
     # path computation.
@@ -125,15 +126,15 @@ ev hasher_state([s[3], h[12], i]) {
     # b is the value of the bit which is discarded during shift by one bit to the right.
     let b = i - 2 * i';
 
-    # Enforce that when absorbing the next set of elements into the state during linear hash 
-    # computation (i.e. f_abp = 1) the first 4 elements (the capacity portion) are carried over to 
+    # Enforce that when absorbing the next set of elements into the state during linear hash
+    # computation (i.e. f_abp = 1) the first 4 elements (the capacity portion) are carried over to
     # the next row.
     enf f_abp * (h' - h) = 0 for h in h;
 
     # TODO: Double check the following and fix both docs and VM if there is a typo
     #
-    # Enforce that when absorbing the next node during Merkle path computation 
-    # (i.e. f_mp + f_mv + f_mu = 1), the result of the previous hash (h[4], ..., h[7]) are copied 
+    # Enforce that when absorbing the next node during Merkle path computation
+    # (i.e. f_mp + f_mv + f_mu = 1), the result of the previous hash (h[4], ..., h[7]) are copied
     # over either to (h[4]', ..., h[7]') or to (h[8]', ..., h[11]') depending on the value of b.
     #
     # TODO: uncomment when computed indices are supported
@@ -184,63 +185,63 @@ ev hasher_state([s[3], h[12], i]) {
 
 # f_mp: Merkle Path verification flag (1,0,1) on cycle_row_0
 # Initiates standard Merkle path verification computation.
-fn get_f_mp(s: felt[3]) -> felt {
-    return cycle_row_0 & s[0] & binary_not(s[1]) & s[2];
+fn get_f_mp(s: felt[3], row0: felt) -> felt {
+    return row0 & s[0] & binary_not(s[1]) & s[2];
 }
 
 # f_mv: Merkle path Verification for "old" node flag (1,1,0) on cycle_row_0
 # Begins verification for old leaf value during Merkle root update computation.
-fn get_f_mv(s: felt[3]) -> felt {
-    return cycle_row_0 & s[0] & s[1] & binary_not(s[2]);
+fn get_f_mv(s: felt[3], row0: felt) -> felt {
+    return row0 & s[0] & s[1] & binary_not(s[2]);
 }
 
 # f_mu: Merkle path verification for "new" node flag (1,1,1) on cycle_row_0
 # Starts verification for new leaf value during Merkle root update computation.
-fn get_f_mu(s: felt[3]) -> felt {
-    return cycle_row_0 & s[0] & s[1] & s[2];
+fn get_f_mu(s: felt[3], row0: felt) -> felt {
+    return row0 & s[0] & s[1] & s[2];
 }
 
 # f_abp: Absorb elements for linear hash flag (1,0,0) on cycle_row_7
 # Absorbs next set of elements into hasher state during linear hash computation.
-fn get_f_abp(s: felt[3]) -> felt {
-    return cycle_row_7 & s[0] & binary_not(s[1]) & binary_not(s[2]);
+fn get_f_abp(s: felt[3], row7: felt) -> felt {
+    return row7 & s[0] & binary_not(s[1]) & binary_not(s[2]);
 }
 
 # f_mpa: Merkle Path Absorb flag (1,0,1) on cycle_row_7
 # Absorbs next Merkle path node during standard verification computation.
-fn get_f_mpa(s: felt[3]) -> felt {
-    return cycle_row_7 & s[0] & binary_not(s[1]) & s[2];
+fn get_f_mpa(s: felt[3], row7: felt) -> felt {
+    return row7 & s[0] & binary_not(s[1]) & s[2];
 }
 
 # f_mva: Merkle path absorb for "old" node flag (1,1,0) on cycle_row_7
 # Absorbs next node during "old" leaf verification (Merkle root update computation).
-fn get_f_mva(s: felt[3]) -> felt {
-    return cycle_row_7 & s[0] & s[1] & binary_not(s[2]);
+fn get_f_mva(s: felt[3], row7: felt) -> felt {
+    return row7 & s[0] & s[1] & binary_not(s[2]);
 }
 
 # f_mua: Merkle path absorb for "new" node flag (1,1,1) on cycle_row_7
 # Absorbs next node during "new" leaf verification (Merkle root update computation).
-fn get_f_mua(s: felt[3]) -> felt {
-    return cycle_row_7 & s[0] & s[1] & s[2];
+fn get_f_mua(s: felt[3], row7: felt) -> felt {
+    return row7 & s[0] & s[1] & s[2];
 }
 
 # We can define two flags:
-# 1. Flag f_hout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & binary_not(s[2]), 
-# which is set to 1 when selector flags are (0,0,0) on rows which are 1 less than a multiple 
+# 1. Flag f_hout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & binary_not(s[2]),
+# which is set to 1 when selector flags are (0,0,0) on rows which are 1 less than a multiple
 # of 8. This flag is for the instruction that returns the resulting digest of the currently
 # running computation.
-# 2. Flag f_sout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & s[2], which is set to 1 
+# 2. Flag f_sout = cycle_row_7 & binary_not(s[0]) & binary_not(s[1]) & s[2], which is set to 1
 # when selector flags are (0,0,1) on rows which are 1 less than a multiple of 8. This flag is
 # for the instruction that returns the whole hasher state.
 #
 # Flag f_out is set to 1 when either f_hout = 1 or f_sout = 1 in the current row.
-fn get_f_out(s: felt[3]) -> felt {
-    return cycle_row_7 & binary_not(s[0]) & binary_not(s[1]);
+fn get_f_out(s: felt[3], row7: felt) -> felt {
+    return row7 & binary_not(s[0]) & binary_not(s[1]);
 }
 
 # Flag f_out_next is set to 1 when either f_hout = 1 or f_sout = 1 in the next row.
-fn get_f_out_next(s: felt[3]) -> felt {
-    return cycle_row_6 & binary_not(s[0]') & binary_not(s[1]');
+fn get_f_out_next(s: felt[3], row6: felt, s0_next: felt, s1_next: felt) -> felt {
+    return row6 & binary_not(s0_next) & binary_not(s1_next);
 }
 
 ##########################################################################################

@@ -25,6 +25,8 @@ mod chiplets
 use ace::ace_chiplet_constraints_all_rows;
 use ace::ace_chiplet_constraints_first_row;
 
+use hasher::hash_chiplet;
+
 use bitwise::bitwise_chiplet_constraints;
 
 use memory::memory_chiplet_constraints_all_rows;
@@ -63,7 +65,7 @@ ev chiplets_constraints([chiplets[20]]) {
 
     # Apply chiplet-specific constraints based on hierarchical selector state.
     enf match {
-        #case hash_active: hash_chiplet_constraints([chiplets[1..20]]),
+        case hash_active: hash_chiplet([chiplets[1..17]]),
         case bitwise_active: bitwise_chiplet_constraints([chiplets[2..15]]),
         case memory_active: memory_chiplet_constraints_all_rows([chiplets[3..18]]),
         case ace_active: ace_chiplet_constraints_all_rows([chiplets[3..20]]),
