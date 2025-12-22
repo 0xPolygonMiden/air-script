@@ -444,9 +444,9 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
             self.current_module.clone().unwrap(),
             NamespacedIdentifier::Function(function.name),
         );
-        let current_item_node_index = self.deps_graph.add_node(current_item);
-        for (referenced_item, ref_type) in self.referenced.iter() {
-            let referenced_item_node_index = self.deps_graph.add_node(referenced_item.clone());
+        let current_item_node_index = self.get_node_index_or_add(&current_item);
+        for (referenced_item, ref_type) in self.referenced.clone().iter() {
+            let referenced_item_node_index = self.get_node_index_or_add(referenced_item);
             self.deps_graph.add_edge(
                 current_item_node_index,
                 referenced_item_node_index,
