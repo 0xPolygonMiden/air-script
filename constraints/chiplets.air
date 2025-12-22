@@ -35,6 +35,9 @@ use memory::flag_memory_active_not_last_row;
 use memory::flag_next_row_first_row_memory;
 use memory::memory_chiplet_constraints_first_row;
 
+use kernel_rom::ker_rom_chiplet_constraints;
+use kernel_rom::kernel_rom_chiplet_constraints_first_row;
+
 use utils::*;
 
 ##########################################################################################
@@ -69,7 +72,7 @@ ev chiplets_constraints([chiplets[20]]) {
         case bitwise_active: bitwise_chiplet_constraints([chiplets[2..15]]),
         case memory_active: memory_chiplet_constraints_all_rows([chiplets[3..18]]),
         case ace_active: ace_chiplet_constraints_all_rows([chiplets[3..20]]),
-        #case ker_rom_active: ker_rom_chiplet_constraints([chiplets[5..20]]),
+        case ker_rom_active: ker_rom_chiplet_constraints([chiplets[4..10]]),
     };
 
     # CHIPLET CONSTRAINTS REQUIRING SPECIAL HANDLING
@@ -94,6 +97,13 @@ ev chiplets_constraints([chiplets[20]]) {
     ### Apply ACE chiplet initialization constraints at the transition point
     let next_row_first_ace = binary_and(memory_active, s2');   # Transitioning into ACE chiplet
     enf ace_chiplet_constraints_first_row([chiplets[4..20]]) when next_row_first_ace;
+
+    ## KERNEL ROM
+
+    ### The kernel ROM chiplet requires initialization constraints to ensure proper startup.
+    ### We force sfirst' = 1 on the first kernel ROM row, establishing proper digest initialization.
+    let next_row_first_kernel_rom = binary_and(ace_active, s3');   # Transitioning into kernel ROM chiplet
+    enf kernel_rom_chiplet_constraints_first_row([chiplets[4..10]]) when next_row_first_kernel_rom;
 
 }
 
