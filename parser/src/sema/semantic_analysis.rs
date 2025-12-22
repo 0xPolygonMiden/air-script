@@ -633,6 +633,15 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                             0,
                         )))))
                         .expect("unexpected scalar iterable");
+                    // Comprehension bindings are local variables holding values, not direct
+                    // references to module-level declarations like periodic columns or constants.
+                    // Convert these to Local bindings to ensure proper scoping.
+                    let binding_ty = match binding_ty {
+                        BindingType::PeriodicColumn(_) | BindingType::Constant(_) => {
+                            BindingType::Local(binding_ty.ty().unwrap_or(Type::Felt))
+                        },
+                        other => other,
+                    };
                     binding_tys.push((binding, iterable.span(), Some(binding_ty)));
                 },
                 Err(InvalidAccessError::InvalidBinding) => {
