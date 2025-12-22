@@ -1,0 +1,161 @@
+##########################################################################################
+# CHIPLETS CONSTRAINTS MODULE
+##########################################################################################
+#
+# The Chiplets module contains specialized computation units that handle complex operations
+# like cryptographic hashing, bitwise operations, and memory access. Each chiplet uses a
+# hierarchical selector system to identify which operations are active.
+#
+# CHIPLETS COLUMN LAYOUT (20 columns):
+# ┌─────────┬──────────────────────────────────────────────────────────────────────┐
+# │ Columns │                        Purpose                                       │
+# ├─────────┼──────────────────────────────────────────────────────────────────────┤
+# │   0-4   │ s[5] - Hierarchical selector flags                                   │
+# │  5-19   │ Chiplet-specific data (hasher, bitwise ops, memory, ACE, kernel ROM) │
+# └─────────┴──────────────────────────────────────────────────────────────────────┘
+#
+# STATUS: Not fully implemented
+#
+# REFERENCES:
+# - Chiplets Design: https://0xmiden.github.io/miden-vm/design/chiplets/main.html
+##########################################################################################
+
+mod chiplets
+
+use ace::ace_chiplet_constraints_all_rows;
+use ace::ace_chiplet_constraints_first_row;
+
+use bitwise::bitwise_chiplet_constraints;
+
+use memory::memory_chiplet_constraints_all_rows;
+use memory::memory_chiplet_constraints_all_rows_except_last;
+use memory::flag_memory_active_not_last_row;
+use memory::flag_next_row_first_row_memory;
+use memory::memory_chiplet_constraints_first_row;
+
+use utils::*;
+
+##########################################################################################
+# CHIPLETS CONSTRAINTS
+##########################################################################################
+
+ev chiplets_constraints([chiplets[20]]) {
+    # Chiplets' flag constraints
+    let s0 = chiplets[0];
+    let s1 = chiplets[1];
+    let s2 = chiplets[2];
+    let s3 = chiplets[3];
+    let s4 = chiplets[4];
+    enf chiplet_selectors([s0, s1, s2, s3, s4]);
+
+    # MAIN CHIPLET CONSTRAINT:
+    
+    # The chiplet system uses a hierarchical binary selector scheme where each selector
+    # bit (s0, s1, s2, s3, s4) determines which chiplet is active at any given row.
+    #
+    # This hierarchy ensures exactly one chiplet is active per row and provides
+    # deterministic transitions between chiplets based on selector state changes.
+    let hash_active = hasher_chiplet_flag(s0);            # Active when: !s0
+    let bitwise_active = bitwise_chiplet_flag(s0, s1);    # Active when: s0 * !s1
+    let memory_active = memory_chiplet_flag(s0, s1, s2);  # Active when: s0 * s1 * !s2
+    let ace_active = ace_chiplet_flag(s0, s1, s2, s3);    # Active when: s0 * s1 * s2 * !s3
+    let ker_rom_active = ker_rom_chiplet_flag(s0, s1, s2, s3, s4); # Active when: s0 * s1 * s2 * s3 * !s4
+
+    # Apply chiplet-specific constraints based on hierarchical selector state.
+    enf match {
+        #case hash_active: hash_chiplet_constraints([chiplets[1..20]]),
+        case bitwise_active: bitwise_chiplet_constraints([chiplets[2..15]]),
+        case memory_active: memory_chiplet_constraints_all_rows([chiplets[3..18]]),
+        case ace_active: ace_chiplet_constraints_all_rows([chiplets[3..20]]),
+        #case ker_rom_active: ker_rom_chiplet_constraints([chiplets[5..20]]),
+    };
+
+    # CHIPLET CONSTRAINTS REQUIRING SPECIAL HANDLING
+
+    ## MEMORY
+
+    ### The memory chiplet requires special handling for both initialization and transition constraints
+    ### to ensure proper memory access sequencing and state transitions.
+    let flag_next_row_first_row_memory = flag_next_row_first_row_memory(s0, s1, s2);   # Transitioning into memory chiplet
+    let flag_memory_active_not_last_row = flag_memory_active_not_last_row(s0, s1, s2); # Active in memory, not exiting
+
+    ### MEMORY INITIALIZATION CONSTRAINTS:
+    ### Apply specialized initialization constraints when first entering the memory chiplet.
+    enf memory_chiplet_constraints_first_row([chiplets[3..18]]) when flag_next_row_first_row_memory;
+
+    ### MEMORY TRANSITION CONSTRAINTS ON ALL BUT LAST ROW:
+    ### Apply standard transition constraints while active in memory chiplet, excluding the final row.
+    enf memory_chiplet_constraints_all_rows_except_last([chiplets[3..18]]) when flag_memory_active_not_last_row;
+
+    ## ACE
+
+    ### Apply ACE chiplet initialization constraints at the transition point
+    let next_row_first_ace = binary_and(memory_active, s2');   # Transitioning into ACE chiplet
+    enf ace_chiplet_constraints_first_row([chiplets[4..20]]) when next_row_first_ace;
+
+}
+
+##########################################################################################
+# CHIPLET SELECTOR SYSTEM
+##########################################################################################
+
+# Hierarchical chiplet selector constraints
+#
+# CONSTRAINT DEGREE: 2 (quadratic due to binary constraints)
+#
+ev chiplet_selectors([s[5]]) {
+    ####################################################################################
+    # BINARY CONSTRAINTS - Ensure all selectors are valid binary values
+    ####################################################################################
+
+    enf is_binary([s[0]]);
+
+    enf is_binary([s[1]]) when s[0];
+    enf is_binary([s[2]]) when s[0] & s[1];
+    enf is_binary([s[3]]) when s[0] & s[1] & s[2];
+    enf is_binary([s[4]]) when s[0] & s[1] & s[2] & s[3];
+
+    ####################################################################################
+    # STABILITY CONSTRAINTS - Prevent deactivation (forbids 1→0 transitions)
+    ####################################################################################
+
+    # Once a selector level becomes active (1), it must remain active
+    # This ensures chiplet operations maintain consistent state throughout execution
+    enf s[0]' = s[0] when s[0];
+    enf s[1]' = s[1] when s[0] & s[1];
+    enf s[2]' = s[2] when s[0] & s[1] & s[2];
+    enf s[3]' = s[3] when s[0] & s[1] & s[2] & s[3];
+    enf s[4]' = s[4] when s[0] & s[1] & s[2] & s[3] & s[4];
+}
+
+##########################################################################################
+# CHIPLET ACTIVATION FUNCTIONS
+##########################################################################################
+
+# These functions decode the hierarchical selector pattern to identify active chiplets.
+# Each chiplet activates when its selector pattern matches and the next level is inactive.
+
+# Hasher chiplet: Active when root selector is inactive
+fn hasher_chiplet_flag(s_0: felt) -> felt {
+    return !s_0;
+}
+
+# Bitwise chiplet: Active when s0=1, s1=0
+fn bitwise_chiplet_flag(s_0: felt, s_1: felt) -> felt {
+    return s_0 * !s_1;
+}
+
+# Memory chiplet: Active when s0=1, s1=1, s2=0
+fn memory_chiplet_flag(s_0: felt, s_1: felt, s_2: felt) -> felt {
+    return s_0 * s_1 * !s_2;
+}
+
+# ACE chiplet: Active when s0=1, s1=1, s2=1, s3=0
+fn ace_chiplet_flag(s_0: felt, s_1: felt, s_2: felt, s_3: felt) -> felt {
+    return s_0 * s_1 * s_2 * !s_3;
+}
+
+# Kernel ROM chiplet: Active when s0=1, s1=1, s2=1, s3=1, s4=0
+fn ker_rom_chiplet_flag(s_0: felt, s_1: felt, s_2: felt, s_3: felt, s_4: felt) -> felt {
+    return s_0 * s_1 * s_2 * s_3 * !s_4;
+}
