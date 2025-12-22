@@ -1,0 +1,15 @@
+##########################################################################################
+# STACK CONSTRAINTS MODULE
+##########################################################################################
+#
+# The Stack module manages Miden VM's operand stack which is practically of unlimited depth
+# (up to 2³² items), though only the top 16 stack items are directly accessible, with deeper
+# items stored in an overflow virtual table.
+#
+# STATUS: Not implemented
+#
+# REFERENCES:
+# - Stack Design: https://0xmiden.github.io/miden-vm/design/stack/main.html
+##########################################################################################
+
+mod stack

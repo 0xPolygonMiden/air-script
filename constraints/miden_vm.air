@@ -1,0 +1,184 @@
+##########################################################################################
+# MIDEN VM - ALGEBRAIC INTERMEDIATE REPRESENTATION (AIR) CONSTRAINTS
+##########################################################################################
+#
+# The Miden Virtual Machine is a STARK-based zero-knowledge virtual machine designed for
+# efficient execution and proving of arbitrary computations. This AIR specification defines
+# the arithmetic constraints that govern the VM's execution.
+#
+# STATUS: Not fully implemented
+#
+# REFERENCES:
+# - Miden VM implementation: https://0xmiden.github.io/miden-vm/
+# - Miden VM documentation : https://0xmiden.github.io/miden-vm/intro/main.html
+##########################################################################################
+
+def MidenVM
+
+use chiplets::chiplets_constraints;
+use bitwise::*;
+use hasher::*;
+use range_checker::*;
+use system::*;
+use utils::*;
+
+##########################################################################################
+# EXECUTION TRACE LAYOUT
+##########################################################################################
+#
+# The execution trace captures the state of the VM at each cycle. The main trace consists
+# of 80 columns organized into logical segments.
+#
+##########################################################################################
+
+trace_columns {
+    main: [system[8], decoder[24], stack[19], range_checker[2], chiplets[20], padding[7]],
+}
+
+##########################################################################################
+# PUBLIC INPUTS
+##########################################################################################
+#
+# Public inputs define the interface between the prover and verifier, establishing
+# the computation's inputs and expected outputs that must be verified.
+#
+# INPUT STRUCTURE:
+# ┌───────────────┬─────────┬───────────────────────────────────────────────────┐
+# │     Field     │  Size   │                Description                        │
+# ├───────────────┼─────────┼───────────────────────────────────────────────────┤
+# │ stack_inputs  │   16    │ Initial operand stack state (top 16 elements)     │
+# │ stack_outputs │   16    │ Final operand stack state (top 16 elements)       │
+# │program_digest │    4    │ MAST root hash identifying the executed program   │
+# │kernel_digests │  [[5]]  │ Hashes of kernel procedures (dynamic array)       │
+# └───────────────┴─────────┴───────────────────────────────────────────────────┘
+#
+##########################################################################################
+
+public_inputs {
+    stack_inputs: [16],    # Initial operand stack state (16 field elements)
+    stack_outputs: [16],   # Final operand stack state (16 field elements)
+    program_digest: [4],   # MAST root hash (4 field elements)
+    kernel_digests: [[5]], # Kernel procedure hashes plus an op label
+}
+
+##########################################################################################
+# BUS ARCHITECTURE
+##########################################################################################
+#
+# Buses enable efficient communication between VM components using cryptographic
+# protocols like multiset checks and LogUp. They ensure data integrity and consistency
+# across different execution units.
+#
+##########################################################################################
+
+buses {
+    # Decoder buses
+    multiset bus_0_decoder_p1,
+    multiset bus_1_decoder_p2,
+    multiset bus_2_decoder_p3,
+
+    # Stack overflow table
+    multiset bus_3_stack_p1,
+
+    # Range checker bus
+    logup    bus_4_range_checker,
+
+    # Chiplet buses
+    multiset bus_5_v_table,       # Chiplets virtual table
+    multiset bus_6_chiplets_bus,  # Main chiplets communication bus
+
+    # Wiring bus
+    logup    bus_7_wiring_bus,    # ACE (Algebraic Circuit Elements) wiring
+}
+
+##########################################################################################
+# BOUNDARY CONSTRAINTS
+##########################################################################################
+#
+# Boundary constraints establish the initial and final states of the VM execution.
+# They ensure proper initialization and define the expected state at program completion.
+#
+##########################################################################################
+
+boundary_constraints {
+    ####################################################################################
+    # MAIN TRACE BOUNDARIES
+    ####################################################################################
+
+    # System clock must start at 0 (VM begins execution at cycle 0)
+    enf system[0].first = 0;
+
+    ####################################################################################
+    # AUXILIARY COLUMN BOUNDARIES
+    ####################################################################################
+
+    # Decoder buses
+    enf bus_0_decoder_p1.first = unconstrained;
+    enf bus_0_decoder_p1.last = unconstrained;
+    enf bus_1_decoder_p2.first = unconstrained;
+    enf bus_1_decoder_p2.last = unconstrained;
+    enf bus_2_decoder_p3.first = unconstrained;
+    enf bus_2_decoder_p3.last = unconstrained;
+
+    # Stack overflow table
+    enf bus_3_stack_p1.first = unconstrained;
+    enf bus_3_stack_p1.last = unconstrained;
+
+    # Range checker bus - LogUp protocol requires null initialization/finalization
+    enf bus_4_range_checker.first = null;
+    enf bus_4_range_checker.last = null;
+
+    # Chiplets virtual table
+    enf bus_5_v_table.first = unconstrained;
+    enf bus_5_v_table.last = unconstrained;
+
+    # Chiplets communication bus
+    # Initial state contains kernel procedure digests against which the program was compiled
+    enf bus_6_chiplets_bus.first = kernel_digests;
+    enf bus_6_chiplets_bus.last = unconstrained;
+
+    # ACE (Algebraic Circuit Elements) wiring bus
+    enf bus_7_wiring_bus.first = unconstrained;
+    enf bus_7_wiring_bus.last = unconstrained;
+}
+
+##########################################################################################
+# INTEGRITY CONSTRAINTS
+##########################################################################################
+#
+# Integrity constraints define the state transition rules that govern VM execution.
+# These constraints ensure that each step of program execution is valid according
+# to the Miden VM instruction set architecture.
+#
+##########################################################################################
+
+integrity_constraints {
+    ####################################################################################
+    # MAIN TRACE CONSTRAINTS
+    ####################################################################################
+
+    # System state transitions
+    enf system_transition([system[0..8]]);
+
+    # TODO: Decoder constraints - Program execution and MAST verification
+    # enf decoder_constraints([decoder]);
+
+    # TODO: Stack constraints - Operand stack operations and overflow handling
+    # enf stack_constraints([stack]);
+
+    # TODO: Chiplet constraints - Hash, bitwise, ACE, memory operations, and kernel ROM
+    enf chiplets_constraints([chiplets[0..20]]);
+
+    ####################################################################################
+    # BUS CONSTRAINTS
+    ####################################################################################
+
+    # Range checker bus protocol - Connects stack and chiplets for 16-bit range checks
+    enf range_checker_constraints([decoder[0..24], range_checker[0..2], chiplets[0..20]]);
+
+    # TODO: Additional bus constraints for complete VM verification
+    # enf decoder_bus_constraints([decoder]);
+    # enf stack_bus_constraints([stack]);
+    # enf chiplet_bus_constraints([chiplets]);
+    # enf ace_bus_constraints([chiplets])
+}
