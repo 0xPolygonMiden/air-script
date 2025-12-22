@@ -560,7 +560,7 @@ SymbolAccessBaseSpanned: Span<(Identifier, AccessType)> = {
 
 SymbolAccessBase: (Identifier, AccessType) = {
     <ident: Identifier> => (ident, AccessType::Default),
-    <ident: Identifier> "[" <range: Range> "]" => (ident, AccessType::Slice(range)),
+    <ident: Identifier> "[" <range: Range> "]" => (ident, AccessType::Slice(Box::new(range))),
     <ident: Identifier> <idx: Index> =>  (ident, AccessType::Index(idx)),
     <ident: Identifier> <row: Index> <col: Index> => (ident, AccessType::Matrix(row, col)),
     // accessing an identifier used in a section declaration, like a named trace segment, e.g. $main
@@ -611,7 +611,7 @@ Iterables: Vec<Expr> = {
 Iterable: Expr = {
     <ident: Identifier> => Expr::SymbolAccess(SymbolAccess::new(ident.span(), ident, AccessType::Default, 0)),
     <range: Range> => Expr::Range(range),
-    <l:@L> <ident: Identifier> "[" <range: Range> "]" <r:@R> => Expr::SymbolAccess(SymbolAccess::new(span!(l, r), ident, AccessType::Slice(range), 0)),
+    <l:@L> <ident: Identifier> "[" <range: Range> "]" <r:@R> => Expr::SymbolAccess(SymbolAccess::new(span!(l, r), ident, AccessType::Slice(Box::new(range)), 0)),
     <l:@L> <function_call: FunctionCall> <r:@R> => if let ScalarExpr::Call(call) = function_call {
         Expr::Call(call)
     } else {
