@@ -15,6 +15,8 @@ mod constant_in_range;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod constants;
 #[allow(unused_variables, dead_code, unused_mut)]
+mod cross_module_constants;
+#[allow(unused_variables, dead_code, unused_mut)]
 mod constraint_comprehension;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod evaluators;
