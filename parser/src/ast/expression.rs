@@ -865,7 +865,7 @@ pub enum AccessType {
     #[default]
     Default,
     /// Access binds a sub-slice of a vector
-    Slice(RangeExpr),
+    Slice(Box<RangeExpr>),
     /// Access binds the value at a specific index of an aggregate value (i.e. vector or matrix)
     ///
     /// The result type may be either a scalar or a vector, depending on the type of the aggregate
@@ -1073,7 +1073,7 @@ impl SymbolAccess {
                         Err(InvalidAccessError::IndexOutOfBounds)
                     },
                     Type::Vector(_) => Ok(Self {
-                        access_type: AccessType::Slice(shifted),
+                        access_type: AccessType::Slice(Box::new(shifted.clone())),
                         ty: Some(Type::Vector(rlen)),
                         ..self.clone()
                     }),
@@ -1081,7 +1081,7 @@ impl SymbolAccess {
                         Err(InvalidAccessError::IndexOutOfBounds)
                     },
                     Type::Matrix(_, cols) => Ok(Self {
-                        access_type: AccessType::Slice(shifted),
+                        access_type: AccessType::Slice(Box::new(shifted)),
                         ty: Some(Type::Matrix(rlen, cols)),
                         ..self.clone()
                     }),
