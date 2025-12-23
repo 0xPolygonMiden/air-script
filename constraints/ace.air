@@ -118,7 +118,6 @@ ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
 
     # Remove ACE INIT response when a section starts
     bus_6_chiplets_bus.remove(ACEINIT, ctx, ptr, clk, nread, n_eval) when sstart;
-
     ####################################################################################
     # BUS REQUESTS - ACE MEMORY ACCESS
     ####################################################################################

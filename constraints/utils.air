@@ -173,7 +173,6 @@ const ACEINIT = 8;                 # ACE circuit initialization (uses bus_6_chip
 # Kernel ROM Chiplet Operation Labels
 const KERNELPROCCALL = 16;         # Kernel procedure call
 const KERNELPROCINIT = 48;         # Kernel procedure initialization
-
 ##########################################################################################
 # GENERAL CONSTANTS
 ##########################################################################################
