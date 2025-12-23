@@ -75,7 +75,11 @@ ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
 
     let flag_ace_next = flag_ace_current_and_next(s3');
     let flag_ace_last = flag_ace_last(s3');
-        
+
+    ####################################################################################
+    # TRANSITION CONSTRAINTS
+    ####################################################################################
+
     # Section and block flags constraints
     enf section_block_flags_constraints([s3, sstart, sstart', sblock, id0, n_eval]);
 
@@ -91,10 +95,33 @@ ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
     # Finalization constraints
     let f_end = binary_or(binary_and(flag_ace_next, sstart'), flag_ace_last);
     enf finalization_constraints([id0, v0_0, v0_1]) when f_end;
+
+    ####################################################################################
+    # BUS RESPONSE - ACE INITIALIZATION
+    ####################################################################################
+    # The ACE chiplet provides a response to the decoder's ACE_INIT request via the
+    # chiplets bus. The response is sent when a new section starts (sstart = 1).
+    #
+    # Message format: (ACE_INIT, ctx, ptr, clk, nread, neval)
+    # where:
+    # - ctx, clk: Memory access context and clock cycle
+    # - ptr: Word-aligned pointer to first input variable
+    # - nread: Total count of input and constant elements (computed as id0 + 1 - neval)
+    # - neval: Total number of arithmetic operations
+    #
+    # Note: Since id0 = nread + neval - 1 in the first row, we have nread = id0 - neval + 1
+    ####################################################################################
+
+    # Compute nread from id0 and n_eval
+    # Since id0 = nread + neval - 1 in first row, then: nread = id0 - neval + 1
+    let nread = id0 + 1 - n_eval;
+
+    # Remove ACE INIT response when a section starts
+    bus_6_chiplets_bus.remove(ACEINIT, ctx, ptr, clk, nread, n_eval) when sstart;
 }
 
 # Enforces that on the first row of ACE chiplet we should have sstart' = 1
-ev ace_chiplet_constraints_first_row([ace[16]]) {
+ev ace_chiplet_constraints_first_row([s3, ace[16]]) {
     let sstart = ace[0];    # Section start flag
 
     enf sstart' = 1;
@@ -167,9 +194,6 @@ ev enforce_binary_columns([sstart, sblock]) {
 # - Context (ctx) and clock (clk) remain constant within a section
 # - Memory pointer (ptr) increments with fixed increments: +4 in READ, +1 in EVAL
 # - Node identifiers (id0) decrement with fixed decrements: -2 in READ, -1 in EVAL
-#
-# Note: These constraints are active when the next row is NOT the start of a new section,
-# i.e., all but the last rows of the section (intra-section transitions only).
 ev section_constraints([sstart, sblock, ctx, ptr, clk, id0]) {
     let flag_within_section = binary_not(sstart');
     let flag_read = !sblock;
@@ -181,10 +205,10 @@ ev section_constraints([sstart, sblock, ctx, ptr, clk, id0]) {
     # Clock consistency within a section
     enf clk' = clk when flag_within_section;
 
-    # Memory pointer increases by 4 in READ blocks and by 1 in EVAL blocks
+    # Memory pointer must decrease by 4 in READ blocks and by 1 in EVAL blocks
     enf ptr' = ptr + 4 * flag_read + flag_eval when flag_within_section;
 
-    # Node identifiers decrease by 2 in READ blocks and by 1 in EVAL blocks
+    # Node identifiers decreases by 2 in READ blocks and by 1 in EVAL blocks
     enf id0 = id0' + 2 * flag_read + flag_eval when flag_within_section;
 }
 

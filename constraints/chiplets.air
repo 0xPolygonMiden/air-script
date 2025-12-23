@@ -44,7 +44,7 @@ use utils::*;
 # CHIPLETS CONSTRAINTS
 ##########################################################################################
 
-ev chiplets_constraints([chiplets[20]]) {
+ev chiplets_constraints([chiplets[20], system_clk]) {
     # Chiplets' flag constraints
     let s0 = chiplets[0];
     let s1 = chiplets[1];
@@ -68,7 +68,7 @@ ev chiplets_constraints([chiplets[20]]) {
 
     # Apply chiplet-specific constraints based on hierarchical selector state.
     enf match {
-        case hash_active: hash_chiplet([chiplets[1..17]]),
+        case hash_active: hash_chiplet([chiplets[0..16], system_clk]),
         case bitwise_active: bitwise_chiplet_constraints([chiplets[2..15]]),
         case memory_active: memory_chiplet_constraints_all_rows([chiplets[3..18]]),
         case ace_active: ace_chiplet_constraints_all_rows([chiplets[3..20]]),
@@ -96,7 +96,7 @@ ev chiplets_constraints([chiplets[20]]) {
 
     ### Apply ACE chiplet initialization constraints at the transition point
     let next_row_first_ace = memory_active * s2' * binary_not(s3');   # Transitioning into ACE chiplet
-    enf ace_chiplet_constraints_first_row([chiplets[4..20]]) when next_row_first_ace;
+    enf ace_chiplet_constraints_first_row([chiplets[3..20]]) when next_row_first_ace;
 
     ## KERNEL ROM
 

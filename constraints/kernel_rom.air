@@ -9,7 +9,7 @@
 # The chiplet contains digest values for all kernel procedures and enforces contiguity
 # constraints to ensure proper execution tracking.
 #
-# STATUS: Core constraints implemented, bus constraints not implemented
+# STATUS: Fully implemented (core constraints + bus responses complete)
 #
 # REFERENCES:
 # - Kernel ROM Chiplet: https://0xmiden.github.io/miden-vm/design/chiplets/kernel_rom.html
@@ -25,15 +25,44 @@ use utils::*;
 
 # Enforces the constraints on the kernel ROM chiplet given its columns.
 #
-# Parameters:
-# - s4: Chiplet selector flag
-# - sfirst: Section first flag (1 = start of new digest block, 0 = continuation of a given block)
-# - r[4]: Kernel procedure root/digest (4 field elements)
-#
 # Max constraint degree: 3
 ev ker_rom_chiplet_constraints([s4, sfirst, r[4]]) {
+    ####################################################################################
+    # TRANSITION CONSTRAINTS
+    ####################################################################################
+
     enf kernel_rom_selector([sfirst]);
     enf kernel_rom_digest_contiguity([s4, sfirst, r]);
+
+    ####################################################################################
+    # BUS OPERATIONS - CHIPLETS COMMUNICATION
+    ####################################################################################
+    # The kernel ROM chiplet provides responses to kernel procedure requests via the
+    # chiplets bus.
+    #
+    # OPERATIONS:
+    # - KERNELPROCINIT (label = 48): Initialization from verifier (sfirst = 1)
+    #   Responds to public input kernel digests on first row of digest block
+    #
+    # - KERNELPROCCALL (label = 16): Procedure call from decoder (sfirst = 0)
+    #   Responds to SYSCALL operations on subsequent rows
+    #
+    # Response format: (operation_label, r0, r1, r2, r3)
+    # where r0-r3 form the 4-element kernel procedure digest.
+    ####################################################################################
+
+    # Extract digest elements
+    let r0 = r[0];
+    let r1 = r[1];
+    let r2 = r[2];
+    let r3 = r[3];
+
+    # Compute operation flags
+    let is_init = sfirst;                # 1 when sfirst = 1 (initialization)
+    let is_call = binary_not(sfirst);    # 1 when sfirst = 0 (procedure call)
+
+    bus_6_chiplets_bus.remove(KERNELPROCINIT, r0, r1, r2, r3) when is_init;
+    bus_6_chiplets_bus.remove(KERNELPROCCALL, r0, r1, r2, r3) when is_call;
 }
 
 # Enforces initialization constraints for the first row of kernel ROM chiplet execution.
@@ -54,24 +83,32 @@ ev kernel_rom_chiplet_constraints_first_row([s4, sfirst, r[4]]) {
 # HELPERS
 ##########################################################################################
 
+### Helper evaluators #############################################################################
+
 # Enforces that the kernel ROM selector is valid.
 #
 # Max constraint degree: 2
 ev kernel_rom_selector([sfirst]) {
-    # Enforce that sfirst is binary (0 or 1)
+    # Enforce that sfirst is binary (0 or 1).
+    # Constraint degree: 2
     enf is_binary([sfirst]);
+
+    # First row initialization constraint
+    # This is part of the ACE chiplet constraints
 }
 
 # Enforces digest contiguity constraints for the kernel ROM.
 #
-# When sfirst' = 0 (not starting a new digest block), the digest values must remain
-# unchanged from the current row to the next row. This ensures contiguous blocks of
-# identical digest values for proper tracking of kernel procedure executions.
+# When sfirst' = 0, consecutive rows must contain identical digest values to ensure
+# proper tracking of kernel procedure executions.
 #
 # Max constraint degree: 3
 ev kernel_rom_digest_contiguity([s4, sfirst, r[4]]) {
-    # Constraint is active when:
-    # - sfirst' = 0 (next row is not the start of a new digest block)
-    # - s4' = 0 (next row is still within the kernel ROM chiplet)
-    enf is_unchanged([r_i]) for r_i in r when binary_and(binary_not(s4'), binary_not(sfirst'));
+    # Enforce that when sfirst = 0 (not the start of a new digest block),
+    # the digest values in the current row must be identical to the next row.
+    # This ensures contiguous blocks of identical digest values.
+    #
+    # Note: This constraint is disabled when the current row is the last row of the kernel ROM chiplet
+    # which is indicated by s4' being set to 1
+    enf is_unchanged([r]) for r in r when binary_and(binary_not(s4'), binary_not(sfirst'));
 }
