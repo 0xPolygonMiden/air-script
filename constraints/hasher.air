@@ -147,6 +147,36 @@ ev hash_chiplet([s[3], h[12], i, system_clk]) {
     # MU: Merkle root update (new path) - send leaf value based on bit b
     bus_6_chiplets_bus.remove(HASHERMRUPDATENEW, system_clk + 1, i, 0, 0, 0, 0, h0, h1, h2, h3, 0, 0, 0, 0) when f_mu * is_b_zero;
     bus_6_chiplets_bus.remove(HASHERMRUPDATENEW, system_clk + 1, i, 0, 0, 0, 0, h4, h5, h6, h7, 0, 0, 0, 0) when f_mu * is_b_one;
+
+    ####################################################################################
+    # VIRTUAL TABLE SIBLING SHARING
+    ####################################################################################
+    # The virtual table ensures identical sibling nodes are used when verifying both
+    # old and new Merkle paths during root updates:
+    # - MV (old path): INSERT siblings into virtual table
+    # - MU (new path): REMOVE siblings from virtual table (must match insertions)
+    #
+    # Sibling location based on LSB of node index (bit b):
+    # - b=0: sibling in rate1 h[4..7]  |  b=1: sibling in rate0 h[0..3]
+    #
+    # Message format: (node_index, sibling[0..3])
+    ####################################################################################
+
+    # Compute absorption flags (on cycle_row_7)
+    let f_mva = get_f_mva(s, cycle_row_7);
+    let f_mua = get_f_mua(s, cycle_row_7);
+
+    # MV: INSERT siblings during OLD path verification (cycle_row_0 and cycle_row_7)
+    bus_5_v_table.insert(i, h4, h5, h6, h7) when f_mv * is_b_zero;
+    bus_5_v_table.insert(i, h0, h1, h2, h3) when f_mv * is_b_one;
+    bus_5_v_table.insert(i, h4', h5', h6', h7') when f_mva * is_b_zero;
+    bus_5_v_table.insert(i, h0', h1', h2', h3') when f_mva * is_b_one;
+
+    # MU: REMOVE siblings during NEW path verification (cycle_row_0 and cycle_row_7)
+    bus_5_v_table.remove(i, h4, h5, h6, h7) when f_mu * is_b_zero;
+    bus_5_v_table.remove(i, h0, h1, h2, h3) when f_mu * is_b_one;
+    bus_5_v_table.remove(i, h4', h5', h6', h7') when f_mua * is_b_zero;
+    bus_5_v_table.remove(i, h0', h1', h2', h3') when f_mua * is_b_one;
 }
 
 ##########################################################################################
