@@ -29,7 +29,7 @@ ev stack([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, 
           decoder_addr, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
           decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5, decoder_h6, decoder_h7,
           decoder_sp, decoder_gc, decoder_ox, decoder_c0, decoder_c1, decoder_c2, decoder_e0, decoder_e1,
-          system_clk, system_fmp]) {
+          system_clk, system_fmp, system_ctx, system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3]) {
     # Stack element columns (always visible top 16 elements)
     # s0-s15 are the top 16 stack elements (s0 = top of stack)
     # b0 = stack depth (≥ 16)
@@ -48,9 +48,10 @@ ev stack([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, 
     ####################################################################################
 
     enf stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
-                                       b0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+                                       b0, b1, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
                                        decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5,
-                                       decoder_e0, decoder_e1, system_clk, system_fmp]);
+                                       decoder_e0, decoder_e1, system_clk, system_fmp, system_ctx,
+                                       system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3]);
 
 }
 
@@ -154,10 +155,11 @@ ev right_shift_b1_constraint([b1, decoder_b0, decoder_b1, decoder_b2, decoder_b3
 
 # Applies the appropriate operation-specific constraints based on active operation flags
 ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
-                               stack_b0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
+                               stack_b0, stack_b1, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
                                decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5,
                                decoder_e0, decoder_e1,
-                               system_clk, system_fmp
+                               system_clk, system_fmp, system_ctx,
+                               system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3
                                ])
     {
 
@@ -255,13 +257,17 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
     let is_mstream = flag_mstream(op_bits, decoder_e0);  # Opcode 83 (101_0011)
     let is_split = flag_split(op_bits, decoder_e0);  # Opcode 84 (101_0100)
     let is_loop = flag_loop(op_bits, decoder_e0);  # Opcode 85 (101_0101)
+    let is_dyn = flag_dyn(op_bits, decoder_e0);  # Opcode 88 (101_1000)
     let is_hornerext = flag_hornerext(op_bits, decoder_e0);  # Opcode 89 (101_1001)
     let is_push = flag_push(op_bits, decoder_e0);  # Opcode 91 (101_1011)
+    let is_dyncall = flag_dyncall(op_bits, decoder_e0);  # Opcode 92 (101_1100)
     let is_evalcircuit = flag_evalcircuit(op_bits, decoder_e0);  # Opcode 93 (101_1101)
 
     # Group 5: Very high-degree operations (110 group) - requires e1 for degree reduction
     let is_mrupdate = flag_mrupdate(op_bits, decoder_e1);  # Opcode 96 (110_0000)
     let is_hornerbase = flag_hornerbase(op_bits, decoder_e1);  # Opcode 100 (110_0100)
+    let is_syscall = flag_syscall(op_bits, decoder_e1);  # Opcode 104 (110_1000)
+    let is_call = flag_call(op_bits, decoder_e1);  # Opcode 108 (110_1100)
 
     enf match {
         # No stack shift operations - ordered by Miden VM specification (opcodes 0-31)
@@ -272,9 +278,9 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
         case is_incr: incr_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 4
         case is_not: not_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),           # 5
         case is_fmpadd: fmpadd_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_fmp]), # 6
-        case is_mload: mload_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),       # 7
+        case is_mload: mload_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]),       # 7
         case is_swap: swap_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 8
-        case is_caller: caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 9
+        case is_caller: caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3]),     # 9
         case is_movup2: movup2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 10
         case is_movdn2: movdn2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 11
         case is_movup3: movup3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 12
@@ -311,9 +317,9 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
         case is_drop: drop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),       # 41
         case is_cswap: cswap_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 42
         case is_cswapw: cswapw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 43
-        case is_mloadw: mloadw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 44
-        case is_mstore: mstore_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 45
-        case is_mstorew: mstorew_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 46
+        case is_mloadw: mloadw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]),   # 44
+        case is_mstore: mstore_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]),   # 45
+        case is_mstorew: mstorew_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]), # 46
         case is_fmpupdate: fmpupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_fmp]), # 47
 
         # Right stack shift operations - ordered by Miden VM specification (opcodes 48-63)
@@ -351,13 +357,17 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
         case is_mstream: mstream_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 83
         case is_split: split_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 84
         case is_loop: loop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 85
+        case is_dyn: dyn_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 88
         case is_hornerext: hornerext_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 89
         case is_push: push_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 91
+        case is_dyncall: dyncall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_b0, stack_b1]), # 92
         case is_evalcircuit: evalcircuit_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 93
 
         # Very high-degree operations (110 group)
         case is_mrupdate: mrupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 96
         case is_hornerbase: hornerbase_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 100
+        case is_syscall: syscall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_b0, stack_b1]), # 104
+        case is_call: call_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_b0, stack_b1]), # 108
     };
 
 }
@@ -415,6 +425,11 @@ ev add_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, 
 # Positions 0-11: Transformed by RPO permutation (validated by hash chiplet)
 # Positions 12-15: Unchanged
 ev hperm_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Positions 0-11: Transformed by RPO permutation (unconstrained, validated by hash chiplet)
+    # Request full state from hasher chiplet (SOUT returns all 12 elements)
+    bus_6_chiplets_bus.insert(HASHERRETURNSTATE, s0', s1', s2', s3', s4', s5', s6', s7', s8', s9', s10', s11') when 1;
+
+    # Positions 12-15: Unchanged
     enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
 }
 
@@ -422,6 +437,11 @@ ev hperm_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
 # Stack behavior: [V0, V1, V2, V3, d, i, R0, R1, R2, R3, ...] -> [V0, V1, V2, V3, d, i, R0, R1, R2, R3, ...]
 # Verifies Merkle path from node value V to root R at depth d and index i
 ev mpverify_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Request Merkle path verification from hasher chiplet
+    # The hasher verifies that the path from leaf V (s0-s3) at index i (s5) and depth d (s4)
+    # results in root R (s6-s9). The result (should equal R) is returned in the response.
+    bus_6_chiplets_bus.insert(HASHERMPVERIFY, s6, s7, s8, s9) when 1;
+
     # Positions 0-9: Unchanged (node value, depth, index, root all stay on stack)
     enf s0' = s0; enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
     enf s8' = s8; enf s9' = s9;
@@ -474,6 +494,14 @@ ev push_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11,
 # Stack behavior: [V0, V1, V2, V3, d, i, R0, R1, R2, R3, NV0, NV1, NV2, NV3, ...] -> [NR0, NR1, NR2, NR3, d, i, R0, R1, R2, R3, NV0, NV1, NV2, NV3, ...]
 # Updates node from old value V to new value NV, replaces top with new root NR
 ev mrupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Request Merkle root update from hasher chiplet
+    # This involves two verifications:
+    # 1. MV (old path): Verify path from old value V (s0-s3) results in old root R (s6-s9)
+    # 2. MU (new path): Verify path from new value NV (s10-s13) results in new root NR (s0'-s3')
+    # The hasher computes the new root and returns it.
+    bus_6_chiplets_bus.insert(HASHERMRUPDATEOLD, s6, s7, s8, s9) when 1;
+    bus_6_chiplets_bus.insert(HASHERMRUPDATENEW, s0', s1', s2', s3') when 1;
+
     # Positions 0-3: Overwritten by new root (unconstrained, validated by hash chiplet)
     # Positions 4-15: Unchanged (depth, index, old root, new value all stay)
     enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
@@ -1240,6 +1268,11 @@ ev u32and_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
     enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9;
     enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
     # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+
+    # Insert bitwise AND request to chiplets bus
+    # Operands: s0 (top of stack), s1 (second element)
+    # Result: s0' (will contain the AND result)
+    bus_6_chiplets_bus.insert(BITWISEAND, s0, s1, s0') when 1;
 }
 
 # U32XOR operation: Bitwise XOR of two u32 values
@@ -1250,33 +1283,51 @@ ev u32xor_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
     enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9;
     enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
     # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+
+    # Insert bitwise XOR request to chiplets bus
+    # Operands: s0 (top of stack), s1 (second element)
+    # Result: s0' (will contain the XOR result)
+    bus_6_chiplets_bus.insert(BITWISEXOR, s0, s1, s0') when 1;
 }
 
 # MLOADW operation: Load word from memory at address s4
 # Stack behavior: [a, b, c, d, addr, ...] -> [v3, v2, v1, v0, ...]
-ev mloadw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+ev mloadw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]) {
     # Positions 0-3: Overwritten by memory word (unconstrained)
     # Positions 4-14: Left shift
     enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9; enf s9' = s10;
     enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+
+    # Insert memory read word request to chiplets bus
+    # MLOADW reads a 4-element word from memory address s0 (must be word-aligned)
+    # The word will be placed in s0', s1', s2', s3' (unconstrained here, but constrained by memory chiplet response)
+    bus_6_chiplets_bus.insert(MEMREADWORD, system_ctx, s0, system_clk, s0', s1', s2', s3') when 1;
 }
 
 # MSTORE operation: Store element to memory at address s0
 # Stack behavior: [addr, value, ...] -> [value, ...]
-ev mstore_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+ev mstore_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]) {
     # Positions 0-14: Left shift by 1 (address consumed, value stays)
     enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6;
     enf s6' = s7; enf s7' = s8; enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12;
     enf s12' = s13; enf s13' = s14; enf s14' = s15;
+
+    # Insert memory write element request to chiplets bus
+    # MSTORE writes a single element (s1) to memory address s0 in the current execution context
+    bus_6_chiplets_bus.insert(MEMWRITEELEMENT, system_ctx, s0, system_clk, s1) when 1;
 }
 
 # MSTOREW operation: Store word to memory at address s0
 # Stack behavior: [addr, v0, v1, v2, v3, ...] -> [v0, v1, v2, v3, ...]
-ev mstorew_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+ev mstorew_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]) {
     # Positions 0-14: Left shift by 1 (address consumed, word stays)
     enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6;
     enf s6' = s7; enf s7' = s8; enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12;
     enf s12' = s13; enf s13' = s14; enf s14' = s15;
+
+    # Insert memory write word request to chiplets bus
+    # MSTOREW writes a 4-element word (s1, s2, s3, s4) to memory address s0 (must be word-aligned)
+    bus_6_chiplets_bus.insert(MEMWRITEWORD, system_ctx, s0, system_clk, s1, s2, s3, s4) when 1;
 }
 
 # FRIE2F4 operation: TODO
@@ -1325,6 +1376,14 @@ ev loop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11,
     enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8;
     enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
     # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
+}
+
+# DYN operation: Execute code block dynamically without context switch
+ev dyn_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+    # Stack LEFT SHIFT: all elements shift up one position
+    enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8;
+    enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' from overflow table or 0 (handled by left_shift_zero_insertion)
 }
 
 ##########################################################################################
@@ -1748,14 +1807,20 @@ ev expacc_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
     enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
 }
 
-# CALLER operation: Get ID of the calling context (no stack depth change)
-# Stack behavior: [...] -> [caller_id, ...] (no depth change)
-ev caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
-    # Position 0: Gets caller context ID from system state
-    # TODO: Integrate with system context columns to get actual caller ID
-    enf s0' = 0; # Placeholder - needs system context integration
-    # Positions 1-15: Unchanged (all other elements stay in place)
-    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
+# CALLER operation: Get hash of the calling function (no stack depth change)
+# Stack behavior: [...] -> [fn_hash[0], fn_hash[1], fn_hash[2], fn_hash[3], ...] (no depth change)
+# Loads the function hash (4 elements) from system state onto top of stack
+# Note: CALLER can only be executed within a SYSCALL; constraints enforced in system.air
+ev caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
+                                  fn_hash_0, fn_hash_1, fn_hash_2, fn_hash_3]) {
+    # Positions 0-3: Load function hash word from system state
+    enf s0' = fn_hash_0;
+    enf s1' = fn_hash_1;
+    enf s2' = fn_hash_2;
+    enf s3' = fn_hash_3;
+
+    # Positions 4-15: Unchanged (all other elements stay in place)
+    enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
     enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
 }
 
@@ -1768,11 +1833,16 @@ ev emit_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11,
 
 # MLOAD operation: Load word from memory (no stack depth change)
 # Stack behavior: [addr, ...] -> [mem[addr], ...] (no depth change)
-ev mload_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
+ev mload_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]) {
     # Position 0: Overwritten by memory value (unconstrained)
     # Positions 1-15: Unchanged
     enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
     enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+
+    # Insert memory read element request to chiplets bus
+    # MLOAD reads a single element from memory address s0 in the current execution context
+    # The value read will be placed in s0' (which is unconstrained here, but constrained by memory chiplet response)
+    bus_6_chiplets_bus.insert(MEMREADELEMENT, system_ctx, s0, system_clk, s0') when 1;
 }
 
 # ADVPOPW operation: Pop word from advice stack (no stack depth change)
@@ -1855,4 +1925,38 @@ ev ext2mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s
     # Positions 4-15: Unchanged (all other elements stay in place)
     enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
     enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+##########################################################################################
+# CONTEXT SWITCHING OPERATIONS
+##########################################################################################
+
+# CALL operation: Call a function and start a new execution context
+ev call_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, b0, b1]) {
+    # Stack elements s0-s15 remain unchanged (no shift)
+
+    # Reset stack depth and overflow address for new context
+    enf b0' = 16;
+    enf b1' = 0;
+}
+
+# SYSCALL operation: Call kernel function in root context
+ev syscall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, b0, b1]) {
+    # Stack elements s0-s15 remain unchanged (no shift)
+
+    # Reset stack depth and overflow address for root context
+    enf b0' = 16;
+    enf b1' = 0;
+}
+
+# DYNCALL operation: Call function dynamically with hash from memory
+ev dyncall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, b0, b1]) {
+    # Stack LEFT SHIFT: all elements shift up one position
+    enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8;
+    enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
+    # s15' from overflow table or 0 (handled by left_shift_zero_insertion)
+
+    # Reset stack depth and overflow address for new context
+    enf b0' = 16;
+    enf b1' = 0;
 }
