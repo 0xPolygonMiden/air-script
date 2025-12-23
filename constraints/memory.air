@@ -86,7 +86,6 @@ ev memory_chiplet_constraints_all_rows([memory[15]]) {
 
     # Binary column constraints
     enf enforce_binary_columns([is_read, is_word_access, idx0, idx1]);
-
     # For word access, idx bits must be zero (only element access uses idx0/idx1).
     enf is_word_access * idx0 = 0;
     enf is_word_access * idx1 = 0;
