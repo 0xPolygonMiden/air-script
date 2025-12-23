@@ -176,8 +176,8 @@ integrity_constraints {
     # MAIN TRACE CONSTRAINTS
     ####################################################################################
 
-    # System state transitions
-    enf system_transition([system[0..8]]);
+    # System state transitions (needs decoder columns for operation flags)
+    enf system_transition([system[0..8], decoder[0..24]]);
 
     # Decoder constraints - Program execution and operation decoding (needs stack top s0)
     enf decoder([decoder, stack[0]]);
