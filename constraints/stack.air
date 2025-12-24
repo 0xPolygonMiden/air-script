@@ -313,7 +313,7 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
         case is_or: or_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),           # 37
         case is_u32and: u32and_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 38
         case is_u32xor: u32xor_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 39
-        case is_frie2f4: frie2f4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 40
+        case is_frie2f4: frie2f4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 40
         case is_drop: drop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),       # 41
         case is_cswap: cswap_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),     # 42
         case is_cswapw: cswapw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),   # 43
@@ -1330,10 +1330,218 @@ ev mstorew_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s
     bus_6_chiplets_bus.insert(MEMWRITEWORD, system_ctx, s0, system_clk, s1, s2, s3, s4) when 1;
 }
 
-# FRIE2F4 operation: TODO
-ev frie2f4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
-    # TODO: FRIE2F4 is not yet implemented
-    enf s0 = 0;
+# FRIE2F4 operation: FRI layer folding with factor 4 in degree-2 extension field
+# Performs FRI layer folding by factor 4, verifies previous layer correctness, and prepares
+# state for next FRI layer. All constraints are degree ≤ 2.
+#
+# Input stack:  [v7, v6, v5, v4, v3, v2, v1, v0, f_pos, d_seg, poe, pe1, pe0, a1, a0, cptr, ...]
+# Output stack: [tmp0_1, tmp0_0, tmp1_1, tmp1_0, df3, df2, df1, df0, poe², tau_factor, cptr+8, poe⁴, f_pos, ne1, ne0, eptr, ...]
+#
+# Where:
+#   v0-v7: Four query points (q₀, q₁, q₂, q₃) in extension field
+#   a0, a1: Verifier challenge α
+#   poe: Power of domain generator
+#   d_seg: Domain segment (0, 1, 2, or 3)
+#   pe0, pe1: Previous layer result
+#   ne0, ne1: New folded result
+#   df0-df3: One-hot encoding flags for d_seg
+#   tmp0, tmp1: Intermediate fold results
+ev frie2f4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4, h5]) {
+    ####################################################################################
+    # CONSTANTS
+    ####################################################################################
+
+    let DOMAIN_OFFSET = 7;
+    let TAU_INV = 18446462594437873665;       # τ⁻¹ (4th root of unity inverse)
+    let TAU_INV2 = 18446744069414584320;      # τ⁻²
+    let TAU_INV3 = 281474976710656;           # τ⁻³
+
+    ####################################################################################
+    # INPUT STACK POSITIONS
+    ####################################################################################
+
+    # Query points (4 extension field elements)
+    let v7 = s0;   # q₃.1
+    let v6 = s1;   # q₃.0
+    let v5 = s2;   # q₂.1
+    let v4 = s3;   # q₂.0
+    let v3 = s4;   # q₁.1
+    let v2 = s5;   # q₁.0
+    let v1 = s6;   # q₀.1
+    let v0 = s7;   # q₀.0
+
+    # Challenge and state
+    let f_pos = s8;       # Folded position
+    let d_seg = s9;       # Domain segment (0-3)
+    let poe = s10;        # Power of domain generator
+    let pe1 = s11;        # Previous layer result, coefficient 1
+    let pe0 = s12;        # Previous layer result, coefficient 0
+    let alpha_1 = s13;    # α.1
+    let alpha_0 = s14;    # α.0
+    let cptr = s15;       # Current layer pointer
+
+    ####################################################################################
+    # OUTPUT STACK POSITIONS
+    ####################################################################################
+
+    let tmp0_1 = s0';        # First fold result, coefficient 1
+    let tmp0_0 = s1';        # First fold result, coefficient 0
+    let tmp1_1 = s2';        # Second fold result, coefficient 1
+    let tmp1_0 = s3';        # Second fold result, coefficient 0
+    let df3 = s4';           # Domain flag: 1 if d_seg=3, else 0
+    let df2 = s5';           # Domain flag: 1 if d_seg=2, else 0
+    let df1 = s6';           # Domain flag: 1 if d_seg=1, else 0
+    let df0 = s7';           # Domain flag: 1 if d_seg=0, else 0
+    let poe2 = s8';          # poe²
+    let tau_factor = s9';    # Tau factor for domain segment
+    let cptr_next = s10';    # Next layer pointer (cptr + 8)
+    let poe4 = s11';         # poe⁴
+    let f_pos_out = s12';    # Folded position (preserved)
+    let ne1 = s13';          # New folded result, coefficient 1
+    let ne0 = s14';          # New folded result, coefficient 0
+    # s15' = eptr (from overflow table, not constrained here)
+
+    ####################################################################################
+    # HELPER REGISTERS
+    ####################################################################################
+
+    let ev0 = h0;      # Evaluation point, coefficient 0 (α/x)
+    let ev1 = h1;      # Evaluation point, coefficient 1
+    let es0 = h2;      # Squared evaluation point, coefficient 0
+    let es1 = h3;      # Squared evaluation point, coefficient 1
+    let x = h4;        # Domain value at query position
+    let x_inv = h5;    # Inverse of domain value
+
+    ####################################################################################
+    # GROUP 1: DOMAIN SEGMENT ONE-HOT ENCODING
+    ####################################################################################
+
+    # Constraint 1.1: Each domain flag must be binary (0 or 1)
+    enf df3 * (df3 - 1) = 0;    # degree 2
+    enf df2 * (df2 - 1) = 0;    # degree 2
+    enf df1 * (df1 - 1) = 0;    # degree 2
+    enf df0 * (df0 - 1) = 0;    # degree 2
+
+    # Constraint 1.2: Exactly one flag is active (one-hot encoding)
+    enf df0 + df1 + df2 + df3 = 1;  # degree 1
+
+    # Constraint 1.3: Flags encode domain segment
+    # Formula: d_seg = (1×df0 + 2×df1 + 3×df2 + 4×df3) - 1
+    # Maps: df0=1 → 0, df1=1 → 1, df2=1 → 2, df3=1 → 3
+    enf d_seg = (df0 + 2 * df1 + 3 * df2 + 4 * df3) - 1;  # degree 2
+
+    ####################################################################################
+    # GROUP 2: TAU FACTOR COMPUTATION
+    ####################################################################################
+
+    # Constraint 2.1: Tau factor as weighted sum of one-hot flags
+    # tau_factor = df0×1 + df1×τ⁻¹ + df2×τ⁻² + df3×τ⁻³
+    enf tau_factor = df0 * 1
+                   + df1 * TAU_INV
+                   + df2 * TAU_INV2
+                   + df3 * TAU_INV3;  # degree 2
+
+    ####################################################################################
+    # GROUP 3: DOMAIN VALUE AND INVERSE
+    ####################################################################################
+
+    # Constraint 3.1: X computation via inverse relationship
+    # From: x = poe / tau_factor × DOMAIN_OFFSET
+    # Rearranged: x × tau_factor = poe × DOMAIN_OFFSET
+    enf x * tau_factor = poe * DOMAIN_OFFSET;  # degree 2
+
+    # Constraint 3.2: X inverse verification
+    enf x * x_inv = 1;  # degree 2
+
+    ####################################################################################
+    # GROUP 4: EVALUATION POINTS
+    ####################################################################################
+
+    # Constraint 4.1: Evaluation point ev = α × x_inv
+    # Extension field: (α.0, α.1) × (x_inv, 0)
+    # Simplified: (α.0 × x_inv, α.1 × x_inv)
+    enf ev0 = alpha_0 * x_inv;  # degree 2
+    enf ev1 = alpha_1 * x_inv;  # degree 2
+
+    # Constraint 4.2: Squared evaluation point es = ev²
+    # Extension field squaring: (a0, a1)² = (a0² - 2a1², 2a0·a1 - a1²)
+    enf es0 = ev0 * ev0 - 2 * ev1 * ev1;        # degree 2
+    enf es1 = 2 * ev0 * ev1 - ev1 * ev1;        # degree 2
+
+    ####################################################################################
+    # GROUP 5: FIRST-LEVEL FOLDING
+    ####################################################################################
+    # fold2(a, b, e) ≡ 2×result = (a + b) + (a - b) × e
+
+    # Constraint 5.1: tmp0 = fold2(q0, q2, ev)
+    # Query points: q0 = (v0, v1), q2 = (v4, v5)
+    let sum0_0 = v0 + v4;
+    let sum0_1 = v1 + v5;
+    let diff0_0 = v0 - v4;
+    let diff0_1 = v1 - v5;
+
+    # Extension field multiplication: (diff0_0, diff0_1) × (ev0, ev1)
+    # Product: (diff0_0×ev0 - 2×diff0_1×ev1, (diff0_0+diff0_1)×(ev0+ev1) - diff0_0×ev0)
+    enf 2 * tmp0_0 = sum0_0 + diff0_0 * ev0 - 2 * diff0_1 * ev1;                       # degree 2
+    enf 2 * tmp0_1 = sum0_1 + (diff0_0 + diff0_1) * (ev0 + ev1) - diff0_0 * ev0;       # degree 2
+
+    # Constraint 5.2: tmp1 = fold2(q1, q3, ev × τ⁻¹)
+    # Query points: q1 = (v2, v3), q3 = (v6, v7)
+    # ev × τ⁻¹ = (ev0×τ⁻¹, ev1×τ⁻¹) (scalar multiplication)
+    let ev_tau_0 = ev0 * TAU_INV;
+    let ev_tau_1 = ev1 * TAU_INV;
+
+    let sum1_0 = v2 + v6;
+    let sum1_1 = v3 + v7;
+    let diff1_0 = v2 - v6;
+    let diff1_1 = v3 - v7;
+
+    # Extension field multiplication: (diff1_0, diff1_1) × (ev_tau_0, ev_tau_1)
+    enf 2 * tmp1_0 = sum1_0 + diff1_0 * ev_tau_0 - 2 * diff1_1 * ev_tau_1;                       # degree 2
+    enf 2 * tmp1_1 = sum1_1 + (diff1_0 + diff1_1) * (ev_tau_0 + ev_tau_1) - diff1_0 * ev_tau_0;  # degree 2
+
+    ####################################################################################
+    # GROUP 6: SECOND-LEVEL FOLDING
+    ####################################################################################
+
+    # Constraint 6.1: result = fold2(tmp0, tmp1, es)
+    let sum_final_0 = tmp0_0 + tmp1_0;
+    let sum_final_1 = tmp0_1 + tmp1_1;
+    let diff_final_0 = tmp0_0 - tmp1_0;
+    let diff_final_1 = tmp0_1 - tmp1_1;
+
+    # Extension field multiplication: (diff_final_0, diff_final_1) × (es0, es1)
+    enf 2 * ne0 = sum_final_0 + diff_final_0 * es0 - 2 * diff_final_1 * es1;                       # degree 2
+    enf 2 * ne1 = sum_final_1 + (diff_final_0 + diff_final_1) * (es0 + es1) - diff_final_0 * es0;  # degree 2
+
+    ####################################################################################
+    # GROUP 7: PREVIOUS LAYER VERIFICATION
+    ####################################################################################
+
+    # Constraint 7.1: Verify q_{d_seg} = pe (one-hot selection)
+    # Only the matching query point contributes as only one flag can be set
+    enf (v0 - pe0) * df0 + (v2 - pe0) * df1 + (v4 - pe0) * df2 + (v6 - pe0) * df3 = 0;  # degree 2
+    enf (v1 - pe1) * df0 + (v3 - pe1) * df1 + (v5 - pe1) * df2 + (v7 - pe1) * df3 = 0;  # degree 2
+
+    ####################################################################################
+    # GROUP 8: POWER OF DOMAIN GENERATOR
+    ####################################################################################
+
+    # Constraint 8.1: poe² = poe × poe
+    enf poe2 = poe * poe;  # degree 2
+
+    # Constraint 8.2: poe⁴ = poe² × poe²
+    enf poe4 = poe2 * poe2;  # degree 2
+
+    ####################################################################################
+    # GROUP 9: MEMORY POINTER AND POSITION
+    ####################################################################################
+
+    # Constraint 9.1: Increment memory pointer by 8
+    enf cptr_next = cptr + 8;  # degree 1
+
+    # Constraint 9.2: Preserve folded position
+    enf f_pos_out = f_pos;  # degree 1
 }
 
 # FMPADD operation: Add FMP value to top stack element (no stack depth change)
