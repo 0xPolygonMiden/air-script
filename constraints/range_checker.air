@@ -6,7 +6,7 @@
 # using the LogUp protocol with optimized gap handling to minimize the minimal
 # trace length while supporting (practically) unlimited range checks.
 #
-# STATUS: Not fully implemented
+# STATUS: Fully implemented
 #
 # REFERENCES:
 # - Range Checker Spec: https://0xmiden.github.io/miden-vm/design/range.html
@@ -19,15 +19,18 @@ use chiplets::*;
 use utils::*;
 
 ##########################################################################################
-# RANGE CHECKER BUS CONSTRAINTS
+# RANGE CHECKER CONSTRAINTS
 ##########################################################################################
-
 
 ev range_checker_constraints([decoder[24], range_checker[2], chiplets[20]]) {
 
     ####################################################################################
-    # Components requesting range checks
+    # COLUMN DEFINITIONS
     ####################################################################################
+
+    # Range checker table columns
+    let value = range_checker[1];        # v: Current 16-bit value [0, 65535]
+    let multiplicity = range_checker[0]; # m: Usage count (how many times v is range-checked)
 
     # Stack values requiring 16-bit range checks (from decoder trace)
     # These correspond to the top 4 operand stack elements during u32 operations
@@ -37,16 +40,8 @@ ev range_checker_constraints([decoder[24], range_checker[2], chiplets[20]]) {
     let sv3 = decoder[13];  # Stack value 3
 
     # Memory chiplet values requiring 16-bit range checks
-    let mv0 = chiplets[14]; # Memory value 0
-    let mv1 = chiplets[15]; # Memory value 1
-
-    ####################################################################################
-    # RANGE CHECKER STATE
-    ####################################################################################
-
-    # Core range checker table columns
-    let value = range_checker[1];        # v: Current 16-bit value [0, 65535]
-    let multiplicity = range_checker[0]; # m: Usage count (how many times v is range-checked)
+    let mem_d0 = chiplets[14]; # Memory delta 0 (low 16 bits)
+    let mem_d1 = chiplets[15]; # Memory delta 1 (high 16 bits)
 
     ####################################################################################
     # OPERATION FLAGS - Determine when range checks are needed
@@ -66,19 +61,43 @@ ev range_checker_constraints([decoder[24], range_checker[2], chiplets[20]]) {
     let chiplets_memory_flag = memory_chiplet_flag(s_0, s_1, s_2);
 
     ####################################################################################
-    # RANGE CHECKER INTERACTIONS
+    # TRANSITION CONSTRAINTS
     ####################################################################################
 
-    # Each cycle, we insert the current value with its multiplicity
+    # Value transition constraint - Gap handling with powers of 3
+    # The value column must increase monotonically, with gaps that are powers of 3.
+    # This optimization allows the table to skip unused values, reducing trace length
+    # from a required 65,536 rows to a much smaller number based on actual usage.
+    # Allowed deltas: {0, 1, 3, 9, 27, 81, 243, 729, 2187}
+    # Constraint degree: 9
+    let delta = value' - value;
+    enf delta * (delta - 1) * (delta - 3) * (delta - 9) * (delta - 27)
+        * (delta - 81) * (delta - 243) * (delta - 729) * (delta - 2187) = 0;
+
+    ####################################################################################
+    # BUS OPERATIONS
+    ####################################################################################
+    # The range checker provides responses to range check requests via the LogUp
+    # protocol (bus_4_range_checker). The LogUp protocol ensures that all values
+    # requested for range checking (from stack u32 operations and memory chiplet)
+    # are present in the range checker table with appropriate multiplicities.
+    #
+    # The auxiliary column constraint for the LogUp bus is automatically generated
+    # by the AIR-script compiler from these insert/remove operations:
+    #   b_range' = b_range + m/(α + v)              [table provides values]
+    #            - flag_u32_op/(α + sv0) - ...      [stack requests checks]
+    #            - flag_mem/(α + mem_d0) - ...      [memory requests checks]
+    # where α is a random challenge from the verifier.
+    ####################################################################################
+
+    # Table provides: Each cycle, insert the current value with its multiplicity
     bus_4_range_checker.insert(value) with multiplicity;
 
-    # Memory-related range checks
-    # When memory operations occur, verify that memory values are 16-bit
-    bus_4_range_checker.remove(mv0) when chiplets_memory_flag;
-    bus_4_range_checker.remove(mv1) when chiplets_memory_flag;
+    # Memory requests: When memory operations occur, verify values are 16-bit
+    bus_4_range_checker.remove(mem_d0) when chiplets_memory_flag;
+    bus_4_range_checker.remove(mem_d1) when chiplets_memory_flag;
 
-    # Stack-related range checks
-    # When u32 operations occur, verify that all operand components are 16-bit
+    # Stack requests: When u32 operations occur, verify operand components are 16-bit
     bus_4_range_checker.remove(sv0) when u32_rc_op;
     bus_4_range_checker.remove(sv1) when u32_rc_op;
     bus_4_range_checker.remove(sv2) when u32_rc_op;
