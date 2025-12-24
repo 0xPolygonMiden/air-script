@@ -163,7 +163,7 @@ boundary_constraints {
     enf bus_3_stack_p1.first = unconstrained;
     enf bus_3_stack_p1.last = unconstrained;
 
-    # Range checker bus - LogUp protocol requires null initialization/finalization
+    # Range checker bus
     enf bus_4_range_checker.first = null;
     enf bus_4_range_checker.last = null;
 
@@ -176,7 +176,7 @@ boundary_constraints {
     enf bus_6_chiplets_bus.first = kernel_digests;
     enf bus_6_chiplets_bus.last = unconstrained;
 
-    # ACE wiring bus - LogUp protocol requires null initialization/finalization
+    # ACE wiring bus
     # Ensures all nodes inserted are consumed exactly as many times as their multiplicity
     enf bus_7_wiring_bus.first = null;
     enf bus_7_wiring_bus.last = null;
