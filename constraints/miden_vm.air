@@ -138,6 +138,16 @@ boundary_constraints {
     enf range_checker[1].last = 65535;   # v = 65535 (end of 16-bit range, 2^16 - 1)
 
     ####################################################################################
+    # RANGE CHECKER BOUNDARIES
+    ####################################################################################
+
+    # Range checker value column must span complete 16-bit range [0, 65535]
+    # The table uses gap handling (powers of 3) to skip unused values, but must
+    # start at 0 and end at the maximum 16-bit value to ensure complete coverage
+    enf range_checker[1].first = 0;      # v = 0 (start of 16-bit range)
+    enf range_checker[1].last = 65535;   # v = 65535 (end of 16-bit range, 2^16 - 1)
+
+    ####################################################################################
     # AUXILIARY COLUMN BOUNDARIES
     ####################################################################################
 
