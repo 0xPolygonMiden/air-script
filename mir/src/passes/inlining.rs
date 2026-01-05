@@ -141,6 +141,7 @@ pub struct InliningSecondPass<'a> {
     // HashMap<CaleePtr, (Callee, Vec<Call nodes where called>)>
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
     had_calls: bool,
+    seen_root_call: bool,
 }
 
 impl<'a> InliningSecondPass<'a> {
@@ -158,6 +159,7 @@ impl<'a> InliningSecondPass<'a> {
             func_eval_nodes_where_called,
             func_eval_inlining_order,
             had_calls: false,
+            seen_root_call: false,
         }
     }
 }
@@ -315,7 +317,7 @@ impl Visitor for InliningSecondPass<'_> {
         let root_nodes_to_visit = self.root_nodes_to_visit(graph);
         self.had_calls = !root_nodes_to_visit.is_empty();
 
-        for root_node in root_nodes_to_visit {
+        for root_node in root_nodes_to_visit.iter() {
             let mut updated_op = None;
 
             if let Some(op) = root_node.as_op() {
@@ -346,9 +348,9 @@ impl Visitor for InliningSecondPass<'_> {
                 self.call_inlining_context = Some(context.clone());
                 self.nodes_to_replace.clear();
                 self.params_for_ref_node.clear();
+                self.seen_root_call = false;
 
                 self.scan_node(graph, root_node.clone())?;
-
                 while let Some(node) = self.work_stack().pop() {
                     self.visit_node(graph, node.clone())?;
                 }
@@ -429,7 +431,7 @@ impl Visitor for InliningSecondPass<'_> {
         if let Some(op) = node.clone().as_op() {
             // If we scan a `Call` node, we do not visit its children (the call's arguments)
             // TODO INLINING: Check whether this is the wanted behavior
-            if op.as_call().is_some() {
+            if op.as_call().is_some() && !self.seen_root_call {
                 return Ok(());
             };
             for child in node.children().borrow().iter() {
@@ -469,54 +471,59 @@ impl Visitor for InliningSecondPass<'_> {
 
             // First, check if it's a known `Call` to inline,
             // if so, set the context and scan its body
-            if call_op.clone().as_call().is_some() {
+            if call_op.clone().as_call().is_some() && !self.seen_root_call {
+                self.seen_root_call = true;
                 self.visit_call(graph, call_op.clone())?;
+                // NOTE: Once the call has been processed, we return early to avoid
+                // an infinite loop.
+                // If there are nested calls, they will be handled via fixed-point
+                // compilation (see [<Inlining<'_> as Pass>::run]).
+                return Ok(());
+            }
+
+            // Else, we are currently visiting the body of a function or an evaluator of a call
+            // we want to inline. We use our helper duplicate_node_or_replace to
+            // duplicate the body, while replacing the `Function` or `Evaluator` parameters with
+            // the `Call` arguments
+            if self.call_inlining_context.clone().unwrap().pure_function {
+                duplicate_node_or_replace(
+                    &mut self.nodes_to_replace,
+                    call_op.clone(),
+                    self.call_inlining_context.clone().unwrap().arguments.borrow().clone(),
+                    self.call_inlining_context.clone().unwrap().ref_node,
+                    None,
+                    &mut self.params_for_ref_node,
+                );
             } else {
-                // Else, we are currently visiting the body of a function or an evaluator of a call
-                // we want to inline We use our helper duplicate_node_or_replace to
-                // duplicate the body, while replacing the `Function` or `Evaluator` parameters with
-                // the `Call` arguments
-                if self.call_inlining_context.clone().unwrap().pure_function {
-                    duplicate_node_or_replace(
-                        &mut self.nodes_to_replace,
-                        call_op.clone(),
-                        self.call_inlining_context.clone().unwrap().arguments.borrow().clone(),
-                        self.call_inlining_context.clone().unwrap().ref_node,
-                        None,
-                        &mut self.params_for_ref_node,
-                    );
-                } else {
-                    // If we're inside the body of an evaluator, we first need to unpack the
-                    // arguments of the call to have a `Vector` of `TraceColumn`, and not
-                    // bindings to multiple columns
-                    let args =
-                        self.call_inlining_context.clone().unwrap().arguments.borrow().clone();
+                // If we're inside the body of an evaluator, we first need to unpack the
+                // arguments of the call to have a `Vector` of `TraceColumn`, and not
+                // bindings to multiple columns
+                let args = self.call_inlining_context.clone().unwrap().arguments.borrow().clone();
 
-                    let callee_params = self
-                        .call_inlining_context
-                        .clone()
-                        .unwrap()
-                        .ref_node
-                        .as_root()
-                        .unwrap()
-                        .as_evaluator()
-                        .unwrap()
-                        .parameters
-                        .clone();
+                let callee_params = self
+                    .call_inlining_context
+                    .clone()
+                    .unwrap()
+                    .ref_node
+                    .as_root()
+                    .unwrap()
+                    .as_evaluator()
+                    .unwrap()
+                    .parameters
+                    .clone();
 
-                    check_evaluator_argument_sizes(&args, callee_params, self.diagnostics)?;
+                check_evaluator_argument_sizes(&args, callee_params, self.diagnostics)?;
 
-                    let args_unpacked = unpack_evaluator_arguments(&args);
+                let args_unpacked = unpack_evaluator_arguments(&args);
 
-                    duplicate_node_or_replace(
-                        &mut self.nodes_to_replace,
-                        call_op.clone(),
-                        args_unpacked,
-                        self.call_inlining_context.clone().unwrap().ref_node,
-                        None,
-                        &mut self.params_for_ref_node,
-                    );
-                }
+                duplicate_node_or_replace(
+                    &mut self.nodes_to_replace,
+                    call_op.clone(),
+                    args_unpacked,
+                    self.call_inlining_context.clone().unwrap().ref_node,
+                    None,
+                    &mut self.params_for_ref_node,
+                );
             }
         }
 
@@ -532,7 +539,10 @@ fn extract_accessor(op: Link<Op>) -> Link<Op> {
     };
     let mut indexable = accessor.indexable.clone();
     match &accessor.access_type {
-        MirAccessType::Default => accessor.indexable.clone(),
+        MirAccessType::Default => {
+            // Recursively extract accessors from the indexable
+            extract_accessor(accessor.indexable.clone())
+        },
         MirAccessType::Index(idx_op) => {
             let idx = get_inner_const(idx_op)
                 .unwrap_or_else(|| panic!("expected constant index, got {:#?}", idx_op))
