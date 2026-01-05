@@ -44,6 +44,9 @@ impl Child for Vector {
         self.parents.push(parent.into());
     }
     fn remove_parent(&mut self, parent: Link<Self::Parent>) {
-        self.parents.retain(|p| *p != parent.clone().into());
+        self.parents.retain(|p| match p.to_link() {
+            Some(link) => link != parent,
+            None => true,
+        });
     }
 }
