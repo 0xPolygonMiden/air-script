@@ -52,7 +52,7 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
                 p3_challenger::HashChallenger<u8, ByteHash, 32>,
             >;
             type Dft = p3_dft::Radix2DitParallel<Val>;
-            type Pcs = p3_fri::TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
+            type Pcs = p3_miden_fri::TwoAdicFriPcs<Val, Dft, ValMmcs, ChallengeMmcs>;
             type MyConfig = p3_miden_prover::StarkConfig<Pcs, Challenge, Challenger>;
 
             let byte_hash = ByteHash {};
@@ -62,7 +62,7 @@ macro_rules! generate_air_plonky3_test_with_airscript_traits {
             let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
             let challenger = Challenger::from_hasher(vec![], byte_hash);
             let dft = Dft::default();
-            let mut fri_params = p3_fri::create_recursive_miden_fri_params(challenge_mmcs);
+            let mut fri_params = p3_miden_fri::create_recursive_miden_fri_params(challenge_mmcs);
             let pcs = Pcs::new(dft, val_mmcs, fri_params);
             let config = MyConfig::new(pcs, challenger);
 
