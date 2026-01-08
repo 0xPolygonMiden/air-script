@@ -6,3 +6,4 @@
 mod binary;
 mod bitwise;
 mod constants;
+mod fibonacci;
