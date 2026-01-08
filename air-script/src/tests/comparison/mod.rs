@@ -4,3 +4,4 @@
 //! produce equivalent constraint evaluations for the same AIR and trace data.
 
 mod binary;
+mod constants;
