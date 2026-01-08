@@ -40,6 +40,7 @@ miden-air = { package = "miden-air", git="https://github.com/massalabs/miden-vm"
 
 [dev-dependencies]
 expect-test = "1.4"
+pretty_assertions = "1.4"
 
 # Upstream Plonky3 dependencies
 p3-air = { version = "0.4.2", default-features = false }

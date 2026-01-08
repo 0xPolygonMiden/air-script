@@ -43,6 +43,7 @@ mod trace_col_groups;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod variables;
 
+mod comparison;
 mod docs_sync;
 mod plonky3;
 mod winterfell;

@@ -2,6 +2,8 @@
 pub mod air_tester_macros;
 /// Code generation for tests/**/*.air files.
 pub mod codegen;
+/// Cross-backend constraint evaluation comparison utilities.
+pub mod cross_backend_comparison;
 /// Conversion utilities for test inputs (both public inputs and variable-length public inputs).
 pub mod pub_inputs_conversion_utils;
 /// Winterfell-specific traits
