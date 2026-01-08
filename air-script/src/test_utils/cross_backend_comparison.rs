@@ -180,6 +180,32 @@ pub fn evaluate_winterfell_transition_at_row_with_selector<A>(
 where
     A: Air<BaseField = WinterfellFelt>,
 {
+    // Use the version with periodic values, passing empty periodic values
+    evaluate_winterfell_transition_at_row_with_periodic(air, trace, row, num_rows, &[])
+}
+
+/// Evaluates Winterfell transition constraints at a specific row,
+/// with periodic column values and `is_transition` selector applied.
+///
+/// This is the full-featured version that supports periodic columns.
+///
+/// # Arguments
+///
+/// * `air` - The Winterfell AIR instance
+/// * `trace` - The trace in column-major format
+/// * `row` - The row to evaluate at
+/// * `num_rows` - Total number of rows in the trace
+/// * `periodic_values` - The periodic column values evaluated at this row
+pub fn evaluate_winterfell_transition_at_row_with_periodic<A>(
+    air: &A,
+    trace: &[Vec<WinterfellFelt>],
+    row: usize,
+    num_rows: usize,
+    periodic_values: &[WinterfellFelt],
+) -> Vec<u64>
+where
+    A: Air<BaseField = WinterfellFelt>,
+{
     let trace_width = trace.len();
     let trace_length = trace[0].len();
 
@@ -196,9 +222,8 @@ where
     let num_constraints = air.context().num_transition_constraints();
     let mut result = vec![WinterfellFelt::ZERO; num_constraints];
 
-    // Evaluate transition constraints (empty periodic values for simple AIRs)
-    let periodic_values: Vec<WinterfellFelt> = vec![];
-    air.evaluate_transition(&frame, &periodic_values, &mut result);
+    // Evaluate transition constraints with periodic values
+    air.evaluate_transition(&frame, periodic_values, &mut result);
 
     // Apply is_transition selector: 1 for rows 0..n-1, 0 for row n-1
     let is_transition = if row < num_rows - 1 {
@@ -209,6 +234,60 @@ where
 
     // Convert to canonical u64, applying the selector
     result.iter().map(|e| (is_transition * *e).to_canonical_u64()).collect()
+}
+
+// ============================================================================
+// Periodic Column Evaluation
+// ============================================================================
+
+/// Evaluates periodic column values at a specific row.
+///
+/// Periodic columns repeat with a given period. At row `r`, the value is
+/// `column[r % period]` where `period` is the length of the column.
+///
+/// # Arguments
+///
+/// * `periodic_columns` - Vec of periodic column definitions, each as Vec<u64>
+/// * `row` - The row index to evaluate at
+///
+/// # Returns
+///
+/// A vector of field elements, one for each periodic column, evaluated at the given row.
+pub fn evaluate_periodic_values_at_row<F: Field + PrimeCharacteristicRing>(
+    periodic_columns: &[Vec<u64>],
+    row: usize,
+) -> Vec<F> {
+    periodic_columns
+        .iter()
+        .map(|column| {
+            if column.is_empty() {
+                F::ZERO
+            } else {
+                let period = column.len();
+                let idx = row % period;
+                F::from_u64(column[idx])
+            }
+        })
+        .collect()
+}
+
+/// Evaluates periodic column values at a specific row for Winterfell (WinterfellFelt).
+pub fn evaluate_winterfell_periodic_at_row(
+    periodic_columns: &[Vec<u64>],
+    row: usize,
+) -> Vec<WinterfellFelt> {
+    periodic_columns
+        .iter()
+        .map(|column| {
+            if column.is_empty() {
+                WinterfellFelt::ZERO
+            } else {
+                let period = column.len();
+                let idx = row % period;
+                WinterfellFelt::new(column[idx])
+            }
+        })
+        .collect()
 }
 
 /// Gets Winterfell boundary constraint info.
@@ -652,8 +731,22 @@ pub trait CrossBackendTestConfig {
 
     /// Returns the periodic column values (empty by default).
     ///
-    /// Each inner Vec represents a periodic column, with values that repeat.
-    /// TODO: Implement periodic column support in future.
+    /// Each inner Vec represents a periodic column, with values that repeat
+    /// cyclically. The period is determined by the length of each inner Vec.
+    ///
+    /// For example, `vec![1, 0, 0, 0]` defines a periodic column with period 4
+    /// that has value 1 on rows 0, 4, 8, ... and value 0 elsewhere.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// fn periodic_column_values(&self) -> Vec<Vec<u64>> {
+    ///     vec![
+    ///         vec![1, 0, 0, 0, 0, 0, 0, 0], // k0: period 8, value 1 at rows 0, 8, 16, ...
+    ///         vec![1, 1, 1, 1, 1, 1, 1, 0], // k1: period 8, value 1 except at rows 7, 15, 23, ...
+    ///     ]
+    /// }
+    /// ```
     fn periodic_column_values(&self) -> Vec<Vec<u64>> {
         vec![]
     }
@@ -724,11 +817,19 @@ where
     // Get the last_step for Winterfell (where last-row boundary constraints apply)
     let last_step = trace_length - winterfell_air.context().num_transition_exemptions();
 
+    // Get periodic column definitions
+    let periodic_columns = config.periodic_column_values();
+
     // Evaluate constraints at each row
     let mut winterfell_results: Vec<Vec<u64>> = Vec::new();
     let mut plonky3_results: Vec<Vec<u64>> = Vec::new();
 
     for row in 0..trace_length {
+        // Evaluate periodic values at this row for both backends
+        let winterfell_periodic = evaluate_winterfell_periodic_at_row(&periodic_columns, row);
+        let plonky3_periodic: Vec<Goldilocks> =
+            evaluate_periodic_values_at_row(&periodic_columns, row);
+
         // Winterfell: evaluate boundary constraints
         let w_boundary = evaluate_winterfell_boundary_at_row_with_last_step(
             &winterfell_air,
@@ -739,12 +840,13 @@ where
         );
 
         // Winterfell: evaluate transition constraints with is_transition selector
-        // This makes results comparable with Plonky3's when_transition() behavior
-        let w_transition = evaluate_winterfell_transition_at_row_with_selector(
+        // and periodic values
+        let w_transition = evaluate_winterfell_transition_at_row_with_periodic(
             &winterfell_air,
             &winterfell_trace,
             row,
             trace_length,
+            &winterfell_periodic,
         );
 
         // Combine: boundary constraints first, then transition constraints
@@ -752,12 +854,12 @@ where
         w_all.extend(w_transition);
         winterfell_results.push(w_all);
 
-        // Plonky3: create a capturing builder for this row
+        // Plonky3: create a capturing builder for this row with periodic values
         let mut builder = ConstraintCapturingBuilder::new(
             &plonky3_trace,
             row,
             plonky3_pub_inputs.clone(),
-            vec![], // TODO: periodic values support
+            plonky3_periodic,
         );
 
         // Evaluate the Plonky3 AIR
