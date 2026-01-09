@@ -27,10 +27,6 @@ use crate::{
     },
 };
 
-// ============================================================================
-// Test Configuration
-// ============================================================================
-
 /// Configuration for ConstraintComprehension AIR cross-backend comparison tests.
 struct ConstraintComprehensionTestConfig {
     /// The trace length.
@@ -139,10 +135,6 @@ impl CrossBackendTestConfig for ConstraintComprehensionTestConfig {
         16
     }
 }
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 #[test]
 fn test_constraint_comprehension_air_constraint_comparison() {

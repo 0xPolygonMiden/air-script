@@ -36,16 +36,8 @@ use winter_air::{
 use winter_math::{FieldElement, ToElements, fields::f64::BaseElement as WinterfellFelt};
 use winter_utils::Serializable;
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /// The Goldilocks field modulus: 2^64 - 2^32 + 1
 const GOLDILOCKS_MODULUS: u64 = 0xFFFF_FFFF_0000_0001;
-
-// ============================================================================
-// Random Seed Generation
-// ============================================================================
 
 /// Generates a deterministic seed from a test name and iteration number.
 ///
@@ -57,10 +49,6 @@ pub fn generate_test_seed(test_name: &str, iteration: u64) -> u64 {
     iteration.hash(&mut hasher);
     hasher.finish()
 }
-
-// ============================================================================
-// Canonical u64 Conversion
-// ============================================================================
 
 /// Trait for converting field elements to their canonical u64 representation.
 ///
@@ -81,10 +69,6 @@ impl ToCanonicalU64 for Goldilocks {
         self.as_canonical_u64()
     }
 }
-
-// ============================================================================
-// Constraint Mismatch Reporting
-// ============================================================================
 
 /// Represents a single constraint evaluation mismatch between backends.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,10 +128,6 @@ impl ComparisonResult {
         report
     }
 }
-
-// ============================================================================
-// Winterfell Constraint Evaluation
-// ============================================================================
 
 /// Evaluates Winterfell transition constraints at a specific row.
 ///
@@ -263,10 +243,6 @@ where
     // Convert to canonical u64, applying the selector
     result.iter().map(|e| (is_transition * *e).to_canonical_u64()).collect()
 }
-
-// ============================================================================
-// Periodic Column Evaluation
-// ============================================================================
 
 /// Evaluates periodic column values at a specific row.
 ///
@@ -390,10 +366,6 @@ where
 
     results
 }
-
-// ============================================================================
-// Plonky3 Constraint Capturing Builder
-// ============================================================================
 
 /// A view into two consecutive rows of the trace matrix for constraint evaluation.
 pub struct TwoRowMatrixView<F> {
@@ -574,10 +546,6 @@ impl<F: Field + PrimeCharacteristicRing + Clone> MidenAirBuilder for ConstraintC
     }
 }
 
-// ============================================================================
-// Trace Conversion Utilities
-// ============================================================================
-
 /// Converts a Plonky3 RowMajorMatrix to a Winterfell-style column-major trace.
 pub fn plonky3_trace_to_winterfell<F>(trace: &RowMajorMatrix<F>) -> Vec<Vec<WinterfellFelt>>
 where
@@ -620,10 +588,6 @@ pub fn winterfell_trace_to_plonky3<F: Field + PrimeCharacteristicRing>(
 
     RowMajorMatrix::new(values, num_cols)
 }
-
-// ============================================================================
-// High-Level Comparison Functions
-// ============================================================================
 
 /// Compares constraint evaluations row by row.
 ///
@@ -692,10 +656,6 @@ pub fn compare_evaluations_by_row(
         total_constraints_checked,
     }
 }
-
-// ============================================================================
-// Cross-Backend Test Configuration Trait
-// ============================================================================
 
 /// Trait for configuring cross-backend comparison tests.
 ///
@@ -812,10 +772,6 @@ pub trait CrossBackendTestConfig {
     }
 }
 
-// ============================================================================
-// Default Proof Options
-// ============================================================================
-
 /// Creates default proof options for testing.
 pub fn default_proof_options() -> WinterProofOptions {
     WinterProofOptions::new(
@@ -829,10 +785,6 @@ pub fn default_proof_options() -> WinterProofOptions {
         BatchingMethod::Linear, // DEEP polynomial batching
     )
 }
-
-// ============================================================================
-// Main Comparison Functions
-// ============================================================================
 
 /// Runs a full cross-backend comparison for the given test configuration.
 ///

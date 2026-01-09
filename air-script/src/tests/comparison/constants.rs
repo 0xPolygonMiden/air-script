@@ -24,10 +24,6 @@ use crate::{
     },
 };
 
-// ============================================================================
-// Test Configuration
-// ============================================================================
-
 /// Configuration for Constants AIR cross-backend comparison tests.
 struct ConstantsTestConfig {
     /// The trace length.
@@ -126,10 +122,6 @@ impl CrossBackendTestConfig for ConstantsTestConfig {
         32
     }
 }
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 #[test]
 fn test_constants_air_constraint_comparison() {

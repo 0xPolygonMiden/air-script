@@ -25,10 +25,6 @@ use crate::{
     },
 };
 
-// ============================================================================
-// Test Configuration
-// ============================================================================
-
 /// Configuration for Bitwise AIR cross-backend comparison tests.
 struct BitwiseTestConfig {
     /// The trace length (must be divisible by the period 8).
@@ -121,10 +117,6 @@ impl CrossBackendTestConfig for BitwiseTestConfig {
         ]
     }
 }
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 #[test]
 fn test_bitwise_air_constraint_comparison() {

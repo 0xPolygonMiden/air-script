@@ -22,10 +22,6 @@ use crate::{
     },
 };
 
-// ============================================================================
-// Test Configuration
-// ============================================================================
-
 /// Configuration for Fibonacci AIR cross-backend comparison tests.
 struct FibonacciTestConfig {
     /// The first Fibonacci number (fib_0).
@@ -134,10 +130,6 @@ impl CrossBackendTestConfig for FibonacciTestConfig {
         3 // stack_inputs[0], stack_inputs[1], stack_output[0]
     }
 }
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 #[test]
 fn test_fibonacci_air_constraint_comparison() {

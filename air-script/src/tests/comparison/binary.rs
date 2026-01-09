@@ -18,10 +18,6 @@ use crate::{
     },
 };
 
-// ============================================================================
-// Test Configuration
-// ============================================================================
-
 /// Configuration for Binary AIR cross-backend comparison tests.
 struct BinaryTestConfig {
     /// The starting value for the binary trace (0 or 1).
@@ -114,10 +110,6 @@ impl CrossBackendTestConfig for BinaryTestConfig {
         16
     }
 }
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 #[test]
 fn test_binary_air_constraint_comparison() {
