@@ -15,7 +15,9 @@ use winter_air::{Air, ProofOptions as WinterProofOptions, TraceInfo};
 use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 
 use crate::{
-    test_utils::cross_backend_comparison::{CrossBackendTestConfig, run_cross_backend_comparison},
+    test_utils::cross_backend_comparison::{
+        CrossBackendTestConfig, run_cross_backend_comparison, run_cross_backend_comparison_random,
+    },
     tests::constants::{
         constants::{ConstantsAir as WinterfellConstantsAir, PublicInputs},
         constants_plonky3::ConstantsAir as Plonky3ConstantsAir,
@@ -158,4 +160,28 @@ fn test_constants_air_constraint_comparison_longer_trace() {
         "Constants AIR comparison (128 rows) passed: {} constraints checked across {} rows",
         result.total_constraints_checked, result.total_rows
     );
+}
+
+#[test]
+fn test_constants_air_constraint_comparison_random_inputs() {
+    let config = ConstantsTestConfig::new(64);
+
+    // Test with iterations 0 through 50 for thorough coverage
+    for iteration in 0u64..=50 {
+        let result = run_cross_backend_comparison_random(
+            &config,
+            "test_constants_air_constraint_comparison_random_inputs",
+            iteration,
+        );
+
+        if !result.is_ok() {
+            panic!(
+                "Random constraint evaluation comparison failed (iteration={})!\n\n{}",
+                iteration,
+                result.format_report()
+            );
+        }
+    }
+
+    println!("Constants AIR random comparison passed for all 51 iterations (0-50)");
 }

@@ -76,3 +76,5 @@ winter-utils = { package = "winter-utils", version = "0.12", default-features = 
 winter-prover = { package = "winter-prover", version = "0.12", default-features = false }
 winter-verifier = { package = "winter-verifier", version = "0.12", default-features = false }
 winterfell = { package = "winterfell", version = "0.12", default-features = false }
+rand = { version = "0.9", features = ["small_rng"] }
+rand_chacha = "0.9"
