@@ -124,7 +124,7 @@ trace_columns {
 
 integrity_constraints {
     enf s^2 = s;
-    enf c' = s * (a + b) + (1 - s) * (a * b);
+    enf c' = s * (a + b) + (1 - s) * (a * c);
 }
 ```
 Notice that we also need to enforce $s^2 = s$ to ensure that column $s$ can contain only binary values.
@@ -192,7 +192,7 @@ ev foo([a, b, c]) {
 }
 
 ev bar([a, b, c]) {
-    enf c' = a * b;
+    enf c' = a * c;
 }
 ```
 The above is equivalent to the first example in this section. However, the real power of combining evaluators and conditional constraints comes from two aspects:
