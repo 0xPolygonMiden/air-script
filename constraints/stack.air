@@ -410,11 +410,11 @@ ev add_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, 
 }
 
 # HPERM operation: Apply RPO permutation to top 12 elements (high-degree operation)
-# Stack behavior: [r0, r1, r2, r3, r4, r5, r6, r7, c0, c1, c2, c3, ...] -> [r0', r1', r2', r3', r4', r5', r6', r7', c0', c1', c2', c3', ...]
-# Applies Rescue Prime Optimized permutation to top 12 elements (8 rate + 4 capacity)
+# Stack layout: [R0(4), R1(4), C(4), ...] where R0=first rate word (top), R1=second rate word, C=capacity
+# Internal sponge state order: [RATE0, RATE1, CAPACITY] - digest is in R0 (positions 0-3) after permutation
+# Positions 0-11: Transformed by RPO permutation (validated by hash chiplet)
+# Positions 12-15: Unchanged
 ev hperm_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
-    # Positions 0-11: Transformed by RPO permutation (unconstrained, validated by hash chiplet)
-    # Positions 12-15: Unchanged
     enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
 }
 
@@ -429,12 +429,13 @@ ev mpverify_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, 
     enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
 }
 
-# PIPE operation: Pop two words from advice stack, write to memory, place on stack (high-degree operation)
-# Stack behavior: [a, b, c, d, e, f, g, h, i, j, k, l, addr, ...] -> [d7, d6, d5, d4, d3, d2, d1, d0, i, j, k, l, addr+8, ...]
-# Pops 8 elements from advice stack, writes to memory at address s12, places values on stack top, address incremented by 8
+# PIPE operation: Pop two words from advice stack, write to memory, replace rate portion of sponge (high-degree operation)
+# Stack layout: [R0(4), R1(4), C(4), addr, ...] where R0, R1 are rate words, C is capacity
+# After: [D0(4), D1(4), C(4), addr+8, ...] where D0, D1 are advice stack data
+# Pops 8 elements from advice stack, writes to memory at address s12, places values on stack top
 ev pipe_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
     # Positions 0-7: Overwritten by advice stack values (unconstrained in stack module)
-    # Positions 8-11: Unchanged
+    # Positions 8-11: Unchanged (capacity preserved)
     enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
     # Position 12: Address incremented by 8 (2 words)
     enf s12' = s12 + 8;
@@ -442,12 +443,13 @@ ev pipe_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11,
     enf s13' = s13; enf s14' = s14; enf s15' = s15;
 }
 
-# MSTREAM operation: Load two words from memory (high-degree operation)
-# Stack behavior: [a, b, c, d, e, f, g, h, i, j, k, l, addr, ...] -> [v7, v6, v5, v4, v3, v2, v1, v0, i, j, k, l, addr+8, ...]
+# MSTREAM operation: Load two words from memory, replace rate portion of sponge (high-degree operation)
+# Stack layout: [R0(4), R1(4), C(4), addr, ...] where R0, R1 are rate words, C is capacity
+# After: [M0(4), M1(4), C(4), addr+8, ...] where M0, M1 are memory values
 # Loads 8 elements from memory starting at address s12, address incremented by 8
 ev mstream_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
     # Positions 0-7: Overwritten by memory values (unconstrained)
-    # Positions 8-11: Unchanged
+    # Positions 8-11: Unchanged (capacity preserved)
     enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
     # Position 12: Address incremented by 8
     enf s12' = s12 + 8;
@@ -478,10 +480,15 @@ ev mrupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, 
     enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
 }
 
-# HORNERBASE operation: Horner polynomial evaluation (very high-degree operation)
-# Stack behavior: [a0, a1, a2, a3, a4, a5, a6, a7, -, -, -, -, -, alpha_ptr, acc0, acc1] -> [a0, a1, a2, a3, a4, a5, a6, a7, -, -, -, -, -, alpha_ptr, acc0', acc1']
-# Performs 8 steps of Horner method to evaluate polynomial with coefficients a0-a7 at extension field point α
-# Helper registers: h0=α0, h1=α1, h2=k0, h3=k1, h4=tmp0, h5=tmp1
+# HORNERBASE operation: Horner polynomial evaluation (high-degree operation)
+# Stack layout: [c_0, c_1, c_2, c_3, c_4, c_5, c_6, c_7, -, -, -, -, -, alpha_ptr, acc0, acc1]
+# where c_0 (at s0) is the highest-degree coefficient (α^7 term) and c_7 (at s7) is the constant term
+# Helper registers: h0=α0, h1=α1, h2=tmp1_0, h3=tmp1_1, h4=tmp0_0, h5=tmp0_1
+# Extension field: 𝔽p[x]/(x² - 7), so x² = 7
+# Algorithm:
+#   tmp0 = acc·α² + c0·α + c1  (processes c0, c1)
+#   tmp1 = tmp0·α³ + c2·α² + c3·α + c4  (processes c2, c3, c4)
+#   acc' = tmp1·α³ + c5·α² + c6·α + c7  (processes c5, c6, c7)
 ev hornerbase_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4, h5]) {
     # Positions 0-13: Unchanged
     enf s0' = s0; enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
@@ -492,46 +499,53 @@ ev hornerbase_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10
     let a1 = h1;
     let acc0 = s14;
     let acc1 = s15;
-    let tmp0 = h4;
-    let tmp1 = h5;
+    let tmp0_0 = h4;
+    let tmp0_1 = h5;
+    let tmp1_0 = h2;
+    let tmp1_1 = h3;
 
-    # Constraint 1: tmp0 computation | degree=5
-    enf tmp0 = acc0 * a0^4 - 8 * acc1 * a0^3 * a1 - 12 * acc0 * a0^2 * a1^2 - 12 * acc1 * a0^2 * a1^2
-             - 8 * acc0 * a0 * a1^3 + 8 * acc1 * a0 * a1^3 + 2 * acc0 * a1^4 + 6 * acc1 * a1^4
-             + s7 * a0^3 - 6 * s7 * a0 * a1^2 - 2 * s7 * a1^3
-             + s6 * a0^2 - 2 * s6 * a1^2
-             + s5 * a0
-             + s4;
+    # For x² - 7:
+    # α² = (a0² + 7·a1², 2·a0·a1)
+    # α³ = (a0³ + 21·a0·a1², 3·a0²·a1 + 7·a1³)
+    # Multiplication (e0,e1)·(f0,f1) = (e0·f0 + 7·e1·f1, e0·f1 + e1·f0)
 
-    # Constraint 2: tmp1 computation | degree=5
-    enf tmp1 = acc1 * a0^4 + 4 * acc0 * a0^3 * a1 + 4 * acc1 * a0^3 * a1 + 6 * acc0 * a0^2 * a1^2
-             - 6 * acc1 * a0^2 * a1^2 - 4 * acc0 * a0 * a1^3 - 12 * acc1 * a0 * a1^3
-             - 3 * acc0 * a1^4 - acc1 * a1^4
-             + 3 * s7 * a0^2 * a1 + 3 * s7 * a0 * a1^2 - s7 * a1^3
-             + 2 * s6 * a0 * a1 + s6 * a1^2
-             + s5 * a1;
+    # Constraint 1: tmp0_0 = acc·α² + c0·α + c1 (real part) | degree=3
+    # tmp0_0 = acc0·(a0² + 7·a1²) + 7·acc1·(2·a0·a1) + s0·a0 + s1
+    enf tmp0_0 = acc0 * a0^2 + 7 * acc0 * a1^2 + 14 * acc1 * a0 * a1
+              + s0 * a0 + s1;
 
-    # Constraint 3: acc0' computation | degree=5
-    enf s14' = tmp0 * a0^4 - 8 * tmp1 * a0^3 * a1 - 12 * tmp0 * a0^2 * a1^2 - 12 * tmp1 * a0^2 * a1^2
-             - 8 * tmp0 * a0 * a1^3 + 8 * tmp1 * a0 * a1^3 + 2 * tmp0 * a1^4 + 6 * tmp1 * a1^4
-             + s3 * a0^3 - 6 * s3 * a0 * a1^2 - 2 * s3 * a1^3
-             + s2 * a0^2 - 2 * s2 * a1^2
-             + s1 * a0
-             + s0;
+    # Constraint 2: tmp0_1 = acc·α² + c0·α (imag part) | degree=3
+    # tmp0_1 = acc0·(2·a0·a1) + acc1·(a0² + 7·a1²) + s0·a1
+    enf tmp0_1 = 2 * acc0 * a0 * a1 + acc1 * a0^2 + 7 * acc1 * a1^2
+              + s0 * a1;
 
-    # Constraint 4: acc1' computation | degree=5
-    enf s15' = tmp1 * a0^4 + 4 * tmp0 * a0^3 * a1 + 4 * tmp1 * a0^3 * a1 + 6 * tmp0 * a0^2 * a1^2
-             - 6 * tmp1 * a0^2 * a1^2 - 4 * tmp0 * a0 * a1^3 - 12 * tmp1 * a0 * a1^3
-             - 3 * tmp0 * a1^4 - tmp1 * a1^4
-             + 3 * s3 * a0^2 * a1 + 3 * s3 * a0 * a1^2 - s3 * a1^3
-             + 2 * s2 * a0 * a1 + s2 * a1^2
-             + s1 * a1;
+    # Constraint 3: tmp1_0 = tmp0·α³ + c2·α² + c3·α + c4 (real part) | degree=4
+    # tmp1_0 = tmp0_0·(a0³ + 21·a0·a1²) + tmp0_1·(21·a0²·a1 + 49·a1³) + s2·(a0² + 7·a1²) + s3·a0 + s4
+    enf tmp1_0 = tmp0_0 * (a0^3 + 21 * a0 * a1^2) + tmp0_1 * (21 * a0^2 * a1 + 49 * a1^3)
+              + s2 * a0^2 + 7 * s2 * a1^2 + s3 * a0 + s4;
+
+    # Constraint 4: tmp1_1 = tmp0·α³ + c2·α² + c3·α (imag part) | degree=4
+    # tmp1_1 = tmp0_0·(3·a0²·a1 + 7·a1³) + tmp0_1·(a0³ + 21·a0·a1²) + s2·(2·a0·a1) + s3·a1
+    enf tmp1_1 = tmp0_0 * (3 * a0^2 * a1 + 7 * a1^3) + tmp0_1 * (a0^3 + 21 * a0 * a1^2)
+              + 2 * s2 * a0 * a1 + s3 * a1;
+
+    # Constraint 5: acc'_0 = tmp1·α³ + c5·α² + c6·α + c7 (real part) | degree=4
+    # acc'_0 = tmp1_0·(a0³ + 21·a0·a1²) + tmp1_1·(21·a0²·a1 + 49·a1³) + s5·(a0² + 7·a1²) + s6·a0 + s7
+    enf s14' = tmp1_0 * (a0^3 + 21 * a0 * a1^2) + tmp1_1 * (21 * a0^2 * a1 + 49 * a1^3)
+             + s5 * a0^2 + 7 * s5 * a1^2 + s6 * a0 + s7;
+
+    # Constraint 6: acc'_1 = tmp1·α³ + c5·α² + c6·α (imag part) | degree=4
+    # acc'_1 = tmp1_0·(3·a0²·a1 + 7·a1³) + tmp1_1·(a0³ + 21·a0·a1²) + s5·(2·a0·a1) + s6·a1
+    enf s15' = tmp1_0 * (3 * a0^2 * a1 + 7 * a1^3) + tmp1_1 * (a0^3 + 21 * a0 * a1^2)
+             + 2 * s5 * a0 * a1 + s6 * a1;
 }
 
 # HORNEREXT operation: Horner polynomial evaluation with extension field coefficients (high-degree operation)
-# Stack: [s0,s1: a0, s2,s3: a1, s4,s5: a2, s6,s7: a3, s8..s12: unused, s13: alpha_ptr, s14: acc0, s15: acc1]
+# Stack: [s0,s1: c_0, s2,s3: c_1, s4,s5: c_2, s6,s7: c_3, s8..s12: unused, s13: alpha_ptr, s14: acc0, s15: acc1]
+# where each c_i is an extension field element (2 base field elements), c_0 (at s0,s1) is highest degree
 # Helpers: h0=α0, h1=α1 (evaluation point), h2=k0, h3=k1, h4=tmp0, h5=tmp1
-# Evaluates polynomial in extension field 𝔽p² using Horner method over 4 extension field coefficients
+# Extension field: 𝔽p[x]/(x² - 7), so x² = 7
+# Computes: tmp = c1 + c0·α + acc·α², then acc' = c3 + c2·α + tmp·α²
 ev hornerext_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4, h5]) {
     # Positions 0-13: Unchanged
     enf s0' = s0; enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
@@ -545,25 +559,28 @@ ev hornerext_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10,
     let tmp0 = h4;
     let tmp1 = h5;
 
-    # Constraint 1: tmp0 computation | degree=3
-    enf tmp0 = acc0 * a0^2 - 4 * acc1 * a0 * a1 - 2 * acc0 * a1^2 - 2 * acc1 * a1^2
-             + s6 * a0 - 2 * s7 * a1
-             + s4;
+    # For x² - 7: α² = (a0² + 7·a1², 2·a0·a1)
+    # Multiplication (e0,e1)·(f0,f1) = (e0·f0 + 7·e1·f1, e0·f1 + e1·f0)
 
-    # Constraint 2: tmp1 computation | degree=3
-    enf tmp1 = acc1 * a0^2 + 2 * acc0 * a0 * a1 + 2 * acc1 * a0 * a1 + acc0 * a1^2 - acc1 * a1^2
-             + s7 * a0 + s6 * a1 + s7 * a1
-             + s5;
+    # Constraint 1: tmp0 = acc0·(a0² + 7·a1²) + 7·acc1·(2·a0·a1) + s0·a0 + 7·s1·a1 + s2 | degree=3
+    enf tmp0 = acc0 * a0^2 + 7 * acc0 * a1^2 + 14 * acc1 * a0 * a1
+             + s0 * a0 + 7 * s1 * a1
+             + s2;
 
-    # Constraint 3: acc0' computation | degree=3
-    enf s14' = tmp0 * a0^2 - 4 * tmp1 * a0 * a1 - 2 * tmp0 * a1^2 - 2 * tmp1 * a1^2
-             + s2 * a0 - 2 * s3 * a1
-             + s0;
+    # Constraint 2: tmp1 = acc1·(a0² + 7·a1²) + acc0·(2·a0·a1) + s1·a0 + s0·a1 + s3 | degree=3
+    enf tmp1 = acc1 * a0^2 + 7 * acc1 * a1^2 + 2 * acc0 * a0 * a1
+             + s1 * a0 + s0 * a1
+             + s3;
 
-    # Constraint 4: acc1' computation | degree=3
-    enf s15' = tmp1 * a0^2 + 2 * tmp0 * a0 * a1 + 2 * tmp1 * a0 * a1 + tmp0 * a1^2 - tmp1 * a1^2
-             + s3 * a0 + s2 * a1 + s3 * a1
-             + s1;
+    # Constraint 3: acc0' = tmp0·(a0² + 7·a1²) + 7·tmp1·(2·a0·a1) + s4·a0 + 7·s5·a1 + s6 | degree=3
+    enf s14' = tmp0 * a0^2 + 7 * tmp0 * a1^2 + 14 * tmp1 * a0 * a1
+             + s4 * a0 + 7 * s5 * a1
+             + s6;
+
+    # Constraint 4: acc1' = tmp1·(a0² + 7·a1²) + tmp0·(2·a0·a1) + s5·a0 + s4·a1 + s7 | degree=3
+    enf s15' = tmp1 * a0^2 + 7 * tmp1 * a1^2 + 2 * tmp0 * a0 * a1
+             + s5 * a0 + s4 * a1
+             + s7;
 }
 
 # EVALCIRCUIT operation: Evaluate arithmetic circuit (high-degree operation)
@@ -1019,7 +1036,7 @@ ev cswapw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
 }
 
 # U32SPLIT operation: Split element into u32 low and high parts
-# Stack: [a, ...] -> [lo, hi, ...] (right shift - increases depth by 1)
+# Stack: [a, ...] -> [lo, hi, ...] where lo is on top (right shift - increases depth by 1)
 # Helpers: h0=limb0, h1=limb1, h2=limb2, h3=limb3 (16-bit limbs), h4=m (validity check)
 ev u32split_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4]) {
     # Local variables for 16-bit limbs
@@ -1032,13 +1049,13 @@ ev u32split_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, 
     # Constraint 1: Original value reconstruction s0 = 2^48·h3 + 2^32·h2 + 2^16·h1 + h0
     enf s0 = limb3 * 2^48 + limb2 * 2^32 + limb1 * 2^16 + limb0;
 
-    # Constraint 2: Lower 32 bits s1' = 2^16·h1 + h0
+    # Constraint 2: Lower 32 bits s0' = 2^16·h1 + h0 (lo on top - LE convention)
     let v_lo = limb1 * 2^16 + limb0;
-    enf s1' = v_lo;
+    enf s0' = v_lo;
 
-    # Constraint 3: Upper 32 bits s0' = 2^16·h3 + h2
+    # Constraint 3: Upper 32 bits s1' = 2^16·h3 + h2 (hi below)
     let v_hi = limb3 * 2^16 + limb2;
-    enf s0' = v_hi;
+    enf s1' = v_hi;
 
     # Constraint 4: Element validity check (1 - m·(2^32 - 1 - v_hi))·v_lo = 0 | degree=3
     enf (1 - m * (2^32 - 1 - v_hi)) * v_lo = 0;
@@ -1070,7 +1087,7 @@ ev u32assert2_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10
 }
 
 # U32ADD operation: Addition of two u32 values
-# Stack behavior: [b, a, ...] -> [d, c, ...] where c = (a + b) mod 2^32, d = carry bit (0 or 1)
+# Stack behavior: [a, b, ...] -> [sum, carry, ...] where sum is on top (LE convention)
 # Helper registers: h0-h2 contain 16-bit limbs of sum, h3 is set to 0
 ev u32add_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3]) {
     # Local variables for 16-bit limbs
@@ -1081,11 +1098,11 @@ ev u32add_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
     # Constraint 1: Sum reconstruction s0 + s1 = 2^32·h2 + 2^16·h1 + h0
     enf s0 + s1 = limb2 * 2^32 + limb1 * 2^16 + limb0;
 
-    # Constraint 2: Carry bit s0' = h2 (0 or 1)
-    enf s0' = limb2;
+    # Constraint 2: Lower 32 bits s0' = 2^16·h1 + h0 (sum on top - LE convention)
+    enf s0' = limb1 * 2^16 + limb0;
 
-    # Constraint 3: Lower 32 bits s1' = 2^16·h1 + h0
-    enf s1' = limb1 * 2^16 + limb0;
+    # Constraint 3: Carry bit s1' = h2 (0 or 1) (carry below)
+    enf s1' = limb2;
 
     # Positions 2-15: Unchanged
     enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9;
@@ -1133,7 +1150,7 @@ ev u32div_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
 }
 
 # U32ADD3 operation: Addition of three u32 values
-# Stack behavior: [c, b, a, ...] -> [e, d, ...] where d = (a + b + c) mod 2^32, e = (a + b + c) / 2^32
+# Stack behavior: [a, b, c, ...] -> [sum, carry, ...] where sum is on top (LE convention)
 # Helper registers: h0-h2 contain 16-bit limbs of sum, h3 is set to 0
 ev u32add3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3]) {
     # Local variables for 16-bit limbs
@@ -1144,11 +1161,11 @@ ev u32add3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s
     # Constraint 1: Sum reconstruction s0 + s1 + s2 = 2^32·h2 + 2^16·h1 + h0
     enf s0 + s1 + s2 = limb2 * 2^32 + limb1 * 2^16 + limb0;
 
-    # Constraint 2: High 32 bits s0' = h2
-    enf s0' = limb2;
+    # Constraint 2: Lower 32 bits s0' = 2^16·h1 + h0 (sum on top - LE convention)
+    enf s0' = limb1 * 2^16 + limb0;
 
-    # Constraint 3: Lower 32 bits s1' = 2^16·h1 + h0
-    enf s1' = limb1 * 2^16 + limb0;
+    # Constraint 3: Carry s1' = h2 (can be 0, 1, or 2) (carry below)
+    enf s1' = limb2;
 
     # Positions 2-14: Left shift (position 2 consumed)
     enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8; enf s8' = s9; enf s9' = s10;
@@ -1156,7 +1173,7 @@ ev u32add3_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s
 }
 
 # U32MUL operation: Multiplication of two u32 values
-# Stack behavior: [a, b, ...] -> [lo, hi, ...] where lo = (a * b) mod 2^32, hi = (a * b) / 2^32
+# Stack behavior: [a, b, ...] -> [lo, hi, ...] where lo is on top (LE convention)
 # Helper registers: h0-h3 contain 16-bit limbs of product, h4 contains m for validity check
 ev u32mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4]) {
     # Local variables for 16-bit limbs
@@ -1169,13 +1186,13 @@ ev u32mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
     # Constraint 1: Product reconstruction s0 * s1 = 2^48·h3 + 2^32·h2 + 2^16·h1 + h0 | degree=2
     enf s0 * s1 = limb3 * 2^48 + limb2 * 2^32 + limb1 * 2^16 + limb0;
 
-    # Constraint 2: Lower 32 bits s1' = 2^16·h1 + h0
+    # Constraint 2: Lower 32 bits s0' = 2^16·h1 + h0 (lo on top - LE convention)
     let v_lo = limb1 * 2^16 + limb0;
-    enf s1' = v_lo;
+    enf s0' = v_lo;
 
-    # Constraint 3: Upper 32 bits s0' = 2^16·h3 + h2
+    # Constraint 3: Upper 32 bits s1' = 2^16·h3 + h2 (hi below)
     let v_hi = limb3 * 2^16 + limb2;
-    enf s0' = v_hi;
+    enf s1' = v_hi;
 
     # Constraint 4: Element validity check (1 - m·(2^32 - 1 - v_hi))·v_lo = 0 | degree=3
     enf (1 - m * (2^32 - 1 - v_hi)) * v_lo = 0;
@@ -1185,8 +1202,8 @@ ev u32mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
     enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
 }
 
-# U32MADD operation: Multiply-add of three u32 values (a + b * c)
-# Stack behavior: [c, b, a, ...] -> [d, e, ...] where d = (a + b * c) / 2^32 (hi), e = (a + b * c) mod 2^32 (lo)
+# U32MADD operation: Multiply-add of three u32 values (a * b + c)
+# Stack behavior: [a, b, c, ...] -> [lo, hi, ...] where lo is on top (LE convention)
 # Helper registers: h0-h3 contain 16-bit limbs of result, h4 contains m for validity check
 ev u32madd_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4]) {
     # Local variables for 16-bit limbs
@@ -1199,13 +1216,13 @@ ev u32madd_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s
     # Constraint 1: Multiply-add reconstruction s0 * s1 + s2 = 2^48·h3 + 2^32·h2 + 2^16·h1 + h0 | degree=2
     enf s0 * s1 + s2 = limb3 * 2^48 + limb2 * 2^32 + limb1 * 2^16 + limb0;
 
-    # Constraint 2: Lower 32 bits s1' = 2^16·h1 + h0
+    # Constraint 2: Lower 32 bits s0' = 2^16·h1 + h0 (lo on top - LE convention)
     let v_lo = limb1 * 2^16 + limb0;
-    enf s1' = v_lo;
+    enf s0' = v_lo;
 
-    # Constraint 3: Upper 32 bits s0' = 2^16·h3 + h2
+    # Constraint 3: Upper 32 bits s1' = 2^16·h3 + h2 (hi below)
     let v_hi = limb3 * 2^16 + limb2;
-    enf s0' = v_hi;
+    enf s1' = v_hi;
 
     # Constraint 4: Element validity check (1 - m·(2^32 - 1 - v_hi))·v_lo = 0 | degree=3
     enf (1 - m * (2^32 - 1 - v_hi)) * v_lo = 0;
@@ -1813,33 +1830,27 @@ ev swapdw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
 }
 
 # EXT2MUL operation: Multiply two quadratic extension field elements (no stack depth change)
-# Stack behavior: [b1, b0, a1, a0, ...] -> [b1, b0, c1, c0, ...] where c = a * b in 𝔽ₚ[x]/(x² - x + 2)
-# Extension field elements: a = a1·x + a0, b = b1·x + b0
-# Multiplication result: c = (a1·b0 + a0·b1 + a1·b1)·x + (a0·b0 - 2·a1·b1)
+# Stack behavior: [b0, b1, a0, a1, ...] -> [b0, b1, c0, c1, ...] where c = a * b in 𝔽ₚ[x]/(x² - 7)
+# Extension field elements: a = a0 + a1·x, b = b0 + b1·x (LE convention: base coeff on top)
+# Multiplication result: c = (a0·b0 + 7·a1·b1) + (a0·b1 + a1·b0)·x
 ev ext2mul_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]) {
-    # Stack positions: s0 = b1, s1 = b0, s2 = a1, s3 = a0
-    # Result positions: s0' = b1, s1' = b0, s2' = c1 (x coefficient), s3' = c0 (constant term)
+    # Stack positions (LE): s0 = b0 (base), s1 = b1 (x coeff), s2 = a0 (base), s3 = a1 (x coeff)
+    # Result positions: s0' = b0, s1' = b1, s2' = c0 (base), s3' = c1 (x coeff)
 
-    # Position 0 (b1): Unchanged (remains on stack)
-    # Constraint: s0' - s0 = 0 (degree 1)
+    # Position 0 (b0): Unchanged (remains on stack)
     enf s0' = s0;
 
-    # Position 1 (b0): Unchanged (remains on stack)
-    # Constraint: s1' - s1 = 0 (degree 1)
+    # Position 1 (b1): Unchanged (remains on stack)
     enf s1' = s1;
 
-    # Position 2 (c1): x coefficient of product using Karatsuba optimization
-    # Constraint: s2' - (s0 + s1) * (s2 + s3) + s1 * s3 = 0 (degree 2)
-    # Formula: c1 = a1·b0 + a0·b1 + a1·b1
-    #            = (a0 + a1)(b0 + b1) - a0·b0  [Karatsuba trick]
-    #            = (s3 + s2)(s1 + s0) - s3·s1
-    enf s2' = (s0 + s1) * (s2 + s3) - s1 * s3;
+    # Position 2 (c0): Base coefficient of product
+    # Formula: c0 = a0·b0 + 7·a1·b1 = s2·s0 + 7·s3·s1
+    enf s2' = s0 * s2 + 7 * s1 * s3;
 
-    # Position 3 (c0): Constant term of product
-    # Constraint: s3' - s1 * s3 + 2 * s0 * s2 = 0 (degree 2)
-    # Formula: c0 = a0·b0 - 2·a1·b1
-    #            = s3·s1 - 2·s2·s0
-    enf s3' = s1 * s3 - 2 * s0 * s2;
+    # Position 3 (c1): x coefficient of product using Karatsuba optimization
+    # Formula: c1 = a0·b1 + a1·b0 = (a0 + a1)(b0 + b1) - a0·b0 - a1·b1
+    #            = (s2 + s3)(s0 + s1) - s2·s0 - s3·s1
+    enf s3' = (s0 + s1) * (s2 + s3) - s0 * s2 - s1 * s3;
 
     # Positions 4-15: Unchanged (all other elements stay in place)
     enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;

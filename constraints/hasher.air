@@ -127,20 +127,20 @@ ev hasher_state([s[3], h[12], i]) {
     let b = i - 2 * i';
 
     # Enforce that when absorbing the next set of elements into the state during linear hash
-    # computation (i.e. f_abp = 1) the first 4 elements (the capacity portion) are carried over to
-    # the next row.
+    # computation (i.e. f_abp = 1) the last 4 elements (the capacity portion, h[8]..h[11]) are
+    # carried over to the next row.
     enf f_abp * (h' - h) = 0 for h in h;
 
     # TODO: Double check the following and fix both docs and VM if there is a typo
     #
     # Enforce that when absorbing the next node during Merkle path computation
-    # (i.e. f_mp + f_mv + f_mu = 1), the result of the previous hash (h[4], ..., h[7]) are copied
-    # over either to (h[4]', ..., h[7]') or to (h[8]', ..., h[11]') depending on the value of b.
+    # (i.e. f_mp + f_mv + f_mu = 1), the digest from the previous hash (h[0], ..., h[3], RATE0)
+    # is copied over to either (h[0]', ..., h[3]') or (h[4]', ..., h[7]', RATE1) depending on b.
     #
     # TODO: uncomment when computed indices are supported
     # enf match {
-        # !b & f_absorb_node: is_unchanged(h[j + 4]) for j in 0..4,
-        # b & f_absorb_node: h[j + 8]' = h[j + 4] for j in 0..4
+        # !b & f_absorb_node: is_unchanged(h[j]) for j in 0..4,
+        # b & f_absorb_node: h[j + 4]' = h[j] for j in 0..4
     # }
 }
 
