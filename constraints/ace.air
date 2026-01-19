@@ -235,7 +235,7 @@ ev enforce_eval_block_constraints([sblock, op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_
 # - op =  0: Multiplication (v0 = v1 × v2)
 # - op =  1: Addition (v0 = v1 + v2)
 #
-# All arithmetic is in the quadratic extension field 𝔽ₚ[x]/(x² - x + 2)
+# All arithmetic is in the quadratic extension field 𝔽ₚ[x]/(x² - 7)
 ev enforce_arithmetic_operation([op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]) {
     # Decode operation and enforce arithmetic constraint for extension field elements
     # Extension field elements are represented as (a_0, a_1) where element = a_0 + a_1 * α
@@ -265,15 +265,18 @@ fn compute_linear_op(op: felt, v1_0: felt, v1_1: felt, v2_0: felt, v2_1: felt) -
 
 # Multiplication in the quadratic extension field.
 #
-# The extension is 𝔽ₚ[x]/(x² - x + 2)
+# The extension is 𝔽ₚ[x]/(x² - 7), so x² = 7
+# For (a0 + a1·x)(b0 + b1·x) mod (x² - 7):
+#   res0 = a0·b0 + 7·a1·b1
+#   res1 = a0·b1 + a1·b0 = (a0 + a1)(b0 + b1) - a0·b0 - a1·b1
 fn compute_non_linear_op(v1_0: felt, v1_1: felt, v2_0: felt, v2_1: felt) -> felt[2] {
     let a0 = v1_0;
     let a1 = v1_1;
     let b0 = v2_0;
     let b1 = v2_1;
-    
-    let res0 = a0 * b0 - 2 * a1 * b1;
-    let res1 = (b0 + b1) * (a0 + a1) - a0 * b0;
+
+    let res0 = a0 * b0 + 7 * a1 * b1;
+    let res1 = (b0 + b1) * (a0 + a1) - a0 * b0 - a1 * b1;
 
     return [res0, res1];
 }
