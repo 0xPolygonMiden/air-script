@@ -118,8 +118,8 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
 
         miden_air_impl.new_fn("aux_width").arg_ref_self().ret("usize").line("AUX_WIDTH");
 
-        let bus_types_fn = miden_air_impl.new_fn("bus_types").arg_ref_self().ret("Vec<BusType>");
-        bus_types_fn.line("vec![");
+        let bus_types_fn = miden_air_impl.new_fn("bus_types").arg_ref_self().ret("&[BusType]");
+        bus_types_fn.line("&[");
         for (_id, bus) in &ir.buses {
             let bus_type_str = match bus.bus_type {
                 air_ir::BusType::Multiset => "BusType::Multiset",

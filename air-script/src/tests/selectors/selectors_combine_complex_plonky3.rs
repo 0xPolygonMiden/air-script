@@ -29,8 +29,8 @@ where F: Field,
         AUX_WIDTH
     }
 
-    fn bus_types(&self) -> Vec<BusType> {
-        vec![
+    fn bus_types(&self) -> &[BusType] {
+        &[
             BusType::Multiset,
         ]
     }
