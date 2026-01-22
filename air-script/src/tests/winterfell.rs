@@ -92,8 +92,7 @@ fn comprehension_periodic_binding() {
     .transpile(Target::Winterfell)
     .unwrap();
 
-    let expected =
-        expect_file!["comprehension_periodic_binding/comprehension_periodic_binding.rs"];
+    let expected = expect_file!["comprehension_periodic_binding/comprehension_periodic_binding.rs"];
     expected.assert_eq(&generated_air);
 }
 
