@@ -7,4 +7,5 @@ mod binary;
 mod bitwise;
 mod constants;
 mod constraint_comprehension;
+mod cross_module_constants;
 mod fibonacci;
