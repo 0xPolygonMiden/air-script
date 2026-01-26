@@ -33,7 +33,7 @@ pub(super) fn add_air(scope: &mut Scope, ir: &Air) {
     add_air_struct(scope, ir, name);
 
     // add the aux trace generation utils if needed
-    if ir.num_random_values > 0 {
+    if ir.num_random_values > 0 && name != "MidenVM" {
         add_aux_trace_utils(scope, ir, name);
     }
 }
@@ -131,7 +131,7 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     }
 
     // add the build_aux_trace function if needed
-    if ir.num_random_values > 0 {
+    if ir.num_random_values > 0 && name != "MidenVM" {
         let build_aux_trace_func = miden_air_impl
             .new_fn("build_aux_trace")
             .arg_ref_self()
