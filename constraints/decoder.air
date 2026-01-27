@@ -93,11 +93,7 @@ ev general_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, h4, 
     enf is_binary([s0]) when fsplit_loop;
 
     # 2. DYN Hasher Zero Constraint (degree 6)
-    # Sets all hasher registers to 0 during DYN operation
-    enf h0 = 0 when fdyn;
-    enf h1 = 0 when fdyn;
-    enf h2 = 0 when fdyn;
-    enf h3 = 0 when fdyn;
+    # DYN uses h0..h3 for the callee digest; only h4..h7 must be zero.
     enf h4 = 0 when fdyn;
     enf h5 = 0 when fdyn;
     enf h6 = 0 when fdyn;
@@ -180,7 +176,7 @@ ev basic_block_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, 
     let frespan_next = flag_respan([b0', b1', b2', b3', b4', b5', b6'], e1');
 
     # Compute helper values used across multiple constraints
-    let delta_gc = gc' - gc;  # Group count change
+    let delta_gc = gc - gc';  # Group count decrement (0 or 1)
     let delta_ox = ox' - ox;  # Op index change
 
     # Compute opcode for next row: op' = Σ(bi' * 2^i) for i = 0 to 6
@@ -191,14 +187,11 @@ ev basic_block_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, 
     # Reference: https://0xmiden.github.io/miden-vm/design/decoder/constraints.html#in-span-column-constraints
     # ==================================================================================
 
-    # 1. When executing SPAN or RESPAN, next sp must be set to 1 (degree 6)
+    # 1. sp is binary
+    enf is_binary([sp]) = 0;
+
+    # 2. When executing SPAN or RESPAN, next sp must be set to 1 (degree 6)
     enf sp' = 1 when (fspan + frespan);
-
-    # 2. When next operation is END or RESPAN, next sp must be set to 0 (degree 5)
-    enf sp' = 0 when (fend_next + frespan_next);
-
-    # 3. In all other cases, sp must be copied to next row (degree 6)
-    enf sp' = sp when !(fspan + frespan + fend_next + frespan_next);
 
     # ==================================================================================
     # BLOCK ADDRESS CONSTRAINTS (1 constraint)
@@ -214,16 +207,16 @@ ev basic_block_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, 
     # ==================================================================================
 
     # 5. Inside basic block, gc can stay same or decrease by 1 (degree 3)
-    enf delta_gc = 1 when sp * delta_gc;
+    enf sp * delta_gc * (delta_gc - 1) = 0;
 
-    # 6. When gc decrements, either h0 is 0 or immediate value op is executed (degree 8)
-    enf (1 - fimm) * h0 = 0 when sp * delta_gc;
+    # 6. When gc decrements in a span, either h0 is 0 or immediate value op is executed (degree 8)
+    enf sp * delta_gc * (1 - fimm) * h0 = 0;
 
     # 7. During SPAN, RESPAN, or immediate value ops, gc must decrement by 1 (degree 6)
-    enf delta_gc = 1 when (fspan + frespan + fimm);
+    enf (fspan + frespan + fimm) * (delta_gc - 1) = 0;
 
     # 8. If next operation is END or RESPAN, gc must remain same (degree 5)
-    enf delta_gc = 0 when  (fend_next + frespan_next);
+    enf delta_gc * (fend_next + frespan_next) = 0;
 
     # 9. When END operation is executed, gc must be 0 (degree 5)
     enf gc = 0 when fend;
@@ -248,8 +241,8 @@ ev basic_block_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h3, 
     # Reference: https://0xmiden.github.io/miden-vm/design/decoder/constraints.html#op-index-constraints
     # ==================================================================================
 
-    # New group flag: ng = Δgc (when gc decrements, we start a new group)
-    let ng = delta_gc;
+    # New group flag: ng = Δgc - fimm (ignore immediate-value groups)
+    let ng = delta_gc - fimm;
 
     # 12. When executing SPAN or RESPAN, next ox must be set to 0 (degree 6)
     enf ox' = 0 when fspan + frespan;
@@ -278,11 +271,11 @@ ev op_batch_flags_constraints([b0, b1, b2, b3, b4, b5, b6, e0, e1, h0, h1, h2, h
     let fspan = flag_span([b0, b1, b2, b3, b4, b5, b6], e0);
     let frespan = flag_respan([b0, b1, b2, b3, b4, b5, b6], e1);
 
-    # Compute batch group flags (corrected formulas from specification)
+    # Compute batch group flags (trace encodings)
     let fg8 = c0;                             # 8 groups (c0=1)
-    let fg4 = (1 - c0) * c1 * c2;             # 4 groups (c0=0, c1=1, c2=1)
+    let fg4 = (1 - c0) * c1 * (1 - c2);       # 4 groups (c0=0, c1=1, c2=0)
     let fg2 = (1 - c0) * (1 - c1) * c2;       # 2 groups (c0=0, c1=0, c2=1)
-    let fg1 = (1 - c0) * c1 * (1 - c2);       # 1 group  (c0=0, c1=1, c2=0)
+    let fg1 = (1 - c0) * c1 * c2;             # 1 group  (c0=0, c1=1, c2=1)
 
     # ==================================================================================
     # BATCH FLAG CONSTRAINTS (6 constraints)
