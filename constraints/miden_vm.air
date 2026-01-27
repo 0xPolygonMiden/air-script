@@ -124,6 +124,9 @@ boundary_constraints {
     enf stack[17].first = 0;    # b1 = 0 (no overflow at start)
     enf stack[17].last = 0;     # b1 = 0 (no overflow at end)
 
+    # Decoder must start outside a basic block
+    enf decoder[16].first = 0;  # sp = 0
+
     ####################################################################################
     # AUXILIARY COLUMN BOUNDARIES
     ####################################################################################
