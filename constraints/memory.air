@@ -77,6 +77,10 @@ ev memory_chiplet_constraints_all_rows([memory[15]]) {
 
     # Index bit 1 must be binary
     enf is_binary([idx1]);
+
+    # For word access, idx bits must be zero (only element access uses idx0/idx1).
+    enf is_word_access * idx0 = 0;
+    enf is_word_access * idx1 = 0;
 }
 
 # Enforces memory state transition constraints for all rows except the final row
