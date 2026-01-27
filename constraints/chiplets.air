@@ -95,14 +95,14 @@ ev chiplets_constraints([chiplets[20]]) {
     ## ACE
 
     ### Apply ACE chiplet initialization constraints at the transition point
-    let next_row_first_ace = binary_and(memory_active, s2');   # Transitioning into ACE chiplet
+    let next_row_first_ace = memory_active * s2' * binary_not(s3');   # Transitioning into ACE chiplet
     enf ace_chiplet_constraints_first_row([chiplets[4..20]]) when next_row_first_ace;
 
     ## KERNEL ROM
 
     ### The kernel ROM chiplet requires initialization constraints to ensure proper startup.
     ### We force sfirst' = 1 on the first kernel ROM row, establishing proper digest initialization.
-    let next_row_first_kernel_rom = binary_and(ace_active, s3');   # Transitioning into kernel ROM chiplet
+    let next_row_first_kernel_rom = ace_active * s3' * binary_not(s4');   # Transitioning into kernel ROM chiplet
     enf kernel_rom_chiplet_constraints_first_row([chiplets[4..10]]) when next_row_first_kernel_rom;
 
 }

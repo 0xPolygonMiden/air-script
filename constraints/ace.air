@@ -146,10 +146,10 @@ ev section_block_flags_constraints([s3, sstart, sstart_next, sblock, id0, n_eval
     enf f_read = 0 when f_end;
 
     # In a READ block, n_eval stays constant.
-    # When transitioning to an EVAL block, the next id0 must equal n_eval - 1.
+    # When transitioning to an EVAL block, the next id0 must equal n_eval.
     # This ensures proper sequencing: READ loads nodes with IDs, EVAL starts processing
-    # from the highest loaded node ID (n_eval - 1).
-    enf select(f_read_next, n_eval', id0' + 1) = n_eval when f_read;
+    # from the highest loaded node ID (n_eval).
+    enf select(f_read_next, n_eval', id0') = n_eval when f_read;
 }
 
 # Constrains binary columns for flags and selectors
