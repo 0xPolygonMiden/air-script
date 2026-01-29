@@ -142,16 +142,18 @@ boundary_constraints {
     ####################################################################################
 
     # Decoder buses
-    enf bus_0_decoder_p1.first = unconstrained;
-    enf bus_0_decoder_p1.last = unconstrained;
+    enf bus_0_decoder_p1.first = null;
+    enf bus_0_decoder_p1.last = null;
+    # Block hash table (p2) boundaries will be handled via aux_finals once buses are
+    # uniformized to start at 1/0, so we leave both ends unconstrained here.
     enf bus_1_decoder_p2.first = unconstrained;
     enf bus_1_decoder_p2.last = unconstrained;
-    enf bus_2_decoder_p3.first = unconstrained;
-    enf bus_2_decoder_p3.last = unconstrained;
+    enf bus_2_decoder_p3.first = null;
+    enf bus_2_decoder_p3.last = null;
 
     # Stack overflow table
-    enf bus_3_stack_p1.first = unconstrained;
-    enf bus_3_stack_p1.last = unconstrained;
+    enf bus_3_stack_p1.first = null;
+    enf bus_3_stack_p1.last = null;
 
     # Range checker bus
     enf bus_4_range_checker.first = null;
@@ -162,8 +164,9 @@ boundary_constraints {
     enf bus_5_v_table.last = unconstrained;
 
     # Chiplets communication bus
-    # Initial state contains kernel procedure digests against which the program was compiled
-    enf bus_6_chiplets_bus.first = kernel_digests;
+    # Bus starts empty; kernel digests are folded in via kernel ROM responses.
+    # Final value is checked via aux_finals in the VM, so we leave last unconstrained here.
+    enf bus_6_chiplets_bus.first = null;
     enf bus_6_chiplets_bus.last = unconstrained;
 
     # ACE wiring bus

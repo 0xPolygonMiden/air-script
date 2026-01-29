@@ -73,6 +73,7 @@ ev decoder([addr, b0, b1, b2, b3, b4, b5, b6, h0, h1, h2, h3, h4, h5, h6, h7, sp
     let fdyncall = flag_dyncall([b0, b1, b2, b3, b4, b5, b6], e0);
     let fsyscall = flag_syscall([b0, b1, b2, b3, b4, b5, b6], e1);
     let fevalcircuit = flag_evalcircuit([b0, b1, b2, b3, b4, b5, b6], e0);
+    let flogprecompile = flag_logprecompile([b0, b1, b2, b3, b4, b5, b6], e0);
     let fspan = flag_span([b0, b1, b2, b3, b4, b5, b6], e0);
     let frespan = flag_respan([b0, b1, b2, b3, b4, b5, b6], e1);
     let fend = flag_end([b0, b1, b2, b3, b4, b5, b6], e1);
@@ -183,9 +184,16 @@ ev decoder([addr, b0, b1, b2, b3, b4, b5, b6, h0, h1, h2, h3, h4, h5, h6, h7, sp
     bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when fdyncall;
     bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when fcall;
     bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when fsyscall;
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when flogprecompile;
 
-    # END: Remove child hash (h6 indicates first child of JOIN)
-    bus_1_decoder_p2.remove(h1', h0', h1', h2', h3', h6, h5) when fend;
+    # END: Remove child hash.
+    # is_first_child = 1 when next op is NOT {END, REPEAT, HALT}
+    let fend_next = flag_end([b0', b1', b2', b3', b4', b5', b6'], e1');
+    let frepeat_next = flag_repeat([b0', b1', b2', b3', b4', b5', b6'], e1');
+    let fhalt_next = flag_halt([b0', b1', b2', b3', b4', b5', b6'], e1');
+    let is_first_child = 1 - (fend_next + frepeat_next + fhalt_next);
+    let is_loop_body = h4;
+    bus_1_decoder_p2.remove(addr', h0, h1, h2, h3, is_first_child, is_loop_body) when fend;
 
     ####################################################################################
     # BUS 2: OP GROUP TABLE (bus_2_decoder_p3)
@@ -525,10 +533,6 @@ fn flag_not(bits: felt[7]) -> felt {
     return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * bits[2] * (1 - bits[1]) * bits[0];
 }
 
-fn flag_fmpadd(bits: felt[7]) -> felt {
-    return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * bits[2] * bits[1] * (1 - bits[0]);
-}
-
 fn flag_mload(bits: felt[7]) -> felt {
     return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]) * bits[2] * bits[1] * bits[0];
 }
@@ -697,10 +701,6 @@ fn flag_mstorew(bits: felt[7]) -> felt {
     return (1 - bits[6]) * bits[5] * (1 - bits[4]) * bits[3] * bits[2] * bits[1] * (1 - bits[0]);
 }
 
-fn flag_fmpupdate(bits: felt[7]) -> felt {
-    return (1 - bits[6]) * bits[5] * (1 - bits[4]) * bits[3] * bits[2] * bits[1] * bits[0];
-}
-
 ##########################################################################################
 # RIGHT STACK SHIFT OPERATIONS (011 group) - 16 operations
 ##########################################################################################
@@ -847,11 +847,11 @@ fn flag_dyn(bits: felt[7], e0: felt) -> felt {
     return e0 * f_x1000(bits[3], bits[2], bits[1], bits[0]);
 }
 
-fn flag_hornerext(bits: felt[7], e0: felt) -> felt {
+fn flag_hornerbase(bits: felt[7], e0: felt) -> felt {
     return e0 * f_x1001(bits[3], bits[2], bits[1], bits[0]);
 }
 
-fn flag_op101_1010(bits: felt[7], e0: felt) -> felt {
+fn flag_hornerext(bits: felt[7], e0: felt) -> felt {
     return e0 * f_x1010(bits[3], bits[2], bits[1], bits[0]);
 }
 
@@ -867,7 +867,7 @@ fn flag_evalcircuit(bits: felt[7], e0: felt) -> felt {
     return e0 * f_x1101(bits[3], bits[2], bits[1], bits[0]);
 }
 
-fn flag_op101_1110(bits: felt[7], e0: felt) -> felt {
+fn flag_logprecompile(bits: felt[7], e0: felt) -> felt {
     return e0 * f_x1110(bits[3], bits[2], bits[1], bits[0]);
 }
 
@@ -884,7 +884,7 @@ fn flag_mrupdate(bits: felt[7], e1: felt) -> felt {
     return e1 * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]);  # 110_0000, last 2 bits forced to 0
 }
 
-fn flag_hornerbase(bits: felt[7], e1: felt) -> felt {
+fn flag_cryptostream(bits: felt[7], e1: felt) -> felt {
     return e1 * (1 - bits[4]) * bits[3] * (1 - bits[2]);        # 110_0100, last 2 bits forced to 0
 }
 
@@ -1060,7 +1060,7 @@ fn compute_all_operation_flags(bits: felt[7], e0: felt, e1: felt) -> felt[96] {
         f_000_val * f_x0011_val,    # op_inv
         f_000_val * f_x0100_val,    # op_incr
         f_000_val * f_x0101_val,    # op_not
-        f_000_val * f_x0110_val,    # op_fmpadd
+        0,                          # unused
         f_000_val * f_x0111_val,    # op_mload
         f_000_val * f_x1000_val,    # op_swap
         f_000_val * f_x1001_val,    # op_caller
@@ -1105,7 +1105,7 @@ fn compute_all_operation_flags(bits: felt[7], e0: felt, e1: felt) -> felt[96] {
         f_010_val * f_x1100_val,    # op_mloadw
         f_010_val * f_x1101_val,    # op_mstore
         f_010_val * f_x1110_val,    # op_mstorew
-        f_010_val * f_x1111_val,    # op_fmpupdate
+        0,                          # unused
 
         # Right stack shift operations (011 group) - 16 operations
         f_011_val * f_x0000_val,    # op_pad
@@ -1145,17 +1145,17 @@ fn compute_all_operation_flags(bits: felt[7], e0: felt, e1: felt) -> felt[96] {
         e0 * f_x0110_val,    # op_span
         e0 * f_x0111_val,    # op_join
         e0 * f_x1000_val,    # op_dyn
-        e0 * f_x1001_val,    # op_hornerext
-        e0 * f_x1010_val,    # op_101_1010 (unused)
+        e0 * f_x1001_val,    # op_hornerbase
+        e0 * f_x1010_val,    # op_hornerext
         e0 * f_x1011_val,    # op_push (high-degree)
         e0 * f_x1100_val,    # op_dyncall
         e0 * f_x1101_val,    # op_evalcircuit
-        e0 * f_x1110_val,    # op_101_1110 (unused)
+        e0 * f_x1110_val,    # op_logprecompile
         e0 * f_x1111_val,    # op_101_1111 (unused)
 
         # Very high-degree operations (110/111 groups) - 8 operations
         e1 * (1 - bits[4]) * (1 - bits[3]) * (1 - bits[2]),    # op_mrupdate (110_0000)
-        e1 * (1 - bits[4]) * bits[3] * (1 - bits[2]),          # op_hornerbase (110_0100)
+        e1 * (1 - bits[4]) * bits[3] * (1 - bits[2]),          # op_cryptostream (110_0100)
         e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]),          # op_syscall (110_1000)
         e1 * bits[4] * bits[3] * (1 - bits[2]),                # op_call (110_1100)
         e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]),          # op_end (111_0000)
@@ -1188,7 +1188,9 @@ fn flag_shr(bits: felt[7], e0: felt, e1: felt) -> felt {
     return fshr_base + fu32split + fpush;
 }
 
-# Left-Shift Flag: fshl = (1−b6)⋅b5⋅(1−b4) + fadd3_madd + fsplit_loop + frepeat + fend⋅h5 (degree 5)
+# Left-Shift Flag: fshl = (1−b6)⋅b5⋅(1−b4) + fadd3_madd + fsplit_loop + fdyn + frepeat + fend⋅h5 (degree 5)
+# Note: DYNCALL performs a left shift but is excluded here because its overflow handling
+# uses the decoder hasher state instead of the standard stack overflow columns.
 fn flag_shl(bits: felt[7], h5: felt, e0: felt, e1: felt) -> felt {
     # Base left shift pattern: (1−b6)⋅b5⋅(1−b4)
     let fshl_base = (1 - bits[6]) * bits[5] * (1 - bits[4]);
@@ -1199,6 +1201,9 @@ fn flag_shl(bits: felt[7], h5: felt, e0: felt, e1: felt) -> felt {
     # fsplit_loop: SPLIT and LOOP operations (101 group with specific pattern)
     let fsplit_loop = e0 * (1 - bits[3]) * bits[2] * (1 - bits[1]);
 
+    # fdyn: DYN operation (opcode 88: 101_1000)
+    let fdyn = flag_dyn(bits, e0);
+
     # frepeat: REPEAT operation (opcode 116: 111_0100)
     let frepeat = e1 * bits[4] * (1 - bits[3]) * bits[2];
 
@@ -1206,10 +1211,10 @@ fn flag_shl(bits: felt[7], h5: felt, e0: felt, e1: felt) -> felt {
     let fend = e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]);
     let fend_h5 = fend * h5;
 
-    return fshl_base + fadd3_madd + fsplit_loop + frepeat + fend_h5;
+    return fshl_base + fadd3_madd + fsplit_loop + fdyn + frepeat + fend_h5;
 }
 
-# Control Flow Flag: fctrl = fspan,join,split,loop + fend,repeat,respan,halt + fdyn + fcall + fsyscall (degree 5)
+# Control Flow Flag: fctrl = fspan,join,split,loop + fend,repeat,respan,halt + fdyn + fdyncall + fcall + fsyscall (degree 5)
 fn flag_ctrl(bits: felt[7], e0: felt, e1: felt) -> felt {
     # fspan,join,split,loop: High-degree control flow ops with pattern e0⋅(1−b3)⋅b2
     let fspan_join_split_loop = e0 * (1 - bits[3]) * bits[2];
@@ -1220,13 +1225,16 @@ fn flag_ctrl(bits: felt[7], e0: felt, e1: felt) -> felt {
     # fdyn: DYN operation (opcode 88: 101_1000)
     let fdyn = e0 * bits[3] * (1 - bits[2]) * (1 - bits[1]) * (1 - bits[0]);
 
+    # fdyncall: DYNCALL operation (opcode 92: 101_1100)
+    let fdyncall = e0 * f_x1100(bits[3], bits[2], bits[1], bits[0]);
+
     # fcall: CALL operation (opcode 108: 110_1100)
     let fcall = e1 * bits[4] * bits[3] * (1 - bits[2]);
 
     # fsyscall: SYSCALL operation (opcode 104: 110_1000)
     let fsyscall = e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]);
 
-    return fspan_join_split_loop + fend_repeat_respan_halt + fdyn + fcall + fsyscall;
+    return fspan_join_split_loop + fend_repeat_respan_halt + fdyn + fdyncall + fcall + fsyscall;
 }
 
 # Immediate Value Flag: fimm = fpush (degree 5)

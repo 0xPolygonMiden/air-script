@@ -167,12 +167,16 @@ const MEMREADELEMENT = 12;         # Element read operation (1 element)
 const MEMWRITEWORD = 20;           # Word write operation (4 elements)
 const MEMREADWORD = 28;            # Word read operation (4 elements)
 
-# ACE Chiplet Operation Labels
+# ACE Chiplet Operation Label
 const ACEINIT = 8;                 # ACE circuit initialization (uses bus_6_chiplets_bus)
+
+# Log Precompile Operation label
+const LOGPRECOMPILE = 94;
 
 # Kernel ROM Chiplet Operation Labels
 const KERNELPROCCALL = 16;         # Kernel procedure call
 const KERNELPROCINIT = 48;         # Kernel procedure initialization
+
 ##########################################################################################
 # GENERAL CONSTANTS
 ##########################################################################################

@@ -76,6 +76,24 @@ ev stack_general_constraints([s15, b0, b1, h0, decoder_b0, decoder_b1, decoder_b
     # 4. LEFT SHIFT ZERO INSERTION CONSTRAINT
     enf left_shift_zero_insertion([s15, b0, h0, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
                                   decoder_h5, decoder_e0, decoder_e1]);
+
+    # 5. STACK OVERFLOW BUS CONSTRAINTS
+    #
+    # Tracks rows pushed to and popped from the overflow table:
+    # - Right shift: push (clk, s15, b1)
+    # - Left shift: pop (b1, s15', b1') when overflow is non-empty
+    # - DYNCALL: pop (b1, s15', h5) when overflow is non-empty
+    let depth_excess = b0 - 16;
+    let fov = depth_excess * h0;
+
+    let op_bits = [decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6];
+    let fshr = flag_shr(op_bits, decoder_e0, decoder_e1);
+    let fshl = flag_shl(op_bits, decoder_h5, decoder_e0, decoder_e1);
+    let fdyncall = flag_dyncall(op_bits, decoder_e0);
+
+    bus_3_stack_p1.insert(system_clk, s15, b1) when fshr;
+    bus_3_stack_p1.remove(b1, s15', b1') when (fshl * fov);
+    bus_3_stack_p1.remove(b1, s15', decoder_h5) when (fdyncall * fov);
 }
 
 # Stack overflow flag constraint
@@ -153,6 +171,10 @@ ev right_shift_b1_constraint([b1, decoder_b0, decoder_b1, decoder_b2, decoder_b3
 # OPERATION-SPECIFIC STACK CONSTRAINTS
 ##########################################################################################
 
+# Stack-manipulation constraints mirror the implementation grouping:
+# PAD/DUP*/CLK, SWAP, MOVUP2..MOVUP8, MOVDN2..MOVDN8, SWAPW/SWAPW2/SWAPW3/SWAPDW, CSWAP/CSWAPW.
+# The per-op constraints below are listed in opcode order but cover the same groups.
+
 # Applies the appropriate operation-specific constraints based on active operation flags
 ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
                                stack_b0, stack_b1, decoder_b0, decoder_b1, decoder_b2, decoder_b3, decoder_b4, decoder_b5, decoder_b6,
@@ -177,7 +199,6 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
     let is_inv = flag_inv(op_bits);             # Opcode 3
     let is_incr = flag_incr(op_bits);           # Opcode 4
     let is_not = flag_not(op_bits);             # Opcode 5
-    let is_fmpadd = flag_fmpadd(op_bits);       # Opcode 6
     let is_mload = flag_mload(op_bits);         # Opcode 7
     let is_swap = flag_swap(op_bits);           # Opcode 8
     let is_caller = flag_caller(op_bits);       # Opcode 9
@@ -220,7 +241,6 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
     let is_mloadw = flag_mloadw(op_bits);       # Opcode 44
     let is_mstore = flag_mstore(op_bits);       # Opcode 45
     let is_mstorew = flag_mstorew(op_bits);     # Opcode 46
-    let is_fmpupdate = flag_fmpupdate(op_bits);   # Opcode 47
 
     # Group 3: Right stack shift operations - ordered by Miden VM specification (opcodes 48-63)
     let is_pad = flag_pad(op_bits);             # Opcode 48
@@ -258,14 +278,16 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
     let is_split = flag_split(op_bits, decoder_e0);  # Opcode 84 (101_0100)
     let is_loop = flag_loop(op_bits, decoder_e0);  # Opcode 85 (101_0101)
     let is_dyn = flag_dyn(op_bits, decoder_e0);  # Opcode 88 (101_1000)
-    let is_hornerext = flag_hornerext(op_bits, decoder_e0);  # Opcode 89 (101_1001)
+    let is_hornerext = flag_hornerext(op_bits, decoder_e0);  # Opcode 90 (101_1010)
     let is_push = flag_push(op_bits, decoder_e0);  # Opcode 91 (101_1011)
     let is_dyncall = flag_dyncall(op_bits, decoder_e0);  # Opcode 92 (101_1100)
     let is_evalcircuit = flag_evalcircuit(op_bits, decoder_e0);  # Opcode 93 (101_1101)
+    let is_logprecompile = flag_logprecompile(op_bits, decoder_e0);  # Opcode 94 (101_1110)
 
     # Group 5: Very high-degree operations (110 group) - requires e1 for degree reduction
     let is_mrupdate = flag_mrupdate(op_bits, decoder_e1);  # Opcode 96 (110_0000)
-    let is_hornerbase = flag_hornerbase(op_bits, decoder_e1);  # Opcode 100 (110_0100)
+    let is_cryptostream = flag_cryptostream(op_bits, decoder_e1);  # Opcode 100 (110_0100)
+    let is_hornerbase = flag_hornerbase(op_bits, decoder_e0);  # Opcode 89 (101_1001)
     let is_syscall = flag_syscall(op_bits, decoder_e1);  # Opcode 104 (110_1000)
     let is_call = flag_call(op_bits, decoder_e1);  # Opcode 108 (110_1100)
 
@@ -277,7 +299,6 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
         case is_inv: inv_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),           # 3
         case is_incr: incr_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 4
         case is_not: not_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),           # 5
-        case is_fmpadd: fmpadd_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_fmp]), # 6
         case is_mload: mload_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]),       # 7
         case is_swap: swap_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),         # 8
         case is_caller: caller_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3]),     # 9
@@ -320,7 +341,6 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
         case is_mloadw: mloadw_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]),   # 44
         case is_mstore: mstore_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]),   # 45
         case is_mstorew: mstorew_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]), # 46
-        case is_fmpupdate: fmpupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_fmp]), # 47
 
         # Right stack shift operations - ordered by Miden VM specification (opcodes 48-63)
         case is_pad: pad_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]),       # 48
@@ -358,14 +378,17 @@ ev stack_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
         case is_split: split_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 84
         case is_loop: loop_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 85
         case is_dyn: dyn_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 88
-        case is_hornerext: hornerext_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 89
+        case is_hornerext: hornerext_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 90
         case is_push: push_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 91
         case is_dyncall: dyncall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_b0, stack_b1]), # 92
         case is_evalcircuit: evalcircuit_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 93
+        case is_logprecompile: logprecompile_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
+                                                                    decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4]), # 94
 
         # Very high-degree operations (110 group)
         case is_mrupdate: mrupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]), # 96
-        case is_hornerbase: hornerbase_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 100
+        case is_cryptostream: cryptostream_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]), # 100
+        case is_hornerbase: hornerbase_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, decoder_h0, decoder_h1, decoder_h2, decoder_h3, decoder_h4, decoder_h5]), # 89
         case is_syscall: syscall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_b0, stack_b1]), # 104
         case is_call: call_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, stack_b0, stack_b1]), # 108
     };
@@ -475,6 +498,29 @@ ev mstream_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s
     enf s12' = s12 + 8;
     # Positions 13-15: Unchanged
     enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# CRYPTOSTREAM operation: Read two words, add rate, write ciphertext, update rate.
+# Stack layout: [R0(4), R1(4), C(4), src_ptr, dst_ptr, ...]
+# After: [CT0(4), CT1(4), C(4), src_ptr+8, dst_ptr+8, ...]
+ev cryptostream_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, system_ctx, system_clk]) {
+    # Positions 8-11: Unchanged (capacity preserved)
+    enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11;
+    # Positions 12-13: Source/destination pointers incremented by 8 (2 words)
+    enf s12' = s12 + 8;
+    enf s13' = s13 + 8;
+    # Positions 14-15: Unchanged
+    enf s14' = s14; enf s15' = s15;
+
+    # Plaintext = ciphertext - rate (element-wise)
+    let p0 = s0' - s0; let p1 = s1' - s1; let p2 = s2' - s2; let p3 = s3' - s3;
+    let p4 = s4' - s4; let p5 = s5' - s5; let p6 = s6' - s6; let p7 = s7' - s7;
+
+    # Read two words from source and write two words to destination.
+    bus_6_chiplets_bus.insert(MEMREADWORD, system_ctx, s12, system_clk, p0, p1, p2, p3) when 1;
+    bus_6_chiplets_bus.insert(MEMREADWORD, system_ctx, s12 + 4, system_clk, p4, p5, p6, p7) when 1;
+    bus_6_chiplets_bus.insert(MEMWRITEWORD, system_ctx, s13, system_clk, s0', s1', s2', s3') when 1;
+    bus_6_chiplets_bus.insert(MEMWRITEWORD, system_ctx, s13 + 4, system_clk, s4', s5', s6', s7') when 1;
 }
 
 # PUSH operation: Push an immediate value onto the stack (high-degree operation)
@@ -618,6 +664,21 @@ ev evalcircuit_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s1
     # All positions unchanged (circuit evaluation handled by ACE chiplet)
     enf s0' = s0; enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7;
     enf s8' = s8; enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+}
+
+# LOG_PRECOMPILE operation: Apply Poseidon2 to [COMM, TAG, CAP_PREV] and update stack.
+# Stack behavior: [COMM, TAG, PAD, ...] -> [R0, R1, CAP_NEXT, ...]
+ev logprecompile_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, h0, h1, h2, h3, h4]) {
+    # Positions 0-11: overwritten by hasher outputs (unconstrained in stack module)
+    # Positions 12-15: unchanged
+    enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
+
+    # CAP_PREV comes from decoder helper registers h1..h4; CAP_NEXT is s8'..s11'.
+    bus_5_v_table.remove(LOGPRECOMPILE, h1, h2, h3, h4) when 1;
+    bus_5_v_table.insert(LOGPRECOMPILE, s8', s9', s10', s11') when 1;
+
+    # Link the output state to the hasher chiplet bus.
+    bus_6_chiplets_bus.insert(HASHERRETURNSTATE, s0', s1', s2', s3', s4', s5', s6', s7', s8', s9', s10', s11') when 1;
 }
 
 # DUP operation: Duplicate top stack element
@@ -1169,8 +1230,8 @@ ev u32div_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s1
     # Constraint 2: Quotient bound s1 - s1' = 2^16·h1 + h0 (ensures c ≤ a)
     enf s1 - s1' = h1 * 2^16 + h0;
 
-    # Constraint 3: Remainder bound s0 - s0' - 1 = 2^16·h2 + h3 (ensures d < b)
-    enf s0 - s0' - 1 = h2 * 2^16 + h3;
+    # Constraint 3: Remainder bound s0 - s0' - 1 = 2^16·h3 + h2 (ensures d < b)
+    enf s0 - s0' - 1 = h3 * 2^16 + h2;
 
     # Positions 2-15: Unchanged
     enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8; enf s9' = s9;
@@ -1542,28 +1603,6 @@ ev frie2f4_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s
 
     # Constraint 9.2: Preserve folded position
     enf f_pos_out = f_pos;  # degree 1
-}
-
-# FMPADD operation: Add FMP value to top stack element (no stack depth change)
-# Stack behavior: [a, ...] -> [a + fmp, ...] (no depth change)
-ev fmpadd_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, fmp]) {
-    # Position 0: Gets s0 + fmp (adds FMP value to top element)
-    enf s0' = s0 + fmp;
-    # Positions 1-15: Unchanged (all other elements stay in place)
-    enf s1' = s1; enf s2' = s2; enf s3' = s3; enf s4' = s4; enf s5' = s5; enf s6' = s6; enf s7' = s7; enf s8' = s8;
-    enf s9' = s9; enf s10' = s10; enf s11' = s11; enf s12' = s12; enf s13' = s13; enf s14' = s14; enf s15' = s15;
-}
-
-# FMPUPDATE operation: Add top stack value to FMP and remove it (left shift - decreases depth by 1)
-# Stack behavior: [value, ...] -> [...] updates FMP = FMP + value
-ev fmpupdate_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, fmp]) {
-    # FMP system state constraint: new_fmp = fmp + s0 (the top stack value is added to FMP)
-    enf fmp' = fmp + s0;
-
-    # Stack behavior: Left shift by 1 (removes the value from stack)
-    enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8;
-    enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
-    # s15' comes from overflow table or is 0 (handled by left_shift_zero_insertion)
 }
 
 # SPLIT operation: Flow control operation for conditional execution (high-degree)
@@ -2163,6 +2202,7 @@ ev dyncall_operation_constraints([s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s
     enf s0' = s1; enf s1' = s2; enf s2' = s3; enf s3' = s4; enf s4' = s5; enf s5' = s6; enf s6' = s7; enf s7' = s8;
     enf s8' = s9; enf s9' = s10; enf s10' = s11; enf s11' = s12; enf s12' = s13; enf s13' = s14; enf s14' = s15;
     # s15' from overflow table or 0 (handled by left_shift_zero_insertion)
+    # Note: overflow-table removal for DYNCALL uses decoder hasher state, not b1'.
 
     # Reset stack depth and overflow address for new context
     enf b0' = 16;
