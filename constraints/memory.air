@@ -24,6 +24,11 @@
 #
 # STATUS: Fully implemented with chiplets bus integration
 #
+# NOTE: The spec currently omits explicit range checks to ensure addresses fit within the
+# intended 32-bit space and that word accesses satisfy the divisibility-by-4 requirement
+# (addr = 4 * w_addr + idx0 + 2 * idx1 with idx0/idx1 in {0,1}). These checks should be added
+# in a follow-up pass.
+#
 # REFERENCES:
 # - Memory Design: https://0xmiden.github.io/miden-vm/design/chiplets/memory.html
 ##########################################################################################
@@ -153,11 +158,15 @@ ev memory_chiplet_constraints_all_rows_except_last([memory[15]]) {
     let f3_bus = idx1 * idx0;
     let element_value = f0_bus * v0 + f1_bus * v1 + f2_bus * v2 + f3_bus * v3;
 
+    # Compute element address: addr + idx0 + 2 * idx1.
+    # For word accesses, idx bits are 0, so this equals the word address.
+    let element_addr = addr + idx0 + 2 * idx1;
+
     # Remove responses from bus when operations occur
-    bus_6_chiplets_bus.remove(MEMREADWORD, ctx, addr, clk, v0, v1, v2, v3) when is_word_read;
-    bus_6_chiplets_bus.remove(MEMWRITEWORD, ctx, addr, clk, v0, v1, v2, v3) when is_word_write;
-    bus_6_chiplets_bus.remove(MEMREADELEMENT, ctx, addr, clk, element_value) when is_element_read;
-    bus_6_chiplets_bus.remove(MEMWRITEELEMENT, ctx, addr, clk, element_value) when is_element_write;
+    bus_6_chiplets_bus.remove(MEMREADWORD, ctx, element_addr, clk, v0, v1, v2, v3) when is_word_read;
+    bus_6_chiplets_bus.remove(MEMWRITEWORD, ctx, element_addr, clk, v0, v1, v2, v3) when is_word_write;
+    bus_6_chiplets_bus.remove(MEMREADELEMENT, ctx, element_addr, clk, element_value) when is_element_read;
+    bus_6_chiplets_bus.remove(MEMWRITEELEMENT, ctx, element_addr, clk, element_value) when is_element_write;
 }
 
 ##########################################################################################

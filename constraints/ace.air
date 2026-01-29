@@ -147,7 +147,12 @@ ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
     # - READ blocks: Define 2 nodes (id0, id1) with multiplicities (m0, m1)
     # - EVAL blocks: Consume 2 nodes (id1, id2), define 1 node (id0) with multiplicity m0
     #
-    # Each node is tracked with: (ctx, clk, id, v0, v1)
+    # Each node is tracked with: (clk, ctx, id, v0, v1)
+    #
+    # NOTE: The VM implementation forces the wiring bus accumulator to be 0 on ACE entry/exit,
+    # but Air-Script can only express `null` boundary constraints for buses. There is no way
+    # to encode these mid-trace boundary checks here.
+    # The sibling virtual table has the same limitation; its constraints are expected to be redesigned.
     ####################################################################################
 
     # READ block: Insert two nodes being loaded from memory
@@ -156,8 +161,8 @@ ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
     # Use conditional multiplicity: m * is_read_block (multiplicity if READ, 0 if EVAL)
     let m0_read = m0 * is_read_block;
     let m1_read = m1 * is_read_block;
-    bus_7_wiring_bus.insert(ctx, clk, id0, v0_0, v0_1) with m0_read;
-    bus_7_wiring_bus.insert(ctx, clk, id1, v1_0, v1_1) with m1_read;
+    bus_7_wiring_bus.insert(clk, ctx, id0, v0_0, v0_1) with m0_read;
+    bus_7_wiring_bus.insert(clk, ctx, id1, v1_0, v1_1) with m1_read;
 
     # EVAL block: Consume two input nodes, insert one result node
     # Consume input node 1: (id1, v1)
@@ -166,9 +171,9 @@ ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
     # Use conditional multiplicity: 1 * is_eval_block (consume if EVAL, 0 if READ)
     let consume = is_eval_block;
     let m0_eval = m0 * is_eval_block;
-    bus_7_wiring_bus.remove(ctx, clk, id1, v1_0, v1_1) with consume;
-    bus_7_wiring_bus.remove(ctx, clk, id2, v2_0, v2_1) with consume;
-    bus_7_wiring_bus.insert(ctx, clk, id0, v0_0, v0_1) with m0_eval;
+    bus_7_wiring_bus.remove(clk, ctx, id1, v1_0, v1_1) with consume;
+    bus_7_wiring_bus.remove(clk, ctx, id2, v2_0, v2_1) with consume;
+    bus_7_wiring_bus.insert(clk, ctx, id0, v0_0, v0_1) with m0_eval;
 }
 
 # Enforces that on the first row of ACE chiplet we should have sstart' = 1
