@@ -6,7 +6,7 @@ pub mod selectors;
 pub mod selectors_combine_simple;
 #[rustfmt::skip]
 #[allow(clippy::all)]
-mod selectors_combine_complex;
+pub mod selectors_combine_complex;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 pub mod selectors_combine_with_list_comprehensions;
@@ -24,7 +24,7 @@ pub mod selectors_combine_simple_plonky3;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 #[allow(unused_imports)]
-mod selectors_combine_complex_plonky3;
+pub mod selectors_combine_complex_plonky3;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 #[allow(unused_imports)]

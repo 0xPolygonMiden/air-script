@@ -29,6 +29,7 @@ mod list_folding;
 mod periodic_columns;
 mod pub_inputs;
 mod selectors;
+mod selectors_combine_complex;
 mod selectors_combine_simple;
 mod selectors_combine_with_list_comprehensions;
 mod selectors_with_evaluators;
