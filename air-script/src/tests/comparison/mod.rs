@@ -19,3 +19,4 @@ mod functions_complex;
 mod functions_simple;
 mod indexed_trace_access;
 mod inlined_functions_simple;
+mod list_comprehension;
