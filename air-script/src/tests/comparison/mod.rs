@@ -10,6 +10,7 @@ mod buses_simple;
 mod buses_simple_with_evaluators;
 mod buses_varlen_boundary_both;
 mod buses_varlen_boundary_first;
+mod buses_varlen_boundary_last;
 mod cc_with_evaluators;
 mod comprehension_periodic_binding;
 mod computed_indices_complex;
