@@ -29,3 +29,4 @@ mod selectors_combine_with_list_comprehensions;
 mod selectors_with_evaluators;
 mod system;
 mod trace_col_groups;
+mod variables;
