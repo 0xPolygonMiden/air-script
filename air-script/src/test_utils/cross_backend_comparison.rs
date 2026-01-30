@@ -30,8 +30,8 @@ use p3_miden_air::{MidenAir, MidenAirBuilder};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use winter_air::{
-    Air, BatchingMethod, EvaluationFrame, FieldExtension, ProofOptions as WinterProofOptions,
-    TraceInfo,
+    Air, AuxRandElements, BatchingMethod, EvaluationFrame, FieldExtension,
+    ProofOptions as WinterProofOptions, TraceInfo,
 };
 use winter_math::{FieldElement, ToElements, fields::f64::BaseElement as WinterfellFelt};
 use winter_utils::Serializable;
@@ -210,8 +210,10 @@ where
     // Create evaluation frame
     let frame = EvaluationFrame::from_rows(current, next);
 
-    // Allocate result buffer based on number of transition constraints
-    let num_constraints = air.context().num_transition_constraints();
+    // Allocate result buffer based on main transition constraints only.
+    // Winterfell counts main + aux constraints together in the context, but
+    // evaluate_transition only writes main constraints.
+    let num_constraints = air.context().num_main_transition_constraints();
     let mut result = vec![WinterfellFelt::ZERO; num_constraints];
 
     // Evaluate transition constraints with periodic values
@@ -225,6 +227,58 @@ where
     };
 
     // Convert to canonical u64, applying the selector
+    result.iter().map(|e| (is_transition * *e).to_canonical_u64()).collect()
+}
+
+/// Evaluates Winterfell auxiliary transition constraints at a specific row.
+///
+/// This uses the aux trace and verifier randomness, and applies the same
+/// is_transition selector as main constraints.
+pub fn evaluate_winterfell_aux_transition<A>(
+    air: &A,
+    main_trace: &[Vec<WinterfellFelt>],
+    aux_trace: &[Vec<WinterfellFelt>],
+    row: usize,
+    num_rows: usize,
+    periodic_values: &[WinterfellFelt],
+    aux_rand_elements: &AuxRandElements<WinterfellFelt>,
+) -> Vec<u64>
+where
+    A: Air<BaseField = WinterfellFelt>,
+{
+    let main_width = main_trace.len();
+    let aux_width = aux_trace.len();
+    let trace_length = main_trace[0].len();
+
+    let main_current: Vec<WinterfellFelt> =
+        (0..main_width).map(|col| main_trace[col][row]).collect();
+    let next_row = (row + 1) % trace_length;
+    let main_next: Vec<WinterfellFelt> =
+        (0..main_width).map(|col| main_trace[col][next_row]).collect();
+    let main_frame = EvaluationFrame::from_rows(main_current, main_next);
+
+    let aux_current: Vec<WinterfellFelt> = (0..aux_width).map(|col| aux_trace[col][row]).collect();
+    let aux_next: Vec<WinterfellFelt> =
+        (0..aux_width).map(|col| aux_trace[col][next_row]).collect();
+    let aux_frame = EvaluationFrame::from_rows(aux_current, aux_next);
+
+    let num_constraints = air.context().num_aux_transition_constraints();
+    let mut result = vec![WinterfellFelt::ZERO; num_constraints];
+
+    air.evaluate_aux_transition(
+        &main_frame,
+        &aux_frame,
+        periodic_values,
+        aux_rand_elements,
+        &mut result,
+    );
+
+    let is_transition = if row < num_rows - 1 {
+        WinterfellFelt::ONE
+    } else {
+        WinterfellFelt::ZERO
+    };
+
     result.iter().map(|e| (is_transition * *e).to_canonical_u64()).collect()
 }
 
@@ -323,6 +377,31 @@ where
         .collect()
 }
 
+/// Gets Winterfell aux boundary constraint info.
+/// Returns (column, row, expected_value) for each aux assertion.
+pub fn get_winterfell_aux_boundary_assertions<A>(
+    air: &A,
+    aux_rand_elements: &AuxRandElements<WinterfellFelt>,
+) -> Vec<(usize, usize, u64)>
+where
+    A: Air<BaseField = WinterfellFelt>,
+{
+    air.get_aux_assertions(aux_rand_elements)
+        .iter()
+        .map(|assertion| {
+            let col = assertion.column();
+            let step = assertion.first_step();
+            let values = assertion.values();
+            let expected = if !values.is_empty() {
+                values[0].to_canonical_u64()
+            } else {
+                0
+            };
+            (col, step, expected)
+        })
+        .collect()
+}
+
 /// A view into two consecutive rows of the trace matrix for constraint evaluation.
 pub struct TwoRowMatrixView<F> {
     current_row: Vec<F>,
@@ -360,6 +439,8 @@ impl<F: Clone + Send + Sync> Matrix<F> for TwoRowMatrixView<F> {
 pub struct ConstraintCapturingBuilder<F: Field> {
     /// View of current and next rows
     main_view: TwoRowMatrixView<F>,
+    /// View of current and next aux rows (if any)
+    aux_view: Option<TwoRowMatrixView<F>>,
     /// Current row index being evaluated
     current_row: usize,
     /// Total number of rows in the trace
@@ -368,6 +449,10 @@ pub struct ConstraintCapturingBuilder<F: Field> {
     public_values: Vec<F>,
     /// Periodic column evaluations (empty for simple AIRs)
     periodic_values: Vec<F>,
+    /// Verifier randomness for aux constraints
+    randomness: Vec<F>,
+    /// Aux bus boundary values
+    aux_bus_boundary_values: Vec<F>,
     /// Captured constraint evaluations
     captured_constraints: Vec<F>,
 }
@@ -376,9 +461,12 @@ impl<F: Field + Clone> ConstraintCapturingBuilder<F> {
     /// Creates a new constraint capturing builder for a specific row.
     pub fn new(
         trace: &RowMajorMatrix<F>,
+        aux_trace: Option<&RowMajorMatrix<F>>,
         row: usize,
         public_values: Vec<F>,
         periodic_values: Vec<F>,
+        randomness: Vec<F>,
+        aux_bus_boundary_values: Vec<F>,
     ) -> Self {
         let num_rows = trace.height();
         let width = trace.width();
@@ -398,12 +486,31 @@ impl<F: Field + Clone> ConstraintCapturingBuilder<F> {
 
         let main_view = TwoRowMatrixView::new(current_row, next_row);
 
+        let aux_view = aux_trace.map(|aux| {
+            let aux_width = aux.width();
+            let aux_current: Vec<F> = aux
+                .row_slice(row)
+                .map(|s| s.iter().cloned().collect())
+                .unwrap_or_else(|| vec![F::ZERO; aux_width]);
+
+            let aux_next_idx = (row + 1) % num_rows;
+            let aux_next: Vec<F> = aux
+                .row_slice(aux_next_idx)
+                .map(|s| s.iter().cloned().collect())
+                .unwrap_or_else(|| vec![F::ZERO; aux_width]);
+
+            TwoRowMatrixView::new(aux_current, aux_next)
+        });
+
         Self {
             main_view,
+            aux_view,
             current_row: row,
             num_rows,
             public_values,
             periodic_values,
+            randomness,
+            aux_bus_boundary_values,
             captured_constraints: Vec::new(),
         }
     }
@@ -490,15 +597,23 @@ impl<F: Field + PrimeCharacteristicRing + Clone> MidenAirBuilder for ConstraintC
     }
 
     fn permutation(&self) -> Self::MP {
-        self.main()
+        match &self.aux_view {
+            Some(view) => TwoRowMatrixView::new(view.current_row.clone(), view.next_row.clone()),
+            None => {
+                // Plonky3 expects a permutation matrix even when aux width is 0.
+                // We return an empty view to keep the builder generic without
+                // special-casing non-aux AIRs in generated code paths.
+                TwoRowMatrixView::new(Vec::new(), Vec::new())
+            },
+        }
     }
 
     fn permutation_randomness(&self) -> &[Self::RandomVar] {
-        &[]
+        &self.randomness
     }
 
     fn aux_bus_boundary_values(&self) -> &[Self::VarEF] {
-        &[]
+        &self.aux_bus_boundary_values
     }
 }
 
@@ -728,6 +843,44 @@ pub trait CrossBackendTestConfig {
         vec![]
     }
 
+    /// Builds verifier-supplied randomness for auxiliary constraints.
+    ///
+    /// Randomness is always generated when `num_randomness > 0`. If the length is 0,
+    /// this returns an empty vector.
+    fn build_aux_randomness(
+        &self,
+        seed_name: &str,
+        iteration: u64,
+        num_randomness: usize,
+    ) -> Vec<u64> {
+        if num_randomness == 0 {
+            return vec![];
+        }
+
+        let seed = generate_test_seed(seed_name, iteration);
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+
+        (0..num_randomness)
+            .map(|_| 1 + rng.random_range(0..(GOLDILOCKS_MODULUS - 1)))
+            .collect()
+    }
+
+    /// Builds a Plonky3 auxiliary trace. Defaults to None; run_comparison will
+    /// supply a zeroed aux trace if aux width > 0 and no aux trace is provided.
+    fn build_plonky3_aux_trace(
+        &self,
+        _plonky3_air: &Self::Plonky3Air,
+        _main_trace: &RowMajorMatrix<Goldilocks>,
+        _randomness: &[Goldilocks],
+    ) -> Option<RowMajorMatrix<Goldilocks>> {
+        None
+    }
+
+    /// Returns aux bus boundary values (empty by default).
+    fn aux_bus_boundary_values(&self) -> Vec<u64> {
+        vec![]
+    }
+
     /// Builds a random trace in Winterfell format (column-major) using a seeded RNG.
     ///
     /// The seed is generated from the test name and iteration number using
@@ -812,12 +965,12 @@ pub fn run_comparison<C>(config: &C, source: TraceSource<'_>) -> ComparisonResul
 where
     C: CrossBackendTestConfig,
 {
-    let winterfell_trace = match source {
-        TraceSource::Default => config.build_winterfell_trace(),
+    let (winterfell_trace, seed_name, seed_iteration) = match source {
+        TraceSource::Default => (config.build_winterfell_trace(), std::any::type_name::<C>(), 0),
         TraceSource::Random { test_name, iteration } => {
-            config.build_random_winterfell_trace(test_name, iteration)
+            (config.build_random_winterfell_trace(test_name, iteration), test_name, iteration)
         },
-        TraceSource::Custom(trace) => trace.to_vec(),
+        TraceSource::Custom(trace) => (trace.to_vec(), std::any::type_name::<C>(), 0),
     };
 
     let trace_length = config.trace_length();
@@ -829,20 +982,70 @@ where
     let winterfell_pub_inputs = config.build_winterfell_public_inputs();
     let plonky3_pub_inputs = config.build_plonky3_public_inputs();
 
-    // Create Winterfell AIR
-    let trace_info = TraceInfo::new(config.trace_width(), trace_length);
+    // Create Plonky3 AIR first so we can determine aux trace parameters.
+    let plonky3_air = config.create_plonky3_air();
+    let aux_width = plonky3_air.aux_width();
+    let num_randomness = plonky3_air.num_randomness();
+
+    // Create Winterfell AIR with appropriate trace info.
+    let trace_info = if aux_width > 0 || num_randomness > 0 {
+        TraceInfo::new_multi_segment(
+            config.trace_width(),
+            aux_width,
+            num_randomness,
+            trace_length,
+            vec![],
+        )
+    } else {
+        TraceInfo::new(config.trace_width(), trace_length)
+    };
     let proof_options = default_proof_options();
     let winterfell_air =
         config.create_winterfell_air(trace_info, winterfell_pub_inputs, proof_options);
-
-    // Create Plonky3 AIR
-    let plonky3_air = config.create_plonky3_air();
 
     // Get the last_step for Winterfell (where last-row boundary constraints apply)
     let last_step = trace_length - winterfell_air.context().num_transition_exemptions();
 
     // Get periodic column definitions
     let periodic_columns = config.periodic_column_values();
+
+    // Aux trace support is optional; when aux width is 0 there is no aux data.
+    let aux_randomness_u64 = config.build_aux_randomness(seed_name, seed_iteration, num_randomness);
+    let plonky3_randomness: Vec<Goldilocks> =
+        aux_randomness_u64.iter().map(|val| Goldilocks::from_u64(*val)).collect();
+    let winterfell_randomness: Vec<WinterfellFelt> =
+        aux_randomness_u64.iter().map(|val| WinterfellFelt::new(*val)).collect();
+    let aux_rand_elements = AuxRandElements::new(winterfell_randomness);
+
+    let aux_trace_plonky3: Option<RowMajorMatrix<Goldilocks>> = if aux_width > 0 {
+        let custom_aux =
+            config.build_plonky3_aux_trace(&plonky3_air, &plonky3_trace, &plonky3_randomness);
+        custom_aux
+            .or_else(|| plonky3_air.build_aux_trace(&plonky3_trace, &plonky3_randomness))
+            .or_else(|| {
+                // Default to an all-zero aux trace when the width is > 0 but no
+                // aux trace is provided. This keeps aux support optional for
+                // tests that don't exercise auxiliary constraints.
+                Some(RowMajorMatrix::new(
+                    vec![Goldilocks::ZERO; trace_length * aux_width],
+                    aux_width,
+                ))
+            })
+    } else {
+        None
+    };
+    let aux_trace_winterfell = aux_trace_plonky3.as_ref().map(plonky3_trace_to_winterfell);
+
+    let mut aux_boundary_values = config.aux_bus_boundary_values();
+    if aux_width > 0 && aux_boundary_values.is_empty() {
+        aux_boundary_values = vec![0; aux_width];
+    }
+    let plonky3_aux_boundary_values: Vec<Goldilocks> =
+        aux_boundary_values.iter().map(|val| Goldilocks::from_u64(*val)).collect();
+
+    // Use Winterfell's assertion count to split Plonky3 boundary vs transition
+    // constraints since Plonky3 does not report boundary counts separately.
+    let main_boundary_count = winterfell_air.get_assertions().len();
 
     // Evaluate constraints at each row where transition constraints are enforced.
     // Rows >= last_step have transition exemptions in Winterfell, so we skip them
@@ -865,6 +1068,18 @@ where
             last_step,
         );
 
+        let w_aux_boundary = match aux_trace_winterfell.as_ref() {
+            Some(aux_trace) => evaluate_winterfell_aux_boundary(
+                &winterfell_air,
+                aux_trace,
+                row,
+                trace_length,
+                last_step,
+                &aux_rand_elements,
+            ),
+            None => Vec::new(),
+        };
+
         // Winterfell: evaluate transition constraints with is_transition selector
         // and periodic values
         let w_transition = evaluate_winterfell_transition(
@@ -875,17 +1090,46 @@ where
             &winterfell_periodic,
         );
 
-        // Combine: boundary constraints first, then transition constraints
+        let w_aux_transition = match aux_trace_winterfell.as_ref() {
+            Some(aux_trace) => evaluate_winterfell_aux_transition(
+                &winterfell_air,
+                &winterfell_trace,
+                aux_trace,
+                row,
+                trace_length,
+                &winterfell_periodic,
+                &aux_rand_elements,
+            ),
+            None => Vec::new(),
+        };
+
+        // Combine: to follow the order of emitted constraints in Plonky3, we inject:
+        // - main boundary constraints
+        // - aux boundary constraints (Winterfell-only: Plonky3 eval does not emit
+        //   explicit aux boundary assertions; bus boundary values are handled outside eval)
+        // - main transition constraints
+        // - aux transition constraints
+        // TODO: Best guess for now: Plonky3 eval does not emit aux boundary assertions,
+        // so we are not comparing those constraints independently across backends.
+        // We replicate Winterfell's aux boundary evaluations into the Plonky3 result
+        // to keep constraint ordering consistent. Follow-up: emit aux boundary
+        // assertions in Plonky3 codegen so both backends produce them directly,
+        // then remove this injection.
         let mut w_all = w_boundary;
+        w_all.extend(w_aux_boundary.clone());
         w_all.extend(w_transition);
+        w_all.extend(w_aux_transition);
         winterfell_results.push(w_all);
 
         // Plonky3: create a capturing builder for this row with periodic values
         let mut builder = ConstraintCapturingBuilder::new(
             &plonky3_trace,
+            aux_trace_plonky3.as_ref(),
             row,
             plonky3_pub_inputs.clone(),
             plonky3_periodic,
+            plonky3_randomness.clone(),
+            plonky3_aux_boundary_values.clone(),
         );
 
         // Evaluate the Plonky3 AIR
@@ -893,6 +1137,21 @@ where
 
         // Get captured constraints
         let p_all = builder.get_captured_constraints();
+
+        let p_all = if !w_aux_boundary.is_empty() && p_all.len() >= main_boundary_count {
+            let (p_boundary, p_transition) = p_all.split_at(main_boundary_count);
+            let mut combined = Vec::with_capacity(p_all.len() + w_aux_boundary.len());
+            combined.extend_from_slice(p_boundary);
+            // Plonky3 generated AIRs do not emit explicit aux boundary assertions,
+            // so we evaluate them from the Winterfell AIR and insert them here
+            // to compare all constraints in a consistent order.
+            combined.extend_from_slice(&w_aux_boundary);
+            combined.extend_from_slice(p_transition);
+            combined
+        } else {
+            p_all
+        };
+
         plonky3_results.push(p_all);
     }
 
@@ -946,6 +1205,47 @@ where
             results.push(result.to_canonical_u64());
         } else if assertion_row == last_step {
             // Last row boundary constraint (using last_step from AIR)
+            let actual_felt = WinterfellFelt::new(actual);
+            let expected_felt = WinterfellFelt::new(expected);
+            let is_last_felt = WinterfellFelt::new(is_last_row);
+            let diff = actual_felt - expected_felt;
+            let result = is_last_felt * diff;
+            results.push(result.to_canonical_u64());
+        }
+    }
+
+    results
+}
+
+/// Evaluates auxiliary boundary constraints at a specific row for Winterfell.
+pub fn evaluate_winterfell_aux_boundary<A>(
+    air: &A,
+    aux_trace: &[Vec<WinterfellFelt>],
+    row: usize,
+    num_rows: usize,
+    last_step: usize,
+    aux_rand_elements: &AuxRandElements<WinterfellFelt>,
+) -> Vec<u64>
+where
+    A: Air<BaseField = WinterfellFelt>,
+{
+    let assertions = get_winterfell_aux_boundary_assertions(air, aux_rand_elements);
+    let mut results = Vec::new();
+
+    for (col, assertion_row, expected) in assertions {
+        let actual = aux_trace[col][row].to_canonical_u64();
+
+        let is_first_row = if row == 0 { 1u64 } else { 0u64 };
+        let is_last_row = if row == num_rows - 1 { 1u64 } else { 0u64 };
+
+        if assertion_row == 0 {
+            let actual_felt = WinterfellFelt::new(actual);
+            let expected_felt = WinterfellFelt::new(expected);
+            let is_first_felt = WinterfellFelt::new(is_first_row);
+            let diff = actual_felt - expected_felt;
+            let result = is_first_felt * diff;
+            results.push(result.to_canonical_u64());
+        } else if assertion_row == last_step {
             let actual_felt = WinterfellFelt::new(actual);
             let expected_felt = WinterfellFelt::new(expected);
             let is_last_felt = WinterfellFelt::new(is_last_row);
