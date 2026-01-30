@@ -23,6 +23,7 @@ mod inlined_functions_simple;
 mod list_comprehension;
 mod list_comprehension_nested;
 mod list_folding;
+mod periodic_columns;
 mod pub_inputs;
 mod selectors;
 mod selectors_combine_simple;
