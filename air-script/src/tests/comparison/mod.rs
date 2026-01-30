@@ -5,6 +5,7 @@
 
 mod binary;
 mod bitwise;
+mod buses_complex;
 mod buses_simple;
 mod cc_with_evaluators;
 mod comprehension_periodic_binding;
