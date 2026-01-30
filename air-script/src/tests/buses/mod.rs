@@ -9,7 +9,7 @@ pub mod buses_simple;
 mod buses_varlen_boundary_both;
 #[rustfmt::skip]
 #[allow(clippy::all)]
-mod buses_varlen_boundary_first;
+pub mod buses_varlen_boundary_first;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 mod buses_varlen_boundary_last;
@@ -29,7 +29,7 @@ mod buses_varlen_boundary_both_plonky3;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 #[allow(unused_imports)]
-mod buses_varlen_boundary_first_plonky3;
+pub mod buses_varlen_boundary_first_plonky3;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 #[allow(unused_imports)]

@@ -8,6 +8,7 @@ mod bitwise;
 mod buses_complex;
 mod buses_simple;
 mod buses_simple_with_evaluators;
+mod buses_varlen_boundary_first;
 mod cc_with_evaluators;
 mod comprehension_periodic_binding;
 mod computed_indices_complex;
