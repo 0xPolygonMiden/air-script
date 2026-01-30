@@ -1,10 +1,10 @@
 #[rustfmt::skip]
 #[allow(clippy::all)]
-mod list_comprehension_nested;
+pub mod list_comprehension_nested;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 #[allow(unused_imports)]
-mod list_comprehension_nested_plonky3;
+pub mod list_comprehension_nested_plonky3;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 pub mod list_comprehension;
