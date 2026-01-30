@@ -24,3 +24,4 @@ mod list_comprehension_nested;
 mod list_folding;
 mod pub_inputs;
 mod selectors;
+mod selectors_with_evaluators;
