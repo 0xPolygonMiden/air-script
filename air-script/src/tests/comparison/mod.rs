@@ -15,5 +15,6 @@ mod evaluators;
 mod evaluators_nested_slice_call;
 mod evaluators_slice;
 mod fibonacci;
+mod functions_complex;
 mod functions_simple;
 mod indexed_trace_access;
