@@ -129,73 +129,12 @@ impl ComparisonResult {
     }
 }
 
-/// Evaluates Winterfell transition constraints at a specific row.
-///
-/// Returns a vector of constraint evaluation values as canonical u64.
-///
-/// Note: This does NOT apply the `is_transition` multiplier. Use
-/// `evaluate_winterfell_transition_at_row_with_selector` if you need
-/// the results to be comparable with Plonky3's `when_transition()` behavior.
-pub fn evaluate_winterfell_transition_at_row<A>(
-    air: &A,
-    trace: &[Vec<WinterfellFelt>],
-    row: usize,
-) -> Vec<u64>
-where
-    A: Air<BaseField = WinterfellFelt>,
-{
-    let trace_width = trace.len();
-    let trace_length = trace[0].len();
-
-    // Build current and next row data
-    let current: Vec<WinterfellFelt> = (0..trace_width).map(|col| trace[col][row]).collect();
-
-    let next_row = (row + 1) % trace_length;
-    let next: Vec<WinterfellFelt> = (0..trace_width).map(|col| trace[col][next_row]).collect();
-
-    // Create evaluation frame
-    let frame = EvaluationFrame::from_rows(current, next);
-
-    // Allocate result buffer based on number of transition constraints
-    let num_constraints = air.context().num_transition_constraints();
-    let mut result = vec![WinterfellFelt::ZERO; num_constraints];
-
-    // Evaluate transition constraints (empty periodic values for simple AIRs)
-    let periodic_values: Vec<WinterfellFelt> = vec![];
-    air.evaluate_transition(&frame, &periodic_values, &mut result);
-
-    // Convert to canonical u64
-    result.iter().map(|e| e.to_canonical_u64()).collect()
-}
-
-/// Evaluates Winterfell transition constraints at a specific row,
-/// with each result multiplied by `is_transition`.
-///
-/// This makes the results comparable with Plonky3's `when_transition()` behavior,
-/// where constraints are multiplied by a selector that is 1 on all rows except
-/// the last one.
-///
-/// Note: This applies the selector to ALL transition constraints, including
-/// those that are NOT wrapped in `when_transition()` in Plonky3. For valid
-/// traces where all constraints evaluate to 0, this doesn't matter. For
-/// invalid traces or debugging, be aware of this difference.
-pub fn evaluate_winterfell_transition_at_row_with_selector<A>(
-    air: &A,
-    trace: &[Vec<WinterfellFelt>],
-    row: usize,
-    num_rows: usize,
-) -> Vec<u64>
-where
-    A: Air<BaseField = WinterfellFelt>,
-{
-    // Use the version with periodic values, passing empty periodic values
-    evaluate_winterfell_transition_at_row_with_periodic(air, trace, row, num_rows, &[])
-}
-
 /// Evaluates Winterfell transition constraints at a specific row,
 /// with periodic column values and `is_transition` selector applied.
 ///
-/// This is the full-featured version that supports periodic columns.
+/// This is the unified evaluation function that supports:
+/// - Periodic columns (pass values via `periodic_values`)
+/// - Transition selectors (applied automatically)
 ///
 /// # Arguments
 ///
@@ -203,8 +142,8 @@ where
 /// * `trace` - The trace in column-major format
 /// * `row` - The row to evaluate at
 /// * `num_rows` - Total number of rows in the trace
-/// * `periodic_values` - The periodic column values evaluated at this row
-pub fn evaluate_winterfell_transition_at_row_with_periodic<A>(
+/// * `periodic_values` - The periodic column values evaluated at this row (empty for simple AIRs)
+pub fn evaluate_winterfell_transition<A>(
     air: &A,
     trace: &[Vec<WinterfellFelt>],
     row: usize,
@@ -317,54 +256,6 @@ where
             (col, step, expected)
         })
         .collect()
-}
-
-/// Evaluates boundary constraints at a specific row for Winterfell.
-/// Returns the constraint evaluation (actual - expected) for each boundary constraint
-/// that applies to this row, multiplied by the first_row indicator (like Plonky3 does).
-pub fn evaluate_winterfell_boundary_at_row<A>(
-    air: &A,
-    trace: &[Vec<WinterfellFelt>],
-    row: usize,
-    num_rows: usize,
-) -> Vec<u64>
-where
-    A: Air<BaseField = WinterfellFelt>,
-{
-    let assertions = get_winterfell_boundary_assertions(air);
-    let mut results = Vec::new();
-
-    for (col, assertion_row, expected) in assertions {
-        // Compute (actual - expected)
-        let actual = trace[col][row].to_canonical_u64();
-
-        // For first row constraints: multiply by is_first_row indicator
-        // For last row constraints: multiply by is_last_row indicator
-        let is_first_row = if row == 0 { 1u64 } else { 0u64 };
-        let is_last_row = if row == num_rows - 1 { 1u64 } else { 0u64 };
-
-        if assertion_row == 0 {
-            // First row boundary constraint
-            // Plonky3 computes: is_first_row * (actual - expected)
-            // We need to do the same arithmetic in the field
-            let actual_felt = WinterfellFelt::new(actual);
-            let expected_felt = WinterfellFelt::new(expected);
-            let is_first_felt = WinterfellFelt::new(is_first_row);
-            let diff = actual_felt - expected_felt;
-            let result = is_first_felt * diff;
-            results.push(result.to_canonical_u64());
-        } else if assertion_row == num_rows - 1 {
-            // Last row boundary constraint
-            let actual_felt = WinterfellFelt::new(actual);
-            let expected_felt = WinterfellFelt::new(expected);
-            let is_last_felt = WinterfellFelt::new(is_last_row);
-            let diff = actual_felt - expected_felt;
-            let result = is_last_felt * diff;
-            results.push(result.to_canonical_u64());
-        }
-    }
-
-    results
 }
 
 /// A view into two consecutive rows of the trace matrix for constraint evaluation.
@@ -701,7 +592,16 @@ pub trait CrossBackendTestConfig {
     fn build_winterfell_public_inputs(&self) -> Self::WinterfellPublicInputs;
 
     /// Builds the Plonky3 public inputs.
-    fn build_plonky3_public_inputs(&self) -> Vec<Goldilocks>;
+    ///
+    /// Default implementation auto-converts from Winterfell public inputs.
+    /// Override this if you need custom conversion logic.
+    fn build_plonky3_public_inputs(&self) -> Vec<Goldilocks> {
+        self.build_winterfell_public_inputs()
+            .to_elements()
+            .into_iter()
+            .map(|felt| Goldilocks::from_u64(felt.as_int()))
+            .collect()
+    }
 
     /// Creates the Winterfell AIR instance.
     fn create_winterfell_air(
@@ -715,7 +615,11 @@ pub trait CrossBackendTestConfig {
     fn create_plonky3_air(&self) -> Self::Plonky3Air;
 
     /// Returns the number of public values for Plonky3.
-    fn num_public_values(&self) -> usize;
+    ///
+    /// Default implementation returns the length of Plonky3 public inputs.
+    fn num_public_values(&self) -> usize {
+        self.build_plonky3_public_inputs().len()
+    }
 
     /// Returns the periodic column values (empty by default).
     ///
@@ -866,7 +770,7 @@ where
             evaluate_periodic_values_at_row(&periodic_columns, row);
 
         // Winterfell: evaluate boundary constraints
-        let w_boundary = evaluate_winterfell_boundary_at_row_with_last_step(
+        let w_boundary = evaluate_winterfell_boundary(
             &winterfell_air,
             &winterfell_trace,
             row,
@@ -876,7 +780,7 @@ where
 
         // Winterfell: evaluate transition constraints with is_transition selector
         // and periodic values
-        let w_transition = evaluate_winterfell_transition_at_row_with_periodic(
+        let w_transition = evaluate_winterfell_transition(
             &winterfell_air,
             &winterfell_trace,
             row,
@@ -941,10 +845,17 @@ where
 
 /// Evaluates boundary constraints at a specific row for Winterfell.
 ///
-/// This version takes the explicit `last_step` value from Winterfell's AIR,
-/// which accounts for transition exemptions when determining when last-row
-/// boundary constraints should apply.
-pub fn evaluate_winterfell_boundary_at_row_with_last_step<A>(
+/// This function evaluates boundary constraints with proper handling of the last step
+/// from Winterfell's AIR context, which accounts for transition exemptions when
+/// determining when last-row boundary constraints should apply.
+///
+/// # Arguments
+/// * `air` - The Winterfell AIR instance
+/// * `trace` - The trace in column-major format
+/// * `row` - The row to evaluate at
+/// * `num_rows` - Total number of rows in the trace
+/// * `last_step` - The last step index from AIR context (accounts for transition exemptions)
+pub fn evaluate_winterfell_boundary<A>(
     air: &A,
     trace: &[Vec<WinterfellFelt>],
     row: usize,
