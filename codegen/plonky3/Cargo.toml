@@ -1,0 +1,17 @@
+[package]
+name = "air-codegen-plonky3"
+version = "0.5.0"
+description = "Plonky3 code generator for the AirScript language"
+authors.workspace = true
+readme = "README.md"
+license.workspace = true
+repository.workspace = true
+categories = ["compilers", "cryptography"]
+keywords = ["air", "stark", "plonky3", "zero-knowledge", "zkp"]
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+air-ir = { package = "air-ir", path = "../../air", version = "0.5" }
+anyhow = { workspace = true }
+codegen = "0.2"

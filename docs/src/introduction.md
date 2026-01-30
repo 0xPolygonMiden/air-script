@@ -7,6 +7,7 @@
 Currently, AirScript is on version 0.3, which includes about 95% of features needed to describe Miden VM constraints, and supports generation of constraint evaluation code for the following backends:
 
 - **Winterfell**: Generates Rust code implementing the `Air` trait for the [Winterfell prover](https://github.com/facebook/winterfell)
+- **Plonky3**: Generates Rust code implementing the `Air` trait implementation for the [Plonky3 prover](https://github.com/Plonky3/Plonky3)
 - **ACE**: Generates arithmetic circuits for Miden VM's ACE (Arithmetic Circuit Evaluation) chiplet for recursive proof verification
 
 AirScript includes the following features:
@@ -57,6 +58,8 @@ Then, run the `airc` target with the `transpile` option. For example:
 ```
 This will output constraint evaluation code targeted for the Winterfell prover.
 
+Using the  `--target plonky3` argument will output constraint evaluation code targeted for the Plonky3 prover instead.
+
 You can use the `help` option to see other available options.
 
 ```ignore
@@ -75,6 +78,5 @@ The following changes are some of the improvements under consideration for futur
   - removing unnecessary nodes from the `AlgebraicGraph` of boundary and integrity constraints.
   - combining integrity constraints with mutually exclusive selectors to reduce the total number of constraints.
 - additional language targets for simplifying verifier implementations:
-  - Plonky3 AirBuilder.
   - JSON-based constraint syntax.
 - formal verification

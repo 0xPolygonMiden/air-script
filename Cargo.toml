@@ -8,6 +8,8 @@ members = [
     "air",
     "codegen/winterfell",
     "codegen/ace",
+    "codegen/plonky3",
+    "constraints",
 ]
 resolver = "2"
 

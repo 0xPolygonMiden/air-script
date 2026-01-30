@@ -1,0 +1,49 @@
+use p3_field::PrimeField64;
+use p3_miden_air::RowMajorMatrix;
+
+use crate::{
+    generate_air_plonky3_test_with_airscript_traits,
+    tests::indexed_trace_access::indexed_trace_access_plonky3::{MAIN_WIDTH, TraceAccessAir},
+};
+
+pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<u64>) -> RowMajorMatrix<F> {
+    let num_rows = 512;
+    let trace_length = num_rows * MAIN_WIDTH;
+
+    let mut long_trace = F::zero_vec(trace_length);
+
+    let mut trace = RowMajorMatrix::new(long_trace, MAIN_WIDTH);
+
+    let (prefix, rows, suffix) = unsafe { trace.values.align_to_mut::<[F; MAIN_WIDTH]>() };
+    assert!(prefix.is_empty(), "Alignment should match");
+    assert!(suffix.is_empty(), "Alignment should match");
+    assert_eq!(rows.len(), num_rows);
+
+    // Initialize first row
+    rows[0][0] = F::ZERO;
+    rows[0][1] = F::ZERO;
+    rows[0][2] = F::ZERO;
+    rows[0][3] = F::ZERO;
+
+    // Fill subsequent rows using direct access to the rows array
+    #[allow(clippy::needless_range_loop)]
+    for i in 1..num_rows {
+        // Update current row
+        rows[i][0] = F::ONE;
+        rows[i][1] = F::ZERO;
+        rows[i][2] = F::ZERO;
+        rows[i][3] = F::ZERO;
+    }
+
+    trace
+}
+
+fn generate_inputs() -> Vec<u64> {
+    vec![1; 16]
+}
+
+fn generate_var_len_pub_inputs<'a>() -> Vec<Vec<Vec<u64>>> {
+    vec![]
+}
+
+generate_air_plonky3_test_with_airscript_traits!(test_air_plonky3, TraceAccessAir);

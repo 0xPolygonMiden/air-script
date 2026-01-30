@@ -18,6 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 air-codegen-winter = { package = "air-codegen-winter", path = "../codegen/winterfell", version = "0.5" }
+air-codegen-plonky3 = { package = "air-codegen-plonky3", path = "../codegen/plonky3", version = "0.5" }
 air-ir = { package = "air-ir", path = "../air", version = "0.5" }
 air-parser = { package = "air-parser", path = "../parser", version = "0.5" }
 air-pass = { package = "air-pass", path = "../pass", version = "0.5" }
@@ -27,11 +28,53 @@ log = { version = "0.4", default-features = false }
 miden-diagnostics = { workspace = true }
 mir = { package = "air-mir", path = "../mir", version = "0.5" }
 
+# Upstream Plonky3 dependencies
+p3-field = { version = "0.4.2", default-features = false }
+p3-matrix = { version = "0.4.2", default-features = false }
+# Internal p3-miden crates
+p3-miden-air = { package = "p3-miden-air", git = "https://github.com/0xMiden/p3-miden", rev = "b6cb824d2a462bbcbbfb828c158de220aa7ca11f", default-features = false }
+
+# MassaLabs fork
+miden-processor = { package = "miden-processor", git="https://github.com/massalabs/miden-vm", rev = "bc553af69a2543a0789830e8508b019694528181", default-features = false }
+miden-air = { package = "miden-air", git="https://github.com/massalabs/miden-vm", rev = "bc553af69a2543a0789830e8508b019694528181", default-features = false }
+
 [dev-dependencies]
 expect-test = "1.4"
+pretty_assertions = "1.4"
+
+# Upstream Plonky3 dependencies
+p3-air = { version = "0.4.2", default-features = false }
+p3-baby-bear = { version = "0.4.2", default-features = false }
+p3-challenger = { version = "0.4.2", default-features = false }
+p3-circle = { version = "0.4.2", default-features = false }
+p3-commit = { version = "0.4.2", default-features = false }
+p3-dft = { version = "0.4.2", default-features = false }
+p3-field-testing = { version = "0.4.2", default-features = false }
+p3-fri = { version = "0.4.2", default-features = false }
+p3-goldilocks = { version = "0.4.2", default-features = false }
+p3-interpolation = { version = "0.4.2", default-features = false }
+p3-keccak = { version = "0.4.2", default-features = false }
+p3-matrix = { version = "0.4.2", default-features = false }
+p3-maybe-rayon = { version = "0.4.2", default-features = false }
+p3-mds = { version = "0.4.2", default-features = false }
+p3-merkle-tree = { version = "0.4.2", default-features = false }
+p3-mersenne-31 = { version = "0.4.2", default-features = false }
+p3-poseidon = { version = "0.4.2", default-features = false }
+p3-poseidon2 = { version = "0.4.2", default-features = false }
+p3-sha256 = { version = "0.4.2", default-features = false }
+p3-symmetric = { version = "0.4.2", default-features = false }
+p3-uni-stark = { version = "0.4.2", default-features = false }
+p3-util = { version = "0.4.2", default-features = false }
+# Internal p3-miden crates
+p3-miden-fri = { package = "p3-miden-fri", git = "https://github.com/0xMiden/p3-miden", rev = "b6cb824d2a462bbcbbfb828c158de220aa7ca11f", default-features = false }
+p3-miden-prover = { package = "p3-miden-prover", git = "https://github.com/0xMiden/p3-miden", rev = "b6cb824d2a462bbcbbfb828c158de220aa7ca11f",  default-features = false }
+p3-miden-uni-stark = { package = "p3-miden-uni-stark", git = "https://github.com/0xMiden/p3-miden", rev = "b6cb824d2a462bbcbbfb828c158de220aa7ca11f",  default-features = false }
+
 winter-air = { package = "winter-air", version = "0.12", default-features = false }
 winter-math = { package = "winter-math", version = "0.12", default-features = false }
 winter-utils = { package = "winter-utils", version = "0.12", default-features = false }
 winter-prover = { package = "winter-prover", version = "0.12", default-features = false }
 winter-verifier = { package = "winter-verifier", version = "0.12", default-features = false }
 winterfell = { package = "winterfell", version = "0.12", default-features = false }
+rand = { version = "0.9", features = ["small_rng"] }
+rand_chacha = "0.9"

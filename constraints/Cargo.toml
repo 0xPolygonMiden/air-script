@@ -1,0 +1,23 @@
+[package]
+name = "constraints"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+air-ir = { path = "../air", version = "0.5" }
+air-parser = { path = "../parser", version = "0.5" }
+air-pass = { path = "../pass", version = "0.5" }
+air-mir = { path = "../mir", version = "0.5" }
+air-codegen-ace = { path = "../codegen/ace", version = "0.5" }
+miden-diagnostics = { workspace = true }
+miden-core = { package = "miden-core", version = "0.13", default-features = false }
+
+winter-air = { package = "winter-air", version = "0.12", default-features = false }
+winter-math = { package = "winter-math", version = "0.12", default-features = false }
+winter-utils = { package = "winter-utils", version = "0.12", default-features = false }
+winter-prover = { package = "winter-prover", version = "0.12", default-features = false }
+winter-verifier = { package = "winter-verifier", version = "0.12", default-features = false }
+winterfell = { package = "winterfell", version = "0.12", default-features = false }
+
+[dev-dependencies]
+anyhow = "1"

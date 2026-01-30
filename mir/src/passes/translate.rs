@@ -695,7 +695,7 @@ impl<'a> MirBuilder<'a> {
             // At this point during compilation, fully-qualified identifiers can only possibly refer
             // to a periodic column, as all functions have been inlined, and constants propagated.
             ast::ResolvableIdentifier::Resolved(qual_ident) => {
-                if let Some(pc) = self.mir.periodic_columns.get(&qual_ident).cloned() {
+                if let Some(pc) = self.mir.periodic_columns.get(qual_ident).cloned() {
                     let node = Value::builder()
                         .value(SpannedMirValue {
                             span: access.span(),
@@ -706,7 +706,7 @@ impl<'a> MirBuilder<'a> {
                         })
                         .build();
                     Ok(node)
-                } else if let Some(bus) = self.mir.constraint_graph().get_bus_link(&qual_ident) {
+                } else if let Some(bus) = self.mir.constraint_graph().get_bus_link(qual_ident) {
                     let node = Value::builder()
                         .value(SpannedMirValue {
                             span: access.span(),
@@ -714,6 +714,10 @@ impl<'a> MirBuilder<'a> {
                         })
                         .build();
                     Ok(node)
+                } else if let Some(constant) = self.program.constants.get(qual_ident) {
+                    // Handle qualified constant references that weren't inlined
+                    // (e.g., constants used in comprehension iterables across modules)
+                    self.translate_const(&constant.value, access.span())
                 } else {
                     // This is a qualified reference that should have been eliminated
                     // during inlining or constant propagation, but somehow slipped through.
@@ -735,7 +739,7 @@ impl<'a> MirBuilder<'a> {
             },
             // This must be one of public inputs or trace columns
             ast::ResolvableIdentifier::Global(ident) | ast::ResolvableIdentifier::Local(ident) => {
-                self.translate_symbol_access_global_or_local(&ident, access)
+                self.translate_symbol_access_global_or_local(ident, access)
             },
             // These should have been eliminated by previous compiler passes
             ast::ResolvableIdentifier::Unresolved(_ident) => {
@@ -1063,7 +1067,8 @@ impl<'a> MirBuilder<'a> {
         access: &'a ast::SymbolAccess,
     ) -> Option<Link<Op>> {
         // If it's a slice access, we need to create a vector of MirAccessType::Index
-        if let AccessType::Slice(ast::RangeExpr { start, end, .. }) = &access.access_type {
+        if let AccessType::Slice(range) = &access.access_type {
+            let ast::RangeExpr { start, end, .. } = range.as_ref();
             let (
                 ast::RangeBound::Const(Span { item: start, .. }),
                 ast::RangeBound::Const(Span { item: end, .. }),

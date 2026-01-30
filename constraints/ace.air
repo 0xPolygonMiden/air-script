@@ -1,0 +1,313 @@
+##########################################################################################
+# ACE CHIPLET CONSTRAINTS MODULE
+##########################################################################################
+#
+# The ACE (Arithmetic Circuit Evaluation) chiplet reduces the number of cycles required
+# when recursively verifying a STARK proof in Miden assembly by evaluating arithmetic
+# circuits and ensuring they evaluate to zero over given inputs.
+#
+# OVERVIEW:
+# The ACE chiplet operates in two phases:
+# 1. READ blocks: Load extension field elements from memory and assign node IDs
+# 2. EVAL blocks: Execute arithmetic operations on previously loaded nodes
+#
+# Each section starts with READ operations to load inputs, followed by EVAL operations
+# to compute intermediate and final results. The final result must evaluate to zero
+# to represent a valid constraint satisfaction.
+#
+# ACE TRACE TABLE LAYOUT (16 columns):
+#
+# ┌─────────────┬────────────────────────────────────────────────────────────────────────────┐
+# │   Column    │ Purpose                                                                    │
+# ├─────────────┼────────────────────────────────────────────────────────────────────────────┤
+# │ sstart      │ Section start flag (binary): 1 = first row of section, 0 = otherwise       │
+# │ sblock      │ Block selector (binary): 0 = READ block, 1 = EVAL block                    │
+# │ ctx         │ Memory access context (constant throughout section)                        │
+# │ ptr         │ Memory pointer: increments by +4 in READ, +1 in EVAL blocks                │
+# │ clk         │ Memory access clock cycle (constant within section)                        │
+# │ op          │ Operation type (EVAL only): -1 = SUB, 0 = MUL, 1 = ADD                     │
+# │ id0         │ Result node ID: decrements by -2 in READ, -1 in EVAL                       │
+# │ v0_0        │ Result node value (extension field element, coefficient 0)                 │
+# │ v0_1        │ Result node value (extension field element, coefficient 1)                 │
+# │ id1         │ First operand node ID                                                      │
+# │ v1_0        │ First operand value (extension field element, coefficient 0)               │
+# │ v1_1        │ First operand value (extension field element, coefficient 1)               │
+# │ id2 / n_eval│ Dual use: 2nd operand node ID (EVAL) / #evaluations in section (READ)      │
+# │ v2_0        │ Second operand value (extension field element, coefficient 0)              │
+# │ v2_1        │ Second operand value (extension field element, coefficient 1)              │
+# │ m0          │ Wire bus multiplicity (for node tracking, not yet implemented)             │
+# └─────────────┴────────────────────────────────────────────────────────────────────────────┘
+#
+# STATUS: Core constraints implemented, wire bus constraints not implemented
+#
+# REFERENCES:
+# - ACE Design: https://0xmiden.github.io/miden-vm/design/chiplets/ace.html
+##########################################################################################
+
+mod ace
+
+use chiplets::*;
+use utils::*;
+
+##########################################################################################
+# ACE CHIPLET CONSTRAINTS
+##########################################################################################
+
+# Enforces constraints on all rows of ACE chiplet.
+ev ace_chiplet_constraints_all_rows([s3, ace[16]]) {
+    let sstart = ace[0];    # Section start flag
+    let sblock = ace[1];    # Block selector (0=READ, 1=EVAL)
+    let ctx = ace[2];       # Memory access context
+    let ptr = ace[3];       # Memory pointer
+    let clk = ace[4];       # Memory access clock
+    let op = ace[5];        # Operation type (for EVAL block)
+    let id0 = ace[6];       # First node identifier
+    let v0_0 = ace[7];      # First node value (element 0)
+    let v0_1 = ace[8];      # First node value (element 1)
+    let id1 = ace[9];       # Second node identifier
+    let v1_0 = ace[10];     # Second node value (element 0)
+    let v1_1 = ace[11];     # Second node value (element 1)
+    let id2 = ace[12];      # Third node identifier (result node in EVAL)
+    let n_eval = ace[12];   # Total number of arithmetic operations
+    let v2_0 = ace[13];     # Third node value (element 0)
+    let v2_1 = ace[14];     # Third node value (element 1)
+    let m0 = ace[15];       # Multiplicity for wire bus operations
+
+    let flag_ace_next = flag_ace_current_and_next(s3');
+    let flag_ace_last = flag_ace_last(s3');
+        
+    # Section and block flags constraints
+    enf section_block_flags_constraints([s3, sstart, sstart', sblock, id0, n_eval]);
+
+    # Section general constraints
+    enf section_constraints([sstart, sblock, ctx, ptr, clk, id0]) when flag_ace_next;
+
+    # Section specific constraints: READ block
+    enf enforce_read_block_constraints([sblock, id0, id1]);
+
+    # Section specific constraints: EVAL block
+    enf enforce_eval_block_constraints([sblock, op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]);
+
+    # Finalization constraints
+    let f_end = binary_or(binary_and(flag_ace_next, sstart'), flag_ace_last);
+    enf finalization_constraints([id0, v0_0, v0_1]) when f_end;
+}
+
+# Enforces that on the first row of ACE chiplet we should have sstart' = 1
+ev ace_chiplet_constraints_first_row([ace[16]]) {
+    let sstart = ace[0];    # Section start flag
+
+    enf sstart' = 1;
+}
+
+##########################################################################################
+# CONSTRAINT EVALUATORS
+##########################################################################################
+
+# Section and block flag management
+#
+# This evaluator enforces the proper sequencing of ACE chiplet operations:
+# - Sections must start with READ blocks and end with EVAL blocks
+# - Block transitions follow valid patterns (READ→EVAL within sections)
+# - Section boundaries are correctly marked with sstart flags
+# - READ→EVAL transition occurs when n_eval matches id0
+ev section_block_flags_constraints([s3, sstart, sstart_next, sblock, id0, n_eval]) {
+    let flag_ace_next = flag_ace_current_and_next(s3');
+    let flag_ace_last = flag_ace_last(s3');
+        
+    let section_flags = section_flags(s3', sstart, sstart_next);
+    let f_start = section_flags[0];
+    let f_next = section_flags[1];
+    let f_end = section_flags[2];
+
+    let block_flags = block_flags(sblock);
+    let block_flags_next = block_flags(sblock');
+    let f_read = block_flags[0];
+    let f_eval = block_flags[1];
+    let f_read_next = block_flags_next[0];
+    let f_eval_next = block_flags_next[1];
+
+    # Binary constraints for section and block flags
+    enf enforce_binary_columns([sstart, sblock]);
+
+    # Last row of ACE chiplet cannot be section start
+    enf sstart = 0 when flag_ace_last;
+
+    # Prevent consecutive section starts within ACE chiplet
+    enf binary_and(sstart, sstart') = 0 when flag_ace_next;
+
+    # Sections must start with READ blocks (not EVAL)
+    enf f_eval = 0 when f_start;
+
+    # EVAL blocks cannot be followed by READ blocks within same section
+    enf f_read_next = 0 when binary_and(f_next, f_eval);
+
+    # Sections must end with EVAL blocks (not READ)
+    enf f_read = 0 when f_end;
+
+    # In a READ block, n_eval stays constant.
+    # When transitioning to an EVAL block, the next id0 must equal n_eval - 1.
+    # This ensures proper sequencing: READ loads nodes with IDs, EVAL starts processing
+    # from the highest loaded node ID (n_eval - 1).
+    enf select(f_read_next, n_eval', id0' + 1) = n_eval when f_read;
+}
+
+# Constrains binary columns for flags and selectors
+ev enforce_binary_columns([sstart, sblock]) {
+    # Section start flag must be binary
+    enf is_binary([sstart]);
+
+    # Block selector must be binary
+    enf is_binary([sblock]);
+}
+
+# Section-level constraints (common to both READ and EVAL blocks)
+#
+# These constraints apply throughout an entire section regardless of block type:
+# - Context (ctx) and clock (clk) remain constant within a section
+# - Memory pointer (ptr) increments with fixed increments: +4 in READ, +1 in EVAL
+# - Node identifiers (id0) decrement with fixed decrements: -2 in READ, -1 in EVAL
+#
+# Note: These constraints are active when the next row is NOT the start of a new section,
+# i.e., all but the last rows of the section (intra-section transitions only).
+ev section_constraints([sstart, sblock, ctx, ptr, clk, id0]) {
+    let flag_within_section = binary_not(sstart');
+    let flag_read = !sblock;
+    let flag_eval = sblock;
+
+    # Context consistency within a section
+    enf ctx' = ctx when flag_within_section;
+
+    # Clock consistency within a section
+    enf clk' = clk when flag_within_section;
+
+    # Memory pointer increases by 4 in READ blocks and by 1 in EVAL blocks
+    enf ptr' = ptr + 4 * flag_read + flag_eval when flag_within_section;
+
+    # Node identifiers decrease by 2 in READ blocks and by 1 in EVAL blocks
+    enf id0 = id0' + 2 * flag_read + flag_eval when flag_within_section;
+}
+
+# Finalization constraints (ensure final result is zero)
+ev finalization_constraints([id0, v0_0, v0_1]) {
+    # The final result of the arithmetic circuit evaluation must be zero
+    # This ensures the circuit represents a valid constraint
+    enf v0_0 = 0;
+    enf v0_1 = 0;
+
+    # Final node ID should be the root node
+    enf id0 = 0;
+}
+
+# READ block operation constraints
+#
+# The only specific constraint to READ blocks is a constraint ensuring that the IDs of the two
+# loaded extension field elements is consecutive.
+ev enforce_read_block_constraints([sblock, id0, id1]) {
+    let is_read_block = binary_not(sblock);
+
+    # In READ block, we read two extension field elements and assign node IDs
+    # The two node IDs should be consecutive. Note that the node IDs are decreasing.
+    enf id1 = id0 - 1 when is_read_block;
+}
+
+# EVAL block operation constraints
+#
+# Enforces arithmetic circuit evaluation during EVAL operations:
+# - Validates operation codes (op ∈ {-1, 0, 1} for SUB, MUL, ADD)
+# - Performs extension field arithmetic on input nodes (v1, v2)
+ev enforce_eval_block_constraints([sblock, op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]) {
+    let is_eval_block = sblock;
+
+    # In EVAL block, we decode instruction and perform arithmetic operation
+    # The 'op' column contains the operation type and must be equal to either -1, 0, or 1
+    enf op * (op - 1) * (op + 1) = 0 when is_eval_block;
+
+    # Arithmetic operation constraint based on op type
+    enf enforce_arithmetic_operation([op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]) when is_eval_block;
+}
+
+
+# Arithmetic operation evaluation for EVAL block
+#
+# Performs extension field arithmetic based on operation code:
+# - op = -1: Subtraction (v0 = v1 - v2)
+# - op =  0: Multiplication (v0 = v1 × v2)
+# - op =  1: Addition (v0 = v1 + v2)
+#
+# All arithmetic is in the quadratic extension field 𝔽ₚ[x]/(x² - x + 2)
+ev enforce_arithmetic_operation([op, v0_0, v0_1, v1_0, v1_1, v2_0, v2_1]) {
+    # Decode operation and enforce arithmetic constraint for extension field elements
+    # Extension field elements are represented as (a_0, a_1) where element = a_0 + a_1 * α
+
+    let linear_op = compute_linear_op(op, v1_0, v1_1, v2_0, v2_1);
+    let linear_op_0 = linear_op[0];
+    let linear_op_1 = linear_op[1];
+
+    let non_linear_op = compute_non_linear_op(v1_0, v1_1, v2_0, v2_1);
+    let non_linear_op_0 = non_linear_op[0];
+    let non_linear_op_1 = non_linear_op[1];
+
+    let op_square = op^2;
+
+    enf op_square * (linear_op_0 - non_linear_op_0) + non_linear_op_0 = v0_0;
+    enf op_square * (linear_op_1 - non_linear_op_1) + non_linear_op_1 = v0_1;
+}
+
+# Computes linear operations (addition and subtraction) in extension field
+# - op = -1: Subtraction (v0 = v1 - v2)
+# - op =  1: Addition (v0 = v1 + v2)
+fn compute_linear_op(op: felt, v1_0: felt, v1_1: felt, v2_0: felt, v2_1: felt) -> felt[2] {
+    let res0 = v1_0 + op * v2_0;
+    let res1 = v1_1 + op * v2_1;
+    return [res0, res1];
+}
+
+# Multiplication in the quadratic extension field.
+#
+# The extension is 𝔽ₚ[x]/(x² - x + 2)
+fn compute_non_linear_op(v1_0: felt, v1_1: felt, v2_0: felt, v2_1: felt) -> felt[2] {
+    let a0 = v1_0;
+    let a1 = v1_1;
+    let b0 = v2_0;
+    let b1 = v2_1;
+    
+    let res0 = a0 * b0 - 2 * a1 * b1;
+    let res1 = (b0 + b1) * (a0 + a1) - a0 * b0;
+
+    return [res0, res1];
+}
+
+##########################################################################################
+# HELPER FUNCTIONS
+##########################################################################################
+
+# ACE chiplet active in current row and continuing to next row
+fn flag_ace_current_and_next(s3_next: felt) -> felt {
+    return !s3_next;
+}
+
+# ACE chiplet active in current row but transitioning out in next row
+fn flag_ace_last(s3_next: felt) -> felt {
+    return s3_next;
+}
+
+# Computes section-level flags: [f_start, f_next, f_end]
+fn section_flags(s3_next: felt, s_start: felt, s_start_next: felt) -> felt[3] {
+    let f_ace_next = flag_ace_current_and_next(s3_next);
+    let f_ace_last = flag_ace_last(s3_next);
+
+    let f_start = s_start;
+    let f_next = !s_start_next;
+    let f_end = binary_or(binary_and(f_ace_next, s_start_next), f_ace_last);
+
+    return [f_start, f_next, f_end];
+}
+
+# Computes block-level flags: [f_read, f_eval]
+fn block_flags(s_block: felt) -> felt[2] {
+    let f_read = !s_block;
+    let f_eval = s_block;
+
+    return [f_read, f_eval];
+}

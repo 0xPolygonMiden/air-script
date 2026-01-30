@@ -9,11 +9,13 @@ use miden_diagnostics::{
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum Target {
     Winterfell,
+    Plonky3,
 }
 impl Target {
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Winterfell => "rs",
+            Self::Plonky3 => "rs",
         }
     }
 }
@@ -55,6 +57,7 @@ impl Transpile {
                 let target = self.target.unwrap_or(Target::Winterfell);
                 let backend: Box<dyn CodeGenerator<Output = String>> = match target {
                     Target::Winterfell => Box::new(air_codegen_winter::CodeGenerator),
+                    Target::Plonky3 => Box::new(air_codegen_plonky3::CodeGenerator),
                 };
 
                 // write transpiled output to the output path
@@ -62,6 +65,13 @@ impl Transpile {
                     Some(path) => path.clone(),
                     None => {
                         let mut path = input_path.clone();
+                        if target == Target::Plonky3 {
+                            path.set_file_name(format!(
+                                "{}_plonky3",
+                                path.file_stem().unwrap().display()
+                            ));
+                            path.set_extension("air");
+                        }
                         path.set_extension(target.extension());
                         path
                     },
