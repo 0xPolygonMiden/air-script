@@ -21,3 +21,4 @@ mod indexed_trace_access;
 mod inlined_functions_simple;
 mod list_comprehension;
 mod list_comprehension_nested;
+mod list_folding;
