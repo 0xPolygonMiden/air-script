@@ -1,6 +1,6 @@
 #[rustfmt::skip]
 #[allow(clippy::all)]
-mod computed_indices_complex;
+pub mod computed_indices_complex;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 pub mod computed_indices_simple;
@@ -8,7 +8,7 @@ pub mod computed_indices_simple;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 #[allow(unused_imports)]
-mod computed_indices_complex_plonky3;
+pub mod computed_indices_complex_plonky3;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 #[allow(unused_imports)]
