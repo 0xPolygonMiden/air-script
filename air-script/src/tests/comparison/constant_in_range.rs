@@ -10,8 +10,6 @@
 //! Trace columns: [a, b[3], c[4], d[4]] (12 total)
 //! Column indices: a=0, b=1-3, c=4-7, d=8-11
 
-use p3_field::PrimeCharacteristicRing;
-use p3_goldilocks::Goldilocks;
 use winter_air::{Air, ProofOptions as WinterProofOptions, TraceInfo};
 use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 
@@ -97,10 +95,6 @@ impl CrossBackendTestConfig for ConstantInRangeTestConfig {
         PublicInputs::new([Felt::ZERO; 16])
     }
 
-    fn build_plonky3_public_inputs(&self) -> Vec<Goldilocks> {
-        vec![Goldilocks::ZERO; 16]
-    }
-
     fn create_winterfell_air(
         &self,
         trace_info: TraceInfo,
@@ -112,10 +106,6 @@ impl CrossBackendTestConfig for ConstantInRangeTestConfig {
 
     fn create_plonky3_air(&self) -> Plonky3ConstantInRangeAir {
         Plonky3ConstantInRangeAir
-    }
-
-    fn num_public_values(&self) -> usize {
-        16
     }
 }
 

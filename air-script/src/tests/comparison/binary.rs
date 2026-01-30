@@ -3,8 +3,6 @@
 //! This test verifies that Winterfell and Plonky3 produce equivalent
 //! constraint evaluations for the Binary AIR at every row of the trace.
 
-use p3_field::PrimeCharacteristicRing;
-use p3_goldilocks::Goldilocks;
 use winter_air::{Air, ProofOptions as WinterProofOptions, TraceInfo};
 use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 
@@ -81,18 +79,6 @@ impl CrossBackendTestConfig for BinaryTestConfig {
         PublicInputs::new(inputs)
     }
 
-    fn build_plonky3_public_inputs(&self) -> Vec<Goldilocks> {
-        (0..16)
-            .map(|i| {
-                if i == 0 {
-                    Goldilocks::from_u64(self.start_value)
-                } else {
-                    Goldilocks::ZERO
-                }
-            })
-            .collect()
-    }
-
     fn create_winterfell_air(
         &self,
         trace_info: TraceInfo,
@@ -104,10 +90,6 @@ impl CrossBackendTestConfig for BinaryTestConfig {
 
     fn create_plonky3_air(&self) -> Plonky3BinaryAir {
         Plonky3BinaryAir
-    }
-
-    fn num_public_values(&self) -> usize {
-        16
     }
 }
 

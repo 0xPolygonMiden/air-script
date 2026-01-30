@@ -9,8 +9,6 @@
 //! - `when_transition()` transition constraints (4 constraints)
 //! - Global integrity constraints (1 constraint without `when_transition()`)
 
-use p3_field::PrimeCharacteristicRing;
-use p3_goldilocks::Goldilocks;
 use winter_air::{Air, ProofOptions as WinterProofOptions, TraceInfo};
 use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 
@@ -101,10 +99,6 @@ impl CrossBackendTestConfig for ConstantsTestConfig {
         PublicInputs::new([Felt::ZERO; 4], [Felt::ZERO; 4], [Felt::ZERO; 4], [Felt::ZERO; 20])
     }
 
-    fn build_plonky3_public_inputs(&self) -> Vec<Goldilocks> {
-        vec![Goldilocks::ZERO; 32]
-    }
-
     fn create_winterfell_air(
         &self,
         trace_info: TraceInfo,
@@ -116,10 +110,6 @@ impl CrossBackendTestConfig for ConstantsTestConfig {
 
     fn create_plonky3_air(&self) -> Plonky3ConstantsAir {
         Plonky3ConstantsAir
-    }
-
-    fn num_public_values(&self) -> usize {
-        32
     }
 }
 

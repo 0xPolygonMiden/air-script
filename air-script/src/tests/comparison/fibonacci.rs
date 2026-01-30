@@ -7,8 +7,6 @@
 //! - Boundary: `a.first = stack_inputs[0]`, `b.first = stack_inputs[1]`, `b.last = stack_output[0]`
 //! - Transition: `b' = a + b`, `a' = b`
 
-use p3_field::PrimeCharacteristicRing;
-use p3_goldilocks::Goldilocks;
 use winter_air::{Air, ProofOptions as WinterProofOptions, TraceInfo};
 use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 
@@ -104,15 +102,6 @@ impl CrossBackendTestConfig for FibonacciTestConfig {
         PublicInputs::new(stack_inputs, stack_output)
     }
 
-    fn build_plonky3_public_inputs(&self) -> Vec<Goldilocks> {
-        // Plonky3 public inputs: [stack_inputs[0], stack_inputs[1], stack_output[0]]
-        vec![
-            Goldilocks::from_u64(self.fib_0),
-            Goldilocks::from_u64(self.fib_1),
-            Goldilocks::from_u64(self.expected_output().as_int()),
-        ]
-    }
-
     fn create_winterfell_air(
         &self,
         trace_info: TraceInfo,
@@ -124,10 +113,6 @@ impl CrossBackendTestConfig for FibonacciTestConfig {
 
     fn create_plonky3_air(&self) -> Plonky3FibonacciAir {
         Plonky3FibonacciAir
-    }
-
-    fn num_public_values(&self) -> usize {
-        3 // stack_inputs[0], stack_inputs[1], stack_output[0]
     }
 }
 

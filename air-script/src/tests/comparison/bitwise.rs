@@ -10,8 +10,6 @@
 //! This test validates that the periodic column evaluation works correctly
 //! in the cross-backend comparison framework.
 
-use p3_field::PrimeCharacteristicRing;
-use p3_goldilocks::Goldilocks;
 use winter_air::{Air, ProofOptions as WinterProofOptions, TraceInfo};
 use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 
@@ -84,10 +82,6 @@ impl CrossBackendTestConfig for BitwiseTestConfig {
         PublicInputs::new([Felt::ZERO; 16])
     }
 
-    fn build_plonky3_public_inputs(&self) -> Vec<Goldilocks> {
-        vec![Goldilocks::ZERO; 16]
-    }
-
     fn create_winterfell_air(
         &self,
         trace_info: TraceInfo,
@@ -99,10 +93,6 @@ impl CrossBackendTestConfig for BitwiseTestConfig {
 
     fn create_plonky3_air(&self) -> Plonky3BitwiseAir {
         Plonky3BitwiseAir
-    }
-
-    fn num_public_values(&self) -> usize {
-        16
     }
 
     /// Returns the periodic column values for the Bitwise AIR.
