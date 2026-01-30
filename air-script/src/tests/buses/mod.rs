@@ -6,7 +6,7 @@ pub mod buses_complex;
 pub mod buses_simple;
 #[rustfmt::skip]
 #[allow(clippy::all)]
-mod buses_varlen_boundary_both;
+pub mod buses_varlen_boundary_both;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 pub mod buses_varlen_boundary_first;
@@ -25,7 +25,7 @@ pub mod buses_simple_plonky3;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 #[allow(unused_imports)]
-mod buses_varlen_boundary_both_plonky3;
+pub mod buses_varlen_boundary_both_plonky3;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 #[allow(unused_imports)]
