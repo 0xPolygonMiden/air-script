@@ -12,3 +12,4 @@ mod constants;
 mod constraint_comprehension;
 mod cross_module_constants;
 mod fibonacci;
+mod indexed_trace_access;
