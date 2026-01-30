@@ -5,6 +5,7 @@
 
 mod binary;
 mod bitwise;
+mod cc_with_evaluators;
 mod computed_indices_complex;
 mod computed_indices_simple;
 mod constant_in_range;
