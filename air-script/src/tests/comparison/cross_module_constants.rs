@@ -14,9 +14,7 @@ use winter_air::{Air, ProofOptions as WinterProofOptions, TraceInfo};
 use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 
 use crate::{
-    test_utils::cross_backend_comparison::{
-        CrossBackendTestConfig, run_cross_backend_comparison, run_cross_backend_comparison_random,
-    },
+    test_utils::cross_backend_comparison::{CrossBackendTestConfig, TraceSource, run_comparison},
     tests::cross_module_constants::{
         cross_mod_constants::{
             CrossModuleConstantsTest as WinterfellCrossModuleConstantsTest, PublicInputs,
@@ -102,7 +100,7 @@ impl CrossBackendTestConfig for CrossModuleConstantsTestConfig {
 #[test]
 fn test_cross_module_constants_air_constraint_comparison() {
     let config = CrossModuleConstantsTestConfig::new(64);
-    let result = run_cross_backend_comparison(&config);
+    let result = run_comparison(&config, TraceSource::Default);
 
     if !result.is_ok() {
         panic!("Constraint evaluation comparison failed!\n\n{}", result.format_report());
@@ -119,10 +117,12 @@ fn test_cross_module_constants_air_constraint_comparison_random_inputs() {
     let config = CrossModuleConstantsTestConfig::new(64);
 
     for iteration in 0u64..=50 {
-        let result = run_cross_backend_comparison_random(
+        let result = run_comparison(
             &config,
-            "test_cross_module_constants_air_constraint_comparison_random_inputs",
-            iteration,
+            TraceSource::Random {
+                test_name: "test_cross_module_constants_air_constraint_comparison_random_inputs",
+                iteration,
+            },
         );
 
         if !result.is_ok() {

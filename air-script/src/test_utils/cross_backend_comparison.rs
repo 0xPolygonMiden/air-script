@@ -43,6 +43,12 @@ const GOLDILOCKS_MODULUS: u64 = 0xFFFF_FFFF_0000_0001;
 ///
 /// This ensures different tests get different random traces even with the same iteration,
 /// making test results reproducible while avoiding trace collisions across tests.
+///
+/// # Examples
+/// ```ignore
+/// let seed = generate_test_seed("my_test", 0);
+/// let rng = ChaCha8Rng::seed_from_u64(seed);
+/// ```
 pub fn generate_test_seed(test_name: &str, iteration: u64) -> u64 {
     let mut hasher = DefaultHasher::new();
     test_name.hash(&mut hasher);
@@ -129,6 +135,39 @@ impl ComparisonResult {
     }
 }
 
+/// Specifies the source of trace data for cross-backend comparison.
+///
+/// # Examples
+/// ```ignore
+/// let result = run_comparison(&config, TraceSource::Default);
+/// ```
+///
+/// ```ignore
+/// let result = run_comparison(
+///     &config,
+///     TraceSource::Random { test_name: "my_test", iteration: 0 },
+/// );
+/// ```
+///
+/// ```ignore
+/// let trace = vec![vec![WinterfellFelt::ZERO; 64]; 2];
+/// let result = run_comparison(&config, TraceSource::Custom(&trace));
+/// ```
+#[derive(Debug, Clone)]
+pub enum TraceSource<'a> {
+    /// Use the trace from `config.build_winterfell_trace()`.
+    Default,
+    /// Generate a random trace with the given seed parameters.
+    Random {
+        /// Name of the test (used for seed generation).
+        test_name: &'static str,
+        /// Iteration number (used for seed generation).
+        iteration: u64,
+    },
+    /// Use a custom provided trace.
+    Custom(&'a [Vec<WinterfellFelt>]),
+}
+
 /// Evaluates Winterfell transition constraints at a specific row,
 /// with periodic column values and `is_transition` selector applied.
 ///
@@ -143,6 +182,12 @@ impl ComparisonResult {
 /// * `row` - The row to evaluate at
 /// * `num_rows` - Total number of rows in the trace
 /// * `periodic_values` - The periodic column values evaluated at this row (empty for simple AIRs)
+///
+/// # Examples
+/// ```ignore
+/// let periodic = vec![WinterfellFelt::ONE];
+/// let values = evaluate_winterfell_transition(&air, &trace, 0, trace_len, &periodic);
+/// ```
 pub fn evaluate_winterfell_transition<A>(
     air: &A,
     trace: &[Vec<WinterfellFelt>],
@@ -196,6 +241,12 @@ where
 /// # Returns
 ///
 /// A vector of field elements, one for each periodic column, evaluated at the given row.
+///
+/// # Examples
+/// ```ignore
+/// let columns = vec![vec![1, 0, 0, 0], vec![1, 1, 1, 0]];
+/// let values: Vec<Goldilocks> = evaluate_periodic_values_at_row(&columns, 5);
+/// ```
 pub fn evaluate_periodic_values_at_row<F: Field + PrimeCharacteristicRing>(
     periodic_columns: &[Vec<u64>],
     row: usize,
@@ -215,6 +266,12 @@ pub fn evaluate_periodic_values_at_row<F: Field + PrimeCharacteristicRing>(
 }
 
 /// Evaluates periodic column values at a specific row for Winterfell (WinterfellFelt).
+///
+/// # Examples
+/// ```ignore
+/// let columns = vec![vec![1, 0, 0, 0]];
+/// let values = evaluate_winterfell_periodic_at_row(&columns, 2);
+/// ```
 pub fn evaluate_winterfell_periodic_at_row(
     periodic_columns: &[Vec<u64>],
     row: usize,
@@ -235,6 +292,14 @@ pub fn evaluate_winterfell_periodic_at_row(
 
 /// Gets Winterfell boundary constraint info.
 /// Returns (column, row, expected_value) for each assertion.
+///
+/// # Examples
+/// ```ignore
+/// let assertions = get_winterfell_boundary_assertions(&air);
+/// for (col, row, expected) in assertions {
+///     println!("col={col}, row={row}, expected={expected}");
+/// }
+/// ```
 pub fn get_winterfell_boundary_assertions<A>(air: &A) -> Vec<(usize, usize, u64)>
 where
     A: Air<BaseField = WinterfellFelt>,
@@ -438,6 +503,12 @@ impl<F: Field + PrimeCharacteristicRing + Clone> MidenAirBuilder for ConstraintC
 }
 
 /// Converts a Plonky3 RowMajorMatrix to a Winterfell-style column-major trace.
+///
+/// # Examples
+/// ```ignore
+/// let trace = RowMajorMatrix::new(vec![Goldilocks::ZERO; 8], 2);
+/// let winterfell_trace = plonky3_trace_to_winterfell(&trace);
+/// ```
 pub fn plonky3_trace_to_winterfell<F>(trace: &RowMajorMatrix<F>) -> Vec<Vec<WinterfellFelt>>
 where
     F: PrimeField64 + Clone + Send + Sync,
@@ -458,6 +529,12 @@ where
 }
 
 /// Converts a Winterfell column-major trace to a Plonky3 RowMajorMatrix.
+///
+/// # Examples
+/// ```ignore
+/// let trace = vec![vec![WinterfellFelt::ZERO; 4]; 2];
+/// let plonky3_trace: RowMajorMatrix<Goldilocks> = winterfell_trace_to_plonky3(&trace);
+/// ```
 pub fn winterfell_trace_to_plonky3<F: Field + PrimeCharacteristicRing>(
     trace: &[Vec<WinterfellFelt>],
 ) -> RowMajorMatrix<F> {
@@ -483,6 +560,14 @@ pub fn winterfell_trace_to_plonky3<F: Field + PrimeCharacteristicRing>(
 /// Compares constraint evaluations row by row.
 ///
 /// Returns a ComparisonResult with any mismatches found.
+///
+/// # Examples
+/// ```ignore
+/// let winterfell = vec![vec![0u64, 1u64]];
+/// let plonky3 = vec![vec![0u64, 1u64]];
+/// let result = compare_evaluations_by_row(&winterfell, &plonky3);
+/// assert!(result.is_ok());
+/// ```
 pub fn compare_evaluations_by_row(
     winterfell_evals: &[Vec<u64>],
     plonky3_evals: &[Vec<u64>],
@@ -677,6 +762,11 @@ pub trait CrossBackendTestConfig {
 }
 
 /// Creates default proof options for testing.
+///
+/// # Examples
+/// ```ignore
+/// let options = default_proof_options();
+/// ```
 pub fn default_proof_options() -> WinterProofOptions {
     WinterProofOptions::new(
         32,                     // number of queries
@@ -690,10 +780,10 @@ pub fn default_proof_options() -> WinterProofOptions {
     )
 }
 
-/// Runs a full cross-backend comparison for the given test configuration.
+/// Runs a full cross-backend comparison.
 ///
 /// This function:
-/// 1. Builds the trace using the config
+/// 1. Builds or selects a trace based on `source`
 /// 2. Creates both Winterfell and Plonky3 AIR instances
 /// 3. Evaluates all constraints at each row for both backends
 /// 4. Compares the results and returns a detailed report
@@ -701,38 +791,35 @@ pub fn default_proof_options() -> WinterProofOptions {
 /// # Arguments
 ///
 /// * `config` - The test configuration implementing `CrossBackendTestConfig`
+/// * `source` - Where to get the trace data from
 ///
-/// # Returns
+/// # Examples
+/// ```ignore
+/// let result = run_comparison(&config, TraceSource::Default);
+/// assert!(result.is_ok());
+/// ```
 ///
-/// A `ComparisonResult` containing any mismatches found and statistics.
-pub fn run_cross_backend_comparison<C>(config: &C) -> ComparisonResult
+/// ```ignore
+/// let result = run_comparison(
+///     &config,
+///     TraceSource::Random {
+///         test_name: "my_test",
+///         iteration: 0,
+///     },
+/// );
+/// ```
+pub fn run_comparison<C>(config: &C, source: TraceSource<'_>) -> ComparisonResult
 where
     C: CrossBackendTestConfig,
 {
-    let winterfell_trace = config.build_winterfell_trace();
-    run_cross_backend_comparison_with_trace(config, winterfell_trace)
-}
+    let winterfell_trace = match source {
+        TraceSource::Default => config.build_winterfell_trace(),
+        TraceSource::Random { test_name, iteration } => {
+            config.build_random_winterfell_trace(test_name, iteration)
+        },
+        TraceSource::Custom(trace) => trace.to_vec(),
+    };
 
-/// Runs a full cross-backend comparison using a provided trace.
-///
-/// This is useful for testing with custom or random traces instead of
-/// the valid trace generated by `build_winterfell_trace`.
-///
-/// # Arguments
-///
-/// * `config` - The test configuration implementing `CrossBackendTestConfig`
-/// * `winterfell_trace` - The trace in Winterfell format (column-major)
-///
-/// # Returns
-///
-/// A `ComparisonResult` containing any mismatches found and statistics.
-pub fn run_cross_backend_comparison_with_trace<C>(
-    config: &C,
-    winterfell_trace: Vec<Vec<WinterfellFelt>>,
-) -> ComparisonResult
-where
-    C: CrossBackendTestConfig,
-{
     let trace_length = config.trace_length();
 
     // Convert to Plonky3 format
@@ -813,36 +900,6 @@ where
     compare_evaluations_by_row(&winterfell_results, &plonky3_results)
 }
 
-/// Runs a full cross-backend comparison using a randomly generated trace.
-///
-/// This tests that both backends produce identical constraint evaluations
-/// for random (invalid) inputs, verifying that the constraint logic matches
-/// even when constraints are not satisfied.
-///
-/// The random trace is generated deterministically from the test name and
-/// iteration number, ensuring reproducible results.
-///
-/// # Arguments
-///
-/// * `config` - The test configuration implementing `CrossBackendTestConfig`
-/// * `test_name` - Name of the test (used for seed generation)
-/// * `iteration` - Iteration number (used for seed generation)
-///
-/// # Returns
-///
-/// A `ComparisonResult` containing any mismatches found and statistics.
-pub fn run_cross_backend_comparison_random<C>(
-    config: &C,
-    test_name: &str,
-    iteration: u64,
-) -> ComparisonResult
-where
-    C: CrossBackendTestConfig,
-{
-    let random_trace = config.build_random_winterfell_trace(test_name, iteration);
-    run_cross_backend_comparison_with_trace(config, random_trace)
-}
-
 /// Evaluates boundary constraints at a specific row for Winterfell.
 ///
 /// This function evaluates boundary constraints with proper handling of the last step
@@ -855,6 +912,11 @@ where
 /// * `row` - The row to evaluate at
 /// * `num_rows` - Total number of rows in the trace
 /// * `last_step` - The last step index from AIR context (accounts for transition exemptions)
+///
+/// # Examples
+/// ```ignore
+/// let values = evaluate_winterfell_boundary(&air, &trace, 0, trace_len, last_step);
+/// ```
 pub fn evaluate_winterfell_boundary<A>(
     air: &A,
     trace: &[Vec<WinterfellFelt>],

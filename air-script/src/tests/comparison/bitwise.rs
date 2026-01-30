@@ -14,9 +14,7 @@ use winter_air::{Air, ProofOptions as WinterProofOptions, TraceInfo};
 use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 
 use crate::{
-    test_utils::cross_backend_comparison::{
-        CrossBackendTestConfig, run_cross_backend_comparison, run_cross_backend_comparison_random,
-    },
+    test_utils::cross_backend_comparison::{CrossBackendTestConfig, TraceSource, run_comparison},
     tests::bitwise::{
         bitwise::{BitwiseAir as WinterfellBitwiseAir, PublicInputs},
         bitwise_plonky3::BitwiseAir as Plonky3BitwiseAir,
@@ -112,7 +110,7 @@ impl CrossBackendTestConfig for BitwiseTestConfig {
 fn test_bitwise_air_constraint_comparison() {
     // Use 64 rows (8 complete periods)
     let config = BitwiseTestConfig::new(64);
-    let result = run_cross_backend_comparison(&config);
+    let result = run_comparison(&config, TraceSource::Default);
 
     if !result.is_ok() {
         panic!("Constraint evaluation comparison failed!\n\n{}", result.format_report());
@@ -128,7 +126,7 @@ fn test_bitwise_air_constraint_comparison() {
 fn test_bitwise_air_constraint_comparison_larger_trace() {
     // Use 512 rows (64 complete periods) - same as the Winterfell test
     let config = BitwiseTestConfig::new(512);
-    let result = run_cross_backend_comparison(&config);
+    let result = run_comparison(&config, TraceSource::Default);
 
     if !result.is_ok() {
         panic!("Constraint evaluation comparison failed!\n\n{}", result.format_report());
@@ -146,10 +144,12 @@ fn test_bitwise_air_constraint_comparison_random_inputs() {
 
     // Test with iterations 0 through 50 for thorough coverage
     for iteration in 0u64..=50 {
-        let result = run_cross_backend_comparison_random(
+        let result = run_comparison(
             &config,
-            "test_bitwise_air_constraint_comparison_random_inputs",
-            iteration,
+            TraceSource::Random {
+                test_name: "test_bitwise_air_constraint_comparison_random_inputs",
+                iteration,
+            },
         );
 
         if !result.is_ok() {

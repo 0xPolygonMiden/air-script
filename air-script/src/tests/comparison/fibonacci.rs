@@ -11,9 +11,7 @@ use winter_air::{Air, ProofOptions as WinterProofOptions, TraceInfo};
 use winter_math::{FieldElement, fields::f64::BaseElement as Felt};
 
 use crate::{
-    test_utils::cross_backend_comparison::{
-        CrossBackendTestConfig, run_cross_backend_comparison, run_cross_backend_comparison_random,
-    },
+    test_utils::cross_backend_comparison::{CrossBackendTestConfig, TraceSource, run_comparison},
     tests::fibonacci::{
         fibonacci::{FibonacciAir as WinterfellFibonacciAir, PublicInputs},
         fibonacci_plonky3::FibonacciAir as Plonky3FibonacciAir,
@@ -120,7 +118,7 @@ impl CrossBackendTestConfig for FibonacciTestConfig {
 fn test_fibonacci_air_constraint_comparison() {
     // Standard Fibonacci starting with 0, 1
     let config = FibonacciTestConfig::new(0, 1, 64);
-    let result = run_cross_backend_comparison(&config);
+    let result = run_comparison(&config, TraceSource::Default);
 
     if !result.is_ok() {
         panic!("Constraint evaluation comparison failed!\n\n{}", result.format_report());
@@ -136,7 +134,7 @@ fn test_fibonacci_air_constraint_comparison() {
 fn test_fibonacci_air_constraint_comparison_different_start() {
     // Fibonacci-like sequence starting with 1, 1
     let config = FibonacciTestConfig::new(1, 1, 64);
-    let result = run_cross_backend_comparison(&config);
+    let result = run_comparison(&config, TraceSource::Default);
 
     if !result.is_ok() {
         panic!("Constraint evaluation comparison failed!\n\n{}", result.format_report());
@@ -152,7 +150,7 @@ fn test_fibonacci_air_constraint_comparison_different_start() {
 fn test_fibonacci_air_constraint_comparison_larger_values() {
     // Test with larger starting values to exercise field arithmetic
     let config = FibonacciTestConfig::new(100, 200, 32);
-    let result = run_cross_backend_comparison(&config);
+    let result = run_comparison(&config, TraceSource::Default);
 
     if !result.is_ok() {
         panic!("Constraint evaluation comparison failed!\n\n{}", result.format_report());
@@ -170,10 +168,12 @@ fn test_fibonacci_air_constraint_comparison_random_inputs() {
 
     // Test with iterations 0 through 50 for thorough coverage
     for iteration in 0u64..=50 {
-        let result = run_cross_backend_comparison_random(
+        let result = run_comparison(
             &config,
-            "test_fibonacci_air_constraint_comparison_random_inputs",
-            iteration,
+            TraceSource::Random {
+                test_name: "test_fibonacci_air_constraint_comparison_random_inputs",
+                iteration,
+            },
         );
 
         if !result.is_ok() {
