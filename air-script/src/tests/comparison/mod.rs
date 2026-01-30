@@ -5,6 +5,7 @@
 
 mod binary;
 mod bitwise;
+mod computed_indices_simple;
 mod constant_in_range;
 mod constants;
 mod constraint_comprehension;
