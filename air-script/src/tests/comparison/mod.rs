@@ -11,5 +11,6 @@ mod constant_in_range;
 mod constants;
 mod constraint_comprehension;
 mod cross_module_constants;
+mod evaluators;
 mod fibonacci;
 mod indexed_trace_access;
