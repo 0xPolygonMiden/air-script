@@ -1,3 +1,7 @@
 #[rustfmt::skip]
 #[allow(clippy::all)]
-mod comprehension_periodic_binding;
+pub mod comprehension_periodic_binding;
+#[rustfmt::skip]
+#[allow(clippy::all)]
+#[allow(unused_imports)]
+pub mod comprehension_periodic_binding_plonky3;
