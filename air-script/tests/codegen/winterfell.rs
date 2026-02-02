@@ -365,3 +365,30 @@ fn variables() {
     let expected = expect_file!["../variables/variables.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn cross_module_constants() {
+    // Test that constants used in comprehension iterables work across module boundaries
+    let generated_air =
+        Test::new("tests/cross_module_constants/cross_module_constants.air".to_string())
+            .transpile(Target::Winterfell)
+            .unwrap();
+
+    let expected = expect_file!["../cross_module_constants/cross_mod_constants.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn comprehension_periodic_binding() {
+    // Test that comprehension bindings over periodic columns are typed as Local, not PeriodicColumn
+    // This pattern is used when iterating over a vector containing periodic column references
+    let generated_air = Test::new(
+        "tests/comprehension_periodic_binding/comprehension_periodic_binding.air".to_string(),
+    )
+    .transpile(Target::Winterfell)
+    .unwrap();
+
+    let expected =
+        expect_file!["../comprehension_periodic_binding/comprehension_periodic_binding.rs"];
+    expected.assert_eq(&generated_air);
+}

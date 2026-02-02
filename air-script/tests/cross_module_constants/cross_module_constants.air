@@ -1,0 +1,21 @@
+def CrossModuleConstantsTest
+
+# Import evaluator that uses a chain: apply_computation -> compute_result -> weighted_sum -> WEIGHTS constant
+use constants_lib::apply_computation;
+
+trace_columns {
+    main: [a, b, c, d, result],
+}
+
+public_inputs {
+    expected: [1],
+}
+
+boundary_constraints {
+    enf a.first = 0;
+}
+
+integrity_constraints {
+    # Use imported evaluator that internally uses constants in comprehensions
+    enf apply_computation([a, b, c, d, result]);
+}
