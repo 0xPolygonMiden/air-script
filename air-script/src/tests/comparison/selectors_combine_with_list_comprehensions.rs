@@ -1,7 +1,8 @@
 //! Cross-backend comparison test for the SelectorsCombineWithListComprehensions AIR.
 //!
 //! This test verifies that Winterfell and Plonky3 produce equivalent
-//! constraint evaluations for the SelectorsCombineWithListComprehensions AIR at every row of the trace.
+//! constraint evaluations for the SelectorsCombineWithListComprehensions AIR at every row of the
+//! trace.
 
 use winter_air::{Air, ProofOptions as WinterProofOptions, TraceInfo};
 use winter_math::{FieldElement, fields::f64::BaseElement as Felt};

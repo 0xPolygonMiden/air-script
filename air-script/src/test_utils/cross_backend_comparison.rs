@@ -1105,8 +1105,8 @@ where
 
         // Combine: to follow the order of emitted constraints in Plonky3, we inject:
         // - main boundary constraints
-        // - aux boundary constraints (Winterfell-only: Plonky3 eval does not emit
-        //   explicit aux boundary assertions; bus boundary values are handled outside eval)
+        // - aux boundary constraints (Winterfell-only: Plonky3 eval does not emit explicit aux
+        //   boundary assertions; bus boundary values are handled outside eval)
         // - main transition constraints
         // - aux transition constraints
         // TODO: Best guess for now: Plonky3 eval does not emit aux boundary assertions,
