@@ -21,6 +21,7 @@
 - In Plonky3 codegen, use MidenAir and MidenAirBuilder from 0xMiden's Plonky3 fork instead of AirScriptAir and AirScriptBuilder (#515).
 - In Plonky3 codegen, use prove/verify workflow for tests (#523).
 - Fix MIR inlining loop on deeply nested calls (#524).
+- Compare evaluations between Winterfell and Plonky3 codegen (#533).
 
 ## 0.4.0 (2025-06-20)
 
