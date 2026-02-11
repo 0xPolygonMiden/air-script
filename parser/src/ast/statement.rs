@@ -7,7 +7,7 @@
 //! Statements do not return any value, unlike expressions.
 use std::fmt;
 
-use miden_diagnostics::{SourceSpan, Spanned};
+use miden_diagnostics::{SourceSpan, Span, Spanned};
 
 use super::*;
 
@@ -41,7 +41,7 @@ pub enum Statement {
     /// This variant accepts a [ScalarExpr] for simplicity in the parser, but is expected to always
     /// be either a call to an evaluator function, or a binary expression of the form `lhs = rhs`,
     /// i.e. an equality. This is validated by the semantic analyzer.
-    Enforce(ScalarExpr),
+    Enforce(Enforce),
     /// Declares a constraint to be conditionally enforced.
     ///
     /// This has all the same semantics as `Enforce`, except it has a condition expression which
@@ -64,6 +64,39 @@ pub enum Statement {
     /// Declares a bus related constraint
     BusEnforce(ListComprehension),
 }
+
+/// An `enf` constraint statement, optionally tagged with a unique constraint id.
+///
+/// Tags are intended to give constraints stable, monotonic IDs so that AIRScript constraints can
+/// be compared against other pipelines (e.g. the miden-vm AirBuilder). Tags are only allowed on
+/// simple constraints (no match/comprehensions), so each tag maps to exactly one final constraint.
+#[derive(Debug, Clone, Spanned)]
+pub struct Enforce {
+    #[span]
+    pub span: SourceSpan,
+    pub expr: ScalarExpr,
+    pub tag: Option<ConstraintTag>,
+}
+impl Enforce {
+    pub fn new(span: SourceSpan, expr: ScalarExpr, tag: Option<ConstraintTag>) -> Self {
+        Self { span, expr, tag }
+    }
+}
+
+impl PartialEq for Enforce {
+    fn eq(&self, other: &Self) -> bool {
+        self.expr == other.expr
+            && self.tag.as_ref().map(|t| t.item) == other.tag.as_ref().map(|t| t.item)
+    }
+}
+
+impl Eq for Enforce {}
+
+/// A constraint tag used to identify constraints across compilation pipelines.
+///
+/// When any tags are present, `CURRENT_MAX_ID` must be defined in the root module and the tags
+/// must cover the full range `0..=CURRENT_MAX_ID` with no duplicates.
+pub type ConstraintTag = Span<u64>;
 
 #[derive(Clone, Spanned, Debug, Eq)]
 pub struct Match {

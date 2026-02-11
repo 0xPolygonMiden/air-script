@@ -178,6 +178,7 @@ pub enum Token {
     Ampersand,
     Bar,
     Bang,
+    At,
     Arrow,
     SemiColon,
 }
@@ -314,6 +315,7 @@ impl fmt::Display for Token {
             Self::Ampersand => write!(f, "&"),
             Self::Bar => write!(f, "|"),
             Self::Bang => write!(f, "!"),
+            Self::At => write!(f, "@"),
             Self::Arrow => write!(f, "->"),
             Self::SemiColon => write!(f, ";"),
         }
@@ -539,6 +541,7 @@ where
             '&' => pop!(self, Token::Ampersand),
             '|' => pop!(self, Token::Bar),
             '!' => pop!(self, Token::Bang),
+            '@' => pop!(self, Token::At),
             ';' => pop!(self, Token::SemiColon),
             '$' => self.lex_special_identifier(),
             '0'..='9' => self.lex_number(),

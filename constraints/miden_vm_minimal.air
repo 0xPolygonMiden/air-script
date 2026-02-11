@@ -20,6 +20,13 @@
 def MidenVM_Minimal
 
 ##########################################################################################
+# TAGGING
+##########################################################################################
+
+# Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
+const CURRENT_MAX_ID = 7;
+
+##########################################################################################
 # EXECUTION TRACE LAYOUT
 ##########################################################################################
 
@@ -52,8 +59,8 @@ buses {
     # Stack overflow table
     multiset bus_3_stack_p1,
 
-    # Range checker bus
-    logup    bus_4_range_checker,
+    # Range checker bus (tag_transition -> range.bus.transition)
+    logup    bus_4_range_checker @tag_transition(7),
 
     # Chiplet buses
     multiset bus_5_v_table,
@@ -119,11 +126,11 @@ ev range_checker_minimal([decoder[24], range_checker[2], chiplets[20]]) {
 
 boundary_constraints {
     # System clock must start at 0
-    enf system[0].first = 0;
+    @tag(0) enf system[0].first = 0;
 
     # Range checker value column must span complete 16-bit range [0, 65535]
-    enf range_checker[1].first = 0;
-    enf range_checker[1].last = 65535;
+    @tag(2) enf range_checker[1].first = 0;
+    @tag(3) enf range_checker[1].last = 65535;
 
     # Bus boundaries: only the range checker bus is constrained in this minimal spec
     enf bus_0_decoder_p1.first = unconstrained;
@@ -134,8 +141,8 @@ boundary_constraints {
     enf bus_2_decoder_p3.last = unconstrained;
     enf bus_3_stack_p1.first = unconstrained;
     enf bus_3_stack_p1.last = unconstrained;
-    enf bus_4_range_checker.first = null;
-    enf bus_4_range_checker.last = null;
+    @tag(5) enf bus_4_range_checker.first = null;
+    @tag(6) enf bus_4_range_checker.last = null;
     enf bus_5_v_table.first = unconstrained;
     enf bus_5_v_table.last = unconstrained;
     enf bus_6_chiplets_bus.first = unconstrained;
@@ -150,10 +157,10 @@ boundary_constraints {
 
 integrity_constraints {
     # System clock transition
-    enf system_clk_transition([system[0..6]]);
+    @tag(1) enf system_clk_transition([system[0..6]]);
 
     # Range checker constraints (value transition + logup bus transition)
-    enf range_checker_minimal([decoder[0..24], range_checker[0..2], chiplets[0..20]]);
+    @tag(4) enf range_checker_minimal([decoder[0..24], range_checker[0..2], chiplets[0..20]]);
 }
 
 ##########################################################################################

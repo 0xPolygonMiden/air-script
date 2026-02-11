@@ -79,11 +79,17 @@ pub struct Bus {
     pub span: SourceSpan,
     pub name: Identifier,
     pub bus_type: BusType,
+    pub transition_tag: Option<ConstraintTag>,
 }
 impl Bus {
     /// Creates a new bus declaration
-    pub const fn new(span: SourceSpan, name: Identifier, bus_type: BusType) -> Self {
-        Self { span, name, bus_type }
+    pub fn new(
+        span: SourceSpan,
+        name: Identifier,
+        bus_type: BusType,
+        transition_tag: Option<ConstraintTag>,
+    ) -> Self {
+        Self { span, name, bus_type, transition_tag }
     }
 }
 #[derive(Default, Copy, Hash, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

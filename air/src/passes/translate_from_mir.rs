@@ -37,6 +37,7 @@ impl Pass for MirToAir<'_> {
 
     fn run<'a>(&mut self, mir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
         let mut air = Air::new(mir.name);
+        air.expected_max_constraint_id = mir.expected_max_constraint_id;
 
         let buses = mir.constraint_graph().buses.clone();
 
@@ -108,11 +109,11 @@ impl Pass for MirToAir<'_> {
         // as it's a requirement for the CommonSubexpressionElimination pass to work with the
         // winterfell codegen.
         for bc in graph.boundary_constraints_roots.borrow().deref().iter() {
-            builder.build_boundary_constraint(bc)?;
+            builder.build_boundary_constraint(bc, None)?;
         }
 
         for ic in graph.integrity_constraints_roots.borrow().deref().iter() {
-            builder.build_integrity_constraint(ic)?;
+            builder.build_integrity_constraint(ic, None)?;
         }
 
         // Note: In the MIR, buses operations are kept in integrity constraints to
@@ -411,21 +412,47 @@ impl AirBuilder<'_> {
         }
     }
 
-    fn build_boundary_constraint(&mut self, bc: &Link<Op>) -> Result<(), CompileError> {
+    fn build_boundary_constraint(
+        &mut self,
+        bc: &Link<Op>,
+        tag: Option<u64>,
+    ) -> Result<(), CompileError> {
         match bc.borrow().deref() {
             Op::Vector(vector) => {
+                if tag.is_some() {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("tagged constraint expanded into multiple constraints")
+                        .with_primary_label(
+                            bc.span(),
+                            "tags are only supported on simple (non-expanded) constraints",
+                        )
+                        .emit();
+                    return Err(CompileError::Failed);
+                }
                 let vec = vector.elements.borrow().deref().clone();
                 for node in vec.iter() {
-                    self.build_boundary_constraint(node)?;
+                    self.build_boundary_constraint(node, None)?;
                 }
                 Ok(())
             },
             Op::Matrix(matrix) => {
+                if tag.is_some() {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("tagged constraint expanded into multiple constraints")
+                        .with_primary_label(
+                            bc.span(),
+                            "tags are only supported on simple (non-expanded) constraints",
+                        )
+                        .emit();
+                    return Err(CompileError::Failed);
+                }
                 let rows = matrix.elements.borrow().deref().clone();
                 for row in rows.iter() {
                     let vec = row.borrow().deref().children().borrow().deref().clone();
                     for node in vec.iter() {
-                        self.build_boundary_constraint(node)?;
+                        self.build_boundary_constraint(node, None)?;
                     }
                 }
                 Ok(())
@@ -434,8 +461,9 @@ impl AirBuilder<'_> {
                 let child_op = enf.expr.clone();
                 let child_op = accessor_to_scalar(&child_op);
                 let child_op = vec_to_scalar(&child_op);
+                let next_tag = enf.tag.or(tag);
 
-                self.build_boundary_constraint(&child_op)?;
+                self.build_boundary_constraint(&child_op, next_tag)?;
                 Ok(())
             },
             Op::Sub(sub) => {
@@ -499,7 +527,7 @@ impl AirBuilder<'_> {
                 let root = self.insert_op(Operation::Sub(lhs, rhs));
 
                 // Store the generated constraint
-                self.air.constraints.insert_constraint(trace_access.segment, root, domain);
+                self.air.constraints.insert_constraint(trace_access.segment, root, domain, tag);
                 Ok(())
             },
             Op::Boundary(boundary) => {
@@ -518,27 +546,53 @@ impl AirBuilder<'_> {
                 let domain = boundary.kind.into();
 
                 // Store the generated constraint
-                self.air.constraints.insert_constraint(trace_access.segment, root, domain);
+                self.air.constraints.insert_constraint(trace_access.segment, root, domain, tag);
                 Ok(())
             },
             _ => unreachable!(),
         }
     }
 
-    fn build_integrity_constraint(&mut self, ic: &Link<Op>) -> Result<(), CompileError> {
+    fn build_integrity_constraint(
+        &mut self,
+        ic: &Link<Op>,
+        tag: Option<u64>,
+    ) -> Result<(), CompileError> {
         match ic.borrow().deref() {
             Op::Vector(vector) => {
+                if tag.is_some() {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("tagged constraint expanded into multiple constraints")
+                        .with_primary_label(
+                            ic.span(),
+                            "tags are only supported on simple (non-expanded) constraints",
+                        )
+                        .emit();
+                    return Err(CompileError::Failed);
+                }
                 let vec = vector.children().borrow().deref().clone();
                 for node in vec.iter() {
-                    self.build_integrity_constraint(node)?;
+                    self.build_integrity_constraint(node, None)?;
                 }
             },
             Op::Matrix(matrix) => {
+                if tag.is_some() {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("tagged constraint expanded into multiple constraints")
+                        .with_primary_label(
+                            ic.span(),
+                            "tags are only supported on simple (non-expanded) constraints",
+                        )
+                        .emit();
+                    return Err(CompileError::Failed);
+                }
                 let rows = matrix.elements.borrow().deref().clone();
                 for row in rows.iter() {
                     let vec = row.borrow().deref().children().borrow().deref().clone();
                     for node in vec.iter() {
-                        self.build_integrity_constraint(node)?;
+                        self.build_integrity_constraint(node, None)?;
                     }
                 }
             },
@@ -547,9 +601,10 @@ impl AirBuilder<'_> {
                 let child_op = accessor_to_scalar(&child_op);
                 let child_op = vec_to_scalar(&child_op);
                 let child_op = enf_to_scalar(&child_op);
+                let enf_tag = enf.tag.or(tag);
                 match child_op.clone().borrow().deref() {
                     Op::Sub(_sub) => {
-                        self.build_integrity_constraint(&child_op)?;
+                        self.build_integrity_constraint(&child_op, enf_tag)?;
                     },
                     Op::BusOp(bus_op) => {
                         let bus = bus_op.bus.to_link().unwrap();
@@ -564,7 +619,12 @@ impl AirBuilder<'_> {
                             .air
                             .constraint_graph()
                             .node_details(&root, ConstraintDomain::EveryRow)?;
-                        self.air.constraints.insert_constraint(trace_segment, root, domain);
+                        self.air.constraints.insert_constraint(
+                            trace_segment,
+                            root,
+                            domain,
+                            enf_tag,
+                        );
                     },
                 }
             },
@@ -576,7 +636,7 @@ impl AirBuilder<'_> {
                 let root = self.insert_op(Operation::Sub(lhs_node_index, rhs_node_index));
                 let (trace_segment, domain) =
                     self.air.constraint_graph().node_details(&root, ConstraintDomain::EveryRow)?;
-                self.air.constraints.insert_constraint(trace_segment, root, domain);
+                self.air.constraints.insert_constraint(trace_segment, root, domain, tag);
             },
             _ => unreachable!("Unexpected integrity constraint root: {:?}", ic),
         }
@@ -608,7 +668,16 @@ impl AirBuilder<'_> {
         }
         self.air.buses.insert(
             mir_bus.name(),
-            Bus::new(mir_bus.name(), mir_bus.bus_type, first, last, bus_ops),
+            Bus::new(
+                mir_bus.name(),
+                mir_bus.bus_type,
+                first,
+                last,
+                bus_ops,
+                mir_bus.first_tag(),
+                mir_bus.last_tag(),
+                mir_bus.transition_tag(),
+            ),
         );
         Ok(())
     }

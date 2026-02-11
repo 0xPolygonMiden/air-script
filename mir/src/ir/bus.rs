@@ -69,6 +69,9 @@ pub struct Bus {
     pub latches: Vec<Link<Op>>,
     first: Link<Op>,
     last: Link<Op>,
+    first_tag: Option<u64>,
+    last_tag: Option<u64>,
+    transition_tag: Option<u64>,
     #[span]
     span: SourceSpan,
 }
@@ -92,10 +95,16 @@ impl PartialEq for Bus {
 }
 
 impl Bus {
-    pub fn create(name: Identifier, bus_type: ast::BusType, span: SourceSpan) -> Link<Bus> {
+    pub fn create(
+        name: Identifier,
+        bus_type: ast::BusType,
+        span: SourceSpan,
+        transition_tag: Option<u64>,
+    ) -> Link<Bus> {
         Bus {
             name: Some(name),
             bus_type,
+            transition_tag,
             span,
             ..Default::default()
         }
@@ -110,11 +119,27 @@ impl Bus {
         Ok(())
     }
 
+    pub fn set_first_tag(&mut self, tag: u64) -> Result<(), CompileError> {
+        if self.first_tag.is_some() {
+            return Err(CompileError::Failed);
+        }
+        self.first_tag = Some(tag);
+        Ok(())
+    }
+
     pub fn set_last(&mut self, last: Link<Op>) -> Result<(), CompileError> {
         let Op::None(_) = self.last.borrow().deref() else {
             return Err(CompileError::Failed);
         };
         self.last = last;
+        Ok(())
+    }
+
+    pub fn set_last_tag(&mut self, tag: u64) -> Result<(), CompileError> {
+        if self.last_tag.is_some() {
+            return Err(CompileError::Failed);
+        }
+        self.last_tag = Some(tag);
         Ok(())
     }
     /// Set the name of the bus but only if it is not already set
@@ -139,6 +164,18 @@ impl Bus {
 
     pub fn get_last(&self) -> Link<Op> {
         self.last.clone()
+    }
+
+    pub fn first_tag(&self) -> Option<u64> {
+        self.first_tag
+    }
+
+    pub fn last_tag(&self) -> Option<u64> {
+        self.last_tag
+    }
+
+    pub fn transition_tag(&self) -> Option<u64> {
+        self.transition_tag
     }
 
     pub fn name(&self) -> Identifier {

@@ -214,8 +214,21 @@ Buses: Span<Vec<Bus>> = {
 }
 
 Bus: Bus = {
-    <l:@L> <bus_type: BusType> <name: Identifier> "," <r:@R>
-        => Bus::new(span!(l, r), name, bus_type),
+    <l:@L> <bus_type: BusType> <name: Identifier> <tag: BusTagAttr?> "," <r:@R>
+        => Bus::new(span!(l, r), name, bus_type, tag),
+}
+
+BusTagAttr: Span<u64> = {
+    <l:@L> "@" <name:FunctionIdentifier> "(" <value: Num_u64> ")" <r:@R> =>? {
+        if name != "tag_transition" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid bus tag")
+                .with_primary_label(span!(l, r), "expected @tag_transition(<id>)")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(Span::new(span!(l, r), value))
+    }
 }
 
 BusType: BusType = {
@@ -351,6 +364,16 @@ ConstraintStatements: Vec<Statement> = {
 }
 
 ConstraintStatement: Vec<Statement> = {
+    <l:@L> <tag:TagAttr> "enf" <expr: ScalarConstraintExpr> ";" <r:@R> => {
+        vec![Statement::Enforce(Enforce::new(span!(l, r), expr, Some(tag)))]
+    },
+    <l:@L> <tag:TagAttr> "enf" "match" "{" <arms: MatchArm+> "}" ";" <r:@R> =>? {
+        diagnostics.diagnostic(Severity::Error)
+            .with_message("tagged constraints cannot use `match`")
+            .with_primary_label(span!(l, r), "remove the tag or refactor the constraint")
+            .emit();
+        Err(ParseError::Failed.into())
+    },
     <l:@L> "enf" "match" "{" <arms: MatchArm+> "}" ";" <r:@R> => {
         let match_expr = Match::new(span!(l, r), arms);
         vec![Statement::EnforceIf(match_expr)]
@@ -408,9 +431,22 @@ ConstraintExpr: Statement = {
             if let Some(selector) = selector {
                 Statement::EnforceIf(Match::new(span!(l,r), vec![MatchArm::new(span!(l,r), expr, selector)]))
             } else {
-                Statement::Enforce(expr)
+                Statement::Enforce(Enforce::new(span!(l, r), expr, None))
             }
         }
+    }
+}
+
+TagAttr: Span<u64> = {
+    <l:@L> "@" <name:FunctionIdentifier> "(" <value: Num_u64> ")" <r:@R> =>? {
+        if name != "tag" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid constraint tag")
+                .with_primary_label(span!(l, r), "expected @tag(<id>)")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(Span::new(span!(l, r), value))
     }
 }
 
@@ -732,6 +768,7 @@ extern {
         "&" => Token::Ampersand,
         "|" => Token::Bar,
         "!" => Token::Bang,
+        "@" => Token::At,
         ":" => Token::Colon,
         "::" => Token::ColonColon,
         "," => Token::Comma,

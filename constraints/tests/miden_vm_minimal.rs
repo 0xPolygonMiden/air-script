@@ -253,32 +253,54 @@ impl OodContext {
 /// Evaluates constraints in tag order to match `CONSTRAINT_NAMES`.
 /// The order is aligned with constraint IDs (boundary/integrity buckets).
 fn eval_constraints_in_id_order(air: &Air, ctx: &OodContext) -> Vec<QuadGoldilocksOOD> {
-    let main_boundary = air.boundary_constraints(TraceSegmentId::Main);
-    let main_integrity = air.integrity_constraints(TraceSegmentId::Main);
-    let aux_boundary = air.boundary_constraints(TraceSegmentId::Aux);
-    let aux_integrity = air.integrity_constraints(TraceSegmentId::Aux);
+    let mut tagged = Vec::new();
+    for segment in [TraceSegmentId::Main, TraceSegmentId::Aux] {
+        if usize::from(segment) >= air.trace_segment_widths.len() {
+            continue;
+        }
+        for constraint in air.boundary_constraints(segment) {
+            let tag = constraint.tag().expect("boundary constraint missing tag");
+            tagged.push((tag, constraint));
+        }
+        for constraint in air.integrity_constraints(segment) {
+            let tag = constraint.tag().expect("integrity constraint missing tag");
+            tagged.push((tag, constraint));
+        }
+    }
 
-    assert_eq!(main_boundary.len(), 3, "unexpected main boundary constraint count");
-    assert_eq!(main_integrity.len(), 2, "unexpected main integrity constraint count");
-    assert_eq!(aux_boundary.len(), 2, "unexpected aux boundary constraint count");
-    assert_eq!(aux_integrity.len(), 1, "unexpected aux integrity constraint count");
+    tagged.sort_by_key(|(tag, _)| *tag);
+    assert_eq!(tagged.len(), CONSTRAINT_NAMES.len());
+    for (expected, (tag, _)) in tagged.iter().enumerate() {
+        assert_eq!(*tag as usize, expected, "unexpected tag ordering");
+    }
 
     let graph = air.constraint_graph();
     let mut cache = vec![None; graph.num_nodes()];
+    tagged
+        .into_iter()
+        .map(|(_, constraint)| eval_constraint(graph, constraint, ctx, &mut cache))
+        .collect()
+}
 
-    // Order mirrors `CONSTRAINT_NAMES` / tag IDs:
-    // 0 main boundary[0], 1 main integrity[0], 2 main boundary[1], 3 main boundary[2],
-    // 4 main integrity[1], 5 aux boundary[0], 6 aux boundary[1], 7 aux integrity[0].
-    let mut values = Vec::with_capacity(8);
-    values.push(eval_constraint(graph, &main_boundary[0], ctx, &mut cache));
-    values.push(eval_constraint(graph, &main_integrity[0], ctx, &mut cache));
-    values.push(eval_constraint(graph, &main_boundary[1], ctx, &mut cache));
-    values.push(eval_constraint(graph, &main_boundary[2], ctx, &mut cache));
-    values.push(eval_constraint(graph, &main_integrity[1], ctx, &mut cache));
-    values.push(eval_constraint(graph, &aux_boundary[0], ctx, &mut cache));
-    values.push(eval_constraint(graph, &aux_boundary[1], ctx, &mut cache));
-    values.push(eval_constraint(graph, &aux_integrity[0], ctx, &mut cache));
-    values
+/// Collects constraint tags with their segment/domain, sorted by tag.
+fn collect_tagged_constraints(air: &Air) -> Vec<(u64, TraceSegmentId, ConstraintDomain)> {
+    let mut tagged = Vec::new();
+    for segment in [TraceSegmentId::Main, TraceSegmentId::Aux] {
+        if usize::from(segment) >= air.trace_segment_widths.len() {
+            continue;
+        }
+        for constraint in air.boundary_constraints(segment) {
+            let tag = constraint.tag().expect("boundary constraint missing tag");
+            tagged.push((tag, segment, constraint.domain()));
+        }
+        for constraint in air.integrity_constraints(segment) {
+            let tag = constraint.tag().expect("integrity constraint missing tag");
+            tagged.push((tag, segment, constraint.domain()));
+        }
+    }
+
+    tagged.sort_by_key(|(tag, ..)| *tag);
+    tagged
 }
 
 /// Evaluates a constraint root and applies its row-domain gate.
@@ -431,5 +453,21 @@ fn test_miden_vm_minimal_ood_evals_match() {
         assert_eq!(actual_name, expected_name);
         // Preserve both ordering and numeric equivalence with miden-vm.
         assert_eq!(actual_value, expected_value);
+    }
+
+    // Print tag ordering and evaluations to aid manual inspection.
+    let air_string = load_miden_vm_minimal_air().expect("unable to read MidenVM_Minimal AIR");
+    let air = generate_air(&air_string);
+    let tagged = collect_tagged_constraints(&air);
+    let ctx = OodContext::new(&air, OOD_SEED);
+    let evals = eval_constraints_in_id_order(&air, &ctx);
+
+    println!("tagged constraints (tag -> segment/domain -> name -> eval):");
+    for (((tag, segment, domain), name), value) in
+        tagged.iter().zip(CONSTRAINT_NAMES.iter()).zip(evals.iter())
+    {
+        let quad = value.to_quad();
+        let [c0, c1] = quad.to_base_elements();
+        println!("  {tag}: {segment:?}/{domain:?} {name} = {} + {} X", c0.as_int(), c1.as_int());
     }
 }

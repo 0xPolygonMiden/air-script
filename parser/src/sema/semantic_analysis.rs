@@ -116,6 +116,10 @@ impl<'a> SemanticAnalysis<'a> {
             return Err(err);
         }
 
+        if module.is_root() && self.module_has_tags(module) {
+            self.reference_current_max_id(module)?;
+        }
+
         // If this is the root module, we may have top-level dependencies
         if module.path.0.item == vec![self.program.name] {
             // Update the dependency graph with the collected information
@@ -143,6 +147,54 @@ impl<'a> SemanticAnalysis<'a> {
             );
         }
 
+        Ok(())
+    }
+
+    fn module_has_tags(&self, module: &Module) -> bool {
+        fn visit_statements(statements: &[Statement]) -> bool {
+            for statement in statements {
+                match statement {
+                    Statement::Enforce(enf) => {
+                        if enf.tag.is_some() {
+                            return true;
+                        }
+                    },
+                    Statement::Let(let_stmt) => {
+                        if visit_statements(&let_stmt.body) {
+                            return true;
+                        }
+                    },
+                    Statement::EnforceIf(_)
+                    | Statement::EnforceAll(_)
+                    | Statement::BusEnforce(_)
+                    | Statement::Expr(_) => {},
+                }
+            }
+            false
+        }
+
+        if let Some(boundary) = &module.boundary_constraints {
+            if visit_statements(&boundary.item) {
+                return true;
+            }
+        }
+        if let Some(integrity) = &module.integrity_constraints {
+            if visit_statements(&integrity.item) {
+                return true;
+            }
+        }
+        module.buses.values().any(|bus| bus.transition_tag.is_some())
+    }
+
+    fn reference_current_max_id(&mut self, module: &Module) -> Result<(), SemanticAnalysisError> {
+        let ident = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("CURRENT_MAX_ID"));
+        if !module.constants.contains_key(&ident) {
+            // Missing constant is reported later during MIR translation when tags are validated.
+            return Ok(());
+        }
+        let qid =
+            QualifiedIdentifier::new(module.path.clone(), NamespacedIdentifier::Binding(ident));
+        self.referenced.insert(qid, DependencyType::Constant);
         Ok(())
     }
 }

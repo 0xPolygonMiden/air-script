@@ -36,7 +36,7 @@ pub fn duplicate_node(
         Op::Enf(enf) => {
             let expr = enf.expr.clone();
             let new_expr = duplicate_node(expr, current_replace_map);
-            Enf::create(new_expr, enf.span())
+            Enf::create(new_expr, enf.span(), enf.tag)
         },
         Op::Boundary(boundary) => {
             let expr = boundary.expr.clone();
@@ -245,7 +245,7 @@ pub fn duplicate_node_or_replace(
         Op::Enf(enf) => {
             let expr = enf.expr.clone();
             let new_expr = current_replace_map[&expr.get_ptr()].1.clone();
-            let new_node = Enf::create(new_expr, enf.span());
+            let new_node = Enf::create(new_expr, enf.span(), enf.tag);
             current_replace_map.insert(node.get_ptr(), (node.clone(), new_node));
         },
         Op::Boundary(boundary) => {

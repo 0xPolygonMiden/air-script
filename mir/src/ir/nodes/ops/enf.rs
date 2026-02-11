@@ -8,6 +8,7 @@ use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singlet
 pub struct Enf {
     pub parents: Vec<BackLink<Owner>>,
     pub expr: Link<Op>,
+    pub tag: Option<u64>,
     pub _node: Singleton<Node>,
     pub _owner: Singleton<Owner>,
     #[span]
@@ -15,8 +16,8 @@ pub struct Enf {
 }
 
 impl Enf {
-    pub fn create(expr: Link<Op>, span: SourceSpan) -> Link<Op> {
-        Op::Enf(Self { expr, span, ..Default::default() }).into()
+    pub fn create(expr: Link<Op>, span: SourceSpan, tag: Option<u64>) -> Link<Op> {
+        Op::Enf(Self { expr, tag, span, ..Default::default() }).into()
     }
 }
 

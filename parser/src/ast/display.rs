@@ -98,8 +98,11 @@ impl fmt::Display for DisplayStatement<'_> {
                 };
                 write!(f, "{display}")
             },
-            Statement::Enforce(expr) => {
-                write!(f, "enf {expr}")
+            Statement::Enforce(enf) => {
+                if let Some(tag) = &enf.tag {
+                    write!(f, "@tag({}) ", tag.item)?;
+                }
+                write!(f, "enf {}", enf.expr)
             },
             Statement::EnforceIf(match_expr) => {
                 write!(f, "enf {match_expr}")

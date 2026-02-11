@@ -28,6 +28,7 @@ impl Pass for BusOpExpand<'_> {
                 &mut ir,
                 bus_type,
                 &bus.first,
+                bus.first_tag,
                 Boundary::First,
                 bus_index,
             );
@@ -35,6 +36,7 @@ impl Pass for BusOpExpand<'_> {
                 &mut ir,
                 bus_type,
                 &bus.last,
+                bus.last_tag,
                 Boundary::Last,
                 bus_index,
             );
@@ -64,6 +66,7 @@ impl Pass for BusOpExpand<'_> {
                             bus_access,
                             bus_access_with_offset,
                             bus_index,
+                            bus.transition_tag,
                         );
                     },
                     BusType::Logup => {
@@ -73,6 +76,7 @@ impl Pass for BusOpExpand<'_> {
                             bus_access,
                             bus_access_with_offset,
                             bus_index,
+                            bus.transition_tag,
                         );
                     },
                 }
@@ -101,6 +105,7 @@ impl<'a> BusOpExpand<'a> {
         ir: &mut Air,
         bus_type: BusType,
         bus_boundary: &BusBoundary,
+        tag: Option<u64>,
         boundary: Boundary,
         bus_index: usize,
     ) {
@@ -140,7 +145,7 @@ impl<'a> BusOpExpand<'a> {
             Boundary::Last => ConstraintDomain::LastRow,
         };
         // Store the generated constraint
-        ir.constraints.insert_constraint(TraceSegmentId::Aux, root, domain);
+        ir.constraints.insert_constraint(TraceSegmentId::Aux, root, domain, tag);
 
         // Also store the initial value for auxiliary trace generation
         if boundary == Boundary::First {
@@ -164,6 +169,7 @@ impl<'a> BusOpExpand<'a> {
         bus_access: NodeIndex,
         bus_access_with_offset: NodeIndex,
         bus_index: usize,
+        tag: Option<u64>,
     ) {
         let graph = ir.constraint_graph_mut();
 
@@ -254,6 +260,7 @@ impl<'a> BusOpExpand<'a> {
             TraceSegmentId::Aux,
             root,
             ConstraintDomain::EveryFrame(2),
+            tag,
         );
 
         // Also store the expression to computed p_prime for auxiliary trace generation
@@ -268,6 +275,7 @@ impl<'a> BusOpExpand<'a> {
         bus_access: NodeIndex,
         bus_access_with_offset: NodeIndex,
         bus_index: usize,
+        tag: Option<u64>,
     ) {
         let graph = ir.constraint_graph_mut();
         // Example:
@@ -410,6 +418,7 @@ impl<'a> BusOpExpand<'a> {
             TraceSegmentId::Aux,
             root,
             ConstraintDomain::EveryFrame(2),
+            tag,
         );
 
         ir.buses_transitions.insert(bus_index, (numerator, total_factors));

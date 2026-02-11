@@ -53,8 +53,8 @@ impl Constraints {
     /// Updates the root boundary and integrity constraints to use the new node indices  
     /// values, given in the `renumbering_map`.  
     ///  
-    /// This functions also removes duplicate constraints (that share the same root and domain).  
-    ///  
+    /// This functions also removes duplicate constraints (that share the same root, domain, and
+    /// tag).  
     /// # Panics  
     /// Panics if a constraint's node index is not found in the renumbering map.
     pub fn renumber_and_deduplicate_constraints(
@@ -73,7 +73,7 @@ impl Constraints {
                     .get(constraint.node_index())
                     .expect("Error: cannot find constraint index in renumbering map");
                 // Don't keep duplicate constraints
-                if !added_indices.insert((new_index, constraint.domain)) {
+                if !added_indices.insert((new_index, constraint.domain, constraint.tag())) {
                     return false;
                 }
                 // If this constraint is new, we update its node index and keep it
@@ -122,8 +122,9 @@ impl Constraints {
         trace_segment: TraceSegmentId,
         root: NodeIndex,
         domain: ConstraintDomain,
+        tag: Option<u64>,
     ) {
-        let root = ConstraintRoot::new(root, domain);
+        let root = ConstraintRoot::new(root, domain, tag);
         if domain.is_boundary() {
             self.boundary_constraints[trace_segment].push(root);
         } else {
@@ -153,11 +154,12 @@ impl Constraints {
 pub struct ConstraintRoot {
     index: NodeIndex,
     domain: ConstraintDomain,
+    tag: Option<u64>,
 }
 impl ConstraintRoot {
     /// Creates a new [ConstraintRoot] with the specified entry index and row offset.
-    pub const fn new(index: NodeIndex, domain: ConstraintDomain) -> Self {
-        Self { index, domain }
+    pub const fn new(index: NodeIndex, domain: ConstraintDomain, tag: Option<u64>) -> Self {
+        Self { index, domain, tag }
     }
 
     /// Returns the index of the entry node of the subgraph representing the constraint.
@@ -175,6 +177,11 @@ impl ConstraintRoot {
     /// the constraint should be applied.
     pub const fn domain(&self) -> ConstraintDomain {
         self.domain
+    }
+
+    /// Returns the optional tag associated with this constraint.
+    pub const fn tag(&self) -> Option<u64> {
+        self.tag
     }
 }
 

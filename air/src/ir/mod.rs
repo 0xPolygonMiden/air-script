@@ -189,6 +189,8 @@ pub struct Air {
     pub public_inputs: BTreeMap<Identifier, PublicInput>,
     /// The total number of elements in the random values array
     pub num_random_values: u16,
+    /// Expected maximum constraint id (inclusive) when tag validation is enabled.
+    pub expected_max_constraint_id: Option<u64>,
     /// The constraints enforced by this program, in their algebraic graph representation.
     pub constraints: Constraints,
     /// The buses referenced by this program.
@@ -227,6 +229,7 @@ impl Air {
             periodic_columns: Default::default(),
             public_inputs: Default::default(),
             num_random_values: 0,
+            expected_max_constraint_id: None,
             constraints: Default::default(),
             buses: Default::default(),
             buses_initial_values: Default::default(),
