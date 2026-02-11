@@ -1,0 +1,169 @@
+##########################################################################################
+# MIDEN VM - MINIMAL AIR
+##########################################################################################
+#
+# This definition is intentionally minimal and only includes the 8 constraints used for
+# cross-checking with the Rust AirBuilder tagging work:
+#   0 system.clk.first_row
+#   1 system.clk.transition
+#   2 range.main.v.first_row
+#   3 range.main.v.last_row
+#   4 range.main.v.transition
+#   5 range.bus.first_row
+#   6 range.bus.last_row
+#   7 range.bus.transition
+#
+# NOTE: The trace layout matches the current miden-vm main trace (71 columns, padded to 72):
+#   system[6], decoder[24], stack[19], range_checker[2], chiplets[20], padding[1]
+##########################################################################################
+
+def MidenVM_Minimal
+
+##########################################################################################
+# EXECUTION TRACE LAYOUT
+##########################################################################################
+
+trace_columns {
+    main: [system[6], decoder[24], stack[19], range_checker[2], chiplets[20], padding[1]],
+}
+
+##########################################################################################
+# PUBLIC INPUTS
+##########################################################################################
+
+public_inputs {
+    dummy: [1],
+}
+
+##########################################################################################
+# BUS ARCHITECTURE
+##########################################################################################
+#
+# We keep the full bus list to preserve auxiliary trace column ordering. All buses except
+# bus_4_range_checker are left unconstrained and have no operations.
+##########################################################################################
+
+buses {
+    # Decoder buses
+    multiset bus_0_decoder_p1,
+    multiset bus_1_decoder_p2,
+    multiset bus_2_decoder_p3,
+
+    # Stack overflow table
+    multiset bus_3_stack_p1,
+
+    # Range checker bus
+    logup    bus_4_range_checker,
+
+    # Chiplet buses
+    multiset bus_5_v_table,
+    multiset bus_6_chiplets_bus,
+
+    # Wiring bus
+    logup    bus_7_wiring_bus,
+}
+
+##########################################################################################
+# EVALUATORS
+##########################################################################################
+
+ev system_clk_transition([system[6]]) {
+    let clk = system[0];
+    enf clk' = clk + 1;
+}
+
+ev range_checker_minimal([decoder[24], range_checker[2], chiplets[20]]) {
+    # Range checker table columns
+    let value = range_checker[1];        # v: Current 16-bit value [0, 65535]
+    let multiplicity = range_checker[0]; # m: Usage count
+
+    # Stack values requiring 16-bit range checks (from decoder trace)
+    let sv0 = decoder[10];
+    let sv1 = decoder[11];
+    let sv2 = decoder[12];
+    let sv3 = decoder[13];
+
+    # Memory chiplet values requiring 16-bit range checks
+    let mem_d0 = chiplets[14];
+    let mem_d1 = chiplets[15];
+
+    # U32 range check operation flag
+    let not_4 = binary_not(decoder[5]);
+    let not_5 = binary_not(decoder[6]);
+    let u32_rc_op = decoder[7] * not_4 * not_5;
+
+    # Memory chiplet operation flag
+    let s_0 = chiplets[0];
+    let s_1 = chiplets[1];
+    let s_2 = chiplets[2];
+    let chiplets_memory_flag = memory_chiplet_flag(s_0, s_1, s_2);
+
+    # Value transition constraint - powers of 3 (gap handling)
+    let delta = value' - value;
+    enf delta * (delta - 1) * (delta - 3) * (delta - 9) * (delta - 27)
+        * (delta - 81) * (delta - 243) * (delta - 729) * (delta - 2187) = 0;
+
+    # LogUp bus operations
+    bus_4_range_checker.insert(value) with multiplicity;
+    bus_4_range_checker.remove(mem_d0) when chiplets_memory_flag;
+    bus_4_range_checker.remove(mem_d1) when chiplets_memory_flag;
+    bus_4_range_checker.remove(sv0) when u32_rc_op;
+    bus_4_range_checker.remove(sv1) when u32_rc_op;
+    bus_4_range_checker.remove(sv2) when u32_rc_op;
+    bus_4_range_checker.remove(sv3) when u32_rc_op;
+}
+
+##########################################################################################
+# BOUNDARY CONSTRAINTS
+##########################################################################################
+
+boundary_constraints {
+    # System clock must start at 0
+    enf system[0].first = 0;
+
+    # Range checker value column must span complete 16-bit range [0, 65535]
+    enf range_checker[1].first = 0;
+    enf range_checker[1].last = 65535;
+
+    # Bus boundaries: only the range checker bus is constrained in this minimal spec
+    enf bus_0_decoder_p1.first = unconstrained;
+    enf bus_0_decoder_p1.last = unconstrained;
+    enf bus_1_decoder_p2.first = unconstrained;
+    enf bus_1_decoder_p2.last = unconstrained;
+    enf bus_2_decoder_p3.first = unconstrained;
+    enf bus_2_decoder_p3.last = unconstrained;
+    enf bus_3_stack_p1.first = unconstrained;
+    enf bus_3_stack_p1.last = unconstrained;
+    enf bus_4_range_checker.first = null;
+    enf bus_4_range_checker.last = null;
+    enf bus_5_v_table.first = unconstrained;
+    enf bus_5_v_table.last = unconstrained;
+    enf bus_6_chiplets_bus.first = unconstrained;
+    enf bus_6_chiplets_bus.last = unconstrained;
+    enf bus_7_wiring_bus.first = unconstrained;
+    enf bus_7_wiring_bus.last = unconstrained;
+}
+
+##########################################################################################
+# INTEGRITY CONSTRAINTS
+##########################################################################################
+
+integrity_constraints {
+    # System clock transition
+    enf system_clk_transition([system[0..6]]);
+
+    # Range checker constraints (value transition + logup bus transition)
+    enf range_checker_minimal([decoder[0..24], range_checker[0..2], chiplets[0..20]]);
+}
+
+##########################################################################################
+# HELPER FUNCTIONS
+##########################################################################################
+
+fn binary_not(a: felt) -> felt {
+    return 1 - a;
+}
+
+fn memory_chiplet_flag(s_0: felt, s_1: felt, s_2: felt) -> felt {
+    return s_0 * s_1 * binary_not(s_2);
+}

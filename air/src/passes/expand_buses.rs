@@ -394,7 +394,7 @@ impl<'a> BusOpExpand<'a> {
         };
 
         // 5. Create the resulting constraint
-        let root = graph.insert_node(Operation::Sub(q_term, q_prime_term));
+        let root = graph.insert_node(Operation::Sub(q_prime_term, q_term));
 
         // Also store the expression to computed q_prime for auxiliary trace generation
         // Note: TODO: Potentially adapt CSE to handle this properly, otherwise indices might
