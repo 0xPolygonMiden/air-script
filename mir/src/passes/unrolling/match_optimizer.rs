@@ -258,7 +258,7 @@ impl<'a> MatchOptimizer<'a> {
                     .latch
                     .borrow_mut()
                     .clone_from(&new_latch.borrow());
-                let enf_constraint = Enf::create(constraint.clone(), constraint.span());
+                let enf_constraint = Enf::create(constraint.clone(), constraint.span(), None);
                 all_constraints.push(enf_constraint);
             }
         }

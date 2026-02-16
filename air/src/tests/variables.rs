@@ -257,7 +257,10 @@ fn invalid_trailing_let() {
         let a = 1;
     }";
 
-    expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
+    expect_diagnostic(
+        source,
+        "expected one of: '\"@\"', '\"enf\"', '\"let\"', '\"return\"', 'identifier'",
+    );
 }
 
 #[test]

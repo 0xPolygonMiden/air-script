@@ -606,7 +606,7 @@ macro_rules! return_ {
 
 macro_rules! enforce {
     ($expr:expr) => {
-        Statement::Enforce($expr)
+        Statement::Enforce(Enforce::new(miden_diagnostics::SourceSpan::UNKNOWN, $expr, None))
     };
 
     ($expr:expr, when $selector:expr) => {

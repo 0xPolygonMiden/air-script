@@ -720,8 +720,8 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         Err(err) => return ControlFlow::Break(err),
                     }
                 },
-                Statement::Enforce(expr) => {
-                    self.visit_mut_enforce(expr)?;
+                Statement::Enforce(enf) => {
+                    self.visit_mut_enforce(&mut enf.expr)?;
                 },
                 Statement::EnforceAll(expr) => {
                     self.in_constraint_comprehension = true;
