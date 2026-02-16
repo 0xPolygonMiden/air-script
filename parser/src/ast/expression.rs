@@ -1202,6 +1202,10 @@ pub type ComprehensionContext = Vec<(Identifier, Expr)>;
 pub struct ListComprehension {
     #[span]
     pub span: SourceSpan,
+    /// Optional constraint tag spec when this comprehension is used in a constraint context.
+    ///
+    /// This is ignored for general expression comprehensions.
+    pub tag: Option<ConstraintTagSpec>,
     /// The names to be bound to each element of their corresponding iterable in `iterables`
     ///
     /// NOTE: There must be the same number of bindings as iterables.
@@ -1232,11 +1236,13 @@ impl ListComprehension {
         body: ScalarExpr,
         mut context: ComprehensionContext,
         selector: Option<ScalarExpr>,
+        tag: Option<ConstraintTagSpec>,
     ) -> Self {
         let bindings = context.iter().map(|(name, _)| name).copied().collect();
         let iterables = context.drain(..).map(|(_, iterable)| iterable).collect();
         Self {
             span,
+            tag,
             bindings,
             iterables,
             body: Box::new(body),
@@ -1252,6 +1258,7 @@ impl PartialEq for ListComprehension {
             && self.iterables == other.iterables
             && self.body == other.body
             && self.selector == other.selector
+            && self.tag == other.tag
     }
 }
 impl fmt::Debug for ListComprehension {

@@ -648,7 +648,7 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, None)
+        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, None, None)
     }};
 
     (($(($binding:literal, $iterable:expr)),+) => $body:expr) => {{
@@ -657,7 +657,7 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, None)
+        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, None, None)
     }};
 
     (($(($binding:ident, $iterable:expr)),*) => $body:expr, when $selector:expr) => {{
@@ -666,7 +666,13 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, Some($selector))
+        ListComprehension::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            $body,
+            context,
+            Some($selector),
+            None
+        )
     }};
 
     (($(($binding:literal, $iterable:expr)),*) => $body:expr, when $selector:expr) => {{
@@ -675,7 +681,13 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, Some($selector))
+        ListComprehension::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            $body,
+            context,
+            Some($selector),
+            None
+        )
     }};
 
 
@@ -685,7 +697,13 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, Some($multiplicity))
+        ListComprehension::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            $body,
+            context,
+            Some($multiplicity),
+            None
+        )
     }};
 
     (($(($binding:literal, $iterable:expr)),*) => $body:expr, with $multiplicity:expr) => {{
@@ -694,7 +712,13 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, Some($multiplicity))
+        ListComprehension::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            $body,
+            context,
+            Some($multiplicity),
+            None
+        )
     }};
 }
 

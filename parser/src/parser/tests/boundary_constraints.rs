@@ -59,12 +59,20 @@ fn test_module() -> Module {
     expected
         .public_inputs
         .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
-    expected
-        .buses
-        .insert(ident!(p), Bus::new(SourceSpan::UNKNOWN, ident!(p), BusType::Multiset));
-    expected
-        .buses
-        .insert(ident!(q), Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup));
+    expected.buses.insert(
+        ident!(p),
+        Bus::new(
+            SourceSpan::UNKNOWN,
+            ident!(p),
+            BusType::Multiset,
+            BusConstraintForm::Product,
+            None,
+        ),
+    );
+    expected.buses.insert(
+        ident!(q),
+        Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup, BusConstraintForm::Product, None),
+    );
     expected.integrity_constraints =
         Some(Span::new(SourceSpan::UNKNOWN, vec![enforce!(eq!(access!(clk), int!(0)))]));
     expected
@@ -411,7 +419,10 @@ fn err_missing_boundary_constraint() {
         let c = [[a - 1, a^2], [b[0], b[1]]];
     }}"
     );
-    ParseTest::new().expect_module_diagnostic(&source, "expected one of: '\"enf\"', '\"let\"'");
+    ParseTest::new().expect_module_diagnostic(
+        &source,
+        "expected one of: '\"@\"', '\"enf\"', '\"let\"', '\"return\"', 'identifier'",
+    );
 }
 
 #[test]

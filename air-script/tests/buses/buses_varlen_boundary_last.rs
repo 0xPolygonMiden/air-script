@@ -4,32 +4,36 @@ use winter_math::{ExtensionOf, FieldElement, ToElements};
 use winter_utils::{ByteWriter, Serializable};
 
 pub struct PublicInputs {
-    outputs: Vec<[Felt; 2]>,
+    outputs_p: Vec<[Felt; 2]>,
+    outputs_q: Vec<[Felt; 2]>,
 }
 
 impl PublicInputs {
-    pub fn new(outputs: Vec<[Felt; 2]>) -> Self {
-        Self { outputs }
+    pub fn new(outputs_p: Vec<[Felt; 2]>, outputs_q: Vec<[Felt; 2]>) -> Self {
+        Self { outputs_p, outputs_q }
     }
 }
 
 impl Serializable for PublicInputs {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        self.outputs.write_into(target);
+        self.outputs_p.write_into(target);
+        self.outputs_q.write_into(target);
     }
 }
 
 impl ToElements<Felt> for PublicInputs {
     fn to_elements(&self) -> Vec<Felt> {
         let mut elements = Vec::new();
-        self.outputs.iter().for_each(|row| elements.extend_from_slice(row));
+        self.outputs_p.iter().for_each(|row| elements.extend_from_slice(row));
+        self.outputs_q.iter().for_each(|row| elements.extend_from_slice(row));
         elements
     }
 }
 
 pub struct BusesAir {
     context: AirContext<Felt>,
-    outputs: Vec<[Felt; 2]>,
+    outputs_p: Vec<[Felt; 2]>,
+    outputs_q: Vec<[Felt; 2]>,
 }
 
 impl BusesAir {
@@ -75,7 +79,7 @@ impl Air for BusesAir {
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
         let main_degrees = vec![];
-        let aux_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(1)];
+        let aux_degrees = vec![TransitionConstraintDegree::new(3), TransitionConstraintDegree::new(2)];
         let num_main_assertions = 0;
         let num_aux_assertions = 4;
 
@@ -88,7 +92,7 @@ impl Air for BusesAir {
             options,
         )
         .set_num_transition_exemptions(2);
-        Self { context, outputs: public_inputs.outputs }
+        Self { context, outputs_p: public_inputs.outputs_p, outputs_q: public_inputs.outputs_q }
     }
 
     fn get_periodic_column_values(&self) -> Vec<Vec<Felt>> {
@@ -102,12 +106,12 @@ impl Air for BusesAir {
 
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
-        let reduced_outputs_multiset = Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.outputs);
-        let reduced_outputs_logup = Self::bus_logup_boundary_varlen(aux_rand_elements, &self.outputs);
+        let reduced_outputs_p_multiset = Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.outputs_p);
+        let reduced_outputs_q_logup = Self::bus_logup_boundary_varlen(aux_rand_elements, &self.outputs_q);
         result.push(Assertion::single(0, 0, E::ONE));
-        result.push(Assertion::single(0, self.last_step(), reduced_outputs_multiset));
+        result.push(Assertion::single(0, self.last_step(), reduced_outputs_p_multiset));
         result.push(Assertion::single(1, 0, E::ZERO));
-        result.push(Assertion::single(1, self.last_step(), reduced_outputs_logup));
+        result.push(Assertion::single(1, self.last_step(), reduced_outputs_q_logup));
         result
     }
 
@@ -124,7 +128,7 @@ impl Air for BusesAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
-        result[0] = ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1]) * E::from(main_current[0]) + E::ONE - E::from(main_current[0])) * aux_current[0] - ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1]) * (E::from(main_current[0]) - E::ONE) + E::ONE - (E::from(main_current[0]) - E::ONE)) * aux_next[0];
-        result[1] = (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * aux_current[1] + (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * E::from(main_current[0]) + (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * E::from(main_current[0]) - ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * aux_next[1] + (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * E::from(Felt::new(2_u64)));
+        result[0] = ((aux_rand_elements.rand_elements()[0] + E::from(main_current[0]) * aux_rand_elements.rand_elements()[1]) * E::from(main_current[1]) + E::ONE - E::from(main_current[1])) * aux_current[0] - ((aux_rand_elements.rand_elements()[0] + E::from(main_current[0]) * aux_rand_elements.rand_elements()[1]) * E::from(main_current[2]) + E::ONE - E::from(main_current[2])) * aux_next[0];
+        result[1] = (aux_rand_elements.rand_elements()[0] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[1] + E::from(main_current[0]) * aux_rand_elements.rand_elements()[2]) * aux_next[1] + E::from(main_current[4]) - ((aux_rand_elements.rand_elements()[0] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[1] + E::from(main_current[0]) * aux_rand_elements.rand_elements()[2]) * aux_current[1] + E::from(main_current[3]) + E::from(main_current[3]));
     }
 }
