@@ -432,8 +432,13 @@ StatementBlock: Vec<Statement> = {
 }
 
 Let: Let = {
-    <l:@L> "let" <name: Identifier> "=" <value: Expr> ";" <r:@R> <body: StatementBlock>
-        => Let::new(span!(l, r), name, value, body)
+    <l:@L> "let" <binding: LetBinding> "=" <value: Expr> ";" <r:@R> <body: StatementBlock>
+        => Let::new(span!(l, r), binding, value, body)
+}
+
+LetBinding: LetBinding = {
+    <name: Identifier> => LetBinding::Single(name),
+    <names: Vector<Identifier>> => LetBinding::Vector(names),
 }
 
 ConstraintStatements: Vec<Statement> = {

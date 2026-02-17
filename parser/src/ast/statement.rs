@@ -189,13 +189,63 @@ impl TryFrom<ScalarExpr> for Statement {
     }
 }
 
-/// A `let` statement binds `name` to the value of `expr` in `body`.
+/// The binding target for a `let` statement.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LetBinding {
+    Single(Identifier),
+    Vector(Vec<Identifier>),
+}
+
+impl LetBinding {
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Single(_) => 1,
+            Self::Vector(names) => names.len(),
+        }
+    }
+
+    pub fn names(&self) -> Vec<Identifier> {
+        match self {
+            Self::Single(name) => vec![*name],
+            Self::Vector(names) => names.clone(),
+        }
+    }
+
+    pub fn span(&self) -> SourceSpan {
+        match self {
+            Self::Single(name) => name.span(),
+            Self::Vector(names) => names
+                .iter()
+                .fold(SourceSpan::UNKNOWN, |acc, name| acc.merge(name.span()).unwrap_or(acc)),
+        }
+    }
+}
+
+impl fmt::Display for LetBinding {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Single(name) => write!(f, "{name}"),
+            Self::Vector(names) => {
+                f.write_str("[")?;
+                for (idx, name) in names.iter().enumerate() {
+                    if idx > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{name}")?;
+                }
+                f.write_str("]")
+            },
+        }
+    }
+}
+
+/// A `let` statement binds `binding` to the value of `expr` in `body`.
 #[derive(Clone, Spanned)]
 pub struct Let {
     #[span]
     pub span: SourceSpan,
-    /// The identifier to be bound
-    pub name: Identifier,
+    /// The binding target
+    pub binding: LetBinding,
     /// The expression to bind
     pub value: Expr,
     /// The statements for which this binding will be visible.
@@ -224,8 +274,8 @@ pub struct Let {
     pub body: Vec<Statement>,
 }
 impl Let {
-    pub fn new(span: SourceSpan, name: Identifier, value: Expr, body: Vec<Statement>) -> Self {
-        Self { span, name, value, body }
+    pub fn new(span: SourceSpan, binding: LetBinding, value: Expr, body: Vec<Statement>) -> Self {
+        Self { span, binding, value, body }
     }
 
     /// Return the type of the overall `let` expression.
@@ -258,13 +308,13 @@ impl Let {
 impl Eq for Let {}
 impl PartialEq for Let {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.value == other.value && self.body == other.body
+        self.binding == other.binding && self.value == other.value && self.body == other.body
     }
 }
 impl fmt::Debug for Let {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Let")
-            .field("name", &self.name)
+            .field("binding", &self.binding)
             .field("value", &self.value)
             .field("body", &self.body)
             .finish()

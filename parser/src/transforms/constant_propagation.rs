@@ -133,14 +133,39 @@ impl<'a> ConstantPropagation<'a> {
         let is_constant = expr.value.is_constant();
         if is_constant {
             match expr.value {
-                Expr::Const(ref value) => {
-                    self.local.insert(expr.name, value.clone());
+                Expr::Const(ref value) => match expr.binding {
+                    LetBinding::Single(name) => {
+                        self.local.insert(name, value.clone());
+                    },
+                    LetBinding::Vector(ref names) => {
+                        let ConstantExpr::Vector(ref values) = value.item else {
+                            unreachable!();
+                        };
+                        for (idx, name) in names.iter().copied().enumerate() {
+                            self.local.insert(
+                                name,
+                                Span::new(value.span(), ConstantExpr::Scalar(values[idx])),
+                            );
+                        }
+                    },
                 },
                 Expr::Range(ref range) => {
                     let span = range.span();
                     let range = range.to_slice_range();
                     let vector = range.map(|i| i as u64).collect();
-                    self.local.insert(expr.name, Span::new(span, ConstantExpr::Vector(vector)));
+                    match expr.binding {
+                        LetBinding::Single(name) => {
+                            self.local.insert(name, Span::new(span, ConstantExpr::Vector(vector)));
+                        },
+                        LetBinding::Vector(ref names) => {
+                            for (idx, name) in names.iter().copied().enumerate() {
+                                self.local.insert(
+                                    name,
+                                    Span::new(span, ConstantExpr::Scalar(vector[idx])),
+                                );
+                            }
+                        },
+                    }
                 },
                 _ => unreachable!(),
             }
@@ -154,7 +179,8 @@ impl<'a> ConstantPropagation<'a> {
         // If this let is constant, then the binding is no longer
         // used in the body after constant propagation, so we can
         // fold away the let entirely
-        let is_live = self.live.contains(&expr.name);
+        let binding_names = expr.binding.names();
+        let is_live = binding_names.iter().any(|name| self.live.contains(name));
         let result = if is_constant && !is_live {
             match expr.body.last().unwrap() {
                 Statement::Expr(Expr::Const(const_value)) => {
@@ -168,7 +194,9 @@ impl<'a> ConstantPropagation<'a> {
 
         // Propagate liveness from the body of the let to its parent scope
         let mut live = core::mem::take(&mut self.live);
-        live.remove(&expr.name);
+        for name in binding_names.iter() {
+            live.remove(name);
+        }
         self.live = &prev_live | &live;
 
         // Restore the previous scope

@@ -537,11 +537,34 @@ impl<'a> MirBuilder<'a> {
     /// Note: as we already return the operation of the last statement, we do not need to add it to
     /// the root's body here. This should be handled by the caller.
     fn translate_let(&mut self, let_stmt: &'a ast::Let) -> Result<Link<Op>, CompileError> {
-        let name = &let_stmt.name;
         let value: Link<Op> = self.translate_expr(&let_stmt.value)?;
         let mut ret_value = value.clone();
         self.bindings.enter();
-        self.bindings.insert(name, value.clone());
+        match &let_stmt.binding {
+            ast::LetBinding::Single(name) => {
+                self.bindings.insert(name, value.clone());
+            },
+            ast::LetBinding::Vector(names) => {
+                let vector_elements =
+                    value.as_vector().map(|vec| vec.elements.borrow().deref().clone());
+                for (idx, name) in names.iter().enumerate() {
+                    let element_node = if let Some(elements) = &vector_elements {
+                        elements[idx].clone()
+                    } else {
+                        let index_node =
+                            self.translate_scalar_const(idx as u64, let_stmt.value.span())?;
+                        let mir_access_type = MirAccessType::Index(index_node);
+                        Accessor::create(
+                            duplicate_node(value.clone(), &mut Default::default()),
+                            mir_access_type,
+                            0,
+                            name.span(),
+                        )
+                    };
+                    self.bindings.insert(name, element_node);
+                }
+            },
+        }
         for (i, stmt) in let_stmt.body.iter().enumerate() {
             let new_stmt = self.translate_statement(stmt)?;
             // Skip the last statement as it is returned
