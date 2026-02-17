@@ -1,5 +1,4 @@
-use super::super::compile_from_source;
-use super::super::expect_diagnostic;
+use super::super::{compile_from_source, expect_diagnostic};
 
 #[test]
 fn constraint_comprehension() {

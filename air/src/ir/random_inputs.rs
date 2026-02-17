@@ -3,7 +3,7 @@ use alloc::collections::BTreeMap;
 
 use air_parser::ast::TraceSegmentId;
 use mir::ir::{QuadFelt, const_quad_felt, query_indexed_eval, query_mapped_eval};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{SeedableRng, rngs::StdRng};
 use winter_math::fields::f64::BaseElement as Felt;
 
 use crate::{

@@ -578,7 +578,8 @@ impl AirBuilder<'_> {
             Op::Vector(vector) => {
                 let vec = vector.children().borrow().deref().clone();
                 if let Some(tag_spec) = tag {
-                    // Bus ops are expanded into their own constraints later; do not consume tags here.
+                    // Bus ops are expanded into their own constraints later; do not consume tags
+                    // here.
                     let taggable = vec.iter().filter(|node| !self.is_bus_op_node(node)).count();
                     let tags = self.expand_tag_spec(&tag_spec, taggable)?;
                     let mut tag_iter = tags.into_iter();
@@ -607,7 +608,8 @@ impl AirBuilder<'_> {
                     for row in rows.iter() {
                         let vec = row.borrow().deref().children().borrow().deref().clone();
                         for node in vec.iter() {
-                            // Bus ops are expanded into their own constraints later; do not consume tags here.
+                            // Bus ops are expanded into their own constraints later; do not consume
+                            // tags here.
                             if !self.is_bus_op_node(node) {
                                 total += 1;
                             }
