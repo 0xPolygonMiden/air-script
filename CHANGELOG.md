@@ -11,12 +11,17 @@
 - Removed `TraceSegmentId::index()` and replaced segment indexing with `TraceShape<T>`/`FullTraceShape<T>` across ACE codegen, MIR-to-AIR pass, and constraints (#442).
 - Allow computed indices (#444).
 - Fix regressions on MIR and list_comprehensions (#449).
+- Add Plonky3 codegen backend (#461).
 - Fixed a vector unrolling issue in nested match evaluations (#491).
 - Fix evaluator argument vector slice expansion (#495).
-- Fixed MIR's constant propagation to fold 0^0 to 1 (#509)
+- Support importing hierarchical modules (#507).
+- In Plonky3 codegen, use AirScriptAir and AirScriptBuilder traits, and generate aux constraints (#508).
+- Fixed MIR's constant propagation to fold 0^0 to 1 (#509).
 - Support importing hierarchical modules (#507, #513, #514).
+- In Plonky3 codegen, use MidenAir and MidenAirBuilder from 0xMiden's Plonky3 fork instead of AirScriptAir and AirScriptBuilder (#515).
+- In Plonky3 codegen, use prove/verify workflow for tests (#523).
 - Fix MIR inlining loop on deeply nested calls (#524).
-- Fix cross-module constant resolution and comprehension scoping (#526).
+- Add constraints tagging infrastructure in order to cross-check with constraints in `miden-vm` (#539).
 
 ## 0.4.0 (2025-06-20)
 
