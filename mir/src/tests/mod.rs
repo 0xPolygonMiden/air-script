@@ -12,6 +12,7 @@ mod list_folding;
 mod pub_inputs;
 mod selectors;
 mod source_sections;
+mod tag_validation;
 mod trace;
 mod variables;
 

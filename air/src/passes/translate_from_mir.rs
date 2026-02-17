@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, ops::Deref};
+use std::{
+    collections::{BTreeMap, HashMap},
+    ops::Deref,
+};
 
 use air_parser::{
     SemanticAnalysisError,
@@ -100,6 +103,7 @@ impl Pass for MirToAir<'_> {
             air: &mut air,
             trace_columns: trace_columns.clone(),
             bus_bindings_map,
+            tag_allocators: HashMap::new(),
         };
 
         let graph = mir.constraint_graph();
@@ -133,6 +137,51 @@ struct AirBuilder<'a> {
     air: &'a mut Air,
     trace_columns: TraceShape<TraceSegment>,
     bus_bindings_map: BTreeMap<Identifier, usize>,
+    tag_allocators: HashMap<SourceSpan, TagAllocator>,
+}
+
+struct TagAllocator {
+    spec: ConstraintTagSpec,
+    next_idx: usize,
+}
+
+impl TagAllocator {
+    fn new(spec: ConstraintTagSpec) -> Self {
+        Self { spec, next_idx: 0 }
+    }
+
+    fn next(&mut self) -> Option<Span<u64>> {
+        let span = self.spec.span();
+        match &self.spec {
+            ConstraintTagSpec::Single(tag) => {
+                if self.next_idx == 0 {
+                    self.next_idx = 1;
+                    Some(tag.clone())
+                } else {
+                    None
+                }
+            },
+            ConstraintTagSpec::Range { start, .. } => {
+                let len = self.spec.len();
+                if self.next_idx >= len {
+                    None
+                } else {
+                    let value = *start + self.next_idx as u64;
+                    self.next_idx += 1;
+                    Some(Span::new(span, value))
+                }
+            },
+            ConstraintTagSpec::List { tags, .. } => {
+                if self.next_idx >= tags.len() {
+                    None
+                } else {
+                    let value = tags[self.next_idx];
+                    self.next_idx += 1;
+                    Some(Span::new(span, value))
+                }
+            },
+        }
+    }
 }
 
 /// In case of nested list comprehension, we may not have entirely unrolled outer loops iterators
@@ -749,7 +798,7 @@ impl AirBuilder<'_> {
     }
 
     fn resolve_single_tag(
-        &self,
+        &mut self,
         tag: Option<ConstraintTagSpec>,
     ) -> Result<Option<u64>, CompileError> {
         match tag {
@@ -757,17 +806,29 @@ impl AirBuilder<'_> {
             Some(spec) => match spec.as_single() {
                 Some(tag) => Ok(Some(tag)),
                 None => {
-                    self.diagnostics
-                        .diagnostic(Severity::Error)
-                        .with_message("tag range does not match expanded constraint length")
-                        .with_primary_label(
-                            spec.span(),
-                            "expected a single tag for this constraint",
-                        )
-                        .emit();
-                    Err(CompileError::Failed)
+                    let next = self.next_tag_from_spec(&spec)?;
+                    Ok(Some(next.item))
                 },
             },
+        }
+    }
+
+    fn next_tag_from_spec(&mut self, spec: &ConstraintTagSpec) -> Result<Span<u64>, CompileError> {
+        let span = spec.span();
+        let entry = self
+            .tag_allocators
+            .entry(span)
+            .or_insert_with(|| TagAllocator::new(spec.clone()));
+
+        if let Some(tag) = entry.next() {
+            Ok(tag)
+        } else {
+            self.diagnostics
+                .diagnostic(Severity::Error)
+                .with_message("constraint tag range exhausted")
+                .with_primary_label(span, "no tags left to assign here")
+                .emit();
+            Err(CompileError::Failed)
         }
     }
 
@@ -897,6 +958,45 @@ impl AirBuilder<'_> {
             return Err(CompileError::Failed);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tag_allocator_consumes_range_in_order() {
+        let span = SourceSpan::default();
+        let spec = ConstraintTagSpec::range(span, 10, 13, false); // 10..13 -> 10,11,12
+        let mut alloc = TagAllocator::new(spec);
+
+        let first = alloc.next().map(|tag| tag.item);
+        let second = alloc.next().map(|tag| tag.item);
+        let third = alloc.next().map(|tag| tag.item);
+        let fourth = alloc.next().map(|tag| tag.item);
+
+        assert_eq!(first, Some(10));
+        assert_eq!(second, Some(11));
+        assert_eq!(third, Some(12));
+        assert_eq!(fourth, None);
+    }
+
+    #[test]
+    fn tag_allocator_consumes_list_in_order() {
+        let span = SourceSpan::default();
+        let spec = ConstraintTagSpec::list(span, vec![3, 1, 4]);
+        let mut alloc = TagAllocator::new(spec);
+
+        let first = alloc.next().map(|tag| tag.item);
+        let second = alloc.next().map(|tag| tag.item);
+        let third = alloc.next().map(|tag| tag.item);
+        let fourth = alloc.next().map(|tag| tag.item);
+
+        assert_eq!(first, Some(3));
+        assert_eq!(second, Some(1));
+        assert_eq!(third, Some(4));
+        assert_eq!(fourth, None);
     }
 }
 
