@@ -24,7 +24,9 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     #   s_i' * (no_shift_i + left_shift_{i+1} + right_shift_{i-1})
     #       = no_shift_i * s_i + left_shift_{i+1} * s_{i+1} + right_shift_{i-1} * s_{i-1}.
     #
-    # At the edges we drop the invalid term (i=0 has no right_shift_{-1}, i=15 has no left_shift_16).
+    # At the edges we drop the invalid term (i=0 has no right_shift_{-1}).
+    # For i=15, left shifts are handled by the overflow constraints: if overflow is non-empty,
+    # s15' is pulled from the overflow table; otherwise s15' is forced to 0.
 
     let s0 = stack[0];
     let s1 = stack[1];
@@ -45,7 +47,7 @@ ev stack_general_transition([stack[16], decoder[24]]) {
 
     # b0..b6 are the 7 opcode bits (LSB -> MSB) used by op flag helpers.
     # e0/e1 are the two extra op-bit columns used for degree reduction.
-    # h5, the 5th helper register, is the loop-end flag used by END to decide whether it shifts the stack.
+    # h5, the 5th helper register, is the loop-end flag used in END to decide whether it shifts the stack or not.
     let b0 = decoder[1];
     let b1 = decoder[2];
     let b2 = decoder[3];
@@ -60,13 +62,10 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     let op_bits = [b0, b1, b2, b3, b4, b5, b6];
 
     # Operation flags (degree 7/6/5/4 groups)
-    let is_noop = flag_noop(op_bits);
-    let is_swap = flag_swap(op_bits);
     let is_movup2 = flag_movup2(op_bits);
     let is_movdn2 = flag_movdn2(op_bits);
     let is_movup3 = flag_movup3(op_bits);
     let is_movdn3 = flag_movdn3(op_bits);
-    let is_advpopw = flag_advpopw(op_bits);
     let is_movup4 = flag_movup4(op_bits);
     let is_movdn4 = flag_movdn4(op_bits);
     let is_movup5 = flag_movup5(op_bits);
@@ -75,14 +74,18 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     let is_movdn6 = flag_movdn6(op_bits);
     let is_movup7 = flag_movup7(op_bits);
     let is_movdn7 = flag_movdn7(op_bits);
-    let is_swapw = flag_swapw(op_bits);
-    let is_ext2mul = flag_ext2mul(op_bits);
     let is_movup8 = flag_movup8(op_bits);
     let is_movdn8 = flag_movdn8(op_bits);
+
+    let is_swap = flag_swap(op_bits);
+    let is_swapw = flag_swapw(op_bits);
     let is_swapw2 = flag_swapw2(op_bits);
     let is_swapw3 = flag_swapw3(op_bits);
-    let is_emit = flag_emit(op_bits);
 
+    let is_noop = flag_noop(op_bits);
+    let is_emit = flag_emit(op_bits);
+    let is_ext2mul = flag_ext2mul(op_bits);
+    let is_advpopw = flag_advpopw(op_bits);
     let is_assert = flag_assert(op_bits);
     let is_eqz = flag_eqz(op_bits);
     let is_neg = flag_neg(op_bits);
@@ -185,7 +188,7 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     # subtract NOOP to avoid double counting.
     let no_change_1_flag = f0000 - is_noop;
 
-    # left_change_1_flag: this is the "rest of the 0100 left‑shift prefix".
+    # left_change_1_flag: this is the "rest of the 0100 left-shift prefix".
     # The 0100 prefix includes ASSERT/EQ/ADD/MUL/AND/OR/U32AND/U32XOR/FRIE2F4 plus
     # DROP/CSWAP/CSWAPW/MLOADW/MSTORE/MSTOREW and the unused 010_1111 opcode.
     # ASSERT is already in left_shift_1, so we remove it here.
@@ -196,11 +199,11 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     let shift_left_on_end = is_end * h5;
 
     # split_loop_flag: SPLIT and LOOP both remove one item from the stack (the block id),
-    # so they share the same left‑shift behavior and can be grouped.
+    # so they share the same left-shift behavior and can be grouped.
     let split_loop_flag = is_split + is_loop;
 
     # add3_madd_flag: U32ADD3 and U32MADD both consume three operands, so they share the
-    # same left‑shift behavior and can be grouped.
+    # same left-shift behavior and can be grouped.
     let add3_madd_flag = is_u32add3 + is_u32madd;
 
     # MOV/SWAP PREFIX HELPERS
@@ -225,27 +228,38 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     let mov7_prefix = mov7_flag(op_bits);
     let mov8_prefix = mov8_flag(op_bits);
 
-    # movdn_any / movup_any are the directional sums over all MOVDNn / MOVUPn.
-    # These are used at shallow depths, and then we subtract the specific MOVDNn/MOVUPn
-    # as we go deeper to "turn off" their effect past depth n-1.
-    let movdn_any = movdnn_flag(op_bits);
-    let movup_any = movupn_flag(op_bits);
+    # Directional MOV sums by depth.
+    # movdn_geN = MOVDNn for n >= N; movup_geN = MOVUPn for n >= N.
+    # (e.g., MOVDN3 affects positions 0..2 only).
+    let movdn_ge2 = is_movdn2 + is_movdn3 + is_movdn4 + is_movdn5 + is_movdn6 + is_movdn7 + is_movdn8;
+    let movdn_ge3 = is_movdn3 + is_movdn4 + is_movdn5 + is_movdn6 + is_movdn7 + is_movdn8;
+    let movdn_ge4 = is_movdn4 + is_movdn5 + is_movdn6 + is_movdn7 + is_movdn8;
+    let movdn_ge5 = is_movdn5 + is_movdn6 + is_movdn7 + is_movdn8;
+    let movdn_ge6 = is_movdn6 + is_movdn7 + is_movdn8;
+    let movdn_ge7 = is_movdn7 + is_movdn8;
+    let movdn_ge8 = is_movdn8;
+
+    let movup_ge2 = is_movup2 + is_movup3 + is_movup4 + is_movup5 + is_movup6 + is_movup7 + is_movup8;
+    let movup_ge3 = is_movup3 + is_movup4 + is_movup5 + is_movup6 + is_movup7 + is_movup8;
+    let movup_ge4 = is_movup4 + is_movup5 + is_movup6 + is_movup7 + is_movup8;
+    let movup_ge5 = is_movup5 + is_movup6 + is_movup7 + is_movup8;
+    let movup_ge6 = is_movup6 + is_movup7 + is_movup8;
+    let movup_ge7 = is_movup7 + is_movup8;
+    let movup_ge8 = is_movup8;
+
     let swapw_prefix = swapwx_flag(op_bits);
     let adv_popw_or_expacc = adv_popw_expacc(op_bits);
     let ext2mul_flag = is_ext2mul;
 
-    # HOW TO READ THE +/- PATTERN
-    # ---------------------------
+    # HOW TO READ THE DEPTH SUMS
+    # --------------------------
     # Many ops only affect a *prefix* of the stack. For example:
     #   - MOVDN3 shifts positions 0..2 left, but positions 3..15 are unchanged.
     #   - MOVUP4 shifts positions 0..3 right, but positions 4..15 are unchanged.
     #
-    # We encode that by:
-    #   - adding a broad "movdn_any"/"movup_any" at shallow positions, then
-    #   - subtracting the specific MOVDNn/MOVUPn flag once we reach a depth > n-1.
-    #
-    # Example: left_shift_3 includes "movdn_any - is_movdn2".
-    # That means MOVDN2 still shifts positions 0..1, but no longer affects position 2+.
+    # We encode that by using the explicit depth sums above:
+    #   - use movdn_ge2 at shallow positions, then switch to movdn_ge3, movdn_ge4, ...
+    #   - similarly for movup_geN on the right-shift side.
 
     # NO-SHIFT FLAGS (PER POSITION)
     # -----------------------------
@@ -270,18 +284,18 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     let no_shift_2 = no_shift_1 + is_swap + f1000;
 
     # Positions 3..9 add the MOV prefix groups and swapw/ext2mul/mrupdate adjustments.
-    let no_shift_3 = no_shift_2 + mov2_prefix;
-    let no_shift_4 = no_shift_3
+    let no_shift_3  = no_shift_2 + mov2_prefix;
+    let no_shift_4  = no_shift_3
         + mov3_prefix
         + adv_popw_or_expacc
         + swapw_prefix
         + ext2mul_flag
         + is_mrupdate;
-    let no_shift_5 = no_shift_4 + mov4_prefix;
-    let no_shift_6 = no_shift_5 + mov5_prefix;
-    let no_shift_7 = no_shift_6 + mov6_prefix;
-    let no_shift_8 = no_shift_7 + mov7_prefix + is_swapw - is_swapw2;
-    let no_shift_9 = no_shift_8 + mov8_prefix;
+    let no_shift_5  = no_shift_4 + mov4_prefix;
+    let no_shift_6  = no_shift_5 + mov5_prefix;
+    let no_shift_7  = no_shift_6 + mov6_prefix;
+    let no_shift_8  = no_shift_7 + mov7_prefix + is_swapw - is_swapw2;
+    let no_shift_9  = no_shift_8 + mov8_prefix;
 
     # Remaining positions share the same no-shift set as position 9,
     # except for swaps/hperm adjustments at depth 12.
@@ -295,8 +309,18 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     # LEFT-SHIFT FLAGS (PER POSITION)
     # -------------------------------
     # Left shifts happen when the operation removes one or more items from the top.
-    # The key pattern is: MOVDNn shifts positions 0..(n-1), but not deeper. That is why
-    # we subtract is_movdn2 at position 3, is_movdn3 at position 4, etc.
+    # The key pattern is: MOVDNn shifts positions 0..(n-1), but not deeper. We encode
+    # that by switching from movdn_ge2 -> movdn_ge3 -> ... as depth increases.
+    #
+    # Depth map (MOVDN):
+    #   depth 1-2: use movdn_ge2
+    #   depth 3  : use movdn_ge3
+    #   depth 4  : use movdn_ge4
+    #   depth 5  : use movdn_ge5 (+ MLOADW)
+    #   depth 6  : use movdn_ge6 (+ MLOADW)
+    #   depth 7  : use movdn_ge7 (+ MLOADW)
+    #   depth 8  : use movdn_ge8 (+ MLOADW)
+    #   depth 9+ : no MOVDN contribution
     #
     # Worked example (MOVDN3):
     #   - MOVDN3 removes the top element and shifts s0..s2 left.
@@ -312,9 +336,8 @@ ev stack_general_transition([stack[16], decoder[24]]) {
 
     let left_shift_0 = 0;
 
-    # Position 1: assert/drop/mstore/etc and all MOVDNn ops cause a left shift at depth 1.
-    let left_shift_1 = is_assert
-        + movdn_any
+    # Base left-shift set shared by all depths which can shift left.
+    let base_left = is_assert
         + is_drop
         + is_mstore
         + op_47
@@ -324,23 +347,28 @@ ev stack_general_transition([stack[16], decoder[24]]) {
         + is_dyn
         + is_dyncall;
 
-    # Position 2 adds all "0100" prefix ops except ASSERT (already in left_shift_1).
-    let left_shift_2 = left_shift_1 + left_change_1_flag;
+    # Helper bases to keep the per-depth formulas compact.
+    let base_left_prefix = base_left + left_change_1_flag + add3_madd_flag + is_cswap;
+    let base_left_mload = base_left_prefix + is_mloadw;
 
-    # Position 3 adds CSWAP and the add3/madd group, but MOVDN2 stops affecting deeper positions.
-    let left_shift_3 = left_shift_2 + add3_madd_flag + is_cswap - is_movdn2;
+    # Position 1: base_left plus any MOVDNn (n >= 2).
+    let left_shift_1  = base_left + movdn_ge2;
 
-    # As depth increases, each MOVDNn ceases to affect positions deeper than n.
-    let left_shift_4 = left_shift_3 - is_movdn3;
+    # Position 2: add the rest of the 0100 prefix (left_change_1_flag).
+    let left_shift_2  = base_left + left_change_1_flag + movdn_ge2;
 
-    # MLOADW adds a left shift at depth 5; then we drop MOVDN4.
-    let left_shift_5 = left_shift_4 + is_mloadw - is_movdn4;
-    let left_shift_6 = left_shift_5 - is_movdn5;
-    let left_shift_7 = left_shift_6 - is_movdn6;
-    let left_shift_8 = left_shift_7 - is_movdn7;
+    # Position 3: add CSWAP and add3/madd, and move to movdn_ge3 (drops MOVDN2).
+    let left_shift_3  = base_left_prefix + movdn_ge3;
 
-    # CSWAPW adds a left shift at depth 9; then we drop MOVDN8.
-    let left_shift_9 = left_shift_8 + is_cswapw - is_movdn8;
+    # Positions 4..8: deepen the MOVDN cutoff and add MLOADW at depth 5.
+    let left_shift_4  = base_left_prefix + movdn_ge4;
+    let left_shift_5  = base_left_mload + movdn_ge5;
+    let left_shift_6  = base_left_mload + movdn_ge6;
+    let left_shift_7  = base_left_mload + movdn_ge7;
+    let left_shift_8  = base_left_mload + movdn_ge8;
+
+    # Position 9+: CSWAPW applies, and no MOVDNn reaches this depth.
+    let left_shift_9  = base_left_mload + is_cswapw;
     let left_shift_10 = left_shift_9;
     let left_shift_11 = left_shift_9;
     let left_shift_12 = left_shift_9;
@@ -352,7 +380,18 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     # --------------------------------
     # Right shifts happen when the operation inserts new values near the top.
     # The pattern mirrors left_shift: MOVUPn shifts positions 0..(n-1) "down",
-    # then stops affecting deeper positions. We subtract is_movup2 at position 2, etc.
+    # then stops affecting deeper positions. We encode this by switching from
+    # movup_ge2 -> movup_ge3 -> ... as depth increases.
+    #
+    # Depth map (MOVUP):
+    #   depth 0-1: use movup_ge2
+    #   depth 2  : use movup_ge3
+    #   depth 3  : use movup_ge4
+    #   depth 4  : use movup_ge5
+    #   depth 5  : use movup_ge6
+    #   depth 6  : use movup_ge7
+    #   depth 7  : use movup_ge8
+    #   depth 8+ : no MOVUP contribution
     #
     # Worked example (MOVUP4):
     #   - MOVUP4 inserts a value and shifts s0..s3 right.
@@ -365,20 +404,23 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     #
     # right_shift_0 covers all insertions at the top (PUSH, MOVUPn, and prefix 011 ops).
 
-    let right_shift_0 = f011 + is_push + movup_any;
+    let base_right = f011 + is_push;
+    let base_right_u32split = base_right + is_u32split;
+
+    let right_shift_0  = base_right + movup_ge2;
 
     # U32SPLIT inserts one extra value, so it shifts position 2 as well.
-    let right_shift_1 = right_shift_0 + is_u32split;
+    let right_shift_1  = base_right_u32split + movup_ge2;
 
-    # As depth increases, each MOVUPn stops affecting positions deeper than n.
-    let right_shift_2 = right_shift_1 - is_movup2;
-    let right_shift_3 = right_shift_2 - is_movup3;
-    let right_shift_4 = right_shift_3 - is_movup4;
-    let right_shift_5 = right_shift_4 - is_movup5;
-    let right_shift_6 = right_shift_5 - is_movup6;
-    let right_shift_7 = right_shift_6 - is_movup7;
-    let right_shift_8 = right_shift_7 - is_movup8;
-    let right_shift_9 = right_shift_8;
+    # As depth increases, move to the smaller MOVUP depth set.
+    let right_shift_2  = base_right_u32split + movup_ge3;
+    let right_shift_3  = base_right_u32split + movup_ge4;
+    let right_shift_4  = base_right_u32split + movup_ge5;
+    let right_shift_5  = base_right_u32split + movup_ge6;
+    let right_shift_6  = base_right_u32split + movup_ge7;
+    let right_shift_7  = base_right_u32split + movup_ge8;
+    let right_shift_8  = base_right_u32split;
+    let right_shift_9  = right_shift_8;
     let right_shift_10 = right_shift_8;
     let right_shift_11 = right_shift_8;
     let right_shift_12 = right_shift_8;
@@ -386,8 +428,9 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     let right_shift_14 = right_shift_8;
     let right_shift_15 = right_shift_8;
 
+    # ------------------------------------------------------------------------------------------
     # TRANSITION CONSTRAINTS
-    # ----------------------
+    # ------------------------------------------------------------------------------------------
 
     # Position 0: only no_shift_0 and left_shift_1 can contribute to s0'.
     let flag_sum_0 = no_shift_0 + left_shift_1;
@@ -395,16 +438,16 @@ ev stack_general_transition([stack[16], decoder[24]]) {
 
     # Positions 1-14: each position i can pull from i (no shift), i+1 (left shift),
     # or i-1 (right shift).
-    enf s1' * (no_shift_1 + left_shift_2 + right_shift_0) = no_shift_1 * s1 + left_shift_2 * s2 + right_shift_0 * s0;
-    enf s2' * (no_shift_2 + left_shift_3 + right_shift_1) = no_shift_2 * s2 + left_shift_3 * s3 + right_shift_1 * s1;
-    enf s3' * (no_shift_3 + left_shift_4 + right_shift_2) = no_shift_3 * s3 + left_shift_4 * s4 + right_shift_2 * s2;
-    enf s4' * (no_shift_4 + left_shift_5 + right_shift_3) = no_shift_4 * s4 + left_shift_5 * s5 + right_shift_3 * s3;
-    enf s5' * (no_shift_5 + left_shift_6 + right_shift_4) = no_shift_5 * s5 + left_shift_6 * s6 + right_shift_4 * s4;
-    enf s6' * (no_shift_6 + left_shift_7 + right_shift_5) = no_shift_6 * s6 + left_shift_7 * s7 + right_shift_5 * s5;
-    enf s7' * (no_shift_7 + left_shift_8 + right_shift_6) = no_shift_7 * s7 + left_shift_8 * s8 + right_shift_6 * s6;
-    enf s8' * (no_shift_8 + left_shift_9 + right_shift_7) = no_shift_8 * s8 + left_shift_9 * s9 + right_shift_7 * s7;
-    enf s9' * (no_shift_9 + left_shift_10 + right_shift_8) = no_shift_9 * s9 + left_shift_10 * s10 + right_shift_8 * s8;
-    enf s10' * (no_shift_10 + left_shift_11 + right_shift_9) = no_shift_10 * s10 + left_shift_11 * s11 + right_shift_9 * s9;
+    enf s1'  * (no_shift_1  + left_shift_2  + right_shift_0)  = no_shift_1  * s1  + left_shift_2  * s2  + right_shift_0 * s0;
+    enf s2'  * (no_shift_2  + left_shift_3  + right_shift_1)  = no_shift_2  * s2  + left_shift_3  * s3  + right_shift_1 * s1;
+    enf s3'  * (no_shift_3  + left_shift_4  + right_shift_2)  = no_shift_3  * s3  + left_shift_4  * s4  + right_shift_2 * s2;
+    enf s4'  * (no_shift_4  + left_shift_5  + right_shift_3)  = no_shift_4  * s4  + left_shift_5  * s5  + right_shift_3 * s3;
+    enf s5'  * (no_shift_5  + left_shift_6  + right_shift_4)  = no_shift_5  * s5  + left_shift_6  * s6  + right_shift_4 * s4;
+    enf s6'  * (no_shift_6  + left_shift_7  + right_shift_5)  = no_shift_6  * s6  + left_shift_7  * s7  + right_shift_5 * s5;
+    enf s7'  * (no_shift_7  + left_shift_8  + right_shift_6)  = no_shift_7  * s7  + left_shift_8  * s8  + right_shift_6 * s6;
+    enf s8'  * (no_shift_8  + left_shift_9  + right_shift_7)  = no_shift_8  * s8  + left_shift_9  * s9  + right_shift_7 * s7;
+    enf s9'  * (no_shift_9  + left_shift_10 + right_shift_8)  = no_shift_9  * s9  + left_shift_10 * s10 + right_shift_8 * s8;
+    enf s10' * (no_shift_10 + left_shift_11 + right_shift_9)  = no_shift_10 * s10 + left_shift_11 * s11 + right_shift_9 * s9;
     enf s11' * (no_shift_11 + left_shift_12 + right_shift_10) = no_shift_11 * s11 + left_shift_12 * s12 + right_shift_10 * s10;
     enf s12' * (no_shift_12 + left_shift_13 + right_shift_11) = no_shift_12 * s12 + left_shift_13 * s13 + right_shift_11 * s11;
     enf s13' * (no_shift_13 + left_shift_14 + right_shift_12) = no_shift_13 * s13 + left_shift_14 * s14 + right_shift_12 * s12;
