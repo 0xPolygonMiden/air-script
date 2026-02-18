@@ -64,6 +64,54 @@ fn let_vector_destructure_in_boundary_constraint() {
 }
 
 #[test]
+fn let_vector_destructure_from_function_call() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk],
+    }
+    fn pair(x: felt) -> felt[2] {
+        return [x, 5];
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        let [a, b] = pair(1);
+        enf clk.first = a + b;
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
+
+    assert!(compile_from_source(source).is_ok());
+}
+
+#[test]
+fn let_vector_binding_from_function_call() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk],
+    }
+    fn pair(x: felt) -> felt[2] {
+        return [x, 5];
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        let tmp = pair(1);
+        enf clk.first = tmp[0] + tmp[1];
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
+
+    assert!(compile_from_source(source).is_ok());
+}
+
+#[test]
 fn err_let_destructure_length_mismatch() {
     let source = "
     def test

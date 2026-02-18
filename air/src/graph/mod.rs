@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::ir::*;
 
@@ -206,6 +206,24 @@ impl AlgebraicGraph {
                 NodeIndex(index)
             },
         )
+    }
+
+    /// Insert the operation and return its node index using a caller-provided cache.
+    /// This avoids an O(n) scan of the existing nodes for each insert.
+    pub(crate) fn insert_node_cached(
+        &mut self,
+        op: Operation,
+        cache: &mut HashMap<Operation, NodeIndex>,
+    ) -> NodeIndex {
+        if let Some(existing) = cache.get(&op) {
+            return *existing;
+        }
+
+        let index = self.nodes.len();
+        self.nodes.push(Node { op: op.clone() });
+        let node_index = NodeIndex(index);
+        cache.insert(op, node_index);
+        node_index
     }
 
     /// Recursively accumulates the base degree and the cycle lengths of the periodic columns.

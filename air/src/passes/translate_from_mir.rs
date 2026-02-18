@@ -4,7 +4,7 @@ use std::{
 };
 
 use air_parser::{
-    SemanticAnalysisError,
+    SemanticAnalysisError, Symbol,
     ast::{self, ConstraintTagSpec, TraceSegment},
 };
 use air_pass::Pass;
@@ -104,6 +104,15 @@ impl Pass for MirToAir<'_> {
             trace_columns: trace_columns.clone(),
             bus_bindings_map,
             tag_allocators: HashMap::new(),
+            mir_node_cache: HashMap::new(),
+            mir_key_by_ptr: HashMap::new(),
+            mir_key_intern: HashMap::new(),
+            mir_key_to_air: HashMap::new(),
+            next_mir_key_id: 1,
+            air_op_cache: HashMap::new(),
+            stats: std::env::var("AIR_MIR_TO_AIR_STATS")
+                .is_ok()
+                .then_some(MirToAirStats::default()),
         };
 
         let graph = mir.constraint_graph();
@@ -128,6 +137,19 @@ impl Pass for MirToAir<'_> {
             builder.build_bus(bus)?;
         }
 
+        if let Some(stats) = builder.stats.as_ref() {
+            let air_nodes_total = builder.air.constraint_graph().num_nodes();
+            eprintln!(
+                "mir_to_air: mir_nodes_seen={} cache_hits={} cache_misses={} cache_size={} air_nodes_created={} air_nodes_total={}",
+                stats.mir_nodes_seen,
+                stats.mir_cache_hits,
+                stats.mir_cache_misses,
+                builder.mir_node_cache.len(),
+                stats.air_nodes_created,
+                air_nodes_total
+            );
+        }
+
         Ok(air)
     }
 }
@@ -138,6 +160,71 @@ struct AirBuilder<'a> {
     trace_columns: TraceShape<TraceSegment>,
     bus_bindings_map: BTreeMap<Identifier, usize>,
     tag_allocators: HashMap<SourceSpan, TagAllocator>,
+    mir_node_cache: HashMap<usize, NodeIndex>,
+    mir_key_by_ptr: HashMap<usize, MirKeyId>,
+    mir_key_intern: HashMap<MirKey, MirKeyId>,
+    mir_key_to_air: HashMap<MirKeyId, NodeIndex>,
+    next_mir_key_id: MirKeyId,
+    air_op_cache: HashMap<Operation, NodeIndex>,
+    stats: Option<MirToAirStats>,
+}
+
+#[derive(Default)]
+struct MirToAirStats {
+    mir_nodes_seen: usize,
+    mir_cache_hits: usize,
+    mir_cache_misses: usize,
+    air_nodes_created: usize,
+}
+
+type MirKeyId = u64;
+
+#[derive(Hash, Eq, PartialEq, Clone)]
+enum NamespacedIdentifierKey {
+    Function(Symbol),
+    Binding(Symbol),
+}
+
+#[derive(Hash, Eq, PartialEq, Clone)]
+struct QualifiedIdentifierKey {
+    module: Vec<Symbol>,
+    item: NamespacedIdentifierKey,
+}
+
+#[derive(Hash, Eq, PartialEq, Clone)]
+enum MirValueKey {
+    Constant(u64),
+    TraceAccess {
+        segment: TraceSegmentId,
+        column: ast::TraceColumnIndex,
+        row_offset: usize,
+    },
+    BusAccess {
+        name: Symbol,
+        row_offset: usize,
+    },
+    PeriodicColumn {
+        name: QualifiedIdentifierKey,
+        cycle: usize,
+    },
+    PublicInput {
+        name: Symbol,
+        index: usize,
+    },
+    PublicInputTable {
+        name: Symbol,
+        num_cols: usize,
+    },
+    RandomValue(usize),
+}
+
+#[derive(Hash, Eq, PartialEq, Clone)]
+enum MirKey {
+    Add { lhs: MirKeyId, rhs: MirKeyId },
+    Sub { lhs: MirKeyId, rhs: MirKeyId },
+    Mul { lhs: MirKeyId, rhs: MirKeyId },
+    Exp { lhs: MirKeyId, rhs: u64 },
+    Value(MirValueKey),
 }
 
 struct TagAllocator {
@@ -191,10 +278,10 @@ fn accessor_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
         match accessor.access_type.clone() {
             MirAccessType::Index(index) => {
                 if let Some(vec) = accessor.indexable.as_vector() {
-                    let children = vec.elements.borrow().deref().clone();
                     let index = get_inner_const(&index)
                         .expect("Index should be a constant value after constant propagation")
                         as usize;
+                    let children = vec.elements.borrow();
                     if index >= children.len() {
                         panic!(
                             "Index out of bounds during indexed accessor translation from MIR to AIR: {index}",
@@ -208,7 +295,36 @@ fn accessor_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
             MirAccessType::Default => {
                 add_row_offset_if_trace_access(&accessor.indexable, accessor.offset)
             },
-            _ => mir_node.clone(),
+            MirAccessType::Matrix(row, col) => {
+                if let Some(matrix) = accessor.indexable.as_matrix() {
+                    let row_index = get_inner_const(&row)
+                        .expect("Row index should be a constant value after constant propagation")
+                        as usize;
+                    let col_index = get_inner_const(&col).expect(
+                        "Column index should be a constant value after constant propagation",
+                    ) as usize;
+                    let rows = matrix.elements.borrow();
+                    if row_index >= rows.len() {
+                        panic!(
+                            "Row index out of bounds during matrix accessor translation from MIR to AIR: {row_index}",
+                        );
+                    }
+                    let row_node = rows[row_index].clone();
+                    if let Some(row_vec) = row_node.as_vector() {
+                        let cols = row_vec.elements.borrow();
+                        if col_index >= cols.len() {
+                            panic!(
+                                "Column index out of bounds during matrix accessor translation from MIR to AIR: {col_index}",
+                            );
+                        }
+                        cols[col_index].clone()
+                    } else {
+                        row_node
+                    }
+                } else {
+                    mir_node.clone()
+                }
+            },
         }
     } else {
         mir_node.clone()
@@ -267,6 +383,189 @@ fn enf_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
 }
 
 impl AirBuilder<'_> {
+    fn normalize_mir_node(&self, mir_node: &Link<Op>) -> Link<Op> {
+        let mir_node = accessor_to_scalar(mir_node);
+        let mir_node = vec_to_scalar(&mir_node);
+        accessor_to_scalar(&mir_node)
+    }
+
+    fn intern_mir_key(&mut self, key: MirKey) -> MirKeyId {
+        if let Some(existing) = self.mir_key_intern.get(&key) {
+            return *existing;
+        }
+        let id = self.next_mir_key_id;
+        self.next_mir_key_id += 1;
+        self.mir_key_intern.insert(key, id);
+        id
+    }
+
+    fn mir_key_for(&mut self, mir_node: &Link<Op>) -> Result<MirKeyId, CompileError> {
+        let mir_node = self.normalize_mir_node(mir_node);
+        self.mir_key_for_normalized(&mir_node)
+    }
+
+    fn mir_key_for_normalized(&mut self, mir_node: &Link<Op>) -> Result<MirKeyId, CompileError> {
+        if let Some(existing) = self.mir_key_by_ptr.get(&mir_node.get_ptr()) {
+            return Ok(*existing);
+        }
+
+        let key = match mir_node.borrow().deref() {
+            Op::Add(add) => {
+                let lhs = self.mir_key_for(&add.lhs)?;
+                let rhs = self.mir_key_for(&add.rhs)?;
+                MirKey::Add { lhs, rhs }
+            },
+            Op::Sub(sub) => {
+                let lhs = self.mir_key_for(&sub.lhs)?;
+                let rhs = self.mir_key_for(&sub.rhs)?;
+                MirKey::Sub { lhs, rhs }
+            },
+            Op::Mul(mul) => {
+                let lhs = self.mir_key_for(&mul.lhs)?;
+                let rhs = self.mir_key_for(&mul.rhs)?;
+                MirKey::Mul { lhs, rhs }
+            },
+            Op::Exp(exp) => {
+                let lhs = self.mir_key_for(&exp.lhs)?;
+                let rhs = self.exp_rhs_const(&exp.rhs)?;
+                MirKey::Exp { lhs, rhs }
+            },
+            Op::Value(value) => {
+                let value_key = self.mir_value_key_from_value(&value.value.value)?;
+                MirKey::Value(value_key)
+            },
+            Op::Enf(enf) => {
+                return self.mir_key_for(&enf.expr);
+            },
+            Op::Accessor(accessor) => {
+                let value_key = self.mir_value_key_for_accessor(accessor)?;
+                MirKey::Value(value_key)
+            },
+            _ => panic!("Should not have Mir op in graph: {mir_node:?}"),
+        };
+
+        let key_id = self.intern_mir_key(key);
+        self.mir_key_by_ptr.insert(mir_node.get_ptr(), key_id);
+        Ok(key_id)
+    }
+
+    fn mir_value_key_from_value(&self, mir_value: &MirValue) -> Result<MirValueKey, CompileError> {
+        Ok(match mir_value {
+            MirValue::Constant(constant_value) => match constant_value {
+                ConstantValue::Felt(felt) => MirValueKey::Constant(*felt),
+                _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
+            },
+            MirValue::TraceAccess(trace_access) => MirValueKey::TraceAccess {
+                segment: trace_access.segment,
+                column: trace_access.column,
+                row_offset: trace_access.row_offset,
+            },
+            MirValue::BusAccess(bus_access) => {
+                let name = bus_access.bus.borrow().deref().name().name();
+                MirValueKey::BusAccess { name, row_offset: bus_access.row_offset }
+            },
+            MirValue::PeriodicColumn(periodic_column_access) => MirValueKey::PeriodicColumn {
+                name: Self::qualified_identifier_key(&periodic_column_access.name),
+                cycle: periodic_column_access.cycle,
+            },
+            MirValue::PublicInput(public_input_access) => MirValueKey::PublicInput {
+                name: public_input_access.name.name(),
+                index: public_input_access.index,
+            },
+            MirValue::PublicInputTable(public_input_table_access) => {
+                MirValueKey::PublicInputTable {
+                    name: public_input_table_access.table_name.name(),
+                    num_cols: public_input_table_access.num_cols,
+                }
+            },
+            MirValue::RandomValue(index) => MirValueKey::RandomValue(*index),
+            _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
+        })
+    }
+
+    fn mir_value_key_for_accessor(
+        &self,
+        accessor: &mir::ir::Accessor,
+    ) -> Result<MirValueKey, CompileError> {
+        let offset = accessor.offset;
+        let child = accessor_to_scalar(&accessor.indexable);
+        let value = child.as_value().expect("Expected value in accessor");
+        let mir_value = &value.value.value;
+        Ok(match mir_value {
+            MirValue::Constant(constant_value) => match constant_value {
+                ConstantValue::Felt(felt) => MirValueKey::Constant(*felt),
+                _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
+            },
+            MirValue::TraceAccess(trace_access) => MirValueKey::TraceAccess {
+                segment: trace_access.segment,
+                column: trace_access.column,
+                row_offset: offset,
+            },
+            MirValue::BusAccess(bus_access) => {
+                let name = bus_access.bus.borrow().deref().name().name();
+                MirValueKey::BusAccess { name, row_offset: offset }
+            },
+            MirValue::PeriodicColumn(periodic_column_access) => MirValueKey::PeriodicColumn {
+                name: Self::qualified_identifier_key(&periodic_column_access.name),
+                cycle: periodic_column_access.cycle,
+            },
+            MirValue::PublicInput(public_input_access) => MirValueKey::PublicInput {
+                name: public_input_access.name.name(),
+                index: public_input_access.index,
+            },
+            MirValue::PublicInputTable(public_input_table_access) => {
+                MirValueKey::PublicInputTable {
+                    name: public_input_table_access.table_name.name(),
+                    num_cols: public_input_table_access.num_cols,
+                }
+            },
+            MirValue::RandomValue(index) => MirValueKey::RandomValue(*index),
+            _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
+        })
+    }
+
+    fn exp_rhs_const(&self, rhs: &Link<Op>) -> Result<u64, CompileError> {
+        let rhs = match rhs.borrow().deref() {
+            Op::Accessor(accessor) => accessor.indexable.clone(),
+            _ => rhs.clone(),
+        };
+        let Some(value_ref) = rhs.as_value() else {
+            return Err(CompileError::SemanticAnalysis(SemanticAnalysisError::InvalidExpr(
+                ast::InvalidExprError::NonConstantExponent(rhs.span()),
+            )));
+        };
+        let mir_value = value_ref.value.value.clone();
+        let MirValue::Constant(constant_value) = mir_value else {
+            return Err(CompileError::SemanticAnalysis(SemanticAnalysisError::InvalidExpr(
+                ast::InvalidExprError::NonConstantExponent(rhs.span()),
+            )));
+        };
+        let ConstantValue::Felt(rhs_value) = constant_value else {
+            return Err(CompileError::SemanticAnalysis(SemanticAnalysisError::InvalidExpr(
+                ast::InvalidExprError::NonConstantExponent(rhs.span()),
+            )));
+        };
+        Ok(rhs_value)
+    }
+
+    fn qualified_identifier_key(ident: &ast::QualifiedIdentifier) -> QualifiedIdentifierKey {
+        QualifiedIdentifierKey {
+            module: Self::module_symbols(&ident.module),
+            item: Self::namespaced_identifier_key(&ident.item),
+        }
+    }
+
+    fn module_symbols(module: &ast::ModuleId) -> Vec<Symbol> {
+        (0..module.len()).map(|idx| module[idx].name()).collect()
+    }
+
+    fn namespaced_identifier_key(ident: &ast::NamespacedIdentifier) -> NamespacedIdentifierKey {
+        match ident {
+            ast::NamespacedIdentifier::Function(id) => NamespacedIdentifierKey::Function(id.name()),
+            ast::NamespacedIdentifier::Binding(id) => NamespacedIdentifierKey::Binding(id.name()),
+        }
+    }
+
     // Uses square and multiply algorithm to expand the exp into a series of multiplications
     fn expand_exp(&mut self, lhs: NodeIndex, rhs: u64) -> NodeIndex {
         match rhs {
@@ -294,31 +593,49 @@ impl AirBuilder<'_> {
         //   access type) or `Vector` with size 1.
         // - in case of nested list comprehensions, we may need to unwrap two accessors, so we
         //   unwrap them multiple times.
-        let mir_node = accessor_to_scalar(mir_node);
-        let mir_node = vec_to_scalar(&mir_node);
-        let mir_node = accessor_to_scalar(&mir_node);
+        let mir_node = self.normalize_mir_node(mir_node);
+        if let Some(stats) = self.stats.as_mut() {
+            stats.mir_nodes_seen += 1;
+        }
+        if let Some(cached) = self.mir_node_cache.get(&mir_node.get_ptr()) {
+            if let Some(stats) = self.stats.as_mut() {
+                stats.mir_cache_hits += 1;
+            }
+            return Ok(*cached);
+        }
+        let key = self.mir_key_for_normalized(&mir_node)?;
+        if let Some(cached) = self.mir_key_to_air.get(&key) {
+            if let Some(stats) = self.stats.as_mut() {
+                stats.mir_cache_hits += 1;
+            }
+            self.mir_node_cache.insert(mir_node.get_ptr(), *cached);
+            return Ok(*cached);
+        }
+        if let Some(stats) = self.stats.as_mut() {
+            stats.mir_cache_misses += 1;
+        }
         let mir_node_ref = mir_node.borrow();
-        match mir_node_ref.deref() {
+        let node = match mir_node_ref.deref() {
             Op::Add(add) => {
                 let lhs = add.lhs.clone();
                 let rhs = add.rhs.clone();
                 let lhs_node_index = self.insert_mir_operation(&lhs)?;
                 let rhs_node_index = self.insert_mir_operation(&rhs)?;
-                Ok(self.insert_op(Operation::Add(lhs_node_index, rhs_node_index)))
+                self.insert_op(Operation::Add(lhs_node_index, rhs_node_index))
             },
             Op::Sub(sub) => {
                 let lhs = sub.lhs.clone();
                 let rhs = sub.rhs.clone();
                 let lhs_node_index = self.insert_mir_operation(&lhs)?;
                 let rhs_node_index = self.insert_mir_operation(&rhs)?;
-                Ok(self.insert_op(Operation::Sub(lhs_node_index, rhs_node_index)))
+                self.insert_op(Operation::Sub(lhs_node_index, rhs_node_index))
             },
             Op::Mul(mul) => {
                 let lhs = mul.lhs.clone();
                 let rhs = mul.rhs.clone();
                 let lhs_node_index = self.insert_mir_operation(&lhs)?;
                 let rhs_node_index = self.insert_mir_operation(&rhs)?;
-                Ok(self.insert_op(Operation::Mul(lhs_node_index, rhs_node_index)))
+                self.insert_op(Operation::Mul(lhs_node_index, rhs_node_index))
             },
             Op::Exp(exp) => {
                 let lhs = exp.lhs.clone();
@@ -358,7 +675,7 @@ impl AirBuilder<'_> {
                     ));
                 };
 
-                Ok(self.expand_exp(lhs_node_index, rhs_value))
+                self.expand_exp(lhs_node_index, rhs_value)
             },
             Op::Value(value) => {
                 let mir_value = &value.value.value;
@@ -402,11 +719,11 @@ impl AirBuilder<'_> {
                     _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
                 };
 
-                Ok(self.insert_op(Operation::Value(value)))
+                self.insert_op(Operation::Value(value))
             },
             Op::Enf(enf) => {
                 let child = enf.expr.clone();
-                self.insert_mir_operation(&child)
+                self.insert_mir_operation(&child)?
             },
             Op::Accessor(accessor) => {
                 let offset = accessor.offset;
@@ -455,10 +772,13 @@ impl AirBuilder<'_> {
                     _ => unreachable!(),
                 };
 
-                Ok(self.insert_op(Operation::Value(value)))
+                self.insert_op(Operation::Value(value))
             },
             _ => panic!("Should not have Mir op in graph: {mir_node:?}"),
-        }
+        };
+        self.mir_node_cache.insert(mir_node.get_ptr(), node);
+        self.mir_key_to_air.insert(key, node);
+        Ok(node)
     }
 
     fn build_boundary_constraint(
@@ -544,13 +864,13 @@ impl AirBuilder<'_> {
 
                 self.mark_constrained_boundary(trace_access, &boundary)?;
 
-                let lhs = self.air.constraint_graph_mut().insert_node(Operation::Value(
-                    crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+                let lhs = self.insert_op(Operation::Value(crate::ir::Value::TraceAccess(
+                    crate::ir::TraceAccess {
                         segment: trace_access.segment,
                         column: trace_access.column,
                         row_offset: trace_access.row_offset,
-                    }),
-                ));
+                    },
+                )));
                 let rhs = self.insert_mir_operation(&rhs)?;
 
                 // Compare the inferred trace segment and domain of the operands
@@ -598,13 +918,13 @@ impl AirBuilder<'_> {
 
                 self.mark_constrained_boundary(trace_access, boundary)?;
 
-                let root = self.air.constraint_graph_mut().insert_node(Operation::Value(
-                    crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+                let root = self.insert_op(Operation::Value(crate::ir::Value::TraceAccess(
+                    crate::ir::TraceAccess {
                         segment: trace_access.segment,
                         column: trace_access.column,
                         row_offset: trace_access.row_offset,
-                    }),
-                ));
+                    },
+                )));
 
                 let domain = boundary.kind.into();
 
@@ -875,7 +1195,10 @@ impl AirBuilder<'_> {
     /// Adds the specified operation to the graph and returns the index of its node.
     #[inline]
     fn insert_op(&mut self, op: Operation) -> NodeIndex {
-        self.air.constraint_graph_mut().insert_node(op)
+        if let Some(stats) = self.stats.as_mut() {
+            stats.air_nodes_created += 1;
+        }
+        self.air.constraint_graph_mut().insert_node_cached(op, &mut self.air_op_cache)
     }
 
     /// Extracts the trace access information from a given [Mir] `Boundary`.
