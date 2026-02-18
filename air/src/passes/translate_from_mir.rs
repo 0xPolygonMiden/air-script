@@ -358,12 +358,12 @@ fn add_row_offset_if_trace_access(node: &Link<Op>, offset: usize) -> Link<Op> {
 fn vec_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
     if let Some(vector) = mir_node.as_vector() {
         let size = vector.size;
-        let children = vector.elements.borrow().deref().clone();
         if size != 1 {
             panic!("Vector of len >1 after unrolling: {mir_node:?}");
         }
-        let child = children.first().unwrap();
-        let child = vec_to_scalar(child);
+        let children = vector.elements.borrow();
+        let child = children.first().unwrap().clone();
+        let child = vec_to_scalar(&child);
         let child = accessor_to_scalar(&child);
         child.clone()
     } else {
@@ -450,6 +450,14 @@ impl AirBuilder<'_> {
     }
 
     fn mir_value_key_from_value(&self, mir_value: &MirValue) -> Result<MirValueKey, CompileError> {
+        self.mir_value_key_from_value_with_offset(mir_value, None)
+    }
+
+    fn mir_value_key_from_value_with_offset(
+        &self,
+        mir_value: &MirValue,
+        row_offset_override: Option<usize>,
+    ) -> Result<MirValueKey, CompileError> {
         Ok(match mir_value {
             MirValue::Constant(constant_value) => match constant_value {
                 ConstantValue::Felt(felt) => MirValueKey::Constant(*felt),
@@ -458,11 +466,14 @@ impl AirBuilder<'_> {
             MirValue::TraceAccess(trace_access) => MirValueKey::TraceAccess {
                 segment: trace_access.segment,
                 column: trace_access.column,
-                row_offset: trace_access.row_offset,
+                row_offset: row_offset_override.unwrap_or(trace_access.row_offset),
             },
             MirValue::BusAccess(bus_access) => {
                 let name = bus_access.bus.borrow().deref().name().name();
-                MirValueKey::BusAccess { name, row_offset: bus_access.row_offset }
+                MirValueKey::BusAccess {
+                    name,
+                    row_offset: row_offset_override.unwrap_or(bus_access.row_offset),
+                }
             },
             MirValue::PeriodicColumn(periodic_column_access) => MirValueKey::PeriodicColumn {
                 name: Self::qualified_identifier_key(&periodic_column_access.name),
@@ -490,36 +501,58 @@ impl AirBuilder<'_> {
         let offset = accessor.offset;
         let child = accessor_to_scalar(&accessor.indexable);
         let value = child.as_value().expect("Expected value in accessor");
-        let mir_value = &value.value.value;
+        self.mir_value_key_from_value_with_offset(&value.value.value, Some(offset))
+    }
+
+    fn air_value_from_mir_value(
+        &self,
+        mir_value: &MirValue,
+        row_offset_override: Option<usize>,
+    ) -> Result<Value, CompileError> {
         Ok(match mir_value {
-            MirValue::Constant(constant_value) => match constant_value {
-                ConstantValue::Felt(felt) => MirValueKey::Constant(*felt),
-                _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
-            },
-            MirValue::TraceAccess(trace_access) => MirValueKey::TraceAccess {
-                segment: trace_access.segment,
-                column: trace_access.column,
-                row_offset: offset,
-            },
-            MirValue::BusAccess(bus_access) => {
-                let name = bus_access.bus.borrow().deref().name().name();
-                MirValueKey::BusAccess { name, row_offset: offset }
-            },
-            MirValue::PeriodicColumn(periodic_column_access) => MirValueKey::PeriodicColumn {
-                name: Self::qualified_identifier_key(&periodic_column_access.name),
-                cycle: periodic_column_access.cycle,
-            },
-            MirValue::PublicInput(public_input_access) => MirValueKey::PublicInput {
-                name: public_input_access.name.name(),
-                index: public_input_access.index,
-            },
-            MirValue::PublicInputTable(public_input_table_access) => {
-                MirValueKey::PublicInputTable {
-                    name: public_input_table_access.table_name.name(),
-                    num_cols: public_input_table_access.num_cols,
+            MirValue::Constant(constant_value) => {
+                if let ConstantValue::Felt(felt) = constant_value {
+                    crate::ir::Value::Constant(*felt)
+                } else {
+                    unreachable!("Unexpected MirValue: {:#?}", mir_value)
                 }
             },
-            MirValue::RandomValue(index) => MirValueKey::RandomValue(*index),
+            MirValue::TraceAccess(trace_access) => crate::ir::Value::TraceAccess(
+                crate::ir::TraceAccess {
+                    segment: trace_access.segment,
+                    column: trace_access.column,
+                    row_offset: row_offset_override.unwrap_or(trace_access.row_offset),
+                },
+            ),
+            MirValue::BusAccess(bus_access) => {
+                let name = bus_access.bus.borrow().deref().name();
+                let column = self.bus_bindings_map.get(&name).unwrap();
+                crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+                    segment: TraceSegmentId::Aux,
+                    column: *column,
+                    row_offset: row_offset_override.unwrap_or(bus_access.row_offset),
+                })
+            },
+            MirValue::PeriodicColumn(periodic_column_access) => {
+                crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
+                    name: periodic_column_access.name.clone(),
+                    cycle: periodic_column_access.cycle,
+                })
+            },
+            MirValue::PublicInput(public_input_access) => {
+                crate::ir::Value::PublicInput(crate::ir::PublicInputAccess {
+                    name: public_input_access.name,
+                    index: public_input_access.index,
+                })
+            },
+            MirValue::PublicInputTable(public_input_table_access) => {
+                crate::ir::Value::PublicInputTable(crate::ir::PublicInputTableAccess::new(
+                    public_input_table_access.table_name,
+                    public_input_table_access.num_cols,
+                    public_input_table_access.bus_type(),
+                ))
+            },
+            MirValue::RandomValue(index) => crate::ir::Value::RandomValue(*index),
             _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
         })
     }
@@ -617,108 +650,23 @@ impl AirBuilder<'_> {
         let mir_node_ref = mir_node.borrow();
         let node = match mir_node_ref.deref() {
             Op::Add(add) => {
-                let lhs = add.lhs.clone();
-                let rhs = add.rhs.clone();
-                let lhs_node_index = self.insert_mir_operation(&lhs)?;
-                let rhs_node_index = self.insert_mir_operation(&rhs)?;
-                self.insert_op(Operation::Add(lhs_node_index, rhs_node_index))
+                self.insert_binary_op(Operation::Add, &add.lhs, &add.rhs)?
             },
             Op::Sub(sub) => {
-                let lhs = sub.lhs.clone();
-                let rhs = sub.rhs.clone();
-                let lhs_node_index = self.insert_mir_operation(&lhs)?;
-                let rhs_node_index = self.insert_mir_operation(&rhs)?;
-                self.insert_op(Operation::Sub(lhs_node_index, rhs_node_index))
+                self.insert_binary_op(Operation::Sub, &sub.lhs, &sub.rhs)?
             },
             Op::Mul(mul) => {
-                let lhs = mul.lhs.clone();
-                let rhs = mul.rhs.clone();
-                let lhs_node_index = self.insert_mir_operation(&lhs)?;
-                let rhs_node_index = self.insert_mir_operation(&rhs)?;
-                self.insert_op(Operation::Mul(lhs_node_index, rhs_node_index))
+                self.insert_binary_op(Operation::Mul, &mul.lhs, &mul.rhs)?
             },
             Op::Exp(exp) => {
                 let lhs = exp.lhs.clone();
-                let rhs = exp.rhs.clone();
-
                 let lhs_node_index = self.insert_mir_operation(&lhs)?;
-
-                // Remove the accessor for rhs if it exists
-                let rhs = match rhs.borrow().deref() {
-                    Op::Accessor(accessor) => accessor.indexable.clone(),
-                    _ => rhs.clone(),
-                };
-
-                let Some(value_ref) = rhs.as_value() else {
-                    return Err(CompileError::SemanticAnalysis(
-                        SemanticAnalysisError::InvalidExpr(
-                            ast::InvalidExprError::NonConstantExponent(rhs.span()),
-                        ),
-                    ));
-                };
-
-                let mir_value = value_ref.value.value.clone();
-
-                let MirValue::Constant(constant_value) = mir_value else {
-                    return Err(CompileError::SemanticAnalysis(
-                        SemanticAnalysisError::InvalidExpr(
-                            ast::InvalidExprError::NonConstantExponent(rhs.span()),
-                        ),
-                    ));
-                };
-
-                let ConstantValue::Felt(rhs_value) = constant_value else {
-                    return Err(CompileError::SemanticAnalysis(
-                        SemanticAnalysisError::InvalidExpr(
-                            ast::InvalidExprError::NonConstantExponent(rhs.span()),
-                        ),
-                    ));
-                };
-
+                let rhs_value = self.exp_rhs_const(&exp.rhs)?;
                 self.expand_exp(lhs_node_index, rhs_value)
             },
             Op::Value(value) => {
                 let mir_value = &value.value.value;
-
-                let value = match mir_value {
-                    MirValue::Constant(constant_value) => {
-                        if let ConstantValue::Felt(felt) = constant_value {
-                            crate::ir::Value::Constant(*felt)
-                        } else {
-                            unreachable!()
-                        }
-                    },
-                    MirValue::TraceAccess(trace_access) => {
-                        crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: trace_access.segment,
-                            column: trace_access.column,
-                            row_offset: trace_access.row_offset,
-                        })
-                    },
-                    MirValue::BusAccess(bus_access) => {
-                        let name = bus_access.bus.borrow().deref().name();
-                        let column = self.bus_bindings_map.get(&name).unwrap();
-                        crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: TraceSegmentId::Aux,
-                            column: *column,
-                            row_offset: bus_access.row_offset,
-                        })
-                    },
-                    MirValue::PeriodicColumn(periodic_column_access) => {
-                        crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
-                            name: periodic_column_access.name.clone(),
-                            cycle: periodic_column_access.cycle,
-                        })
-                    },
-                    MirValue::PublicInput(public_input_access) => {
-                        crate::ir::Value::PublicInput(crate::ir::PublicInputAccess {
-                            name: public_input_access.name,
-                            index: public_input_access.index,
-                        })
-                    },
-                    _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
-                };
-
+                let value = self.air_value_from_mir_value(mir_value, None)?;
                 self.insert_op(Operation::Value(value))
             },
             Op::Enf(enf) => {
@@ -732,46 +680,7 @@ impl AirBuilder<'_> {
 
                 let value = child.as_value().expect("Expected value in accessor");
                 let mir_value = &value.value.value;
-
-                let value = match mir_value {
-                    MirValue::Constant(constant_value) => {
-                        if let ConstantValue::Felt(felt) = constant_value {
-                            crate::ir::Value::Constant(*felt)
-                        } else {
-                            unreachable!()
-                        }
-                    },
-                    MirValue::TraceAccess(trace_access) => {
-                        crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: trace_access.segment,
-                            column: trace_access.column,
-                            row_offset: offset,
-                        })
-                    },
-                    MirValue::BusAccess(bus_access) => {
-                        let name = bus_access.bus.borrow().deref().name();
-                        let column = self.bus_bindings_map.get(&name).unwrap();
-                        crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: TraceSegmentId::Aux,
-                            column: *column,
-                            row_offset: offset,
-                        })
-                    },
-                    MirValue::PeriodicColumn(periodic_column_access) => {
-                        crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
-                            name: periodic_column_access.name.clone(),
-                            cycle: periodic_column_access.cycle,
-                        })
-                    },
-                    MirValue::PublicInput(public_input_access) => {
-                        crate::ir::Value::PublicInput(crate::ir::PublicInputAccess {
-                            name: public_input_access.name,
-                            index: public_input_access.index,
-                        })
-                    },
-                    _ => unreachable!(),
-                };
-
+                let value = self.air_value_from_mir_value(mir_value, Some(offset))?;
                 self.insert_op(Operation::Value(value))
             },
             _ => panic!("Should not have Mir op in graph: {mir_node:?}"),
@@ -779,6 +688,17 @@ impl AirBuilder<'_> {
         self.mir_node_cache.insert(mir_node.get_ptr(), node);
         self.mir_key_to_air.insert(key, node);
         Ok(node)
+    }
+
+    fn insert_binary_op(
+        &mut self,
+        op: fn(NodeIndex, NodeIndex) -> Operation,
+        lhs: &Link<Op>,
+        rhs: &Link<Op>,
+    ) -> Result<NodeIndex, CompileError> {
+        let lhs_node_index = self.insert_mir_operation(lhs)?;
+        let rhs_node_index = self.insert_mir_operation(rhs)?;
+        Ok(self.insert_op(op(lhs_node_index, rhs_node_index)))
     }
 
     fn build_boundary_constraint(
@@ -864,13 +784,7 @@ impl AirBuilder<'_> {
 
                 self.mark_constrained_boundary(trace_access, &boundary)?;
 
-                let lhs = self.insert_op(Operation::Value(crate::ir::Value::TraceAccess(
-                    crate::ir::TraceAccess {
-                        segment: trace_access.segment,
-                        column: trace_access.column,
-                        row_offset: trace_access.row_offset,
-                    },
-                )));
+                let lhs = self.insert_trace_access_value(trace_access);
                 let rhs = self.insert_mir_operation(&rhs)?;
 
                 // Compare the inferred trace segment and domain of the operands
@@ -918,13 +832,7 @@ impl AirBuilder<'_> {
 
                 self.mark_constrained_boundary(trace_access, boundary)?;
 
-                let root = self.insert_op(Operation::Value(crate::ir::Value::TraceAccess(
-                    crate::ir::TraceAccess {
-                        segment: trace_access.segment,
-                        column: trace_access.column,
-                        row_offset: trace_access.row_offset,
-                    },
-                )));
+                let root = self.insert_trace_access_value(trace_access);
 
                 let domain = boundary.kind.into();
 
@@ -1199,6 +1107,16 @@ impl AirBuilder<'_> {
             stats.air_nodes_created += 1;
         }
         self.air.constraint_graph_mut().insert_node_cached(op, &mut self.air_op_cache)
+    }
+
+    fn insert_trace_access_value(&mut self, trace_access: MirTraceAccess) -> NodeIndex {
+        self.insert_op(Operation::Value(crate::ir::Value::TraceAccess(
+            crate::ir::TraceAccess {
+                segment: trace_access.segment,
+                column: trace_access.column,
+                row_offset: trace_access.row_offset,
+            },
+        )))
     }
 
     /// Extracts the trace access information from a given [Mir] `Boundary`.

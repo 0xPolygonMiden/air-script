@@ -36,8 +36,6 @@ pub struct UnrollingSecondPass<'a> {
     // Cache parameters by (owner_id, position, is_for_output) to preserve identity across
     // duplication and avoid re-allocating equivalent params in nested contexts.
     param_cache: HashMap<(OwnerId, usize, bool), Link<Op>>,
-    // Map placeholder parameters (per-iteration) to their inlining contexts.
-    context_by_param: HashMap<usize, ForInliningContext>,
     // Template contexts keyed by (owner_id, position) for nested duplication.
     context_by_owner_pos: HashMap<(OwnerId, usize), ForInliningContext>,
 }
@@ -66,7 +64,6 @@ impl<'a> UnrollingSecondPass<'a> {
             params_for_ref_node: HashMap::new(),
             owner_id_map: HashMap::new(),
             param_cache: HashMap::new(),
-            context_by_param: HashMap::new(),
             context_by_owner_pos: HashMap::new(),
         }
     }
@@ -89,7 +86,6 @@ impl Visitor for UnrollingSecondPass<'_> {
 
     fn run(&mut self, graph: &mut Graph) -> Result<(), CompileError> {
         let mut seen_params: HashSet<usize> = HashSet::new();
-        self.context_by_param.clear();
         self.context_by_owner_pos.clear();
         // Seed a template context per (owner_id, position) so nested unrolling can
         // reconstruct the right body/iterators after duplication.
@@ -114,7 +110,6 @@ impl Visitor for UnrollingSecondPass<'_> {
                         if !seen_params.insert(ptr) {
                             continue;
                         }
-                        self.context_by_param.insert(ptr, ctx.clone());
                         queue.push_back((actual_param.clone(), ctx.clone()));
                     }
                     if !params.is_empty() {
@@ -127,7 +122,6 @@ impl Visitor for UnrollingSecondPass<'_> {
             if !seen_params.insert(ptr) {
                 continue;
             }
-            self.context_by_param.insert(ptr, ctx.clone());
             queue.push_back((param.clone(), ctx.clone()));
         }
 
@@ -324,7 +318,6 @@ impl<'a> UnrollingSecondPass<'a> {
         }
 
         for (param, ctx) in to_enqueue.into_iter() {
-            self.context_by_param.insert(param.get_ptr(), ctx.clone());
             queue.push_back((param, ctx));
         }
     }
