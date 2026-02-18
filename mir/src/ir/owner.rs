@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Child, Link, Node, Op, Parent, Root};
+use crate::ir::{BackLink, Child, Link, Node, Op, OwnerId, Parent, Root};
 
 /// The nodes that can own [Op] nodes
 /// The [Owner] enum does not own it's inner struct to avoid reference cycles,
@@ -177,6 +177,27 @@ impl std::hash::Hash for Owner {
 }
 
 impl Link<Owner> {
+    /// Return a stable owner id for owners that can be referenced by parameters.
+    pub fn owner_id(&self) -> OwnerId {
+        match self.borrow().deref() {
+            Owner::Function(f) => f
+                .to_link()
+                .and_then(|l| l.as_function().map(|f| f.owner_id))
+                .unwrap_or_default(),
+            Owner::Evaluator(e) => e
+                .to_link()
+                .and_then(|l| l.as_evaluator().map(|e| e.owner_id))
+                .unwrap_or_default(),
+            Owner::For(back) => {
+                back.to_link().and_then(|l| l.as_for().map(|f| f.owner_id)).unwrap_or_default()
+            },
+            Owner::If(back) => {
+                back.to_link().and_then(|l| l.as_if().map(|i| i.owner_id)).unwrap_or_default()
+            },
+            _ => OwnerId::default(),
+        }
+    }
+
     /// Update the current node to the right variant of the new inner [Op] or [Root]
     /// Note: Only meant to be used internally
     pub fn update_variant(&self) {

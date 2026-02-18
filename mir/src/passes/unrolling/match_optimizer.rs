@@ -252,12 +252,7 @@ impl<'a> MatchOptimizer<'a> {
                     duplicate_node(cur_latch, &mut HashMap::new()),
                     span,
                 );
-                constraint
-                    .as_bus_op_mut()
-                    .unwrap()
-                    .latch
-                    .borrow_mut()
-                    .clone_from(&new_latch.borrow());
+                constraint.as_bus_op_mut().unwrap().latch = new_latch.clone();
                 let enf_constraint = Enf::create(constraint.clone(), constraint.span(), None);
                 all_constraints.push(enf_constraint);
             }

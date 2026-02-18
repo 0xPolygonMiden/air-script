@@ -118,6 +118,17 @@ impl Graph {
         self.evaluators.values().cloned().collect()
     }
 
+    /// Returns the function/evaluator name for a given root pointer, if known.
+    pub fn get_root_name_by_ptr(&self, ptr: usize) -> Option<QualifiedIdentifier> {
+        if let Some((ident, _)) = self.functions.iter().find(|(_, root)| root.get_ptr() == ptr) {
+            return Some(ident.clone());
+        }
+        if let Some((ident, _)) = self.evaluators.iter().find(|(_, root)| root.get_ptr() == ptr) {
+            return Some(ident.clone());
+        }
+        None
+    }
+
     /// Inserts a boundary constraint into the graph, if it does not already exist.
     pub fn insert_boundary_constraints_root(&mut self, root: ir::Link<ir::Op>) {
         if !self.boundary_constraints_roots.borrow().contains(&root) {

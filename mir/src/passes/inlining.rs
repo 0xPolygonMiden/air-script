@@ -1,17 +1,137 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{
+    collections::{HashMap, HashSet, hash_map::DefaultHasher},
+    hash::{Hash, Hasher},
+    ops::Deref,
+};
 
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Spanned};
 
-use super::{duplicate_node_or_replace, visitor::Visitor};
+use super::{duplicate_node_or_replace_with_interner, visitor::Visitor};
 use crate::{
     CompileError,
     ir::{
-        Graph, Link, Mir, MirAccessType, MirType, MirValue, Node, Op, Parameter, Parent, Root,
-        SpannedMirValue, TraceAccessBinding, Value, Vector,
+        ConstantValue, Graph, Link, Mir, MirAccessType, MirType, MirValue, Node, Op, OpInterner,
+        OwnerId, Parameter, Parent, Root, SpannedMirValue, TraceAccessBinding, Value, Vector,
+        is_shareable_root,
     },
     passes::constant_propagation::get_inner_const,
 };
+
+fn collect_param_replacements(
+    node: &Link<Op>,
+    args: &Vec<Link<Op>>,
+    ref_owner_id: OwnerId,
+    seen: &mut HashSet<usize>,
+    replacements: &mut HashMap<usize, (Link<Op>, Link<Op>)>,
+) {
+    let ptr = node.get_ptr();
+    if !seen.insert(ptr) {
+        return;
+    }
+
+    let param_info = node.as_parameter().map(|param| (param.owner_id, param.position));
+    if let Some((owner_id, position)) = param_info {
+        if owner_id == ref_owner_id {
+            let replacement = args[position].clone();
+            replacements.entry(ptr).or_insert((node.clone(), replacement));
+        }
+        return;
+    }
+
+    let children: Vec<Link<Op>> = node.children().borrow().iter().cloned().collect();
+    for child in children {
+        collect_param_replacements(&child, args, ref_owner_id, seen, replacements);
+    }
+}
+
+fn estimate_callee_body_size(
+    callee: &Link<Root>,
+    budget: usize,
+    call_cache: &mut HashMap<usize, usize>,
+    call_visiting: &mut HashSet<usize>,
+) -> usize {
+    let callee_ptr = callee.get_ptr();
+    if let Some(size) = call_cache.get(&callee_ptr) {
+        return *size;
+    }
+    if !call_visiting.insert(callee_ptr) {
+        return budget;
+    }
+
+    let body_nodes: Vec<Link<Op>> = match callee.borrow().deref() {
+        Root::Function(f) => {
+            let body_ref = f.body.borrow();
+            body_ref.last().cloned().into_iter().collect()
+        },
+        Root::Evaluator(e) => {
+            let body_ref = e.body.borrow();
+            body_ref.iter().cloned().collect()
+        },
+        _ => Vec::new(),
+    };
+
+    let mut seen = HashSet::new();
+    let mut total = 0usize;
+    for node in body_nodes.iter() {
+        total += estimate_op_size_with_calls(node, &mut seen, budget, call_cache, call_visiting);
+        if total >= budget {
+            total = budget;
+            break;
+        }
+    }
+    call_visiting.remove(&callee_ptr);
+    call_cache.insert(callee_ptr, total);
+    total
+}
+
+fn estimate_op_size_with_calls(
+    node: &Link<Op>,
+    seen: &mut HashSet<usize>,
+    budget: usize,
+    call_cache: &mut HashMap<usize, usize>,
+    call_visiting: &mut HashSet<usize>,
+) -> usize {
+    let ptr = node.get_ptr();
+    if !seen.insert(ptr) {
+        return 0;
+    }
+    if seen.len() >= budget {
+        return budget;
+    }
+    let mut count = 1usize;
+
+    if let Some(call) = node.as_call() {
+        // Count arguments
+        for arg in call.arguments.borrow().iter() {
+            count += estimate_op_size_with_calls(arg, seen, budget, call_cache, call_visiting);
+            if count >= budget {
+                return budget;
+            }
+        }
+        // Count callee body (approximate inline cost)
+        let callee_size =
+            estimate_callee_body_size(&call.function, budget, call_cache, call_visiting);
+        count += callee_size;
+        return count.min(budget);
+    }
+
+    if node.as_owner().is_some() {
+        for child in node.children().borrow().iter() {
+            count += estimate_op_size_with_calls(child, seen, budget, call_cache, call_visiting);
+            if count >= budget {
+                return budget;
+            }
+        }
+    }
+    count
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct CallKey {
+    callee_ptr: usize,
+    arg_hashes: Vec<u64>,
+}
 
 /// This pass handles inlining of `Call` nodes at their call sites.
 ///
@@ -25,11 +145,15 @@ use crate::{
 ///  
 pub struct Inlining<'a> {
     diagnostics: &'a DiagnosticsHandler,
+    inline_cache: HashMap<CallKey, Link<Op>>,
 }
 
 impl<'a> Inlining<'a> {
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
-        Self { diagnostics }
+        Self {
+            diagnostics,
+            inline_cache: HashMap::new(),
+        }
     }
 
     /// Runs the Inlining pass once (with both InliningFirstPass and InliningSecondPass)
@@ -37,9 +161,23 @@ impl<'a> Inlining<'a> {
     /// Returns true if any calls were inlined, false otherwise, to let the caller know if any
     /// changes were made or if we reached a fixed point.
     fn run_once(&mut self, ir: &mut Mir) -> Result<bool, CompileError> {
+        // AIR_INLINE_PROGRESS emits inlining progress and cache stats.
+        let trace_progress = std::env::var("AIR_INLINE_PROGRESS").is_ok();
         // The first pass only identifies the call graph dependencies and the needed calls to inline
         let mut first_pass = InliningFirstPass::new(self.diagnostics);
         Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
+        if trace_progress {
+            let call_sites: usize = first_pass
+                .func_eval_nodes_where_called
+                .values()
+                .map(|(_, nodes)| nodes.len())
+                .sum();
+            eprintln!(
+                "mir: inlining run_once: callees={} call_sites={}",
+                first_pass.func_eval_nodes_where_called.len(),
+                call_sites
+            );
+        }
 
         // We then create the inlining order (inlining first the functions and evaluators that do
         // not call other functions or evaluators)
@@ -51,6 +189,7 @@ impl<'a> Inlining<'a> {
             self.diagnostics,
             func_eval_inlining_order.clone(),
             first_pass.func_eval_nodes_where_called.clone(),
+            &mut self.inline_cache,
         );
         Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
 
@@ -67,11 +206,23 @@ impl Pass for Inlining<'_> {
     type Error = CompileError;
 
     fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
+        // AIR_INLINE_PROGRESS emits per-iteration timing.
+        let trace_progress = std::env::var("AIR_INLINE_PROGRESS").is_ok();
         let mut had_calls = true;
         let mut iterations = 0;
+        let total_start = std::time::Instant::now();
 
         while had_calls && iterations < INLINING_LIMIT {
+            let iter_start = std::time::Instant::now();
             had_calls = self.run_once(&mut ir)?;
+            if trace_progress {
+                eprintln!(
+                    "mir: inlining iteration {} had_calls={} elapsed={:?}",
+                    iterations,
+                    had_calls,
+                    iter_start.elapsed()
+                );
+            }
             iterations += 1;
         }
 
@@ -82,6 +233,9 @@ impl Pass for Inlining<'_> {
             return Err(CompileError::Failed);
         }
 
+        if trace_progress {
+            eprintln!("mir: inlining total elapsed={:?}", total_start.elapsed());
+        }
         Ok(ir)
     }
 }
@@ -100,6 +254,7 @@ pub struct InliningFirstPass<'a> {
     func_eval_dependency_graph: HashMap<usize, (Link<Root>, Vec<Link<Root>>)>,
     // HashMap<CaleePtr, Callee, Vec<Call nodes where called>>
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
+    seen_calls: HashSet<usize>,
 }
 
 impl<'a> InliningFirstPass<'a> {
@@ -111,6 +266,7 @@ impl<'a> InliningFirstPass<'a> {
             current_callees_encountered: Vec::new(),
             func_eval_dependency_graph: HashMap::new(),
             func_eval_nodes_where_called: HashMap::new(),
+            seen_calls: HashSet::new(),
         }
     }
 }
@@ -122,7 +278,8 @@ pub struct CallInliningContext {
     body: Link<Vec<Link<Op>>>,
     arguments: Link<Vec<Link<Op>>>,
     pure_function: bool,
-    ref_node: Link<Node>,
+    callee: Link<Root>,
+    ref_owner_id: OwnerId,
 }
 
 pub struct InliningSecondPass<'a> {
@@ -136,30 +293,68 @@ pub struct InliningSecondPass<'a> {
     call_inlining_context: Option<CallInliningContext>,
     // HashMap<KeyPtr, (Key, Value)>
     nodes_to_replace: HashMap<usize, (Link<Op>, Link<Op>)>,
-    params_for_ref_node: HashMap<usize, Vec<Link<Op>>>,
+    params_for_ref_node: HashMap<OwnerId, Vec<Link<Op>>>,
+    owner_id_map: HashMap<OwnerId, OwnerId>,
+    param_cache: HashMap<(OwnerId, usize, bool), Link<Op>>,
 
     // HashMap<CaleePtr, (Callee, Vec<Call nodes where called>)>
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
     had_calls: bool,
     seen_root_call: bool,
+    trace_progress: bool,
+    progress_every: usize,
+    calls_processed: usize,
+    trace_calls: bool,
+    trace_last: Option<usize>,
+    trace_slow_ms: Option<u128>,
+    call_size_cache: HashMap<usize, usize>,
+    inline_cache: &'a mut HashMap<CallKey, Link<Op>>,
+    op_interner: Option<OpInterner>,
 }
 
 impl<'a> InliningSecondPass<'a> {
-    pub fn new(
+    fn new(
         diagnostics: &'a DiagnosticsHandler,
         func_eval_inlining_order: Vec<Link<Root>>,
         func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>,
+        inline_cache: &'a mut HashMap<CallKey, Link<Op>>,
     ) -> Self {
+        let trace_progress = std::env::var("AIR_INLINE_PROGRESS").is_ok();
+        let progress_every = std::env::var("AIR_INLINE_PROGRESS_EVERY")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(50);
+        let trace_calls = std::env::var("AIR_INLINE_TRACE_CALLS").is_ok();
+        let trace_last = std::env::var("AIR_INLINE_TRACE_LAST")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0);
+        let trace_slow_ms = std::env::var("AIR_INLINE_TRACE_SLOW_MS")
+            .ok()
+            .and_then(|value| value.parse::<u128>().ok())
+            .filter(|value| *value > 0);
         Self {
             diagnostics,
             work_stack: vec![],
             call_inlining_context: None,
             nodes_to_replace: HashMap::new(),
             params_for_ref_node: HashMap::new(),
+            owner_id_map: HashMap::new(),
+            param_cache: HashMap::new(),
             func_eval_nodes_where_called,
             func_eval_inlining_order,
             had_calls: false,
             seen_root_call: false,
+            trace_progress,
+            progress_every,
+            calls_processed: 0,
+            trace_calls,
+            trace_last,
+            trace_slow_ms,
+            call_size_cache: HashMap::new(),
+            inline_cache,
+            op_interner: None,
         }
     }
 }
@@ -279,9 +474,14 @@ impl Visitor for InliningFirstPass<'_> {
     //   or evaluators (to build the dependency graph)
     // - add it to the list of calls to inline with the func_eval_nodes_where_called map
     fn visit_call(&mut self, _graph: &mut Graph, call: Link<Op>) -> Result<(), CompileError> {
-        // safe to unwrap because we just dispatched on it
-        let callee = &call.as_call().unwrap().function;
+        let Some(call_ref) = call.as_call() else {
+            return Ok(());
+        };
+        let callee = &call_ref.function;
 
+        if !self.seen_calls.insert(call.get_ptr()) {
+            return Ok(());
+        }
         if self.in_func_or_eval {
             self.current_callees_encountered.push(callee.clone());
         }
@@ -316,18 +516,60 @@ impl Visitor for InliningSecondPass<'_> {
     fn run(&mut self, graph: &mut Graph) -> Result<(), CompileError> {
         let root_nodes_to_visit = self.root_nodes_to_visit(graph);
         self.had_calls = !root_nodes_to_visit.is_empty();
+        let total_calls = if self.trace_progress {
+            root_nodes_to_visit
+                .iter()
+                .filter(|node| {
+                    if let Some(op) = node.as_op() {
+                        op.as_call().is_some()
+                    } else {
+                        false
+                    }
+                })
+                .count()
+        } else {
+            0
+        };
 
         for root_node in root_nodes_to_visit.iter() {
+            let call_start = std::time::Instant::now();
             let mut updated_op = None;
 
             if let Some(op) = root_node.as_op() {
                 // Set context for inlining this call
-                let Some(call_node) = op.as_call() else {
-                    return Ok(());
+                let (callee, arguments, call_span, callee_ptr) = {
+                    let Some(call_node) = op.as_call() else {
+                        return Ok(());
+                    };
+                    (
+                        call_node.function.clone(),
+                        call_node.arguments.clone(),
+                        call_node.span(),
+                        call_node.function.get_ptr(),
+                    )
                 };
+                let should_trace_call = if self.trace_calls {
+                    true
+                } else if let Some(trace_last) = self.trace_last {
+                    total_calls > 0
+                        && (self.calls_processed + 1) > total_calls.saturating_sub(trace_last)
+                } else {
+                    false
+                };
+                if should_trace_call {
+                    let callee_name = graph
+                        .get_root_name_by_ptr(callee_ptr)
+                        .map(|ident| format!("{ident:?}"))
+                        .unwrap_or_else(|| "<unknown>".to_string());
+                    eprintln!(
+                        "mir: inlining call {}/{} callee={} span={:?}",
+                        self.calls_processed + 1,
+                        total_calls,
+                        callee_name,
+                        call_span
+                    );
+                }
 
-                let callee = call_node.function.clone();
-                let arguments = call_node.arguments.clone();
                 let (pure_function, body) = if let Some(f) = callee.clone().as_function() {
                     (true, f.body.clone())
                 } else if let Some(ev) = callee.clone().as_evaluator() {
@@ -338,89 +580,346 @@ impl Visitor for InliningSecondPass<'_> {
                     );
                 };
 
+                let ref_owner_id = callee.as_owner().owner_id();
                 let context = CallInliningContext {
-                    body,
-                    arguments,
+                    body: body.clone(),
+                    arguments: arguments.clone(),
                     pure_function,
-                    ref_node: callee.as_node(),
+                    callee: callee.clone(),
+                    ref_owner_id,
                 };
 
-                self.call_inlining_context = Some(context.clone());
-                self.nodes_to_replace.clear();
-                self.params_for_ref_node.clear();
-                self.seen_root_call = false;
+                let shareable_root = pure_function && is_shareable_root(&callee);
+                let arg_hashes = if shareable_root {
+                    let mut hash_memo: HashMap<usize, Option<u64>> = HashMap::new();
+                    arguments
+                        .borrow()
+                        .iter()
+                        .map(|arg| hash_op(arg, &mut hash_memo))
+                        .collect::<Option<Vec<_>>>()
+                } else {
+                    None
+                };
+                let cache_key = if shareable_root {
+                    arg_hashes.as_ref().map(|hashes| CallKey {
+                        callee_ptr: callee.get_ptr(),
+                        arg_hashes: hashes.clone(),
+                    })
+                } else {
+                    None
+                };
+                // Disable caching when the body contains For/If. These introduce per-call
+                // duplication semantics that are not safe to reuse across call sites.
+                let allow_cache = shareable_root && !context_has_for_or_if(&context.body);
 
-                self.scan_node(graph, root_node.clone())?;
-                while let Some(node) = self.work_stack().pop() {
-                    self.visit_node(graph, node.clone())?;
+                let inline_max_nodes = std::env::var("AIR_INLINE_MAX_NODES")
+                    .ok()
+                    .and_then(|value| value.parse::<usize>().ok())
+                    .filter(|value| *value > 0);
+                let mut skip_inline = false;
+                if let Some(max_nodes) = inline_max_nodes {
+                    let body_nodes: Vec<Link<Op>> = {
+                        let body_ref = body.borrow();
+                        body_ref.iter().cloned().collect()
+                    };
+                    let mut seen = HashSet::new();
+                    let mut call_visiting = HashSet::new();
+                    let estimated = if pure_function {
+                        body_nodes
+                            .last()
+                            .map(|node| {
+                                estimate_op_size_with_calls(
+                                    node,
+                                    &mut seen,
+                                    max_nodes + 1,
+                                    &mut self.call_size_cache,
+                                    &mut call_visiting,
+                                )
+                            })
+                            .unwrap_or(0)
+                    } else {
+                        let mut total = 0usize;
+                        for node in body_nodes.iter() {
+                            total += estimate_op_size_with_calls(
+                                node,
+                                &mut seen,
+                                max_nodes + 1,
+                                &mut self.call_size_cache,
+                                &mut call_visiting,
+                            );
+                            if total > max_nodes {
+                                break;
+                            }
+                        }
+                        total
+                    };
+                    if estimated > max_nodes {
+                        skip_inline = true;
+                        if self.trace_progress {
+                            let callee_name = graph
+                                .get_root_name_by_ptr(callee_ptr)
+                                .map(|ident| format!("{ident:?}"))
+                                .unwrap_or_else(|| "<unknown>".to_string());
+                            eprintln!(
+                                "mir: inlining skip callee={} estimated_nodes={} max_nodes={}",
+                                callee_name, estimated, max_nodes
+                            );
+                        }
+                    } else if should_trace_call {
+                        let callee_name = graph
+                            .get_root_name_by_ptr(callee_ptr)
+                            .map(|ident| format!("{ident:?}"))
+                            .unwrap_or_else(|| "<unknown>".to_string());
+                        eprintln!(
+                            "mir: inlining estimate callee={} estimated_nodes={} max_nodes={}",
+                            callee_name, estimated, max_nodes
+                        );
+                    }
                 }
 
-                if context.pure_function {
-                    // We have finished inlining the body, we can now replace the Call node with the
-                    // last expression of the body
-                    let last_child_of_body = context.body.borrow().last().unwrap().clone();
-                    let (_, new_node) =
-                        self.nodes_to_replace.get(&last_child_of_body.get_ptr()).unwrap().clone();
-                    updated_op = Some(new_node);
-                } else {
-                    // We have finished inlining the body, we can now replace the Call node with all
-                    // the body
-                    let mut new_nodes = Vec::new();
-                    for body_node in context.body.borrow().iter() {
-                        // FIXME: Maybe we should only push nodes that are Enf()?
-                        // Depends if additional nodes change things (e.g. the Vector size..)
-                        // For now I think we can keep all nodes, and just ignore the non-Enf nodes
-                        // When building the constraints during lowering Mir -> Air
+                if should_trace_call {
+                    match &arg_hashes {
+                        Some(hashes) => eprintln!("mir: inlining args_hash={hashes:?}"),
+                        None => eprintln!("mir: inlining args_hash=<unsupported>"),
+                    }
+                }
 
-                        let new_node =
-                            self.nodes_to_replace.get(&body_node.get_ptr()).unwrap().1.clone();
+                let fastpath_enabled = std::env::var("AIR_INLINE_FASTPATH").is_ok();
+                let single_call_site = self
+                    .func_eval_nodes_where_called
+                    .get(&callee_ptr)
+                    .map(|(_, nodes)| nodes.len() == 1)
+                    .unwrap_or(false);
 
-                        if let Some(bus_op) = new_node.clone().as_bus_op() {
-                            let latch = bus_op.latch.clone();
+                if updated_op.is_none() && single_call_site && fastpath_enabled {
+                    if should_trace_call || fastpath_enabled {
+                        let callee_name = graph
+                            .get_root_name_by_ptr(callee_ptr)
+                            .map(|ident| format!("{ident:?}"))
+                            .unwrap_or_else(|| "<unknown>".to_string());
+                        eprintln!(
+                            "mir: inlining fastpath single_call_site=true callee={} span={:?}",
+                            callee_name, call_span
+                        );
+                    }
+                    let args = if context.pure_function {
+                        context.arguments.borrow().clone()
+                    } else {
+                        let args = context.arguments.borrow().clone();
+                        let callee_params =
+                            context.callee.as_evaluator().unwrap().parameters.clone();
+                        check_evaluator_argument_sizes(&args, callee_params, self.diagnostics)?;
+                        unpack_evaluator_arguments(&args)
+                    };
 
-                            bus_op
-                                .bus
-                                .to_link()
-                                .unwrap()
-                                .borrow_mut()
-                                .columns
-                                .push(new_node.clone());
-                            bus_op.bus.to_link().unwrap().borrow_mut().latches.push(latch.clone());
+                    let body_nodes: Vec<Link<Op>> = if context.pure_function {
+                        context.body.borrow().last().cloned().into_iter().collect()
+                    } else {
+                        context.body.borrow().iter().cloned().collect()
+                    };
+
+                    let mut seen = HashSet::new();
+                    let mut replacements: HashMap<usize, (Link<Op>, Link<Op>)> = HashMap::new();
+                    for node in body_nodes.iter() {
+                        collect_param_replacements(
+                            node,
+                            &args,
+                            context.ref_owner_id,
+                            &mut seen,
+                            &mut replacements,
+                        );
+                    }
+                    for (_ptr, (node, replacement)) in replacements.into_iter() {
+                        if node.get_ptr() == replacement.get_ptr() {
+                            continue;
                         }
+                        node.set(&replacement);
+                    }
 
-                        if new_node.clone().as_enf().is_some() {
-                            new_nodes.push(new_node);
+                    if context.pure_function {
+                        updated_op = body_nodes.last().cloned();
+                    } else {
+                        let mut new_nodes = Vec::new();
+                        for body_node in body_nodes.iter() {
+                            let new_node = body_node.clone();
+                            if let Some(bus_op) = new_node.clone().as_bus_op() {
+                                let latch = bus_op.latch.clone();
+                                bus_op
+                                    .bus
+                                    .to_link()
+                                    .unwrap()
+                                    .borrow_mut()
+                                    .columns
+                                    .push(new_node.clone());
+                                bus_op
+                                    .bus
+                                    .to_link()
+                                    .unwrap()
+                                    .borrow_mut()
+                                    .latches
+                                    .push(latch.clone());
+                            }
+                            if new_node.clone().as_enf().is_some() {
+                                new_nodes.push(new_node);
+                            }
+                        }
+                        let span = new_nodes
+                            .iter()
+                            .map(|n| n.span())
+                            .fold(SourceSpan::UNKNOWN, |acc, s| {
+                                acc.merge(s).unwrap_or(SourceSpan::UNKNOWN)
+                            });
+                        let new_nodes_vector = Vector::create(new_nodes, span);
+                        updated_op = Some(new_nodes_vector);
+                    }
+                }
+
+                if allow_cache {
+                    if let Some(key) = cache_key.as_ref() {
+                        if let Some(cached) = self.inline_cache.get(key) {
+                            if should_trace_call {
+                                eprintln!("mir: inlining cache_hit=true");
+                            }
+                            updated_op = Some(cached.clone());
                         }
                     }
-                    let span =
-                        new_nodes.iter().map(|n| n.span()).fold(SourceSpan::UNKNOWN, |acc, s| {
-                            acc.merge(s).unwrap_or(SourceSpan::UNKNOWN)
-                        });
-                    let new_nodes_vector = Vector::create(new_nodes, span);
+                }
 
-                    updated_op = Some(new_nodes_vector);
+                if updated_op.is_none() && !skip_inline {
+                    self.op_interner = Some(OpInterner::new());
+                    self.call_inlining_context = Some(context.clone());
+                    self.nodes_to_replace.clear();
+                    self.params_for_ref_node.clear();
+                    self.owner_id_map.clear();
+                    self.param_cache.clear();
+                    self.seen_root_call = false;
+
+                    self.scan_node(graph, root_node.clone())?;
+                    while let Some(node) = self.work_stack().pop() {
+                        self.visit_node(graph, node.clone())?;
+                    }
+
+                    if context.pure_function {
+                        // We have finished inlining the body, we can now replace the Call node with
+                        // the last expression of the body
+                        let last_child_of_body = context.body.borrow().last().unwrap().clone();
+                        let (_, new_node) = self
+                            .nodes_to_replace
+                            .get(&last_child_of_body.get_ptr())
+                            .unwrap()
+                            .clone();
+                        updated_op = Some(new_node);
+                    } else {
+                        // We have finished inlining the body, we can now replace the Call node with
+                        // all the body
+                        let mut new_nodes = Vec::new();
+                        for body_node in context.body.borrow().iter() {
+                            // FIXME: Maybe we should only push nodes that are Enf()?
+                            // Depends if additional nodes change things (e.g. the Vector size..)
+                            // For now I think we can keep all nodes, and just ignore the non-Enf
+                            // nodes When building the constraints
+                            // during lowering Mir -> Air
+
+                            let new_node =
+                                self.nodes_to_replace.get(&body_node.get_ptr()).unwrap().1.clone();
+
+                            if let Some(bus_op) = new_node.clone().as_bus_op() {
+                                let latch = bus_op.latch.clone();
+
+                                bus_op
+                                    .bus
+                                    .to_link()
+                                    .unwrap()
+                                    .borrow_mut()
+                                    .columns
+                                    .push(new_node.clone());
+                                bus_op
+                                    .bus
+                                    .to_link()
+                                    .unwrap()
+                                    .borrow_mut()
+                                    .latches
+                                    .push(latch.clone());
+                            }
+
+                            if new_node.clone().as_enf().is_some() {
+                                new_nodes.push(new_node);
+                            }
+                        }
+                        let span = new_nodes
+                            .iter()
+                            .map(|n| n.span())
+                            .fold(SourceSpan::UNKNOWN, |acc, s| {
+                                acc.merge(s).unwrap_or(SourceSpan::UNKNOWN)
+                            });
+                        let new_nodes_vector = Vector::create(new_nodes, span);
+
+                        updated_op = Some(new_nodes_vector);
+                    }
+
+                    if let (Some(key), Some(node)) = (cache_key, updated_op.clone()) {
+                        if allow_cache {
+                            self.inline_cache.insert(key, node);
+                        }
+                    }
+                    self.op_interner = None;
+                }
+
+                // Effectively replace the `Call` node with the updated op
+                // Note: We also update the references of Parameters that referenced the node we are
+                // replacing
+                if let Some(updated_op) = updated_op {
+                    let prev_owner_id =
+                        updated_op.as_owner().map(|owner| owner.owner_id()).unwrap_or_default();
+                    let params = if prev_owner_id.is_unknown() {
+                        None
+                    } else {
+                        self.params_for_ref_node.get(&prev_owner_id).cloned()
+                    };
+
+                    root_node.as_op().unwrap().set(&updated_op);
+
+                    if let Some(params) = params {
+                        let new_owner_id = root_node
+                            .clone()
+                            .as_op()
+                            .unwrap()
+                            .clone()
+                            .as_owner()
+                            .unwrap()
+                            .owner_id();
+                        for param in params.iter() {
+                            param.as_parameter_mut().unwrap().set_owner_id(new_owner_id);
+                        }
+                    }
+                }
+
+                if self.trace_progress {
+                    self.calls_processed += 1;
+                    if self.calls_processed % self.progress_every == 0 {
+                        eprintln!(
+                            "mir: inlining processed {}/{} calls",
+                            self.calls_processed, total_calls
+                        );
+                    }
+                }
+
+                if let Some(threshold_ms) = self.trace_slow_ms {
+                    let elapsed_ms = call_start.elapsed().as_millis();
+                    if elapsed_ms >= threshold_ms {
+                        let callee_name = graph
+                            .get_root_name_by_ptr(callee_ptr)
+                            .map(|ident| format!("{ident:?}"))
+                            .unwrap_or_else(|| "<unknown>".to_string());
+                        eprintln!(
+                            "mir: inlining slow_call {}ms callee={} span={:?}",
+                            elapsed_ms, callee_name, call_span
+                        );
+                    }
                 }
 
                 // Reset context to None
                 self.call_inlining_context = None;
-            }
-
-            // Effectively replace the `Call` node with the updated op
-            // Note: We also update the references of Parameters that referenced the node we are
-            // replacing
-            if let Some(updated_op) = updated_op {
-                //
-                let prev_owner_ptr = updated_op.as_owner().unwrap().get_ptr();
-                let params = self.params_for_ref_node.get(&prev_owner_ptr).cloned();
-
-                root_node.as_op().unwrap().set(&updated_op);
-
-                if let Some(params) = params {
-                    let new_owner = root_node.clone().as_op().unwrap().clone().as_owner().unwrap();
-                    for param in params.iter() {
-                        param.as_parameter_mut().unwrap().set_ref_node(new_owner.clone());
-                    }
-                }
             }
         }
         Ok(())
@@ -486,13 +985,15 @@ impl Visitor for InliningSecondPass<'_> {
             // duplicate the body, while replacing the `Function` or `Evaluator` parameters with
             // the `Call` arguments
             if self.call_inlining_context.clone().unwrap().pure_function {
-                duplicate_node_or_replace(
+                duplicate_node_or_replace_with_interner(
                     &mut self.nodes_to_replace,
                     call_op.clone(),
                     self.call_inlining_context.clone().unwrap().arguments.borrow().clone(),
-                    self.call_inlining_context.clone().unwrap().ref_node,
-                    None,
+                    self.call_inlining_context.clone().unwrap().ref_owner_id,
                     &mut self.params_for_ref_node,
+                    &mut self.owner_id_map,
+                    &mut self.param_cache,
+                    &mut self.op_interner,
                 );
             } else {
                 // If we're inside the body of an evaluator, we first need to unpack the
@@ -504,9 +1005,7 @@ impl Visitor for InliningSecondPass<'_> {
                     .call_inlining_context
                     .clone()
                     .unwrap()
-                    .ref_node
-                    .as_root()
-                    .unwrap()
+                    .callee
                     .as_evaluator()
                     .unwrap()
                     .parameters
@@ -516,18 +1015,239 @@ impl Visitor for InliningSecondPass<'_> {
 
                 let args_unpacked = unpack_evaluator_arguments(&args);
 
-                duplicate_node_or_replace(
+                duplicate_node_or_replace_with_interner(
                     &mut self.nodes_to_replace,
                     call_op.clone(),
                     args_unpacked,
-                    self.call_inlining_context.clone().unwrap().ref_node,
-                    None,
+                    self.call_inlining_context.clone().unwrap().ref_owner_id,
                     &mut self.params_for_ref_node,
+                    &mut self.owner_id_map,
+                    &mut self.param_cache,
+                    &mut self.op_interner,
                 );
             }
         }
 
         Ok(())
+    }
+}
+
+type HashMemo = HashMap<usize, Option<u64>>;
+
+fn context_has_for_or_if(body: &Link<Vec<Link<Op>>>) -> bool {
+    // Conservative check: if a callee contains For/If, we avoid caching the inlined body
+    // because duplication interacts with parameter identity and owner ids.
+    let mut seen: HashSet<usize> = HashSet::new();
+    for node in body.borrow().iter() {
+        if op_contains_for_or_if(node, &mut seen) {
+            return true;
+        }
+    }
+    false
+}
+
+fn op_contains_for_or_if(node: &Link<Op>, seen: &mut HashSet<usize>) -> bool {
+    let mut stack: Vec<Link<Node>> = vec![node.clone().as_node()];
+    while let Some(node) = stack.pop() {
+        let ptr = node.get_ptr();
+        if !seen.insert(ptr) {
+            continue;
+        }
+        match node.borrow().deref() {
+            Node::For(_) | Node::If(_) => return true,
+            _ => {},
+        }
+        if node.as_owner().is_some() {
+            for child in node.children().borrow().iter() {
+                stack.push(child.clone().as_node());
+            }
+        }
+    }
+    false
+}
+
+fn hash_op(node: &Link<Op>, memo: &mut HashMemo) -> Option<u64> {
+    if let Some(hash) = memo.get(&node.get_ptr()) {
+        return *hash;
+    }
+
+    let mut hasher = DefaultHasher::new();
+    let hash = match node.borrow().deref() {
+        Op::Value(value) => {
+            0u8.hash(&mut hasher);
+            hash_mir_value(&value.value.value, &mut hasher);
+            Some(hasher.finish())
+        },
+        Op::Accessor(accessor) => {
+            1u8.hash(&mut hasher);
+            accessor.offset.hash(&mut hasher);
+            hash_access_type(&accessor.access_type, memo, &mut hasher)?;
+            let indexable_hash = hash_op(&accessor.indexable, memo)?;
+            indexable_hash.hash(&mut hasher);
+            Some(hasher.finish())
+        },
+        Op::Add(add) => {
+            2u8.hash(&mut hasher);
+            hash_op(&add.lhs, memo)?.hash(&mut hasher);
+            hash_op(&add.rhs, memo)?.hash(&mut hasher);
+            Some(hasher.finish())
+        },
+        Op::Sub(sub) => {
+            3u8.hash(&mut hasher);
+            hash_op(&sub.lhs, memo)?.hash(&mut hasher);
+            hash_op(&sub.rhs, memo)?.hash(&mut hasher);
+            Some(hasher.finish())
+        },
+        Op::Mul(mul) => {
+            4u8.hash(&mut hasher);
+            hash_op(&mul.lhs, memo)?.hash(&mut hasher);
+            hash_op(&mul.rhs, memo)?.hash(&mut hasher);
+            Some(hasher.finish())
+        },
+        Op::Exp(exp) => {
+            5u8.hash(&mut hasher);
+            hash_op(&exp.lhs, memo)?.hash(&mut hasher);
+            hash_op(&exp.rhs, memo)?.hash(&mut hasher);
+            Some(hasher.finish())
+        },
+        Op::Vector(vector) => {
+            6u8.hash(&mut hasher);
+            let children = vector.children();
+            let elems = children.borrow();
+            elems.len().hash(&mut hasher);
+            for elem in elems.iter() {
+                hash_op(elem, memo)?.hash(&mut hasher);
+            }
+            Some(hasher.finish())
+        },
+        Op::Matrix(matrix) => {
+            7u8.hash(&mut hasher);
+            let children = matrix.children();
+            let rows = children.borrow();
+            rows.len().hash(&mut hasher);
+            for row in rows.iter() {
+                hash_op(row, memo)?.hash(&mut hasher);
+            }
+            Some(hasher.finish())
+        },
+        Op::Parameter(parameter) => {
+            8u8.hash(&mut hasher);
+            parameter.position.hash(&mut hasher);
+            parameter.ty.hash(&mut hasher);
+            parameter.owner_id.hash(&mut hasher);
+            Some(hasher.finish())
+        },
+        Op::Call(call) => {
+            9u8.hash(&mut hasher);
+            call.function.get_ptr().hash(&mut hasher);
+            let args = call.arguments.borrow();
+            args.len().hash(&mut hasher);
+            for arg in args.iter() {
+                hash_op(arg, memo)?.hash(&mut hasher);
+            }
+            Some(hasher.finish())
+        },
+        _ => None,
+    };
+
+    memo.insert(node.get_ptr(), hash);
+    hash
+}
+
+fn hash_access_type(
+    access_type: &MirAccessType,
+    memo: &mut HashMemo,
+    hasher: &mut DefaultHasher,
+) -> Option<()> {
+    match access_type {
+        MirAccessType::Default => {
+            0u8.hash(hasher);
+            Some(())
+        },
+        MirAccessType::Index(index) => {
+            1u8.hash(hasher);
+            hash_op(index, memo)?.hash(hasher);
+            Some(())
+        },
+        MirAccessType::Matrix(row, col) => {
+            2u8.hash(hasher);
+            hash_op(row, memo)?.hash(hasher);
+            hash_op(col, memo)?.hash(hasher);
+            Some(())
+        },
+    }
+}
+
+fn hash_mir_value(value: &MirValue, hasher: &mut DefaultHasher) {
+    match value {
+        MirValue::Constant(constant) => {
+            0u8.hash(hasher);
+            match constant {
+                ConstantValue::Felt(felt) => {
+                    0u8.hash(hasher);
+                    felt.hash(hasher);
+                },
+                ConstantValue::Vector(values) => {
+                    1u8.hash(hasher);
+                    values.len().hash(hasher);
+                    for value in values {
+                        value.hash(hasher);
+                    }
+                },
+                ConstantValue::Matrix(rows) => {
+                    2u8.hash(hasher);
+                    rows.len().hash(hasher);
+                    for row in rows {
+                        row.len().hash(hasher);
+                        for value in row {
+                            value.hash(hasher);
+                        }
+                    }
+                },
+            }
+        },
+        MirValue::TraceAccess(trace_access) => {
+            1u8.hash(hasher);
+            trace_access.segment.hash(hasher);
+            trace_access.column.hash(hasher);
+            trace_access.row_offset.hash(hasher);
+        },
+        MirValue::PublicInput(public_input) => {
+            2u8.hash(hasher);
+            public_input.name.hash(hasher);
+            public_input.index.hash(hasher);
+        },
+        MirValue::PeriodicColumn(periodic) => {
+            3u8.hash(hasher);
+            periodic.name.hash(hasher);
+            periodic.cycle.hash(hasher);
+        },
+        MirValue::RandomValue(value) => {
+            4u8.hash(hasher);
+            value.hash(hasher);
+        },
+        MirValue::BusAccess(bus_access) => {
+            5u8.hash(hasher);
+            bus_access.bus.get_ptr().hash(hasher);
+            bus_access.row_offset.hash(hasher);
+        },
+        MirValue::TraceAccessBinding(binding) => {
+            6u8.hash(hasher);
+            binding.segment.hash(hasher);
+            binding.offset.hash(hasher);
+            binding.size.hash(hasher);
+        },
+        MirValue::PublicInputTable(table) => {
+            7u8.hash(hasher);
+            table.table_name.hash(hasher);
+            table.num_cols.hash(hasher);
+        },
+        MirValue::Null => {
+            8u8.hash(hasher);
+        },
+        MirValue::Unconstrained => {
+            9u8.hash(hasher);
+        },
     }
 }
 

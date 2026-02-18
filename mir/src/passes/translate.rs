@@ -14,7 +14,7 @@ use crate::{
     ir::{
         Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue,
         Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir,
-        MirAccessType, MirType, MirValue, Mul, Op, Owner, Parameter, PublicInputAccess,
+        MirAccessType, MirType, MirValue, Mul, Op, Owner, OwnerId, Parameter, PublicInputAccess,
         PublicInputTableAccess, Root, SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value,
         Vector,
     },
@@ -61,7 +61,7 @@ pub struct MirBuilder<'a> {
     diagnostics: &'a DiagnosticsHandler,
     mir: Mir,
     trace_columns: &'a Vec<ast::TraceSegment>,
-    bindings: LexicalScope<&'a ast::Identifier, Link<Op>>,
+    bindings: LexicalScope<&'a ast::Identifier, BindingValue>,
     // The root node is either the evaluator or function we're currently translating the body of,
     // or None if we're not inside a function or evaluator (e.g. translating boundary / integrity
     // constraints)
@@ -69,6 +69,18 @@ pub struct MirBuilder<'a> {
     root_name: Option<&'a ast::QualifiedIdentifier>,
     in_boundary: bool,
     current_constraint_tag: Option<ast::ConstraintTagSpec>,
+}
+
+#[derive(Clone)]
+struct BindingValue {
+    node: Link<Op>,
+    share_indexable: bool,
+}
+
+impl BindingValue {
+    fn new(node: Link<Op>, share_indexable: bool) -> Self {
+        Self { node, share_indexable }
+    }
 }
 
 impl<'a> MirBuilder<'a> {
@@ -284,7 +296,7 @@ impl<'a> MirBuilder<'a> {
         let mut all_params_flatten = Vec::new();
 
         self.root_name = Some(ident);
-        let mut ev = Evaluator::builder().span(ast_eval.span);
+        let mut ev = Evaluator::builder().span(ast_eval.span).owner_id(OwnerId::next());
         let mut i = 0;
 
         for trace_segment in &ast_eval.params {
@@ -344,12 +356,14 @@ impl<'a> MirBuilder<'a> {
                             }
                         }
                         let vector_node = Vector::create(params_vec, span);
-                        self.bindings.insert(name.unwrap(), vector_node.clone());
+                        self.bindings
+                            .insert(name.unwrap(), BindingValue::new(vector_node.clone(), false));
                     },
                     ast::Type::Felt => {
                         let param = all_params_flatten_for_trace_segment[i].clone();
                         i += 1;
-                        self.bindings.insert(name.unwrap(), param.clone());
+                        self.bindings
+                            .insert(name.unwrap(), BindingValue::new(param.clone(), false));
                     },
                     _ => unreachable!(),
                 };
@@ -370,7 +384,7 @@ impl<'a> MirBuilder<'a> {
         let mut params = Vec::new();
 
         self.root_name = Some(ident);
-        let mut func = Function::builder().span(ast_func.span());
+        let mut func = Function::builder().span(ast_func.span()).owner_id(OwnerId::next());
         let mut i = 0;
         for (param_ident, ty) in ast_func.params.iter() {
             let name = Some(param_ident);
@@ -403,7 +417,7 @@ impl<'a> MirBuilder<'a> {
         self.bindings.enter();
         self.root_name = Some(ident);
         for ((param_ident, _ty), param) in ast_func.params.iter().zip(params) {
-            self.bindings.insert(param_ident, param.clone());
+            self.bindings.insert(param_ident, BindingValue::new(param.clone(), false));
         }
         self.translate_body(ident, original_root.clone(), &ast_func.body)?;
 
@@ -542,7 +556,11 @@ impl<'a> MirBuilder<'a> {
         self.bindings.enter();
         match &let_stmt.binding {
             ast::LetBinding::Single(name) => {
-                self.bindings.insert(name, value.clone());
+                let share_indexable = matches!(
+                    let_stmt.value.ty(),
+                    Some(ast::Type::Vector(_)) | Some(ast::Type::Matrix(_, _))
+                );
+                self.bindings.insert(name, BindingValue::new(value.clone(), share_indexable));
             },
             ast::LetBinding::Vector(names) => {
                 let vector_elements =
@@ -554,14 +572,10 @@ impl<'a> MirBuilder<'a> {
                         let index_node =
                             self.translate_scalar_const(idx as u64, let_stmt.value.span())?;
                         let mir_access_type = MirAccessType::Index(index_node);
-                        Accessor::create(
-                            duplicate_node(value.clone(), &mut Default::default()),
-                            mir_access_type,
-                            0,
-                            name.span(),
-                        )
+                        Accessor::create(value.clone(), mir_access_type, 0, name.span())
                     };
-                    self.bindings.insert(name, element_node);
+                    let share_indexable = vector_elements.is_none();
+                    self.bindings.insert(name, BindingValue::new(element_node, share_indexable));
                 }
             },
         }
@@ -652,7 +666,7 @@ impl<'a> MirBuilder<'a> {
         for (index, binding) in list_comp.bindings.iter().enumerate() {
             let binding_node = Parameter::create(index, ast::Type::Felt.into(), binding.span());
             params.push(binding_node.clone());
-            self.bindings.insert(binding, binding_node);
+            self.bindings.insert(binding, BindingValue::new(binding_node, false));
         }
 
         let for_node = For::create(
@@ -669,13 +683,11 @@ impl<'a> MirBuilder<'a> {
         } else {
             Link::default()
         };
-        for_node.as_for_mut().unwrap().expr.borrow_mut().clone_from(&body_node.borrow());
-        for_node
-            .as_for_mut()
-            .unwrap()
-            .selector
-            .borrow_mut()
-            .clone_from(&selector_node.borrow());
+        {
+            let mut for_mut = for_node.as_for_mut().unwrap();
+            for_mut.expr = body_node.clone();
+            for_mut.selector = selector_node.clone();
+        }
 
         let enf_node: Link<Op> = Enf::create(for_node, list_comp.span(), list_comp.tag.clone());
         let node = self.insert_enforce(enf_node);
@@ -765,7 +777,7 @@ impl<'a> MirBuilder<'a> {
             },
         };
         // Note: safe to unwrap because we checked that bus_op is a BusOp above
-        bus_op.as_bus_op_mut().unwrap().latch.borrow_mut().clone_from(&sel.borrow());
+        bus_op.as_bus_op_mut().unwrap().latch = sel.clone();
         let enf_node = self.insert_enforce(bus_op.clone())?;
         Ok(enf_node)
     }
@@ -1193,7 +1205,7 @@ impl<'a> MirBuilder<'a> {
         for (index, binding) in list_comp.bindings.iter().enumerate() {
             let binding_node = Parameter::create(index, ast::Type::Felt.into(), binding.span());
             params.push(binding_node.clone());
-            self.bindings.insert(binding, binding_node);
+            self.bindings.insert(binding, BindingValue::new(binding_node, false));
         }
 
         let for_node = For::create(
@@ -1211,13 +1223,11 @@ impl<'a> MirBuilder<'a> {
         };
         let body_node = self.translate_scalar_expr(&list_comp.body)?;
 
-        for_node.as_for_mut().unwrap().expr.borrow_mut().clone_from(&body_node.borrow());
-        for_node
-            .as_for_mut()
-            .unwrap()
-            .selector
-            .borrow_mut()
-            .clone_from(&selector_node.borrow());
+        {
+            let mut for_mut = for_node.as_for_mut().unwrap();
+            for_mut.expr = body_node.clone();
+            for_mut.selector = selector_node.clone();
+        }
 
         self.bindings.exit();
 
@@ -1466,27 +1476,48 @@ impl<'a> MirBuilder<'a> {
         }
 
         // If we reach here, this must be a let-bound variable
-        if let Some(let_bound_access_expr) = self.bindings.get(access.name.as_ref()).cloned() {
+        if let Some(binding) = self.bindings.get(access.name.as_ref()).cloned() {
+            let bound_node = binding.node.clone();
             // If the let-bound variable is a parameter, we probably already have the type
             //
             // In that case, replacing the default type (Felt) with the one from the access
-            if let Some(mut param) = let_bound_access_expr.as_parameter_mut()
+            if let Some(mut param) = bound_node.as_parameter_mut()
                 && let Some(access_ty) = &access.ty
             {
                 param.ty = self.translate_type(access_ty);
             }
             // If it's a slice access, we need to return its translation.
             // This eliminates the case of [ast::AccessType::Slice] in MIR
-            if let Some(slice) = self.translate_potential_slice(&let_bound_access_expr, access) {
+            if let Some(slice) = self.translate_potential_slice(&bound_node, access) {
                 return Ok(slice);
             }
             let mir_access_type = self.translate_access_type(&access.access_type)?;
-            let accessor: Link<Op> = Accessor::create(
-                duplicate_node(let_bound_access_expr, &mut Default::default()),
-                mir_access_type,
-                access.offset,
-                access.span(),
-            );
+            let indexable = if bound_node.as_parameter().is_some() {
+                bound_node.clone()
+            } else if binding.share_indexable {
+                bound_node.clone()
+            } else {
+                duplicate_node(bound_node, &mut Default::default())
+            };
+            if binding.share_indexable
+                && matches!(access.access_type, ast::AccessType::Default)
+                && access.offset == 0
+            {
+                // If the bound node is already an accessor with a non-default access type,
+                // keep wrapping so downstream checks (e.g. bus ops) see a default accessor.
+                let is_default_accessor = indexable
+                    .as_accessor()
+                    .map(|accessor| matches!(accessor.access_type, MirAccessType::Default))
+                    .unwrap_or(false);
+                if is_default_accessor {
+                    return Ok(indexable);
+                }
+                if indexable.as_accessor().is_none() {
+                    return Ok(indexable);
+                }
+            }
+            let accessor: Link<Op> =
+                Accessor::create(indexable, mir_access_type, access.offset, access.span());
             return Ok(accessor);
         }
 

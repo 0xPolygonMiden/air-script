@@ -9,7 +9,10 @@ use winter_math::{FieldElement, StarkField};
 
 use crate::{
     CompileError,
-    ir::{ConstantValue, Link, MirValue, Op, PeriodicColumnAccess, PublicInputAccess},
+    ir::{
+        ConstantValue, Link, MirAccessType, MirValue, Op, Parent, PeriodicColumnAccess,
+        PublicInputAccess, TraceAccess,
+    },
 };
 
 pub type QuadFelt = QuadExtension<Felt>;
@@ -65,6 +68,32 @@ pub struct RandomInputs {
 }
 
 impl RandomInputs {
+    fn const_index(&self, node: &Link<Op>, context: &str) -> Result<usize, CompileError> {
+        if let Op::Value(value) = node.borrow().deref()
+            && let MirValue::Constant(ConstantValue::Felt(c)) = value.value.value
+        {
+            return Ok(c as usize);
+        }
+        println!("Non-constant index in RandomInputs::eval for {context}");
+        Err(CompileError::Failed)
+    }
+
+    fn eval_trace_access(&mut self, trace_access: TraceAccess) -> Result<QuadFelt, CompileError> {
+        let index = trace_access.column * 2 + trace_access.row_offset;
+        match trace_access.segment {
+            TraceSegmentId::Main => {
+                Ok(query_indexed_eval(&mut self.rng, &mut self.main_trace, index))
+            },
+            _ => {
+                println!(
+                    "Unexpected trace_access segment in RandomInputs::eval: {}. This segment should only be used for buses and should be handled separately.",
+                    trace_access.segment
+                );
+                Err(CompileError::Failed)
+            },
+        }
+    }
+
     /// Evaluates a given MIR node at random points.
     ///
     /// Note that we currently assume this will be called only during the unrolling phase, some
@@ -168,31 +197,104 @@ impl RandomInputs {
                     },
                 }
             },
-            Op::Accessor(a) => {
-                if let Op::Value(v) = a.indexable.borrow().deref()
-                    && let MirValue::TraceAccess(trace_access) = v.value.value
-                {
-                    // Use accessor offset instead of the trace_access row_offset
-                    let index = trace_access.column * 2 + a.offset;
-                    match trace_access.segment {
-                        TraceSegmentId::Main => {
-                            return Ok(query_indexed_eval(
-                                &mut self.rng,
-                                &mut self.main_trace,
-                                index,
-                            ));
+            Op::Accessor(a) => match &a.access_type {
+                MirAccessType::Default => {
+                    if let Op::Value(v) = a.indexable.borrow().deref() {
+                        match v.value.value {
+                            MirValue::TraceAccess(trace_access) => {
+                                let trace_access = TraceAccess {
+                                    row_offset: trace_access.row_offset + a.offset,
+                                    ..trace_access
+                                };
+                                return self.eval_trace_access(trace_access);
+                            },
+                            MirValue::PublicInput(public_input_access) => {
+                                let public_input_access = PublicInputAccess {
+                                    index: public_input_access.index + a.offset,
+                                    ..public_input_access
+                                };
+                                return Ok(query_mapped_eval(
+                                    &mut self.rng,
+                                    &mut self.public_inputs,
+                                    &public_input_access,
+                                ));
+                            },
+                            _ => {},
+                        }
+                    }
+                    let indexable = self.eval(a.indexable.clone())?;
+                    Ok(indexable)
+                },
+                MirAccessType::Index(index) => {
+                    let index_usize = self.const_index(index, "index accessor")?;
+                    match a.indexable.borrow().deref() {
+                        Op::Vector(vector) => {
+                            let children = vector.children();
+                            let elements = children.borrow();
+                            let child =
+                                elements.get(index_usize).ok_or(CompileError::Failed)?.clone();
+                            self.eval(child)
+                        },
+                        Op::Value(v) => match v.value.value {
+                            MirValue::PublicInput(public_input_access) => {
+                                let public_input_access = PublicInputAccess {
+                                    index: public_input_access.index + index_usize,
+                                    ..public_input_access
+                                };
+                                Ok(query_mapped_eval(
+                                    &mut self.rng,
+                                    &mut self.public_inputs,
+                                    &public_input_access,
+                                ))
+                            },
+                            MirValue::TraceAccess(trace_access) => {
+                                let trace_access = TraceAccess {
+                                    column: trace_access.column + index_usize,
+                                    ..trace_access
+                                };
+                                self.eval_trace_access(trace_access)
+                            },
+                            _ => {
+                                println!(
+                                    "Unexpected indexable value in RandomInputs::eval: {op:?}"
+                                );
+                                Err(CompileError::Failed)
+                            },
                         },
                         _ => {
                             println!(
-                                "Unexpected trace_access segment in RandomInputs::eval: {}. This segment should only be used for buses and should be handled separately.",
-                                trace_access.segment
+                                "Unexpected indexable in RandomInputs::eval for index accessor: {op:?}"
                             );
-                            return Err(CompileError::Failed);
+                            Err(CompileError::Failed)
                         },
                     }
-                }
-                let indexable = self.eval(a.indexable.clone())?;
-                Ok(indexable)
+                },
+                MirAccessType::Matrix(row, col) => {
+                    let row_index = self.const_index(row, "matrix row accessor")?;
+                    let col_index = self.const_index(col, "matrix col accessor")?;
+                    match a.indexable.borrow().deref() {
+                        Op::Matrix(matrix) => {
+                            let rows_link = matrix.children();
+                            let rows = rows_link.borrow();
+                            let row_node = rows.get(row_index).ok_or(CompileError::Failed)?.clone();
+                            if let Some(row_vec) = row_node.as_vector() {
+                                let cols_link = row_vec.children();
+                                let cols = cols_link.borrow();
+                                let col_node =
+                                    cols.get(col_index).ok_or(CompileError::Failed)?.clone();
+                                self.eval(col_node)
+                            } else {
+                                self.eval(row_node)
+                            }
+                        },
+                        _ => {
+                            println!(
+                                "Unexpected indexable in RandomInputs::eval for matrix accessor: {op:?}"
+                            );
+                            Err(CompileError::Failed)
+                        },
+                    }
+                },
             },
             Op::Call(_) => {
                 // We expect Inlining to have already been done before Unrolling
