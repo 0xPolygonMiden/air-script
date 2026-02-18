@@ -404,6 +404,15 @@ impl AirBuilder<'_> {
         self.mir_key_for_normalized(&mir_node)
     }
 
+    fn canonical_commutative(lhs: MirKeyId, rhs: MirKeyId) -> (MirKeyId, MirKeyId) {
+        // Canonical order for commutative ops (Add/Mul) to increase cache hits.
+        if lhs <= rhs {
+            (lhs, rhs)
+        } else {
+            (rhs, lhs)
+        }
+    }
+
     fn mir_key_for_normalized(&mut self, mir_node: &Link<Op>) -> Result<MirKeyId, CompileError> {
         if let Some(existing) = self.mir_key_by_ptr.get(&mir_node.get_ptr()) {
             return Ok(*existing);
@@ -413,6 +422,8 @@ impl AirBuilder<'_> {
             Op::Add(add) => {
                 let lhs = self.mir_key_for(&add.lhs)?;
                 let rhs = self.mir_key_for(&add.rhs)?;
+                // Canonicalize commutative ops to maximize cache hits.
+                let (lhs, rhs) = Self::canonical_commutative(lhs, rhs);
                 MirKey::Add { lhs, rhs }
             },
             Op::Sub(sub) => {
@@ -423,6 +434,8 @@ impl AirBuilder<'_> {
             Op::Mul(mul) => {
                 let lhs = self.mir_key_for(&mul.lhs)?;
                 let rhs = self.mir_key_for(&mul.rhs)?;
+                // Canonicalize commutative ops to maximize cache hits.
+                let (lhs, rhs) = Self::canonical_commutative(lhs, rhs);
                 MirKey::Mul { lhs, rhs }
             },
             Op::Exp(exp) => {
