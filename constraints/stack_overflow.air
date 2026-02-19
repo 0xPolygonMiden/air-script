@@ -1,0 +1,71 @@
+##########################################################################################
+# STACK OVERFLOW CONSTRAINTS MODULE
+##########################################################################################
+#
+# Enforces stack overflow depth/address transitions and overflow table bus operations.
+##########################################################################################
+
+mod stack_overflow
+use flags::*;
+
+ev stack_overflow_transition([stack[19], decoder[24], system_clk]) {
+    let s15 = stack[15];
+    let stack_b0 = stack[16];
+    let stack_b1 = stack[17];
+    let stack_h0 = stack[18];
+
+    let b0 = decoder[1];
+    let b1 = decoder[2];
+    let b2 = decoder[3];
+    let b3 = decoder[4];
+    let b4 = decoder[5];
+    let b5 = decoder[6];
+    let b6 = decoder[7];
+    let h5 = decoder[13];
+    # h6/h7 are decoder helpers for END-of-call and END-of-syscall.
+    # In the full AIR, decoder constraints make them binary and mutually exclusive.
+    let h6 = decoder[14];
+    let h7 = decoder[15];
+    let e0 = decoder[22];
+    let e1 = decoder[23];
+
+    let op_bits = [b0, b1, b2, b3, b4, b5, b6];
+
+    # Overflow flag: fov = 1 when depth > 16, else 0 (via witness h0 = 1/(b0-16)).
+    let depth_excess = stack_b0 - 16;
+    let fov = depth_excess * stack_h0;
+
+    let fshl = flag_shl(op_bits, h5, e0, e1);
+    let fshr = flag_shr(op_bits, e0, e1);
+    let fcall = flag_call(op_bits, e1);
+    let fsyscall = flag_syscall(op_bits, e1);
+    let fdyncall = flag_dyncall(op_bits, e0);
+    let fend = flag_end(op_bits, e1);
+
+    # END row is "special" only when ending CALL/DYNCALL or SYSCALL (h6/h7 helpers).
+    let f_call_or_sys_end = fend * (h6 + h7);
+    let f_call_like = fcall + fsyscall + fdyncall;
+    # Normal rows: not call-entry and not end-of-call.
+    let normal_flag = 1 - f_call_like - f_call_or_sys_end;
+
+    # Depth update:
+    # - normal rows: b0' - b0 + fshl*fov - fshr = 0
+    # - call-entry:  b0' = 16
+    # - end-of-call rows: depth handled by block-stack constraints
+    enf (stack_b0' - stack_b0) * normal_flag + fshl * fov - fshr
+        + f_call_like * (stack_b0' - 16) = 0;
+    # Keep this constraint in the transition domain (matches when_transition).
+    enf (1 - fov) * depth_excess + (stack_b0' - stack_b0') = 0;
+    # Right shift pushes a new overflow row; record clk as new b1.
+    enf fshr * (stack_b1' - system_clk) = 0;
+    # Left shift with empty overflow shifts in a 0 at s15.
+    enf fshl * (1 - fov) * s15' = 0;
+
+    # Overflow table multiset (p1):
+    # - right shift inserts (clk, s15, prev_b1)
+    # - left shift (non-empty) removes (b1, s15', b1')
+    # - dyncall (non-empty) removes (b1, s15', hasher_state[5])
+    bus_3_stack_p1.insert(system_clk, s15, stack_b1) when fshr;
+    bus_3_stack_p1.remove(stack_b1, s15', stack_b1') when (fshl * fov);
+    bus_3_stack_p1.remove(stack_b1, s15', h5) when (fdyncall * fov);
+}

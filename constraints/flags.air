@@ -1035,3 +1035,27 @@ fn compute_all_operation_flags(bits: felt[7], e0: felt, e1: felt) -> felt[96] {
         e1 * bits[4] * bits[3] * bits[2]                       # op_halt (111_1100)
     ];
 }
+
+##########################################################################################
+# STACK OVERFLOW SHIFT FLAGS
+##########################################################################################
+
+# Right-shift flag: base right-shift group + u32split + push.
+fn flag_shr(bits: felt[7], e0: felt, e1: felt) -> felt {
+    let fshr_base = (1 - bits[6]) * bits[5] * bits[4];
+    let fu32split = flag_u32split(bits);
+    let fpush = e0 * bits[3] * (1 - bits[2]) * bits[1] * bits[0];
+    return fshr_base + fu32split + fpush;
+}
+
+# Left-shift flag: base left-shift group + add3/madd + split/loop + dyn + repeat + end*h5.
+fn flag_shl(bits: felt[7], h5: felt, e0: felt, e1: felt) -> felt {
+    let fshl_base = (1 - bits[6]) * bits[5] * (1 - bits[4]);
+    let fadd3_madd = bits[6] * (1 - bits[5]) * (1 - bits[4]) * bits[3] * bits[2];
+    let fsplit_loop = e0 * (1 - bits[3]) * bits[2] * (1 - bits[1]);
+    let fdyn = flag_dyn(bits, e0);
+    let frepeat = e1 * bits[4] * (1 - bits[3]) * bits[2];
+    let fend = e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]);
+    let fend_h5 = fend * h5;
+    return fshl_base + fadd3_madd + fsplit_loop + fdyn + frepeat + fend_h5;
+}
