@@ -406,11 +406,7 @@ impl AirBuilder<'_> {
 
     fn canonical_commutative(lhs: MirKeyId, rhs: MirKeyId) -> (MirKeyId, MirKeyId) {
         // Canonical order for commutative ops (Add/Mul) to increase cache hits.
-        if lhs <= rhs {
-            (lhs, rhs)
-        } else {
-            (rhs, lhs)
-        }
+        if lhs <= rhs { (lhs, rhs) } else { (rhs, lhs) }
     }
 
     fn mir_key_for_normalized(&mut self, mir_node: &Link<Op>) -> Result<MirKeyId, CompileError> {
@@ -530,13 +526,13 @@ impl AirBuilder<'_> {
                     unreachable!("Unexpected MirValue: {:#?}", mir_value)
                 }
             },
-            MirValue::TraceAccess(trace_access) => crate::ir::Value::TraceAccess(
-                crate::ir::TraceAccess {
+            MirValue::TraceAccess(trace_access) => {
+                crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
                     segment: trace_access.segment,
                     column: trace_access.column,
                     row_offset: row_offset_override.unwrap_or(trace_access.row_offset),
-                },
-            ),
+                })
+            },
             MirValue::BusAccess(bus_access) => {
                 let name = bus_access.bus.borrow().deref().name();
                 let column = self.bus_bindings_map.get(&name).unwrap();
@@ -662,15 +658,9 @@ impl AirBuilder<'_> {
         }
         let mir_node_ref = mir_node.borrow();
         let node = match mir_node_ref.deref() {
-            Op::Add(add) => {
-                self.insert_binary_op(Operation::Add, &add.lhs, &add.rhs)?
-            },
-            Op::Sub(sub) => {
-                self.insert_binary_op(Operation::Sub, &sub.lhs, &sub.rhs)?
-            },
-            Op::Mul(mul) => {
-                self.insert_binary_op(Operation::Mul, &mul.lhs, &mul.rhs)?
-            },
+            Op::Add(add) => self.insert_binary_op(Operation::Add, &add.lhs, &add.rhs)?,
+            Op::Sub(sub) => self.insert_binary_op(Operation::Sub, &sub.lhs, &sub.rhs)?,
+            Op::Mul(mul) => self.insert_binary_op(Operation::Mul, &mul.lhs, &mul.rhs)?,
             Op::Exp(exp) => {
                 let lhs = exp.lhs.clone();
                 let lhs_node_index = self.insert_mir_operation(&lhs)?;
@@ -1123,13 +1113,11 @@ impl AirBuilder<'_> {
     }
 
     fn insert_trace_access_value(&mut self, trace_access: MirTraceAccess) -> NodeIndex {
-        self.insert_op(Operation::Value(crate::ir::Value::TraceAccess(
-            crate::ir::TraceAccess {
-                segment: trace_access.segment,
-                column: trace_access.column,
-                row_offset: trace_access.row_offset,
-            },
-        )))
+        self.insert_op(Operation::Value(crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+            segment: trace_access.segment,
+            column: trace_access.column,
+            row_offset: trace_access.row_offset,
+        })))
     }
 
     /// Extracts the trace access information from a given [Mir] `Boundary`.
