@@ -1,15 +1,307 @@
 ##########################################################################################
-# FLAG HELPERS MODULE
+# FLAGS MODULE
 ##########################################################################################
 #
-# This module defines the per-op opcode flag polynomials derived from decoder op bits.
-# These helpers are shared across system, stack, and decoder constraints.
+# Defines per-op opcode flag polynomials and shared helper patterns derived from decoder
+# op bits. Also provides the full op-flag table used by stack selectors.
 # Keep these in sync with the Rust `op_flags` module.
-##########################################################################################
 
 mod flags
 
-# SYSTEMATIC OPERATION FLAG FUNCTIONS - INDIVIDUAL FLAGS PER OP
+##########################################################################################
+# STACK OP FLAGS (SHIFT SELECTORS)
+##########################################################################################
+#
+# Computes per-position shift selectors for stack_general_transition:
+# - no_shift_i: position i keeps its value
+# - left_shift_i: position i pulls from i+1
+# - right_shift_i: position i pulls from i-1
+#
+# All op-flag logic is centralized here so the transition constraints only consume
+# the already-aggregated shift weights.
+
+fn stack_op_flags(bits: felt[7], e0: felt, e1: felt, h5: felt) -> felt[48] {
+    # Operation flags used by stack shift logic.
+    # Layout matches compute_all_operation_flags (see below for index mapping).
+    let ops = compute_all_operation_flags(bits, e0, e1);
+
+    # op_flags layout:
+    #   0..15  : 000 group (no-shift ops)
+    #   16..31 : 001 group (no-shift ops)
+    #   32..47 : 010 group (left-shift ops)
+    #   48..63 : 011 group (right-shift ops)
+    #   64..71 : u32 ops (100 group)
+    #   72..87 : high-degree ops (101 group, e0)
+    #   88..95 : very high-degree ops (110/111 group, e1)
+
+    # 000 group (0..15)
+    let is_noop = ops[0];
+    let is_swap = ops[8];
+    let is_movup2 = ops[10];
+    let is_movdn2 = ops[11];
+    let is_movup3 = ops[12];
+    let is_movdn3 = ops[13];
+    let is_advpopw = ops[14];
+    let is_expacc = ops[15];
+
+    # 001 group (16..31)
+    let is_movup4 = ops[16];
+    let is_movdn4 = ops[17];
+    let is_movup5 = ops[18];
+    let is_movdn5 = ops[19];
+    let is_movup6 = ops[20];
+    let is_movdn6 = ops[21];
+    let is_movup7 = ops[22];
+    let is_movdn7 = ops[23];
+    let is_swapw = ops[24];
+    let is_ext2mul = ops[25];
+    let is_movup8 = ops[26];
+    let is_movdn8 = ops[27];
+    let is_swapw2 = ops[28];
+    let is_swapw3 = ops[29];
+    let is_emit = ops[31];
+
+    # 010 group (32..47)
+    let is_assert = ops[32];
+    let is_drop = ops[41];
+    let is_cswap = ops[42];
+    let is_cswapw = ops[43];
+    let is_mloadw = ops[44];
+    let is_mstore = ops[45];
+    let is_mstorew = ops[46];
+    let op_47 = opcode_47(bits);
+
+    # u32 ops (64..71)
+    let is_u32split = ops[68];
+    let is_u32assert2 = ops[69];
+    let is_u32add3 = ops[70];
+    let is_u32madd = ops[71];
+
+    # 101 group (72..87)
+    let is_hperm = ops[72];
+    let is_mpverify = ops[73];
+    let is_split = ops[76];
+    let is_loop = ops[77];
+    let is_span = ops[78];
+    let is_join = ops[79];
+    let is_dyn = ops[80];
+    let is_push = ops[83];
+    let is_dyncall = ops[84];
+
+    # 110/111 group (88..95)
+    let is_mrupdate = ops[88];
+    let is_call = ops[91];
+    let is_end = ops[92];
+    let is_respan = ops[94];
+    let is_halt = ops[95];
+
+    # Prefix flags for shift sets.
+    let f011 = prefix_011(bits);
+    let f0000 = prefix_0000(bits);
+    let f0100 = prefix_0100(bits);
+    let f1000 = prefix_1000(bits);
+
+    # MOV/SWAP prefix helpers (used to build depth-based aggregates).
+    let mov2_prefix = is_movup2 + is_movdn2;
+    let mov3_prefix = is_movup3 + is_movdn3;
+    let mov4_prefix = is_movup4 + is_movdn4;
+    let mov5_prefix = is_movup5 + is_movdn5;
+    let mov6_prefix = is_movup6 + is_movdn6;
+    let mov7_prefix = is_movup7 + is_movdn7;
+    let mov8_prefix = is_movup8 + is_movdn8;
+
+    # Directional MOV sums by depth.
+    let movdn_ge2 = is_movdn2 + is_movdn3 + is_movdn4 + is_movdn5 + is_movdn6 + is_movdn7 + is_movdn8;
+    let movdn_ge3 = is_movdn3 + is_movdn4 + is_movdn5 + is_movdn6 + is_movdn7 + is_movdn8;
+    let movdn_ge4 = is_movdn4 + is_movdn5 + is_movdn6 + is_movdn7 + is_movdn8;
+    let movdn_ge5 = is_movdn5 + is_movdn6 + is_movdn7 + is_movdn8;
+    let movdn_ge6 = is_movdn6 + is_movdn7 + is_movdn8;
+    let movdn_ge7 = is_movdn7 + is_movdn8;
+    let movdn_ge8 = is_movdn8;
+
+    let movup_ge2 = is_movup2 + is_movup3 + is_movup4 + is_movup5 + is_movup6 + is_movup7 + is_movup8;
+    let movup_ge3 = is_movup3 + is_movup4 + is_movup5 + is_movup6 + is_movup7 + is_movup8;
+    let movup_ge4 = is_movup4 + is_movup5 + is_movup6 + is_movup7 + is_movup8;
+    let movup_ge5 = is_movup5 + is_movup6 + is_movup7 + is_movup8;
+    let movup_ge6 = is_movup6 + is_movup7 + is_movup8;
+    let movup_ge7 = is_movup7 + is_movup8;
+    let movup_ge8 = is_movup8;
+
+    let swapw_prefix = is_swapw2 + is_swapw3;
+    let adv_popw_or_expacc = is_advpopw + is_expacc;
+    let ext2mul_flag = is_ext2mul;
+
+    # PREFIX FLAGS FOR SHIFT SETS
+    # ---------------------------
+    # These are the (b6..b3) prefixes used by the Rust op_flags construction:
+    # - prefix_0000: no-shift group (NOOP/EQZ/NEG/INV/INCR/NOT/MLOAD + SWAP/CALLER/MOV*)
+    # - prefix_0100: left-shift group (ASSERT/EQ/ADD/MUL/AND/OR/U32AND/U32XOR/FRIE2F4/...)
+    # - prefix_011: right-shift group (PAD/DUP*/ADVPOP/SDEPTH/CLK)
+    # - prefix_1000: u32 arithmetic group (U32ADD/U32SUB/U32MUL/U32DIV/U32SPLIT/U32ASSERT2/U32ADD3/U32MADD)
+
+    let no_change_1_flag = f0000 - is_noop;
+    let left_change_1_flag = f0100 - is_assert;
+
+    # END only shifts left when it closes a loop (h5 is loop_end).
+    let shift_left_on_end = is_end * h5;
+
+    # SPLIT and LOOP remove one stack item (block id), so they share left-shift behavior.
+    let split_loop_flag = is_split + is_loop;
+
+    # U32ADD3 and U32MADD both consume three operands.
+    let add3_madd_flag = is_u32add3 + is_u32madd;
+
+    # NO-SHIFT FLAGS (PER POSITION)
+    let no_shift_0 = is_noop + is_u32assert2 + is_mpverify + is_span + is_join + is_emit
+        + is_respan
+        + is_halt
+        + is_call
+        + is_end * (1 - h5);
+
+    let no_shift_1 = no_shift_0 + no_change_1_flag;
+    let no_shift_2 = no_shift_1 + is_swap + f1000;
+
+    let no_shift_3  = no_shift_2 + mov2_prefix;
+    let no_shift_4  = no_shift_3
+        + mov3_prefix
+        + adv_popw_or_expacc
+        + swapw_prefix
+        + ext2mul_flag
+        + is_mrupdate;
+    let no_shift_5  = no_shift_4 + mov4_prefix;
+    let no_shift_6  = no_shift_5 + mov5_prefix;
+    let no_shift_7  = no_shift_6 + mov6_prefix;
+    let no_shift_8  = no_shift_7 + mov7_prefix + is_swapw - is_swapw2;
+    let no_shift_9  = no_shift_8 + mov8_prefix;
+
+    let no_shift_10 = no_shift_9;
+    let no_shift_11 = no_shift_9;
+    let no_shift_12 = no_shift_9 - is_swapw3 + is_swapw2 + is_hperm;
+    let no_shift_13 = no_shift_12;
+    let no_shift_14 = no_shift_12;
+    let no_shift_15 = no_shift_12;
+
+    # LEFT-SHIFT FLAGS (PER POSITION)
+    let left_shift_0 = 0;
+
+    let base_left = is_assert
+        + is_drop
+        + is_mstore
+        + op_47
+        + is_mstorew
+        + split_loop_flag
+        + shift_left_on_end
+        + is_dyn
+        + is_dyncall;
+
+    let base_left_prefix = base_left + left_change_1_flag + add3_madd_flag + is_cswap;
+    let base_left_mload = base_left_prefix + is_mloadw;
+
+    let left_shift_1  = base_left + movdn_ge2;
+    let left_shift_2  = base_left + left_change_1_flag + movdn_ge2;
+    let left_shift_3  = base_left_prefix + movdn_ge3;
+    let left_shift_4  = base_left_prefix + movdn_ge4;
+    let left_shift_5  = base_left_mload + movdn_ge5;
+    let left_shift_6  = base_left_mload + movdn_ge6;
+    let left_shift_7  = base_left_mload + movdn_ge7;
+    let left_shift_8  = base_left_mload + movdn_ge8;
+
+    let left_shift_9  = base_left_mload + is_cswapw;
+    let left_shift_10 = left_shift_9;
+    let left_shift_11 = left_shift_9;
+    let left_shift_12 = left_shift_9;
+    let left_shift_13 = left_shift_9;
+    let left_shift_14 = left_shift_9;
+    let left_shift_15 = left_shift_9;
+
+    # RIGHT-SHIFT FLAGS (PER POSITION)
+    let base_right = f011 + is_push;
+    let base_right_u32split = base_right + is_u32split;
+
+    let right_shift_0  = base_right + movup_ge2;
+    let right_shift_1  = base_right_u32split + movup_ge2;
+    let right_shift_2  = base_right_u32split + movup_ge3;
+    let right_shift_3  = base_right_u32split + movup_ge4;
+    let right_shift_4  = base_right_u32split + movup_ge5;
+    let right_shift_5  = base_right_u32split + movup_ge6;
+    let right_shift_6  = base_right_u32split + movup_ge7;
+    let right_shift_7  = base_right_u32split + movup_ge8;
+    let right_shift_8  = base_right_u32split;
+    let right_shift_9  = right_shift_8;
+    let right_shift_10 = right_shift_8;
+    let right_shift_11 = right_shift_8;
+    let right_shift_12 = right_shift_8;
+    let right_shift_13 = right_shift_8;
+    let right_shift_14 = right_shift_8;
+    let right_shift_15 = right_shift_8;
+
+    return [
+        no_shift_0,
+        no_shift_1,
+        no_shift_2,
+        no_shift_3,
+        no_shift_4,
+        no_shift_5,
+        no_shift_6,
+        no_shift_7,
+        no_shift_8,
+        no_shift_9,
+        no_shift_10,
+        no_shift_11,
+        no_shift_12,
+        no_shift_13,
+        no_shift_14,
+        no_shift_15,
+        left_shift_0,
+        left_shift_1,
+        left_shift_2,
+        left_shift_3,
+        left_shift_4,
+        left_shift_5,
+        left_shift_6,
+        left_shift_7,
+        left_shift_8,
+        left_shift_9,
+        left_shift_10,
+        left_shift_11,
+        left_shift_12,
+        left_shift_13,
+        left_shift_14,
+        left_shift_15,
+        right_shift_0,
+        right_shift_1,
+        right_shift_2,
+        right_shift_3,
+        right_shift_4,
+        right_shift_5,
+        right_shift_6,
+        right_shift_7,
+        right_shift_8,
+        right_shift_9,
+        right_shift_10,
+        right_shift_11,
+        right_shift_12,
+        right_shift_13,
+        right_shift_14,
+        right_shift_15
+    ];
+}
+
+# Accessors for composite shift flags.
+fn no_shift_at(flags: felt[48], idx: felt) -> felt {
+    return flags[idx];
+}
+
+fn left_shift_at(flags: felt[48], idx: felt) -> felt {
+    return flags[idx + 16];
+}
+
+fn right_shift_at(flags: felt[48], idx: felt) -> felt {
+    return flags[idx + 32];
+}
+
+##########################################################################################
+# OPERATION FLAG FUNCTIONS - INDIVIDUAL FLAGS PER OP
 ##########################################################################################
 
 ##########################################################################################
@@ -267,7 +559,6 @@ fn flag_dup15(bits: felt[7]) -> felt {
 fn flag_advpop(bits: felt[7]) -> felt {
     return (1 - bits[6]) * bits[5] * bits[4] * bits[3] * bits[2] * (1 - bits[1]) * bits[0];
 }
-
 
 fn flag_sdepth(bits: felt[7]) -> felt {
     return (1 - bits[6]) * bits[5] * bits[4] * bits[3] * bits[2] * bits[1] * (1 - bits[0]);
@@ -527,6 +818,7 @@ fn f_x1111(b3: felt, b2: felt, b1: felt, b0: felt) -> felt {
 #
 # Small focused helpers used by stack_general.air for prefix flags and the unused opcode 47.
 #
+
 fn prefix_0000(bits: felt[7]) -> felt {
     return (1 - bits[6]) * (1 - bits[5]) * (1 - bits[4]) * (1 - bits[3]);
 }
@@ -743,5 +1035,3 @@ fn compute_all_operation_flags(bits: felt[7], e0: felt, e1: felt) -> felt[96] {
         e1 * bits[4] * bits[3] * bits[2]                       # op_halt (111_1100)
     ];
 }
-
-##########################################################################################
