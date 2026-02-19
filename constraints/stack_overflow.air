@@ -42,7 +42,7 @@ ev stack_overflow_transition([stack[19], decoder[24], system_clk]) {
     let fdyncall = flag_dyncall(op_bits, e0);
     let fend = flag_end(op_bits, e1);
 
-    # END row is "special" only when ending CALL/DYNCALL or SYSCALL (h6/h7 helpers are then used).
+    # END row is "special" only when ending CALL/DYNCALL or SYSCALL (h6/h7 helpers).
     let f_call_or_sys_end = fend * (h6 + h7);
     let f_call_like = fcall + fsyscall + fdyncall;
     # Normal rows: not call-entry and not end-of-call.
@@ -54,12 +54,12 @@ ev stack_overflow_transition([stack[19], decoder[24], system_clk]) {
     # - end-of-call rows: depth handled by block-stack constraints
     enf (stack_b0' - stack_b0) * normal_flag + fshl * fov - fshr
         + f_call_like * (stack_b0' - 16) = 0;
-    # When there is no overflow, depth_excess must be zero.
-    enf depth_excess = 0 when !fov;
-    # Right shift pushes a new row from overflow portion of the stack; record clk as new b1.
-    enf stack_b1' = system_clk when fshr;
+    # Keep this constraint in the transition domain (matches when_transition).
+    enf (1 - fov) * depth_excess + (stack_b0' - stack_b0') = 0;
+    # Right shift pushes a new overflow row; record clk as new b1.
+    enf fshr * (stack_b1' - system_clk) = 0;
     # Left shift with empty overflow shifts in a 0 at s15.
-    enf s15' = 0 when fshl & !fov;
+    enf fshl * (1 - fov) * s15' = 0;
 
     # Overflow table multiset (p1):
     # - right shift inserts (clk, s15, prev_b1)
