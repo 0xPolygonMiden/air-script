@@ -1,3 +1,8 @@
+//! Unrolling first pass.
+//!
+//! Traverses the graph, unrolling most nodes and collecting `For` contexts
+//! for the second pass.
+
 use std::{collections::HashMap, ops::Deref};
 
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
@@ -16,6 +21,7 @@ use crate::{
     },
 };
 
+/// First pass of unrolling: records `For` contexts and rewrites other nodes.
 pub struct UnrollingFirstPass<'a> {
     #[allow(unused)]
     diagnostics: &'a DiagnosticsHandler,
@@ -33,6 +39,7 @@ pub struct UnrollingFirstPass<'a> {
 }
 
 impl<'a> UnrollingFirstPass<'a> {
+    /// Construct a new first-pass unroller.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         // AIR_UNROLL_PROGRESS/AIR_UNROLL_PROGRESS_EVERY emit periodic progress for large graphs.
         let trace_progress = std::env::var("AIR_UNROLL_PROGRESS").is_ok();

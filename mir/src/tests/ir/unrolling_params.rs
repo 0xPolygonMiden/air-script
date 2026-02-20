@@ -1,3 +1,5 @@
+//! Tests for parameter identity preservation during unrolling/inlining.
+
 use std::collections::{HashMap, HashSet};
 
 use miden_diagnostics::SourceSpan;

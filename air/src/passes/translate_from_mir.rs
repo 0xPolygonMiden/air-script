@@ -1,3 +1,12 @@
+//! MIR to AIR lowering pass.
+//!
+//! The goal is to convert the MIR constraint graph into AIR operations after inlining/unrolling.
+//! We do that by structurally translating MIR ops while memoizing repeated subgraphs using
+//! canonical MIR keys (including commutative canonicalization) to avoid blow-ups. The tradeoff
+//! is that normalization stays conservative (e.g. vector/accessor stripping relies on prior
+//! passes), and caching is intentionally rigid so keys retain all semantic details, which means
+//! we miss some reuse opportunities that aggressive hashing would allow.
+
 use std::{
     collections::{BTreeMap, HashMap},
     ops::Deref,
@@ -19,10 +28,11 @@ use mir::{
 
 use crate::{CompileError, graph::NodeIndex, ir::*};
 
-/// This pass creates the [Air] from the [Mir].
-///  
-/// We mainly directly transform Mir operations to Air operations,
-/// as after the Inlining and Unrolling the nodes correspond 1 to 1.
+/// Lowers a fully inlined/unrolled MIR graph into AIR.
+///
+/// After inlining and unrolling, MIR nodes correspond 1:1 with AIR operations,
+/// so the translation is mostly structural. We add memoization to avoid
+/// re-creating identical subgraphs when MIR contains repeated shapes.
 pub struct MirToAir<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
@@ -154,21 +164,36 @@ impl Pass for MirToAir<'_> {
     }
 }
 
+/// Stateful builder for MIR to AIR translation.
+///
+/// This keeps per-run caches so repeated MIR subgraphs map to the same AIR nodes,
+/// reducing graph size and memory usage after aggressive inlining.
 struct AirBuilder<'a> {
     diagnostics: &'a DiagnosticsHandler,
     air: &'a mut Air,
     trace_columns: TraceShape<TraceSegment>,
     bus_bindings_map: BTreeMap<Identifier, usize>,
     tag_allocators: HashMap<SourceSpan, TagAllocator>,
+    /// Fast path: map an exact MIR node pointer to the AIR node already created for it.
+    /// This avoid re-lowering the same MIR node when it is referenced multiple times.
     mir_node_cache: HashMap<usize, NodeIndex>,
+    /// Memoize the canonical key for a MIR node pointer to avoid recomputing it.
+    /// The aim is to reduce repeated structural hashing when the same MIR node is visited again.
     mir_key_by_ptr: HashMap<usize, MirKeyId>,
+    /// Intern table for canonical MIR keys (stable ids for structural shapes).
+    /// This assigns compact ids to structural shapes so they can be referenced cheaply.
     mir_key_intern: HashMap<MirKey, MirKeyId>,
+    /// Cross-pointer cache: canonical MIR key to AIR node for structurally identical subgraphs.
+    /// Reuses AIR nodes even when MIR pointers differ but the structure is identical.
     mir_key_to_air: HashMap<MirKeyId, NodeIndex>,
     next_mir_key_id: MirKeyId,
+    /// Deduplicate AIR operations so identical operations share a single graph node.
+    /// Its purpose is to keep the AIR algebraic DAG compact by reusing identical ops.
     air_op_cache: HashMap<Operation, NodeIndex>,
     stats: Option<MirToAirStats>,
 }
 
+/// Diagnostics counters for the MIR to AIR translation cache.
 #[derive(Default)]
 struct MirToAirStats {
     mir_nodes_seen: usize,
@@ -177,20 +202,24 @@ struct MirToAirStats {
     air_nodes_created: usize,
 }
 
+/// Stable id for canonical MIR keys (interned).
 type MirKeyId = u64;
 
+/// Hashable identifier used in MIR key canonicalization.
 #[derive(Hash, Eq, PartialEq, Clone)]
 enum NamespacedIdentifierKey {
     Function(Symbol),
     Binding(Symbol),
 }
 
+/// Hashable fully-qualified identifier for periodic columns.
 #[derive(Hash, Eq, PartialEq, Clone)]
 struct QualifiedIdentifierKey {
     module: Vec<Symbol>,
     item: NamespacedIdentifierKey,
 }
 
+/// Canonical key for MIR values used in caching.
 #[derive(Hash, Eq, PartialEq, Clone)]
 enum MirValueKey {
     Constant(u64),
@@ -218,6 +247,7 @@ enum MirValueKey {
     RandomValue(usize),
 }
 
+/// Canonical key for MIR ops used in caching.
 #[derive(Hash, Eq, PartialEq, Clone)]
 enum MirKey {
     Add { lhs: MirKeyId, rhs: MirKeyId },
@@ -227,16 +257,22 @@ enum MirKey {
     Value(MirValueKey),
 }
 
+/// Allocates tags from a constraint tag specification.
+///
+/// This is used when a constraint declares a range/list of tags and we must
+/// consume them in a deterministic order during lowering.
 struct TagAllocator {
     spec: ConstraintTagSpec,
     next_idx: usize,
 }
 
 impl TagAllocator {
+    /// Create a new allocator for the given tag specification.
     fn new(spec: ConstraintTagSpec) -> Self {
         Self { spec, next_idx: 0 }
     }
 
+    /// Return the next available tag, or `None` once exhausted.
     fn next(&mut self) -> Option<Span<u64>> {
         let span = self.spec.span();
         match &self.spec {
@@ -383,6 +419,7 @@ fn enf_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
 }
 
 impl AirBuilder<'_> {
+    /// Normalize MIR nodes to improve cache hit rate (strip vectors/accessors/enf wrappers).
     fn normalize_mir_node(&self, mir_node: &Link<Op>) -> Link<Op> {
         let mir_node = accessor_to_scalar(mir_node);
         let mir_node = vec_to_scalar(&mir_node);
@@ -399,6 +436,7 @@ impl AirBuilder<'_> {
         id
     }
 
+    /// Build a canonical key for a MIR node, after normalization.
     fn mir_key_for(&mut self, mir_node: &Link<Op>) -> Result<MirKeyId, CompileError> {
         let mir_node = self.normalize_mir_node(mir_node);
         self.mir_key_for_normalized(&mir_node)
@@ -409,6 +447,7 @@ impl AirBuilder<'_> {
         if lhs <= rhs { (lhs, rhs) } else { (rhs, lhs) }
     }
 
+    /// Build a canonical key for a normalized MIR node.
     fn mir_key_for_normalized(&mut self, mir_node: &Link<Op>) -> Result<MirKeyId, CompileError> {
         if let Some(existing) = self.mir_key_by_ptr.get(&mir_node.get_ptr()) {
             return Ok(*existing);
@@ -458,10 +497,12 @@ impl AirBuilder<'_> {
         Ok(key_id)
     }
 
+    /// Canonicalize a MIR value into a cache key.
     fn mir_value_key_from_value(&self, mir_value: &MirValue) -> Result<MirValueKey, CompileError> {
         self.mir_value_key_from_value_with_offset(mir_value, None)
     }
 
+    /// Canonicalize a MIR value into a cache key with an optional row-offset override.
     fn mir_value_key_from_value_with_offset(
         &self,
         mir_value: &MirValue,
@@ -636,6 +677,16 @@ impl AirBuilder<'_> {
         // - in case of nested list comprehensions, we may need to unwrap two accessors, so we
         //   unwrap them multiple times.
         let mir_node = self.normalize_mir_node(mir_node);
+
+        // Cache flow (where each field participates):
+        // 1) `mir_node_cache` fast-path: exact MIR pointer to AIR node.
+        // 2) `mir_key_by_ptr` memoizes the canonical key computation for that pointer.
+        // 3) `mir_key_intern` assigns a stable `MirKeyId` for each structural shape (i.e. op +
+        //    canonicalized children/value keys, ignoring pointer identity).
+        // 4) `mir_key_to_air` reuses AIR nodes across different MIR pointers that share the same
+        //    canonical key/shape.
+        // 5) On a miss, we build the AIR node and populate both pointer + key caches.
+        // 6) `air_op_cache` (inside `insert_op`) deduplicates AIR operations themselves.
         if let Some(stats) = self.stats.as_mut() {
             stats.mir_nodes_seen += 1;
         }

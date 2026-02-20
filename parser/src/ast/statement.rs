@@ -192,7 +192,9 @@ impl TryFrom<ScalarExpr> for Statement {
 /// The binding target for a `let` statement.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LetBinding {
+    /// Bind a single identifier (e.g. `let x = ...`).
     Single(Identifier),
+    /// Destructure a vector into multiple identifiers (e.g. `let [a, b] = ...`).
     Vector(Vec<Identifier>),
 }
 

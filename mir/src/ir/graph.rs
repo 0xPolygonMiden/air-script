@@ -7,7 +7,7 @@ use air_parser::ast::QualifiedIdentifier;
 
 use crate::{CompileError, ir};
 
-/// The constraints graph for the Mir.
+/// The constraints graph for MIR.
 ///
 /// We store constraints (boundary and integrity), as well as function and evaluator definitions.
 #[derive(Debug, Default, PartialEq, Eq)]

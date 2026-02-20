@@ -1,3 +1,8 @@
+//! MIR utility helpers.
+//!
+//! Includes helpers for traversing roots, stripping spans, and shareability checks
+//! used by caching/interning passes.
+
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     hash::{DefaultHasher, Hash, Hasher},
@@ -10,6 +15,7 @@ use pretty_assertions::assert_eq;
 
 use crate::{CompileError, ir::*, passes::Visitor};
 
+/// Strip spans from all MIR nodes (used in tests and canonicalization).
 pub fn strip_spans(mir: &mut Mir) {
     let graph = mir.constraint_graph_mut();
     let mut visitor = StripSpansVisitor::default();
@@ -21,12 +27,14 @@ pub fn strip_spans(mir: &mut Mir) {
     }
 }
 
+/// Visitor used by `strip_spans`.
 #[derive(Default)]
 pub struct StripSpansVisitor {
     _done: BTreeMap<usize, bool>,
     work_stack: Vec<Link<Node>>,
 }
 
+/// Extract selected root nodes from the graph.
 pub fn extract_roots(
     graph: &Graph,
     include_boundary: bool,
@@ -66,31 +74,38 @@ pub fn extract_roots(
     nodes
 }
 
+/// Extract all root nodes from the graph.
 pub fn extract_all_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, true, true, true, true, true)
 }
 
+/// Extract boundary constraint roots.
 pub fn extract_boundary_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, true, false, false, false, false)
 }
 
+/// Extract integrity constraint roots.
 pub fn extract_integrity_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, true, false, false, false)
 }
 
+/// Extract bus constraint roots.
 pub fn extract_bus_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, false, true, false, false)
 }
 
+/// Extract function roots.
 pub fn extract_function_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, false, false, true, false)
 }
 
+/// Extract evaluator roots.
 pub fn extract_evaluator_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, false, false, false, true)
 }
 
 /// Conservative shareability predicate for ops.
+///
 /// Used to gate caching/interning to avoid accidental semantic changes.
 pub fn is_shareable_op(op: &Op) -> bool {
     matches!(
@@ -108,6 +123,7 @@ pub fn is_shareable_op(op: &Op) -> bool {
 }
 
 /// Conservative shareability predicate for roots.
+///
 /// Only functions with fully shareable bodies are considered shareable.
 pub fn is_shareable_root(root: &Link<Root>) -> bool {
     let mut memo = HashMap::new();

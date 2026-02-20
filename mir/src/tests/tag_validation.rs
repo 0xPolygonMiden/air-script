@@ -1,3 +1,5 @@
+//! Tests for constraint tag validation in MIR.
+
 use super::{compile, expect_diagnostic};
 
 #[test]

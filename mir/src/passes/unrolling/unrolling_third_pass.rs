@@ -1,3 +1,7 @@
+//! Unrolling third pass.
+//!
+//! Unrolls remaining `If` nodes and applies match optimizations.
+
 use std::ops::Deref;
 
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
@@ -14,6 +18,7 @@ use crate::{
     },
 };
 
+/// Third pass of unrolling: unroll `If` nodes and optimize match constraints.
 pub struct UnrollingThirdPass<'a> {
     #[allow(unused)]
     diagnostics: &'a DiagnosticsHandler,
@@ -28,6 +33,7 @@ pub struct UnrollingThirdPass<'a> {
 }
 
 impl<'a> UnrollingThirdPass<'a> {
+    /// Construct a new third-pass unroller.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         // AIR_UNROLL_PROGRESS/AIR_UNROLL_PROGRESS_EVERY emit periodic progress for large graphs.
         let trace_progress = std::env::var("AIR_UNROLL_PROGRESS").is_ok();

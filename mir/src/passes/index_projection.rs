@@ -1,3 +1,10 @@
+//! Index projection pass for MIR.
+//!
+//! The aim is to avoid eager vector/matrix expansion when only one element is used. We do this
+//! by recognizing pure function returns that are immediately indexed and replacing the accessor
+//! with the projected element. The tradeoff is a conservative check (purity + constant indices),
+//! so we intentionally skip some projection opportunities.
+
 use std::{collections::HashMap, ops::Deref};
 
 use air_pass::Pass;
@@ -20,6 +27,7 @@ pub struct IndexProjection<'a> {
 }
 
 impl<'a> IndexProjection<'a> {
+    /// Create a new index projection pass.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self {
             _diagnostics: diagnostics,

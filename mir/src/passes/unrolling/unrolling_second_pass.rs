@@ -1,3 +1,8 @@
+//! Unrolling second pass.
+//!
+//! Inlines `For` bodies using the contexts captured in the first pass while
+//! preserving parameter identity.
+
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     ops::Deref,
@@ -14,6 +19,7 @@ use crate::{
     },
 };
 
+/// Second pass of unrolling: inline `For` bodies and fix up parameters.
 pub struct UnrollingSecondPass<'a> {
     #[allow(unused)]
     diagnostics: &'a DiagnosticsHandler,
@@ -41,6 +47,7 @@ pub struct UnrollingSecondPass<'a> {
 }
 
 impl<'a> UnrollingSecondPass<'a> {
+    /// Construct a new second-pass unroller.
     pub fn new(
         diagnostics: &'a DiagnosticsHandler,
         bodies_to_inline: Vec<(Link<Op>, ForInliningContext)>,
@@ -265,6 +272,10 @@ impl Visitor for UnrollingSecondPass<'_> {
 }
 
 impl<'a> UnrollingSecondPass<'a> {
+    /// Enqueue nested `For` contexts discovered during duplication.
+    ///
+    /// This preserves parameter identity for nested comprehensions by mapping placeholder
+    /// parameters back to their template contexts.
     fn enqueue_nested_contexts(
         &mut self,
         outer_ctx: &ForInliningContext,
@@ -322,6 +333,9 @@ impl<'a> UnrollingSecondPass<'a> {
         }
     }
 
+    /// Clone an inner `For` context while substituting outer iterators.
+    ///
+    /// This re-binds the inner body/iterators to the outer loop values and remaps owner ids.
     fn duplicate_context_with_outer(
         &self,
         inner_ctx: &ForInliningContext,
@@ -409,6 +423,7 @@ impl<'a> UnrollingSecondPass<'a> {
         }
     }
 
+    /// Collect reachable `For` output placeholder parameters keyed by (owner_id, position).
     fn collect_reachable_params_by_key(
         &self,
         graph: &Graph,

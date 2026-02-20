@@ -1,3 +1,11 @@
+//! MIR inlining pass.
+//!
+//! The goal is to inline function/evaluator bodies to simplify the graph before unrolling and
+//! lowering. We do that by building a call dependency graph, computing a callee-first order, and
+//! substituting parameters with arguments while preserving owner identity; we also cache identical
+//! call sites to avoid re-inlining the same body. The tradeoff is that inlining can grow the
+//! graph, so it is iterative and bounded, and caching stays conservative to remain safe.
+
 use std::{
     collections::{HashMap, HashSet, hash_map::DefaultHasher},
     hash::{Hash, Hasher},
@@ -127,28 +135,29 @@ fn estimate_op_size_with_calls(
     count
 }
 
+/// Cache key for a call-site (callee pointer + argument hashes).
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct CallKey {
     callee_ptr: usize,
     arg_hashes: Vec<u64>,
 }
 
-/// This pass handles inlining of `Call` nodes at their call sites.
+/// Inlines `Call` nodes at their call sites.
 ///
 /// It works in three steps:
-/// * Firstly, we visit the graph to build the call dependency graph.
-/// * This dependency graph is then used to compute the wanted inlining order (we first replace
-///   calls to callees that do not have `Call` in their body). If it is not possible to create this
-///   order, this means there is a circular dependency.
-/// * Then, we visit the graph again at each `Call` nodes, building a duplicate of the body (with
-///   Parameter replaced by call arguments), and replacing the `Call` node by this duplicate body.
-///  
+/// 1. Build the call dependency graph.
+/// 2. Compute an inlining order (callee-first to avoid cycles).
+/// 3. Replace each call with a duplicated body where parameters are substituted by arguments.
+///
+/// Parameter identity is preserved using owner ids to avoid collisions across duplicated nodes.
 pub struct Inlining<'a> {
     diagnostics: &'a DiagnosticsHandler,
+    /// Memoized inlined bodies keyed by callee + arguments.
     inline_cache: HashMap<CallKey, Link<Op>>,
 }
 
 impl<'a> Inlining<'a> {
+    /// Construct a new inliner.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self {
             diagnostics,
@@ -240,6 +249,7 @@ impl Pass for Inlining<'_> {
     }
 }
 
+/// First inlining pass: compute dependency graph and call sites.
 pub struct InliningFirstPass<'a> {
     #[allow(unused)]
     diagnostics: &'a DiagnosticsHandler,
@@ -258,6 +268,7 @@ pub struct InliningFirstPass<'a> {
 }
 
 impl<'a> InliningFirstPass<'a> {
+    /// Construct a new first-pass inliner.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self {
             diagnostics,
@@ -275,13 +286,19 @@ impl<'a> InliningFirstPass<'a> {
 /// evaluator.
 #[derive(Clone, Debug)]
 pub struct CallInliningContext {
+    /// Callee body to inline.
     body: Link<Vec<Link<Op>>>,
+    /// Call arguments to substitute for parameters.
     arguments: Link<Vec<Link<Op>>>,
+    /// Whether the callee is a pure function.
     pure_function: bool,
+    /// Callee root node.
     callee: Link<Root>,
+    /// Owner id of the callee (used for parameter identity).
     ref_owner_id: OwnerId,
 }
 
+/// Second inlining pass: perform substitutions and replace call nodes.
 pub struct InliningSecondPass<'a> {
     diagnostics: &'a DiagnosticsHandler,
 
@@ -313,6 +330,7 @@ pub struct InliningSecondPass<'a> {
 }
 
 impl<'a> InliningSecondPass<'a> {
+    /// Construct a new second-pass inliner.
     fn new(
         diagnostics: &'a DiagnosticsHandler,
         func_eval_inlining_order: Vec<Link<Root>>,

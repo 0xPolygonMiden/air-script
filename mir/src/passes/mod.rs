@@ -1,3 +1,10 @@
+//! MIR pass pipeline utilities and helpers.
+//!
+//! This module collects shared helpers used across the MIR pass pipeline. It exposes pass types
+//! and common graph-duplication utilities so passes can safely clone subtrees while preserving
+//! owner identity. The tradeoff is that deep duplication can grow the graph, so it is used
+//! sparingly and usually paired with CSE/interning afterward.
+
 mod constant_propagation;
 mod cse;
 mod index_projection;
@@ -25,13 +32,12 @@ use crate::{
     },
 };
 
-/// Helper to duplicate a MIR node and its children recursively
-/// It should be used when we want to reference the same node multiple times in the MIR graph (e.g.
-/// referencing let bound variables)
+/// Duplicate a MIR node and its children recursively.
 ///
-/// Note: the current_replace_map is only used to keep track of `For` nodes, that can be referenced
-/// by `Parameters` inside their bodies Then, duplicated Parameters should reference the new `For`
-/// node, not the original one
+/// Used when we need a deep clone of a subtree (e.g. when expanding let-bound values).
+///
+/// Note: `current_replace_map` is used to keep track of `For` nodes referenced by `Parameter`s
+/// inside their bodies. When duplicating, those parameters must be re-bound to the new `For`.
 pub fn duplicate_node(
     node: Link<Op>,
     current_replace_map: &mut HashMap<usize, (Link<Op>, Link<Op>)>,
@@ -316,6 +322,9 @@ fn ensure_mapped(
 }
 
 /// Same as [duplicate_node_or_replace], but optionally interns high-fanout ops.
+///
+/// This is used in inlining/unrolling/index-projection paths to avoid allocating
+/// duplicate subtrees when a shared op is safe to intern.
 pub fn duplicate_node_or_replace_with_interner(
     current_replace_map: &mut HashMap<usize, (Link<Op>, Link<Op>)>,
     node: Link<Op>,

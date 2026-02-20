@@ -1,3 +1,10 @@
+//! AST to MIR lowering pass.
+//!
+//! The goal is to convert the parsed/validated AIR AST into a MIR graph of explicit ops. We do
+//! this by traversing the AST, building MIR nodes for expressions/constraints, and attaching the
+//! ownership metadata needed for later inlining/unrolling. The tradeoff is explicitness over
+//! compactness, relying on later passes (CSE/inlining/unrolling) to simplify and normalize.
+
 use core::panic;
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -21,24 +28,24 @@ use crate::{
     passes::duplicate_node,
 };
 
-/// This pass transforms a given [ast::Program] into a Middle Intermediate Representation ([Mir])
+/// Lowers an AST [ast::Program] into MIR.
 ///
-/// This pass assumes that the input program:
-/// * has been semantically validated
-/// * has had constant propagation already applied
+/// Assumptions:
+/// - The input program has been semantically validated.
+/// - Constant propagation has already been applied.
 ///
 /// Notes:
-/// * During this step, we unpack parameters and arguments of evaluators, in order to make it easier
-///   to inline them
+/// - Evaluator parameters/arguments are unpacked to simplify later inlining.
 ///
 /// TODO:
-/// - [ ] Implement diagnostics for better error handling
+/// - Implement diagnostics for better error handling.
 pub struct AstToMir<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
 
 impl<'a> AstToMir<'a> {
     #[inline]
+    /// Construct a new AST to MIR translator.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self { diagnostics }
     }
@@ -56,6 +63,7 @@ impl Pass for AstToMir<'_> {
     }
 }
 
+/// Stateful builder used during AST to MIR translation.
 pub struct MirBuilder<'a> {
     program: &'a ast::Program,
     diagnostics: &'a DiagnosticsHandler,
@@ -71,9 +79,12 @@ pub struct MirBuilder<'a> {
     current_constraint_tag: Option<ast::ConstraintTagSpec>,
 }
 
+/// Value stored in the lexical scope during AST to MIR lowering.
 #[derive(Clone)]
 struct BindingValue {
+    /// Bound MIR node.
     node: Link<Op>,
+    /// Whether the indexable value can be shared across uses.
     share_indexable: bool,
 }
 

@@ -1,3 +1,10 @@
+//! Common subexpression elimination (CSE) for MIR.
+//!
+//! The goal is to collapse repeated MIR subtrees so the graph stays small and later passes do less
+//! work. We do that by canonicalizing ops and interning identical structures via `OpInterner`,
+//! with memoization to avoid revisiting nodes. The tradeoff is that we stay conservative (spans
+//! and exact structural keys) to preserve correctness and diagnostics, which limits sharing.
+
 use std::collections::HashMap;
 
 use air_pass::Pass;
@@ -8,9 +15,11 @@ use crate::{
     ir::{Link, MatchArm, Mir, MirAccessType, Op, OpInterner, Parent},
 };
 
+/// Canonicalizes MIR ops and interns identical subtrees.
 pub struct Cse;
 
 impl Cse {
+    /// Construct a new CSE pass instance.
     pub fn new() -> Self {
         Self
     }
