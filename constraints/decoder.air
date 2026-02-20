@@ -1,0 +1,335 @@
+##########################################################################################
+# DECODER CONSTRAINTS MODULE
+##########################################################################################
+#
+# Enforces decoder op-bit, in-span, group count, op index, and batch flag constraints.
+# Decoder bus operations (p1/p2/p3) are included here. Tagging is applied at the call site
+# in the main module.
+##########################################################################################
+
+mod decoder
+use flags::*;
+
+##########################################################################################
+# DECODER TRANSITION CONSTRAINTS
+##########################################################################################
+#
+# The decoder in-span boundary constraint (sp starts at 0) is enforced in the main module.
+# This evaluator contains the remaining decoder constraints in tag order.
+##########################################################################################
+
+ev decoder_transition([decoder[24], stack[19], system[6]]) {
+    # Stack inputs: s0/s1/s2 are used by decoder bus messages.
+    let [s0, s1, s2, s3_unused, s4_unused, s5_unused, s6_unused, s7_unused,
+         s8_unused, s9_unused, s10_unused, s11_unused, s12_unused, s13_unused, s14_unused,
+         s15_unused, stack_b0, stack_b1, stack_h0_unused] = stack;
+
+    # System inputs: context + function hash (used by block-stack bus messages).
+    let [system_clk, system_ctx, fn_hash_0, fn_hash_1, fn_hash_2, fn_hash_3] = system;
+
+    # Decoder columns: address, op bits, hasher state, span/group/index/batch flags, extra columns.
+    let [
+        addr,
+        b0, b1, b2, b3, b4, b5, b6,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        sp, gc, ox, c0, c1, c2, e0, e1
+    ] = decoder;
+
+    # Op bits as a packed array for flag helpers.
+    let op_bits = [b0, b1, b2, b3, b4, b5, b6];
+
+    let is_span = flag_span(op_bits, e0);
+    let is_respan = flag_respan(op_bits, e1);
+    let is_push = flag_push(op_bits, e0);
+    let is_join = flag_join(op_bits, e0);
+    let is_split = flag_split(op_bits, e0);
+    let is_loop = flag_loop(op_bits, e0);
+    let is_dyn = flag_dyn(op_bits, e0);
+    let is_dyncall = flag_dyncall(op_bits, e0);
+    let is_call = flag_call(op_bits, e1);
+    let is_syscall = flag_syscall(op_bits, e1);
+    let is_end = flag_end(op_bits, e1);
+    let is_repeat = flag_repeat(op_bits, e1);
+    let is_halt = flag_halt(op_bits, e1);
+
+    # Next-row op flags used in transition constraints.
+    let op_bits_next = [b0', b1', b2', b3', b4', b5', b6'];
+    let e1_next = e1';
+
+    let is_end_next = flag_end(op_bits_next, e1_next);
+    let is_repeat_next = flag_repeat(op_bits_next, e1_next);
+    let is_respan_next = flag_respan(op_bits_next, e1_next);
+    let is_halt_next = flag_halt(op_bits_next, e1_next);
+
+    # ---------------------------------------------------------------------------
+    # In-span constraints.
+    # ---------------------------------------------------------------------------
+    # sp is the binary in-span flag.
+    enf sp * (sp - 1) = 0;
+    # After SPAN/RESPAN, the next row must be inside a span.
+    enf is_span * (1 - sp') = 0;
+    enf is_respan * (1 - sp') = 0;
+
+    # ---------------------------------------------------------------------------
+    # Op bits must be binary.
+    # ---------------------------------------------------------------------------
+    # Each opcode bit is 0 or 1.
+    enf b0 * (b0 - 1) = 0;
+    enf b1 * (b1 - 1) = 0;
+    enf b2 * (b2 - 1) = 0;
+    enf b3 * (b3 - 1) = 0;
+    enf b4 * (b4 - 1) = 0;
+    enf b5 * (b5 - 1) = 0;
+    enf b6 * (b6 - 1) = 0;
+
+    # ---------------------------------------------------------------------------
+    # Extra columns for degree reduction.
+    # ---------------------------------------------------------------------------
+    # e0/e1 exist to reduce the degree of op-flag selectors for the `101...` and `11...`
+    # opcode groups, respectively (see docs/src/design/stack/op_constraints.md in miden-vm).
+    enf e0 - (b6 * (1 - b5) * b4) = 0;
+    enf e1 - (b6 * b5) = 0;
+
+    # ---------------------------------------------------------------------------
+    # Op-bit group constraints.
+    # ---------------------------------------------------------------------------
+    # U32 ops share a prefix and forbid b0=1.
+    let u32_prefix = b6 * (1 - b5) * (1 - b4);
+    enf u32_prefix * b0 = 0;
+
+    # Very-high-degree ops share a prefix and forbid b0,b1=1.
+    let very_high_prefix = b6 * b5;
+    enf very_high_prefix * b0 = 0;
+    enf very_high_prefix * b1 = 0;
+
+    # ---------------------------------------------------------------------------
+    # Batch flags must be binary.
+    # ---------------------------------------------------------------------------
+    # Each batch flag is 0 or 1.
+    enf c0 * (c0 - 1) = 0;
+    enf c1 * (c1 - 1) = 0;
+    enf c2 * (c2 - 1) = 0;
+
+    # ---------------------------------------------------------------------------
+    # General decoder constraints.
+    # ---------------------------------------------------------------------------
+    # SPLIT/LOOP: top of stack selects a branch, so it must be binary.
+    let split_or_loop = is_split + is_loop;
+    enf split_or_loop * s0 * (s0 - 1) = 0;
+
+    # DYN: only the first half of the hasher state is used; the tail must be zero.
+    enf is_dyn * h4 = 0;
+    enf is_dyn * h5 = 0;
+    enf is_dyn * h6 = 0;
+    enf is_dyn * h7 = 0;
+
+    # REPEAT: must be inside a loop body (h4=1) and have s0=1.
+    enf is_repeat * (1 - s0) = 0;
+    enf is_repeat * (1 - h4) = 0;
+
+    # END inside a loop: if is_loop flag is set, s0 must be 0.
+    enf is_end * h5 * s0 = 0;
+
+    # END followed by REPEAT: carry hasher state h0..h4 to the next row.
+    enf is_end * is_repeat_next * (h0' - h0) = 0;
+    enf is_end * is_repeat_next * (h1' - h1) = 0;
+    enf is_end * is_repeat_next * (h2' - h2) = 0;
+    enf is_end * is_repeat_next * (h3' - h3) = 0;
+    enf is_end * is_repeat_next * (h4' - h4) = 0;
+
+    # HALT is absorbing: must be followed by HALT.
+    enf is_halt * (1 - is_halt_next) = 0;
+
+    # ---------------------------------------------------------------------------
+    # Group count constraints.
+    # ---------------------------------------------------------------------------
+    # gc tracks remaining op groups within the span.
+    let delta_gc = gc - gc';
+    # gc can only stay the same or decrement by 1 inside a span.
+    enf sp * delta_gc * (delta_gc - 1) = 0;
+    # If gc decrements and this isn't a PUSH, h0 must be 0 (no immediate).
+    enf sp * delta_gc * (1 - is_push) * h0 = 0;
+    # SPAN/RESPAN/PUSH must decrement gc.
+    enf (is_span + is_respan + is_push) * (delta_gc - 1) = 0;
+    # gc cannot decrement when the next op is END/RESPAN.
+    enf delta_gc * (is_end_next + is_respan_next) = 0;
+    # END requires gc = 0.
+    enf is_end * gc = 0;
+
+    # ---------------------------------------------------------------------------
+    # Op group decoding constraints.
+    # ---------------------------------------------------------------------------
+    # op_next encodes the next opcode as an integer.
+    let op_next = b0' + 2 * b1' + 4 * b2' + 8 * b3' + 16 * b4' + 32 * b5' + 64 * b6';
+    # f_sgc: gc stays the same inside a span.
+    let f_sgc = sp * sp' * (1 - delta_gc);
+    # Update h0 with the next opcode when starting/continuing a group.
+    enf (is_span + is_respan + is_push + f_sgc) * (h0 - h0' * 2^7 - op_next) = 0;
+    # If next op is END/RESPAN, h0 must be zeroed.
+    enf sp * (is_end_next + is_respan_next) * h0 = 0;
+
+    # ---------------------------------------------------------------------------
+    # Op index constraints.
+    # ---------------------------------------------------------------------------
+    # ox tracks position within the current op group.
+    let ng = delta_gc - is_push;
+    # Reset ox on SPAN/RESPAN.
+    enf (is_span + is_respan) * ox' = 0;
+    # Reset ox when starting a new group.
+    enf sp * ng * ox' = 0;
+    # Otherwise, increment ox by 1 within a span.
+    enf sp * sp' * (1 - ng) * (ox' - ox - 1) = 0;
+    # ox is in range [0, 8].
+    enf ox * (ox - 1) * (ox - 2) * (ox - 3) * (ox - 4) * (ox - 5) * (ox - 6) * (ox - 7) * (ox - 8) = 0;
+
+    # ---------------------------------------------------------------------------
+    # Batch flag decoding and hasher state zeroing.
+    # ---------------------------------------------------------------------------
+    # Batch flags encode how many op groups are emitted by SPAN/RESPAN.
+    let batch_g8 = c0;
+    let batch_g4 = (1 - c0) * c1 * (1 - c2);
+    let batch_g2 = (1 - c0) * (1 - c1) * c2;
+    let batch_g1 = (1 - c0) * c1 * c2;
+    let span_or_respan = is_span + is_respan;
+
+    # Exactly one batch size flag must be set on SPAN/RESPAN rows.
+    enf span_or_respan - (batch_g1 + batch_g2 + batch_g4 + batch_g8) = 0;
+    # Otherwise, all batch flags must be zero.
+    enf (1 - span_or_respan) * (c0 + c1 + c2) = 0;
+
+    # If batch size is <= 4 groups, unused hasher lanes h4..h7 must be zero.
+    let small_batch = batch_g1 + batch_g2 + batch_g4;
+    enf small_batch * h4 = 0;
+    enf small_batch * h5 = 0;
+    enf small_batch * h6 = 0;
+    enf small_batch * h7 = 0;
+
+    # If batch size is <= 2 groups, unused hasher lanes h2..h3 must be zero.
+    let tiny_batch = batch_g1 + batch_g2;
+    enf tiny_batch * h2 = 0;
+    enf tiny_batch * h3 = 0;
+    enf batch_g1 * h1 = 0;
+
+    # ---------------------------------------------------------------------------
+    # Block address constraints.
+    # ---------------------------------------------------------------------------
+    # Inside a span the block address stays fixed.
+    enf sp * (addr' - addr) = 0;
+    # RESPAN moves to the next hash block.
+    enf is_respan * (addr' - addr - 32) = 0;
+    # HALT forces address to 0.
+    enf is_halt * addr = 0;
+
+    # ---------------------------------------------------------------------------
+    # Control flow constraint.
+    # ---------------------------------------------------------------------------
+    # Outside a span (sp=0), the opcode must be one of the control-flow ops.
+    let control_flow = is_span + is_join + is_split + is_loop + is_end + is_repeat
+        + is_respan + is_halt + is_dyn + is_dyncall + is_call + is_syscall;
+    enf 1 - sp - control_flow = 0;
+
+    # ---------------------------------------------------------------------------
+    # Decoder bus operations (bus tags are on the bus definitions).
+    # ---------------------------------------------------------------------------
+    let fjoin = is_join;
+    let fsplit = is_split;
+    let fspan = is_span;
+    let fdyn = is_dyn;
+    let floop = is_loop;
+    let frespan = is_respan;
+
+    # ---------------------------------------------------------------------------
+    # BUS 0: block stack table (p1)
+    # ---------------------------------------------------------------------------
+    # Tracks block nesting. Inserts push (block_id, parent_id, is_loop, ctx, depth, overflow, fn_hash)
+    # on block entry; removals pop the same tuple on END/RESPAN.
+    # For JOIN/SPLIT/SPAN/DYN/RESPAN, the context fields (ctx, depth, overflow, fn_hash) are 0
+    # and is_loop = 0 (except LOOP which uses s0). CALL/SYSCALL/DYNCALL fill:
+    #   ctx = system_ctx, depth = stack_b0 (or h4 for DYNCALL), overflow = stack_b1 (or h5),
+    #   fn_hash = fn_hash_0..fn_hash_3.
+    bus_0_decoder_p1.insert(addr', addr, 0, 0, 0, 0, 0, 0, 0, 0) when fjoin;
+    bus_0_decoder_p1.insert(addr', addr, 0, 0, 0, 0, 0, 0, 0, 0) when fsplit;
+    bus_0_decoder_p1.insert(addr', addr, 0, 0, 0, 0, 0, 0, 0, 0) when fspan;
+    bus_0_decoder_p1.insert(addr', addr, 0, 0, 0, 0, 0, 0, 0, 0) when fdyn;
+
+    bus_0_decoder_p1.insert(addr', addr, s0, 0, 0, 0, 0, 0, 0, 0) when floop;
+
+    bus_0_decoder_p1.remove(addr, h1', 0, 0, 0, 0, 0, 0, 0, 0) when frespan;
+    bus_0_decoder_p1.insert(addr', h1', 0, 0, 0, 0, 0, 0, 0, 0) when frespan;
+
+    bus_0_decoder_p1.insert(addr', addr, 0, system_ctx, stack_b0, stack_b1, fn_hash_0, fn_hash_1, fn_hash_2, fn_hash_3) when is_call;
+    bus_0_decoder_p1.insert(addr', addr, 0, system_ctx, stack_b0, stack_b1, fn_hash_0, fn_hash_1, fn_hash_2, fn_hash_3) when is_syscall;
+
+    bus_0_decoder_p1.insert(addr', addr, 0, system_ctx, h4, h5, fn_hash_0, fn_hash_1, fn_hash_2, fn_hash_3) when is_dyncall;
+
+    # The loop flag and call/syscall markers are stored in the hasher lanes.
+    let is_loop_flag = h5;
+    let is_call_or_syscall = h6 + h7;
+    let is_simple_end = 1 - is_call_or_syscall;
+    bus_0_decoder_p1.remove(addr, addr', is_loop_flag, system_ctx', stack_b0', stack_b1', fn_hash_0', fn_hash_1', fn_hash_2', fn_hash_3') when is_end * is_call_or_syscall;
+    bus_0_decoder_p1.remove(addr, addr', is_loop_flag, 0, 0, 0, 0, 0, 0, 0) when is_end * is_simple_end;
+
+    # ---------------------------------------------------------------------------
+    # BUS 1: block hash table (p2)
+    # ---------------------------------------------------------------------------
+    # Tracks blocks awaiting execution. Inserts child hashes on JOIN/SPLIT/LOOP/REPEAT/etc.,
+    # and removes the parent hash on END. The `is_first_child`/`is_loop_body` flags help
+    # disambiguate left/right children and loop bodies in the multiset.
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 1, 0) when fjoin;
+    bus_1_decoder_p2.insert(addr', h4, h5, h6, h7, 0, 0) when fjoin;
+
+    let split_h0 = s0 * h0 + (1 - s0) * h4;
+    let split_h1 = s0 * h1 + (1 - s0) * h5;
+    let split_h2 = s0 * h2 + (1 - s0) * h6;
+    let split_h3 = s0 * h3 + (1 - s0) * h7;
+    bus_1_decoder_p2.insert(addr', split_h0, split_h1, split_h2, split_h3, 0, 0) when fsplit;
+
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 1) when floop * s0;
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 1) when is_repeat;
+
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when fdyn;
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when is_dyncall;
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when is_call;
+    bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when is_syscall;
+
+    let is_first_child = 1 - (is_end_next + is_repeat_next + is_halt_next);
+    let is_loop_body = h4;
+    bus_1_decoder_p2.remove(addr', h0, h1, h2, h3, is_first_child, is_loop_body) when is_end;
+
+    # ---------------------------------------------------------------------------
+    # BUS 2: op group table (p3)
+    # ---------------------------------------------------------------------------
+    # Tracks op groups produced by SPAN/RESPAN. The batch flags choose how many groups are
+    # inserted (g1/g2/g4/g8), and groups are removed as gc decrements inside a span.
+    let f_g8_bus = c0;
+    let f_g4_bus = (1 - c0) * c1 * (1 - c2);
+    let f_g2_bus = (1 - c0) * (1 - c1) * c2;
+    let f_g1_bus = (1 - c0) * c1 * c2;
+
+    # It is safe to omit explicit SPAN/RESPAN gating here because the decoder constraints
+    # enforce (1 - span_or_respan) * (c0 + c1 + c2) = 0, which zeros these batch flags
+    # outside span/respan rows.
+    let span_g2 = f_g2_bus;
+    let span_g4 = f_g4_bus;
+    let span_g8 = f_g8_bus;
+
+    bus_2_decoder_p3.insert(addr', gc - 1, h1) when span_g2;
+
+    bus_2_decoder_p3.insert(addr', gc - 1, h1) when span_g4;
+    bus_2_decoder_p3.insert(addr', gc - 2, h2) when span_g4;
+    bus_2_decoder_p3.insert(addr', gc - 3, h3) when span_g4;
+
+    bus_2_decoder_p3.insert(addr', gc - 1, h1) when span_g8;
+    bus_2_decoder_p3.insert(addr', gc - 2, h2) when span_g8;
+    bus_2_decoder_p3.insert(addr', gc - 3, h3) when span_g8;
+    bus_2_decoder_p3.insert(addr', gc - 4, h4) when span_g8;
+    bus_2_decoder_p3.insert(addr', gc - 5, h5) when span_g8;
+    bus_2_decoder_p3.insert(addr', gc - 6, h6) when span_g8;
+    bus_2_decoder_p3.insert(addr', gc - 7, h7) when span_g8;
+
+    let op_next_bus = b0' + 2 * b1' + 4 * b2' + 8 * b3' + 16 * b4' + 32 * b5' + 64 * b6';
+    # Group value: opcode from h0' when not PUSH, otherwise the immediate in s0'.
+    let decoded_op_value = (h0' * 2^7 + op_next_bus) * (1 - is_push) + s0' * is_push;
+    let is_decrementing_gc = sp * (gc - gc');
+    bus_2_decoder_p3.remove(addr, gc, decoded_op_value) when is_decrementing_gc;
+}
