@@ -8,7 +8,7 @@ use miden_diagnostics::{DiagnosticsHandler, Spanned};
 
 use crate::{
     CompileError,
-    ir::{Child, Graph, Link, Node, Op, RandomInputs, Vector},
+    ir::{Graph, Link, Node, Op, RandomInputs, Vector},
     passes::{
         Visitor,
         unrolling::{
@@ -27,28 +27,15 @@ pub struct UnrollingThirdPass<'a> {
     work_stack: Vec<Link<Node>>,
     // current evaluations of nodes at random points
     random_inputs: RandomInputs,
-    trace_progress: bool,
-    progress_every: usize,
-    roots_processed: usize,
 }
 
 impl<'a> UnrollingThirdPass<'a> {
     /// Construct a new third-pass unroller.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
-        // AIR_UNROLL_PROGRESS/AIR_UNROLL_PROGRESS_EVERY emit periodic progress for large graphs.
-        let trace_progress = std::env::var("AIR_UNROLL_PROGRESS").is_ok();
-        let progress_every = std::env::var("AIR_UNROLL_PROGRESS_EVERY")
-            .ok()
-            .and_then(|val| val.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(1000);
         Self {
             diagnostics,
             work_stack: vec![],
             random_inputs: RandomInputs::default(),
-            trace_progress,
-            progress_every,
-            roots_processed: 0,
         }
     }
 }
@@ -143,48 +130,6 @@ impl Visitor for UnrollingThirdPass<'_> {
             | Node::Accessor(_)
             | Node::None(_) => None,
             Node::Parameter(p) => {
-                if let Some(param_op) = p.to_link() {
-                    if let Some(param) = param_op.as_parameter() {
-                        // Parameters should have been eliminated by earlier passes; dump context.
-                        eprintln!(
-                            "unrolling_third_pass: unexpected parameter ptr={} {:?} owner_id={:?}",
-                            param_op.get_ptr(),
-                            *param,
-                            param.owner_id
-                        );
-                        for parent in param.get_parents().iter() {
-                            if let Some(owner) = parent.to_link() {
-                                let owner_kind = match owner.borrow().deref() {
-                                    crate::ir::Owner::Function(_) => "Function",
-                                    crate::ir::Owner::Evaluator(_) => "Evaluator",
-                                    crate::ir::Owner::Accessor(_) => "Accessor",
-                                    crate::ir::Owner::BusOp(_) => "BusOp",
-                                    crate::ir::Owner::Boundary(_) => "Boundary",
-                                    crate::ir::Owner::Vector(_) => "Vector",
-                                    crate::ir::Owner::Matrix(_) => "Matrix",
-                                    crate::ir::Owner::Call(_) => "Call",
-                                    crate::ir::Owner::Fold(_) => "Fold",
-                                    crate::ir::Owner::Add(_) => "Add",
-                                    crate::ir::Owner::Sub(_) => "Sub",
-                                    crate::ir::Owner::Mul(_) => "Mul",
-                                    crate::ir::Owner::Exp(_) => "Exp",
-                                    crate::ir::Owner::Enf(_) => "Enf",
-                                    crate::ir::Owner::For(_) => "For",
-                                    crate::ir::Owner::If(_) => "If",
-                                    crate::ir::Owner::None(_) => "None",
-                                };
-                                eprintln!(
-                                    "unrolling_third_pass: param parent kind={} owner_ptr={}",
-                                    owner_kind,
-                                    owner.get_ptr()
-                                );
-                                if let Some(op) = owner.as_op() {
-                                    eprintln!("unrolling_third_pass: parent op={}", op.debug());
-                                }
-                            }
-                        }
-                    }
-                }
                 return Err(CompileError::Failed);
             },
             _ => {
@@ -207,23 +152,10 @@ impl Visitor for UnrollingThirdPass<'_> {
 impl UnrollingThirdPass<'_> {
     pub fn run(&mut self, graph: &mut Graph) -> Result<(), CompileError> {
         let roots = self.root_nodes_to_visit(graph);
-        let total_roots = roots.len();
-        if self.trace_progress {
-            eprintln!("mir: unrolling third pass roots={total_roots}");
-        }
         for root in roots {
             self.scan_node(graph, root.clone())?;
             while let Some(node) = self.work_stack().pop() {
                 self.visit_node(graph, node)?;
-            }
-            if self.trace_progress {
-                self.roots_processed += 1;
-                if self.roots_processed % self.progress_every == 0 {
-                    eprintln!(
-                        "mir: unrolling third pass processed {}/{} roots",
-                        self.roots_processed, total_roots
-                    );
-                }
             }
         }
         Ok(())

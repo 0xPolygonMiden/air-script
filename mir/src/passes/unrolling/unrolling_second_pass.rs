@@ -26,9 +26,6 @@ pub struct UnrollingSecondPass<'a> {
 
     // general context
     work_stack: Vec<Link<Node>>,
-    trace_progress: bool,
-    progress_every: usize,
-    roots_processed: usize,
     // A list of all the children of `For` nodes to inline
     bodies_to_inline: Vec<(Link<Op>, ForInliningContext)>,
     // The current context for inlining a `For` node, if any
@@ -52,19 +49,9 @@ impl<'a> UnrollingSecondPass<'a> {
         diagnostics: &'a DiagnosticsHandler,
         bodies_to_inline: Vec<(Link<Op>, ForInliningContext)>,
     ) -> Self {
-        // AIR_UNROLL_PROGRESS/AIR_UNROLL_PROGRESS_EVERY emit periodic progress for large graphs.
-        let trace_progress = std::env::var("AIR_UNROLL_PROGRESS").is_ok();
-        let progress_every = std::env::var("AIR_UNROLL_PROGRESS_EVERY")
-            .ok()
-            .and_then(|val| val.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(1000);
         Self {
             diagnostics,
             work_stack: vec![],
-            trace_progress,
-            progress_every,
-            roots_processed: 0,
             bodies_to_inline,
             for_inlining_context: None,
             nodes_to_replace: HashMap::new(),
@@ -132,43 +119,10 @@ impl Visitor for UnrollingSecondPass<'_> {
             queue.push_back((param.clone(), ctx.clone()));
         }
 
-        let total_roots = queue.len();
-        if self.trace_progress {
-            eprintln!("mir: unrolling second pass roots={total_roots}");
-        }
         while let Some((root_param, ctx)) = queue.pop_front() {
             // Skip stale or already-replaced placeholders.
             if root_param.as_parameter().is_none() {
                 continue;
-            }
-            // Optional deep tracing for unrolling; enable with AIR_DEBUG_UNROLL_*.
-            if std::env::var("AIR_DEBUG_UNROLL_PROCESS").is_ok() {
-                if let Some(param_ref) = root_param.as_parameter() {
-                    eprintln!(
-                        "unrolling_second_pass: process owner_id={:?} pos={}",
-                        param_ref.owner_id, param_ref.position
-                    );
-                }
-            }
-            if std::env::var("AIR_DEBUG_UNROLL_BODY").is_ok() {
-                if let Some(param_ref) = root_param.as_parameter() {
-                    eprintln!(
-                        "unrolling_second_pass: body owner_id={:?} pos={} body={}",
-                        param_ref.owner_id,
-                        param_ref.position,
-                        ctx.body.debug()
-                    );
-                }
-            }
-            if std::env::var("AIR_DEBUG_UNROLL_ITERS").is_ok() {
-                if let Some(param_ref) = root_param.as_parameter() {
-                    let iter_debug =
-                        ctx.iterators.iter().map(|it| it.debug()).collect::<Vec<_>>().join(", ");
-                    eprintln!(
-                        "unrolling_second_pass: iters owner_id={:?} pos={} iters=[{}]",
-                        param_ref.owner_id, param_ref.position, iter_debug
-                    );
-                }
             }
 
             // Set the context corresponding to the `For` node we are inlining.
@@ -228,16 +182,6 @@ impl Visitor for UnrollingSecondPass<'_> {
 
             // Enqueue contexts for any duplicated placeholder params (nested comprehensions).
             self.enqueue_nested_contexts(&ctx, &mut queue, &mut seen_params);
-
-            if self.trace_progress {
-                self.roots_processed += 1;
-                if self.roots_processed % self.progress_every == 0 {
-                    eprintln!(
-                        "mir: unrolling second pass processed {}/{} roots",
-                        self.roots_processed, total_roots
-                    );
-                }
-            }
         }
 
         Ok(())
@@ -317,13 +261,6 @@ impl<'a> UnrollingSecondPass<'a> {
             // are re-bound to the correct iteration values.
             let new_ctx =
                 self.duplicate_context_with_outer(&template_ctx, outer_ctx, param_ref.owner_id);
-            // AIR_DEBUG_UNROLL_ENQUEUE traces nested context queueing.
-            if std::env::var("AIR_DEBUG_UNROLL_ENQUEUE").is_ok() {
-                eprintln!(
-                    "unrolling_second_pass: enqueue owner_id={:?} pos={}",
-                    param_ref.owner_id, param_ref.position
-                );
-            }
             seen_params.insert(new_ptr);
             to_enqueue.push((new_node.clone(), new_ctx));
         }

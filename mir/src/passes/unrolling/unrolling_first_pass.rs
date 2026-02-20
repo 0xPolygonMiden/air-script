@@ -28,9 +28,6 @@ pub struct UnrollingFirstPass<'a> {
 
     // general context
     work_stack: Vec<Link<Node>>,
-    trace_progress: bool,
-    progress_every: usize,
-    pub(super) nodes_visited: usize,
     // For each child of a For node encountered, we store the context to inline it in the second
     // pass
     pub bodies_to_inline: Vec<(Link<Op>, ForInliningContext)>,
@@ -41,19 +38,9 @@ pub struct UnrollingFirstPass<'a> {
 impl<'a> UnrollingFirstPass<'a> {
     /// Construct a new first-pass unroller.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
-        // AIR_UNROLL_PROGRESS/AIR_UNROLL_PROGRESS_EVERY emit periodic progress for large graphs.
-        let trace_progress = std::env::var("AIR_UNROLL_PROGRESS").is_ok();
-        let progress_every = std::env::var("AIR_UNROLL_PROGRESS_EVERY")
-            .ok()
-            .and_then(|val| val.parse::<usize>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(100_000);
         Self {
             diagnostics,
             work_stack: vec![],
-            trace_progress,
-            progress_every,
-            nodes_visited: 0,
             bodies_to_inline: vec![],
             params_for_ref_node: HashMap::new(),
         }
@@ -73,7 +60,6 @@ impl UnrollingFirstPass<'_> {
 
         let param_ref = parameter.as_parameter().unwrap();
         if param_ref.owner_id.is_unknown() {
-            eprintln!("unrolling_first_pass: invalid owner_id for parameter: {:?}", param_ref);
             return Err(CompileError::Failed);
         }
 
@@ -119,15 +105,6 @@ impl UnrollingFirstPass<'_> {
 
         let ref_owner_id = for_node.as_owner().unwrap().owner_id();
         let iterator_expected_len = validate_iterators_and_get_expected_len(&iterators);
-        // AIR_DEBUG_FOR_ITER dumps iterator shapes for For nodes during unrolling.
-        if std::env::var("AIR_DEBUG_FOR_ITER").is_ok() {
-            let iter_debug = iterators.iter().map(|it| it.debug()).collect::<Vec<_>>().join(", ");
-            eprintln!(
-                "unrolling_first_pass: for owner_id={:?} len={} iterators=[{}]",
-                ref_owner_id, iterator_expected_len, iter_debug
-            );
-        }
-
         let mut new_vec = vec![];
 
         for i in 0..iterator_expected_len {
@@ -159,14 +136,6 @@ impl UnrollingFirstPass<'_> {
                     ref_owner_id,
                 },
             ));
-            // AIR_DEBUG_UNROLL_CTX traces context creation for nested unrolling.
-            if std::env::var("AIR_DEBUG_UNROLL_CTX").is_ok() {
-                eprintln!(
-                    "unrolling_first_pass: ctx owner_id={:?} body_ptr={}",
-                    ref_owner_id,
-                    expr.get_ptr()
-                );
-            }
         }
 
         let new_vec_op = Vector::create(new_vec.clone(), for_node.span());
@@ -209,12 +178,6 @@ impl Visitor for UnrollingFirstPass<'_> {
     }
 
     fn visit_node(&mut self, _graph: &mut Graph, node: Link<Node>) -> Result<(), CompileError> {
-        if self.trace_progress {
-            self.nodes_visited += 1;
-            if self.nodes_visited % self.progress_every == 0 {
-                eprintln!("mir: unrolling first pass visited {} nodes", self.nodes_visited);
-            }
-        }
         // In this pass, we both need to dispatch the visitor depending on the node type,
         // and also mutate the node if needed. We implement custom visit_*_bis methods
         // that returns a Some(updated_node) if we need to update the node's value.

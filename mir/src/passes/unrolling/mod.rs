@@ -59,21 +59,11 @@ impl Pass for Unrolling<'_> {
         // - `If` nodes and their parents
         let mut first_pass = UnrollingFirstPass::new(self.diagnostics);
         Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
-        // AIR_UNROLL_PROGRESS prints a summary of first-pass work.
-        if std::env::var("AIR_UNROLL_PROGRESS").is_ok() {
-            eprintln!(
-                "mir: unrolling first pass done nodes_visited={} bodies_to_inline={}",
-                first_pass.nodes_visited,
-                first_pass.bodies_to_inline.len()
-            );
-        }
 
         // The second pass actually inlines the `For` nodes
         let mut second_pass =
             UnrollingSecondPass::new(self.diagnostics, first_pass.bodies_to_inline.clone());
         Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
-        // Optional parameter sanity logging (AIR_DEBUG_PARAMS).
-        debug_params(ir.constraint_graph(), "unrolling_second_pass");
 
         // The third pass unrolls all the remaining nodes (`If` nodes and their parents)
         let mut third_pass = UnrollingThirdPass::new(self.diagnostics);

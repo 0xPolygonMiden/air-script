@@ -120,9 +120,6 @@ impl Pass for MirToAir<'_> {
             mir_key_to_air: HashMap::new(),
             next_mir_key_id: 1,
             air_op_cache: HashMap::new(),
-            stats: std::env::var("AIR_MIR_TO_AIR_STATS")
-                .is_ok()
-                .then_some(MirToAirStats::default()),
         };
 
         let graph = mir.constraint_graph();
@@ -145,19 +142,6 @@ impl Pass for MirToAir<'_> {
         // when encountering a `BusOp`, and then visit the buses to build them.
         for bus in buses.values() {
             builder.build_bus(bus)?;
-        }
-
-        if let Some(stats) = builder.stats.as_ref() {
-            let air_nodes_total = builder.air.constraint_graph().num_nodes();
-            eprintln!(
-                "mir_to_air: mir_nodes_seen={} cache_hits={} cache_misses={} cache_size={} air_nodes_created={} air_nodes_total={}",
-                stats.mir_nodes_seen,
-                stats.mir_cache_hits,
-                stats.mir_cache_misses,
-                builder.mir_node_cache.len(),
-                stats.air_nodes_created,
-                air_nodes_total
-            );
         }
 
         Ok(air)
@@ -190,16 +174,6 @@ struct AirBuilder<'a> {
     /// Deduplicate AIR operations so identical operations share a single graph node.
     /// Its purpose is to keep the AIR algebraic DAG compact by reusing identical ops.
     air_op_cache: HashMap<Operation, NodeIndex>,
-    stats: Option<MirToAirStats>,
-}
-
-/// Diagnostics counters for the MIR to AIR translation cache.
-#[derive(Default)]
-struct MirToAirStats {
-    mir_nodes_seen: usize,
-    mir_cache_hits: usize,
-    mir_cache_misses: usize,
-    air_nodes_created: usize,
 }
 
 /// Stable id for canonical MIR keys (interned).
@@ -687,25 +661,13 @@ impl AirBuilder<'_> {
         //    canonical key/shape.
         // 5) On a miss, we build the AIR node and populate both pointer + key caches.
         // 6) `air_op_cache` (inside `insert_op`) deduplicates AIR operations themselves.
-        if let Some(stats) = self.stats.as_mut() {
-            stats.mir_nodes_seen += 1;
-        }
         if let Some(cached) = self.mir_node_cache.get(&mir_node.get_ptr()) {
-            if let Some(stats) = self.stats.as_mut() {
-                stats.mir_cache_hits += 1;
-            }
             return Ok(*cached);
         }
         let key = self.mir_key_for_normalized(&mir_node)?;
         if let Some(cached) = self.mir_key_to_air.get(&key) {
-            if let Some(stats) = self.stats.as_mut() {
-                stats.mir_cache_hits += 1;
-            }
             self.mir_node_cache.insert(mir_node.get_ptr(), *cached);
             return Ok(*cached);
-        }
-        if let Some(stats) = self.stats.as_mut() {
-            stats.mir_cache_misses += 1;
         }
         let mir_node_ref = mir_node.borrow();
         let node = match mir_node_ref.deref() {
@@ -1157,9 +1119,6 @@ impl AirBuilder<'_> {
     /// Adds the specified operation to the graph and returns the index of its node.
     #[inline]
     fn insert_op(&mut self, op: Operation) -> NodeIndex {
-        if let Some(stats) = self.stats.as_mut() {
-            stats.air_nodes_created += 1;
-        }
         self.air.constraint_graph_mut().insert_node_cached(op, &mut self.air_op_cache)
     }
 

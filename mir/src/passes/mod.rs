@@ -602,27 +602,6 @@ pub fn duplicate_node_or_replace_with_interner(
             if let Some(params) = params_for_ref_node.remove(&old_owner_id) {
                 // Any parameters that referenced the old For owner_id must be rebound to the
                 // newly created For to avoid duplicate/aliased placeholders.
-                // AIR_DEBUG_DUP_FOR traces param remapping during For duplication.
-                let debug_dup_for = std::env::var("AIR_DEBUG_DUP_FOR").is_ok();
-                if debug_dup_for {
-                    eprintln!(
-                        "duplicate_node_or_replace: updating {} params for for_owner_id={:?} -> new_owner_id={:?}",
-                        params.len(),
-                        old_owner_id,
-                        new_owner_id
-                    );
-                    for param in params.iter() {
-                        if let Some(param_ref) = param.as_parameter() {
-                            eprintln!(
-                                "duplicate_node_or_replace: param ptr={} pos={} is_for_output={} owner_id(before)={:?}",
-                                param.get_ptr(),
-                                param_ref.position,
-                                param_ref.is_for_output,
-                                param_ref.owner_id
-                            );
-                        }
-                    }
-                }
                 for param in params.iter() {
                     param.as_parameter_mut().unwrap().set_owner_id(new_owner_id);
                     if let Some(param_ref) = param.as_parameter() {
@@ -631,23 +610,9 @@ pub fn duplicate_node_or_replace_with_interner(
                         param_cache.remove(&(old_owner_id, pos, is_for_output));
                         param_cache.insert((new_owner_id, pos, is_for_output), param.clone());
                     }
-                    if debug_dup_for {
-                        if let Some(param_ref) = param.as_parameter() {
-                            eprintln!(
-                                "duplicate_node_or_replace: param ptr={} owner_id(after)={:?}",
-                                param.get_ptr(),
-                                param_ref.owner_id
-                            );
-                        }
-                    }
                 }
 
                 params_for_ref_node.entry(new_owner_id).or_default().extend(params.into_iter());
-            } else if std::env::var("AIR_DEBUG_DUP_FOR").is_ok() {
-                eprintln!(
-                    "duplicate_node_or_replace: no params found for for_owner_id={:?}",
-                    old_owner_id
-                );
             }
         },
         Op::Call(call) => {
@@ -867,46 +832,10 @@ pub fn duplicate_node_or_replace_with_interner(
         Op::Parameter(parameter) => {
             let mut should_replace = parameter.owner_id == ref_owner_id;
             if should_replace && parameter.position >= replace_parameter_list.len() {
-                // AIR_DEBUG_PARAM_REPLACE traces parameter replacement decisions.
-                if std::env::var("AIR_DEBUG_PARAM_REPLACE").is_ok() {
-                    eprintln!(
-                        "duplicate_node_or_replace: param replace skipped pos={} owner_id={:?} ref_owner_id={:?} replace_len={}",
-                        parameter.position,
-                        parameter.owner_id,
-                        ref_owner_id,
-                        replace_parameter_list.len()
-                    );
-                }
                 should_replace = false;
-            }
-            if !should_replace && std::env::var("AIR_DEBUG_PARAM_REPLACE").is_ok() {
-                let mapped = owner_id_map.get(&parameter.owner_id).cloned();
-                eprintln!(
-                    "duplicate_node_or_replace: param not replaced pos={} owner_id={:?} ref_owner_id={:?} mapped_owner_id={:?}",
-                    parameter.position, parameter.owner_id, ref_owner_id, mapped
-                );
-            }
-            if should_replace && std::env::var("AIR_DEBUG_PARAM_REPLACE").is_ok() {
-                eprintln!(
-                    "duplicate_node_or_replace: param replaced ptr={} pos={} owner_id={:?} ref_owner_id={:?}",
-                    node.get_ptr(),
-                    parameter.position,
-                    parameter.owner_id,
-                    ref_owner_id
-                );
             }
             if should_replace {
                 let replace_by_node = replace_parameter_list[parameter.position].clone();
-                if replace_by_node.as_parameter().is_some()
-                    && std::env::var("AIR_DEBUG_PARAM_REPLACE").is_ok()
-                {
-                    let owner_id =
-                        replace_by_node.as_parameter().map(|p| p.owner_id).unwrap_or_default();
-                    eprintln!(
-                        "duplicate_node_or_replace: replace_by_node is parameter owner_id={:?}",
-                        owner_id
-                    );
-                }
                 let new_node = if replace_by_node.as_parameter().is_some() {
                     // Preserve parameter identity.
                     replace_by_node
@@ -946,14 +875,6 @@ pub fn duplicate_node_or_replace_with_interner(
                 if let Some(mut param) = new_param.as_parameter_mut() {
                     param.set_owner_id(owner_id);
                     param.set_for_output(parameter.is_for_output);
-                }
-                // AIR_DEBUG_PARAM_CREATE logs new parameter creation during duplication.
-                if std::env::var("AIR_DEBUG_PARAM_CREATE").is_ok() {
-                    eprintln!(
-                        "duplicate_node_or_replace: created param ptr={} owner_id={:?}",
-                        new_param.get_ptr(),
-                        owner_id
-                    );
                 }
                 param_cache.insert(key, new_param.clone());
                 params_for_ref_node.entry(owner_id).or_default().push(new_param.clone());

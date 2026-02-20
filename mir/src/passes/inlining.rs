@@ -170,23 +170,9 @@ impl<'a> Inlining<'a> {
     /// Returns true if any calls were inlined, false otherwise, to let the caller know if any
     /// changes were made or if we reached a fixed point.
     fn run_once(&mut self, ir: &mut Mir) -> Result<bool, CompileError> {
-        // AIR_INLINE_PROGRESS emits inlining progress and cache stats.
-        let trace_progress = std::env::var("AIR_INLINE_PROGRESS").is_ok();
         // The first pass only identifies the call graph dependencies and the needed calls to inline
         let mut first_pass = InliningFirstPass::new(self.diagnostics);
         Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
-        if trace_progress {
-            let call_sites: usize = first_pass
-                .func_eval_nodes_where_called
-                .values()
-                .map(|(_, nodes)| nodes.len())
-                .sum();
-            eprintln!(
-                "mir: inlining run_once: callees={} call_sites={}",
-                first_pass.func_eval_nodes_where_called.len(),
-                call_sites
-            );
-        }
 
         // We then create the inlining order (inlining first the functions and evaluators that do
         // not call other functions or evaluators)
@@ -215,23 +201,11 @@ impl Pass for Inlining<'_> {
     type Error = CompileError;
 
     fn run<'a>(&mut self, mut ir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
-        // AIR_INLINE_PROGRESS emits per-iteration timing.
-        let trace_progress = std::env::var("AIR_INLINE_PROGRESS").is_ok();
         let mut had_calls = true;
         let mut iterations = 0;
-        let total_start = std::time::Instant::now();
 
         while had_calls && iterations < INLINING_LIMIT {
-            let iter_start = std::time::Instant::now();
             had_calls = self.run_once(&mut ir)?;
-            if trace_progress {
-                eprintln!(
-                    "mir: inlining iteration {} had_calls={} elapsed={:?}",
-                    iterations,
-                    had_calls,
-                    iter_start.elapsed()
-                );
-            }
             iterations += 1;
         }
 
@@ -242,9 +216,6 @@ impl Pass for Inlining<'_> {
             return Err(CompileError::Failed);
         }
 
-        if trace_progress {
-            eprintln!("mir: inlining total elapsed={:?}", total_start.elapsed());
-        }
         Ok(ir)
     }
 }
@@ -318,12 +289,6 @@ pub struct InliningSecondPass<'a> {
     func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>, // Op is a Call here
     had_calls: bool,
     seen_root_call: bool,
-    trace_progress: bool,
-    progress_every: usize,
-    calls_processed: usize,
-    trace_calls: bool,
-    trace_last: Option<usize>,
-    trace_slow_ms: Option<u128>,
     call_size_cache: HashMap<usize, usize>,
     inline_cache: &'a mut HashMap<CallKey, Link<Op>>,
     op_interner: Option<OpInterner>,
@@ -337,21 +302,6 @@ impl<'a> InliningSecondPass<'a> {
         func_eval_nodes_where_called: HashMap<usize, (Link<Root>, Vec<Link<Op>>)>,
         inline_cache: &'a mut HashMap<CallKey, Link<Op>>,
     ) -> Self {
-        let trace_progress = std::env::var("AIR_INLINE_PROGRESS").is_ok();
-        let progress_every = std::env::var("AIR_INLINE_PROGRESS_EVERY")
-            .ok()
-            .and_then(|value| value.parse::<usize>().ok())
-            .filter(|value| *value > 0)
-            .unwrap_or(50);
-        let trace_calls = std::env::var("AIR_INLINE_TRACE_CALLS").is_ok();
-        let trace_last = std::env::var("AIR_INLINE_TRACE_LAST")
-            .ok()
-            .and_then(|value| value.parse::<usize>().ok())
-            .filter(|value| *value > 0);
-        let trace_slow_ms = std::env::var("AIR_INLINE_TRACE_SLOW_MS")
-            .ok()
-            .and_then(|value| value.parse::<u128>().ok())
-            .filter(|value| *value > 0);
         Self {
             diagnostics,
             work_stack: vec![],
@@ -364,12 +314,6 @@ impl<'a> InliningSecondPass<'a> {
             func_eval_inlining_order,
             had_calls: false,
             seen_root_call: false,
-            trace_progress,
-            progress_every,
-            calls_processed: 0,
-            trace_calls,
-            trace_last,
-            trace_slow_ms,
             call_size_cache: HashMap::new(),
             inline_cache,
             op_interner: None,
@@ -534,59 +478,22 @@ impl Visitor for InliningSecondPass<'_> {
     fn run(&mut self, graph: &mut Graph) -> Result<(), CompileError> {
         let root_nodes_to_visit = self.root_nodes_to_visit(graph);
         self.had_calls = !root_nodes_to_visit.is_empty();
-        let total_calls = if self.trace_progress {
-            root_nodes_to_visit
-                .iter()
-                .filter(|node| {
-                    if let Some(op) = node.as_op() {
-                        op.as_call().is_some()
-                    } else {
-                        false
-                    }
-                })
-                .count()
-        } else {
-            0
-        };
 
         for root_node in root_nodes_to_visit.iter() {
-            let call_start = std::time::Instant::now();
             let mut updated_op = None;
 
             if let Some(op) = root_node.as_op() {
                 // Set context for inlining this call
-                let (callee, arguments, call_span, callee_ptr) = {
+                let (callee, arguments, callee_ptr) = {
                     let Some(call_node) = op.as_call() else {
                         return Ok(());
                     };
                     (
                         call_node.function.clone(),
                         call_node.arguments.clone(),
-                        call_node.span(),
                         call_node.function.get_ptr(),
                     )
                 };
-                let should_trace_call = if self.trace_calls {
-                    true
-                } else if let Some(trace_last) = self.trace_last {
-                    total_calls > 0
-                        && (self.calls_processed + 1) > total_calls.saturating_sub(trace_last)
-                } else {
-                    false
-                };
-                if should_trace_call {
-                    let callee_name = graph
-                        .get_root_name_by_ptr(callee_ptr)
-                        .map(|ident| format!("{ident:?}"))
-                        .unwrap_or_else(|| "<unknown>".to_string());
-                    eprintln!(
-                        "mir: inlining call {}/{} callee={} span={:?}",
-                        self.calls_processed + 1,
-                        total_calls,
-                        callee_name,
-                        call_span
-                    );
-                }
 
                 let (pure_function, body) = if let Some(f) = callee.clone().as_function() {
                     (true, f.body.clone())
@@ -673,32 +580,6 @@ impl Visitor for InliningSecondPass<'_> {
                     };
                     if estimated > max_nodes {
                         skip_inline = true;
-                        if self.trace_progress {
-                            let callee_name = graph
-                                .get_root_name_by_ptr(callee_ptr)
-                                .map(|ident| format!("{ident:?}"))
-                                .unwrap_or_else(|| "<unknown>".to_string());
-                            eprintln!(
-                                "mir: inlining skip callee={} estimated_nodes={} max_nodes={}",
-                                callee_name, estimated, max_nodes
-                            );
-                        }
-                    } else if should_trace_call {
-                        let callee_name = graph
-                            .get_root_name_by_ptr(callee_ptr)
-                            .map(|ident| format!("{ident:?}"))
-                            .unwrap_or_else(|| "<unknown>".to_string());
-                        eprintln!(
-                            "mir: inlining estimate callee={} estimated_nodes={} max_nodes={}",
-                            callee_name, estimated, max_nodes
-                        );
-                    }
-                }
-
-                if should_trace_call {
-                    match &arg_hashes {
-                        Some(hashes) => eprintln!("mir: inlining args_hash={hashes:?}"),
-                        None => eprintln!("mir: inlining args_hash=<unsupported>"),
                     }
                 }
 
@@ -710,16 +591,6 @@ impl Visitor for InliningSecondPass<'_> {
                     .unwrap_or(false);
 
                 if updated_op.is_none() && single_call_site && fastpath_enabled {
-                    if should_trace_call || fastpath_enabled {
-                        let callee_name = graph
-                            .get_root_name_by_ptr(callee_ptr)
-                            .map(|ident| format!("{ident:?}"))
-                            .unwrap_or_else(|| "<unknown>".to_string());
-                        eprintln!(
-                            "mir: inlining fastpath single_call_site=true callee={} span={:?}",
-                            callee_name, call_span
-                        );
-                    }
                     let args = if context.pure_function {
                         context.arguments.borrow().clone()
                     } else {
@@ -795,9 +666,6 @@ impl Visitor for InliningSecondPass<'_> {
                 if allow_cache {
                     if let Some(key) = cache_key.as_ref() {
                         if let Some(cached) = self.inline_cache.get(key) {
-                            if should_trace_call {
-                                eprintln!("mir: inlining cache_hit=true");
-                            }
                             updated_op = Some(cached.clone());
                         }
                     }
@@ -909,30 +777,6 @@ impl Visitor for InliningSecondPass<'_> {
                         for param in params.iter() {
                             param.as_parameter_mut().unwrap().set_owner_id(new_owner_id);
                         }
-                    }
-                }
-
-                if self.trace_progress {
-                    self.calls_processed += 1;
-                    if self.calls_processed % self.progress_every == 0 {
-                        eprintln!(
-                            "mir: inlining processed {}/{} calls",
-                            self.calls_processed, total_calls
-                        );
-                    }
-                }
-
-                if let Some(threshold_ms) = self.trace_slow_ms {
-                    let elapsed_ms = call_start.elapsed().as_millis();
-                    if elapsed_ms >= threshold_ms {
-                        let callee_name = graph
-                            .get_root_name_by_ptr(callee_ptr)
-                            .map(|ident| format!("{ident:?}"))
-                            .unwrap_or_else(|| "<unknown>".to_string());
-                        eprintln!(
-                            "mir: inlining slow_call {}ms callee={} span={:?}",
-                            elapsed_ms, callee_name, call_span
-                        );
                     }
                 }
 
