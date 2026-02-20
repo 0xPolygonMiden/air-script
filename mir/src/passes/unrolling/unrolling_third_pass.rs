@@ -129,7 +129,7 @@ impl Visitor for UnrollingThirdPass<'_> {
             | Node::Matrix(_)
             | Node::Accessor(_)
             | Node::None(_) => None,
-            Node::Parameter(p) => {
+            Node::Parameter(_) => {
                 return Err(CompileError::Failed);
             },
             _ => {
