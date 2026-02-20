@@ -6,7 +6,7 @@
 # efficient execution and proving of arbitrary computations. This AIR specification defines
 # the arithmetic constraints that govern the VM's execution.
 #
-# STATUS: Partial (System + Range + Stack General + Stack Overflow).
+# STATUS: Partial (System + Range + Stack).
 #
 # REFERENCES:
 # - Miden VM implementation: https://0xmiden.github.io/miden-vm/
@@ -115,12 +115,21 @@ boundary_constraints {
 ##########################################################################################
 
 integrity_constraints {
+    # --------------------------------------------------------------------------------------
+    # SYSTEM
+    # --------------------------------------------------------------------------------------
     # System transitions (tags 1..12)
     @tag_range(1..13) enf system_transition([system[0..6], decoder[0..24]]);
 
+    # --------------------------------------------------------------------------------------
+    # RANGE CHECKER
+    # --------------------------------------------------------------------------------------
     # Range checker transition (tag 15)
     @tag(15) enf range_checker_constraints([decoder[0..24], range_checker[0..2], chiplets[0..20]]);
 
+    # --------------------------------------------------------------------------------------
+    # STACK
+    # --------------------------------------------------------------------------------------
     # Stack general transition constraints (tags 16..31)
     @tag_range(16..32) enf stack_general_transition([stack[0..16], decoder[0..24]]);
 
