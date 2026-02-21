@@ -16,7 +16,7 @@
 def MidenVM
 
 # Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
-const CURRENT_MAX_ID = 308;
+const CURRENT_MAX_ID = 307;
 
 use flags::*;
 use system::*;
@@ -50,21 +50,21 @@ public_inputs {
 ##########################################################################################
 #
 # Keep the full bus list to preserve auxiliary column ordering. The range checker bus
-# (tag 304), stack overflow bus (tag 305), and decoder buses (tags 306..308) are constrained
+# (tag 303), stack overflow bus (tag 304), and decoder buses (tags 305..307) are constrained
 # in this group.
 ##########################################################################################
 
 buses {
     # Decoder buses
-    multiset bus_0_decoder_p1 @tag_transition(306) @sum_form(assume_exclusive),
-    multiset bus_1_decoder_p2 @tag_transition(307) @sum_form(assume_exclusive),
-    multiset bus_2_decoder_p3 @tag_transition(308) @sum_form(assume_exclusive),
+    multiset bus_0_decoder_p1 @tag_transition(305) @sum_form(assume_exclusive),
+    multiset bus_1_decoder_p2 @tag_transition(306) @sum_form(assume_exclusive),
+    multiset bus_2_decoder_p3 @tag_transition(307) @sum_form(assume_exclusive),
 
     # Stack overflow table
-    multiset bus_3_stack_p1 @tag_transition(305) @sum_form(assume_exclusive),
+    multiset bus_3_stack_p1 @tag_transition(304) @sum_form(assume_exclusive),
 
     # Range checker bus
-    logup    bus_4_range_checker @tag_transition(304),
+    logup    bus_4_range_checker @tag_transition(303),
 
     # Chiplet buses
     multiset bus_5_v_table,
@@ -163,12 +163,12 @@ integrity_constraints {
     # Chiplet selector constraints (tags 231..240)
     @tag_range(231..241) enf chiplet_selectors([chiplets[0..5]]);
 
-    # Hasher transition constraints (tags 241..303)
+    # Hasher transition constraints (tags 241..302)
     #
     # Layout mapping:
     # - chiplets[0] is the chiplet selector s0 (hasher active when s0=0),
     # - chiplets[1..3] are the hasher op selectors s[0..2],
     # - chiplets[4..15] are the hasher state h[0..11],
     # - chiplets[16] is the hasher node index i.
-    @tag_range(241..304) enf hash_chiplet([chiplets[0..17]]);
+    @tag_range(241..303) enf hash_chiplet([chiplets[0..17]]);
 }

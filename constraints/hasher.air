@@ -111,9 +111,6 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
     let not_absorbing_nor_comp_finished = 1 - (f_shift + f_out);
     enf hash_active * not_absorbing_nor_comp_finished * (i' - i) = 0;
 
-    # Keep the output constraint in transition form.
-    enf hash_active * f_out * i = zero;
-
     # -------------------------------------------------------------------------
     # Merkle absorb constraints
     # -------------------------------------------------------------------------
