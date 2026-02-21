@@ -6,7 +6,7 @@
 # efficient execution and proving of arbitrary computations. This AIR specification defines
 # the arithmetic constraints that govern the VM's execution.
 #
-# STATUS: Partial (System + Range + Stack + Decoder).
+# STATUS: Partial (System + Range + Stack + Decoder + Chiplets: selectors/hasher/bitwise).
 #
 # REFERENCES:
 # - Miden VM implementation: https://0xmiden.github.io/miden-vm/
@@ -16,7 +16,7 @@
 def MidenVM
 
 # Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
-const CURRENT_MAX_ID = 307;
+const CURRENT_MAX_ID = 324;
 
 use flags::*;
 use system::*;
@@ -24,6 +24,7 @@ use range_checker::*;
 use decoder::*;
 use chiplets::chiplet_selectors;
 use hasher::*;
+use bitwise::*;
 use stack_general::*;
 use stack_overflow::*;
 use stack_ops::*;
@@ -50,21 +51,21 @@ public_inputs {
 ##########################################################################################
 #
 # Keep the full bus list to preserve auxiliary column ordering. The range checker bus
-# (tag 303), stack overflow bus (tag 304), and decoder buses (tags 305..307) are constrained
+# (tag 320), stack overflow bus (tag 321), and decoder buses (tags 322..324) are constrained
 # in this group.
 ##########################################################################################
 
 buses {
     # Decoder buses
-    multiset bus_0_decoder_p1 @tag_transition(305) @sum_form(assume_exclusive),
-    multiset bus_1_decoder_p2 @tag_transition(306) @sum_form(assume_exclusive),
-    multiset bus_2_decoder_p3 @tag_transition(307) @sum_form(assume_exclusive),
+    multiset bus_0_decoder_p1 @tag_transition(322) @sum_form(assume_exclusive),
+    multiset bus_1_decoder_p2 @tag_transition(323) @sum_form(assume_exclusive),
+    multiset bus_2_decoder_p3 @tag_transition(324) @sum_form(assume_exclusive),
 
     # Stack overflow table
-    multiset bus_3_stack_p1 @tag_transition(304) @sum_form(assume_exclusive),
+    multiset bus_3_stack_p1 @tag_transition(321) @sum_form(assume_exclusive),
 
     # Range checker bus
-    logup    bus_4_range_checker @tag_transition(303),
+    logup    bus_4_range_checker @tag_transition(320),
 
     # Chiplet buses
     multiset bus_5_v_table,
@@ -171,4 +172,14 @@ integrity_constraints {
     # - chiplets[4..15] are the hasher state h[0..11],
     # - chiplets[16] is the hasher node index i.
     @tag_range(241..303) enf hash_chiplet([chiplets[0..17]]);
+
+    # Bitwise transition constraints (tags 303..319)
+    #
+    # Layout mapping:
+    # - chiplets[0] is s0, chiplets[1] is s1,
+    # - chiplets[2] is the op flag,
+    # - chiplets[3..4] are the input aggregates,
+    # - chiplets[5..8] and [9..12] are a/b 4-bit limbs,
+    # - chiplets[13] is the previous output, chiplets[14] is the output.
+    @tag_range(303..320) enf bitwise_chiplet([chiplets[0..15]]);
 }
