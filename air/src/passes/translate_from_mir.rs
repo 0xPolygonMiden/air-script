@@ -726,12 +726,35 @@ impl AirBuilder<'_> {
             Op::Vector(vector) => {
                 let vec = vector.elements.borrow().deref().clone();
                 if let Some(tag_spec) = tag {
-                    let tags = self.expand_tag_spec(&tag_spec, vec.len())?;
-                    for (node, tag_span) in vec.iter().zip(tags.into_iter()) {
-                        self.build_boundary_constraint(
-                            node,
-                            Some(ConstraintTagSpec::Single(tag_span)),
-                        )?;
+                    // Tag ranges are defined over the expanded constraint list, not the
+                    // top-level vector shape. Compute the expanded length and slice tags
+                    // per child accordingly.
+                    let total = vec.iter().map(|node| self.expanded_boundary_len(node)).sum();
+                    let tags = self.expand_tag_spec(&tag_spec, total)?;
+                    let mut tag_iter = tags.into_iter();
+                    for node in vec.iter() {
+                        let count = self.expanded_boundary_len(node);
+                        let node_tag = match count {
+                            0 => None,
+                            1 => Some(ConstraintTagSpec::Single(
+                                tag_iter
+                                    .next()
+                                    .expect("tag length validated against expanded length"),
+                            )),
+                            _ => {
+                                let mut tags = Vec::with_capacity(count);
+                                for _ in 0..count {
+                                    tags.push(
+                                        tag_iter
+                                            .next()
+                                            .expect("tag length validated against expanded length")
+                                            .item,
+                                    );
+                                }
+                                Some(ConstraintTagSpec::List { span: tag_spec.span(), tags })
+                            },
+                        };
+                        self.build_boundary_constraint(node, node_tag)?;
                     }
                 } else {
                     for node in vec.iter() {
@@ -742,22 +765,45 @@ impl AirBuilder<'_> {
             },
             Op::Matrix(matrix) => {
                 let rows = matrix.elements.borrow().deref().clone();
-                let total = rows
-                    .iter()
-                    .map(|row| row.borrow().deref().children().borrow().len())
-                    .sum::<usize>();
                 if let Some(tag_spec) = tag {
+                    // Matrices are vectors of vectors; tag slicing follows the fully expanded
+                    // row-major order.
+                    let total = rows
+                        .iter()
+                        .map(|row| {
+                            let vec = row.borrow().deref().children().borrow().deref().clone();
+                            vec.iter().map(|node| self.expanded_boundary_len(node)).sum::<usize>()
+                        })
+                        .sum::<usize>();
                     let tags = self.expand_tag_spec(&tag_spec, total)?;
                     let mut tag_iter = tags.into_iter();
                     for row in rows.iter() {
                         let vec = row.borrow().deref().children().borrow().deref().clone();
                         for node in vec.iter() {
-                            let tag_span =
-                                tag_iter.next().expect("tag length validated against matrix size");
-                            self.build_boundary_constraint(
-                                node,
-                                Some(ConstraintTagSpec::Single(tag_span)),
-                            )?;
+                            let count = self.expanded_boundary_len(node);
+                            let node_tag = match count {
+                                0 => None,
+                                1 => Some(ConstraintTagSpec::Single(
+                                    tag_iter
+                                        .next()
+                                        .expect("tag length validated against expanded length"),
+                                )),
+                                _ => {
+                                    let mut tags = Vec::with_capacity(count);
+                                    for _ in 0..count {
+                                        tags.push(
+                                            tag_iter
+                                                .next()
+                                                .expect(
+                                                    "tag length validated against expanded length",
+                                                )
+                                                .item,
+                                        );
+                                    }
+                                    Some(ConstraintTagSpec::List { span: tag_spec.span(), tags })
+                                },
+                            };
+                            self.build_boundary_constraint(node, node_tag)?;
                         }
                     }
                 } else {
@@ -872,19 +918,32 @@ impl AirBuilder<'_> {
                 let vec = vector.children().borrow().deref().clone();
                 if let Some(tag_spec) = tag {
                     // Bus ops are expanded into their own constraints later; do not consume tags
-                    // here.
-                    let taggable = vec.iter().filter(|node| !self.is_bus_op_node(node)).count();
-                    let tags = self.expand_tag_spec(&tag_spec, taggable)?;
+                    // here. Tag slicing follows the expanded constraint list.
+                    let total =
+                        vec.iter().map(|node| self.expanded_integrity_len(node)).sum::<usize>();
+                    let tags = self.expand_tag_spec(&tag_spec, total)?;
                     let mut tag_iter = tags.into_iter();
                     for node in vec.iter() {
-                        let node_tag = if self.is_bus_op_node(node) {
-                            None
-                        } else {
-                            Some(ConstraintTagSpec::Single(
+                        let count = self.expanded_integrity_len(node);
+                        let node_tag = match count {
+                            0 => None,
+                            1 => Some(ConstraintTagSpec::Single(
                                 tag_iter
                                     .next()
-                                    .expect("tag length validated against constraint count"),
-                            ))
+                                    .expect("tag length validated against expanded length"),
+                            )),
+                            _ => {
+                                let mut tags = Vec::with_capacity(count);
+                                for _ in 0..count {
+                                    tags.push(
+                                        tag_iter
+                                            .next()
+                                            .expect("tag length validated against expanded length")
+                                            .item,
+                                    );
+                                }
+                                Some(ConstraintTagSpec::List { span: tag_spec.span(), tags })
+                            },
                         };
                         self.build_integrity_constraint(node, node_tag)?;
                     }
@@ -897,30 +956,42 @@ impl AirBuilder<'_> {
             Op::Matrix(matrix) => {
                 let rows = matrix.elements.borrow().deref().clone();
                 if let Some(tag_spec) = tag {
-                    let mut total = 0usize;
-                    for row in rows.iter() {
-                        let vec = row.borrow().deref().children().borrow().deref().clone();
-                        for node in vec.iter() {
-                            // Bus ops are expanded into their own constraints later; do not consume
-                            // tags here.
-                            if !self.is_bus_op_node(node) {
-                                total += 1;
-                            }
-                        }
-                    }
+                    // Matrices are vectors of vectors; tag slicing follows the fully expanded
+                    // row-major order (excluding bus ops).
+                    let total = rows
+                        .iter()
+                        .map(|row| {
+                            let vec = row.borrow().deref().children().borrow().deref().clone();
+                            vec.iter().map(|node| self.expanded_integrity_len(node)).sum::<usize>()
+                        })
+                        .sum::<usize>();
                     let tags = self.expand_tag_spec(&tag_spec, total)?;
                     let mut tag_iter = tags.into_iter();
                     for row in rows.iter() {
                         let vec = row.borrow().deref().children().borrow().deref().clone();
                         for node in vec.iter() {
-                            let node_tag = if self.is_bus_op_node(node) {
-                                None
-                            } else {
-                                Some(ConstraintTagSpec::Single(
+                            let count = self.expanded_integrity_len(node);
+                            let node_tag = match count {
+                                0 => None,
+                                1 => Some(ConstraintTagSpec::Single(
                                     tag_iter
                                         .next()
-                                        .expect("tag length validated against constraint count"),
-                                ))
+                                        .expect("tag length validated against expanded length"),
+                                )),
+                                _ => {
+                                    let mut tags = Vec::with_capacity(count);
+                                    for _ in 0..count {
+                                        tags.push(
+                                            tag_iter
+                                                .next()
+                                                .expect(
+                                                    "tag length validated against expanded length",
+                                                )
+                                                .item,
+                                        );
+                                    }
+                                    Some(ConstraintTagSpec::List { span: tag_spec.span(), tags })
+                                },
                             };
                             self.build_integrity_constraint(node, node_tag)?;
                         }
@@ -992,6 +1063,72 @@ impl AirBuilder<'_> {
             _ => unreachable!("Unexpected integrity constraint root: {:?}", ic),
         }
         Ok(())
+    }
+
+    // Returns the number of boundary constraints produced by `node` after expansion.
+    fn expanded_boundary_len(&self, node: &Link<Op>) -> usize {
+        match node.borrow().deref() {
+            Op::Vector(vector) => vector
+                .elements
+                .borrow()
+                .iter()
+                .map(|child| self.expanded_boundary_len(child))
+                .sum(),
+            Op::Matrix(matrix) => matrix
+                .elements
+                .borrow()
+                .iter()
+                .map(|row| {
+                    let vec = row.borrow().deref().children().borrow().deref().clone();
+                    vec.iter().map(|child| self.expanded_boundary_len(child)).sum::<usize>()
+                })
+                .sum(),
+            Op::Enf(enf) => {
+                let child = accessor_to_scalar(&enf.expr);
+                if child.as_vector().is_some() || child.as_matrix().is_some() {
+                    self.expanded_boundary_len(&child)
+                } else {
+                    1
+                }
+            },
+            _ => 1,
+        }
+    }
+
+    // Returns the number of integrity constraints produced by `node` after expansion.
+    // Bus ops are excluded because they become standalone constraints later.
+    fn expanded_integrity_len(&self, node: &Link<Op>) -> usize {
+        if self.is_bus_op_node(node) {
+            return 0;
+        }
+        match node.borrow().deref() {
+            Op::Vector(vector) => vector
+                .children()
+                .borrow()
+                .iter()
+                .map(|child| self.expanded_integrity_len(child))
+                .sum(),
+            Op::Matrix(matrix) => matrix
+                .elements
+                .borrow()
+                .iter()
+                .map(|row| {
+                    let vec = row.borrow().deref().children().borrow().deref().clone();
+                    vec.iter().map(|child| self.expanded_integrity_len(child)).sum::<usize>()
+                })
+                .sum(),
+            Op::Enf(enf) => {
+                let child = accessor_to_scalar(&enf.expr);
+                if self.is_bus_op_node(&child) {
+                    0
+                } else if child.as_vector().is_some() || child.as_matrix().is_some() {
+                    self.expanded_integrity_len(&child)
+                } else {
+                    1
+                }
+            },
+            _ => 1,
+        }
     }
 
     fn is_bus_op_node(&self, node: &Link<Op>) -> bool {
