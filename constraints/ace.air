@@ -1,0 +1,164 @@
+##########################################################################################
+# ACE CHIPLET CONSTRAINTS MODULE
+##########################################################################################
+#
+# The ACE (Arithmetic Circuit Evaluation) chiplet reduces the number of cycles required
+# when recursively verifying a STARK proof by evaluating arithmetic circuits and ensuring
+# they evaluate to zero.
+##########################################################################################
+
+mod ace
+
+use chiplets::*;
+use utils::*;
+
+##########################################################################################
+# ACE CHIPLET CONSTRAINTS
+##########################################################################################
+
+ev ace_chiplet([chiplets[20]]) {
+    # Chiplet selector columns.
+    let s0_sel = chiplets[0];
+    let s1_sel = chiplets[1];
+    let s2_sel = chiplets[2];
+    let s3_sel = chiplets[3];
+    let s3_next = s3_sel';
+
+    let ace_flag = ace_chiplet_flag(s0_sel, s1_sel, s2_sel, s3_sel);
+    let memory_flag = memory_chiplet_flag(s0_sel, s1_sel, s2_sel);
+
+    # ACE columns (after selectors).
+    let ace_sstart = chiplets[4];
+    let ace_sblock = chiplets[5];
+    let ace_ctx = chiplets[6];
+    let ace_ptr = chiplets[7];
+    let ace_clk = chiplets[8];
+    let ace_op = chiplets[9];
+    let ace_id0 = chiplets[10];
+    let ace_v0_0 = chiplets[11];
+    let ace_v0_1 = chiplets[12];
+    let ace_id1 = chiplets[13];
+    let ace_v1_0 = chiplets[14];
+    let ace_v1_1 = chiplets[15];
+    let ace_n_eval = chiplets[16];
+    let ace_v2_0 = chiplets[17];
+    let ace_v2_1 = chiplets[18];
+    # m0 is used by chiplet bus constraints (not enforced in this module).
+    let ace_m0 = chiplets[19];
+
+    let ace_sstart_next = ace_sstart';
+    let ace_sblock_next = ace_sblock';
+    let ace_ctx_next = ace_ctx';
+    let ace_ptr_next = ace_ptr';
+    let ace_clk_next = ace_clk';
+    let ace_id0_next = ace_id0';
+    let ace_n_eval_next = ace_n_eval';
+
+    # ace_flag_next: next row is still ACE (not transitioning out).
+    # ace_flag_last: next row transitions out of ACE (this row is the last ACE row).
+    let ace_flag_next = 1 - s3_next;
+    let ace_flag_last = s3_next;
+
+    # -------------------------------------------------------------------------
+    # Binary constraints.
+    # -------------------------------------------------------------------------
+    enf ace_flag * ace_sstart * (ace_sstart - 1) = 0;
+    enf ace_flag * ace_sblock * (ace_sblock - 1) = 0;
+
+    # -------------------------------------------------------------------------
+    # Section and block flag constraints.
+    # -------------------------------------------------------------------------
+    let ace_f_next = 1 - ace_sstart_next;
+    # f_end is active on the last row of a section (either sstart' or ACE is ending).
+    let ace_f_end = binary_or(ace_flag_next * ace_sstart_next, ace_flag_last);
+
+    # Last row of ACE chiplet cannot be section start.
+    enf ace_flag * ace_flag_last * ace_sstart = 0;
+
+    # Prevent consecutive section starts within ACE chiplet.
+    enf ace_flag * ace_flag_next * ace_sstart * ace_sstart_next = 0;
+
+    # Sections must start with READ blocks (not EVAL).
+    enf ace_flag * ace_sstart * ace_sblock = 0;
+
+    # EVAL blocks cannot be followed by READ blocks within same section.
+    enf ace_flag
+        * ace_flag_next
+        * ace_f_next
+        * ace_sblock
+        * (1 - ace_sblock_next)
+        = 0;
+
+    # Sections must end with EVAL blocks (not READ).
+    enf ace_flag * ace_f_end * (1 - ace_sblock) = 0;
+
+    # -------------------------------------------------------------------------
+    # Section constraints (within section).
+    # -------------------------------------------------------------------------
+    let ace_f_read = 1 - ace_sblock;
+    let ace_f_eval = ace_sblock;
+    let ace_within_section_gate = ace_flag * ace_flag_next * (1 - ace_sstart_next);
+
+    # ptr increments by +4 in READ, +1 in EVAL.
+    let ace_expected_ptr = ace_ptr + 4 * ace_f_read + ace_f_eval;
+    # id0 decrements by 2 in READ, 1 in EVAL.
+    let ace_expected_id0 = ace_id0_next + 2 * ace_f_read + ace_f_eval;
+
+    enf ace_within_section_gate * (ace_ctx_next - ace_ctx) = 0;
+    enf ace_within_section_gate * (ace_clk_next - ace_clk) = 0;
+    enf ace_within_section_gate * (ace_ptr_next - ace_expected_ptr) = 0;
+    enf ace_within_section_gate * (ace_id0 - ace_expected_id0) = 0;
+
+    # -------------------------------------------------------------------------
+    # READ block constraints.
+    # -------------------------------------------------------------------------
+    let ace_read_gate = ace_flag * ace_f_read;
+    enf ace_read_gate * (ace_id1 - ace_id0 + 1) = 0;
+
+    let ace_f_read_next = 1 - ace_sblock_next;
+    let ace_f_eval_next = ace_sblock_next;
+    # n_eval stores (num_eval_rows - 1), so READ->EVAL switches when id0' == n_eval.
+    # This selects n_eval' on READ rows and id0' on EVAL rows.
+    let ace_selected = ace_f_read_next * ace_n_eval_next + ace_f_eval_next * ace_id0_next;
+    enf ace_read_gate * (ace_selected - ace_n_eval) = 0;
+
+    # -------------------------------------------------------------------------
+    # EVAL block constraints.
+    # -------------------------------------------------------------------------
+    enf ace_flag
+        * ace_f_eval
+        * ace_op
+        * (ace_op - 1)
+        * (ace_op + 1)
+        = 0;
+
+    let ace_linear_0 = ace_v1_0 + ace_op * ace_v2_0;
+    let ace_linear_1 = ace_v1_1 + ace_op * ace_v2_1;
+    let ace_a0b0 = ace_v1_0 * ace_v2_0;
+    let ace_a1b1 = ace_v1_1 * ace_v2_1;
+    let ace_nonlinear_0 = ace_a0b0 + 7 * ace_a1b1;
+    let ace_nonlinear_1 = ace_v1_0 * ace_v2_1 + ace_v1_1 * ace_v2_0;
+    let ace_op_square = ace_op * ace_op;
+    let ace_expected_0 =
+        ace_op_square * (ace_linear_0 - ace_nonlinear_0) + ace_nonlinear_0;
+    let ace_expected_1 =
+        ace_op_square * (ace_linear_1 - ace_nonlinear_1) + ace_nonlinear_1;
+    let ace_eval_gate = ace_flag * ace_f_eval;
+    enf ace_eval_gate * (ace_expected_0 - ace_v0_0) = 0;
+    enf ace_eval_gate * (ace_expected_1 - ace_v0_1) = 0;
+
+    # -------------------------------------------------------------------------
+    # Finalization constraints.
+    # -------------------------------------------------------------------------
+    let ace_final_gate = ace_flag * ace_f_end;
+    enf ace_final_gate * ace_v0_0 = 0;
+    enf ace_final_gate * ace_v0_1 = 0;
+    enf ace_final_gate * ace_id0 = 0;
+
+    # -------------------------------------------------------------------------
+    # First row constraints.
+    # -------------------------------------------------------------------------
+    let ace_next = s2_sel' * (1 - s3_next);
+    let ace_first_row_gate = memory_flag * ace_next;
+    enf ace_first_row_gate * (ace_sstart_next - 1) = 0;
+}
