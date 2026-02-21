@@ -16,7 +16,7 @@
 def MidenVM
 
 # Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
-const CURRENT_MAX_ID = 324;
+const CURRENT_MAX_ID = 345;
 
 use flags::*;
 use system::*;
@@ -25,6 +25,7 @@ use decoder::*;
 use chiplets::chiplet_selectors;
 use hasher::*;
 use bitwise::*;
+use memory::*;
 use stack_general::*;
 use stack_overflow::*;
 use stack_ops::*;
@@ -51,21 +52,21 @@ public_inputs {
 ##########################################################################################
 #
 # Keep the full bus list to preserve auxiliary column ordering. The range checker bus
-# (tag 320), stack overflow bus (tag 321), and decoder buses (tags 322..324) are constrained
+# (tag 341), stack overflow bus (tag 342), and decoder buses (tags 343..345) are constrained
 # in this group.
 ##########################################################################################
 
 buses {
     # Decoder buses
-    multiset bus_0_decoder_p1 @tag_transition(322) @sum_form(assume_exclusive),
-    multiset bus_1_decoder_p2 @tag_transition(323) @sum_form(assume_exclusive),
-    multiset bus_2_decoder_p3 @tag_transition(324) @sum_form(assume_exclusive),
+    multiset bus_0_decoder_p1 @tag_transition(343) @sum_form(assume_exclusive),
+    multiset bus_1_decoder_p2 @tag_transition(344) @sum_form(assume_exclusive),
+    multiset bus_2_decoder_p3 @tag_transition(345) @sum_form(assume_exclusive),
 
     # Stack overflow table
-    multiset bus_3_stack_p1 @tag_transition(321) @sum_form(assume_exclusive),
+    multiset bus_3_stack_p1 @tag_transition(342) @sum_form(assume_exclusive),
 
     # Range checker bus
-    logup    bus_4_range_checker @tag_transition(320),
+    logup    bus_4_range_checker @tag_transition(341),
 
     # Chiplet buses
     multiset bus_5_v_table,
@@ -182,4 +183,15 @@ integrity_constraints {
     # - chiplets[5..8] and [9..12] are a/b 4-bit limbs,
     # - chiplets[13] is the previous output, chiplets[14] is the output.
     @tag_range(303..320) enf bitwise_chiplet([chiplets[0..15]]);
+
+    # Memory transition constraints (tags 320..340)
+    #
+    # Layout mapping:
+    # - chiplets[0..2] are the chiplet selectors (s0,s1,s2),
+    # - chiplets[3..4] are read/word flags,
+    # - chiplets[5..9] are ctx, word addr, idx0, idx1, clk,
+    # - chiplets[10..13] are the value lanes,
+    # - chiplets[14..16] are delta tracking columns,
+    # - chiplets[17] is the same-context/word flag.
+    @tag_range(320..341) enf memory_chiplet([chiplets[0..18]]);
 }

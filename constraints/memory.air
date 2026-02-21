@@ -1,0 +1,157 @@
+##########################################################################################
+# MEMORY CHIPLET CONSTRAINTS MODULE
+##########################################################################################
+#
+# The memory chiplet provides linear read-write random access memory.
+# Memory is element-addressable with addresses in range [0, 2^32).
+##########################################################################################
+
+mod memory
+
+use utils::*;
+use chiplets::*;
+
+##########################################################################################
+# MEMORY CHIPLET TRANSITION CONSTRAINTS
+##########################################################################################
+
+ev memory_chiplet([chiplets[18]]) {
+    # Chiplet selector columns.
+    let s0_sel = chiplets[0];
+    let s1_sel = chiplets[1];
+    let s2_sel = chiplets[2];
+
+    let memory_flag = memory_chiplet_flag(s0_sel, s1_sel, s2_sel);
+
+    let mem_is_read = chiplets[3];
+    let mem_is_word = chiplets[4];
+    let mem_ctx = chiplets[5];
+    let mem_word = chiplets[6];
+    let mem_idx0 = chiplets[7];
+    let mem_idx1 = chiplets[8];
+    let mem_clk = chiplets[9];
+    let mem_values = [chiplets[10], chiplets[11], chiplets[12], chiplets[13]];
+    let mem_d0 = chiplets[14];
+    let mem_d1 = chiplets[15];
+    let mem_d_inv = chiplets[16];
+    let mem_f_scw = chiplets[17];
+
+    # -------------------------------------------------------------------------
+    # Binary constraints.
+    # -------------------------------------------------------------------------
+    enf memory_flag * mem_is_read * (mem_is_read - 1) = 0;
+    enf memory_flag * mem_is_word * (mem_is_word - 1) = 0;
+    enf memory_flag * mem_idx0 * (mem_idx0 - 1) = 0;
+    enf memory_flag * mem_idx1 * (mem_idx1 - 1) = 0;
+
+    # Word access requires idx bits to be zero.
+    let word_gate = memory_flag * mem_is_word;
+    enf word_gate * mem_idx0 = 0;
+    enf word_gate * mem_idx1 = 0;
+
+    # -------------------------------------------------------------------------
+    # First row constraints (transition from bitwise to memory).
+    # -------------------------------------------------------------------------
+    let flag_next_row_first_memory = flag_next_row_first_memory(s0_sel, s1_sel, s1_sel', s2_sel');
+
+    let f0 = (1 - mem_idx1') * (1 - mem_idx0');
+    let f1 = (1 - mem_idx1') * mem_idx0';
+    let f2 = mem_idx1' * (1 - mem_idx0');
+    let f3 = mem_idx1' * mem_idx0';
+
+    # c_i = 1 when v'[i] needs to be constrained (not written to).
+    let mem_c0 = compute_c_i(f0, mem_is_read', mem_is_word');
+    let mem_c1 = compute_c_i(f1, mem_is_read', mem_is_word');
+    let mem_c2 = compute_c_i(f2, mem_is_read', mem_is_word');
+    let mem_c3 = compute_c_i(f3, mem_is_read', mem_is_word');
+
+    let mem_c = [mem_c0, mem_c1, mem_c2, mem_c3];
+    enf flag_next_row_first_memory * mem_c[i] * mem_values[i]' = 0
+        for i in 0..4;
+
+    # -------------------------------------------------------------------------
+    # Transition constraints (memory rows except last).
+    # -------------------------------------------------------------------------
+    let flag_memory_active_not_last = flag_memory_active_not_last_row(s0_sel, s1_sel, s2_sel');
+
+    let ctx_delta = mem_ctx' - mem_ctx;
+    let addr_delta = mem_word' - mem_word;
+    let clk_delta = mem_clk' - mem_clk;
+
+    let n0 = ctx_delta * mem_d_inv';
+    let n1 = addr_delta * mem_d_inv';
+
+    # -------------------------------------------------------------------------
+    # Delta inverse constraints.
+    # -------------------------------------------------------------------------
+    enf flag_memory_active_not_last * n0 * (n0 - 1) = 0;
+    enf flag_memory_active_not_last * (1 - n0) * ctx_delta = 0;
+    enf flag_memory_active_not_last * (1 - n0) * n1 * (n1 - 1) = 0;
+    enf flag_memory_active_not_last * (1 - n0) * (1 - n1) * addr_delta = 0;
+
+    # -------------------------------------------------------------------------
+    # Delta transition constraints (monotonicity).
+    # -------------------------------------------------------------------------
+    let delta_next = mem_d1' * 2^16 + mem_d0';
+    let computed_delta =
+        n0 * ctx_delta + (1 - n0) * (n1 * addr_delta + (1 - n1) * clk_delta);
+    enf flag_memory_active_not_last * (computed_delta - delta_next) = 0;
+
+    # -------------------------------------------------------------------------
+    # Same context/word flag.
+    # -------------------------------------------------------------------------
+    enf flag_memory_active_not_last
+        * (mem_f_scw' - (1 - n0) * (1 - n1)) = 0;
+
+    # -------------------------------------------------------------------------
+    # Same context/word read-only when clk does not advance.
+    # -------------------------------------------------------------------------
+    # When the context and word address are unchanged, the clock may stay the same.
+    # If it does not advance, both rows must be reads.
+    enf flag_memory_active_not_last
+        * mem_f_scw'
+        * (1 - clk_delta * mem_d_inv')
+        * ((1 - mem_is_read) + (1 - mem_is_read'))
+        = 0;
+
+    # -------------------------------------------------------------------------
+    # Value consistency.
+    # -------------------------------------------------------------------------
+    let value_delta_0 =
+        mem_f_scw' * (mem_values[0]' - mem_values[0])
+            + (1 - mem_f_scw') * mem_values[0]';
+    let value_delta_1 =
+        mem_f_scw' * (mem_values[1]' - mem_values[1])
+            + (1 - mem_f_scw') * mem_values[1]';
+    let value_delta_2 =
+        mem_f_scw' * (mem_values[2]' - mem_values[2])
+            + (1 - mem_f_scw') * mem_values[2]';
+    let value_delta_3 =
+        mem_f_scw' * (mem_values[3]' - mem_values[3])
+            + (1 - mem_f_scw') * mem_values[3]';
+    let value_delta = [value_delta_0, value_delta_1, value_delta_2, value_delta_3];
+
+    enf flag_memory_active_not_last * mem_c[i] * value_delta[i] = 0
+        for i in 0..4;
+}
+
+##########################################################################################
+# HELPER FUNCTIONS
+##########################################################################################
+
+# c_i = is_read' + !is_read' * z_i
+# where z_i = !is_word' * !f_i (element access and not this element)
+fn compute_c_i(f_i: felt, is_read_next: felt, is_word_next: felt) -> felt {
+    let z_i = (1 - is_word_next) * (1 - f_i);
+    return is_read_next + (1 - is_read_next) * z_i;
+}
+
+# Memory chiplet active and continuing to next row.
+fn flag_memory_active_not_last_row(s0: felt, s1: felt, s2_next: felt) -> felt {
+    return s0 * s1 * (1 - s2_next);
+}
+
+# Transition into memory chiplet (first row of memory).
+fn flag_next_row_first_memory(s0: felt, s1: felt, s1_next: felt, s2_next: felt) -> felt {
+    return (1 - s1) * s0 * s1_next * (1 - s2_next);
+}

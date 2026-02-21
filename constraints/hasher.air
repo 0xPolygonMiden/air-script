@@ -1,8 +1,8 @@
 ##########################################################################################
-# HASHER CONSTRAINTS MODULE
+# HASHER CHIPLET CONSTRAINTS MODULE
 ##########################################################################################
 #
-# The Hasher module is responsible for all hash-related operations, which includes:
+# The hasher module is responsible for all hash-related operations, which include:
 #
 # 1. A single permutation of Poseidon2.
 # 2. A simple 2-to-1 hash.
@@ -10,7 +10,7 @@
 # 4. Merkle path verification.
 # 5. Merkle root update.
 #
-# REFERENCES:
+# References:
 # - Hasher chiplet design: https://0xmiden.github.io/miden-vm/design/chiplets/hasher.html
 ##########################################################################################
 
@@ -22,7 +22,7 @@ use utils::*;
 # HASHER CHIPLET TRANSITION CONSTRAINTS
 ##########################################################################################
 
-# Enforces the constraints on the hash chiplet given its columns.
+# Enforces the constraints on the hasher chiplet given its columns.
 #
 # The hasher chiplet executes a 32-row Poseidon2 cycle, with internal selectors indicating
 # which hasher operation is in progress. The selector rows and flags are interpreted as:
