@@ -6,7 +6,7 @@
 # efficient execution and proving of arbitrary computations. This AIR specification defines
 # the arithmetic constraints that govern the VM's execution.
 #
-# STATUS: Partial (System + Range + Stack).
+# STATUS: Partial (System + Range + Stack + Decoder).
 #
 # REFERENCES:
 # - Miden VM implementation: https://0xmiden.github.io/miden-vm/
@@ -16,14 +16,18 @@
 def MidenVM
 
 # Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
-const CURRENT_MAX_ID = 123;
+const CURRENT_MAX_ID = 308;
 
 use flags::*;
 use system::*;
 use range_checker::*;
+use decoder::*;
+use chiplets::chiplet_selectors;
+use hasher::*;
 use stack_general::*;
 use stack_overflow::*;
 use stack_ops::*;
+use stack_crypto::*;
 
 ##########################################################################################
 # EXECUTION TRACE LAYOUT
@@ -45,21 +49,22 @@ public_inputs {
 # BUS ARCHITECTURE
 ##########################################################################################
 #
-# Keep the full bus list to preserve auxiliary column ordering. Only the range checker bus
-# (tag 122) and the stack overflow bus (tag 123) are constrained in this group.
+# Keep the full bus list to preserve auxiliary column ordering. The range checker bus
+# (tag 304), stack overflow bus (tag 305), and decoder buses (tags 306..308) are constrained
+# in this group.
 ##########################################################################################
 
 buses {
     # Decoder buses
-    multiset bus_0_decoder_p1 @tag_transition(233) @sum_form(assume_exclusive),
-    multiset bus_1_decoder_p2 @tag_transition(234) @sum_form(assume_exclusive),
-    multiset bus_2_decoder_p3 @tag_transition(235) @sum_form(assume_exclusive),
+    multiset bus_0_decoder_p1 @tag_transition(306) @sum_form(assume_exclusive),
+    multiset bus_1_decoder_p2 @tag_transition(307) @sum_form(assume_exclusive),
+    multiset bus_2_decoder_p3 @tag_transition(308) @sum_form(assume_exclusive),
 
     # Stack overflow table
-    multiset bus_3_stack_p1 @tag_transition(41) @sum_form(assume_exclusive),
+    multiset bus_3_stack_p1 @tag_transition(305) @sum_form(assume_exclusive),
 
     # Range checker bus
-    logup    bus_4_range_checker @tag_transition(122),
+    logup    bus_4_range_checker @tag_transition(304),
 
     # Chiplet buses
     multiset bus_5_v_table,
@@ -86,6 +91,9 @@ boundary_constraints {
     @tag(33) enf stack[16].last = 16;
     @tag(34) enf stack[17].first = 0;
     @tag(35) enf stack[17].last = 0;
+
+    # Decoder in-span boundary (sp starts at 0)
+    @tag(174) enf decoder[16].first = 0;
 
     # Leave bus boundaries unconstrained as these will be handled using the uniform
     # treatment for auxiliary columns boundary constraints, i.e.,
@@ -137,6 +145,30 @@ integrity_constraints {
     # Stack overflow transition constraints (tags 36..39)
     @tag_range(36..40) enf stack_overflow_transition([stack[0..19], decoder[0..24], system[0]]);
 
-    # Stack ops transition constraints (tags 40..121)
-    @tag_range(40..122) enf stack_ops_transition([stack[0..16], decoder[0..24], system[0]]);
+    # Stack ops transition constraints (tags 40..127)
+    @tag_range(40..128) enf stack_ops_transition([stack[0..19], decoder[0..24], system[0..6]]);
+
+    # Stack crypto transition constraints (tags 128..173)
+    @tag_range(128..174) enf stack_crypto_transition([stack[0..19], decoder[0..24], system[0..6]]);
+
+    # --------------------------------------------------------------------------------------
+    # DECODER
+    # --------------------------------------------------------------------------------------
+    # Decoder transition constraints (tags 175..230).
+    @tag_range(175..231) enf decoder_transition([decoder[0..24], stack[0..19], system[0..6]]);
+
+    # --------------------------------------------------------------------------------------
+    # CHIPLETS
+    # --------------------------------------------------------------------------------------
+    # Chiplet selector constraints (tags 231..240)
+    @tag_range(231..241) enf chiplet_selectors([chiplets[0..5]]);
+
+    # Hasher transition constraints (tags 241..303)
+    #
+    # Layout mapping:
+    # - chiplets[0] is the chiplet selector s0 (hasher active when s0=0),
+    # - chiplets[1..3] are the hasher op selectors s[0..2],
+    # - chiplets[4..15] are the hasher state h[0..11],
+    # - chiplets[16] is the hasher node index i.
+    @tag_range(241..304) enf hash_chiplet([chiplets[0..17]]);
 }

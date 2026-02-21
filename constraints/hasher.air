@@ -1,0 +1,418 @@
+##########################################################################################
+# HASHER CONSTRAINTS MODULE
+##########################################################################################
+#
+# The Hasher module is responsible for all hash-related operations, which includes:
+#
+# 1. A single permutation of Poseidon2.
+# 2. A simple 2-to-1 hash.
+# 3. A linear hash of n field elements.
+# 4. Merkle path verification.
+# 5. Merkle root update.
+#
+# REFERENCES:
+# - Hasher chiplet design: https://0xmiden.github.io/miden-vm/design/chiplets/hasher.html
+##########################################################################################
+
+mod hasher
+
+use utils::*;
+
+##########################################################################################
+# HASHER CHIPLET TRANSITION CONSTRAINTS
+##########################################################################################
+
+# Enforces the constraints on the hash chiplet given its columns.
+#
+# The hasher chiplet executes a 32-row Poseidon2 cycle, with internal selectors indicating
+# which hasher operation is in progress. The selector rows and flags are interpreted as:
+#
+# - f_abp: absorb for linear hash (capacity is preserved).
+# - f_mpa/f_mva/f_mua: Merkle absorb variants (capacity reset, digest placed in correct rate lanes).
+# - f_out: operation finished (i must be zero at the end of the cycle).
+#
+# The constraints below are grouped logically:
+#
+# - permutation (Poseidon2)
+# - selector semantics
+# - boundary constraints (capacity preservation, output row requires node index i = 0)
+# - Merkle index updates
+# - Merkle absorb behavior
+#
+ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
+    # Hasher rows are selected when the chiplet selector s0 = 0.
+    let hash_active = 1 - chiplet_s0;
+
+    # -------------------------------------------------------------------------
+    # Poseidon2 permutation
+    # -------------------------------------------------------------------------
+    # Poseidon2 permutation constraints (rows 0..30 of the 32-row cycle).
+    enf poseidon2_permutation([chiplet_s0, h]);
+
+    # -------------------------------------------------------------------------
+    # Selector constraints
+    # -------------------------------------------------------------------------
+    # Dummy zero term to keep constraints in the transition domain (uses next-row access).
+    let zero = s[0]' - s[0]';
+
+    # Selector bits are binary.
+    let selector_bits = [s[0], s[1], s[2]];
+    enf hash_active * binary_constraint(bit) = zero for bit in selector_bits;
+
+    # Flags derived from selector values and cycle markers.
+    let f_abp = get_f_abp(s, cycle_row_31);
+    let f_mpa = get_f_mpa(s, cycle_row_31);
+    let f_mva = get_f_mva(s, cycle_row_31);
+    let f_mua = get_f_mua(s, cycle_row_31);
+    let f_out = get_f_out(s, cycle_row_31);
+    let f_out_next = get_f_out_next(s, cycle_row_30, s[0]', s[1]');
+    let f_absorb = f_mpa + f_mva + f_mua;
+
+    # Selector bits s1/s2 are stable except at cycle boundaries (f_out or f_out_next).
+    let stability_gate = 1 - f_out - f_out_next;
+    let stable_next = [s[1]', s[2]'];
+    let stable_cur = [s[1], s[2]];
+    enf hash_active * stability_gate * (next - cur) = 0 for (next, cur) in (stable_next, stable_cur);
+
+    # Any absorb op forces s0' = 0 at the start of the next cycle.
+    let f_continue = f_abp + f_absorb;
+    enf hash_active * f_continue * s[0]' = 0;
+
+    # On output rows, (s0=0, s1=1, *) is invalid.
+    enf hash_active * cycle_row_31 * (binary_not(s[0]) * s[1]) = 0;
+
+    # -------------------------------------------------------------------------
+    # Boundary constraints
+    # -------------------------------------------------------------------------
+    # ABP keeps capacity lanes unchanged.
+    let cap_next = [h[8]', h[9]', h[10]', h[11]'];
+    let cap_cur = [h[8], h[9], h[10], h[11]];
+    enf hash_active * f_abp * (next - cur) = 0 for (next, cur) in (cap_next, cap_cur);
+
+    # Output row must end with i = 0.
+    enf hash_active * f_out * i = 0;
+
+    # -------------------------------------------------------------------------
+    # Merkle index constraints
+    # -------------------------------------------------------------------------
+    let f_mp = get_f_mp(s, cycle_row_0);
+    let f_mv = get_f_mv(s, cycle_row_0);
+    let f_mu = get_f_mu(s, cycle_row_0);
+
+    # Index shifts occur when absorbing a new node (path/verify/update variants).
+    let f_shift = f_mp + f_mv + f_mu + f_absorb;
+    # b is the dropped bit in i' = floor(i/2), i.e., i = 2*i' + b.
+    let b = i - 2 * i';
+
+    # b is the dropped bit in the right shift; it must be binary when shifting.
+    enf hash_active * f_shift * (b^2 - b) = 0;
+
+    # Otherwise, i is stable across rows.
+    let not_absorbing_nor_comp_finished = 1 - (f_shift + f_out);
+    enf hash_active * not_absorbing_nor_comp_finished * (i' - i) = 0;
+
+    # Keep the output constraint in transition form.
+    enf hash_active * f_out * i = zero;
+
+    # -------------------------------------------------------------------------
+    # Merkle absorb constraints
+    # -------------------------------------------------------------------------
+    # Digest placement: b=0 -> rate0, b=1 -> rate1.
+    let f_b0 = f_absorb * binary_not(b);
+    let f_b1 = f_absorb * b;
+
+    # Absorb resets capacity lanes to 0.
+    enf hash_active * f_absorb * cap = 0 for cap in cap_next;
+
+    let rate0_next = [h[0]', h[1]', h[2]', h[3]'];
+    let rate0_cur = [h[0], h[1], h[2], h[3]];
+    enf hash_active * f_b0 * (next - cur) = 0 for (next, cur) in (rate0_next, rate0_cur);
+
+    let rate1_next = [h[4]', h[5]', h[6]', h[7]'];
+    # When b=1, place the digest (from rate0) into rate1.
+    enf hash_active * f_b1 * (next - cur) = 0 for (next, cur) in (rate1_next, rate0_cur);
+
+    ####################################################################################
+    # BUS OPERATIONS (TODO)
+    ####################################################################################
+    # Chiplet bus operations are TODO.
+}
+
+
+##########################################################################################
+# POSEIDON2 PERMUTATION EVALUATOR
+##########################################################################################
+
+# Poseidon2 permutation constraints for the hasher state.
+#
+# This evaluator is used from `hash_chiplet` to keep the main constraint block readable.
+#
+# Rows in the 32-row cycle:
+# - Row 0: initial external linear layer (M_E).
+# - Rows 1-4 and 27-30: external rounds (S-box on all lanes + M_E).
+# - Rows 5-26: internal rounds (S-box on lane 0 + M_I).
+# - Row 31: no permutation constraint (used for selector/control ops).
+ev poseidon2_permutation([chiplet_s0, h[12]]) {
+    let hash_active = 1 - chiplet_s0;
+
+    let h_state = [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], h[8], h[9], h[10], h[11]];
+    let h_state_next = [h[0]', h[1]', h[2]', h[3]', h[4]', h[5]', h[6]', h[7]', h[8]', h[9]', h[10]', h[11]'];
+
+    # Init linear step: h' = M_E(h)
+    let init_state = poseidon2_init_state(h_state);
+    enf hash_active * cycle_row_0 * (h_next - init_val) = 0
+        for (h_next, init_val) in (h_state_next, init_state);
+
+    # External rounds: h' = M_E(S-box(h + ark_ext))
+    let ext_state = poseidon2_external_state(h_state);
+    enf hash_active * p2_is_external * (h_next - ext_val) = 0
+        for (h_next, ext_val) in (h_state_next, ext_state);
+
+    # Internal rounds: h' = M_I(h with lane0 = (h0 + ark_int)^7)
+    let int_state = poseidon2_internal_state(h_state);
+    enf hash_active * p2_is_internal * (h_next - int_val) = 0
+        for (h_next, int_val) in (h_state_next, int_state);
+}
+
+##########################################################################################
+# HELPER FUNCTIONS
+##########################################################################################
+
+##########################################################################################
+# INSTRUCTION FLAGS - DETAILED DESCRIPTIONS
+##########################################################################################
+#
+# The hasher chiplet uses selector columns s[0], s[1], s[2] to encode different operations:
+#
+# INITIALIZATION FLAGS (on row 0 of a 32-row cycle):
+# • f_bp:  (1,0,0) - Begin Permutation
+#          Initiates: single permutation, 2-to-1 hash, or linear hash computation
+# • f_mp:  (1,0,1) - Merkle Path verification
+#          Starts standard Merkle path verification computation
+# • f_mv:  (1,1,0) - Merkle path Verification for "old" node
+#          Begins verification for old leaf value during Merkle root update
+# • f_mu:  (1,1,1) - Merkle path verification for "new" node
+#          Starts verification for new leaf value during Merkle root update
+#
+# ABSORPTION FLAGS (on row 31 of a 32-row cycle):
+# • f_abp: (1,0,0) - Absorb elements for linear hash (continuing computation)
+#          Absorbs next set of elements into hasher state during linear hash
+# • f_mpa: (1,0,1) - Merkle Path Absorb during standard verification
+#          Absorbs next Merkle path node during standard verification
+# • f_mva: (1,1,0) - Merkle path absorb for "old" node verification
+#          Absorbs next node during "old" leaf verification (Merkle root update)
+# • f_mua: (1,1,1) - Merkle path absorb for "new" node verification
+#          Absorbs next node during "new" leaf verification (Merkle root update)
+#
+# OUTPUT FLAGS (on row 31 of a 32-row cycle):
+# • f_hout: (0,0,0) - Hash Output
+#           Returns the result of the currently running hash computation
+# • f_sout: (0,0,1) - State Output
+#           Returns the entire 12-element hasher state
+# • f_out:  Combined flag (f_hout | f_sout) - any output operation
+#
+##########################################################################################
+
+# f_bp: Begin Permutation flag (1,0,0) on cycle_row_0
+# Initiates single permutation, 2-to-1 hash, or linear hash computation.
+fn get_f_bp(s: felt[3], row0: felt) -> felt {
+    return row0 & s[0] & binary_not(s[1]) & binary_not(s[2]);
+}
+
+# f_mp: Merkle Path verification flag (1,0,1) on cycle_row_0
+# Initiates standard Merkle path verification computation.
+fn get_f_mp(s: felt[3], row0: felt) -> felt {
+    return row0 & s[0] & binary_not(s[1]) & s[2];
+}
+
+# f_mv: Merkle path Verification for "old" node flag (1,1,0) on cycle_row_0
+# Begins verification for old leaf value during Merkle root update computation.
+fn get_f_mv(s: felt[3], row0: felt) -> felt {
+    return row0 & s[0] & s[1] & binary_not(s[2]);
+}
+
+# f_mu: Merkle path verification for "new" node flag (1,1,1) on cycle_row_0
+# Starts verification for new leaf value during Merkle root update computation.
+fn get_f_mu(s: felt[3], row0: felt) -> felt {
+    return row0 & s[0] & s[1] & s[2];
+}
+
+# f_abp: Absorb elements for linear hash flag (1,0,0) on cycle_row_31
+# Absorbs next set of elements into hasher state during linear hash computation.
+fn get_f_abp(s: felt[3], row31: felt) -> felt {
+    return row31 & s[0] & binary_not(s[1]) & binary_not(s[2]);
+}
+
+# f_mpa: Merkle Path Absorb flag (1,0,1) on cycle_row_31
+# Absorbs next Merkle path node during standard verification computation.
+fn get_f_mpa(s: felt[3], row31: felt) -> felt {
+    return row31 & s[0] & binary_not(s[1]) & s[2];
+}
+
+# f_mva: Merkle path absorb for "old" node flag (1,1,0) on cycle_row_31
+# Absorbs next node during "old" leaf verification (Merkle root update computation).
+fn get_f_mva(s: felt[3], row31: felt) -> felt {
+    return row31 & s[0] & s[1] & binary_not(s[2]);
+}
+
+# f_mua: Merkle path absorb for "new" node flag (1,1,1) on cycle_row_31
+# Absorbs next node during "new" leaf verification (Merkle root update computation).
+fn get_f_mua(s: felt[3], row31: felt) -> felt {
+    return row31 & s[0] & s[1] & s[2];
+}
+
+# Flag f_out is set to 1 when either f_hout = 1 or f_sout = 1 in the current row.
+fn get_f_out(s: felt[3], row31: felt) -> felt {
+    return row31 & binary_not(s[0]) & binary_not(s[1]);
+}
+
+# Flag f_out_next is set to 1 when either f_hout = 1 or f_sout = 1 in the next row.
+fn get_f_out_next(s: felt[3], row30: felt, s0_next: felt, s1_next: felt) -> felt {
+    return row30 & binary_not(s0_next) & binary_not(s1_next);
+}
+
+# f_hout: Hash Output flag (0,0,0) on cycle_row_31
+# Returns the 4-element hash result (h0-h3)
+fn get_f_hout(s: felt[3], row31: felt) -> felt {
+    return row31 & binary_not(s[0]) & binary_not(s[1]) & binary_not(s[2]);
+}
+
+# f_sout: State Output flag (0,0,1) on cycle_row_31
+# Returns the entire 12-element hasher state
+fn get_f_sout(s: felt[3], row31: felt) -> felt {
+    return row31 & binary_not(s[0]) & binary_not(s[1]) & s[2];
+}
+
+##########################################################################################
+# LINEAR ALGEBRA HELPERS (POSEIDON2)
+##########################################################################################
+
+fn pow7(x: felt) -> felt {
+    let x2 = x * x;
+    let x4 = x2 * x2;
+    return x4 * x2 * x;
+}
+
+fn matmul_m4(input: felt[4]) -> felt[4] {
+    let a = input[0];
+    let b = input[1];
+    let c = input[2];
+    let d = input[3];
+
+    let t0 = a + b;
+    let t1 = c + d;
+    let t2 = 2 * b + t1;
+    let t3 = 2 * d + t0;
+    let t4 = 4 * t1 + t3;
+    let t5 = 4 * t0 + t2;
+
+    let out0 = t3 + t5;
+    let out1 = t5;
+    let out2 = t2 + t4;
+    let out3 = t4;
+
+    return [out0, out1, out2, out3];
+}
+
+fn poseidon2_init_state(h: felt[12]) -> felt[12] {
+    let b0 = matmul_m4([h[0], h[1], h[2], h[3]]);
+    let b1 = matmul_m4([h[4], h[5], h[6], h[7]]);
+    let b2 = matmul_m4([h[8], h[9], h[10], h[11]]);
+
+    let sum0 = b0[0] + b1[0] + b2[0];
+    let sum1 = b0[1] + b1[1] + b2[1];
+    let sum2 = b0[2] + b1[2] + b2[2];
+    let sum3 = b0[3] + b1[3] + b2[3];
+
+    return [
+        b0[0] + sum0, b0[1] + sum1, b0[2] + sum2, b0[3] + sum3,
+        b1[0] + sum0, b1[1] + sum1, b1[2] + sum2, b1[3] + sum3,
+        b2[0] + sum0, b2[1] + sum1, b2[2] + sum2, b2[3] + sum3
+    ];
+}
+
+fn poseidon2_external_state(h: felt[12]) -> felt[12] {
+    let s0 = pow7(h[0] + ark_ext_0);
+    let s1 = pow7(h[1] + ark_ext_1);
+    let s2 = pow7(h[2] + ark_ext_2);
+    let s3 = pow7(h[3] + ark_ext_3);
+    let s4 = pow7(h[4] + ark_ext_4);
+    let s5 = pow7(h[5] + ark_ext_5);
+    let s6 = pow7(h[6] + ark_ext_6);
+    let s7 = pow7(h[7] + ark_ext_7);
+    let s8 = pow7(h[8] + ark_ext_8);
+    let s9 = pow7(h[9] + ark_ext_9);
+    let s10 = pow7(h[10] + ark_ext_10);
+    let s11 = pow7(h[11] + ark_ext_11);
+
+    let b0 = matmul_m4([s0, s1, s2, s3]);
+    let b1 = matmul_m4([s4, s5, s6, s7]);
+    let b2 = matmul_m4([s8, s9, s10, s11]);
+
+    let sum0 = b0[0] + b1[0] + b2[0];
+    let sum1 = b0[1] + b1[1] + b2[1];
+    let sum2 = b0[2] + b1[2] + b2[2];
+    let sum3 = b0[3] + b1[3] + b2[3];
+
+    return [
+        b0[0] + sum0, b0[1] + sum1, b0[2] + sum2, b0[3] + sum3,
+        b1[0] + sum0, b1[1] + sum1, b1[2] + sum2, b1[3] + sum3,
+        b2[0] + sum0, b2[1] + sum1, b2[2] + sum2, b2[3] + sum3
+    ];
+}
+
+fn poseidon2_internal_state(h: felt[12]) -> felt[12] {
+    let i0 = pow7(h[0] + ark_int);
+    let sum_int = i0 + h[1] + h[2] + h[3] + h[4] + h[5] + h[6] + h[7] + h[8] + h[9] + h[10] + h[11];
+
+    return [
+        i0 * MAT_DIAG[0] + sum_int,
+        h[1] * MAT_DIAG[1] + sum_int,
+        h[2] * MAT_DIAG[2] + sum_int,
+        h[3] * MAT_DIAG[3] + sum_int,
+        h[4] * MAT_DIAG[4] + sum_int,
+        h[5] * MAT_DIAG[5] + sum_int,
+        h[6] * MAT_DIAG[6] + sum_int,
+        h[7] * MAT_DIAG[7] + sum_int,
+        h[8] * MAT_DIAG[8] + sum_int,
+        h[9] * MAT_DIAG[9] + sum_int,
+        h[10] * MAT_DIAG[10] + sum_int,
+        h[11] * MAT_DIAG[11] + sum_int
+    ];
+}
+
+
+##########################################################################################
+# CONSTANTS AND PERIODIC COLUMNS
+##########################################################################################
+
+const MAT_DIAG = [
+    14102670999874605824, 15585654191999307702, 940187017142450255,
+    8747386241522630711, 6750641561540124747, 7440998025584530007,
+    6136358134615751536, 12413576830284969611, 11675438539028694709,
+    17580553691069642926, 892707462476851331, 15167485180850043744
+];
+
+periodic_columns {
+    cycle_row_0: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    cycle_row_30: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+    cycle_row_31: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+
+    p2_is_external: [0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0],
+    p2_is_internal: [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+
+    ark_ext_0: [0, 1431286215153372998, 8724526834049581439, 3342624911463171251, 10250026231324330997, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14306783492963476045, 8595401306696186761, 2911694411222711481, 2440151485689245146, 0],
+    ark_ext_1: [0, 3509349009260703107, 17673787971454860688, 6781356195391537436, 13321947507807660157, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12653264875831356889, 7753411262943026561, 6420652251792580406, 17521895002090134367, 0],
+    ark_ext_2: [0, 2289575380984896342, 2519987773101056005, 4697929572322733707, 13020725208899496943, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10887434669785806501, 12415218859476220947, 323544930728360053, 13821005335130766955, 0],
+    ark_ext_3: [0, 10625215922958251110, 7999687124137420323, 4179687232228901671, 11416990495425192684, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7221072982690633460, 12517451587026875834, 11718666476052241225, 17513705631114265826, 0],
+    ark_ext_4: [0, 17137022507167291684, 18312454652563306701, 17841073646522133059, 7221795794796219413, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9953585853856674407, 3257008032900598499, 2449132068789045592, 17068447856797239529, 0],
+    ark_ext_5: [0, 17143426961497010024, 15136091233824155669, 18340176721233187897, 2607917872900632985, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13497620366078753434, 2187469039578904770, 17993014181992530560, 17964439003977043993, 0],
+    ark_ext_6: [0, 9589775313463224365, 1257110570403430003, 13152929999122219197, 2591896057192169329, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18140292631504202243, 657675168296710415, 15161788952257357966, 5685000919538239429, 0],
+    ark_ext_7: [0, 7736066733515538648, 5665449074466664773, 6306257051437840427, 10485489452304998145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17311934738088402529, 8659969869470208989, 3788504801066818367, 11615940660682589106, 0],
+    ark_ext_8: [0, 2217569167061322248, 16178737609685266571, 4974451914008050921, 9480186048908910015, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6686302214424395771, 12526098871288378639, 1282111773460545571, 2522854885180605258, 0],
+    ark_ext_9: [0, 10394930802584583083, 52855143527893348, 11258703678970285201, 2645141845409940474, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11193071888943695519, 12525853395769009329, 8849495164481705550, 12584118968072796115, 0],
+    ark_ext_10: [0, 4612393375016695705, 8084454992943870230, 581736081259960204, 16242299839765162610, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10233795775801758543, 15388161689979551704, 8380852402060721190, 17841258728624635591, 0],
+    ark_ext_11: [0, 5332470884919453534, 2597062441266647183, 18323286026903235604, 12203738590896308135, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3362219552562939863, 7880966905416338909, 2161980224591127360, 10821564568873127316, 0],
+
+    ark_int: [0, 0, 0, 0, 0, 5395176197344543510, 17941136338888340715, 7559392505546762987, 549633128904721280, 15658455328409267684, 10078371877170729592, 2349868247408080783, 13105911261634181239, 12868653202234053626, 9471330315555975806, 4580289636625406680, 13222733136951421572, 4555032575628627551, 7619130111929922899, 4547848507246491777, 5662043532568004632, 15723873049665279492, 13585630674756818185, 6990417929677264473, 6373257983538884779, 1005856792729125863, 17850970025369572891, 0, 0, 0, 0, 0],
+}
