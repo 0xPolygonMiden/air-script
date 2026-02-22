@@ -59,28 +59,24 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     # CRYPTOSTREAM
     # ------------------------------------------------------------------------------------------
     # Positions 8-11: Unchanged (capacity preserved)
-    enf is_cryptostream * (s8' - s8) = 0;
-    enf is_cryptostream * (s9' - s9) = 0;
-    enf is_cryptostream * (s10' - s10) = 0;
-    enf is_cryptostream * (s11' - s11) = 0;
+    let cryptostream_keep_top = [s8' - s8, s9' - s9, s10' - s10, s11' - s11];
+    enf cryptostream_keep_top[i] = 0 for i in 0..4 when is_cryptostream;
     # Positions 12-13: Source/destination pointers incremented by 8 (2 words)
-    enf is_cryptostream * (s12' - (s12 + 8)) = 0;
-    enf is_cryptostream * (s13' - (s13 + 8)) = 0;
+    let cryptostream_bump = [s12' - (s12 + 8), s13' - (s13 + 8)];
+    enf cryptostream_bump[i] = 0 for i in 0..2 when is_cryptostream;
     # Positions 14-15: Unchanged
-    enf is_cryptostream * (s14' - s14) = 0;
-    enf is_cryptostream * (s15' - s15) = 0;
+    let cryptostream_keep_tail = [s14' - s14, s15' - s15];
+    enf cryptostream_keep_tail[i] = 0 for i in 0..2 when is_cryptostream;
 
     # ------------------------------------------------------------------------------------------
     # HORNERBASE
     # ------------------------------------------------------------------------------------------
     # Positions 0-13: Unchanged
-    enf is_hornerbase * (s0' - s0) = 0; enf is_hornerbase * (s1' - s1) = 0;
-    enf is_hornerbase * (s2' - s2) = 0; enf is_hornerbase * (s3' - s3) = 0;
-    enf is_hornerbase * (s4' - s4) = 0; enf is_hornerbase * (s5' - s5) = 0;
-    enf is_hornerbase * (s6' - s6) = 0; enf is_hornerbase * (s7' - s7) = 0;
-    enf is_hornerbase * (s8' - s8) = 0; enf is_hornerbase * (s9' - s9) = 0;
-    enf is_hornerbase * (s10' - s10) = 0; enf is_hornerbase * (s11' - s11) = 0;
-    enf is_hornerbase * (s12' - s12) = 0; enf is_hornerbase * (s13' - s13) = 0;
+    let hornerbase_keep = [
+        s0' - s0, s1' - s1, s2' - s2, s3' - s3, s4' - s4, s5' - s5, s6' - s6,
+        s7' - s7, s8' - s8, s9' - s9, s10' - s10, s11' - s11, s12' - s12, s13' - s13
+    ];
+    enf hornerbase_keep[i] = 0 for i in 0..14 when is_hornerbase;
 
     # Local variables for readability
     let a0 = h0; let a1 = h1;
@@ -102,45 +98,43 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let alpha_cu_1 = 3 * a0_sq * a1 + 7 * a1_cu;
 
     # tmp0 = acc·α² + c0·α + c1
-    enf is_hornerbase * (tmp0_0 - (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1) + s0 * a0 + s1)) = zero;
-    enf is_hornerbase * (tmp0_1 - (acc0 * alpha_sq_1 + acc1 * alpha_sq_0 + s0 * a1)) = zero;
+    enf tmp0_0 - (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1) + s0 * a0 + s1) = zero when is_hornerbase;
+    enf tmp0_1 - (acc0 * alpha_sq_1 + acc1 * alpha_sq_0 + s0 * a1) = zero when is_hornerbase;
 
     # tmp1 = tmp0·α³ + c2·α² + c3·α + c4
-    enf is_hornerbase * (tmp1_0 - (tmp0_0 * alpha_cu_0 + tmp0_1 * (7 * alpha_cu_1)
-        + s2 * alpha_sq_0 + s3 * a0 + s4)) = zero;
-    enf is_hornerbase * (tmp1_1 - (tmp0_0 * alpha_cu_1 + tmp0_1 * alpha_cu_0
-        + s2 * alpha_sq_1 + s3 * a1)) = zero;
+    enf tmp1_0 - (tmp0_0 * alpha_cu_0 + tmp0_1 * (7 * alpha_cu_1)
+        + s2 * alpha_sq_0 + s3 * a0 + s4) = zero when is_hornerbase;
+    enf tmp1_1 - (tmp0_0 * alpha_cu_1 + tmp0_1 * alpha_cu_0
+        + s2 * alpha_sq_1 + s3 * a1) = zero when is_hornerbase;
 
     # acc' = tmp1·α³ + c5·α² + c6·α + c7
-    enf is_hornerbase * (s14' - (tmp1_0 * alpha_cu_0 + tmp1_1 * (7 * alpha_cu_1)
-        + s5 * alpha_sq_0 + s6 * a0 + s7)) = 0;
-    enf is_hornerbase * (s15' - (tmp1_0 * alpha_cu_1 + tmp1_1 * alpha_cu_0
-        + s5 * alpha_sq_1 + s6 * a1)) = 0;
+    enf s14' - (tmp1_0 * alpha_cu_0 + tmp1_1 * (7 * alpha_cu_1)
+        + s5 * alpha_sq_0 + s6 * a0 + s7) = 0 when is_hornerbase;
+    enf s15' - (tmp1_0 * alpha_cu_1 + tmp1_1 * alpha_cu_0
+        + s5 * alpha_sq_1 + s6 * a1) = 0 when is_hornerbase;
 
     # ------------------------------------------------------------------------------------------
     # HORNEREXT
     # ------------------------------------------------------------------------------------------
     # Positions 0-13: Unchanged
-    enf is_hornerext * (s0' - s0) = 0; enf is_hornerext * (s1' - s1) = 0;
-    enf is_hornerext * (s2' - s2) = 0; enf is_hornerext * (s3' - s3) = 0;
-    enf is_hornerext * (s4' - s4) = 0; enf is_hornerext * (s5' - s5) = 0;
-    enf is_hornerext * (s6' - s6) = 0; enf is_hornerext * (s7' - s7) = 0;
-    enf is_hornerext * (s8' - s8) = 0; enf is_hornerext * (s9' - s9) = 0;
-    enf is_hornerext * (s10' - s10) = 0; enf is_hornerext * (s11' - s11) = 0;
-    enf is_hornerext * (s12' - s12) = 0; enf is_hornerext * (s13' - s13) = 0;
+    let hornerext_keep = [
+        s0' - s0, s1' - s1, s2' - s2, s3' - s3, s4' - s4, s5' - s5, s6' - s6,
+        s7' - s7, s8' - s8, s9' - s9, s10' - s10, s11' - s11, s12' - s12, s13' - s13
+    ];
+    enf hornerext_keep[i] = 0 for i in 0..14 when is_hornerext;
 
     let tmp0 = h4;
     let tmp1 = h5;
 
     # acc_tmp = acc·α² + c0·α + c1
-    enf is_hornerext * (tmp0 - (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1)
-        + s0 * a0 + 7 * s1 * a1 + s2)) = zero;
-    enf is_hornerext * (tmp1 - (acc1 * alpha_sq_0 + acc0 * alpha_sq_1
-        + s1 * a0 + s0 * a1 + s3)) = zero;
+    enf tmp0 - (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1)
+        + s0 * a0 + 7 * s1 * a1 + s2) = zero when is_hornerext;
+    enf tmp1 - (acc1 * alpha_sq_0 + acc0 * alpha_sq_1
+        + s1 * a0 + s0 * a1 + s3) = zero when is_hornerext;
 
     # acc' = acc_tmp·α² + c2·α + c3
-    enf is_hornerext * (s14' - (tmp0 * alpha_sq_0 + tmp1 * (7 * alpha_sq_1)
-        + s4 * a0 + 7 * s5 * a1 + s6)) = 0;
-    enf is_hornerext * (s15' - (tmp1 * alpha_sq_0 + tmp0 * alpha_sq_1
-        + s5 * a0 + s4 * a1 + s7)) = 0;
+    enf s14' - (tmp0 * alpha_sq_0 + tmp1 * (7 * alpha_sq_1)
+        + s4 * a0 + 7 * s5 * a1 + s6) = 0 when is_hornerext;
+    enf s15' - (tmp1 * alpha_sq_0 + tmp0 * alpha_sq_1
+        + s5 * a0 + s4 * a1 + s7) = 0 when is_hornerext;
 }
