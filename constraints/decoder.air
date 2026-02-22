@@ -67,20 +67,14 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # sp is the binary in-span flag.
     enf sp * (sp - 1) = 0;
     # After SPAN/RESPAN, the next row must be inside a span.
-    enf is_span * (1 - sp') = 0;
-    enf is_respan * (1 - sp') = 0;
+    let span_next = [is_span, is_respan];
+    enf span_next[i] * (1 - sp') = 0 for i in 0..2;
 
     # ---------------------------------------------------------------------------
     # Op bits must be binary.
     # ---------------------------------------------------------------------------
     # Each opcode bit is 0 or 1.
-    enf b0 * (b0 - 1) = 0;
-    enf b1 * (b1 - 1) = 0;
-    enf b2 * (b2 - 1) = 0;
-    enf b3 * (b3 - 1) = 0;
-    enf b4 * (b4 - 1) = 0;
-    enf b5 * (b5 - 1) = 0;
-    enf b6 * (b6 - 1) = 0;
+    enf op_bits[i] * (op_bits[i] - 1) = 0 for i in 0..7;
 
     # ---------------------------------------------------------------------------
     # Extra columns for degree reduction.
@@ -106,9 +100,8 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # Batch flags must be binary.
     # ---------------------------------------------------------------------------
     # Each batch flag is 0 or 1.
-    enf c0 * (c0 - 1) = 0;
-    enf c1 * (c1 - 1) = 0;
-    enf c2 * (c2 - 1) = 0;
+    let batch_flags = [c0, c1, c2];
+    enf batch_flags[i] * (batch_flags[i] - 1) = 0 for i in 0..3;
 
     # ---------------------------------------------------------------------------
     # General decoder constraints.
@@ -118,24 +111,19 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     enf split_or_loop * s0 * (s0 - 1) = 0;
 
     # DYN: only the first half of the hasher state is used; the tail must be zero.
-    enf is_dyn * h4 = 0;
-    enf is_dyn * h5 = 0;
-    enf is_dyn * h6 = 0;
-    enf is_dyn * h7 = 0;
+    let dyn_tail = [h4, h5, h6, h7];
+    enf dyn_tail[i] = 0 for i in 0..4 when is_dyn;
 
     # REPEAT: must be inside a loop body (h4=1) and have s0=1.
-    enf is_repeat * (1 - s0) = 0;
-    enf is_repeat * (1 - h4) = 0;
+    let repeat_requirements = [1 - s0, 1 - h4];
+    enf repeat_requirements[i] = 0 for i in 0..2 when is_repeat;
 
     # END inside a loop: if is_loop flag is set, s0 must be 0.
     enf is_end * h5 * s0 = 0;
 
     # END followed by REPEAT: carry hasher state h0..h4 to the next row.
-    enf is_end * is_repeat_next * (h0' - h0) = 0;
-    enf is_end * is_repeat_next * (h1' - h1) = 0;
-    enf is_end * is_repeat_next * (h2' - h2) = 0;
-    enf is_end * is_repeat_next * (h3' - h3) = 0;
-    enf is_end * is_repeat_next * (h4' - h4) = 0;
+    let repeat_hold = [h0' - h0, h1' - h1, h2' - h2, h3' - h3, h4' - h4];
+    enf repeat_hold[i] = 0 for i in 0..5 when is_end * is_repeat_next;
 
     # HALT is absorbing: must be followed by HALT.
     enf is_halt * (1 - is_halt_next) = 0;
@@ -199,15 +187,13 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
 
     # If batch size is <= 4 groups, unused hasher lanes h4..h7 must be zero.
     let small_batch = batch_g1 + batch_g2 + batch_g4;
-    enf small_batch * h4 = 0;
-    enf small_batch * h5 = 0;
-    enf small_batch * h6 = 0;
-    enf small_batch * h7 = 0;
+    let small_batch_tail = [h4, h5, h6, h7];
+    enf small_batch_tail[i] = 0 for i in 0..4 when small_batch;
 
     # If batch size is <= 2 groups, unused hasher lanes h2..h3 must be zero.
     let tiny_batch = batch_g1 + batch_g2;
-    enf tiny_batch * h2 = 0;
-    enf tiny_batch * h3 = 0;
+    let tiny_batch_tail = [h2, h3];
+    enf tiny_batch_tail[i] = 0 for i in 0..2 when tiny_batch;
     enf batch_g1 * h1 = 0;
 
     # ---------------------------------------------------------------------------
