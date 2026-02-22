@@ -113,7 +113,8 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         is_dup13 * (s0' - s13),
         is_dup15 * (s0' - s15)
     ];
-    enf dup_constraints[i] = 0 for i in 0..12;
+    let dup_zeros = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    enf lhs = rhs for (lhs, rhs) in (dup_constraints, dup_zeros);
 
     enf s0' = system_clk when is_clk;
 
@@ -135,7 +136,8 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         is_movup7 * (s0' - s7),
         is_movup8 * (s0' - s8)
     ];
-    enf movup_constraints[i] = 0 for i in 0..7;
+    let movup_zeros = [0, 0, 0, 0, 0, 0, 0];
+    enf lhs = rhs for (lhs, rhs) in (movup_constraints, movup_zeros);
 
     let movdn_constraints = [
         is_movdn2 * (s2' - s0),
@@ -146,7 +148,8 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         is_movdn7 * (s7' - s0),
         is_movdn8 * (s8' - s0)
     ];
-    enf movdn_constraints[i] = 0 for i in 0..7;
+    let movdn_zeros = [0, 0, 0, 0, 0, 0, 0];
+    enf lhs = rhs for (lhs, rhs) in (movdn_constraints, movdn_zeros);
 
     # ------------------------------------------------------------------------------------------
     # SWAPW/SWAPDW
