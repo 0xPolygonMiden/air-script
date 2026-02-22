@@ -39,10 +39,9 @@ ev memory_chiplet([chiplets[18]]) {
     # -------------------------------------------------------------------------
     # Binary constraints.
     # -------------------------------------------------------------------------
-    enf memory_flag * mem_is_read * (mem_is_read - 1) = 0;
-    enf memory_flag * mem_is_word * (mem_is_word - 1) = 0;
-    enf memory_flag * mem_idx0 * (mem_idx0 - 1) = 0;
-    enf memory_flag * mem_idx1 * (mem_idx1 - 1) = 0;
+    let binary_cols = [mem_is_read, mem_is_word, mem_idx0, mem_idx1];
+    enf memory_flag * binary_cols[i] * (binary_cols[i] - 1) = 0
+        for i in 0..4;
 
     # Word access requires idx bits to be zero.
     let word_gate = memory_flag * mem_is_word;
