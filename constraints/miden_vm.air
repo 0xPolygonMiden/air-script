@@ -6,7 +6,7 @@
 # efficient execution and proving of arbitrary computations. This AIR specification defines
 # the arithmetic constraints that govern the VM's execution.
 #
-# STATUS: Partial (System + Range + Stack + Decoder + Chiplets: selectors/hasher/bitwise/memory/ace).
+# STATUS: Partial (System + Range + Stack + Decoder + Chiplets: selectors/hasher/bitwise/memory/ace/kernel).
 #
 # REFERENCES:
 # - Miden VM implementation: https://0xmiden.github.io/miden-vm/
