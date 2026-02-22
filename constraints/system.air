@@ -27,10 +27,7 @@ ev system_transition([system[6], decoder[24]]) {
     # Extract system columns
     let clk = system[0];
     let ctx = system[1];
-    let fn_hash_0 = system[2];
-    let fn_hash_1 = system[3];
-    let fn_hash_2 = system[4];
-    let fn_hash_3 = system[5];
+    let fn_hash = [system[2], system[3], system[4], system[5]];
 
     # Extract decoder columns needed for operation flags
     let op_bit0 = decoder[1];
@@ -40,10 +37,7 @@ ev system_transition([system[6], decoder[24]]) {
     let op_bit4 = decoder[5];
     let op_bit5 = decoder[6];
     let op_bit6 = decoder[7];
-    let decoder_h0 = decoder[8];
-    let decoder_h1 = decoder[9];
-    let decoder_h2 = decoder[10];
-    let decoder_h3 = decoder[11];
+    let decoder_h = [decoder[8], decoder[9], decoder[10], decoder[11]];
     let e0 = decoder[22];
     let e1 = decoder[23];
 
@@ -64,14 +58,8 @@ ev system_transition([system[6], decoder[24]]) {
     enf ctx' = ctx when ctx_preserve;
 
     # Function hash transitions
-    enf fn_hash_0' = decoder_h0 when f_call + f_dyncall;
-    enf fn_hash_1' = decoder_h1 when f_call + f_dyncall;
-    enf fn_hash_2' = decoder_h2 when f_call + f_dyncall;
-    enf fn_hash_3' = decoder_h3 when f_call + f_dyncall;
+    enf fn_hash[i]' = decoder_h[i] for i in 0..4 when f_call + f_dyncall;
 
     let fn_preserve = 1 - (f_call + f_dyncall + f_end);
-    enf fn_hash_0' = fn_hash_0 when fn_preserve;
-    enf fn_hash_1' = fn_hash_1 when fn_preserve;
-    enf fn_hash_2' = fn_hash_2 when fn_preserve;
-    enf fn_hash_3' = fn_hash_3 when fn_preserve;
+    enf fn_hash[i]' = fn_hash[i] for i in 0..4 when fn_preserve;
 }
