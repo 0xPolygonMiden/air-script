@@ -44,7 +44,7 @@ ev kernel_rom_chiplet([chiplets[10]]) {
     # -------------------------------------------------------------------------
     # Selector constraint.
     # -------------------------------------------------------------------------
-    enf kernel_rom_flag * kr_sfirst * (kr_sfirst - 1) = 0;
+    enf kr_sfirst * (kr_sfirst - 1) = 0 when kernel_rom_flag;
 
     # -------------------------------------------------------------------------
     # Digest contiguity.
