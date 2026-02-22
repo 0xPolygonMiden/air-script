@@ -64,8 +64,8 @@ ev ace_chiplet([chiplets[20]]) {
     # -------------------------------------------------------------------------
     # Binary constraints.
     # -------------------------------------------------------------------------
-    enf ace_flag * ace_sstart * (ace_sstart - 1) = 0;
-    enf ace_flag * ace_sblock * (ace_sblock - 1) = 0;
+    let ace_binary = [ace_sstart, ace_sblock];
+    enf ace_binary[i] * (ace_binary[i] - 1) = 0 for i in 0..2 when ace_flag;
 
     # -------------------------------------------------------------------------
     # Section and block flag constraints.
@@ -153,9 +153,8 @@ ev ace_chiplet([chiplets[20]]) {
     # Finalization constraints.
     # -------------------------------------------------------------------------
     let ace_final_gate = ace_flag * ace_f_end;
-    enf ace_final_gate * ace_v0_0 = 0;
-    enf ace_final_gate * ace_v0_1 = 0;
-    enf ace_final_gate * ace_id0 = 0;
+    let ace_final_zero = [ace_v0_0, ace_v0_1, ace_id0];
+    enf ace_final_zero[i] = 0 for i in 0..3 when ace_final_gate;
 
     # -------------------------------------------------------------------------
     # First row constraints.
