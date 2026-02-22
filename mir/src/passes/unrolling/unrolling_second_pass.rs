@@ -375,17 +375,16 @@ impl<'a> UnrollingSecondPass<'a> {
             if !seen.insert(ptr) {
                 continue;
             }
-            if let Node::Parameter(param_back) = &*node.borrow() {
-                if let Some(param_op) = param_back.to_link() {
-                    if let Some(param_ref) = param_op.as_parameter() {
-                        if !param_ref.is_for_output {
-                            continue;
-                        }
-                        let key = (param_ref.owner_id, param_ref.position);
-                        if self.context_by_owner_pos.contains_key(&key) {
-                            found.entry(key).or_default().push(param_op.clone());
-                        }
-                    }
+            if let Node::Parameter(param_back) = &*node.borrow()
+                && let Some(param_op) = param_back.to_link()
+                && let Some(param_ref) = param_op.as_parameter()
+            {
+                if !param_ref.is_for_output {
+                    continue;
+                }
+                let key = (param_ref.owner_id, param_ref.position);
+                if self.context_by_owner_pos.contains_key(&key) {
+                    found.entry(key).or_default().push(param_op.clone());
                 }
             }
             if node.as_owner().is_some() {

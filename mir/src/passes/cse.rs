@@ -25,6 +25,12 @@ impl Cse {
     }
 }
 
+impl Default for Cse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Pass for Cse {
     type Input<'a> = Mir;
     type Output<'a> = Mir;
@@ -89,10 +95,10 @@ fn canonicalize_linked_vec(link: &Link<Vec<Link<Op>>>, state: &mut CseState) {
     canonicalize_op_vec(&mut vec, state);
 }
 
-fn canonicalize_op_vec(vec: &mut Vec<Link<Op>>, state: &mut CseState) {
-    for i in 0..vec.len() {
-        let new = canonicalize_op(vec[i].clone(), state);
-        vec[i] = new;
+fn canonicalize_op_vec(vec: &mut [Link<Op>], state: &mut CseState) {
+    for node in vec.iter_mut() {
+        let new = canonicalize_op(node.clone(), state);
+        *node = new;
     }
 }
 

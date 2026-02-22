@@ -221,3 +221,9 @@ impl OpInterner {
         node
     }
 }
+
+impl Default for OpInterner {
+    fn default() -> Self {
+        Self::new()
+    }
+}

@@ -253,7 +253,7 @@ impl TagAllocator {
             ConstraintTagSpec::Single(tag) => {
                 if self.next_idx == 0 {
                     self.next_idx = 1;
-                    Some(tag.clone())
+                    Some(*tag)
                 } else {
                     None
                 }
@@ -483,9 +483,9 @@ impl AirBuilder<'_> {
         row_offset_override: Option<usize>,
     ) -> Result<MirValueKey, CompileError> {
         Ok(match mir_value {
-            MirValue::Constant(constant_value) => match constant_value {
-                ConstantValue::Felt(felt) => MirValueKey::Constant(*felt),
-                _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
+            MirValue::Constant(ConstantValue::Felt(felt)) => MirValueKey::Constant(*felt),
+            MirValue::Constant(constant_value) => {
+                unreachable!("Unexpected MirValue: {:#?}", constant_value)
             },
             MirValue::TraceAccess(trace_access) => MirValueKey::TraceAccess {
                 segment: trace_access.segment,
@@ -729,11 +729,11 @@ impl AirBuilder<'_> {
                     // Tag ranges are defined over the expanded constraint list, not the
                     // top-level vector shape. Compute the expanded length and slice tags
                     // per child accordingly.
-                    let total = vec.iter().map(|node| self.expanded_boundary_len(node)).sum();
+                    let total = vec.iter().map(Self::expanded_boundary_len).sum();
                     let tags = self.expand_tag_spec(&tag_spec, total)?;
                     let mut tag_iter = tags.into_iter();
                     for node in vec.iter() {
-                        let count = self.expanded_boundary_len(node);
+                        let count = Self::expanded_boundary_len(node);
                         let node_tag = match count {
                             0 => None,
                             1 => Some(ConstraintTagSpec::Single(
@@ -772,7 +772,7 @@ impl AirBuilder<'_> {
                         .iter()
                         .map(|row| {
                             let vec = row.borrow().deref().children().borrow().deref().clone();
-                            vec.iter().map(|node| self.expanded_boundary_len(node)).sum::<usize>()
+                            vec.iter().map(Self::expanded_boundary_len).sum::<usize>()
                         })
                         .sum::<usize>();
                     let tags = self.expand_tag_spec(&tag_spec, total)?;
@@ -780,7 +780,7 @@ impl AirBuilder<'_> {
                     for row in rows.iter() {
                         let vec = row.borrow().deref().children().borrow().deref().clone();
                         for node in vec.iter() {
-                            let count = self.expanded_boundary_len(node);
+                            let count = Self::expanded_boundary_len(node);
                             let node_tag = match count {
                                 0 => None,
                                 1 => Some(ConstraintTagSpec::Single(
@@ -1066,27 +1066,24 @@ impl AirBuilder<'_> {
     }
 
     // Returns the number of boundary constraints produced by `node` after expansion.
-    fn expanded_boundary_len(&self, node: &Link<Op>) -> usize {
+    fn expanded_boundary_len(node: &Link<Op>) -> usize {
         match node.borrow().deref() {
-            Op::Vector(vector) => vector
-                .elements
-                .borrow()
-                .iter()
-                .map(|child| self.expanded_boundary_len(child))
-                .sum(),
+            Op::Vector(vector) => {
+                vector.elements.borrow().iter().map(Self::expanded_boundary_len).sum()
+            },
             Op::Matrix(matrix) => matrix
                 .elements
                 .borrow()
                 .iter()
                 .map(|row| {
                     let vec = row.borrow().deref().children().borrow().deref().clone();
-                    vec.iter().map(|child| self.expanded_boundary_len(child)).sum::<usize>()
+                    vec.iter().map(Self::expanded_boundary_len).sum::<usize>()
                 })
                 .sum(),
             Op::Enf(enf) => {
                 let child = accessor_to_scalar(&enf.expr);
                 if child.as_vector().is_some() || child.as_matrix().is_some() {
-                    self.expanded_boundary_len(&child)
+                    Self::expanded_boundary_len(&child)
                 } else {
                     1
                 }
@@ -1350,45 +1347,6 @@ impl AirBuilder<'_> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn tag_allocator_consumes_range_in_order() {
-        let span = SourceSpan::default();
-        let spec = ConstraintTagSpec::range(span, 10, 13, false); // 10..13 -> 10,11,12
-        let mut alloc = TagAllocator::new(spec);
-
-        let first = alloc.next().map(|tag| tag.item);
-        let second = alloc.next().map(|tag| tag.item);
-        let third = alloc.next().map(|tag| tag.item);
-        let fourth = alloc.next().map(|tag| tag.item);
-
-        assert_eq!(first, Some(10));
-        assert_eq!(second, Some(11));
-        assert_eq!(third, Some(12));
-        assert_eq!(fourth, None);
-    }
-
-    #[test]
-    fn tag_allocator_consumes_list_in_order() {
-        let span = SourceSpan::default();
-        let spec = ConstraintTagSpec::list(span, vec![3, 1, 4]);
-        let mut alloc = TagAllocator::new(spec);
-
-        let first = alloc.next().map(|tag| tag.item);
-        let second = alloc.next().map(|tag| tag.item);
-        let third = alloc.next().map(|tag| tag.item);
-        let fourth = alloc.next().map(|tag| tag.item);
-
-        assert_eq!(first, Some(3));
-        assert_eq!(second, Some(1));
-        assert_eq!(third, Some(4));
-        assert_eq!(fourth, None);
-    }
-}
-
 // HELPERS FUNCTIONS
 // ================================================================================================
 
@@ -1427,5 +1385,44 @@ fn build_bus_boundary(
             Err(CompileError::Failed)
         },
         _ => unreachable!("Unexpected Mir Op in bus boundary: {:#?}", mir_node_ref),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tag_allocator_consumes_range_in_order() {
+        let span = SourceSpan::default();
+        let spec = ConstraintTagSpec::range(span, 10, 13, false); // 10..13 -> 10,11,12
+        let mut alloc = TagAllocator::new(spec);
+
+        let first = alloc.next().map(|tag| tag.item);
+        let second = alloc.next().map(|tag| tag.item);
+        let third = alloc.next().map(|tag| tag.item);
+        let fourth = alloc.next().map(|tag| tag.item);
+
+        assert_eq!(first, Some(10));
+        assert_eq!(second, Some(11));
+        assert_eq!(third, Some(12));
+        assert_eq!(fourth, None);
+    }
+
+    #[test]
+    fn tag_allocator_consumes_list_in_order() {
+        let span = SourceSpan::default();
+        let spec = ConstraintTagSpec::list(span, vec![3, 1, 4]);
+        let mut alloc = TagAllocator::new(spec);
+
+        let first = alloc.next().map(|tag| tag.item);
+        let second = alloc.next().map(|tag| tag.item);
+        let third = alloc.next().map(|tag| tag.item);
+        let fourth = alloc.next().map(|tag| tag.item);
+
+        assert_eq!(first, Some(3));
+        assert_eq!(second, Some(1));
+        assert_eq!(third, Some(4));
+        assert_eq!(fourth, None);
     }
 }

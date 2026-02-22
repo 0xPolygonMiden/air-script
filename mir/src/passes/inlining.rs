@@ -663,12 +663,11 @@ impl Visitor for InliningSecondPass<'_> {
                     }
                 }
 
-                if allow_cache {
-                    if let Some(key) = cache_key.as_ref() {
-                        if let Some(cached) = self.inline_cache.get(key) {
-                            updated_op = Some(cached.clone());
-                        }
-                    }
+                if allow_cache
+                    && let Some(key) = cache_key.as_ref()
+                    && let Some(cached) = self.inline_cache.get(key)
+                {
+                    updated_op = Some(cached.clone());
                 }
 
                 if updated_op.is_none() && !skip_inline {
@@ -743,10 +742,10 @@ impl Visitor for InliningSecondPass<'_> {
                         updated_op = Some(new_nodes_vector);
                     }
 
-                    if let (Some(key), Some(node)) = (cache_key, updated_op.clone()) {
-                        if allow_cache {
-                            self.inline_cache.insert(key, node);
-                        }
+                    if let (Some(key), Some(node)) = (cache_key, updated_op.clone())
+                        && allow_cache
+                    {
+                        self.inline_cache.insert(key, node);
                     }
                     self.op_interner = None;
                 }

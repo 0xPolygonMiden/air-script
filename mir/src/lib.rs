@@ -40,8 +40,7 @@ impl Pass for MirPasses<'_> {
             mir
         } else {
             let mut cse = passes::Cse::new();
-            let mir = cse.run(mir)?;
-            mir
+            cse.run(mir)?
         };
 
         let mut unrolling = passes::Unrolling::new(self.diagnostics);

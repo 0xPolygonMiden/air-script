@@ -206,6 +206,10 @@ impl LetBinding {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn names(&self) -> Vec<Identifier> {
         match self {
             Self::Single(name) => vec![*name],

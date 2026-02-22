@@ -290,10 +290,11 @@ pub fn duplicate_node_or_replace(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn ensure_mapped(
     current_replace_map: &mut HashMap<usize, (Link<Op>, Link<Op>)>,
     child: &Link<Op>,
-    replace_parameter_list: &Vec<Link<Op>>,
+    replace_parameter_list: &[Link<Op>],
     ref_owner_id: OwnerId,
     params_for_ref_node: &mut HashMap<OwnerId, Vec<Link<Op>>>,
     owner_id_map: &mut HashMap<OwnerId, OwnerId>,
@@ -306,7 +307,7 @@ fn ensure_mapped(
     duplicate_node_or_replace_with_interner(
         current_replace_map,
         child.clone(),
-        replace_parameter_list.clone(),
+        replace_parameter_list.to_vec(),
         ref_owner_id,
         params_for_ref_node,
         owner_id_map,
@@ -325,6 +326,7 @@ fn ensure_mapped(
 ///
 /// This is used in inlining/unrolling/index-projection paths to avoid allocating
 /// duplicate subtrees when a shared op is safe to intern.
+#[allow(clippy::too_many_arguments)]
 pub fn duplicate_node_or_replace_with_interner(
     current_replace_map: &mut HashMap<usize, (Link<Op>, Link<Op>)>,
     node: Link<Op>,
@@ -612,7 +614,7 @@ pub fn duplicate_node_or_replace_with_interner(
                     }
                 }
 
-                params_for_ref_node.entry(new_owner_id).or_default().extend(params.into_iter());
+                params_for_ref_node.entry(new_owner_id).or_default().extend(params);
             }
         },
         Op::Call(call) => {
@@ -977,11 +979,11 @@ pub fn should_share_argument(node: &Link<Op>) -> bool {
         Op::Matrix(m) => m.children().borrow().len() > ACCESSOR_UNROLL_MAX_LEN,
         Op::Accessor(accessor) => should_share_argument(&accessor.indexable),
         Op::Call(call) => {
-            if let Some(func) = call.function.clone().as_function() {
-                if let Some(ret_param) = func.return_type.as_parameter() {
-                    return matches!(ret_param.ty, MirType::Vector(size) if size > ACCESSOR_UNROLL_MAX_LEN)
-                        || matches!(ret_param.ty, MirType::Matrix(rows, _) if rows > ACCESSOR_UNROLL_MAX_LEN);
-                }
+            if let Some(func) = call.function.clone().as_function()
+                && let Some(ret_param) = func.return_type.as_parameter()
+            {
+                return matches!(ret_param.ty, MirType::Vector(size) if size > ACCESSOR_UNROLL_MAX_LEN)
+                    || matches!(ret_param.ty, MirType::Matrix(rows, _) if rows > ACCESSOR_UNROLL_MAX_LEN);
             }
             false
         },

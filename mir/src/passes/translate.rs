@@ -6,7 +6,7 @@
 //! compactness, relying on later passes (CSE/inlining/unrolling) to simplify and normalize.
 
 use core::panic;
-use std::{collections::BTreeMap, ops::Deref};
+use std::ops::Deref;
 
 use air_parser::{
     LexicalScope,
@@ -166,47 +166,46 @@ impl<'a> MirBuilder<'a> {
     }
 
     fn validate_constraint_tags(&self) -> Result<Option<u64>, CompileError> {
-        let mut tags = Vec::new();
+        let mut has_tag = false;
         // Collect tags from root constraints and any evaluator bodies they invoke, since
         // tagged constraints can be emitted inside evaluators.
-        Self::collect_tags_from_statements(&self.program.boundary_constraints, &mut tags)?;
-        Self::collect_tags_from_statements(&self.program.integrity_constraints, &mut tags)?;
+        Self::collect_tags_from_statements(&self.program.boundary_constraints, &mut has_tag)?;
+        Self::collect_tags_from_statements(&self.program.integrity_constraints, &mut has_tag)?;
         for evaluator in self.program.evaluators.values() {
-            Self::collect_tags_from_statements(&evaluator.body, &mut tags)?;
+            Self::collect_tags_from_statements(&evaluator.body, &mut has_tag)?;
         }
         for bus in self.program.buses.values() {
-            if let Some(tag) = &bus.transition_tag {
-                tags.push(*tag);
+            if bus.transition_tag.is_some() {
+                has_tag = true;
             }
         }
 
-        if tags.is_empty() {
+        if !has_tag {
             return Ok(None);
         }
 
         let max_id = self.lookup_current_max_id()?;
-        self.validate_tag_sequence(&tags, max_id)?;
         Ok(Some(max_id))
     }
 
     fn collect_tags_from_statements(
         statements: &[ast::Statement],
-        tags: &mut Vec<Span<u64>>,
+        has_tag: &mut bool,
     ) -> Result<(), CompileError> {
         for statement in statements {
             match statement {
                 ast::Statement::Enforce(enf) => {
-                    if let Some(tag_spec) = &enf.tag {
-                        tags.extend(tag_spec.expand_spans());
+                    if enf.tag.is_some() {
+                        *has_tag = true;
                     }
                 },
                 ast::Statement::EnforceAll(list_comp) => {
-                    if let Some(tag_spec) = &list_comp.tag {
-                        tags.extend(tag_spec.expand_spans());
+                    if list_comp.tag.is_some() {
+                        *has_tag = true;
                     }
                 },
                 ast::Statement::Let(let_stmt) => {
-                    Self::collect_tags_from_statements(&let_stmt.body, tags)?;
+                    Self::collect_tags_from_statements(&let_stmt.body, has_tag)?;
                 },
                 ast::Statement::EnforceIf(_)
                 | ast::Statement::BusEnforce(_)
@@ -254,40 +253,7 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
-    fn validate_tag_sequence(&self, tags: &[Span<u64>], max_id: u64) -> Result<(), CompileError> {
-        let expected = max_id as usize + 1;
-        if tags.len() != expected {
-            self.diagnostics
-                .diagnostic(Severity::Error)
-                .with_message("constraint tag count does not match CURRENT_MAX_ID")
-                .with_note(format!("expected {expected} tags for CURRENT_MAX_ID = {max_id}"))
-                .emit();
-            return Err(CompileError::Failed);
-        }
-
-        let mut seen: BTreeMap<u64, Span<u64>> = BTreeMap::new();
-        for tag in tags {
-            if tag.item > max_id {
-                self.diagnostics
-                    .diagnostic(Severity::Error)
-                    .with_message("constraint tag exceeds CURRENT_MAX_ID")
-                    .with_primary_label(tag.span(), format!("tag {} is out of range", tag.item))
-                    .emit();
-                return Err(CompileError::Failed);
-            }
-            if let Some(prev_span) = seen.insert(tag.item, *tag) {
-                self.diagnostics
-                    .diagnostic(Severity::Error)
-                    .with_message("duplicate constraint tag")
-                    .with_primary_label(tag.span(), format!("tag {} reused here", tag.item))
-                    .with_secondary_label(prev_span.span(), "previous tag here")
-                    .emit();
-                return Err(CompileError::Failed);
-            }
-        }
-
-        Ok(())
-    }
+    // Tag sequence validation is deferred to the final AIR pass, after all expansion.
 
     fn translate_bus_definition(&mut self, bus: &'a ast::Bus) -> Result<Link<Bus>, CompileError> {
         Ok(Bus::create(
@@ -1503,9 +1469,7 @@ impl<'a> MirBuilder<'a> {
                 return Ok(slice);
             }
             let mir_access_type = self.translate_access_type(&access.access_type)?;
-            let indexable = if bound_node.as_parameter().is_some() {
-                bound_node.clone()
-            } else if binding.share_indexable {
+            let indexable = if bound_node.as_parameter().is_some() || binding.share_indexable {
                 bound_node.clone()
             } else {
                 duplicate_node(bound_node, &mut Default::default())
