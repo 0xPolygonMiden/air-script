@@ -9,6 +9,7 @@
 
 mod decoder
 use flags::*;
+use utils::*;
 
 ##########################################################################################
 # DECODER TRANSITION CONSTRAINTS
@@ -219,15 +220,125 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     enf 1 - sp - control_flow = 0;
 
     # ---------------------------------------------------------------------------
-    # Decoder bus operations (bus tags are on the bus definitions).
+    # Chiplets bus requests (decoder-driven).
     # ---------------------------------------------------------------------------
+    let fdyn = is_dyn;
+    let fdyncall = is_dyncall;
+    let fsyscall = is_syscall;
+    let fevalcircuit = flag_evalcircuit(op_bits, e0);
+    let fspan = is_span;
+    let frespan = is_respan;
+    let fend = is_end;
     let fjoin = is_join;
     let fsplit = is_split;
-    let fspan = is_span;
-    let fdyn = is_dyn;
     let floop = is_loop;
-    let frespan = is_respan;
+    let fcall = is_call;
 
+    # Hasher transition labels for control blocks.
+    let linear_hash_label = HASHERLINEARHASH + 16;
+    let respan_hash_label = HASHERLINEARHASH + 32;
+    let return_hash_label = HASHERRETURNHASH + 32;
+
+    # DYN: read callee hash from memory and request control block hashing.
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s0, system_clk, h0, h1, h2, h3) when fdyn;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, OPCODE_DYN, 0, 0
+    ) when fdyn;
+
+    # DYNCALL: read callee hash from memory and request control block hashing.
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s0, system_clk, h0, h1, h2, h3)
+        when fdyncall;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, OPCODE_DYNCALL, 0, 0
+    ) when fdyncall;
+
+    # SYSCALL: verify kernel procedure and hash the control block.
+    bus_6_chiplets_bus.remove(KERNELPROCCALL, h0, h1, h2, h3) when fsyscall;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, OPCODE_SYSCALL, 0, 0
+    ) when fsyscall;
+
+    # EVALCIRCUIT initializes the ACE chiplet.
+    let ace_ptr = s0;
+    let ace_nread = s1;
+    let ace_neval = s2;
+    bus_6_chiplets_bus.remove(ACEINIT, system_clk, system_ctx, ace_ptr, ace_nread, ace_neval)
+        when fevalcircuit;
+
+    # SPAN/RESPAN/END control block hashing.
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, 0, 0, 0
+    ) when fspan;
+
+    bus_6_chiplets_bus.remove(
+        respan_hash_label,
+        addr' - 1,
+        0,
+        0, 0, 0, 0, h0, h1, h2, h3, h4, h5, h6, h7
+    ) when frespan;
+
+    bus_6_chiplets_bus.remove(
+        return_hash_label,
+        addr + 31,
+        0,
+        0, 0, 0, 0, h0, h1, h2, h3, 0, 0, 0, 0
+    ) when fend;
+
+    # Control flow hashing with opcode domain separation.
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, OPCODE_JOIN, 0, 0
+    ) when fjoin;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, OPCODE_SPLIT, 0, 0
+    ) when fsplit;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, OPCODE_LOOP, 0, 0
+    ) when floop;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, OPCODE_CALL, 0, 0
+    ) when fcall;
+
+    # FMP initialization on CALL/DYNCALL
+    bus_6_chiplets_bus.remove(MEMWRITEELEMENT, system_ctx', FMP_ADDR, system_clk, FMP_INIT_VALUE)
+        when fcall;
+    bus_6_chiplets_bus.remove(MEMWRITEELEMENT, system_ctx', FMP_ADDR, system_clk, FMP_INIT_VALUE)
+        when fdyncall;
+
+    # ---------------------------------------------------------------------------
+    # Decoder bus operations (bus tags are on the bus definitions).
+    # ---------------------------------------------------------------------------
     # ---------------------------------------------------------------------------
     # BUS 0: block stack table (p1)
     # ---------------------------------------------------------------------------

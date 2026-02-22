@@ -10,6 +10,7 @@
 mod kernel_rom
 
 use chiplets::*;
+use utils::*;
 
 ##########################################################################################
 # KERNEL ROM CHIPLET CONSTRAINTS
@@ -65,4 +66,10 @@ ev kernel_rom_chiplet([chiplets[10]]) {
     let kernel_rom_next = s3_next * !s4_next;
     let kr_first_row_gate = ace_flag * kernel_rom_next;
     enf kr_sfirst_next = 1 when kr_first_row_gate;
+
+    # -------------------------------------------------------------------------
+    # Chiplets bus responses.
+    # -------------------------------------------------------------------------
+    let kr_label = kr_sfirst * KERNELPROCINIT + !kr_sfirst * KERNELPROCCALL;
+    bus_6_chiplets_bus.insert(kr_label, kr_r0, kr_r1, kr_r2, kr_r3) when kernel_rom_flag;
 }

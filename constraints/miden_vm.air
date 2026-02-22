@@ -16,7 +16,7 @@
 def MidenVM
 
 # Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
-const CURRENT_MAX_ID = 373;
+const CURRENT_MAX_ID = 374;
 
 use flags::*;
 use system::*;
@@ -55,7 +55,7 @@ public_inputs {
 #
 # Keep the full bus list to preserve auxiliary column ordering. The range checker bus
 # (tag 367), stack overflow bus (tag 368), decoder buses (tags 369..371), hash-kernel bus
-# (tag 372), and wiring bus (tag 373) are constrained in this group.
+# (tag 372), chiplets bus (tag 373), and wiring bus (tag 374) are constrained in this group.
 ##########################################################################################
 
 buses {
@@ -72,10 +72,10 @@ buses {
 
     # Chiplet buses
     multiset bus_5_v_table @tag_transition(372) @sum_form(assume_exclusive),
-    multiset bus_6_chiplets_bus,
+    multiset bus_6_chiplets_bus @tag_transition(373) @sum_form(assume_exclusive),
 
     # Wiring bus
-    logup    bus_7_wiring_bus @tag_transition(373),
+    logup    bus_7_wiring_bus @tag_transition(374),
 }
 
 ##########################################################################################
@@ -174,7 +174,7 @@ integrity_constraints {
     # - chiplets[1..3] are the hasher op selectors s[0..2],
     # - chiplets[4..15] are the hasher state h[0..11],
     # - chiplets[16] is the hasher node index i.
-    @tag_range(241..303) enf hash_chiplet([chiplets[0..17]]);
+    @tag_range(241..303) enf hash_chiplet([chiplets[0..17], system[0]]);
 
     # Bitwise transition constraints (tags 303..319)
     #
