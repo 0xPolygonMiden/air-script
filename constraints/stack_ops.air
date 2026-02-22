@@ -13,6 +13,7 @@ use flags::*;
 ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
          stack_b0, stack_b1_unused, stack_h0_unused] = stack;
+    let s = [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15];
 
     let [system_clk, system_ctx_unused, system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3] = system;
 
@@ -98,18 +99,22 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     # ------------------------------------------------------------------------------------------
     enf is_pad * s0' = 0;
 
-    enf is_dup * (s0' - s0) = 0;
-    enf is_dup1 * (s0' - s1) = 0;
-    enf is_dup2 * (s0' - s2) = 0;
-    enf is_dup3 * (s0' - s3) = 0;
-    enf is_dup4 * (s0' - s4) = 0;
-    enf is_dup5 * (s0' - s5) = 0;
-    enf is_dup6 * (s0' - s6) = 0;
-    enf is_dup7 * (s0' - s7) = 0;
-    enf is_dup9 * (s0' - s9) = 0;
-    enf is_dup11 * (s0' - s11) = 0;
-    enf is_dup13 * (s0' - s13) = 0;
-    enf is_dup15 * (s0' - s15) = 0;
+    let dup_constraints = [
+        is_dup * (s0' - s0),
+        is_dup1 * (s0' - s1),
+        is_dup2 * (s0' - s2),
+        is_dup3 * (s0' - s3),
+        is_dup4 * (s0' - s4),
+        is_dup5 * (s0' - s5),
+        is_dup6 * (s0' - s6),
+        is_dup7 * (s0' - s7),
+        is_dup9 * (s0' - s9),
+        is_dup11 * (s0' - s11),
+        is_dup13 * (s0' - s13),
+        is_dup15 * (s0' - s15)
+    ];
+    let dup_zeros = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    enf lhs = rhs for (lhs, rhs) in (dup_constraints, dup_zeros);
 
     enf is_clk * (s0' - system_clk) = 0;
 
@@ -119,68 +124,88 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     enf is_swap * (s0' - s1) = 0;
     enf is_swap * (s1' - s0) = 0;
 
-    enf is_movup2 * (s0' - s2) = 0;
-    enf is_movup3 * (s0' - s3) = 0;
-    enf is_movup4 * (s0' - s4) = 0;
-    enf is_movup5 * (s0' - s5) = 0;
-    enf is_movup6 * (s0' - s6) = 0;
-    enf is_movup7 * (s0' - s7) = 0;
-    enf is_movup8 * (s0' - s8) = 0;
+    let movup_constraints = [
+        is_movup2 * (s0' - s2),
+        is_movup3 * (s0' - s3),
+        is_movup4 * (s0' - s4),
+        is_movup5 * (s0' - s5),
+        is_movup6 * (s0' - s6),
+        is_movup7 * (s0' - s7),
+        is_movup8 * (s0' - s8)
+    ];
+    let movup_zeros = [0, 0, 0, 0, 0, 0, 0];
+    enf lhs = rhs for (lhs, rhs) in (movup_constraints, movup_zeros);
 
-    enf is_movdn2 * (s2' - s0) = 0;
-    enf is_movdn3 * (s3' - s0) = 0;
-    enf is_movdn4 * (s4' - s0) = 0;
-    enf is_movdn5 * (s5' - s0) = 0;
-    enf is_movdn6 * (s6' - s0) = 0;
-    enf is_movdn7 * (s7' - s0) = 0;
-    enf is_movdn8 * (s8' - s0) = 0;
+    let movdn_constraints = [
+        is_movdn2 * (s2' - s0),
+        is_movdn3 * (s3' - s0),
+        is_movdn4 * (s4' - s0),
+        is_movdn5 * (s5' - s0),
+        is_movdn6 * (s6' - s0),
+        is_movdn7 * (s7' - s0),
+        is_movdn8 * (s8' - s0)
+    ];
+    let movdn_zeros = [0, 0, 0, 0, 0, 0, 0];
+    enf lhs = rhs for (lhs, rhs) in (movdn_constraints, movdn_zeros);
 
     # ------------------------------------------------------------------------------------------
     # SWAPW/SWAPDW
     # ------------------------------------------------------------------------------------------
-    enf is_swapw * (s0' - s4) = 0;
-    enf is_swapw * (s1' - s5) = 0;
-    enf is_swapw * (s2' - s6) = 0;
-    enf is_swapw * (s3' - s7) = 0;
-    enf is_swapw * (s4' - s0) = 0;
-    enf is_swapw * (s5' - s1) = 0;
-    enf is_swapw * (s6' - s2) = 0;
-    enf is_swapw * (s7' - s3) = 0;
+    let swapw_eqs = [
+        s0' - s4,
+        s1' - s5,
+        s2' - s6,
+        s3' - s7,
+        s4' - s0,
+        s5' - s1,
+        s6' - s2,
+        s7' - s3
+    ];
+    enf swapw_eqs[i] = 0 for i in 0..8 when is_swapw;
 
-    enf is_swapw2 * (s0' - s8) = 0;
-    enf is_swapw2 * (s1' - s9) = 0;
-    enf is_swapw2 * (s2' - s10) = 0;
-    enf is_swapw2 * (s3' - s11) = 0;
-    enf is_swapw2 * (s8' - s0) = 0;
-    enf is_swapw2 * (s9' - s1) = 0;
-    enf is_swapw2 * (s10' - s2) = 0;
-    enf is_swapw2 * (s11' - s3) = 0;
+    let swapw2_eqs = [
+        s0' - s8,
+        s1' - s9,
+        s2' - s10,
+        s3' - s11,
+        s8' - s0,
+        s9' - s1,
+        s10' - s2,
+        s11' - s3
+    ];
+    enf swapw2_eqs[i] = 0 for i in 0..8 when is_swapw2;
 
-    enf is_swapw3 * (s0' - s12) = 0;
-    enf is_swapw3 * (s1' - s13) = 0;
-    enf is_swapw3 * (s2' - s14) = 0;
-    enf is_swapw3 * (s3' - s15) = 0;
-    enf is_swapw3 * (s12' - s0) = 0;
-    enf is_swapw3 * (s13' - s1) = 0;
-    enf is_swapw3 * (s14' - s2) = 0;
-    enf is_swapw3 * (s15' - s3) = 0;
+    let swapw3_eqs = [
+        s0' - s12,
+        s1' - s13,
+        s2' - s14,
+        s3' - s15,
+        s12' - s0,
+        s13' - s1,
+        s14' - s2,
+        s15' - s3
+    ];
+    enf swapw3_eqs[i] = 0 for i in 0..8 when is_swapw3;
 
-    enf is_swapdw * (s0' - s8) = 0;
-    enf is_swapdw * (s1' - s9) = 0;
-    enf is_swapdw * (s2' - s10) = 0;
-    enf is_swapdw * (s3' - s11) = 0;
-    enf is_swapdw * (s4' - s12) = 0;
-    enf is_swapdw * (s5' - s13) = 0;
-    enf is_swapdw * (s6' - s14) = 0;
-    enf is_swapdw * (s7' - s15) = 0;
-    enf is_swapdw * (s8' - s0) = 0;
-    enf is_swapdw * (s9' - s1) = 0;
-    enf is_swapdw * (s10' - s2) = 0;
-    enf is_swapdw * (s11' - s3) = 0;
-    enf is_swapdw * (s12' - s4) = 0;
-    enf is_swapdw * (s13' - s5) = 0;
-    enf is_swapdw * (s14' - s6) = 0;
-    enf is_swapdw * (s15' - s7) = 0;
+    let swapdw_eqs = [
+        s0' - s8,
+        s1' - s9,
+        s2' - s10,
+        s3' - s11,
+        s4' - s12,
+        s5' - s13,
+        s6' - s14,
+        s7' - s15,
+        s8' - s0,
+        s9' - s1,
+        s10' - s2,
+        s11' - s3,
+        s12' - s4,
+        s13' - s5,
+        s14' - s6,
+        s15' - s7
+    ];
+    enf swapdw_eqs[i] = 0 for i in 0..16 when is_swapdw;
 
     # ------------------------------------------------------------------------------------------
     # CSWAP/CSWAPW
@@ -191,17 +216,23 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     # Binary constraint for the cswap selector.
     enf is_cswap * (cswap_c * (cswap_c - 1)) = zero;
 
-    enf is_cswap * (s0' - (cswap_c * s2 + cswap_c_inv * s1)) = 0;
-    enf is_cswap * (s1' - (cswap_c * s1 + cswap_c_inv * s2)) = 0;
+    let cswap_eqs = [
+        s0' - (cswap_c * s2 + cswap_c_inv * s1),
+        s1' - (cswap_c * s1 + cswap_c_inv * s2)
+    ];
+    enf cswap_eqs[i] = 0 for i in 0..2 when is_cswap;
 
-    enf is_cswapw * (s0' - (cswap_c * s5 + cswap_c_inv * s1)) = 0;
-    enf is_cswapw * (s1' - (cswap_c * s6 + cswap_c_inv * s2)) = 0;
-    enf is_cswapw * (s2' - (cswap_c * s7 + cswap_c_inv * s3)) = 0;
-    enf is_cswapw * (s3' - (cswap_c * s8 + cswap_c_inv * s4)) = 0;
-    enf is_cswapw * (s4' - (cswap_c * s1 + cswap_c_inv * s5)) = 0;
-    enf is_cswapw * (s5' - (cswap_c * s2 + cswap_c_inv * s6)) = 0;
-    enf is_cswapw * (s6' - (cswap_c * s3 + cswap_c_inv * s7)) = 0;
-    enf is_cswapw * (s7' - (cswap_c * s4 + cswap_c_inv * s8)) = 0;
+    let cswapw_eqs = [
+        s0' - (cswap_c * s5 + cswap_c_inv * s1),
+        s1' - (cswap_c * s6 + cswap_c_inv * s2),
+        s2' - (cswap_c * s7 + cswap_c_inv * s3),
+        s3' - (cswap_c * s8 + cswap_c_inv * s4),
+        s4' - (cswap_c * s1 + cswap_c_inv * s5),
+        s5' - (cswap_c * s2 + cswap_c_inv * s6),
+        s6' - (cswap_c * s3 + cswap_c_inv * s7),
+        s7' - (cswap_c * s4 + cswap_c_inv * s8)
+    ];
+    enf cswapw_eqs[i] = 0 for i in 0..8 when is_cswapw;
 
     # Binary constraint for the cswapw selector.
     enf is_cswapw * (cswap_c * (cswap_c - 1)) = zero;
@@ -213,10 +244,13 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     enf is_assert * (s0 - 1) = zero;
 
     # CALLER: load the current fn_hash onto the top 4 stack elements.
-    enf is_caller * (s0' - system_fn_hash_0) = 0;
-    enf is_caller * (s1' - system_fn_hash_1) = 0;
-    enf is_caller * (s2' - system_fn_hash_2) = 0;
-    enf is_caller * (s3' - system_fn_hash_3) = 0;
+    let caller_eqs = [
+        s0' - system_fn_hash_0,
+        s1' - system_fn_hash_1,
+        s2' - system_fn_hash_2,
+        s3' - system_fn_hash_3
+    ];
+    enf caller_eqs[i] = 0 for i in 0..4 when is_caller;
 
     # SDEPTH: push current stack depth to the top.
     enf is_sdepth * (s0' - stack_b0) = 0;
