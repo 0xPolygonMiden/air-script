@@ -65,56 +65,9 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     # Shift flags are pre-aggregated in flags.air to keep transition logic compact.
     let op_flags = stack_op_flags(op_bits, e0, e1, h5);
 
-    let no_shift_0 = no_shift_at(op_flags, 0);
-    let no_shift_1 = no_shift_at(op_flags, 1);
-    let no_shift_2 = no_shift_at(op_flags, 2);
-    let no_shift_3 = no_shift_at(op_flags, 3);
-    let no_shift_4 = no_shift_at(op_flags, 4);
-    let no_shift_5 = no_shift_at(op_flags, 5);
-    let no_shift_6 = no_shift_at(op_flags, 6);
-    let no_shift_7 = no_shift_at(op_flags, 7);
-    let no_shift_8 = no_shift_at(op_flags, 8);
-    let no_shift_9 = no_shift_at(op_flags, 9);
-    let no_shift_10 = no_shift_at(op_flags, 10);
-    let no_shift_11 = no_shift_at(op_flags, 11);
-    let no_shift_12 = no_shift_at(op_flags, 12);
-    let no_shift_13 = no_shift_at(op_flags, 13);
-    let no_shift_14 = no_shift_at(op_flags, 14);
-    let no_shift_15 = no_shift_at(op_flags, 15);
-
-    let left_shift_0 = left_shift_at(op_flags, 0);
-    let left_shift_1 = left_shift_at(op_flags, 1);
-    let left_shift_2 = left_shift_at(op_flags, 2);
-    let left_shift_3 = left_shift_at(op_flags, 3);
-    let left_shift_4 = left_shift_at(op_flags, 4);
-    let left_shift_5 = left_shift_at(op_flags, 5);
-    let left_shift_6 = left_shift_at(op_flags, 6);
-    let left_shift_7 = left_shift_at(op_flags, 7);
-    let left_shift_8 = left_shift_at(op_flags, 8);
-    let left_shift_9 = left_shift_at(op_flags, 9);
-    let left_shift_10 = left_shift_at(op_flags, 10);
-    let left_shift_11 = left_shift_at(op_flags, 11);
-    let left_shift_12 = left_shift_at(op_flags, 12);
-    let left_shift_13 = left_shift_at(op_flags, 13);
-    let left_shift_14 = left_shift_at(op_flags, 14);
-    let left_shift_15 = left_shift_at(op_flags, 15);
-
-    let right_shift_0 = right_shift_at(op_flags, 0);
-    let right_shift_1 = right_shift_at(op_flags, 1);
-    let right_shift_2 = right_shift_at(op_flags, 2);
-    let right_shift_3 = right_shift_at(op_flags, 3);
-    let right_shift_4 = right_shift_at(op_flags, 4);
-    let right_shift_5 = right_shift_at(op_flags, 5);
-    let right_shift_6 = right_shift_at(op_flags, 6);
-    let right_shift_7 = right_shift_at(op_flags, 7);
-    let right_shift_8 = right_shift_at(op_flags, 8);
-    let right_shift_9 = right_shift_at(op_flags, 9);
-    let right_shift_10 = right_shift_at(op_flags, 10);
-    let right_shift_11 = right_shift_at(op_flags, 11);
-    let right_shift_12 = right_shift_at(op_flags, 12);
-    let right_shift_13 = right_shift_at(op_flags, 13);
-    let right_shift_14 = right_shift_at(op_flags, 14);
-    let right_shift_15 = right_shift_at(op_flags, 15);
+    let no_shift = [no_shift_at(op_flags, i) for i in 0..16];
+    let left_shift = [left_shift_at(op_flags, i) for i in 0..16];
+    let right_shift = [right_shift_at(op_flags, i) for i in 0..16];
 
     # ------------------------------------------------------------------------------------------
     # TRANSITION CONSTRAINTS
@@ -123,41 +76,41 @@ ev stack_general_transition([stack[16], decoder[24]]) {
     # Each position i can pull from i (no shift), i+1 (left shift), or i-1 (right shift).
     # We build the LHS/RHS vectors explicitly and enforce them via a constraint comprehension.
     let lhs_terms = [
-        s0'  * (no_shift_0  + left_shift_1),
-        s1'  * (no_shift_1  + left_shift_2  + right_shift_0),
-        s2'  * (no_shift_2  + left_shift_3  + right_shift_1),
-        s3'  * (no_shift_3  + left_shift_4  + right_shift_2),
-        s4'  * (no_shift_4  + left_shift_5  + right_shift_3),
-        s5'  * (no_shift_5  + left_shift_6  + right_shift_4),
-        s6'  * (no_shift_6  + left_shift_7  + right_shift_5),
-        s7'  * (no_shift_7  + left_shift_8  + right_shift_6),
-        s8'  * (no_shift_8  + left_shift_9  + right_shift_7),
-        s9'  * (no_shift_9  + left_shift_10 + right_shift_8),
-        s10' * (no_shift_10 + left_shift_11 + right_shift_9),
-        s11' * (no_shift_11 + left_shift_12 + right_shift_10),
-        s12' * (no_shift_12 + left_shift_13 + right_shift_11),
-        s13' * (no_shift_13 + left_shift_14 + right_shift_12),
-        s14' * (no_shift_14 + left_shift_15 + right_shift_13),
-        s15' * (no_shift_15 + right_shift_14)
+        s0'  * (no_shift[0]  + left_shift[1]),
+        s1'  * (no_shift[1]  + left_shift[2]  + right_shift[0]),
+        s2'  * (no_shift[2]  + left_shift[3]  + right_shift[1]),
+        s3'  * (no_shift[3]  + left_shift[4]  + right_shift[2]),
+        s4'  * (no_shift[4]  + left_shift[5]  + right_shift[3]),
+        s5'  * (no_shift[5]  + left_shift[6]  + right_shift[4]),
+        s6'  * (no_shift[6]  + left_shift[7]  + right_shift[5]),
+        s7'  * (no_shift[7]  + left_shift[8]  + right_shift[6]),
+        s8'  * (no_shift[8]  + left_shift[9]  + right_shift[7]),
+        s9'  * (no_shift[9]  + left_shift[10] + right_shift[8]),
+        s10' * (no_shift[10] + left_shift[11] + right_shift[9]),
+        s11' * (no_shift[11] + left_shift[12] + right_shift[10]),
+        s12' * (no_shift[12] + left_shift[13] + right_shift[11]),
+        s13' * (no_shift[13] + left_shift[14] + right_shift[12]),
+        s14' * (no_shift[14] + left_shift[15] + right_shift[13]),
+        s15' * (no_shift[15] + right_shift[14])
     ];
 
     let rhs_terms = [
-        no_shift_0  * s0  + left_shift_1  * s1,
-        no_shift_1  * s1  + left_shift_2  * s2  + right_shift_0  * s0,
-        no_shift_2  * s2  + left_shift_3  * s3  + right_shift_1  * s1,
-        no_shift_3  * s3  + left_shift_4  * s4  + right_shift_2  * s2,
-        no_shift_4  * s4  + left_shift_5  * s5  + right_shift_3  * s3,
-        no_shift_5  * s5  + left_shift_6  * s6  + right_shift_4  * s4,
-        no_shift_6  * s6  + left_shift_7  * s7  + right_shift_5  * s5,
-        no_shift_7  * s7  + left_shift_8  * s8  + right_shift_6  * s6,
-        no_shift_8  * s8  + left_shift_9  * s9  + right_shift_7  * s7,
-        no_shift_9  * s9  + left_shift_10 * s10 + right_shift_8  * s8,
-        no_shift_10 * s10 + left_shift_11 * s11 + right_shift_9  * s9,
-        no_shift_11 * s11 + left_shift_12 * s12 + right_shift_10 * s10,
-        no_shift_12 * s12 + left_shift_13 * s13 + right_shift_11 * s11,
-        no_shift_13 * s13 + left_shift_14 * s14 + right_shift_12 * s12,
-        no_shift_14 * s14 + left_shift_15 * s15 + right_shift_13 * s13,
-        no_shift_15 * s15 + right_shift_14 * s14
+        no_shift[0]  * s0  + left_shift[1]  * s1,
+        no_shift[1]  * s1  + left_shift[2]  * s2  + right_shift[0]  * s0,
+        no_shift[2]  * s2  + left_shift[3]  * s3  + right_shift[1]  * s1,
+        no_shift[3]  * s3  + left_shift[4]  * s4  + right_shift[2]  * s2,
+        no_shift[4]  * s4  + left_shift[5]  * s5  + right_shift[3]  * s3,
+        no_shift[5]  * s5  + left_shift[6]  * s6  + right_shift[4]  * s4,
+        no_shift[6]  * s6  + left_shift[7]  * s7  + right_shift[5]  * s5,
+        no_shift[7]  * s7  + left_shift[8]  * s8  + right_shift[6]  * s6,
+        no_shift[8]  * s8  + left_shift[9]  * s9  + right_shift[7]  * s7,
+        no_shift[9]  * s9  + left_shift[10] * s10 + right_shift[8]  * s8,
+        no_shift[10] * s10 + left_shift[11] * s11 + right_shift[9]  * s9,
+        no_shift[11] * s11 + left_shift[12] * s12 + right_shift[10] * s10,
+        no_shift[12] * s12 + left_shift[13] * s13 + right_shift[11] * s11,
+        no_shift[13] * s13 + left_shift[14] * s14 + right_shift[12] * s12,
+        no_shift[14] * s14 + left_shift[15] * s15 + right_shift[13] * s13,
+        no_shift[15] * s15 + right_shift[14] * s14
     ];
 
     enf lhs = rhs for (lhs, rhs) in (lhs_terms, rhs_terms);
