@@ -180,4 +180,27 @@ ev ace_chiplet([chiplets[20]]) {
         with ace_consume_gate;
     bus_7_wiring_bus.insert(ace_clk, ace_ctx, ace_id0, ace_v0_0, ace_v0_1)
         with (ace_flag * ace_m0_eval);
+
+    # -------------------------------------------------------------------------
+    # Hash-kernel bus operations (ACE memory reads).
+    # -------------------------------------------------------------------------
+    # READ rows fetch two extension elements (word read).
+    # Message layout: label + ctx + ptr + clk + v0 + v1.
+    bus_5_v_table.remove(
+        MEMREADWORD,
+        ace_ctx,
+        ace_ptr,
+        ace_clk,
+        ace_v0_0,
+        ace_v0_1,
+        ace_v1_0,
+        ace_v1_1
+    ) when (ace_flag * ace_f_read);
+
+    # EVAL rows fetch the instruction element (element read).
+    # Message layout: label + ctx + ptr + clk + instruction.
+    let ace_instruction =
+        ace_id1 + ace_id2 * ACEINSTRUCTIONIDONEOFFSET + (ace_op + 1) * ACEINSTRUCTIONIDTWOOFFSET;
+    bus_5_v_table.remove(MEMREADELEMENT, ace_ctx, ace_ptr, ace_clk, ace_instruction)
+        when (ace_flag * ace_f_eval);
 }

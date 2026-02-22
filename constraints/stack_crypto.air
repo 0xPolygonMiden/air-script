@@ -8,6 +8,7 @@
 
 mod stack_crypto
 use flags::*;
+use utils::*;
 
 ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
@@ -51,6 +52,7 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let is_cryptostream = flag_cryptostream(op_bits, e1);
     let is_hornerbase = flag_hornerbase(op_bits, e0);
     let is_hornerext = flag_hornerext(op_bits, e0);
+    let is_logprecompile = flag_logprecompile(op_bits, e0);
 
     # Horner coefficients: c0..c7 = s0..s7.
     let c = [s0, s1, s2, s3, s4, s5, s6, s7];
@@ -173,6 +175,19 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     );
     enf s14' = acc_expected_ext[0] when is_hornerext;
     enf s15' = acc_expected_ext[1] when is_hornerext;
+
+    # ------------------------------------------------------------------------------------------
+    # LOG PRECOMPILE (hash-kernel bus)
+    # ------------------------------------------------------------------------------------------
+    # Hash-kernel bus message layout for LOGPRECOMPILE:
+    # label + cap_prev (remove) or label + cap_next (insert).
+    let lp_cap_prev0 = h1;
+    let lp_cap_prev1 = h2;
+    let lp_cap_prev2 = h3;
+    let lp_cap_prev3 = h4;
+    bus_5_v_table.remove(LOGPRECOMPILE, lp_cap_prev0, lp_cap_prev1, lp_cap_prev2, lp_cap_prev3)
+        when is_logprecompile;
+    bus_5_v_table.insert(LOGPRECOMPILE, s8', s9', s10', s11') when is_logprecompile;
 }
 
 # ------------------------------------------------------------------------------------------

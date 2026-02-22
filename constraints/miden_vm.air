@@ -16,7 +16,7 @@
 def MidenVM
 
 # Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
-const CURRENT_MAX_ID = 366;
+const CURRENT_MAX_ID = 373;
 
 use flags::*;
 use system::*;
@@ -27,6 +27,7 @@ use hasher::*;
 use bitwise::*;
 use memory::*;
 use ace::*;
+use kernel_rom::*;
 use stack_general::*;
 use stack_overflow::*;
 use stack_ops::*;
@@ -53,28 +54,28 @@ public_inputs {
 ##########################################################################################
 #
 # Keep the full bus list to preserve auxiliary column ordering. The range checker bus
-# (tag 361), stack overflow bus (tag 362), decoder buses (tags 363..365), and wiring bus
-# (tag 366) are constrained in this group.
+# (tag 367), stack overflow bus (tag 368), decoder buses (tags 369..371), hash-kernel bus
+# (tag 372), and wiring bus (tag 373) are constrained in this group.
 ##########################################################################################
 
 buses {
     # Decoder buses
-    multiset bus_0_decoder_p1 @tag_transition(363) @sum_form(assume_exclusive),
-    multiset bus_1_decoder_p2 @tag_transition(364) @sum_form(assume_exclusive),
-    multiset bus_2_decoder_p3 @tag_transition(365) @sum_form(assume_exclusive),
+    multiset bus_0_decoder_p1 @tag_transition(369) @sum_form(assume_exclusive),
+    multiset bus_1_decoder_p2 @tag_transition(370) @sum_form(assume_exclusive),
+    multiset bus_2_decoder_p3 @tag_transition(371) @sum_form(assume_exclusive),
 
     # Stack overflow table
-    multiset bus_3_stack_p1 @tag_transition(362) @sum_form(assume_exclusive),
+    multiset bus_3_stack_p1 @tag_transition(368) @sum_form(assume_exclusive),
 
     # Range checker bus
-    logup    bus_4_range_checker @tag_transition(361),
+    logup    bus_4_range_checker @tag_transition(367),
 
     # Chiplet buses
-    multiset bus_5_v_table,
+    multiset bus_5_v_table @tag_transition(372) @sum_form(assume_exclusive),
     multiset bus_6_chiplets_bus,
 
     # Wiring bus
-    logup    bus_7_wiring_bus @tag_transition(366),
+    logup    bus_7_wiring_bus @tag_transition(373),
 }
 
 ##########################################################################################
@@ -206,4 +207,12 @@ integrity_constraints {
     # - chiplets[13..15] are id1, v1_0, v1_1,
     # - chiplets[16..19] are n_eval/id2, v2_0, v2_1/m1, m0.
     @tag_range(341..361) enf ace_chiplet([chiplets[0..20]]);
+
+    # Kernel ROM transition constraints (tags 361..366)
+    #
+    # Layout mapping:
+    # - chiplets[0..4] are the chiplet selectors (s0..s4),
+    # - chiplets[5] is sfirst,
+    # - chiplets[6..9] are the kernel digest lanes (r0..r3).
+    @tag_range(361..367) enf kernel_rom_chiplet([chiplets[0..10]]);
 }
