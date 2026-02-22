@@ -162,7 +162,7 @@ use alloc::collections::BTreeMap;
 
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::graph::AlgebraicGraph;
+use crate::{NodeIndex, graph::AlgebraicGraph};
 
 /// The intermediate representation of a complete AirScript program
 ///
@@ -197,6 +197,16 @@ pub struct Air {
     ///
     /// Only their name, type, and the first and last boundary constraints are stored here.
     pub buses: BTreeMap<Identifier, Bus>,
+    /// Buses initial values used for auxiliary trace generation (indexed by bus index)
+    pub buses_initial_values: BTreeMap<usize, NodeIndex>,
+    /// Buses transition expressions used for auxiliary trace generation (indexed by bus index)
+    /// The tuple contains the numerator and an optional denominator operation (p_prime = numerator
+    /// if None or numerator / denominator), computed in the `ExpandBuses` Air pass depending on
+    /// the bus type
+    /// - for multiset buses: p' = p * columns_inserted_in_bus / columns_removed_from_bus
+    /// - for logup buses, if u corresponds to the columns inserted when s1 and v to the columns
+    ///   removed when s2: q' = q + s1 / u - s2 / v = (q * u * v + s1 * v - s2 * u) / (u * v)
+    pub buses_transitions: BTreeMap<usize, (NodeIndex, Option<NodeIndex>)>,
 }
 impl Default for Air {
     fn default() -> Self {
@@ -220,6 +230,8 @@ impl Air {
             expected_max_constraint_id: None,
             constraints: Default::default(),
             buses: Default::default(),
+            buses_initial_values: Default::default(),
+            buses_transitions: Default::default(),
         }
     }
 

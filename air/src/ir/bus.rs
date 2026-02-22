@@ -74,6 +74,7 @@ impl BusOp {
 }
 
 impl Bus {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: Identifier,
         bus_type: BusType,

@@ -175,15 +175,15 @@ impl<'a> SemanticAnalysis<'a> {
             false
         }
 
-        if let Some(boundary) = &module.boundary_constraints {
-            if visit_statements(&boundary.item) {
-                return true;
-            }
+        if let Some(boundary) = &module.boundary_constraints
+            && visit_statements(&boundary.item)
+        {
+            return true;
         }
-        if let Some(integrity) = &module.integrity_constraints {
-            if visit_statements(&integrity.item) {
-                return true;
-            }
+        if let Some(integrity) = &module.integrity_constraints
+            && visit_statements(&integrity.item)
+        {
+            return true;
         }
         module.buses.values().any(|bus| bus.transition_tag.is_some())
     }

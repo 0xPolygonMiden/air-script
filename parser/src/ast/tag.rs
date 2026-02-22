@@ -59,6 +59,11 @@ impl ConstraintTagSpec {
         }
     }
 
+    /// Returns true if this spec contains no tags.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Returns true if this spec describes exactly one tag.
     pub fn is_single(&self) -> bool {
         self.len() == 1
@@ -68,13 +73,9 @@ impl ConstraintTagSpec {
     pub fn as_single(&self) -> Option<u64> {
         match self {
             Self::Single(tag) => Some(tag.item),
-            Self::Range { start, inclusive, .. } => {
+            Self::Range { start, .. } => {
                 let len = self.len();
-                if len == 1 {
-                    Some(if *inclusive { *start } else { *start })
-                } else {
-                    None
-                }
+                if len == 1 { Some(*start) } else { None }
             },
             Self::List { tags, .. } => {
                 if tags.len() == 1 {
@@ -98,7 +99,7 @@ impl ConstraintTagSpec {
     pub fn expand_spans(&self) -> Vec<Span<u64>> {
         let span = self.span();
         match self {
-            Self::Single(tag) => vec![tag.clone()],
+            Self::Single(tag) => vec![*tag],
             Self::Range { start, end, inclusive, .. } => {
                 let end_inclusive = if *inclusive { *end } else { end.saturating_sub(1) };
                 (*start..=end_inclusive).map(|tag| Span::new(span, tag)).collect()

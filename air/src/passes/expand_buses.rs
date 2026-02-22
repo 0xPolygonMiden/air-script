@@ -165,6 +165,7 @@ impl<'a> BusOpExpand<'a> {
     }
 
     /// Helper function to expand the integrity constraint of a multiset bus
+    #[allow(clippy::too_many_arguments)]
     fn expand_multiset_constraint(
         &self,
         ir: &mut Air,

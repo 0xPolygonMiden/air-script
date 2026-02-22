@@ -144,11 +144,11 @@ impl<'a> MirBuilder<'a> {
 
     fn validate_constraint_tags(&self) -> Result<Option<u64>, CompileError> {
         let mut tags = Vec::new();
-        self.collect_tags_from_statements(&self.program.boundary_constraints, &mut tags)?;
-        self.collect_tags_from_statements(&self.program.integrity_constraints, &mut tags)?;
+        Self::collect_tags_from_statements(&self.program.boundary_constraints, &mut tags)?;
+        Self::collect_tags_from_statements(&self.program.integrity_constraints, &mut tags)?;
         for bus in self.program.buses.values() {
             if let Some(tag) = &bus.transition_tag {
-                tags.push(tag.clone());
+                tags.push(*tag);
             }
         }
 
@@ -162,7 +162,6 @@ impl<'a> MirBuilder<'a> {
     }
 
     fn collect_tags_from_statements(
-        &self,
         statements: &[ast::Statement],
         tags: &mut Vec<Span<u64>>,
     ) -> Result<(), CompileError> {
@@ -179,7 +178,7 @@ impl<'a> MirBuilder<'a> {
                     }
                 },
                 ast::Statement::Let(let_stmt) => {
-                    self.collect_tags_from_statements(&let_stmt.body, tags)?;
+                    Self::collect_tags_from_statements(&let_stmt.body, tags)?;
                 },
                 ast::Statement::EnforceIf(_)
                 | ast::Statement::BusEnforce(_)
@@ -248,7 +247,7 @@ impl<'a> MirBuilder<'a> {
                     .emit();
                 return Err(CompileError::Failed);
             }
-            if let Some(prev_span) = seen.insert(tag.item, tag.clone()) {
+            if let Some(prev_span) = seen.insert(tag.item, *tag) {
                 self.diagnostics
                     .diagnostic(Severity::Error)
                     .with_message("duplicate constraint tag")
@@ -1333,18 +1332,18 @@ impl<'a> MirBuilder<'a> {
         let mut bus_op = BusOp::builder().span(ast_bus_op.span()).bus(bus).kind(bus_op_kind);
         for arg in ast_bus_op.args.iter() {
             let arg_node = self.translate_expr(arg)?;
-            if let Some(accessor) = arg_node.as_accessor() {
-                if !matches!(accessor.access_type, MirAccessType::Default) {
-                    self.diagnostics
-                        .diagnostic(Severity::Error)
-                        .with_message("expected default access type")
-                        .with_primary_label(
-                            arg.span(),
-                            "expected default access type, got this instead",
-                        )
-                        .emit();
-                    return Err(CompileError::Failed);
-                }
+            if let Some(accessor) = arg_node.as_accessor()
+                && !matches!(accessor.access_type, MirAccessType::Default)
+            {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("expected default access type")
+                    .with_primary_label(
+                        arg.span(),
+                        "expected default access type, got this instead",
+                    )
+                    .emit();
+                return Err(CompileError::Failed);
             }
             bus_op = bus_op.args(arg_node);
         }
@@ -1588,7 +1587,7 @@ impl<'a> MirBuilder<'a> {
             // We access $main[i]
             if let AccessType::Index(column) = access.access_type.clone() {
                 let node = self.translate_indexed_trace_access(
-                    column,
+                    *column,
                     TraceSegmentId::Main,
                     0,
                     access.offset,
@@ -1626,7 +1625,7 @@ impl<'a> MirBuilder<'a> {
                 },
                 AccessType::Index(extra_offset) if binding.size > 1 => {
                     let node = self.translate_indexed_trace_access(
-                        extra_offset,
+                        *extra_offset,
                         binding.segment,
                         binding.offset,
                         access.offset,
@@ -1648,14 +1647,14 @@ impl<'a> MirBuilder<'a> {
     /// collection.
     fn translate_indexed_trace_access(
         &mut self,
-        index: Box<ScalarExpr>,
+        index: ScalarExpr,
         segment: TraceSegmentId,
         offset: usize,
         row_offset: usize,
         access: &'a ast::SymbolAccess,
     ) -> Result<Link<Op>, CompileError> {
         // If the index is a constant, we construct the corresponding TraceAccess
-        if let ScalarExpr::Const(c) = *index {
+        if let ScalarExpr::Const(c) = index {
             let ta = TraceAccess::new(segment, offset + c.item as usize, row_offset);
             Ok(Value::builder()
                 .value(SpannedMirValue {
