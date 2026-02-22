@@ -385,6 +385,7 @@ pub const CONSTRAINT_NAMES: [&str; TOTAL_TAGS] = [
     "decoder.bus.p1.transition",
     "decoder.bus.p2.transition",
     "decoder.bus.p3.transition",
+    "chiplets.bus.wiring.transition",
 ];
 
 pub fn expected_ood_evals() -> Vec<EvalRecord> {
@@ -2218,6 +2219,11 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
             id: 365,
             name: "decoder.bus.p3.transition",
             value: QuadFelt::new(Felt::new(9395869302542898577), Felt::new(6472917827183803848)),
+        },
+        EvalRecord {
+            id: 366,
+            name: "chiplets.bus.wiring.transition",
+            value: QuadFelt::new(Felt::new(7613678356270986878), Felt::new(10445474671979834467)),
         },
     ]
 }

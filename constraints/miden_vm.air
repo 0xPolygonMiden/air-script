@@ -16,7 +16,7 @@
 def MidenVM
 
 # Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
-const CURRENT_MAX_ID = 365;
+const CURRENT_MAX_ID = 366;
 
 use flags::*;
 use system::*;
@@ -53,8 +53,8 @@ public_inputs {
 ##########################################################################################
 #
 # Keep the full bus list to preserve auxiliary column ordering. The range checker bus
-# (tag 361), stack overflow bus (tag 362), and decoder buses (tags 363..365) are constrained
-# in this group.
+# (tag 361), stack overflow bus (tag 362), decoder buses (tags 363..365), and wiring bus
+# (tag 366) are constrained in this group.
 ##########################################################################################
 
 buses {
@@ -74,7 +74,7 @@ buses {
     multiset bus_6_chiplets_bus,
 
     # Wiring bus
-    logup    bus_7_wiring_bus,
+    logup    bus_7_wiring_bus @tag_transition(366),
 }
 
 ##########################################################################################

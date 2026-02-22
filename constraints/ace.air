@@ -45,6 +45,8 @@ ev ace_chiplet([chiplets[20]]) {
     let ace_v2_1 = chiplets[18];
     # m0 is used by chiplet bus constraints (not enforced in this module).
     let ace_m0 = chiplets[19];
+    # m1 is stored in v2_1 on READ rows.
+    let ace_m1 = ace_v2_1;
 
     let ace_sstart_next = ace_sstart';
     let ace_sblock_next = ace_sblock';
@@ -161,4 +163,32 @@ ev ace_chiplet([chiplets[20]]) {
     let ace_next = s2_sel' * (1 - s3_next);
     let ace_first_row_gate = memory_flag * ace_next;
     enf ace_first_row_gate * (ace_sstart_next - 1) = 0;
+
+    # -------------------------------------------------------------------------
+    # Wiring bus operations.
+    # -------------------------------------------------------------------------
+    # Wiring bus verifies the circuit wiring by ensuring inserted nodes are later consumed
+    # the claimed number of times (LogUp running-sum).
+    # - READ rows insert the two input nodes (id0, id1) with multiplicities m0, m1.
+    # - EVAL rows consume the two input nodes (id1, id2) once each, then insert the result id0
+    #   with multiplicity m0 (its remaining fan-out).
+    let ace_id2 = ace_n_eval;
+
+    # READ: insert id0/id1 with their fan-out multiplicities.
+    let ace_m0_read = ace_m0 * ace_f_read;
+    let ace_m1_read = ace_m1 * ace_f_read;
+    bus_7_wiring_bus.insert(ace_clk, ace_ctx, ace_id0, ace_v0_0, ace_v0_1)
+        with (ace_flag * ace_m0_read);
+    bus_7_wiring_bus.insert(ace_clk, ace_ctx, ace_id1, ace_v1_0, ace_v1_1)
+        with (ace_flag * ace_m1_read);
+
+    # EVAL: consume the two input wires and insert the result wire.
+    let ace_m0_eval = ace_m0 * ace_f_eval;
+    let ace_consume_gate = ace_flag * ace_f_eval;
+    bus_7_wiring_bus.remove(ace_clk, ace_ctx, ace_id1, ace_v1_0, ace_v1_1)
+        with ace_consume_gate;
+    bus_7_wiring_bus.remove(ace_clk, ace_ctx, ace_id2, ace_v2_0, ace_v2_1)
+        with ace_consume_gate;
+    bus_7_wiring_bus.insert(ace_clk, ace_ctx, ace_id0, ace_v0_0, ace_v0_1)
+        with (ace_flag * ace_m0_eval);
 }

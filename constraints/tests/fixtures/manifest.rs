@@ -57,7 +57,12 @@ pub const TAG_DECODER_BUS_BASE: usize = TAG_STACK_OVERFLOW_BUS_BASE + TAG_STACK_
 /// Number of decoder bus constraints in this group.
 pub const TAG_DECODER_BUS_COUNT: usize = 3;
 
+/// Base ID for the wiring bus constraint.
+pub const TAG_WIRING_BUS_BASE: usize = TAG_DECODER_BUS_BASE + TAG_DECODER_BUS_COUNT;
+/// Number of wiring bus constraints in this group.
+pub const TAG_WIRING_BUS_COUNT: usize = 1;
+
 /// Highest constraint ID (zero-based) for the current group set.
-pub const CURRENT_MAX_ID: usize = TAG_DECODER_BUS_BASE + TAG_DECODER_BUS_COUNT - 1;
+pub const CURRENT_MAX_ID: usize = TAG_WIRING_BUS_BASE + TAG_WIRING_BUS_COUNT - 1;
 /// Total tagged constraints in the current group set.
 pub const TOTAL_TAGS: usize = CURRENT_MAX_ID + 1;
