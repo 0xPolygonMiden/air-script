@@ -6,6 +6,9 @@ mod buses_complex;
 mod buses_simple;
 #[rustfmt::skip]
 #[allow(clippy::all)]
+mod buses_sum_form;
+#[rustfmt::skip]
+#[allow(clippy::all)]
 mod buses_varlen_boundary_both;
 #[rustfmt::skip]
 #[allow(clippy::all)]

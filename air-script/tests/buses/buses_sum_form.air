@@ -1,0 +1,28 @@
+def BusesSumFormAir
+
+trace_columns {
+    main: [s],
+}
+
+buses {
+    multiset p @sum_form,
+}
+
+public_inputs {
+    inputs: [2],
+}
+
+boundary_constraints {
+    enf s.first = 0;
+    enf p.first = null;
+    enf p.last = null;
+}
+
+integrity_constraints {
+    # s is binary
+    enf s^2 = s;
+
+    # mutually exclusive requests allow sum-form expansion
+    p.insert(1) when s;
+    p.remove(1) when (1 - s);
+}

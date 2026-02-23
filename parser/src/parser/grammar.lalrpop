@@ -434,16 +434,17 @@ ConstraintStatement: Vec<Statement> = {
             }
         }
     },
-    <l:@L> <tag:TagAttr> "enf" "match" "{" <arms: MatchArm+> "}" ";" <r:@R> =>? {
-        diagnostics.diagnostic(Severity::Error)
-            .with_message("tagged constraints cannot use `match`")
-            .with_primary_label(span!(l, r), "remove the tag or refactor the constraint")
-            .emit();
-        Err(ParseError::Failed.into())
-    },
-    <l:@L> "enf" "match" "{" <arms: MatchArm+> "}" ";" <r:@R> => {
-        let match_expr = Match::new(span!(l, r), arms);
-        vec![Statement::EnforceIf(match_expr)]
+    <l:@L> <tag:TagAttr?> "enf" "match" "{" <arms: MatchArm+> "}" ";" <r:@R> =>? {
+        if tag.is_some() {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("tagged constraints cannot use `match`")
+                .with_primary_label(span!(l, r), "remove the tag or refactor the constraint")
+                .emit();
+            Err(ParseError::Failed.into())
+        } else {
+            let match_expr = Match::new(span!(l, r), arms);
+            Ok(vec![Statement::EnforceIf(match_expr)])
+        }
     },
     "enf" <ConstraintExpr> ";" => vec![<>],
     <BusConstraintExpr> ";" => vec![<>],
