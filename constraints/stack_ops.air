@@ -2,15 +2,19 @@
 # STACK OPS CONSTRAINTS MODULE
 ##########################################################################################
 #
-# Enforces stack operation semantics that directly rewrite stack items (pad/dup/swap/mov/swapw
-# and conditional swaps). Tagging is applied at the call site in the main module.
+# Enforces stack operation semantics that directly rewrite stack items (pad/dup/swap/mov/swapw,
+# conditional swaps, and small system/io stack ops). Tagging is applied at the call site in the
+# main module.
 ##########################################################################################
 
 mod stack_ops
 use flags::*;
 
-ev stack_ops_transition([stack[16], decoder[24], system_clk]) {
-    let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15] = stack;
+ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
+    let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
+         stack_b0, stack_b1_unused, stack_h0_unused] = stack;
+
+    let [system_clk, system_ctx_unused, system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3] = system;
 
     # b0..b6 are the 7 opcode bits (LSB -> MSB) used by op flag helpers.
     let [
@@ -57,6 +61,9 @@ ev stack_ops_transition([stack[16], decoder[24], system_clk]) {
     let is_dup15 = flag_dup15(op_bits);
 
     let is_clk = flag_clk(op_bits);
+    let is_assert = flag_assert(op_bits);
+    let is_caller = flag_caller(op_bits);
+    let is_sdepth = flag_sdepth(op_bits);
 
     let is_swap = flag_swap(op_bits);
     let is_movup2 = flag_movup2(op_bits);
@@ -198,4 +205,19 @@ ev stack_ops_transition([stack[16], decoder[24], system_clk]) {
 
     # Binary constraint for the cswapw selector.
     enf is_cswapw * (cswap_c * (cswap_c - 1)) = zero;
+
+    # ------------------------------------------------------------------------------------------
+    # ASSERT/CALLER/SDEPTH
+    # ------------------------------------------------------------------------------------------
+
+    enf is_assert * (s0 - 1) = zero;
+
+    # CALLER: load the current fn_hash onto the top 4 stack elements.
+    enf is_caller * (s0' - system_fn_hash_0) = 0;
+    enf is_caller * (s1' - system_fn_hash_1) = 0;
+    enf is_caller * (s2' - system_fn_hash_2) = 0;
+    enf is_caller * (s3' - system_fn_hash_3) = 0;
+
+    # SDEPTH: push current stack depth to the top.
+    enf is_sdepth * (s0' - stack_b0) = 0;
 }

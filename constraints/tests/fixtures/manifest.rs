@@ -23,7 +23,7 @@ pub const TAG_STACK_OVERFLOW_COUNT: usize = 8;
 /// Base ID for the stack ops constraint group.
 pub const TAG_STACK_OPS_BASE: usize = TAG_STACK_OVERFLOW_BASE + TAG_STACK_OVERFLOW_COUNT;
 /// Number of stack ops constraints in this group.
-pub const TAG_STACK_OPS_COUNT: usize = 82;
+pub const TAG_STACK_OPS_COUNT: usize = 88;
 
 /// Base ID for the range bus constraint.
 ///
