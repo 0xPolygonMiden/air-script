@@ -23,17 +23,12 @@ pub const TAG_STACK_OVERFLOW_COUNT: usize = 8;
 /// Base ID for the stack ops constraint group.
 pub const TAG_STACK_OPS_BASE: usize = TAG_STACK_OVERFLOW_BASE + TAG_STACK_OVERFLOW_COUNT;
 /// Number of stack ops constraints in this group.
-pub const TAG_STACK_OPS_COUNT: usize = 88;
-
-/// Base ID for the stack crypto constraint group.
-pub const TAG_STACK_CRYPTO_BASE: usize = TAG_STACK_OPS_BASE + TAG_STACK_OPS_COUNT;
-/// Number of stack crypto constraints in this group.
-pub const TAG_STACK_CRYPTO_COUNT: usize = 46;
+pub const TAG_STACK_OPS_COUNT: usize = 82;
 
 /// Base ID for the range bus constraint.
 ///
 /// The range bus tag is intentionally placed after the main-trace constraints.
-pub const TAG_RANGE_BUS_BASE: usize = TAG_STACK_CRYPTO_BASE + TAG_STACK_CRYPTO_COUNT;
+pub const TAG_RANGE_BUS_BASE: usize = TAG_STACK_OPS_BASE + TAG_STACK_OPS_COUNT;
 /// Number of range bus constraints in this group.
 pub const TAG_RANGE_BUS_COUNT: usize = 1;
 

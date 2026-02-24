@@ -16,7 +16,7 @@
 def MidenVM
 
 # Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
-const CURRENT_MAX_ID = 175;
+const CURRENT_MAX_ID = 123;
 
 use flags::*;
 use system::*;
@@ -24,7 +24,6 @@ use range_checker::*;
 use stack_general::*;
 use stack_overflow::*;
 use stack_ops::*;
-use stack_crypto::*;
 
 ##########################################################################################
 # EXECUTION TRACE LAYOUT
@@ -47,7 +46,7 @@ public_inputs {
 ##########################################################################################
 #
 # Keep the full bus list to preserve auxiliary column ordering. Only the range checker bus
-# (tag 174) and the stack overflow bus (tag 175) are constrained in this group.
+# (tag 122) and the stack overflow bus (tag 123) are constrained in this group.
 ##########################################################################################
 
 buses {
@@ -57,10 +56,10 @@ buses {
     multiset bus_2_decoder_p3,
 
     # Stack overflow table
-    multiset bus_3_stack_p1 @tag_transition(175) @sum_form(assume_exclusive),
+    multiset bus_3_stack_p1 @tag_transition(41) @sum_form(assume_exclusive),
 
     # Range checker bus
-    logup    bus_4_range_checker @tag_transition(174),
+    logup    bus_4_range_checker @tag_transition(122),
 
     # Chiplet buses
     multiset bus_5_v_table,
@@ -138,9 +137,6 @@ integrity_constraints {
     # Stack overflow transition constraints (tags 36..39)
     @tag_range(36..40) enf stack_overflow_transition([stack[0..19], decoder[0..24], system[0]]);
 
-    # Stack ops transition constraints (tags 40..127)
-    @tag_range(40..128) enf stack_ops_transition([stack[0..19], decoder[0..24], system[0..6]]);
-
-    # Stack crypto transition constraints (tags 128..173)
-    @tag_range(128..174) enf stack_crypto_transition([stack[0..19], decoder[0..24], system[0..6]]);
+    # Stack ops transition constraints (tags 40..121)
+    @tag_range(40..122) enf stack_ops_transition([stack[0..16], decoder[0..24], system[0]]);
 }
