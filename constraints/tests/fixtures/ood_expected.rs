@@ -141,12 +141,6 @@ pub const CONSTRAINT_NAMES: [&str; TOTAL_TAGS] = [
     "stack.ops.cswapw",
     "stack.ops.cswapw",
     "stack.ops.cswapw",
-    "stack.system.assert",
-    "stack.system.caller",
-    "stack.system.caller",
-    "stack.system.caller",
-    "stack.system.caller",
-    "stack.io.sdepth",
     "range.bus.transition",
     "stack.overflow.bus.transition",
 ];
@@ -707,7 +701,7 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 110,
             name: "stack.ops.cswap",
-            value: QuadFelt::new(Felt::new(7787471015064615045), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(4142872517165003079), Felt::new(0)),
         },
         EvalRecord {
             id: 111,
@@ -722,85 +716,55 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 113,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(4517595434872149482), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(7382517392819628451), Felt::new(0)),
         },
         EvalRecord {
             id: 114,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(7382517392819628451), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(4827417633003237585), Felt::new(0)),
         },
         EvalRecord {
             id: 115,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(4827417633003237585), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(17779390882653606052), Felt::new(0)),
         },
         EvalRecord {
             id: 116,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(17779390882653606052), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(16587491652407655425), Felt::new(0)),
         },
         EvalRecord {
             id: 117,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(16587491652407655425), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(6936098212561125534), Felt::new(0)),
         },
         EvalRecord {
             id: 118,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(6936098212561125534), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(5094958697700743127), Felt::new(0)),
         },
         EvalRecord {
             id: 119,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(5094958697700743127), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(189412762651021203), Felt::new(0)),
         },
         EvalRecord {
             id: 120,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(189412762651021203), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(8308993958309806023), Felt::new(0)),
         },
         EvalRecord {
             id: 121,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(8308993958309806023), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(16580384734945713908), Felt::new(0)),
         },
         EvalRecord {
             id: 122,
-            name: "stack.system.assert",
-            value: QuadFelt::new(Felt::new(8348363779099446030), Felt::new(0)),
-        },
-        EvalRecord {
-            id: 123,
-            name: "stack.system.caller",
-            value: QuadFelt::new(Felt::new(16674981897661760210), Felt::new(0)),
-        },
-        EvalRecord {
-            id: 124,
-            name: "stack.system.caller",
-            value: QuadFelt::new(Felt::new(14361028107722480662), Felt::new(0)),
-        },
-        EvalRecord {
-            id: 125,
-            name: "stack.system.caller",
-            value: QuadFelt::new(Felt::new(9738252875195915138), Felt::new(0)),
-        },
-        EvalRecord {
-            id: 126,
-            name: "stack.system.caller",
-            value: QuadFelt::new(Felt::new(15161342143096572193), Felt::new(0)),
-        },
-        EvalRecord {
-            id: 127,
-            name: "stack.io.sdepth",
-            value: QuadFelt::new(Felt::new(9690568048381717864), Felt::new(0)),
-        },
-        EvalRecord {
-            id: 128,
             name: "range.bus.transition",
             value: QuadFelt::new(Felt::new(10365289165200035540), Felt::new(16469718665506609592)),
         },
         EvalRecord {
-            id: 129,
+            id: 123,
             name: "stack.overflow.bus.transition",
             value: QuadFelt::new(Felt::new(7384164985445418427), Felt::new(3858806565449404456)),
         },
