@@ -1088,6 +1088,8 @@ impl AirBuilder<'_> {
                     1
                 }
             },
+            // After unrolling/constant propagation, any remaining op types should be scalars,
+            // and accessors resolve to scalar values. These contribute exactly one constraint.
             _ => 1,
         }
     }
@@ -1124,6 +1126,8 @@ impl AirBuilder<'_> {
                     1
                 }
             },
+            // By this stage we expect only scalar ops (no unrolled vectors/matrices/for/if),
+            // so remaining nodes map to a single integrity constraint.
             _ => 1,
         }
     }

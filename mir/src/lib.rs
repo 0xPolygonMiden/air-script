@@ -29,14 +29,18 @@ impl Pass for MirPasses<'_> {
         let mut ast_to_mir = passes::AstToMir::new(self.diagnostics);
         let mir = ast_to_mir.run(input)?;
 
-        let mut projection = passes::IndexProjection::new(self.diagnostics);
-        let mir = projection.run(mir)?;
+        let mir = if std::env::var("AIR_DISABLE_INDEX_PROJECTION").is_ok() {
+            mir
+        } else {
+            let mut projection = passes::IndexProjection::new(self.diagnostics);
+            projection.run(mir)?
+        };
 
         let mut inlining = passes::Inlining::new(self.diagnostics);
         let mir = inlining.run(mir)?;
 
-        // AIR_DISABLE_CSE disables the common subexpression elimination pass.
-        let mir = if std::env::var("AIR_DISABLE_CSE").is_ok() {
+        // AIR_DISABLE_MIR_CSE disables the MIR common subexpression elimination pass.
+        let mir = if std::env::var("AIR_DISABLE_MIR_CSE").is_ok() {
             mir
         } else {
             let mut cse = passes::Cse::new();

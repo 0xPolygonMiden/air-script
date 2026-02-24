@@ -153,19 +153,7 @@ impl RandomInputs {
                     // Note: if we encounter a trace access corresponding to an index we have not
                     // yet evaluated, we will randomly generate values for
                     // this trace access, but also for all previous indices.
-                    MirValue::TraceAccess(trace_access) => match trace_access.segment {
-                        TraceSegmentId::Main => {
-                            let index = trace_access.column * 2 + trace_access.row_offset;
-                            Ok(query_indexed_eval(&mut self.rng, &mut self.main_trace, index))
-                        },
-                        _ => {
-                            println!(
-                                "Unexpected trace_access segment in RandomInputs::eval: {}. This segment should only be used for buses and should be handled separately.",
-                                trace_access.segment
-                            );
-                            Err(CompileError::Failed)
-                        },
-                    },
+                    MirValue::TraceAccess(trace_access) => self.eval_trace_access(*trace_access),
                     MirValue::RandomValue(u) => {
                         Ok(query_indexed_eval(&mut self.rng, &mut self.rand_values, *u))
                     },
