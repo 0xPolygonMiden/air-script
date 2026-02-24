@@ -1,0 +1,69 @@
+##########################################################################################
+# RANGE CHECKER CONSTRAINTS MODULE
+##########################################################################################
+#
+# Range checker enforces 16-bit bounds by maintaining a table of values and multiplicities,
+# and linking stack/memory values through a LogUp bus.
+#
+# RANGE CHECKER COLUMN LAYOUT (2 columns):
+# ┌─────────┬───────────────────────────────────────────────────────────────┐
+# │ Column  │                        Purpose                                │
+# ├─────────┼───────────────────────────────────────────────────────────────┤
+# │    0    │ m - multiplicity (usage count)                                │
+# │    1    │ v - current 16-bit value in [0, 65535]                        │
+# └─────────┴───────────────────────────────────────────────────────────────┘
+#
+# Tagging is applied at call sites in the main module.
+##########################################################################################
+
+mod range_checker
+
+# Tags:
+# - 15: range table transition (delta) tagged at call site
+# - 16: bus_4_range_checker transition (tagged on bus definition)
+
+ev range_checker_constraints([decoder[24], range_checker[2], chiplets[20]]) {
+    # Range checker table columns
+    let value = range_checker[1];        # v: Current 16-bit value [0, 65535]
+    let multiplicity = range_checker[0]; # m: Usage count
+
+    # Stack values requiring 16-bit range checks (from decoder trace)
+    let sv0 = decoder[10];
+    let sv1 = decoder[11];
+    let sv2 = decoder[12];
+    let sv3 = decoder[13];
+
+    # Memory chiplet values requiring 16-bit range checks
+    let mem_d0 = chiplets[14];
+    let mem_d1 = chiplets[15];
+
+    # U32 range check operation flag
+    let not_4 = 1 - decoder[5];
+    let not_5 = 1 - decoder[6];
+    let u32_rc_op = decoder[7] * not_4 * not_5;
+
+    # Memory chiplet operation flag
+    let s_0 = chiplets[0];
+    let s_1 = chiplets[1];
+    let s_2 = chiplets[2];
+    let chiplets_memory_flag = memory_chiplet_flag(s_0, s_1, s_2);
+
+    # Value transition constraint (gap handling)
+    let delta = value' - value;
+    enf delta * (delta - 1) * (delta - 3) * (delta - 9) * (delta - 27)
+        * (delta - 81) * (delta - 243) * (delta - 729) * (delta - 2187) = 0;
+
+    # LogUp bus operations
+    # Note: the bus transition is tagged in the main module's bus declaration.
+    bus_4_range_checker.insert(value) with multiplicity;
+    bus_4_range_checker.remove(mem_d0) when chiplets_memory_flag;
+    bus_4_range_checker.remove(mem_d1) when chiplets_memory_flag;
+    bus_4_range_checker.remove(sv0) when u32_rc_op;
+    bus_4_range_checker.remove(sv1) when u32_rc_op;
+    bus_4_range_checker.remove(sv2) when u32_rc_op;
+    bus_4_range_checker.remove(sv3) when u32_rc_op;
+}
+
+fn memory_chiplet_flag(s0: felt, s1: felt, s2: felt) -> felt {
+    return s0 * s1 * (1 - s2);
+}

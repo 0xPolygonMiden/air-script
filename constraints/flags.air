@@ -1,0 +1,25 @@
+##########################################################################################
+# FLAG HELPERS MODULE
+##########################################################################################
+
+mod flags
+
+fn flag_dyncall(bits: felt[7], e0: felt) -> felt {
+    # opcode 101_1100
+    return e0 * bits[3] * bits[2] * (1 - bits[1]) * (1 - bits[0]);
+}
+
+fn flag_syscall(bits: felt[7], e1: felt) -> felt {
+    # opcode 110_1000 (last two bits forced to 0)
+    return e1 * (1 - bits[4]) * bits[3] * (1 - bits[2]);
+}
+
+fn flag_call(bits: felt[7], e1: felt) -> felt {
+    # opcode 110_1100 (last two bits forced to 0)
+    return e1 * (1 - bits[4]) * bits[3] * bits[2];
+}
+
+fn flag_end(bits: felt[7], e1: felt) -> felt {
+    # opcode 111_0000 (last two bits forced to 0)
+    return e1 * bits[4] * (1 - bits[3]) * (1 - bits[2]);
+}
