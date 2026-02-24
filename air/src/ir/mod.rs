@@ -205,9 +205,7 @@ pub struct Air {
     /// bus type.
     /// - for multiset buses: p' = p * columns_inserted_in_bus / columns_removed_from_bus
     /// - for logup buses, if u corresponds to the columns inserted when s1 and v to the columns
-    ///   removed when s2:
-    ///   q' = q + s1 / u - s2 / v
-    ///   = (q * u * v + s1 * v - s2 * u) / (u * v)
+    ///   removed when s2: q' = q + s1 / u - s2 / v = (q * u * v + s1 * v - s2 * u) / (u * v)
     pub buses_transitions: BTreeMap<usize, (NodeIndex, Option<NodeIndex>)>,
 }
 impl Default for Air {
