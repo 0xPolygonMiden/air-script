@@ -105,7 +105,7 @@ impl Bus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BusAttr {
     Tag(ConstraintTag),
-    SumForm(SourceSpan),
+    SumForm(BusSumForm),
 }
 
 /// Specifies how multiset bus constraints are reformulated.
@@ -124,6 +124,18 @@ pub enum BusType {
     Multiset,
     /// A logup bus
     Logup,
+}
+
+/// Arguments for the `@sum_form` bus attribute.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BusSumForm {
+    pub span: SourceSpan,
+    pub assume_exclusive: bool,
+}
+impl BusSumForm {
+    pub const fn new(span: SourceSpan, assume_exclusive: bool) -> Self {
+        Self { span, assume_exclusive }
+    }
 }
 
 impl fmt::Display for BusType {

@@ -229,11 +229,21 @@ Bus: Bus = {
                     }
                     tag = Some(tag_span);
                 },
-                BusAttr::SumForm(span) => {
+                BusAttr::SumForm(sum_form) => {
                     if constraint_form == BusConstraintForm::Sum {
                         diagnostics.diagnostic(Severity::Error)
                             .with_message("duplicate bus form attribute")
-                            .with_primary_label(span, "duplicate @sum_form")
+                            .with_primary_label(sum_form.span, "duplicate @sum_form")
+                            .emit();
+                        return Err(ParseError::Failed.into());
+                    }
+                    if !sum_form.assume_exclusive {
+                        diagnostics.diagnostic(Severity::Error)
+                            .with_message("invalid bus form attribute")
+                            .with_primary_label(
+                                sum_form.span,
+                                "expected @sum_form(assume_exclusive)",
+                            )
                             .emit();
                         return Err(ParseError::Failed.into());
                     }
@@ -270,7 +280,7 @@ BusTagAttr: Span<u64> = {
     }
 }
 
-BusSumFormAttr: SourceSpan = {
+BusSumFormAttr: BusSumForm = {
     <l:@L> "@" <name:Identifier> <r:@R> =>? {
         if name != "sum_form" {
             diagnostics.diagnostic(Severity::Error)
@@ -279,8 +289,25 @@ BusSumFormAttr: SourceSpan = {
                 .emit();
             return Err(ParseError::Failed.into());
         }
-        Ok(span!(l, r))
-    }
+        Ok(BusSumForm::new(span!(l, r), false))
+    },
+    <l:@L> "@" <name:FunctionIdentifier> "(" <arg:Identifier> ")" <r:@R> =>? {
+        if name != "sum_form" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid bus attribute")
+                .with_primary_label(span!(l, r), "expected @sum_form(assume_exclusive)")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        if arg != "assume_exclusive" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid bus attribute")
+                .with_primary_label(span!(l, r), "expected @sum_form(assume_exclusive)")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(BusSumForm::new(span!(l, r), true))
+    },
 }
 
 BusType: BusType = {

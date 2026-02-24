@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use air_parser::ast::{Boundary, BusConstraintForm, BusType, TraceSegmentId};
 use air_pass::Pass;
-use miden_diagnostics::{DiagnosticsHandler, Severity, Spanned};
+use miden_diagnostics::DiagnosticsHandler;
 use mir::ir::BusOpKind;
 
 use crate::{
@@ -60,18 +60,6 @@ impl Pass for BusOpExpand<'_> {
             // Then, depending on the bus type, expand the integrity constraint if
             // the bus is constrained
             if !bus_ops.is_empty() {
-                if bus_type == BusType::Multiset && bus.constraint_form == BusConstraintForm::Sum {
-                    self.diagnostics
-                        .diagnostic(Severity::Warning)
-                        .with_message(
-                            "@sum_form assumes mutually exclusive latches; this is not validated",
-                        )
-                        .with_primary_label(
-                            bus.name.span(),
-                            "sum form constraints require disjoint latches",
-                        )
-                        .emit();
-                }
                 match bus_type {
                     BusType::Multiset => {
                         self.expand_multiset_constraint(
