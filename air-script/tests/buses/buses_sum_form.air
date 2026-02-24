@@ -5,7 +5,7 @@ trace_columns {
 }
 
 buses {
-    multiset p @sum_form,
+    multiset p @sum_form(assume_exclusive),
 }
 
 public_inputs {

@@ -144,8 +144,13 @@ impl<'a> MirBuilder<'a> {
 
     fn validate_constraint_tags(&self) -> Result<Option<u64>, CompileError> {
         let mut tags = Vec::new();
+        // Collect tags from root constraints and any evaluator bodies they invoke, since
+        // tagged constraints can be emitted inside evaluators.
         Self::collect_tags_from_statements(&self.program.boundary_constraints, &mut tags)?;
         Self::collect_tags_from_statements(&self.program.integrity_constraints, &mut tags)?;
+        for evaluator in self.program.evaluators.values() {
+            Self::collect_tags_from_statements(&evaluator.body, &mut tags)?;
+        }
         for bus in self.program.buses.values() {
             if let Some(tag) = &bus.transition_tag {
                 tags.push(*tag);

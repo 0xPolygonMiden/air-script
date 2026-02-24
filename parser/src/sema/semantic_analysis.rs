@@ -185,6 +185,11 @@ impl<'a> SemanticAnalysis<'a> {
         {
             return true;
         }
+        for evaluator in module.evaluators.values() {
+            if visit_statements(&evaluator.body) {
+                return true;
+            }
+        }
         module.buses.values().any(|bus| bus.transition_tag.is_some())
     }
 

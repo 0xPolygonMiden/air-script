@@ -82,3 +82,26 @@ fn err_tag_out_of_range() {
 
     expect_diagnostic(source, "constraint tag exceeds CURRENT_MAX_ID");
 }
+
+#[test]
+fn err_missing_current_max_id_in_evaluator() {
+    let source = "
+    def test
+    ev advance_clock([clk]) {
+        @tag(0) enf clk' = clk + 1;
+    }
+    trace_columns {
+        main: [clk],
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        enf clk.first = 0;
+    }
+    integrity_constraints {
+        enf advance_clock([clk]);
+    }";
+
+    expect_diagnostic(source, "missing CURRENT_MAX_ID constant for tagged constraints");
+}
