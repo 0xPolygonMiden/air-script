@@ -51,9 +51,9 @@ public_inputs {
 
 buses {
     # Decoder buses
-    multiset bus_0_decoder_p1,
-    multiset bus_1_decoder_p2,
-    multiset bus_2_decoder_p3,
+    multiset bus_0_decoder_p1 @tag_transition(233) @sum_form(assume_exclusive),
+    multiset bus_1_decoder_p2 @tag_transition(234) @sum_form(assume_exclusive),
+    multiset bus_2_decoder_p3 @tag_transition(235) @sum_form(assume_exclusive),
 
     # Stack overflow table
     multiset bus_3_stack_p1 @tag_transition(41) @sum_form(assume_exclusive),
