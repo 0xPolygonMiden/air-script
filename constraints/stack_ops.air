@@ -97,7 +97,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     # ------------------------------------------------------------------------------------------
     # PAD/DUP/CLK
     # ------------------------------------------------------------------------------------------
-    enf is_pad * s0' = 0;
+    enf s0' = 0 when is_pad;
 
     let dup_constraints = [
         is_dup * (s0' - s0),
@@ -113,16 +113,18 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         is_dup13 * (s0' - s13),
         is_dup15 * (s0' - s15)
     ];
-    let dup_zeros = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    enf lhs = rhs for (lhs, rhs) in (dup_constraints, dup_zeros);
+    enf dup_constraints[i] = 0 for i in 0..12;
 
-    enf is_clk * (s0' - system_clk) = 0;
+    enf s0' = system_clk when is_clk;
 
     # ------------------------------------------------------------------------------------------
     # SWAP/MOV
     # ------------------------------------------------------------------------------------------
-    enf is_swap * (s0' - s1) = 0;
-    enf is_swap * (s1' - s0) = 0;
+    let swap_eqs = [
+        s0' - s1,
+        s1' - s0
+    ];
+    enf swap_eqs[i] = 0 for i in 0..2 when is_swap;
 
     let movup_constraints = [
         is_movup2 * (s0' - s2),
@@ -133,8 +135,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         is_movup7 * (s0' - s7),
         is_movup8 * (s0' - s8)
     ];
-    let movup_zeros = [0, 0, 0, 0, 0, 0, 0];
-    enf lhs = rhs for (lhs, rhs) in (movup_constraints, movup_zeros);
+    enf movup_constraints[i] = 0 for i in 0..7;
 
     let movdn_constraints = [
         is_movdn2 * (s2' - s0),
@@ -145,8 +146,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         is_movdn7 * (s7' - s0),
         is_movdn8 * (s8' - s0)
     ];
-    let movdn_zeros = [0, 0, 0, 0, 0, 0, 0];
-    enf lhs = rhs for (lhs, rhs) in (movdn_constraints, movdn_zeros);
+    enf movdn_constraints[i] = 0 for i in 0..7;
 
     # ------------------------------------------------------------------------------------------
     # SWAPW/SWAPDW
@@ -214,7 +214,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     let cswap_c_inv = 1 - cswap_c;
 
     # Binary constraint for the cswap selector.
-    enf is_cswap * (cswap_c * (cswap_c - 1)) = zero;
+    enf cswap_c * (cswap_c - 1) = zero when is_cswap;
 
     let cswap_eqs = [
         s0' - (cswap_c * s2 + cswap_c_inv * s1),
@@ -235,13 +235,13 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     enf cswapw_eqs[i] = 0 for i in 0..8 when is_cswapw;
 
     # Binary constraint for the cswapw selector.
-    enf is_cswapw * (cswap_c * (cswap_c - 1)) = zero;
+    enf cswap_c * (cswap_c - 1) = zero when is_cswapw;
 
     # ------------------------------------------------------------------------------------------
     # ASSERT/CALLER/SDEPTH
     # ------------------------------------------------------------------------------------------
 
-    enf is_assert * (s0 - 1) = zero;
+    enf s0 - 1 = zero when is_assert;
 
     # CALLER: load the current fn_hash onto the top 4 stack elements.
     let caller_eqs = [
@@ -253,5 +253,5 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     enf caller_eqs[i] = 0 for i in 0..4 when is_caller;
 
     # SDEPTH: push current stack depth to the top.
-    enf is_sdepth * (s0' - stack_b0) = 0;
+    enf s0' = stack_b0 when is_sdepth;
 }
