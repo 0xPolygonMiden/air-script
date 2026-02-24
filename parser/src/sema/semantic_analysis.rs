@@ -668,7 +668,7 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
 
         let binding_ty = self.expr_binding_type(&expr.value).unwrap();
         let expected_len = binding_names.len();
-        if expected_len > 1 {
+        if matches!(expr.binding, LetBinding::Vector(_)) {
             match binding_ty.ty() {
                 Some(Type::Vector(len)) if len == expected_len => {},
                 Some(Type::Vector(len)) => {
@@ -699,25 +699,26 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
             if let Some(prev) = self.locals.get_key(&namespaced_name) {
                 self.warn_declaration_shadowed(name.span(), prev.span());
             } else {
-                let element_ty = if expected_len == 1 {
-                    binding_ty.clone()
-                } else {
-                    let idx_expr = ScalarExpr::Const(Span::new(expr.value.span(), idx as u64));
-                    match binding_ty.access(AccessType::Index(Box::new(idx_expr))) {
-                        Ok(ty) => ty,
-                        Err(_) => {
-                            self.diagnostics
-                                .diagnostic(Severity::Error)
-                                .with_message("invalid let binding access")
-                                .with_primary_label(
-                                    expr.span(),
-                                    "unable to index into binding value",
-                                )
-                                .emit();
-                            return ControlFlow::Break(SemanticAnalysisError::Invalid);
-                        },
-                    }
-                };
+                let element_ty =
+                    if expected_len == 1 && matches!(expr.binding, LetBinding::Single(_)) {
+                        binding_ty.clone()
+                    } else {
+                        let idx_expr = ScalarExpr::Const(Span::new(expr.value.span(), idx as u64));
+                        match binding_ty.access(AccessType::Index(Box::new(idx_expr))) {
+                            Ok(ty) => ty,
+                            Err(_) => {
+                                self.diagnostics
+                                    .diagnostic(Severity::Error)
+                                    .with_message("invalid let binding access")
+                                    .with_primary_label(
+                                        expr.span(),
+                                        "unable to index into binding value",
+                                    )
+                                    .emit();
+                                return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                            },
+                        }
+                    };
                 self.locals.insert(NamespacedIdentifier::Binding(name), element_ty);
             }
         }

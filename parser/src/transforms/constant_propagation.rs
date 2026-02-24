@@ -138,14 +138,15 @@ impl<'a> ConstantPropagation<'a> {
                         self.local.insert(name, value.clone());
                     },
                     LetBinding::Vector(ref names) => {
-                        let ConstantExpr::Vector(ref values) = value.item else {
-                            unreachable!();
-                        };
-                        for (idx, name) in names.iter().copied().enumerate() {
-                            self.local.insert(
-                                name,
-                                Span::new(value.span(), ConstantExpr::Scalar(values[idx])),
-                            );
+                        if let ConstantExpr::Vector(ref values) = value.item
+                            && values.len() == names.len()
+                        {
+                            for (idx, name) in names.iter().copied().enumerate() {
+                                self.local.insert(
+                                    name,
+                                    Span::new(value.span(), ConstantExpr::Scalar(values[idx])),
+                                );
+                            }
                         }
                     },
                 },
@@ -158,11 +159,13 @@ impl<'a> ConstantPropagation<'a> {
                             self.local.insert(name, Span::new(span, ConstantExpr::Vector(vector)));
                         },
                         LetBinding::Vector(ref names) => {
-                            for (idx, name) in names.iter().copied().enumerate() {
-                                self.local.insert(
-                                    name,
-                                    Span::new(span, ConstantExpr::Scalar(vector[idx])),
-                                );
+                            if vector.len() == names.len() {
+                                for (idx, name) in names.iter().copied().enumerate() {
+                                    self.local.insert(
+                                        name,
+                                        Span::new(span, ConstantExpr::Scalar(vector[idx])),
+                                    );
+                                }
                             }
                         },
                     }

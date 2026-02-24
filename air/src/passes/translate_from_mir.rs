@@ -217,6 +217,7 @@ enum MirValueKey {
     PublicInputTable {
         name: Symbol,
         num_cols: usize,
+        bus_type: BusType,
     },
     RandomValue(usize),
 }
@@ -508,9 +509,11 @@ impl AirBuilder<'_> {
                 index: public_input_access.index,
             },
             MirValue::PublicInputTable(public_input_table_access) => {
+                let bus_type = public_input_table_access.bus_type();
                 MirValueKey::PublicInputTable {
                     name: public_input_table_access.table_name.name(),
                     num_cols: public_input_table_access.num_cols,
+                    bus_type,
                 }
             },
             MirValue::RandomValue(index) => MirValueKey::RandomValue(*index),
