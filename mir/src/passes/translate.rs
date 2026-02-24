@@ -68,7 +68,7 @@ pub struct MirBuilder<'a> {
     root: Link<Root>,
     root_name: Option<&'a ast::QualifiedIdentifier>,
     in_boundary: bool,
-    current_constraint_tag: Option<u64>,
+    current_constraint_tag: Option<ast::ConstraintTagSpec>,
 }
 
 impl<'a> MirBuilder<'a> {
@@ -579,9 +579,8 @@ impl<'a> MirBuilder<'a> {
 
     fn translate_enforce(&mut self, enf: &'a ast::Enforce) -> Result<Link<Op>, CompileError> {
         let tag_spec = enf.tag.clone();
-        let tag = tag_spec.as_ref().and_then(|spec| spec.as_single());
-        let prev_tag = self.current_constraint_tag;
-        self.current_constraint_tag = tag;
+        let prev_tag = self.current_constraint_tag.clone();
+        self.current_constraint_tag = tag_spec.clone();
         let node = self.translate_scalar_expr(&enf.expr)?;
         self.current_constraint_tag = prev_tag;
 
@@ -922,7 +921,18 @@ impl<'a> MirBuilder<'a> {
                                     .emit();
                                 CompileError::Failed
                             })?;
-                            if let Some(tag) = self.current_constraint_tag {
+                            if let Some(tag_spec) = &self.current_constraint_tag {
+                                let tag = tag_spec.as_single().ok_or_else(|| {
+                                    self.diagnostics
+                                        .diagnostic(Severity::Error)
+                                        .with_message("bus boundary tag must be a single id")
+                                        .with_primary_label(
+                                            tag_spec.span(),
+                                            "use @tag(<id>) for bus boundary constraints",
+                                        )
+                                        .emit();
+                                    CompileError::Failed
+                                })?;
                                 bus.borrow_mut().set_first_tag(tag).map_err(|_| {
                                     self.diagnostics
                                         .diagnostic(Severity::Error)
@@ -948,7 +958,18 @@ impl<'a> MirBuilder<'a> {
                                     .emit();
                                 CompileError::Failed
                             })?;
-                            if let Some(tag) = self.current_constraint_tag {
+                            if let Some(tag_spec) = &self.current_constraint_tag {
+                                let tag = tag_spec.as_single().ok_or_else(|| {
+                                    self.diagnostics
+                                        .diagnostic(Severity::Error)
+                                        .with_message("bus boundary tag must be a single id")
+                                        .with_primary_label(
+                                            tag_spec.span(),
+                                            "use @tag(<id>) for bus boundary constraints",
+                                        )
+                                        .emit();
+                                    CompileError::Failed
+                                })?;
                                 bus.borrow_mut().set_last_tag(tag).map_err(|_| {
                                     self.diagnostics
                                         .diagnostic(Severity::Error)

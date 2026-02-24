@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use air_parser::ast::{Boundary, BusConstraintForm, BusType, TraceSegmentId};
 use air_pass::Pass;
-use miden_diagnostics::DiagnosticsHandler;
+use miden_diagnostics::{DiagnosticsHandler, Severity, Spanned};
 use mir::ir::BusOpKind;
 
 use crate::{
@@ -60,6 +60,18 @@ impl Pass for BusOpExpand<'_> {
             // Then, depending on the bus type, expand the integrity constraint if
             // the bus is constrained
             if !bus_ops.is_empty() {
+                if bus_type == BusType::Multiset && bus.constraint_form == BusConstraintForm::Sum {
+                    self.diagnostics
+                        .diagnostic(Severity::Warning)
+                        .with_message(
+                            "@sum_form assumes mutually exclusive latches; this is not validated",
+                        )
+                        .with_primary_label(
+                            bus.name.span(),
+                            "sum form constraints require disjoint latches",
+                        )
+                        .emit();
+                }
                 match bus_type {
                     BusType::Multiset => {
                         self.expand_multiset_constraint(
@@ -150,17 +162,12 @@ impl<'a> BusOpExpand<'a> {
         // Store the generated constraint
         ir.constraints.insert_constraint(TraceSegmentId::Aux, root, domain, tag);
 
-        // Also store the initial value for auxiliary trace generation
+        // Also store the initial value for auxiliary trace generation.
+        // Note: Variable-length public-input boundaries are legacy; once we switch to
+        // aux_finals-based buses, these will go away and all buses will start from identity
+        // (1 for multiset, 0 for logup).
         if boundary == Boundary::First {
-            // TODO: May be invalid? For now, we put its value to zero
-            if let BusBoundary::PublicInputTable(_) = bus_boundary {
-                let value = ir
-                    .constraint_graph_mut()
-                    .insert_node(Operation::Value(crate::Value::Constant(0)));
-                ir.buses_initial_values.insert(bus_index, value);
-            } else {
-                ir.buses_initial_values.insert(bus_index, value);
-            }
+            ir.buses_initial_values.insert(bus_index, value);
         }
     }
 
