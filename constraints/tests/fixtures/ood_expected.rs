@@ -17,7 +17,8 @@ pub struct EvalRecord {
 pub const TOTAL_TAGS: usize = manifest::TOTAL_TAGS;
 
 /// Stable constraint order as emitted by the miden-vm tagging pipeline.
-/// This order must match the constraint IDs (0..16).
+/// This order must match the constraint IDs (0..CURRENT_MAX_ID) and keeps
+/// main-trace constraints first, followed by the range bus tag.
 pub const CONSTRAINT_NAMES: [&str; TOTAL_TAGS] = [
     "system.clk.first_row",
     "system.clk.transition",
@@ -35,6 +36,22 @@ pub const CONSTRAINT_NAMES: [&str; TOTAL_TAGS] = [
     "range.main.v.first_row",
     "range.main.v.last_row",
     "range.main.v.transition",
+    "stack.general.transition.0",
+    "stack.general.transition.1",
+    "stack.general.transition.2",
+    "stack.general.transition.3",
+    "stack.general.transition.4",
+    "stack.general.transition.5",
+    "stack.general.transition.6",
+    "stack.general.transition.7",
+    "stack.general.transition.8",
+    "stack.general.transition.9",
+    "stack.general.transition.10",
+    "stack.general.transition.11",
+    "stack.general.transition.12",
+    "stack.general.transition.13",
+    "stack.general.transition.14",
+    "stack.general.transition.15",
     "range.bus.transition",
 ];
 
@@ -123,6 +140,86 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         },
         EvalRecord {
             id: 16,
+            name: "stack.general.transition.0",
+            value: QuadFelt::new(Felt::new(2617308096902219240), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 17,
+            name: "stack.general.transition.1",
+            value: QuadFelt::new(Felt::new(4439102810547612775), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 18,
+            name: "stack.general.transition.2",
+            value: QuadFelt::new(Felt::new(15221140463513662734), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 19,
+            name: "stack.general.transition.3",
+            value: QuadFelt::new(Felt::new(4910128267170087966), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 20,
+            name: "stack.general.transition.4",
+            value: QuadFelt::new(Felt::new(8221884229886405628), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 21,
+            name: "stack.general.transition.5",
+            value: QuadFelt::new(Felt::new(87491100192562680), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 22,
+            name: "stack.general.transition.6",
+            value: QuadFelt::new(Felt::new(11411892308848385202), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 23,
+            name: "stack.general.transition.7",
+            value: QuadFelt::new(Felt::new(2425094460891103256), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 24,
+            name: "stack.general.transition.8",
+            value: QuadFelt::new(Felt::new(2767534397043537043), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 25,
+            name: "stack.general.transition.9",
+            value: QuadFelt::new(Felt::new(11686523590994044007), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 26,
+            name: "stack.general.transition.10",
+            value: QuadFelt::new(Felt::new(15000969044032170777), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 27,
+            name: "stack.general.transition.11",
+            value: QuadFelt::new(Felt::new(17422355615541008592), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 28,
+            name: "stack.general.transition.12",
+            value: QuadFelt::new(Felt::new(2555448945580115158), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 29,
+            name: "stack.general.transition.13",
+            value: QuadFelt::new(Felt::new(8864896307613509), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 30,
+            name: "stack.general.transition.14",
+            value: QuadFelt::new(Felt::new(3997062422665481459), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 31,
+            name: "stack.general.transition.15",
+            value: QuadFelt::new(Felt::new(6149720027324442163), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 32,
             name: "range.bus.transition",
             value: QuadFelt::new(Felt::new(10365289165200035540), Felt::new(16469718665506609592)),
         },
