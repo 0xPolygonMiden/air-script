@@ -1,7 +1,19 @@
-use std::{collections::BTreeMap, ops::Deref};
+//! MIR to AIR lowering pass.
+//!
+//! The goal is to convert the MIR constraint graph into AIR operations after inlining/unrolling.
+//! We do that by structurally translating MIR ops while memoizing repeated subgraphs using
+//! canonical MIR keys (including commutative canonicalization) to avoid blow-ups. The tradeoff
+//! is that normalization stays conservative (e.g. vector/accessor stripping relies on prior
+//! passes), and caching is intentionally rigid so keys retain all semantic details, which means
+//! we miss some reuse opportunities that aggressive hashing would allow.
+
+use std::{
+    collections::{BTreeMap, HashMap},
+    ops::Deref,
+};
 
 use air_parser::{
-    SemanticAnalysisError,
+    SemanticAnalysisError, Symbol,
     ast::{self, ConstraintTagSpec, TraceSegment},
 };
 use air_pass::Pass;
@@ -16,10 +28,11 @@ use mir::{
 
 use crate::{CompileError, graph::NodeIndex, ir::*};
 
-/// This pass creates the [Air] from the [Mir].
-///  
-/// We mainly directly transform Mir operations to Air operations,
-/// as after the Inlining and Unrolling the nodes correspond 1 to 1.
+/// Lowers a fully inlined/unrolled MIR graph into AIR.
+///
+/// After inlining and unrolling, MIR nodes correspond 1:1 with AIR operations,
+/// so the translation is mostly structural. We add memoization to avoid
+/// re-creating identical subgraphs when MIR contains repeated shapes.
 pub struct MirToAir<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
@@ -100,6 +113,13 @@ impl Pass for MirToAir<'_> {
             air: &mut air,
             trace_columns: trace_columns.clone(),
             bus_bindings_map,
+            tag_allocators: HashMap::new(),
+            mir_node_cache: HashMap::new(),
+            mir_key_by_ptr: HashMap::new(),
+            mir_key_intern: HashMap::new(),
+            mir_key_to_air: HashMap::new(),
+            next_mir_key_id: 1,
+            air_op_cache: HashMap::new(),
         };
 
         let graph = mir.constraint_graph();
@@ -128,11 +148,138 @@ impl Pass for MirToAir<'_> {
     }
 }
 
+/// Stateful builder for MIR to AIR translation.
+///
+/// This keeps per-run caches so repeated MIR subgraphs map to the same AIR nodes,
+/// reducing graph size and memory usage after aggressive inlining.
 struct AirBuilder<'a> {
     diagnostics: &'a DiagnosticsHandler,
     air: &'a mut Air,
     trace_columns: TraceShape<TraceSegment>,
     bus_bindings_map: BTreeMap<Identifier, usize>,
+    tag_allocators: HashMap<SourceSpan, TagAllocator>,
+    /// Fast path: map an exact MIR node pointer to the AIR node already created for it.
+    /// This avoid re-lowering the same MIR node when it is referenced multiple times.
+    mir_node_cache: HashMap<usize, NodeIndex>,
+    /// Memoize the canonical key for a MIR node pointer to avoid recomputing it.
+    /// The aim is to reduce repeated structural hashing when the same MIR node is visited again.
+    mir_key_by_ptr: HashMap<usize, MirKeyId>,
+    /// Intern table for canonical MIR keys (stable ids for structural shapes).
+    /// This assigns compact ids to structural shapes so they can be referenced cheaply.
+    mir_key_intern: HashMap<MirKey, MirKeyId>,
+    /// Cross-pointer cache: canonical MIR key to AIR node for structurally identical subgraphs.
+    /// Reuses AIR nodes even when MIR pointers differ but the structure is identical.
+    mir_key_to_air: HashMap<MirKeyId, NodeIndex>,
+    next_mir_key_id: MirKeyId,
+    /// Deduplicate AIR operations so identical operations share a single graph node.
+    /// Its purpose is to keep the AIR algebraic DAG compact by reusing identical ops.
+    air_op_cache: HashMap<Operation, NodeIndex>,
+}
+
+/// Stable id for canonical MIR keys (interned).
+type MirKeyId = u64;
+
+/// Hashable identifier used in MIR key canonicalization.
+#[derive(Hash, Eq, PartialEq, Clone)]
+enum NamespacedIdentifierKey {
+    Function(Symbol),
+    Binding(Symbol),
+}
+
+/// Hashable fully-qualified identifier for periodic columns.
+#[derive(Hash, Eq, PartialEq, Clone)]
+struct QualifiedIdentifierKey {
+    module: Vec<Symbol>,
+    item: NamespacedIdentifierKey,
+}
+
+/// Canonical key for MIR values used in caching.
+#[derive(Hash, Eq, PartialEq, Clone)]
+enum MirValueKey {
+    Constant(u64),
+    TraceAccess {
+        segment: TraceSegmentId,
+        column: ast::TraceColumnIndex,
+        row_offset: usize,
+    },
+    BusAccess {
+        name: Symbol,
+        row_offset: usize,
+    },
+    PeriodicColumn {
+        name: QualifiedIdentifierKey,
+        cycle: usize,
+    },
+    PublicInput {
+        name: Symbol,
+        index: usize,
+    },
+    PublicInputTable {
+        name: Symbol,
+        num_cols: usize,
+        bus_type: BusType,
+    },
+    RandomValue(usize),
+}
+
+/// Canonical key for MIR ops used in caching.
+#[derive(Hash, Eq, PartialEq, Clone)]
+enum MirKey {
+    Add { lhs: MirKeyId, rhs: MirKeyId },
+    Sub { lhs: MirKeyId, rhs: MirKeyId },
+    Mul { lhs: MirKeyId, rhs: MirKeyId },
+    Exp { lhs: MirKeyId, rhs: u64 },
+    Value(MirValueKey),
+}
+
+/// Allocates tags from a constraint tag specification.
+///
+/// This is used when a constraint declares a range/list of tags and we must
+/// consume them in a deterministic order during lowering.
+struct TagAllocator {
+    spec: ConstraintTagSpec,
+    next_idx: usize,
+}
+
+impl TagAllocator {
+    /// Create a new allocator for the given tag specification.
+    fn new(spec: ConstraintTagSpec) -> Self {
+        Self { spec, next_idx: 0 }
+    }
+
+    /// Return the next available tag, or `None` once exhausted.
+    fn next(&mut self) -> Option<Span<u64>> {
+        let span = self.spec.span();
+        match &self.spec {
+            ConstraintTagSpec::Single(tag) => {
+                if self.next_idx == 0 {
+                    self.next_idx = 1;
+                    Some(*tag)
+                } else {
+                    None
+                }
+            },
+            ConstraintTagSpec::Range { start, .. } => {
+                let len = self.spec.len();
+                if self.next_idx >= len {
+                    None
+                } else {
+                    let value = *start + self.next_idx as u64;
+                    self.next_idx += 1;
+                    Some(Span::new(span, value))
+                }
+            },
+            ConstraintTagSpec::List { tags, .. } => {
+                if self.next_idx >= tags.len() {
+                    None
+                } else {
+                    let value = tags[self.next_idx];
+                    self.next_idx += 1;
+                    Some(Span::new(span, value))
+                }
+            },
+        }
+    }
 }
 
 /// In case of nested list comprehension, we may not have entirely unrolled outer loops iterators
@@ -142,10 +289,10 @@ fn accessor_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
         match accessor.access_type.clone() {
             MirAccessType::Index(index) => {
                 if let Some(vec) = accessor.indexable.as_vector() {
-                    let children = vec.elements.borrow().deref().clone();
                     let index = get_inner_const(&index)
                         .expect("Index should be a constant value after constant propagation")
                         as usize;
+                    let children = vec.elements.borrow();
                     if index >= children.len() {
                         panic!(
                             "Index out of bounds during indexed accessor translation from MIR to AIR: {index}",
@@ -159,7 +306,36 @@ fn accessor_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
             MirAccessType::Default => {
                 add_row_offset_if_trace_access(&accessor.indexable, accessor.offset)
             },
-            _ => mir_node.clone(),
+            MirAccessType::Matrix(row, col) => {
+                if let Some(matrix) = accessor.indexable.as_matrix() {
+                    let row_index = get_inner_const(&row)
+                        .expect("Row index should be a constant value after constant propagation")
+                        as usize;
+                    let col_index = get_inner_const(&col).expect(
+                        "Column index should be a constant value after constant propagation",
+                    ) as usize;
+                    let rows = matrix.elements.borrow();
+                    if row_index >= rows.len() {
+                        panic!(
+                            "Row index out of bounds during matrix accessor translation from MIR to AIR: {row_index}",
+                        );
+                    }
+                    let row_node = rows[row_index].clone();
+                    if let Some(row_vec) = row_node.as_vector() {
+                        let cols = row_vec.elements.borrow();
+                        if col_index >= cols.len() {
+                            panic!(
+                                "Column index out of bounds during matrix accessor translation from MIR to AIR: {col_index}",
+                            );
+                        }
+                        cols[col_index].clone()
+                    } else {
+                        row_node
+                    }
+                } else {
+                    mir_node.clone()
+                }
+            },
         }
     } else {
         mir_node.clone()
@@ -193,12 +369,12 @@ fn add_row_offset_if_trace_access(node: &Link<Op>, offset: usize) -> Link<Op> {
 fn vec_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
     if let Some(vector) = mir_node.as_vector() {
         let size = vector.size;
-        let children = vector.elements.borrow().deref().clone();
         if size != 1 {
             panic!("Vector of len >1 after unrolling: {mir_node:?}");
         }
-        let child = children.first().unwrap();
-        let child = vec_to_scalar(child);
+        let children = vector.elements.borrow();
+        let child = children.first().unwrap().clone();
+        let child = vec_to_scalar(&child);
         let child = accessor_to_scalar(&child);
         child.clone()
     } else {
@@ -218,6 +394,238 @@ fn enf_to_scalar(mir_node: &Link<Op>) -> Link<Op> {
 }
 
 impl AirBuilder<'_> {
+    /// Normalize MIR nodes to improve cache hit rate (strip vectors/accessors/enf wrappers).
+    fn normalize_mir_node(&self, mir_node: &Link<Op>) -> Link<Op> {
+        let mir_node = accessor_to_scalar(mir_node);
+        let mir_node = vec_to_scalar(&mir_node);
+        accessor_to_scalar(&mir_node)
+    }
+
+    fn intern_mir_key(&mut self, key: MirKey) -> MirKeyId {
+        if let Some(existing) = self.mir_key_intern.get(&key) {
+            return *existing;
+        }
+        let id = self.next_mir_key_id;
+        self.next_mir_key_id += 1;
+        self.mir_key_intern.insert(key, id);
+        id
+    }
+
+    /// Build a canonical key for a MIR node, after normalization.
+    fn mir_key_for(&mut self, mir_node: &Link<Op>) -> Result<MirKeyId, CompileError> {
+        let mir_node = self.normalize_mir_node(mir_node);
+        self.mir_key_for_normalized(&mir_node)
+    }
+
+    fn canonical_commutative(lhs: MirKeyId, rhs: MirKeyId) -> (MirKeyId, MirKeyId) {
+        // Canonical order for commutative ops (Add/Mul) to increase cache hits.
+        if lhs <= rhs { (lhs, rhs) } else { (rhs, lhs) }
+    }
+
+    /// Build a canonical key for a normalized MIR node.
+    fn mir_key_for_normalized(&mut self, mir_node: &Link<Op>) -> Result<MirKeyId, CompileError> {
+        if let Some(existing) = self.mir_key_by_ptr.get(&mir_node.get_ptr()) {
+            return Ok(*existing);
+        }
+
+        let key = match mir_node.borrow().deref() {
+            Op::Add(add) => {
+                let lhs = self.mir_key_for(&add.lhs)?;
+                let rhs = self.mir_key_for(&add.rhs)?;
+                // Canonicalize commutative ops to maximize cache hits.
+                let (lhs, rhs) = Self::canonical_commutative(lhs, rhs);
+                MirKey::Add { lhs, rhs }
+            },
+            Op::Sub(sub) => {
+                let lhs = self.mir_key_for(&sub.lhs)?;
+                let rhs = self.mir_key_for(&sub.rhs)?;
+                MirKey::Sub { lhs, rhs }
+            },
+            Op::Mul(mul) => {
+                let lhs = self.mir_key_for(&mul.lhs)?;
+                let rhs = self.mir_key_for(&mul.rhs)?;
+                // Canonicalize commutative ops to maximize cache hits.
+                let (lhs, rhs) = Self::canonical_commutative(lhs, rhs);
+                MirKey::Mul { lhs, rhs }
+            },
+            Op::Exp(exp) => {
+                let lhs = self.mir_key_for(&exp.lhs)?;
+                let rhs = self.exp_rhs_const(&exp.rhs)?;
+                MirKey::Exp { lhs, rhs }
+            },
+            Op::Value(value) => {
+                let value_key = self.mir_value_key_from_value(&value.value.value)?;
+                MirKey::Value(value_key)
+            },
+            Op::Enf(enf) => {
+                return self.mir_key_for(&enf.expr);
+            },
+            Op::Accessor(accessor) => {
+                let value_key = self.mir_value_key_for_accessor(accessor)?;
+                MirKey::Value(value_key)
+            },
+            _ => panic!("Should not have Mir op in graph: {mir_node:?}"),
+        };
+
+        let key_id = self.intern_mir_key(key);
+        self.mir_key_by_ptr.insert(mir_node.get_ptr(), key_id);
+        Ok(key_id)
+    }
+
+    /// Canonicalize a MIR value into a cache key.
+    fn mir_value_key_from_value(&self, mir_value: &MirValue) -> Result<MirValueKey, CompileError> {
+        self.mir_value_key_from_value_with_offset(mir_value, None)
+    }
+
+    /// Canonicalize a MIR value into a cache key with an optional row-offset override.
+    fn mir_value_key_from_value_with_offset(
+        &self,
+        mir_value: &MirValue,
+        row_offset_override: Option<usize>,
+    ) -> Result<MirValueKey, CompileError> {
+        Ok(match mir_value {
+            MirValue::Constant(ConstantValue::Felt(felt)) => MirValueKey::Constant(*felt),
+            MirValue::Constant(constant_value) => {
+                unreachable!("Unexpected MirValue: {:#?}", constant_value)
+            },
+            MirValue::TraceAccess(trace_access) => MirValueKey::TraceAccess {
+                segment: trace_access.segment,
+                column: trace_access.column,
+                row_offset: row_offset_override.unwrap_or(trace_access.row_offset),
+            },
+            MirValue::BusAccess(bus_access) => {
+                let name = bus_access.bus.borrow().deref().name().name();
+                MirValueKey::BusAccess {
+                    name,
+                    row_offset: row_offset_override.unwrap_or(bus_access.row_offset),
+                }
+            },
+            MirValue::PeriodicColumn(periodic_column_access) => MirValueKey::PeriodicColumn {
+                name: Self::qualified_identifier_key(&periodic_column_access.name),
+                cycle: periodic_column_access.cycle,
+            },
+            MirValue::PublicInput(public_input_access) => MirValueKey::PublicInput {
+                name: public_input_access.name.name(),
+                index: public_input_access.index,
+            },
+            MirValue::PublicInputTable(public_input_table_access) => {
+                let bus_type = public_input_table_access.bus_type();
+                MirValueKey::PublicInputTable {
+                    name: public_input_table_access.table_name.name(),
+                    num_cols: public_input_table_access.num_cols,
+                    bus_type,
+                }
+            },
+            MirValue::RandomValue(index) => MirValueKey::RandomValue(*index),
+            _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
+        })
+    }
+
+    fn mir_value_key_for_accessor(
+        &self,
+        accessor: &mir::ir::Accessor,
+    ) -> Result<MirValueKey, CompileError> {
+        let offset = accessor.offset;
+        let child = accessor_to_scalar(&accessor.indexable);
+        let value = child.as_value().expect("Expected value in accessor");
+        self.mir_value_key_from_value_with_offset(&value.value.value, Some(offset))
+    }
+
+    fn air_value_from_mir_value(
+        &self,
+        mir_value: &MirValue,
+        row_offset_override: Option<usize>,
+    ) -> Result<Value, CompileError> {
+        Ok(match mir_value {
+            MirValue::Constant(constant_value) => {
+                if let ConstantValue::Felt(felt) = constant_value {
+                    crate::ir::Value::Constant(*felt)
+                } else {
+                    unreachable!("Unexpected MirValue: {:#?}", mir_value)
+                }
+            },
+            MirValue::TraceAccess(trace_access) => {
+                crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+                    segment: trace_access.segment,
+                    column: trace_access.column,
+                    row_offset: row_offset_override.unwrap_or(trace_access.row_offset),
+                })
+            },
+            MirValue::BusAccess(bus_access) => {
+                let name = bus_access.bus.borrow().deref().name();
+                let column = self.bus_bindings_map.get(&name).unwrap();
+                crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+                    segment: TraceSegmentId::Aux,
+                    column: *column,
+                    row_offset: row_offset_override.unwrap_or(bus_access.row_offset),
+                })
+            },
+            MirValue::PeriodicColumn(periodic_column_access) => {
+                crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
+                    name: periodic_column_access.name.clone(),
+                    cycle: periodic_column_access.cycle,
+                })
+            },
+            MirValue::PublicInput(public_input_access) => {
+                crate::ir::Value::PublicInput(crate::ir::PublicInputAccess {
+                    name: public_input_access.name,
+                    index: public_input_access.index,
+                })
+            },
+            MirValue::PublicInputTable(public_input_table_access) => {
+                crate::ir::Value::PublicInputTable(crate::ir::PublicInputTableAccess::new(
+                    public_input_table_access.table_name,
+                    public_input_table_access.num_cols,
+                    public_input_table_access.bus_type(),
+                ))
+            },
+            MirValue::RandomValue(index) => crate::ir::Value::RandomValue(*index),
+            _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
+        })
+    }
+
+    fn exp_rhs_const(&self, rhs: &Link<Op>) -> Result<u64, CompileError> {
+        let rhs = match rhs.borrow().deref() {
+            Op::Accessor(accessor) => accessor.indexable.clone(),
+            _ => rhs.clone(),
+        };
+        let Some(value_ref) = rhs.as_value() else {
+            return Err(CompileError::SemanticAnalysis(SemanticAnalysisError::InvalidExpr(
+                ast::InvalidExprError::NonConstantExponent(rhs.span()),
+            )));
+        };
+        let mir_value = value_ref.value.value.clone();
+        let MirValue::Constant(constant_value) = mir_value else {
+            return Err(CompileError::SemanticAnalysis(SemanticAnalysisError::InvalidExpr(
+                ast::InvalidExprError::NonConstantExponent(rhs.span()),
+            )));
+        };
+        let ConstantValue::Felt(rhs_value) = constant_value else {
+            return Err(CompileError::SemanticAnalysis(SemanticAnalysisError::InvalidExpr(
+                ast::InvalidExprError::NonConstantExponent(rhs.span()),
+            )));
+        };
+        Ok(rhs_value)
+    }
+
+    fn qualified_identifier_key(ident: &ast::QualifiedIdentifier) -> QualifiedIdentifierKey {
+        QualifiedIdentifierKey {
+            module: Self::module_symbols(&ident.module),
+            item: Self::namespaced_identifier_key(&ident.item),
+        }
+    }
+
+    fn module_symbols(module: &ast::ModuleId) -> Vec<Symbol> {
+        (0..module.len()).map(|idx| module[idx].name()).collect()
+    }
+
+    fn namespaced_identifier_key(ident: &ast::NamespacedIdentifier) -> NamespacedIdentifierKey {
+        match ident {
+            ast::NamespacedIdentifier::Function(id) => NamespacedIdentifierKey::Function(id.name()),
+            ast::NamespacedIdentifier::Binding(id) => NamespacedIdentifierKey::Binding(id.name()),
+        }
+    }
+
     // Uses square and multiply algorithm to expand the exp into a series of multiplications
     fn expand_exp(&mut self, lhs: NodeIndex, rhs: u64) -> NodeIndex {
         match rhs {
@@ -245,119 +653,44 @@ impl AirBuilder<'_> {
         //   access type) or `Vector` with size 1.
         // - in case of nested list comprehensions, we may need to unwrap two accessors, so we
         //   unwrap them multiple times.
-        let mir_node = accessor_to_scalar(mir_node);
-        let mir_node = vec_to_scalar(&mir_node);
-        let mir_node = accessor_to_scalar(&mir_node);
+        let mir_node = self.normalize_mir_node(mir_node);
+
+        // Cache flow (where each field participates):
+        // 1) `mir_node_cache` fast-path: exact MIR pointer to AIR node.
+        // 2) `mir_key_by_ptr` memoizes the canonical key computation for that pointer.
+        // 3) `mir_key_intern` assigns a stable `MirKeyId` for each structural shape (i.e. op +
+        //    canonicalized children/value keys, ignoring pointer identity).
+        // 4) `mir_key_to_air` reuses AIR nodes across different MIR pointers that share the same
+        //    canonical key/shape.
+        // 5) On a miss, we build the AIR node and populate both pointer + key caches.
+        // 6) `air_op_cache` (inside `insert_op`) deduplicates AIR operations themselves.
+        if let Some(cached) = self.mir_node_cache.get(&mir_node.get_ptr()) {
+            return Ok(*cached);
+        }
+        let key = self.mir_key_for_normalized(&mir_node)?;
+        if let Some(cached) = self.mir_key_to_air.get(&key) {
+            self.mir_node_cache.insert(mir_node.get_ptr(), *cached);
+            return Ok(*cached);
+        }
         let mir_node_ref = mir_node.borrow();
-        match mir_node_ref.deref() {
-            Op::Add(add) => {
-                let lhs = add.lhs.clone();
-                let rhs = add.rhs.clone();
-                let lhs_node_index = self.insert_mir_operation(&lhs)?;
-                let rhs_node_index = self.insert_mir_operation(&rhs)?;
-                Ok(self.insert_op(Operation::Add(lhs_node_index, rhs_node_index)))
-            },
-            Op::Sub(sub) => {
-                let lhs = sub.lhs.clone();
-                let rhs = sub.rhs.clone();
-                let lhs_node_index = self.insert_mir_operation(&lhs)?;
-                let rhs_node_index = self.insert_mir_operation(&rhs)?;
-                Ok(self.insert_op(Operation::Sub(lhs_node_index, rhs_node_index)))
-            },
-            Op::Mul(mul) => {
-                let lhs = mul.lhs.clone();
-                let rhs = mul.rhs.clone();
-                let lhs_node_index = self.insert_mir_operation(&lhs)?;
-                let rhs_node_index = self.insert_mir_operation(&rhs)?;
-                Ok(self.insert_op(Operation::Mul(lhs_node_index, rhs_node_index)))
-            },
+        let node = match mir_node_ref.deref() {
+            Op::Add(add) => self.insert_binary_op(Operation::Add, &add.lhs, &add.rhs)?,
+            Op::Sub(sub) => self.insert_binary_op(Operation::Sub, &sub.lhs, &sub.rhs)?,
+            Op::Mul(mul) => self.insert_binary_op(Operation::Mul, &mul.lhs, &mul.rhs)?,
             Op::Exp(exp) => {
                 let lhs = exp.lhs.clone();
-                let rhs = exp.rhs.clone();
-
                 let lhs_node_index = self.insert_mir_operation(&lhs)?;
-
-                // Remove the accessor for rhs if it exists
-                let rhs = match rhs.borrow().deref() {
-                    Op::Accessor(accessor) => accessor.indexable.clone(),
-                    _ => rhs.clone(),
-                };
-
-                let Some(value_ref) = rhs.as_value() else {
-                    return Err(CompileError::SemanticAnalysis(
-                        SemanticAnalysisError::InvalidExpr(
-                            ast::InvalidExprError::NonConstantExponent(rhs.span()),
-                        ),
-                    ));
-                };
-
-                let mir_value = value_ref.value.value.clone();
-
-                let MirValue::Constant(constant_value) = mir_value else {
-                    return Err(CompileError::SemanticAnalysis(
-                        SemanticAnalysisError::InvalidExpr(
-                            ast::InvalidExprError::NonConstantExponent(rhs.span()),
-                        ),
-                    ));
-                };
-
-                let ConstantValue::Felt(rhs_value) = constant_value else {
-                    return Err(CompileError::SemanticAnalysis(
-                        SemanticAnalysisError::InvalidExpr(
-                            ast::InvalidExprError::NonConstantExponent(rhs.span()),
-                        ),
-                    ));
-                };
-
-                Ok(self.expand_exp(lhs_node_index, rhs_value))
+                let rhs_value = self.exp_rhs_const(&exp.rhs)?;
+                self.expand_exp(lhs_node_index, rhs_value)
             },
             Op::Value(value) => {
                 let mir_value = &value.value.value;
-
-                let value = match mir_value {
-                    MirValue::Constant(constant_value) => {
-                        if let ConstantValue::Felt(felt) = constant_value {
-                            crate::ir::Value::Constant(*felt)
-                        } else {
-                            unreachable!()
-                        }
-                    },
-                    MirValue::TraceAccess(trace_access) => {
-                        crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: trace_access.segment,
-                            column: trace_access.column,
-                            row_offset: trace_access.row_offset,
-                        })
-                    },
-                    MirValue::BusAccess(bus_access) => {
-                        let name = bus_access.bus.borrow().deref().name();
-                        let column = self.bus_bindings_map.get(&name).unwrap();
-                        crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: TraceSegmentId::Aux,
-                            column: *column,
-                            row_offset: bus_access.row_offset,
-                        })
-                    },
-                    MirValue::PeriodicColumn(periodic_column_access) => {
-                        crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
-                            name: periodic_column_access.name.clone(),
-                            cycle: periodic_column_access.cycle,
-                        })
-                    },
-                    MirValue::PublicInput(public_input_access) => {
-                        crate::ir::Value::PublicInput(crate::ir::PublicInputAccess {
-                            name: public_input_access.name,
-                            index: public_input_access.index,
-                        })
-                    },
-                    _ => unreachable!("Unexpected MirValue: {:#?}", mir_value),
-                };
-
-                Ok(self.insert_op(Operation::Value(value)))
+                let value = self.air_value_from_mir_value(mir_value, None)?;
+                self.insert_op(Operation::Value(value))
             },
             Op::Enf(enf) => {
                 let child = enf.expr.clone();
-                self.insert_mir_operation(&child)
+                self.insert_mir_operation(&child)?
             },
             Op::Accessor(accessor) => {
                 let offset = accessor.offset;
@@ -366,50 +699,25 @@ impl AirBuilder<'_> {
 
                 let value = child.as_value().expect("Expected value in accessor");
                 let mir_value = &value.value.value;
-
-                let value = match mir_value {
-                    MirValue::Constant(constant_value) => {
-                        if let ConstantValue::Felt(felt) = constant_value {
-                            crate::ir::Value::Constant(*felt)
-                        } else {
-                            unreachable!()
-                        }
-                    },
-                    MirValue::TraceAccess(trace_access) => {
-                        crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: trace_access.segment,
-                            column: trace_access.column,
-                            row_offset: offset,
-                        })
-                    },
-                    MirValue::BusAccess(bus_access) => {
-                        let name = bus_access.bus.borrow().deref().name();
-                        let column = self.bus_bindings_map.get(&name).unwrap();
-                        crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                            segment: TraceSegmentId::Aux,
-                            column: *column,
-                            row_offset: offset,
-                        })
-                    },
-                    MirValue::PeriodicColumn(periodic_column_access) => {
-                        crate::ir::Value::PeriodicColumn(crate::ir::PeriodicColumnAccess {
-                            name: periodic_column_access.name.clone(),
-                            cycle: periodic_column_access.cycle,
-                        })
-                    },
-                    MirValue::PublicInput(public_input_access) => {
-                        crate::ir::Value::PublicInput(crate::ir::PublicInputAccess {
-                            name: public_input_access.name,
-                            index: public_input_access.index,
-                        })
-                    },
-                    _ => unreachable!(),
-                };
-
-                Ok(self.insert_op(Operation::Value(value)))
+                let value = self.air_value_from_mir_value(mir_value, Some(offset))?;
+                self.insert_op(Operation::Value(value))
             },
             _ => panic!("Should not have Mir op in graph: {mir_node:?}"),
-        }
+        };
+        self.mir_node_cache.insert(mir_node.get_ptr(), node);
+        self.mir_key_to_air.insert(key, node);
+        Ok(node)
+    }
+
+    fn insert_binary_op(
+        &mut self,
+        op: fn(NodeIndex, NodeIndex) -> Operation,
+        lhs: &Link<Op>,
+        rhs: &Link<Op>,
+    ) -> Result<NodeIndex, CompileError> {
+        let lhs_node_index = self.insert_mir_operation(lhs)?;
+        let rhs_node_index = self.insert_mir_operation(rhs)?;
+        Ok(self.insert_op(op(lhs_node_index, rhs_node_index)))
     }
 
     fn build_boundary_constraint(
@@ -421,12 +729,35 @@ impl AirBuilder<'_> {
             Op::Vector(vector) => {
                 let vec = vector.elements.borrow().deref().clone();
                 if let Some(tag_spec) = tag {
-                    let tags = self.expand_tag_spec(&tag_spec, vec.len())?;
-                    for (node, tag_span) in vec.iter().zip(tags.into_iter()) {
-                        self.build_boundary_constraint(
-                            node,
-                            Some(ConstraintTagSpec::Single(tag_span)),
-                        )?;
+                    // Tag ranges are defined over the expanded constraint list, not the
+                    // top-level vector shape. Compute the expanded length and slice tags
+                    // per child accordingly.
+                    let total = vec.iter().map(Self::expanded_boundary_len).sum();
+                    let tags = self.expand_tag_spec(&tag_spec, total)?;
+                    let mut tag_iter = tags.into_iter();
+                    for node in vec.iter() {
+                        let count = Self::expanded_boundary_len(node);
+                        let node_tag = match count {
+                            0 => None,
+                            1 => Some(ConstraintTagSpec::Single(
+                                tag_iter
+                                    .next()
+                                    .expect("tag length validated against expanded length"),
+                            )),
+                            _ => {
+                                let mut tags = Vec::with_capacity(count);
+                                for _ in 0..count {
+                                    tags.push(
+                                        tag_iter
+                                            .next()
+                                            .expect("tag length validated against expanded length")
+                                            .item,
+                                    );
+                                }
+                                Some(ConstraintTagSpec::List { span: tag_spec.span(), tags })
+                            },
+                        };
+                        self.build_boundary_constraint(node, node_tag)?;
                     }
                 } else {
                     for node in vec.iter() {
@@ -437,22 +768,45 @@ impl AirBuilder<'_> {
             },
             Op::Matrix(matrix) => {
                 let rows = matrix.elements.borrow().deref().clone();
-                let total = rows
-                    .iter()
-                    .map(|row| row.borrow().deref().children().borrow().len())
-                    .sum::<usize>();
                 if let Some(tag_spec) = tag {
+                    // Matrices are vectors of vectors; tag slicing follows the fully expanded
+                    // row-major order.
+                    let total = rows
+                        .iter()
+                        .map(|row| {
+                            let vec = row.borrow().deref().children().borrow().deref().clone();
+                            vec.iter().map(Self::expanded_boundary_len).sum::<usize>()
+                        })
+                        .sum::<usize>();
                     let tags = self.expand_tag_spec(&tag_spec, total)?;
                     let mut tag_iter = tags.into_iter();
                     for row in rows.iter() {
                         let vec = row.borrow().deref().children().borrow().deref().clone();
                         for node in vec.iter() {
-                            let tag_span =
-                                tag_iter.next().expect("tag length validated against matrix size");
-                            self.build_boundary_constraint(
-                                node,
-                                Some(ConstraintTagSpec::Single(tag_span)),
-                            )?;
+                            let count = Self::expanded_boundary_len(node);
+                            let node_tag = match count {
+                                0 => None,
+                                1 => Some(ConstraintTagSpec::Single(
+                                    tag_iter
+                                        .next()
+                                        .expect("tag length validated against expanded length"),
+                                )),
+                                _ => {
+                                    let mut tags = Vec::with_capacity(count);
+                                    for _ in 0..count {
+                                        tags.push(
+                                            tag_iter
+                                                .next()
+                                                .expect(
+                                                    "tag length validated against expanded length",
+                                                )
+                                                .item,
+                                        );
+                                    }
+                                    Some(ConstraintTagSpec::List { span: tag_spec.span(), tags })
+                                },
+                            };
+                            self.build_boundary_constraint(node, node_tag)?;
                         }
                     }
                 } else {
@@ -495,13 +849,7 @@ impl AirBuilder<'_> {
 
                 self.mark_constrained_boundary(trace_access, &boundary)?;
 
-                let lhs = self.air.constraint_graph_mut().insert_node(Operation::Value(
-                    crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                        segment: trace_access.segment,
-                        column: trace_access.column,
-                        row_offset: trace_access.row_offset,
-                    }),
-                ));
+                let lhs = self.insert_trace_access_value(trace_access);
                 let rhs = self.insert_mir_operation(&rhs)?;
 
                 // Compare the inferred trace segment and domain of the operands
@@ -549,13 +897,7 @@ impl AirBuilder<'_> {
 
                 self.mark_constrained_boundary(trace_access, boundary)?;
 
-                let root = self.air.constraint_graph_mut().insert_node(Operation::Value(
-                    crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
-                        segment: trace_access.segment,
-                        column: trace_access.column,
-                        row_offset: trace_access.row_offset,
-                    }),
-                ));
+                let root = self.insert_trace_access_value(trace_access);
 
                 let domain = boundary.kind.into();
 
@@ -579,19 +921,32 @@ impl AirBuilder<'_> {
                 let vec = vector.children().borrow().deref().clone();
                 if let Some(tag_spec) = tag {
                     // Bus ops are expanded into their own constraints later; do not consume tags
-                    // here.
-                    let taggable = vec.iter().filter(|node| !self.is_bus_op_node(node)).count();
-                    let tags = self.expand_tag_spec(&tag_spec, taggable)?;
+                    // here. Tag slicing follows the expanded constraint list.
+                    let total =
+                        vec.iter().map(|node| self.expanded_integrity_len(node)).sum::<usize>();
+                    let tags = self.expand_tag_spec(&tag_spec, total)?;
                     let mut tag_iter = tags.into_iter();
                     for node in vec.iter() {
-                        let node_tag = if self.is_bus_op_node(node) {
-                            None
-                        } else {
-                            Some(ConstraintTagSpec::Single(
+                        let count = self.expanded_integrity_len(node);
+                        let node_tag = match count {
+                            0 => None,
+                            1 => Some(ConstraintTagSpec::Single(
                                 tag_iter
                                     .next()
-                                    .expect("tag length validated against constraint count"),
-                            ))
+                                    .expect("tag length validated against expanded length"),
+                            )),
+                            _ => {
+                                let mut tags = Vec::with_capacity(count);
+                                for _ in 0..count {
+                                    tags.push(
+                                        tag_iter
+                                            .next()
+                                            .expect("tag length validated against expanded length")
+                                            .item,
+                                    );
+                                }
+                                Some(ConstraintTagSpec::List { span: tag_spec.span(), tags })
+                            },
                         };
                         self.build_integrity_constraint(node, node_tag)?;
                     }
@@ -604,30 +959,42 @@ impl AirBuilder<'_> {
             Op::Matrix(matrix) => {
                 let rows = matrix.elements.borrow().deref().clone();
                 if let Some(tag_spec) = tag {
-                    let mut total = 0usize;
-                    for row in rows.iter() {
-                        let vec = row.borrow().deref().children().borrow().deref().clone();
-                        for node in vec.iter() {
-                            // Bus ops are expanded into their own constraints later; do not consume
-                            // tags here.
-                            if !self.is_bus_op_node(node) {
-                                total += 1;
-                            }
-                        }
-                    }
+                    // Matrices are vectors of vectors; tag slicing follows the fully expanded
+                    // row-major order (excluding bus ops).
+                    let total = rows
+                        .iter()
+                        .map(|row| {
+                            let vec = row.borrow().deref().children().borrow().deref().clone();
+                            vec.iter().map(|node| self.expanded_integrity_len(node)).sum::<usize>()
+                        })
+                        .sum::<usize>();
                     let tags = self.expand_tag_spec(&tag_spec, total)?;
                     let mut tag_iter = tags.into_iter();
                     for row in rows.iter() {
                         let vec = row.borrow().deref().children().borrow().deref().clone();
                         for node in vec.iter() {
-                            let node_tag = if self.is_bus_op_node(node) {
-                                None
-                            } else {
-                                Some(ConstraintTagSpec::Single(
+                            let count = self.expanded_integrity_len(node);
+                            let node_tag = match count {
+                                0 => None,
+                                1 => Some(ConstraintTagSpec::Single(
                                     tag_iter
                                         .next()
-                                        .expect("tag length validated against constraint count"),
-                                ))
+                                        .expect("tag length validated against expanded length"),
+                                )),
+                                _ => {
+                                    let mut tags = Vec::with_capacity(count);
+                                    for _ in 0..count {
+                                        tags.push(
+                                            tag_iter
+                                                .next()
+                                                .expect(
+                                                    "tag length validated against expanded length",
+                                                )
+                                                .item,
+                                        );
+                                    }
+                                    Some(ConstraintTagSpec::List { span: tag_spec.span(), tags })
+                                },
                             };
                             self.build_integrity_constraint(node, node_tag)?;
                         }
@@ -701,6 +1068,73 @@ impl AirBuilder<'_> {
         Ok(())
     }
 
+    // Returns the number of boundary constraints produced by `node` after expansion.
+    fn expanded_boundary_len(node: &Link<Op>) -> usize {
+        match node.borrow().deref() {
+            Op::Vector(vector) => {
+                vector.elements.borrow().iter().map(Self::expanded_boundary_len).sum()
+            },
+            Op::Matrix(matrix) => matrix
+                .elements
+                .borrow()
+                .iter()
+                .map(|row| {
+                    let vec = row.borrow().deref().children().borrow().deref().clone();
+                    vec.iter().map(Self::expanded_boundary_len).sum::<usize>()
+                })
+                .sum(),
+            Op::Enf(enf) => {
+                let child = accessor_to_scalar(&enf.expr);
+                if child.as_vector().is_some() || child.as_matrix().is_some() {
+                    Self::expanded_boundary_len(&child)
+                } else {
+                    1
+                }
+            },
+            // After unrolling/constant propagation, any remaining op types should be scalars,
+            // and accessors resolve to scalar values. These contribute exactly one constraint.
+            _ => 1,
+        }
+    }
+
+    // Returns the number of integrity constraints produced by `node` after expansion.
+    // Bus ops are excluded because they become standalone constraints later.
+    fn expanded_integrity_len(&self, node: &Link<Op>) -> usize {
+        if self.is_bus_op_node(node) {
+            return 0;
+        }
+        match node.borrow().deref() {
+            Op::Vector(vector) => vector
+                .children()
+                .borrow()
+                .iter()
+                .map(|child| self.expanded_integrity_len(child))
+                .sum(),
+            Op::Matrix(matrix) => matrix
+                .elements
+                .borrow()
+                .iter()
+                .map(|row| {
+                    let vec = row.borrow().deref().children().borrow().deref().clone();
+                    vec.iter().map(|child| self.expanded_integrity_len(child)).sum::<usize>()
+                })
+                .sum(),
+            Op::Enf(enf) => {
+                let child = accessor_to_scalar(&enf.expr);
+                if self.is_bus_op_node(&child) {
+                    0
+                } else if child.as_vector().is_some() || child.as_matrix().is_some() {
+                    self.expanded_integrity_len(&child)
+                } else {
+                    1
+                }
+            },
+            // By this stage we expect only scalar ops (no unrolled vectors/matrices/for/if),
+            // so remaining nodes map to a single integrity constraint.
+            _ => 1,
+        }
+    }
+
     fn is_bus_op_node(&self, node: &Link<Op>) -> bool {
         let node = accessor_to_scalar(node);
         let node = enf_to_scalar(&node);
@@ -749,7 +1183,7 @@ impl AirBuilder<'_> {
     }
 
     fn resolve_single_tag(
-        &self,
+        &mut self,
         tag: Option<ConstraintTagSpec>,
     ) -> Result<Option<u64>, CompileError> {
         match tag {
@@ -757,17 +1191,29 @@ impl AirBuilder<'_> {
             Some(spec) => match spec.as_single() {
                 Some(tag) => Ok(Some(tag)),
                 None => {
-                    self.diagnostics
-                        .diagnostic(Severity::Error)
-                        .with_message("tag range does not match expanded constraint length")
-                        .with_primary_label(
-                            spec.span(),
-                            "expected a single tag for this constraint",
-                        )
-                        .emit();
-                    Err(CompileError::Failed)
+                    let next = self.next_tag_from_spec(&spec)?;
+                    Ok(Some(next.item))
                 },
             },
+        }
+    }
+
+    fn next_tag_from_spec(&mut self, spec: &ConstraintTagSpec) -> Result<Span<u64>, CompileError> {
+        let span = spec.span();
+        let entry = self
+            .tag_allocators
+            .entry(span)
+            .or_insert_with(|| TagAllocator::new(spec.clone()));
+
+        if let Some(tag) = entry.next() {
+            Ok(tag)
+        } else {
+            self.diagnostics
+                .diagnostic(Severity::Error)
+                .with_message("constraint tag range exhausted")
+                .with_primary_label(span, "no tags left to assign here")
+                .emit();
+            Err(CompileError::Failed)
         }
     }
 
@@ -814,7 +1260,15 @@ impl AirBuilder<'_> {
     /// Adds the specified operation to the graph and returns the index of its node.
     #[inline]
     fn insert_op(&mut self, op: Operation) -> NodeIndex {
-        self.air.constraint_graph_mut().insert_node(op)
+        self.air.constraint_graph_mut().insert_node_cached(op, &mut self.air_op_cache)
+    }
+
+    fn insert_trace_access_value(&mut self, trace_access: MirTraceAccess) -> NodeIndex {
+        self.insert_op(Operation::Value(crate::ir::Value::TraceAccess(crate::ir::TraceAccess {
+            segment: trace_access.segment,
+            column: trace_access.column,
+            row_offset: trace_access.row_offset,
+        })))
     }
 
     /// Extracts the trace access information from a given [Mir] `Boundary`.
@@ -938,5 +1392,44 @@ fn build_bus_boundary(
             Err(CompileError::Failed)
         },
         _ => unreachable!("Unexpected Mir Op in bus boundary: {:#?}", mir_node_ref),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tag_allocator_consumes_range_in_order() {
+        let span = SourceSpan::default();
+        let spec = ConstraintTagSpec::range(span, 10, 13, false); // 10..13 -> 10,11,12
+        let mut alloc = TagAllocator::new(spec);
+
+        let first = alloc.next().map(|tag| tag.item);
+        let second = alloc.next().map(|tag| tag.item);
+        let third = alloc.next().map(|tag| tag.item);
+        let fourth = alloc.next().map(|tag| tag.item);
+
+        assert_eq!(first, Some(10));
+        assert_eq!(second, Some(11));
+        assert_eq!(third, Some(12));
+        assert_eq!(fourth, None);
+    }
+
+    #[test]
+    fn tag_allocator_consumes_list_in_order() {
+        let span = SourceSpan::default();
+        let spec = ConstraintTagSpec::list(span, vec![3, 1, 4]);
+        let mut alloc = TagAllocator::new(spec);
+
+        let first = alloc.next().map(|tag| tag.item);
+        let second = alloc.next().map(|tag| tag.item);
+        let third = alloc.next().map(|tag| tag.item);
+        let fourth = alloc.next().map(|tag| tag.item);
+
+        assert_eq!(first, Some(3));
+        assert_eq!(second, Some(1));
+        assert_eq!(third, Some(4));
+        assert_eq!(fourth, None);
     }
 }

@@ -43,6 +43,96 @@ fn let_vector_constant_in_boundary_constraint() {
 }
 
 #[test]
+fn let_vector_destructure_in_boundary_constraint() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk],
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        let [a, b] = [1, 5];
+        enf clk.first = a + b;
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
+
+    assert!(compile_from_source(source).is_ok());
+}
+
+#[test]
+fn let_vector_destructure_from_function_call() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk],
+    }
+    fn pair(x: felt) -> felt[2] {
+        return [x, 5];
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        let [a, b] = pair(1);
+        enf clk.first = a + b;
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
+
+    assert!(compile_from_source(source).is_ok());
+}
+
+#[test]
+fn let_vector_binding_from_function_call() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk],
+    }
+    fn pair(x: felt) -> felt[2] {
+        return [x, 5];
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        let tmp = pair(1);
+        enf clk.first = tmp[0] + tmp[1];
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
+
+    assert!(compile_from_source(source).is_ok());
+}
+
+#[test]
+fn err_let_destructure_length_mismatch() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk],
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        let [a, b] = [1, 5, 7];
+        enf clk.first = a + b;
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
+
+    expect_diagnostic(source, "let binding count does not match vector length");
+}
+
+#[test]
 fn multi_constraint_nested_let_with_expressions_in_boundary_constraint() {
     let source = "
     def test

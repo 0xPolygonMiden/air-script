@@ -1,5 +1,12 @@
+//! AST to MIR lowering pass.
+//!
+//! The goal is to convert the parsed/validated AIR AST into a MIR graph of explicit ops. We do
+//! this by traversing the AST, building MIR nodes for expressions/constraints, and attaching the
+//! ownership metadata needed for later inlining/unrolling. The tradeoff is explicitness over
+//! compactness, relying on later passes (CSE/inlining/unrolling) to simplify and normalize.
+
 use core::panic;
-use std::{collections::BTreeMap, ops::Deref};
+use std::ops::Deref;
 
 use air_parser::{
     LexicalScope,
@@ -14,31 +21,31 @@ use crate::{
     ir::{
         Accessor, Add, Boundary, Builder, Bus, BusAccess, BusOp, BusOpKind, Call, ConstantValue,
         Enf, Evaluator, Exp, Fold, FoldOperator, For, Function, If, Link, MatchArm, Matrix, Mir,
-        MirAccessType, MirType, MirValue, Mul, Op, Owner, Parameter, PublicInputAccess,
+        MirAccessType, MirType, MirValue, Mul, Op, Owner, OwnerId, Parameter, PublicInputAccess,
         PublicInputTableAccess, Root, SpannedMirValue, Sub, TraceAccess, TraceAccessBinding, Value,
         Vector,
     },
     passes::duplicate_node,
 };
 
-/// This pass transforms a given [ast::Program] into a Middle Intermediate Representation ([Mir])
+/// Lowers an AST [ast::Program] into MIR.
 ///
-/// This pass assumes that the input program:
-/// * has been semantically validated
-/// * has had constant propagation already applied
+/// Assumptions:
+/// - The input program has been semantically validated.
+/// - Constant propagation has already been applied.
 ///
 /// Notes:
-/// * During this step, we unpack parameters and arguments of evaluators, in order to make it easier
-///   to inline them
+/// - Evaluator parameters/arguments are unpacked to simplify later inlining.
 ///
 /// TODO:
-/// - [ ] Implement diagnostics for better error handling
+/// - Implement diagnostics for better error handling.
 pub struct AstToMir<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
 
 impl<'a> AstToMir<'a> {
     #[inline]
+    /// Construct a new AST to MIR translator.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self { diagnostics }
     }
@@ -56,12 +63,13 @@ impl Pass for AstToMir<'_> {
     }
 }
 
+/// Stateful builder used during AST to MIR translation.
 pub struct MirBuilder<'a> {
     program: &'a ast::Program,
     diagnostics: &'a DiagnosticsHandler,
     mir: Mir,
     trace_columns: &'a Vec<ast::TraceSegment>,
-    bindings: LexicalScope<&'a ast::Identifier, Link<Op>>,
+    bindings: LexicalScope<&'a ast::Identifier, BindingValue>,
     // The root node is either the evaluator or function we're currently translating the body of,
     // or None if we're not inside a function or evaluator (e.g. translating boundary / integrity
     // constraints)
@@ -69,6 +77,21 @@ pub struct MirBuilder<'a> {
     root_name: Option<&'a ast::QualifiedIdentifier>,
     in_boundary: bool,
     current_constraint_tag: Option<ast::ConstraintTagSpec>,
+}
+
+/// Value stored in the lexical scope during AST to MIR lowering.
+#[derive(Clone)]
+struct BindingValue {
+    /// Bound MIR node.
+    node: Link<Op>,
+    /// Whether the indexable value can be shared across uses.
+    share_indexable: bool,
+}
+
+impl BindingValue {
+    fn new(node: Link<Op>, share_indexable: bool) -> Self {
+        Self { node, share_indexable }
+    }
 }
 
 impl<'a> MirBuilder<'a> {
@@ -143,47 +166,46 @@ impl<'a> MirBuilder<'a> {
     }
 
     fn validate_constraint_tags(&self) -> Result<Option<u64>, CompileError> {
-        let mut tags = Vec::new();
+        let mut has_tag = false;
         // Collect tags from root constraints and any evaluator bodies they invoke, since
         // tagged constraints can be emitted inside evaluators.
-        Self::collect_tags_from_statements(&self.program.boundary_constraints, &mut tags)?;
-        Self::collect_tags_from_statements(&self.program.integrity_constraints, &mut tags)?;
+        Self::collect_tags_from_statements(&self.program.boundary_constraints, &mut has_tag)?;
+        Self::collect_tags_from_statements(&self.program.integrity_constraints, &mut has_tag)?;
         for evaluator in self.program.evaluators.values() {
-            Self::collect_tags_from_statements(&evaluator.body, &mut tags)?;
+            Self::collect_tags_from_statements(&evaluator.body, &mut has_tag)?;
         }
         for bus in self.program.buses.values() {
-            if let Some(tag) = &bus.transition_tag {
-                tags.push(*tag);
+            if bus.transition_tag.is_some() {
+                has_tag = true;
             }
         }
 
-        if tags.is_empty() {
+        if !has_tag {
             return Ok(None);
         }
 
         let max_id = self.lookup_current_max_id()?;
-        self.validate_tag_sequence(&tags, max_id)?;
         Ok(Some(max_id))
     }
 
     fn collect_tags_from_statements(
         statements: &[ast::Statement],
-        tags: &mut Vec<Span<u64>>,
+        has_tag: &mut bool,
     ) -> Result<(), CompileError> {
         for statement in statements {
             match statement {
                 ast::Statement::Enforce(enf) => {
-                    if let Some(tag_spec) = &enf.tag {
-                        tags.extend(tag_spec.expand_spans());
+                    if enf.tag.is_some() {
+                        *has_tag = true;
                     }
                 },
                 ast::Statement::EnforceAll(list_comp) => {
-                    if let Some(tag_spec) = &list_comp.tag {
-                        tags.extend(tag_spec.expand_spans());
+                    if list_comp.tag.is_some() {
+                        *has_tag = true;
                     }
                 },
                 ast::Statement::Let(let_stmt) => {
-                    Self::collect_tags_from_statements(&let_stmt.body, tags)?;
+                    Self::collect_tags_from_statements(&let_stmt.body, has_tag)?;
                 },
                 ast::Statement::EnforceIf(_)
                 | ast::Statement::BusEnforce(_)
@@ -231,40 +253,7 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
-    fn validate_tag_sequence(&self, tags: &[Span<u64>], max_id: u64) -> Result<(), CompileError> {
-        let expected = max_id as usize + 1;
-        if tags.len() != expected {
-            self.diagnostics
-                .diagnostic(Severity::Error)
-                .with_message("constraint tag count does not match CURRENT_MAX_ID")
-                .with_note(format!("expected {expected} tags for CURRENT_MAX_ID = {max_id}"))
-                .emit();
-            return Err(CompileError::Failed);
-        }
-
-        let mut seen: BTreeMap<u64, Span<u64>> = BTreeMap::new();
-        for tag in tags {
-            if tag.item > max_id {
-                self.diagnostics
-                    .diagnostic(Severity::Error)
-                    .with_message("constraint tag exceeds CURRENT_MAX_ID")
-                    .with_primary_label(tag.span(), format!("tag {} is out of range", tag.item))
-                    .emit();
-                return Err(CompileError::Failed);
-            }
-            if let Some(prev_span) = seen.insert(tag.item, *tag) {
-                self.diagnostics
-                    .diagnostic(Severity::Error)
-                    .with_message("duplicate constraint tag")
-                    .with_primary_label(tag.span(), format!("tag {} reused here", tag.item))
-                    .with_secondary_label(prev_span.span(), "previous tag here")
-                    .emit();
-                return Err(CompileError::Failed);
-            }
-        }
-
-        Ok(())
-    }
+    // Tag sequence validation is deferred to the final AIR pass, after all expansion.
 
     fn translate_bus_definition(&mut self, bus: &'a ast::Bus) -> Result<Link<Bus>, CompileError> {
         Ok(Bus::create(
@@ -284,7 +273,7 @@ impl<'a> MirBuilder<'a> {
         let mut all_params_flatten = Vec::new();
 
         self.root_name = Some(ident);
-        let mut ev = Evaluator::builder().span(ast_eval.span);
+        let mut ev = Evaluator::builder().span(ast_eval.span).owner_id(OwnerId::next());
         let mut i = 0;
 
         for trace_segment in &ast_eval.params {
@@ -344,12 +333,14 @@ impl<'a> MirBuilder<'a> {
                             }
                         }
                         let vector_node = Vector::create(params_vec, span);
-                        self.bindings.insert(name.unwrap(), vector_node.clone());
+                        self.bindings
+                            .insert(name.unwrap(), BindingValue::new(vector_node.clone(), false));
                     },
                     ast::Type::Felt => {
                         let param = all_params_flatten_for_trace_segment[i].clone();
                         i += 1;
-                        self.bindings.insert(name.unwrap(), param.clone());
+                        self.bindings
+                            .insert(name.unwrap(), BindingValue::new(param.clone(), false));
                     },
                     _ => unreachable!(),
                 };
@@ -370,7 +361,7 @@ impl<'a> MirBuilder<'a> {
         let mut params = Vec::new();
 
         self.root_name = Some(ident);
-        let mut func = Function::builder().span(ast_func.span());
+        let mut func = Function::builder().span(ast_func.span()).owner_id(OwnerId::next());
         let mut i = 0;
         for (param_ident, ty) in ast_func.params.iter() {
             let name = Some(param_ident);
@@ -403,7 +394,7 @@ impl<'a> MirBuilder<'a> {
         self.bindings.enter();
         self.root_name = Some(ident);
         for ((param_ident, _ty), param) in ast_func.params.iter().zip(params) {
-            self.bindings.insert(param_ident, param.clone());
+            self.bindings.insert(param_ident, BindingValue::new(param.clone(), false));
         }
         self.translate_body(ident, original_root.clone(), &ast_func.body)?;
 
@@ -537,11 +528,34 @@ impl<'a> MirBuilder<'a> {
     /// Note: as we already return the operation of the last statement, we do not need to add it to
     /// the root's body here. This should be handled by the caller.
     fn translate_let(&mut self, let_stmt: &'a ast::Let) -> Result<Link<Op>, CompileError> {
-        let name = &let_stmt.name;
         let value: Link<Op> = self.translate_expr(&let_stmt.value)?;
         let mut ret_value = value.clone();
         self.bindings.enter();
-        self.bindings.insert(name, value.clone());
+        match &let_stmt.binding {
+            ast::LetBinding::Single(name) => {
+                let share_indexable = matches!(
+                    let_stmt.value.ty(),
+                    Some(ast::Type::Vector(_)) | Some(ast::Type::Matrix(_, _))
+                );
+                self.bindings.insert(name, BindingValue::new(value.clone(), share_indexable));
+            },
+            ast::LetBinding::Vector(names) => {
+                let vector_elements =
+                    value.as_vector().map(|vec| vec.elements.borrow().deref().clone());
+                for (idx, name) in names.iter().enumerate() {
+                    let element_node = if let Some(elements) = &vector_elements {
+                        elements[idx].clone()
+                    } else {
+                        let index_node =
+                            self.translate_scalar_const(idx as u64, let_stmt.value.span())?;
+                        let mir_access_type = MirAccessType::Index(index_node);
+                        Accessor::create(value.clone(), mir_access_type, 0, name.span())
+                    };
+                    let share_indexable = vector_elements.is_none();
+                    self.bindings.insert(name, BindingValue::new(element_node, share_indexable));
+                }
+            },
+        }
         for (i, stmt) in let_stmt.body.iter().enumerate() {
             let new_stmt = self.translate_statement(stmt)?;
             // Skip the last statement as it is returned
@@ -629,7 +643,7 @@ impl<'a> MirBuilder<'a> {
         for (index, binding) in list_comp.bindings.iter().enumerate() {
             let binding_node = Parameter::create(index, ast::Type::Felt.into(), binding.span());
             params.push(binding_node.clone());
-            self.bindings.insert(binding, binding_node);
+            self.bindings.insert(binding, BindingValue::new(binding_node, false));
         }
 
         let for_node = For::create(
@@ -646,13 +660,11 @@ impl<'a> MirBuilder<'a> {
         } else {
             Link::default()
         };
-        for_node.as_for_mut().unwrap().expr.borrow_mut().clone_from(&body_node.borrow());
-        for_node
-            .as_for_mut()
-            .unwrap()
-            .selector
-            .borrow_mut()
-            .clone_from(&selector_node.borrow());
+        {
+            let mut for_mut = for_node.as_for_mut().unwrap();
+            for_mut.expr = body_node.clone();
+            for_mut.selector = selector_node.clone();
+        }
 
         let enf_node: Link<Op> = Enf::create(for_node, list_comp.span(), list_comp.tag.clone());
         let node = self.insert_enforce(enf_node);
@@ -742,7 +754,7 @@ impl<'a> MirBuilder<'a> {
             },
         };
         // Note: safe to unwrap because we checked that bus_op is a BusOp above
-        bus_op.as_bus_op_mut().unwrap().latch.borrow_mut().clone_from(&sel.borrow());
+        bus_op.as_bus_op_mut().unwrap().latch = sel.clone();
         let enf_node = self.insert_enforce(bus_op.clone())?;
         Ok(enf_node)
     }
@@ -1170,7 +1182,7 @@ impl<'a> MirBuilder<'a> {
         for (index, binding) in list_comp.bindings.iter().enumerate() {
             let binding_node = Parameter::create(index, ast::Type::Felt.into(), binding.span());
             params.push(binding_node.clone());
-            self.bindings.insert(binding, binding_node);
+            self.bindings.insert(binding, BindingValue::new(binding_node, false));
         }
 
         let for_node = For::create(
@@ -1188,13 +1200,11 @@ impl<'a> MirBuilder<'a> {
         };
         let body_node = self.translate_scalar_expr(&list_comp.body)?;
 
-        for_node.as_for_mut().unwrap().expr.borrow_mut().clone_from(&body_node.borrow());
-        for_node
-            .as_for_mut()
-            .unwrap()
-            .selector
-            .borrow_mut()
-            .clone_from(&selector_node.borrow());
+        {
+            let mut for_mut = for_node.as_for_mut().unwrap();
+            for_mut.expr = body_node.clone();
+            for_mut.selector = selector_node.clone();
+        }
 
         self.bindings.exit();
 
@@ -1443,27 +1453,46 @@ impl<'a> MirBuilder<'a> {
         }
 
         // If we reach here, this must be a let-bound variable
-        if let Some(let_bound_access_expr) = self.bindings.get(access.name.as_ref()).cloned() {
+        if let Some(binding) = self.bindings.get(access.name.as_ref()).cloned() {
+            let bound_node = binding.node.clone();
             // If the let-bound variable is a parameter, we probably already have the type
             //
             // In that case, replacing the default type (Felt) with the one from the access
-            if let Some(mut param) = let_bound_access_expr.as_parameter_mut()
+            if let Some(mut param) = bound_node.as_parameter_mut()
                 && let Some(access_ty) = &access.ty
             {
                 param.ty = self.translate_type(access_ty);
             }
             // If it's a slice access, we need to return its translation.
             // This eliminates the case of [ast::AccessType::Slice] in MIR
-            if let Some(slice) = self.translate_potential_slice(&let_bound_access_expr, access) {
+            if let Some(slice) = self.translate_potential_slice(&bound_node, access) {
                 return Ok(slice);
             }
             let mir_access_type = self.translate_access_type(&access.access_type)?;
-            let accessor: Link<Op> = Accessor::create(
-                duplicate_node(let_bound_access_expr, &mut Default::default()),
-                mir_access_type,
-                access.offset,
-                access.span(),
-            );
+            let indexable = if bound_node.as_parameter().is_some() || binding.share_indexable {
+                bound_node.clone()
+            } else {
+                duplicate_node(bound_node, &mut Default::default())
+            };
+            if binding.share_indexable
+                && matches!(access.access_type, ast::AccessType::Default)
+                && access.offset == 0
+            {
+                // If the bound node is already an accessor with a non-default access type,
+                // keep wrapping so downstream checks (e.g. bus ops) see a default accessor.
+                let is_default_accessor = indexable
+                    .as_accessor()
+                    .map(|accessor| matches!(accessor.access_type, MirAccessType::Default))
+                    .unwrap_or(false);
+                if is_default_accessor {
+                    return Ok(indexable);
+                }
+                if indexable.as_accessor().is_none() {
+                    return Ok(indexable);
+                }
+            }
+            let accessor: Link<Op> =
+                Accessor::create(indexable, mir_access_type, access.offset, access.span());
             return Ok(accessor);
         }
 

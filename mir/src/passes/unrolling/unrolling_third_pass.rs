@@ -1,3 +1,7 @@
+//! Unrolling third pass.
+//!
+//! Unrolls remaining `If` nodes and applies match optimizations.
+
 use std::ops::Deref;
 
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
@@ -14,6 +18,7 @@ use crate::{
     },
 };
 
+/// Third pass of unrolling: unroll `If` nodes and optimize match constraints.
 pub struct UnrollingThirdPass<'a> {
     #[allow(unused)]
     diagnostics: &'a DiagnosticsHandler,
@@ -25,6 +30,7 @@ pub struct UnrollingThirdPass<'a> {
 }
 
 impl<'a> UnrollingThirdPass<'a> {
+    /// Construct a new third-pass unroller.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self {
             diagnostics,
@@ -123,6 +129,9 @@ impl Visitor for UnrollingThirdPass<'_> {
             | Node::Matrix(_)
             | Node::Accessor(_)
             | Node::None(_) => None,
+            Node::Parameter(_) => {
+                return Err(CompileError::Failed);
+            },
             _ => {
                 unreachable!(
                     "Unexpected node during Unrolling: Function, Evaluators, Calls, For nodes and Parameters should have been inlined before this pass. Found: {:?}",
@@ -136,6 +145,19 @@ impl Visitor for UnrollingThirdPass<'_> {
             node.as_op().unwrap().set(&updated_op);
         }
 
+        Ok(())
+    }
+}
+
+impl UnrollingThirdPass<'_> {
+    pub fn run(&mut self, graph: &mut Graph) -> Result<(), CompileError> {
+        let roots = self.root_nodes_to_visit(graph);
+        for root in roots {
+            self.scan_node(graph, root.clone())?;
+            while let Some(node) = self.work_stack().pop() {
+                self.visit_node(graph, node)?;
+            }
+        }
         Ok(())
     }
 }

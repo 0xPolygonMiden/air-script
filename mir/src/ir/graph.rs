@@ -7,7 +7,7 @@ use air_parser::ast::QualifiedIdentifier;
 
 use crate::{CompileError, ir};
 
-/// The constraints graph for the Mir.
+/// The constraints graph for MIR.
 ///
 /// We store constraints (boundary and integrity), as well as function and evaluator definitions.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -116,6 +116,17 @@ impl Graph {
     /// Queries all evaluator nodes
     pub fn get_evaluator_nodes(&self) -> Vec<ir::Link<ir::Root>> {
         self.evaluators.values().cloned().collect()
+    }
+
+    /// Returns the function/evaluator name for a given root pointer, if known.
+    pub fn get_root_name_by_ptr(&self, ptr: usize) -> Option<QualifiedIdentifier> {
+        if let Some((ident, _)) = self.functions.iter().find(|(_, root)| root.get_ptr() == ptr) {
+            return Some(ident.clone());
+        }
+        if let Some((ident, _)) = self.evaluators.iter().find(|(_, root)| root.get_ptr() == ptr) {
+            return Some(ident.clone());
+        }
+        None
     }
 
     /// Inserts a boundary constraint into the graph, if it does not already exist.

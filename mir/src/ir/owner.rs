@@ -1,17 +1,25 @@
+//! MIR ownership metadata.
+//!
+//! The aim is to track which root or op "owns" a node so identity survives graph rewrites
+//! (inlining/unrolling/duplication). We do that by storing a lightweight owner enum with
+//! backlinks to the owning node, avoiding reference cycles while still supporting navigation.
+//! The tradeoff is extra bookkeeping: backlinks must be kept consistent whenever nodes mutate.
+
 use std::ops::Deref;
 
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Child, Link, Node, Op, Parent, Root};
+use crate::ir::{BackLink, Child, Link, Node, Op, OwnerId, Parent, Root};
 
-/// The nodes that can own [Op] nodes
-/// The [Owner] enum does not own it's inner struct to avoid reference cycles,
-/// and hence uses a [BackLink] to refer to the inner [Op] or [Root]
-/// It is meant to be used as a singleton, stored in the inner struct of [Op] and [Root],
-/// so it can be updated to the correct variant when the inner struct is updated
-/// Note: The [None] variant is used to represent a [Owner] that:
-/// - is not yet initialized
-/// - no longer exists (due to its ref-count dropping to 0). We refer to those as "stale" nodes.
+/// The nodes that can own [Op] nodes.
+///
+/// The [Owner] enum does not own its inner struct to avoid reference cycles, and instead
+/// uses a [BackLink] to refer to the inner [Op] or [Root]. It is stored as a singleton
+/// inside each node so it can be updated when the inner struct is updated.
+///
+/// Note: The [None] variant represents an owner that is:
+/// - not yet initialized
+/// - no longer exists (ref-count dropped to 0); we call those "stale" nodes.
 #[derive(Clone, Eq, Debug, Spanned)]
 pub enum Owner {
     Function(BackLink<Root>),
@@ -177,6 +185,27 @@ impl std::hash::Hash for Owner {
 }
 
 impl Link<Owner> {
+    /// Return a stable owner id for owners that can be referenced by parameters.
+    pub fn owner_id(&self) -> OwnerId {
+        match self.borrow().deref() {
+            Owner::Function(f) => f
+                .to_link()
+                .and_then(|l| l.as_function().map(|f| f.owner_id))
+                .unwrap_or_default(),
+            Owner::Evaluator(e) => e
+                .to_link()
+                .and_then(|l| l.as_evaluator().map(|e| e.owner_id))
+                .unwrap_or_default(),
+            Owner::For(back) => {
+                back.to_link().and_then(|l| l.as_for().map(|f| f.owner_id)).unwrap_or_default()
+            },
+            Owner::If(back) => {
+                back.to_link().and_then(|l| l.as_if().map(|i| i.owner_id)).unwrap_or_default()
+            },
+            _ => OwnerId::default(),
+        }
+    }
+
     /// Update the current node to the right variant of the new inner [Op] or [Root]
     /// Note: Only meant to be used internally
     pub fn update_variant(&self) {

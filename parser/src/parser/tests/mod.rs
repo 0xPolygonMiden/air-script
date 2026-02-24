@@ -590,11 +590,21 @@ macro_rules! matrix {
 
 macro_rules! let_ {
     ($name:ident = $value:expr => $($body:expr),+) => {
-        Statement::Let(Let::new(miden_diagnostics::SourceSpan::UNKNOWN, ident!($name), $value, vec![$($body),+]))
+        Statement::Let(Let::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            LetBinding::Single(ident!($name)),
+            $value,
+            vec![$($body),+],
+        ))
     };
 
     ($name:literal = $value:expr => $($body:expr),+) => {
-        Statement::Let(Let::new(miden_diagnostics::SourceSpan::UNKNOWN, ident!($name), $value, vec![$($body),+]))
+        Statement::Let(Let::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            LetBinding::Single(ident!($name)),
+            $value,
+            vec![$($body),+],
+        ))
     };
 }
 

@@ -3,7 +3,7 @@ use crate::graph::NodeIndex;
 
 /// [Operation] defines the various node types represented
 /// in the [AlgebraicGraph].
-#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub enum Operation {
     /// Evaluates to a [Value]
     ///

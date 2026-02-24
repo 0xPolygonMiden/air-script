@@ -648,13 +648,79 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         // Start new lexical scope for the body
         self.locals.enter();
 
-        // Check if the new binding shadows a previous local declaration
-        let namespaced_name = NamespacedIdentifier::Binding(expr.name);
-        if let Some(prev) = self.locals.get_key(&namespaced_name) {
-            self.warn_declaration_shadowed(expr.name.span(), prev.span());
-        } else {
-            let binding_ty = self.expr_binding_type(&expr.value).unwrap();
-            self.locals.insert(NamespacedIdentifier::Binding(expr.name), binding_ty);
+        let binding_names = expr.binding.names();
+        let mut bound = HashSet::<Identifier>::default();
+        for name in binding_names.iter().copied() {
+            if let Some(prev) = bound.get(&name) {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("invalid binding in let statement")
+                    .with_primary_label(
+                        name.span(),
+                        "this name is already bound in this let statement",
+                    )
+                    .with_secondary_label(prev.span(), "previously bound here")
+                    .emit();
+                return ControlFlow::Break(SemanticAnalysisError::NameConflict(name.span()));
+            }
+            bound.insert(name);
+        }
+
+        let binding_ty = self.expr_binding_type(&expr.value).unwrap();
+        let expected_len = binding_names.len();
+        if matches!(expr.binding, LetBinding::Vector(_)) {
+            match binding_ty.ty() {
+                Some(Type::Vector(len)) if len == expected_len => {},
+                Some(Type::Vector(len)) => {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("let binding count does not match vector length")
+                        .with_primary_label(
+                            expr.span(),
+                            format!("expected {len} bindings, got {expected_len}"),
+                        )
+                        .emit();
+                    return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                },
+                _ => {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("let binding expects a vector value")
+                        .with_primary_label(expr.span(), "value must be a vector expression")
+                        .emit();
+                    return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                },
+            }
+        }
+
+        for (idx, name) in binding_names.iter().copied().enumerate() {
+            // Check if the new binding shadows a previous local declaration
+            let namespaced_name = NamespacedIdentifier::Binding(name);
+            if let Some(prev) = self.locals.get_key(&namespaced_name) {
+                self.warn_declaration_shadowed(name.span(), prev.span());
+            } else {
+                let element_ty =
+                    if expected_len == 1 && matches!(expr.binding, LetBinding::Single(_)) {
+                        binding_ty.clone()
+                    } else {
+                        let idx_expr = ScalarExpr::Const(Span::new(expr.value.span(), idx as u64));
+                        match binding_ty.access(AccessType::Index(Box::new(idx_expr))) {
+                            Ok(ty) => ty,
+                            Err(_) => {
+                                self.diagnostics
+                                    .diagnostic(Severity::Error)
+                                    .with_message("invalid let binding access")
+                                    .with_primary_label(
+                                        expr.span(),
+                                        "unable to index into binding value",
+                                    )
+                                    .emit();
+                                return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                            },
+                        }
+                    };
+                self.locals.insert(NamespacedIdentifier::Binding(name), element_ty);
+            }
         }
 
         // Visit the let body

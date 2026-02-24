@@ -571,7 +571,16 @@ where
     V: ?Sized + VisitMut<T>,
 {
     visitor.visit_mut_expr(&mut expr.value)?;
-    visitor.visit_mut_identifier(&mut expr.name)?;
+    match &mut expr.binding {
+        ast::LetBinding::Single(name) => {
+            visitor.visit_mut_identifier(name)?;
+        },
+        ast::LetBinding::Vector(names) => {
+            for name in names.iter_mut() {
+                visitor.visit_mut_identifier(name)?;
+            }
+        },
+    }
     for statement in expr.body.iter_mut() {
         visitor.visit_mut_statement(statement)?;
     }

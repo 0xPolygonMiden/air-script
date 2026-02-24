@@ -141,7 +141,7 @@ impl fmt::Display for DisplayLet<'_> {
         self.write_indent(f)?;
         match &self.let_expr.value {
             super::Expr::Let(value) => {
-                writeln!(f, "let {} = {{", self.let_expr.name)?;
+                writeln!(f, "let {} = {{", self.let_expr.binding)?;
                 let display = DisplayLet {
                     let_expr: value,
                     indent: self.indent + 1,
@@ -156,7 +156,7 @@ impl fmt::Display for DisplayLet<'_> {
                 }
             },
             value => {
-                write!(f, "let {} = {}", self.let_expr.name, value)?;
+                write!(f, "let {} = {}", self.let_expr.binding, value)?;
                 if self.in_expr_position {
                     f.write_str(" in {\n")?;
                 } else {
