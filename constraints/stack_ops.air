@@ -1,0 +1,201 @@
+##########################################################################################
+# STACK OPS CONSTRAINTS MODULE
+##########################################################################################
+#
+# Enforces stack operation semantics that directly rewrite stack items (pad/dup/swap/mov/swapw
+# and conditional swaps). Tagging is applied at the call site in the main module.
+##########################################################################################
+
+mod stack_ops
+use flags::*;
+
+ev stack_ops_transition([stack[16], decoder[24], system_clk]) {
+    let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15] = stack;
+
+    # b0..b6 are the 7 opcode bits (LSB -> MSB) used by op flag helpers.
+    let [
+        d0_unused,
+        b0,
+        b1,
+        b2,
+        b3,
+        b4,
+        b5,
+        b6,
+        d8_unused,
+        d9_unused,
+        d10_unused,
+        d11_unused,
+        d12_unused,
+        d13_unused,
+        d14_unused,
+        d15_unused,
+        d16_unused,
+        d17_unused,
+        d18_unused,
+        d19_unused,
+        d20_unused,
+        d21_unused,
+        d22_unused,
+        d23_unused
+    ] = decoder;
+
+    let op_bits = [b0, b1, b2, b3, b4, b5, b6];
+
+    let is_pad = flag_pad(op_bits);
+    let is_dup = flag_dup(op_bits);
+    let is_dup1 = flag_dup1(op_bits);
+    let is_dup2 = flag_dup2(op_bits);
+    let is_dup3 = flag_dup3(op_bits);
+    let is_dup4 = flag_dup4(op_bits);
+    let is_dup5 = flag_dup5(op_bits);
+    let is_dup6 = flag_dup6(op_bits);
+    let is_dup7 = flag_dup7(op_bits);
+    let is_dup9 = flag_dup9(op_bits);
+    let is_dup11 = flag_dup11(op_bits);
+    let is_dup13 = flag_dup13(op_bits);
+    let is_dup15 = flag_dup15(op_bits);
+
+    let is_clk = flag_clk(op_bits);
+
+    let is_swap = flag_swap(op_bits);
+    let is_movup2 = flag_movup2(op_bits);
+    let is_movup3 = flag_movup3(op_bits);
+    let is_movup4 = flag_movup4(op_bits);
+    let is_movup5 = flag_movup5(op_bits);
+    let is_movup6 = flag_movup6(op_bits);
+    let is_movup7 = flag_movup7(op_bits);
+    let is_movup8 = flag_movup8(op_bits);
+
+    let is_movdn2 = flag_movdn2(op_bits);
+    let is_movdn3 = flag_movdn3(op_bits);
+    let is_movdn4 = flag_movdn4(op_bits);
+    let is_movdn5 = flag_movdn5(op_bits);
+    let is_movdn6 = flag_movdn6(op_bits);
+    let is_movdn7 = flag_movdn7(op_bits);
+    let is_movdn8 = flag_movdn8(op_bits);
+
+    let is_swapw = flag_swapw(op_bits);
+    let is_swapw2 = flag_swapw2(op_bits);
+    let is_swapw3 = flag_swapw3(op_bits);
+    let is_swapdw = flag_swapdw(op_bits);
+
+    let is_cswap = flag_cswap(op_bits);
+    let is_cswapw = flag_cswapw(op_bits);
+
+    # Dummy term to keep binary constraints in the transition domain.
+    let zero = s0' - s0';
+
+    # ------------------------------------------------------------------------------------------
+    # PAD/DUP/CLK
+    # ------------------------------------------------------------------------------------------
+    enf is_pad * s0' = 0;
+
+    enf is_dup * (s0' - s0) = 0;
+    enf is_dup1 * (s0' - s1) = 0;
+    enf is_dup2 * (s0' - s2) = 0;
+    enf is_dup3 * (s0' - s3) = 0;
+    enf is_dup4 * (s0' - s4) = 0;
+    enf is_dup5 * (s0' - s5) = 0;
+    enf is_dup6 * (s0' - s6) = 0;
+    enf is_dup7 * (s0' - s7) = 0;
+    enf is_dup9 * (s0' - s9) = 0;
+    enf is_dup11 * (s0' - s11) = 0;
+    enf is_dup13 * (s0' - s13) = 0;
+    enf is_dup15 * (s0' - s15) = 0;
+
+    enf is_clk * (s0' - system_clk) = 0;
+
+    # ------------------------------------------------------------------------------------------
+    # SWAP/MOV
+    # ------------------------------------------------------------------------------------------
+    enf is_swap * (s0' - s1) = 0;
+    enf is_swap * (s1' - s0) = 0;
+
+    enf is_movup2 * (s0' - s2) = 0;
+    enf is_movup3 * (s0' - s3) = 0;
+    enf is_movup4 * (s0' - s4) = 0;
+    enf is_movup5 * (s0' - s5) = 0;
+    enf is_movup6 * (s0' - s6) = 0;
+    enf is_movup7 * (s0' - s7) = 0;
+    enf is_movup8 * (s0' - s8) = 0;
+
+    enf is_movdn2 * (s2' - s0) = 0;
+    enf is_movdn3 * (s3' - s0) = 0;
+    enf is_movdn4 * (s4' - s0) = 0;
+    enf is_movdn5 * (s5' - s0) = 0;
+    enf is_movdn6 * (s6' - s0) = 0;
+    enf is_movdn7 * (s7' - s0) = 0;
+    enf is_movdn8 * (s8' - s0) = 0;
+
+    # ------------------------------------------------------------------------------------------
+    # SWAPW/SWAPDW
+    # ------------------------------------------------------------------------------------------
+    enf is_swapw * (s0' - s4) = 0;
+    enf is_swapw * (s1' - s5) = 0;
+    enf is_swapw * (s2' - s6) = 0;
+    enf is_swapw * (s3' - s7) = 0;
+    enf is_swapw * (s4' - s0) = 0;
+    enf is_swapw * (s5' - s1) = 0;
+    enf is_swapw * (s6' - s2) = 0;
+    enf is_swapw * (s7' - s3) = 0;
+
+    enf is_swapw2 * (s0' - s8) = 0;
+    enf is_swapw2 * (s1' - s9) = 0;
+    enf is_swapw2 * (s2' - s10) = 0;
+    enf is_swapw2 * (s3' - s11) = 0;
+    enf is_swapw2 * (s8' - s0) = 0;
+    enf is_swapw2 * (s9' - s1) = 0;
+    enf is_swapw2 * (s10' - s2) = 0;
+    enf is_swapw2 * (s11' - s3) = 0;
+
+    enf is_swapw3 * (s0' - s12) = 0;
+    enf is_swapw3 * (s1' - s13) = 0;
+    enf is_swapw3 * (s2' - s14) = 0;
+    enf is_swapw3 * (s3' - s15) = 0;
+    enf is_swapw3 * (s12' - s0) = 0;
+    enf is_swapw3 * (s13' - s1) = 0;
+    enf is_swapw3 * (s14' - s2) = 0;
+    enf is_swapw3 * (s15' - s3) = 0;
+
+    enf is_swapdw * (s0' - s8) = 0;
+    enf is_swapdw * (s1' - s9) = 0;
+    enf is_swapdw * (s2' - s10) = 0;
+    enf is_swapdw * (s3' - s11) = 0;
+    enf is_swapdw * (s4' - s12) = 0;
+    enf is_swapdw * (s5' - s13) = 0;
+    enf is_swapdw * (s6' - s14) = 0;
+    enf is_swapdw * (s7' - s15) = 0;
+    enf is_swapdw * (s8' - s0) = 0;
+    enf is_swapdw * (s9' - s1) = 0;
+    enf is_swapdw * (s10' - s2) = 0;
+    enf is_swapdw * (s11' - s3) = 0;
+    enf is_swapdw * (s12' - s4) = 0;
+    enf is_swapdw * (s13' - s5) = 0;
+    enf is_swapdw * (s14' - s6) = 0;
+    enf is_swapdw * (s15' - s7) = 0;
+
+    # ------------------------------------------------------------------------------------------
+    # CSWAP/CSWAPW
+    # ------------------------------------------------------------------------------------------
+    let cswap_c = s0;
+    let cswap_c_inv = 1 - cswap_c;
+
+    # Binary constraint for the cswap selector.
+    enf is_cswap * (cswap_c * (cswap_c - 1)) = zero;
+
+    enf is_cswap * (s0' - (cswap_c * s2 + cswap_c_inv * s1)) = 0;
+    enf is_cswap * (s1' - (cswap_c * s1 + cswap_c_inv * s2)) = 0;
+
+    enf is_cswapw * (s0' - (cswap_c * s5 + cswap_c_inv * s1)) = 0;
+    enf is_cswapw * (s1' - (cswap_c * s6 + cswap_c_inv * s2)) = 0;
+    enf is_cswapw * (s2' - (cswap_c * s7 + cswap_c_inv * s3)) = 0;
+    enf is_cswapw * (s3' - (cswap_c * s8 + cswap_c_inv * s4)) = 0;
+    enf is_cswapw * (s4' - (cswap_c * s1 + cswap_c_inv * s5)) = 0;
+    enf is_cswapw * (s5' - (cswap_c * s2 + cswap_c_inv * s6)) = 0;
+    enf is_cswapw * (s6' - (cswap_c * s3 + cswap_c_inv * s7)) = 0;
+    enf is_cswapw * (s7' - (cswap_c * s4 + cswap_c_inv * s8)) = 0;
+
+    # Binary constraint for the cswapw selector.
+    enf is_cswapw * (cswap_c * (cswap_c - 1)) = zero;
+}
