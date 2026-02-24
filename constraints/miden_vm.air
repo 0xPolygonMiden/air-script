@@ -56,11 +56,7 @@ buses {
     multiset bus_2_decoder_p3,
 
     # Stack overflow table
-<<<<<<< HEAD
-    multiset bus_3_stack_p1 @tag_transition(41) @sum_form(assume_exclusive),
-=======
     multiset bus_3_stack_p1 @tag_transition(129) @sum_form(assume_exclusive),
->>>>>>> 5bc05c9 (add remaining stack op constraints)
 
     # Range checker bus
     logup    bus_4_range_checker @tag_transition(128),
