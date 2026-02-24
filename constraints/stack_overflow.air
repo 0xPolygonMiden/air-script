@@ -42,7 +42,7 @@ ev stack_overflow_transition([stack[19], decoder[24], system_clk]) {
     let fdyncall = flag_dyncall(op_bits, e0);
     let fend = flag_end(op_bits, e1);
 
-    # END row is "special" only when ending CALL/DYNCALL or SYSCALL (h6/h7 helpers).
+    # END row is "special" only when ending CALL/DYNCALL or SYSCALL (h6/h7 helpers are then used).
     let f_call_or_sys_end = fend * (h6 + h7);
     let f_call_like = fcall + fsyscall + fdyncall;
     # Normal rows: not call-entry and not end-of-call.
@@ -56,7 +56,7 @@ ev stack_overflow_transition([stack[19], decoder[24], system_clk]) {
         + f_call_like * (stack_b0' - 16) = 0;
     # Keep this constraint in the transition domain (matches when_transition).
     enf (1 - fov) * depth_excess + (stack_b0' - stack_b0') = 0;
-    # Right shift pushes a new overflow row; record clk as new b1.
+    # Right shift pushes a new row from overflow portion of the stack; record clk as new b1.
     enf fshr * (stack_b1' - system_clk) = 0;
     # Left shift with empty overflow shifts in a 0 at s15.
     enf fshl * (1 - fov) * s15' = 0;
