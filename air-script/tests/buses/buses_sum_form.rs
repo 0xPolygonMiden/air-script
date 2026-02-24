@@ -27,18 +27,18 @@ impl ToElements<Felt> for PublicInputs {
     }
 }
 
-pub struct BusesAir {
+pub struct BusesSumFormAir {
     context: AirContext<Felt>,
     inputs: [Felt; 2],
 }
 
-impl BusesAir {
+impl BusesSumFormAir {
     pub fn last_step(&self) -> usize {
         self.trace_length() - self.context().num_transition_exemptions()
     }
 }
 
-impl Air for BusesAir {
+impl Air for BusesSumFormAir {
     type BaseField = Felt;
     type PublicInputs = PublicInputs;
 
@@ -47,10 +47,10 @@ impl Air for BusesAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![];
-        let aux_degrees = vec![TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(1)];
-        let num_main_assertions = 0;
-        let num_aux_assertions = 3;
+        let main_degrees = vec![TransitionConstraintDegree::new(2)];
+        let aux_degrees = vec![TransitionConstraintDegree::new(2)];
+        let num_main_assertions = 1;
+        let num_aux_assertions = 2;
 
         let context = AirContext::new_multi_segment(
             trace_info,
@@ -70,20 +70,21 @@ impl Air for BusesAir {
 
     fn get_assertions(&self) -> Vec<Assertion<Felt>> {
         let mut result = Vec::new();
+        result.push(Assertion::single(0, 0, Felt::ZERO));
         result
     }
 
     fn get_aux_assertions<E: FieldElement<BaseField = Felt>>(&self, aux_rand_elements: &AuxRandElements<E>) -> Vec<Assertion<E>> {
         let mut result = Vec::new();
+        result.push(Assertion::single(0, 0, E::ONE));
         result.push(Assertion::single(0, self.last_step(), E::ONE));
-        result.push(Assertion::single(1, 0, E::ZERO));
-        result.push(Assertion::single(1, self.last_step(), E::ZERO));
         result
     }
 
     fn evaluate_transition<E: FieldElement<BaseField = Felt>>(&self, frame: &EvaluationFrame<E>, periodic_values: &[E], result: &mut [E]) {
         let main_current = frame.current();
         let main_next = frame.next();
+        result[0] = main_current[0] * main_current[0] - main_current[0];
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxRandElements<E>, result: &mut [E])
@@ -94,7 +95,6 @@ impl Air for BusesAir {
         let main_next = main_frame.next();
         let aux_current = aux_frame.current();
         let aux_next = aux_frame.next();
-        result[0] = ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1]) * E::from(main_current[0]) + E::ONE - E::from(main_current[0])) * aux_current[0] - ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1]) * (E::ONE - E::from(main_current[0])) + E::from(main_current[0])) * aux_next[0];
-        result[1] = (aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * aux_next[1] + E::from(Felt::new(2_u64)) - ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1] + E::from(Felt::new(2_u64)) * aux_rand_elements.rand_elements()[2]) * aux_current[1] + E::from(main_current[0]));
+        result[0] = ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1]) * (E::ONE - E::from(main_current[0])) + E::from(main_current[0])) * aux_next[0] - ((aux_rand_elements.rand_elements()[0] + aux_rand_elements.rand_elements()[1]) * E::from(main_current[0]) + E::ONE - E::from(main_current[0])) * aux_current[0];
     }
 }

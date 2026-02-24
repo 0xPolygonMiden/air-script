@@ -162,3 +162,61 @@ fn err_buses_unconstrained() {
 
     expect_diagnostic(source, "error: invalid bus boundary");
 }
+
+#[test]
+fn err_sum_form_requires_assume_exclusive() {
+    let source = "
+        def test
+
+    trace_columns {
+        main: [a],
+    }
+
+    buses {
+        multiset p @sum_form,
+    }
+
+    public_inputs {
+        inputs: [[2]],
+    }
+
+    boundary_constraints {
+        enf p.first = null;
+        enf p.last = inputs;
+    }
+
+    integrity_constraints {
+        p.insert(a) when 1;
+    }";
+
+    expect_diagnostic(source, "expected @sum_form(assume_exclusive)");
+}
+
+#[test]
+fn sum_form_assume_exclusive_ok() {
+    let source = "
+        def test
+
+    trace_columns {
+        main: [a],
+    }
+
+    buses {
+        multiset p @sum_form(assume_exclusive),
+    }
+
+    public_inputs {
+        inputs: [[2]],
+    }
+
+    boundary_constraints {
+        enf p.first = null;
+        enf p.last = inputs;
+    }
+
+    integrity_constraints {
+        p.insert(a) when 1;
+    }";
+
+    assert!(compile_from_source(source).is_ok());
+}

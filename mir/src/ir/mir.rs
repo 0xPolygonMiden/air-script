@@ -35,6 +35,8 @@ pub struct Mir {
     pub public_inputs: BTreeMap<Identifier, PublicInput>,
     /// The total number of elements in the random values array
     pub num_random_values: u16,
+    /// Expected maximum constraint id (inclusive) when tag validation is enabled.
+    pub expected_max_constraint_id: Option<u64>,
     /// The constraints of the program, represented as MIR Nodes
     graph: Graph,
 }
@@ -57,6 +59,7 @@ impl Mir {
             periodic_columns: Default::default(),
             public_inputs: Default::default(),
             num_random_values: 0,
+            expected_max_constraint_id: None,
             graph: Default::default(),
         }
     }

@@ -116,6 +116,10 @@ impl<'a> SemanticAnalysis<'a> {
             return Err(err);
         }
 
+        if module.is_root() && self.module_has_tags(module) {
+            self.reference_current_max_id(module)?;
+        }
+
         // If this is the root module, we may have top-level dependencies
         if module.path.0.item == vec![self.program.name] {
             // Update the dependency graph with the collected information
@@ -143,6 +147,61 @@ impl<'a> SemanticAnalysis<'a> {
             );
         }
 
+        Ok(())
+    }
+
+    fn module_has_tags(&self, module: &Module) -> bool {
+        fn visit_statements(statements: &[Statement]) -> bool {
+            for statement in statements {
+                match statement {
+                    Statement::Enforce(enf) => {
+                        if enf.tag.is_some() {
+                            return true;
+                        }
+                    },
+                    Statement::EnforceAll(list_comp) => {
+                        if list_comp.tag.is_some() {
+                            return true;
+                        }
+                    },
+                    Statement::Let(let_stmt) => {
+                        if visit_statements(&let_stmt.body) {
+                            return true;
+                        }
+                    },
+                    Statement::EnforceIf(_) | Statement::BusEnforce(_) | Statement::Expr(_) => {},
+                }
+            }
+            false
+        }
+
+        if let Some(boundary) = &module.boundary_constraints
+            && visit_statements(&boundary.item)
+        {
+            return true;
+        }
+        if let Some(integrity) = &module.integrity_constraints
+            && visit_statements(&integrity.item)
+        {
+            return true;
+        }
+        for evaluator in module.evaluators.values() {
+            if visit_statements(&evaluator.body) {
+                return true;
+            }
+        }
+        module.buses.values().any(|bus| bus.transition_tag.is_some())
+    }
+
+    fn reference_current_max_id(&mut self, module: &Module) -> Result<(), SemanticAnalysisError> {
+        let ident = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("CURRENT_MAX_ID"));
+        if !module.constants.contains_key(&ident) {
+            // Missing constant is reported later during MIR translation when tags are validated.
+            return Ok(());
+        }
+        let qid =
+            QualifiedIdentifier::new(module.path.clone(), NamespacedIdentifier::Binding(ident));
+        self.referenced.insert(qid, DependencyType::Constant);
         Ok(())
     }
 }
@@ -534,6 +593,39 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         self.in_constraint_comprehension = true;
         let result = self.visit_mut_list_comprehension(expr);
         self.in_constraint_comprehension = false;
+        if result.is_break() {
+            return result;
+        }
+
+        if let Some(tag_spec) = expr.tag.as_ref() {
+            let expected_len = match expr.ty {
+                Some(Type::Vector(len)) => len,
+                Some(Type::Matrix(rows, cols)) => rows * cols,
+                _ => {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("unable to validate comprehension tag length")
+                        .with_primary_label(
+                            expr.span(),
+                            "comprehension length could not be inferred",
+                        )
+                        .emit();
+                    return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                },
+            };
+            let tag_len = tag_spec.len();
+            if tag_len != expected_len {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("constraint tag count does not match comprehension length")
+                    .with_primary_label(
+                        tag_spec.span(),
+                        format!("expected {expected_len} tags, got {tag_len}"),
+                    )
+                    .emit();
+                return ControlFlow::Break(SemanticAnalysisError::Invalid);
+            }
+        }
 
         result
     }

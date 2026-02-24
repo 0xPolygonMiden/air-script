@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, ops::Deref};
 
 use air_parser::{
     SemanticAnalysisError,
-    ast::{self, TraceSegment},
+    ast::{self, ConstraintTagSpec, TraceSegment},
 };
 use air_pass::Pass;
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
@@ -37,6 +37,7 @@ impl Pass for MirToAir<'_> {
 
     fn run<'a>(&mut self, mir: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
         let mut air = Air::new(mir.name);
+        air.expected_max_constraint_id = mir.expected_max_constraint_id;
 
         let buses = mir.constraint_graph().buses.clone();
 
@@ -108,11 +109,11 @@ impl Pass for MirToAir<'_> {
         // as it's a requirement for the CommonSubexpressionElimination pass to work with the
         // winterfell codegen.
         for bc in graph.boundary_constraints_roots.borrow().deref().iter() {
-            builder.build_boundary_constraint(bc)?;
+            builder.build_boundary_constraint(bc, None)?;
         }
 
         for ic in graph.integrity_constraints_roots.borrow().deref().iter() {
-            builder.build_integrity_constraint(ic)?;
+            builder.build_integrity_constraint(ic, None)?;
         }
 
         // Note: In the MIR, buses operations are kept in integrity constraints to
@@ -411,21 +412,55 @@ impl AirBuilder<'_> {
         }
     }
 
-    fn build_boundary_constraint(&mut self, bc: &Link<Op>) -> Result<(), CompileError> {
+    fn build_boundary_constraint(
+        &mut self,
+        bc: &Link<Op>,
+        tag: Option<ConstraintTagSpec>,
+    ) -> Result<(), CompileError> {
         match bc.borrow().deref() {
             Op::Vector(vector) => {
                 let vec = vector.elements.borrow().deref().clone();
-                for node in vec.iter() {
-                    self.build_boundary_constraint(node)?;
+                if let Some(tag_spec) = tag {
+                    let tags = self.expand_tag_spec(&tag_spec, vec.len())?;
+                    for (node, tag_span) in vec.iter().zip(tags.into_iter()) {
+                        self.build_boundary_constraint(
+                            node,
+                            Some(ConstraintTagSpec::Single(tag_span)),
+                        )?;
+                    }
+                } else {
+                    for node in vec.iter() {
+                        self.build_boundary_constraint(node, None)?;
+                    }
                 }
                 Ok(())
             },
             Op::Matrix(matrix) => {
                 let rows = matrix.elements.borrow().deref().clone();
-                for row in rows.iter() {
-                    let vec = row.borrow().deref().children().borrow().deref().clone();
-                    for node in vec.iter() {
-                        self.build_boundary_constraint(node)?;
+                let total = rows
+                    .iter()
+                    .map(|row| row.borrow().deref().children().borrow().len())
+                    .sum::<usize>();
+                if let Some(tag_spec) = tag {
+                    let tags = self.expand_tag_spec(&tag_spec, total)?;
+                    let mut tag_iter = tags.into_iter();
+                    for row in rows.iter() {
+                        let vec = row.borrow().deref().children().borrow().deref().clone();
+                        for node in vec.iter() {
+                            let tag_span =
+                                tag_iter.next().expect("tag length validated against matrix size");
+                            self.build_boundary_constraint(
+                                node,
+                                Some(ConstraintTagSpec::Single(tag_span)),
+                            )?;
+                        }
+                    }
+                } else {
+                    for row in rows.iter() {
+                        let vec = row.borrow().deref().children().borrow().deref().clone();
+                        for node in vec.iter() {
+                            self.build_boundary_constraint(node, None)?;
+                        }
                     }
                 }
                 Ok(())
@@ -433,9 +468,14 @@ impl AirBuilder<'_> {
             Op::Enf(enf) => {
                 let child_op = enf.expr.clone();
                 let child_op = accessor_to_scalar(&child_op);
-                let child_op = vec_to_scalar(&child_op);
+                let next_tag = self.merge_tag_spec(enf.tag.clone(), tag)?;
 
-                self.build_boundary_constraint(&child_op)?;
+                if child_op.as_vector().is_some() || child_op.as_matrix().is_some() {
+                    return self.build_boundary_constraint(&child_op, next_tag);
+                }
+
+                let child_op = vec_to_scalar(&child_op);
+                self.build_boundary_constraint(&child_op, next_tag)?;
                 Ok(())
             },
             Op::Sub(sub) => {
@@ -498,8 +538,10 @@ impl AirBuilder<'_> {
                 // Merge the expressions into a single constraint
                 let root = self.insert_op(Operation::Sub(lhs, rhs));
 
+                let tag = self.resolve_single_tag(tag)?;
+
                 // Store the generated constraint
-                self.air.constraints.insert_constraint(trace_access.segment, root, domain);
+                self.air.constraints.insert_constraint(trace_access.segment, root, domain, tag);
                 Ok(())
             },
             Op::Boundary(boundary) => {
@@ -517,41 +559,115 @@ impl AirBuilder<'_> {
 
                 let domain = boundary.kind.into();
 
+                let tag = self.resolve_single_tag(tag)?;
+
                 // Store the generated constraint
-                self.air.constraints.insert_constraint(trace_access.segment, root, domain);
+                self.air.constraints.insert_constraint(trace_access.segment, root, domain, tag);
                 Ok(())
             },
             _ => unreachable!(),
         }
     }
 
-    fn build_integrity_constraint(&mut self, ic: &Link<Op>) -> Result<(), CompileError> {
+    fn build_integrity_constraint(
+        &mut self,
+        ic: &Link<Op>,
+        tag: Option<ConstraintTagSpec>,
+    ) -> Result<(), CompileError> {
         match ic.borrow().deref() {
             Op::Vector(vector) => {
                 let vec = vector.children().borrow().deref().clone();
-                for node in vec.iter() {
-                    self.build_integrity_constraint(node)?;
+                if let Some(tag_spec) = tag {
+                    // Bus ops are expanded into their own constraints later; do not consume tags
+                    // here.
+                    let taggable = vec.iter().filter(|node| !self.is_bus_op_node(node)).count();
+                    let tags = self.expand_tag_spec(&tag_spec, taggable)?;
+                    let mut tag_iter = tags.into_iter();
+                    for node in vec.iter() {
+                        let node_tag = if self.is_bus_op_node(node) {
+                            None
+                        } else {
+                            Some(ConstraintTagSpec::Single(
+                                tag_iter
+                                    .next()
+                                    .expect("tag length validated against constraint count"),
+                            ))
+                        };
+                        self.build_integrity_constraint(node, node_tag)?;
+                    }
+                } else {
+                    for node in vec.iter() {
+                        self.build_integrity_constraint(node, None)?;
+                    }
                 }
             },
             Op::Matrix(matrix) => {
                 let rows = matrix.elements.borrow().deref().clone();
-                for row in rows.iter() {
-                    let vec = row.borrow().deref().children().borrow().deref().clone();
-                    for node in vec.iter() {
-                        self.build_integrity_constraint(node)?;
+                if let Some(tag_spec) = tag {
+                    let mut total = 0usize;
+                    for row in rows.iter() {
+                        let vec = row.borrow().deref().children().borrow().deref().clone();
+                        for node in vec.iter() {
+                            // Bus ops are expanded into their own constraints later; do not consume
+                            // tags here.
+                            if !self.is_bus_op_node(node) {
+                                total += 1;
+                            }
+                        }
+                    }
+                    let tags = self.expand_tag_spec(&tag_spec, total)?;
+                    let mut tag_iter = tags.into_iter();
+                    for row in rows.iter() {
+                        let vec = row.borrow().deref().children().borrow().deref().clone();
+                        for node in vec.iter() {
+                            let node_tag = if self.is_bus_op_node(node) {
+                                None
+                            } else {
+                                Some(ConstraintTagSpec::Single(
+                                    tag_iter
+                                        .next()
+                                        .expect("tag length validated against constraint count"),
+                                ))
+                            };
+                            self.build_integrity_constraint(node, node_tag)?;
+                        }
+                    }
+                } else {
+                    for row in rows.iter() {
+                        let vec = row.borrow().deref().children().borrow().deref().clone();
+                        for node in vec.iter() {
+                            self.build_integrity_constraint(node, None)?;
+                        }
                     }
                 }
             },
             Op::Enf(enf) => {
                 let child_op = enf.expr.clone();
                 let child_op = accessor_to_scalar(&child_op);
-                let child_op = vec_to_scalar(&child_op);
+                let enf_tag = self.merge_tag_spec(enf.tag.clone(), tag)?;
+
                 let child_op = enf_to_scalar(&child_op);
+                if child_op.as_vector().is_some() || child_op.as_matrix().is_some() {
+                    return self.build_integrity_constraint(&child_op, enf_tag);
+                }
+
+                let child_op = vec_to_scalar(&child_op);
                 match child_op.clone().borrow().deref() {
                     Op::Sub(_sub) => {
-                        self.build_integrity_constraint(&child_op)?;
+                        self.build_integrity_constraint(&child_op, enf_tag)?;
                     },
                     Op::BusOp(bus_op) => {
+                        if enf_tag.is_some() {
+                            self.diagnostics
+                                .diagnostic(Severity::Error)
+                                .with_message("bus constraints do not support @tag")
+                                .with_primary_label(
+                                    enf.span(),
+                                    "remove the tag or move it to a non-bus constraint",
+                                )
+                                .emit();
+                            return Err(CompileError::Failed);
+                        }
                         let bus = bus_op.bus.to_link().unwrap();
                         let latch = bus_op.latch.clone();
 
@@ -564,7 +680,8 @@ impl AirBuilder<'_> {
                             .air
                             .constraint_graph()
                             .node_details(&root, ConstraintDomain::EveryRow)?;
-                        self.air.constraints.insert_constraint(trace_segment, root, domain);
+                        let tag = self.resolve_single_tag(enf_tag)?;
+                        self.air.constraints.insert_constraint(trace_segment, root, domain, tag);
                     },
                 }
             },
@@ -576,11 +693,82 @@ impl AirBuilder<'_> {
                 let root = self.insert_op(Operation::Sub(lhs_node_index, rhs_node_index));
                 let (trace_segment, domain) =
                     self.air.constraint_graph().node_details(&root, ConstraintDomain::EveryRow)?;
-                self.air.constraints.insert_constraint(trace_segment, root, domain);
+                let tag = self.resolve_single_tag(tag)?;
+                self.air.constraints.insert_constraint(trace_segment, root, domain, tag);
             },
             _ => unreachable!("Unexpected integrity constraint root: {:?}", ic),
         }
         Ok(())
+    }
+
+    fn is_bus_op_node(&self, node: &Link<Op>) -> bool {
+        let node = accessor_to_scalar(node);
+        let node = enf_to_scalar(&node);
+        matches!(node.borrow().deref(), Op::BusOp(_))
+    }
+
+    fn merge_tag_spec(
+        &self,
+        tag: Option<ConstraintTagSpec>,
+        parent_tag: Option<ConstraintTagSpec>,
+    ) -> Result<Option<ConstraintTagSpec>, CompileError> {
+        match (tag, parent_tag) {
+            (Some(tag), Some(parent)) => {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("multiple tags applied to a constraint")
+                    .with_primary_label(tag.span(), "tag applied here")
+                    .with_secondary_label(parent.span(), "and here")
+                    .emit();
+                Err(CompileError::Failed)
+            },
+            (Some(tag), None) => Ok(Some(tag)),
+            (None, Some(tag)) => Ok(Some(tag)),
+            (None, None) => Ok(None),
+        }
+    }
+
+    fn expand_tag_spec(
+        &self,
+        tag: &ConstraintTagSpec,
+        expected_len: usize,
+    ) -> Result<Vec<Span<u64>>, CompileError> {
+        let tags = tag.expand_spans();
+        if tags.len() != expected_len {
+            self.diagnostics
+                .diagnostic(Severity::Error)
+                .with_message("constraint tag count does not match expanded constraint length")
+                .with_primary_label(
+                    tag.span(),
+                    format!("expected {expected_len} tags, got {}", tags.len()),
+                )
+                .emit();
+            return Err(CompileError::Failed);
+        }
+        Ok(tags)
+    }
+
+    fn resolve_single_tag(
+        &self,
+        tag: Option<ConstraintTagSpec>,
+    ) -> Result<Option<u64>, CompileError> {
+        match tag {
+            None => Ok(None),
+            Some(spec) => match spec.as_single() {
+                Some(tag) => Ok(Some(tag)),
+                None => {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("tag range does not match expanded constraint length")
+                        .with_primary_label(
+                            spec.span(),
+                            "expected a single tag for this constraint",
+                        )
+                        .emit();
+                    Err(CompileError::Failed)
+                },
+            },
+        }
     }
 
     /// Builds the bus struct, containing the bus operations and boundaries.
@@ -608,7 +796,17 @@ impl AirBuilder<'_> {
         }
         self.air.buses.insert(
             mir_bus.name(),
-            Bus::new(mir_bus.name(), mir_bus.bus_type, first, last, bus_ops),
+            Bus::new(
+                mir_bus.name(),
+                mir_bus.bus_type,
+                mir_bus.constraint_form,
+                first,
+                last,
+                bus_ops,
+                mir_bus.first_tag(),
+                mir_bus.last_tag(),
+                mir_bus.transition_tag(),
+            ),
         );
         Ok(())
     }

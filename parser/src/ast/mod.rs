@@ -4,6 +4,7 @@ mod errors;
 mod expression;
 mod module;
 mod statement;
+mod tag;
 mod trace;
 mod types;
 pub mod visit;
@@ -20,7 +21,7 @@ use petgraph::visit::EdgeRef;
 
 pub(crate) use self::display::*;
 pub use self::{
-    declarations::*, errors::*, expression::*, module::*, statement::*, trace::*, types::*,
+    declarations::*, errors::*, expression::*, module::*, statement::*, tag::*, trace::*, types::*,
 };
 use crate::{
     Symbol,

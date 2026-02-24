@@ -41,7 +41,7 @@ pub enum Statement {
     /// This variant accepts a [ScalarExpr] for simplicity in the parser, but is expected to always
     /// be either a call to an evaluator function, or a binary expression of the form `lhs = rhs`,
     /// i.e. an equality. This is validated by the semantic analyzer.
-    Enforce(ScalarExpr),
+    Enforce(Enforce),
     /// Declares a constraint to be conditionally enforced.
     ///
     /// This has all the same semantics as `Enforce`, except it has a condition expression which
@@ -64,6 +64,33 @@ pub enum Statement {
     /// Declares a bus related constraint
     BusEnforce(ListComprehension),
 }
+
+/// An `enf` constraint statement, optionally tagged with a unique constraint id.
+///
+/// Tags are intended to give constraints stable, monotonic IDs so that AIRScript constraints can
+/// be compared against other pipelines (e.g. the miden-vm AirBuilder). Tags can be applied to
+/// constraints that expand (comprehensions or list assertions) via tag ranges/lists, so each
+/// expanded constraint still maps to exactly one final constraint id.
+#[derive(Debug, Clone, Spanned)]
+pub struct Enforce {
+    #[span]
+    pub span: SourceSpan,
+    pub expr: ScalarExpr,
+    pub tag: Option<ConstraintTagSpec>,
+}
+impl Enforce {
+    pub fn new(span: SourceSpan, expr: ScalarExpr, tag: Option<ConstraintTagSpec>) -> Self {
+        Self { span, expr, tag }
+    }
+}
+
+impl PartialEq for Enforce {
+    fn eq(&self, other: &Self) -> bool {
+        self.expr == other.expr && self.tag == other.tag
+    }
+}
+
+impl Eq for Enforce {}
 
 #[derive(Clone, Spanned, Debug, Eq)]
 pub struct Match {

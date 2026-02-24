@@ -71,10 +71,13 @@ impl Pass for Unrolling<'_> {
 /// Unrolls an `Enf` on vectors into a `Vector<Enf>`.
 pub fn visit_enf_bis(enf: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
     let enf_ref = enf.as_enf().unwrap();
+    if enf_ref.tag.is_some() {
+        return Ok(None);
+    }
     let expr = enf_ref.expr.clone();
     if let Op::Vector(vec) = expr.borrow().deref() {
         let ops = vec.children().borrow().clone();
-        let new_vec = ops.iter().map(|op| Enf::create(op.clone(), enf_ref.span())).collect();
+        let new_vec = ops.iter().map(|op| Enf::create(op.clone(), enf_ref.span(), None)).collect();
         return Ok(Some(Vector::create(new_vec, enf_ref.span())));
     }
     Ok(None)

@@ -1,5 +1,5 @@
 use core::panic;
-use std::ops::Deref;
+use std::{collections::BTreeMap, ops::Deref};
 
 use air_parser::{
     LexicalScope,
@@ -68,6 +68,7 @@ pub struct MirBuilder<'a> {
     root: Link<Root>,
     root_name: Option<&'a ast::QualifiedIdentifier>,
     in_boundary: bool,
+    current_constraint_tag: Option<ast::ConstraintTagSpec>,
 }
 
 impl<'a> MirBuilder<'a> {
@@ -81,11 +82,15 @@ impl<'a> MirBuilder<'a> {
             root: Link::default(),
             root_name: None,
             in_boundary: false,
+            current_constraint_tag: None,
         }
     }
 
     pub fn translate_program(&mut self) -> Result<(), CompileError> {
         self.mir = Mir::new(self.program.name);
+        if let Some(max_id) = self.validate_constraint_tags()? {
+            self.mir.expected_max_constraint_id = Some(max_id);
+        }
         let trace_columns = &self.program.trace_columns;
         let boundary_constraints = &self.program.boundary_constraints;
         let integrity_constraints = &self.program.integrity_constraints;
@@ -137,8 +142,138 @@ impl<'a> MirBuilder<'a> {
         Ok(())
     }
 
+    fn validate_constraint_tags(&self) -> Result<Option<u64>, CompileError> {
+        let mut tags = Vec::new();
+        // Collect tags from root constraints and any evaluator bodies they invoke, since
+        // tagged constraints can be emitted inside evaluators.
+        Self::collect_tags_from_statements(&self.program.boundary_constraints, &mut tags)?;
+        Self::collect_tags_from_statements(&self.program.integrity_constraints, &mut tags)?;
+        for evaluator in self.program.evaluators.values() {
+            Self::collect_tags_from_statements(&evaluator.body, &mut tags)?;
+        }
+        for bus in self.program.buses.values() {
+            if let Some(tag) = &bus.transition_tag {
+                tags.push(*tag);
+            }
+        }
+
+        if tags.is_empty() {
+            return Ok(None);
+        }
+
+        let max_id = self.lookup_current_max_id()?;
+        self.validate_tag_sequence(&tags, max_id)?;
+        Ok(Some(max_id))
+    }
+
+    fn collect_tags_from_statements(
+        statements: &[ast::Statement],
+        tags: &mut Vec<Span<u64>>,
+    ) -> Result<(), CompileError> {
+        for statement in statements {
+            match statement {
+                ast::Statement::Enforce(enf) => {
+                    if let Some(tag_spec) = &enf.tag {
+                        tags.extend(tag_spec.expand_spans());
+                    }
+                },
+                ast::Statement::EnforceAll(list_comp) => {
+                    if let Some(tag_spec) = &list_comp.tag {
+                        tags.extend(tag_spec.expand_spans());
+                    }
+                },
+                ast::Statement::Let(let_stmt) => {
+                    Self::collect_tags_from_statements(&let_stmt.body, tags)?;
+                },
+                ast::Statement::EnforceIf(_)
+                | ast::Statement::BusEnforce(_)
+                | ast::Statement::Expr(_) => {},
+            }
+        }
+        Ok(())
+    }
+
+    fn lookup_current_max_id(&self) -> Result<u64, CompileError> {
+        let mut found: Option<&ast::Constant> = None;
+        for (qid, constant) in self.program.constants.iter() {
+            if qid.name() == "CURRENT_MAX_ID" {
+                if found.is_some() {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("duplicate CURRENT_MAX_ID constant")
+                        .with_primary_label(qid.span(), "duplicate declaration")
+                        .emit();
+                    return Err(CompileError::Failed);
+                }
+                found = Some(constant);
+            }
+        }
+
+        let Some(constant) = found else {
+            self.diagnostics
+                .diagnostic(Severity::Error)
+                .with_message("missing CURRENT_MAX_ID constant for tagged constraints")
+                .with_note("define `const CURRENT_MAX_ID = <max id>;` in the root module")
+                .emit();
+            return Err(CompileError::Failed);
+        };
+
+        match constant.value {
+            ast::ConstantExpr::Scalar(value) => Ok(value),
+            _ => {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("CURRENT_MAX_ID must be a scalar integer")
+                    .with_primary_label(constant.span(), "non-scalar constant value")
+                    .emit();
+                Err(CompileError::Failed)
+            },
+        }
+    }
+
+    fn validate_tag_sequence(&self, tags: &[Span<u64>], max_id: u64) -> Result<(), CompileError> {
+        let expected = max_id as usize + 1;
+        if tags.len() != expected {
+            self.diagnostics
+                .diagnostic(Severity::Error)
+                .with_message("constraint tag count does not match CURRENT_MAX_ID")
+                .with_note(format!("expected {expected} tags for CURRENT_MAX_ID = {max_id}"))
+                .emit();
+            return Err(CompileError::Failed);
+        }
+
+        let mut seen: BTreeMap<u64, Span<u64>> = BTreeMap::new();
+        for tag in tags {
+            if tag.item > max_id {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("constraint tag exceeds CURRENT_MAX_ID")
+                    .with_primary_label(tag.span(), format!("tag {} is out of range", tag.item))
+                    .emit();
+                return Err(CompileError::Failed);
+            }
+            if let Some(prev_span) = seen.insert(tag.item, *tag) {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("duplicate constraint tag")
+                    .with_primary_label(tag.span(), format!("tag {} reused here", tag.item))
+                    .with_secondary_label(prev_span.span(), "previous tag here")
+                    .emit();
+                return Err(CompileError::Failed);
+            }
+        }
+
+        Ok(())
+    }
+
     fn translate_bus_definition(&mut self, bus: &'a ast::Bus) -> Result<Link<Bus>, CompileError> {
-        Ok(Bus::create(bus.name, bus.bus_type, bus.span()))
+        Ok(Bus::create(
+            bus.name,
+            bus.bus_type,
+            bus.constraint_form,
+            bus.span(),
+            bus.transition_tag.as_ref().map(|tag| tag.item),
+        ))
     }
 
     fn translate_evaluator_signature(
@@ -447,9 +582,19 @@ impl<'a> MirBuilder<'a> {
         }
     }
 
-    fn translate_enforce(&mut self, enf: &'a ast::ScalarExpr) -> Result<Link<Op>, CompileError> {
-        let node = self.translate_scalar_expr(enf)?;
-        self.insert_enforce(node)
+    fn translate_enforce(&mut self, enf: &'a ast::Enforce) -> Result<Link<Op>, CompileError> {
+        let tag_spec = enf.tag.clone();
+        let prev_tag = self.current_constraint_tag.clone();
+        self.current_constraint_tag = tag_spec.clone();
+        let node = self.translate_scalar_expr(&enf.expr)?;
+        self.current_constraint_tag = prev_tag;
+
+        if matches!(node.borrow().deref(), Op::None(_)) {
+            return Ok(node);
+        }
+
+        let enf_node = Enf::builder().expr(node).span(enf.span()).tag(tag_spec).build();
+        self.insert_enforce(enf_node)
     }
 
     fn translate_enforce_if(
@@ -509,7 +654,7 @@ impl<'a> MirBuilder<'a> {
             .borrow_mut()
             .clone_from(&selector_node.borrow());
 
-        let enf_node: Link<Op> = Enf::create(for_node, list_comp.span());
+        let enf_node: Link<Op> = Enf::create(for_node, list_comp.span(), list_comp.tag.clone());
         let node = self.insert_enforce(enf_node);
         self.bindings.exit();
         node
@@ -611,7 +756,7 @@ impl<'a> MirBuilder<'a> {
         let node_to_add = if let Op::Enf(_) = node.clone().borrow().deref() {
             node
         } else {
-            Enf::builder().expr(node.clone()).span(node.span()).build()
+            Enf::builder().expr(node.clone()).span(node.span()).tag(None).build()
         };
         match self.in_boundary {
             true => self
@@ -781,6 +926,30 @@ impl<'a> MirBuilder<'a> {
                                     .emit();
                                 CompileError::Failed
                             })?;
+                            if let Some(tag_spec) = &self.current_constraint_tag {
+                                let tag = tag_spec.as_single().ok_or_else(|| {
+                                    self.diagnostics
+                                        .diagnostic(Severity::Error)
+                                        .with_message("bus boundary tag must be a single id")
+                                        .with_primary_label(
+                                            tag_spec.span(),
+                                            "use @tag(<id>) for bus boundary constraints",
+                                        )
+                                        .emit();
+                                    CompileError::Failed
+                                })?;
+                                bus.borrow_mut().set_first_tag(tag).map_err(|_| {
+                                    self.diagnostics
+                                        .diagnostic(Severity::Error)
+                                        .with_message("bus boundary tag already set")
+                                        .with_primary_label(
+                                            bin_op.span(),
+                                            "bus boundary tag already set",
+                                        )
+                                        .emit();
+                                    CompileError::Failed
+                                })?;
+                            }
                         },
                         ast::Boundary::Last => {
                             bus.borrow_mut().set_last(rhs.clone()).map_err(|_| {
@@ -794,6 +963,30 @@ impl<'a> MirBuilder<'a> {
                                     .emit();
                                 CompileError::Failed
                             })?;
+                            if let Some(tag_spec) = &self.current_constraint_tag {
+                                let tag = tag_spec.as_single().ok_or_else(|| {
+                                    self.diagnostics
+                                        .diagnostic(Severity::Error)
+                                        .with_message("bus boundary tag must be a single id")
+                                        .with_primary_label(
+                                            tag_spec.span(),
+                                            "use @tag(<id>) for bus boundary constraints",
+                                        )
+                                        .emit();
+                                    CompileError::Failed
+                                })?;
+                                bus.borrow_mut().set_last_tag(tag).map_err(|_| {
+                                    self.diagnostics
+                                        .diagnostic(Severity::Error)
+                                        .with_message("bus boundary tag already set")
+                                        .with_primary_label(
+                                            bin_op.span(),
+                                            "bus boundary tag already set",
+                                        )
+                                        .emit();
+                                    CompileError::Failed
+                                })?;
+                            }
                         },
                     }
                     return Ok(Op::None(bin_op.span()).into());
@@ -820,7 +1013,7 @@ impl<'a> MirBuilder<'a> {
             },
             ast::BinaryOp::Eq => {
                 let sub_node = Sub::builder().lhs(lhs).rhs(rhs).span(bin_op.span()).build();
-                Ok(Enf::builder().expr(sub_node).span(bin_op.span()).build())
+                Ok(Enf::builder().expr(sub_node).span(bin_op.span()).tag(None).build())
             },
         }
     }
@@ -1164,25 +1357,19 @@ impl<'a> MirBuilder<'a> {
 
         let mut bus_op = BusOp::builder().span(ast_bus_op.span()).bus(bus).kind(bus_op_kind);
         for arg in ast_bus_op.args.iter() {
-            let mut arg_node = self.translate_expr(arg)?;
-            let accessor_mut = arg_node.clone();
-            if let Some(accessor) = accessor_mut.as_accessor_mut() {
-                match accessor.access_type {
-                    MirAccessType::Default => {
-                        arg_node = accessor.indexable.clone();
-                    },
-                    _ => {
-                        self.diagnostics
-                            .diagnostic(Severity::Error)
-                            .with_message("expected default access type")
-                            .with_primary_label(
-                                arg.span(),
-                                "expected default access type, got this instead",
-                            )
-                            .emit();
-                        return Err(CompileError::Failed);
-                    },
-                }
+            let arg_node = self.translate_expr(arg)?;
+            if let Some(accessor) = arg_node.as_accessor()
+                && !matches!(accessor.access_type, MirAccessType::Default)
+            {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("expected default access type")
+                    .with_primary_label(
+                        arg.span(),
+                        "expected default access type, got this instead",
+                    )
+                    .emit();
+                return Err(CompileError::Failed);
             }
             bus_op = bus_op.args(arg_node);
         }
@@ -1426,7 +1613,7 @@ impl<'a> MirBuilder<'a> {
             // We access $main[i]
             if let AccessType::Index(column) = access.access_type.clone() {
                 let node = self.translate_indexed_trace_access(
-                    column,
+                    *column,
                     TraceSegmentId::Main,
                     0,
                     access.offset,
@@ -1464,7 +1651,7 @@ impl<'a> MirBuilder<'a> {
                 },
                 AccessType::Index(extra_offset) if binding.size > 1 => {
                     let node = self.translate_indexed_trace_access(
-                        extra_offset,
+                        *extra_offset,
                         binding.segment,
                         binding.offset,
                         access.offset,
@@ -1486,14 +1673,14 @@ impl<'a> MirBuilder<'a> {
     /// collection.
     fn translate_indexed_trace_access(
         &mut self,
-        index: Box<ScalarExpr>,
+        index: ScalarExpr,
         segment: TraceSegmentId,
         offset: usize,
         row_offset: usize,
         access: &'a ast::SymbolAccess,
     ) -> Result<Link<Op>, CompileError> {
         // If the index is a constant, we construct the corresponding TraceAccess
-        if let ScalarExpr::Const(c) = *index {
+        if let ScalarExpr::Const(c) = index {
             let ta = TraceAccess::new(segment, offset + c.item as usize, row_offset);
             Ok(Value::builder()
                 .value(SpannedMirValue {

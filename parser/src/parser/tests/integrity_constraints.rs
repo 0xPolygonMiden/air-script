@@ -90,12 +90,20 @@ fn integrity_constraints_with_buses() {
             enforce!(eq!(bounded_access!(q, Boundary::Last), null!())),
         ],
     ));
-    expected
-        .buses
-        .insert(ident!(p), Bus::new(SourceSpan::UNKNOWN, ident!(p), BusType::Multiset));
-    expected
-        .buses
-        .insert(ident!(q), Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup));
+    expected.buses.insert(
+        ident!(p),
+        Bus::new(
+            SourceSpan::UNKNOWN,
+            ident!(p),
+            BusType::Multiset,
+            BusConstraintForm::Product,
+            None,
+        ),
+    );
+    expected.buses.insert(
+        ident!(q),
+        Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup, BusConstraintForm::Product, None),
+    );
 
     let mut bus_enforces = Vec::new();
 
@@ -741,7 +749,10 @@ fn err_missing_integrity_constraint() {
         let b = [a, 2 * a];
         let c = [[a - 1, a^2], [b[0], b[1]]];
     }";
-    ParseTest::new().expect_module_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
+    ParseTest::new().expect_module_diagnostic(
+        source,
+        "expected one of: '\"@\"', '\"enf\"', '\"let\"', '\"return\"', 'identifier'",
+    );
 }
 
 #[test]
