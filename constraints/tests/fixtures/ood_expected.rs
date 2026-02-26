@@ -17,8 +17,7 @@ pub struct EvalRecord {
 pub const TOTAL_TAGS: usize = manifest::TOTAL_TAGS;
 
 /// Stable constraint order as emitted by the miden-vm tagging pipeline.
-/// This order must match the constraint IDs (0..CURRENT_MAX_ID) and keeps
-/// main-trace constraints first, followed by the range bus tag.
+/// This order must match the constraint IDs (0..CURRENT_MAX_ID).
 pub const CONSTRAINT_NAMES: [&str; TOTAL_TAGS] = [
     "system.clk.first_row",
     "system.clk.transition",
@@ -53,6 +52,15 @@ pub const CONSTRAINT_NAMES: [&str; TOTAL_TAGS] = [
     "stack.general.transition.14",
     "stack.general.transition.15",
     "range.bus.transition",
+    "stack.overflow.depth.first_row",
+    "stack.overflow.depth.last_row",
+    "stack.overflow.addr.first_row",
+    "stack.overflow.addr.last_row",
+    "stack.overflow.depth.transition",
+    "stack.overflow.flag.transition",
+    "stack.overflow.addr.transition",
+    "stack.overflow.zero_insert.transition",
+    "stack.overflow.bus.transition",
 ];
 
 /// Expected OOD values.
@@ -222,6 +230,51 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
             id: 32,
             name: "range.bus.transition",
             value: QuadFelt::new(Felt::new(10365289165200035540), Felt::new(16469718665506609592)),
+        },
+        EvalRecord {
+            id: 33,
+            name: "stack.overflow.depth.first_row",
+            value: QuadFelt::new(Felt::new(1820735510664294085), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 34,
+            name: "stack.overflow.depth.last_row",
+            value: QuadFelt::new(Felt::new(12520055704510454391), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 35,
+            name: "stack.overflow.addr.first_row",
+            value: QuadFelt::new(Felt::new(9235172344178625178), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 36,
+            name: "stack.overflow.addr.last_row",
+            value: QuadFelt::new(Felt::new(6001883085148683205), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 37,
+            name: "stack.overflow.depth.transition",
+            value: QuadFelt::new(Felt::new(6706883717633639596), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 38,
+            name: "stack.overflow.flag.transition",
+            value: QuadFelt::new(Felt::new(5309566436521762910), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 39,
+            name: "stack.overflow.addr.transition",
+            value: QuadFelt::new(Felt::new(13739720401332236216), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 40,
+            name: "stack.overflow.zero_insert.transition",
+            value: QuadFelt::new(Felt::new(15830245309845547857), Felt::new(0)),
+        },
+        EvalRecord {
+            id: 41,
+            name: "stack.overflow.bus.transition",
+            value: QuadFelt::new(Felt::new(7384164985445418427), Felt::new(3858806565449404456)),
         },
     ]
 }

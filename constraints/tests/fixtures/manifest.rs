@@ -22,7 +22,12 @@ pub const TAG_RANGE_BUS_BASE: usize = TAG_STACK_GENERAL_BASE + TAG_STACK_GENERAL
 /// Number of range bus constraints in this group.
 pub const TAG_RANGE_BUS_COUNT: usize = 1;
 
+/// Base ID for the stack overflow constraint group.
+pub const TAG_STACK_OVERFLOW_BASE: usize = TAG_RANGE_BUS_BASE + TAG_RANGE_BUS_COUNT;
+/// Number of stack overflow constraints in this group.
+pub const TAG_STACK_OVERFLOW_COUNT: usize = 9;
+
 /// Highest constraint ID (zero-based) for the current group set.
-pub const CURRENT_MAX_ID: usize = TAG_RANGE_BUS_BASE + TAG_RANGE_BUS_COUNT - 1;
+pub const CURRENT_MAX_ID: usize = TAG_STACK_OVERFLOW_BASE + TAG_STACK_OVERFLOW_COUNT - 1;
 /// Total tagged constraints in the current group set.
 pub const TOTAL_TAGS: usize = CURRENT_MAX_ID + 1;
