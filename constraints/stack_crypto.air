@@ -52,9 +52,6 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let is_hornerbase = flag_hornerbase(op_bits, e0);
     let is_hornerext = flag_hornerext(op_bits, e0);
 
-    # Dummy term to force constraints into the transition domain when needed.
-    let zero = s0' - s0';
-
     # ------------------------------------------------------------------------------------------
     # CRYPTOSTREAM
     # ------------------------------------------------------------------------------------------
@@ -98,14 +95,14 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let alpha_cu_1 = 3 * a0_sq * a1 + 7 * a1_cu;
 
     # tmp0 = acc·α² + c0·α + c1
-    enf tmp0_0 - (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1) + s0 * a0 + s1) = zero when is_hornerbase;
-    enf tmp0_1 - (acc0 * alpha_sq_1 + acc1 * alpha_sq_0 + s0 * a1) = zero when is_hornerbase;
+    enf tmp0_0 = (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1) + s0 * a0 + s1) when is_hornerbase;
+    enf tmp0_1 = (acc0 * alpha_sq_1 + acc1 * alpha_sq_0 + s0 * a1) when is_hornerbase;
 
     # tmp1 = tmp0·α³ + c2·α² + c3·α + c4
-    enf tmp1_0 - (tmp0_0 * alpha_cu_0 + tmp0_1 * (7 * alpha_cu_1)
-        + s2 * alpha_sq_0 + s3 * a0 + s4) = zero when is_hornerbase;
-    enf tmp1_1 - (tmp0_0 * alpha_cu_1 + tmp0_1 * alpha_cu_0
-        + s2 * alpha_sq_1 + s3 * a1) = zero when is_hornerbase;
+    enf tmp1_0 = (tmp0_0 * alpha_cu_0 + tmp0_1 * (7 * alpha_cu_1)
+        + s2 * alpha_sq_0 + s3 * a0 + s4) when is_hornerbase;
+    enf tmp1_1 = (tmp0_0 * alpha_cu_1 + tmp0_1 * alpha_cu_0
+        + s2 * alpha_sq_1 + s3 * a1) when is_hornerbase;
 
     # acc' = tmp1·α³ + c5·α² + c6·α + c7
     enf s14' - (tmp1_0 * alpha_cu_0 + tmp1_1 * (7 * alpha_cu_1)
@@ -127,10 +124,10 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let tmp1 = h5;
 
     # acc_tmp = acc·α² + c0·α + c1
-    enf tmp0 - (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1)
-        + s0 * a0 + 7 * s1 * a1 + s2) = zero when is_hornerext;
-    enf tmp1 - (acc1 * alpha_sq_0 + acc0 * alpha_sq_1
-        + s1 * a0 + s0 * a1 + s3) = zero when is_hornerext;
+    enf tmp0 = (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1)
+        + s0 * a0 + 7 * s1 * a1 + s2) when is_hornerext;
+    enf tmp1 = (acc1 * alpha_sq_0 + acc0 * alpha_sq_1
+        + s1 * a0 + s0 * a1 + s3) when is_hornerext;
 
     # acc' = acc_tmp·α² + c2·α + c3
     enf s14' - (tmp0 * alpha_sq_0 + tmp1 * (7 * alpha_sq_1)
