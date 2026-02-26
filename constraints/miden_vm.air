@@ -16,13 +16,14 @@
 def MidenVM
 
 # Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
-const CURRENT_MAX_ID = 41;
+const CURRENT_MAX_ID = 129;
 
 use flags::*;
 use system::*;
 use range_checker::*;
 use stack_general::*;
 use stack_overflow::*;
+use stack_ops::*;
 
 ##########################################################################################
 # EXECUTION TRACE LAYOUT
@@ -45,7 +46,7 @@ public_inputs {
 ##########################################################################################
 #
 # Keep the full bus list to preserve auxiliary column ordering. Only the range checker bus
-# (tag 32) and the stack overflow bus (tag 41) are constrained in this group.
+# (tag 128) and the stack overflow bus (tag 129) are constrained in this group.
 ##########################################################################################
 
 buses {
@@ -55,10 +56,10 @@ buses {
     multiset bus_2_decoder_p3,
 
     # Stack overflow table
-    multiset bus_3_stack_p1 @tag_transition(41) @sum_form(assume_exclusive),
+    multiset bus_3_stack_p1 @tag_transition(129) @sum_form(assume_exclusive),
 
     # Range checker bus
-    logup    bus_4_range_checker @tag_transition(32),
+    logup    bus_4_range_checker @tag_transition(128),
 
     # Chiplet buses
     multiset bus_5_v_table,
@@ -81,10 +82,10 @@ boundary_constraints {
     @tag(14) enf range_checker[1].last = 65535;
 
     # Stack depth and overflow address boundaries
-    @tag(33) enf stack[16].first = 16;
-    @tag(34) enf stack[16].last = 16;
-    @tag(35) enf stack[17].first = 0;
-    @tag(36) enf stack[17].last = 0;
+    @tag(32) enf stack[16].first = 16;
+    @tag(33) enf stack[16].last = 16;
+    @tag(34) enf stack[17].first = 0;
+    @tag(35) enf stack[17].last = 0;
 
     # Leave bus boundaries unconstrained as these will be handled using the uniform
     # treatment for auxiliary columns boundary constraints, i.e.,
@@ -133,6 +134,9 @@ integrity_constraints {
     # Stack general transition constraints (tags 16..31)
     @tag_range(16..32) enf stack_general_transition([stack[0..16], decoder[0..24]]);
 
-    # Stack overflow transition constraints (tags 37..40, bus tag 41)
-    @tag_range(37..41) enf stack_overflow_transition([stack[0..19], decoder[0..24], system[0]]);
+    # Stack overflow transition constraints (tags 36..39)
+    @tag_range(36..40) enf stack_overflow_transition([stack[0..19], decoder[0..24], system[0]]);
+
+    # Stack ops transition constraints (tags 40..127)
+    @tag_range(40..128) enf stack_ops_transition([stack[0..19], decoder[0..24], system[0..6]]);
 }
