@@ -52,12 +52,9 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
     # -------------------------------------------------------------------------
     # Selector constraints
     # -------------------------------------------------------------------------
-    # Dummy zero term to keep constraints in the transition domain (uses next-row access).
-    let zero = s[0]' - s[0]';
-
     # Selector bits are binary.
     let selector_bits = [s[0], s[1], s[2]];
-    enf hash_active * binary_constraint(bit) = zero for bit in selector_bits;
+    enf binary_constraint(bit) = 0 for bit in selector_bits when hash_active;
 
     # Flags derived from selector values and cycle markers.
     let f_abp = get_f_abp(s, cycle_row_31);
@@ -72,14 +69,14 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
     let stability_gate = 1 - f_out - f_out_next;
     let stable_next = [s[1]', s[2]'];
     let stable_cur = [s[1], s[2]];
-    enf hash_active * stability_gate * (next - cur) = 0 for (next, cur) in (stable_next, stable_cur);
+    enf next = cur for (next, cur) in (stable_next, stable_cur) when hash_active * stability_gate;
 
     # Any absorb op forces s0' = 0 at the start of the next cycle.
     let f_continue = f_abp + f_absorb;
-    enf hash_active * f_continue * s[0]' = 0;
+    enf s[0]' = 0 when hash_active * f_continue;
 
     # On output rows, (s0=0, s1=1, *) is invalid.
-    enf hash_active * cycle_row_31 * (binary_not(s[0]) * s[1]) = 0;
+    enf (1 - s[0]) * s[1] = 0 when hash_active * cycle_row_31;
 
     # -------------------------------------------------------------------------
     # Boundary constraints
@@ -87,10 +84,10 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
     # ABP keeps capacity lanes unchanged.
     let cap_next = [h[8]', h[9]', h[10]', h[11]'];
     let cap_cur = [h[8], h[9], h[10], h[11]];
-    enf hash_active * f_abp * (next - cur) = 0 for (next, cur) in (cap_next, cap_cur);
+    enf next = cur for (next, cur) in (cap_next, cap_cur) when hash_active * f_abp;
 
     # Output row must end with i = 0.
-    enf hash_active * f_out * i = 0;
+    enf i = 0 when hash_active * f_out;
 
     # -------------------------------------------------------------------------
     # Merkle index constraints
@@ -105,29 +102,29 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
     let b = i - 2 * i';
 
     # b is the dropped bit in the right shift; it must be binary when shifting.
-    enf hash_active * f_shift * (b^2 - b) = 0;
+    enf (b^2 - b) = 0 when hash_active * f_shift;
 
     # Otherwise, i is stable across rows.
     let not_absorbing_nor_comp_finished = 1 - (f_shift + f_out);
-    enf hash_active * not_absorbing_nor_comp_finished * (i' - i) = 0;
+    enf i' = i when hash_active * not_absorbing_nor_comp_finished;
 
     # -------------------------------------------------------------------------
     # Merkle absorb constraints
     # -------------------------------------------------------------------------
     # Digest placement: b=0 -> rate0, b=1 -> rate1.
-    let f_b0 = f_absorb * binary_not(b);
+    let f_b0 = f_absorb * (1 - b);
     let f_b1 = f_absorb * b;
 
     # Absorb resets capacity lanes to 0.
-    enf hash_active * f_absorb * cap = 0 for cap in cap_next;
+    enf cap = 0 for cap in cap_next when hash_active * f_absorb;
 
     let rate0_next = [h[0]', h[1]', h[2]', h[3]'];
     let rate0_cur = [h[0], h[1], h[2], h[3]];
-    enf hash_active * f_b0 * (next - cur) = 0 for (next, cur) in (rate0_next, rate0_cur);
+    enf next = cur for (next, cur) in (rate0_next, rate0_cur) when hash_active * f_b0;
 
     let rate1_next = [h[4]', h[5]', h[6]', h[7]'];
     # When b=1, place the digest (from rate0) into rate1.
-    enf hash_active * f_b1 * (next - cur) = 0 for (next, cur) in (rate1_next, rate0_cur);
+    enf next = cur for (next, cur) in (rate1_next, rate0_cur) when hash_active * f_b1;
 
     ####################################################################################
     # BUS OPERATIONS (TODO)
@@ -157,18 +154,18 @@ ev poseidon2_permutation([chiplet_s0, h[12]]) {
 
     # Init linear step: h' = M_E(h)
     let init_state = poseidon2_init_state(h_state);
-    enf hash_active * cycle_row_0 * (h_next - init_val) = 0
-        for (h_next, init_val) in (h_state_next, init_state);
+    enf h_next = init_val for (h_next, init_val) in (h_state_next, init_state)
+        when hash_active * cycle_row_0;
 
     # External rounds: h' = M_E(S-box(h + ark_ext))
     let ext_state = poseidon2_external_state(h_state);
-    enf hash_active * p2_is_external * (h_next - ext_val) = 0
-        for (h_next, ext_val) in (h_state_next, ext_state);
+    enf h_next = ext_val for (h_next, ext_val) in (h_state_next, ext_state)
+        when hash_active * p2_is_external;
 
     # Internal rounds: h' = M_I(h with lane0 = (h0 + ark_int)^7)
     let int_state = poseidon2_internal_state(h_state);
-    enf hash_active * p2_is_internal * (h_next - int_val) = 0
-        for (h_next, int_val) in (h_state_next, int_state);
+    enf h_next = int_val for (h_next, int_val) in (h_state_next, int_state)
+        when hash_active * p2_is_internal;
 }
 
 ##########################################################################################
@@ -213,19 +210,19 @@ ev poseidon2_permutation([chiplet_s0, h[12]]) {
 # f_bp: Begin Permutation flag (1,0,0) on cycle_row_0
 # Initiates single permutation, 2-to-1 hash, or linear hash computation.
 fn get_f_bp(s: felt[3], row0: felt) -> felt {
-    return row0 & s[0] & binary_not(s[1]) & binary_not(s[2]);
+    return row0 & s[0] & (1 - s[1]) & (1 - s[2]);
 }
 
 # f_mp: Merkle Path verification flag (1,0,1) on cycle_row_0
 # Initiates standard Merkle path verification computation.
 fn get_f_mp(s: felt[3], row0: felt) -> felt {
-    return row0 & s[0] & binary_not(s[1]) & s[2];
+    return row0 & s[0] & (1 - s[1]) & s[2];
 }
 
 # f_mv: Merkle path Verification for "old" node flag (1,1,0) on cycle_row_0
 # Begins verification for old leaf value during Merkle root update computation.
 fn get_f_mv(s: felt[3], row0: felt) -> felt {
-    return row0 & s[0] & s[1] & binary_not(s[2]);
+    return row0 & s[0] & s[1] & (1 - s[2]);
 }
 
 # f_mu: Merkle path verification for "new" node flag (1,1,1) on cycle_row_0
@@ -237,19 +234,19 @@ fn get_f_mu(s: felt[3], row0: felt) -> felt {
 # f_abp: Absorb elements for linear hash flag (1,0,0) on cycle_row_31
 # Absorbs next set of elements into hasher state during linear hash computation.
 fn get_f_abp(s: felt[3], row31: felt) -> felt {
-    return row31 & s[0] & binary_not(s[1]) & binary_not(s[2]);
+    return row31 & s[0] & (1 - s[1]) & (1 - s[2]);
 }
 
 # f_mpa: Merkle Path Absorb flag (1,0,1) on cycle_row_31
 # Absorbs next Merkle path node during standard verification computation.
 fn get_f_mpa(s: felt[3], row31: felt) -> felt {
-    return row31 & s[0] & binary_not(s[1]) & s[2];
+    return row31 & s[0] & (1 - s[1]) & s[2];
 }
 
 # f_mva: Merkle path absorb for "old" node flag (1,1,0) on cycle_row_31
 # Absorbs next node during "old" leaf verification (Merkle root update computation).
 fn get_f_mva(s: felt[3], row31: felt) -> felt {
-    return row31 & s[0] & s[1] & binary_not(s[2]);
+    return row31 & s[0] & s[1] & (1 - s[2]);
 }
 
 # f_mua: Merkle path absorb for "new" node flag (1,1,1) on cycle_row_31
@@ -260,24 +257,24 @@ fn get_f_mua(s: felt[3], row31: felt) -> felt {
 
 # Flag f_out is set to 1 when either f_hout = 1 or f_sout = 1 in the current row.
 fn get_f_out(s: felt[3], row31: felt) -> felt {
-    return row31 & binary_not(s[0]) & binary_not(s[1]);
+    return row31 & (1 - s[0]) & (1 - s[1]);
 }
 
 # Flag f_out_next is set to 1 when either f_hout = 1 or f_sout = 1 in the next row.
 fn get_f_out_next(s: felt[3], row30: felt, s0_next: felt, s1_next: felt) -> felt {
-    return row30 & binary_not(s0_next) & binary_not(s1_next);
+    return row30 & (1 - s0_next) & (1 - s1_next);
 }
 
 # f_hout: Hash Output flag (0,0,0) on cycle_row_31
 # Returns the 4-element hash result (h0-h3)
 fn get_f_hout(s: felt[3], row31: felt) -> felt {
-    return row31 & binary_not(s[0]) & binary_not(s[1]) & binary_not(s[2]);
+    return row31 & (1 - s[0]) & (1 - s[1]) & (1 - s[2]);
 }
 
 # f_sout: State Output flag (0,0,1) on cycle_row_31
 # Returns the entire 12-element hasher state
 fn get_f_sout(s: felt[3], row31: felt) -> felt {
-    return row31 & binary_not(s[0]) & binary_not(s[1]) & s[2];
+    return row31 & (1 - s[0]) & (1 - s[1]) & s[2];
 }
 
 ##########################################################################################
