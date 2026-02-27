@@ -40,13 +40,12 @@ ev memory_chiplet([chiplets[18]]) {
     # Binary constraints.
     # -------------------------------------------------------------------------
     let binary_cols = [mem_is_read, mem_is_word, mem_idx0, mem_idx1];
-    enf memory_flag * binary_cols[i] * (binary_cols[i] - 1) = 0
-        for i in 0..4;
+    enf binary_cols[i] * (binary_cols[i] - 1) = 0 for i in 0..4 when memory_flag;
 
     # Word access requires idx bits to be zero.
     let word_gate = memory_flag * mem_is_word;
-    enf word_gate * mem_idx0 = 0;
-    enf word_gate * mem_idx1 = 0;
+    enf mem_idx0 = 0 when word_gate;
+    enf mem_idx1 = 0 when word_gate;
 
     # -------------------------------------------------------------------------
     # First row constraints (transition from bitwise to memory).
@@ -65,8 +64,7 @@ ev memory_chiplet([chiplets[18]]) {
     let mem_c3 = compute_c_i(f3, mem_is_read', mem_is_word');
 
     let mem_c = [mem_c0, mem_c1, mem_c2, mem_c3];
-    enf flag_next_row_first_memory * mem_c[i] * mem_values[i]' = 0
-        for i in 0..4;
+    enf mem_c[i] * mem_values[i]' = 0 for i in 0..4 when flag_next_row_first_memory;
 
     # -------------------------------------------------------------------------
     # Transition constraints (memory rows except last).
@@ -83,10 +81,10 @@ ev memory_chiplet([chiplets[18]]) {
     # -------------------------------------------------------------------------
     # Delta inverse constraints.
     # -------------------------------------------------------------------------
-    enf flag_memory_active_not_last * n0 * (n0 - 1) = 0;
-    enf flag_memory_active_not_last * (1 - n0) * ctx_delta = 0;
-    enf flag_memory_active_not_last * (1 - n0) * n1 * (n1 - 1) = 0;
-    enf flag_memory_active_not_last * (1 - n0) * (1 - n1) * addr_delta = 0;
+    enf n0 * (n0 - 1) = 0 when flag_memory_active_not_last;
+    enf (1 - n0) * ctx_delta = 0 when flag_memory_active_not_last;
+    enf (1 - n0) * n1 * (n1 - 1) = 0 when flag_memory_active_not_last;
+    enf (1 - n0) * (1 - n1) * addr_delta = 0 when flag_memory_active_not_last;
 
     # -------------------------------------------------------------------------
     # Delta transition constraints (monotonicity).
@@ -94,24 +92,22 @@ ev memory_chiplet([chiplets[18]]) {
     let delta_next = mem_d1' * 2^16 + mem_d0';
     let computed_delta =
         n0 * ctx_delta + (1 - n0) * (n1 * addr_delta + (1 - n1) * clk_delta);
-    enf flag_memory_active_not_last * (computed_delta - delta_next) = 0;
+    enf computed_delta = delta_next when flag_memory_active_not_last;
 
     # -------------------------------------------------------------------------
     # Same context/word flag.
     # -------------------------------------------------------------------------
-    enf flag_memory_active_not_last
-        * (mem_f_scw' - (1 - n0) * (1 - n1)) = 0;
+    enf mem_f_scw' = (1 - n0) * (1 - n1) when flag_memory_active_not_last;
 
     # -------------------------------------------------------------------------
     # Same context/word read-only when clk does not advance.
     # -------------------------------------------------------------------------
     # When the context and word address are unchanged, the clock may stay the same.
     # If it does not advance, both rows must be reads.
-    enf flag_memory_active_not_last
-        * mem_f_scw'
+    enf mem_f_scw'
         * (1 - clk_delta * mem_d_inv')
         * ((1 - mem_is_read) + (1 - mem_is_read'))
-        = 0;
+        = 0 when flag_memory_active_not_last;
 
     # -------------------------------------------------------------------------
     # Value consistency.
@@ -130,8 +126,7 @@ ev memory_chiplet([chiplets[18]]) {
             + (1 - mem_f_scw') * mem_values[3]';
     let value_delta = [value_delta_0, value_delta_1, value_delta_2, value_delta_3];
 
-    enf flag_memory_active_not_last * mem_c[i] * value_delta[i] = 0
-        for i in 0..4;
+    enf mem_c[i] * value_delta[i] = 0 for i in 0..4 when flag_memory_active_not_last;
 }
 
 ##########################################################################################
