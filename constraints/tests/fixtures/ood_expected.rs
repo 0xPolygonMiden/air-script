@@ -1778,17 +1778,17 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 277,
             name: "chiplets.hasher.selectors.binary",
-            value: QuadFelt::new(Felt::new(14125970682131069043), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(17059167507535516774), Felt::new(0)),
         },
         EvalRecord {
             id: 278,
             name: "chiplets.hasher.selectors.binary",
-            value: QuadFelt::new(Felt::new(15397757255883077151), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(2543200120204459519), Felt::new(0)),
         },
         EvalRecord {
             id: 279,
             name: "chiplets.hasher.selectors.binary",
-            value: QuadFelt::new(Felt::new(8206822507230624215), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(17534396985644786691), Felt::new(0)),
         },
         EvalRecord {
             id: 280,
