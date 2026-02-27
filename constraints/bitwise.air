@@ -43,23 +43,21 @@ ev bitwise_chiplet([chiplets[15]]) {
     # -------------------------------------------------------------------------
     # Operation flag constraints.
     # -------------------------------------------------------------------------
-    enf bitwise_flag * bw_op * (bw_op - 1) = 0;
-    enf bw_gate_transition * (bw_op - bw_op') = 0;
+    enf bw_op * (bw_op - 1) = 0 when bitwise_flag;
+    enf bw_op = bw_op' when bw_gate_transition;
 
     # -------------------------------------------------------------------------
     # Input bit constraints.
     # -------------------------------------------------------------------------
-    enf bitwise_flag * bw_a_bits[i] * (bw_a_bits[i] - 1) = 0
-        for i in 0..4;
-    enf bitwise_flag * bw_b_bits[i] * (bw_b_bits[i] - 1) = 0
-        for i in 0..4;
+    enf bw_a_bits[i] * (bw_a_bits[i] - 1) = 0 for i in 0..4 when bitwise_flag;
+    enf bw_b_bits[i] * (bw_b_bits[i] - 1) = 0 for i in 0..4 when bitwise_flag;
 
     # First row aggregates and prev output must be zeroed.
     let bw_a_agg = aggregate_limbs(bw_a_bits);
     let bw_b_agg = aggregate_limbs(bw_b_bits);
-    enf bw_gate_first * (bw_a - bw_a_agg) = 0;
-    enf bw_gate_first * (bw_b - bw_b_agg) = 0;
-    enf bw_gate_first * bw_prev = 0;
+    enf bw_a = bw_a_agg when bw_gate_first;
+    enf bw_b = bw_b_agg when bw_gate_first;
+    enf bw_prev = 0 when bw_gate_first;
 
     # -------------------------------------------------------------------------
     # Aggregation transitions.
@@ -69,10 +67,10 @@ ev bitwise_chiplet([chiplets[15]]) {
     let bw_b_agg_next =
         aggregate_limbs([bw_b_bits[0]', bw_b_bits[1]', bw_b_bits[2]', bw_b_bits[3]']);
 
-    enf bw_gate_transition * (bw_a' - (bw_a * 16 + bw_a_agg_next)) = 0;
-    enf bw_gate_transition * (bw_b' - (bw_b * 16 + bw_b_agg_next)) = 0;
+    enf bw_a' = bw_a * 16 + bw_a_agg_next when bw_gate_transition;
+    enf bw_b' = bw_b * 16 + bw_b_agg_next when bw_gate_transition;
 
-    enf bw_gate_transition * (bw_prev' - bw_out) = 0;
+    enf bw_prev' = bw_out when bw_gate_transition;
 
     # -------------------------------------------------------------------------
     # Output aggregation.
@@ -82,7 +80,7 @@ ev bitwise_chiplet([chiplets[15]]) {
     # z = zp * 16 + (op_flag ? a_xor_b : a_and_b)
     # Equivalent: z = zp * 16 + a_and_b + op_flag * (a_xor_b - a_and_b)
     let bw_expected = bw_prev * 16 + bw_and + bw_op * (bw_xor - bw_and);
-    enf bitwise_flag * (bw_out - bw_expected) = 0;
+    enf bw_out = bw_expected when bitwise_flag;
 }
 
 ##########################################################################################
