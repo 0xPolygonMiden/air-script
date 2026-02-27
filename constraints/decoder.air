@@ -290,14 +290,14 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
         respan_hash_label,
         addr' - 1,
         0,
-        0, 0, 0, 0, h0, h1, h2, h3, h4, h5, h6, h7
+        h0, h1, h2, h3, h4, h5, h6, h7, 0, 0, 0, 0
     ) when frespan;
 
     bus_6_chiplets_bus.remove(
         return_hash_label,
         addr + 31,
         0,
-        0, 0, 0, 0, h0, h1, h2, h3, 0, 0, 0, 0
+        h0, h1, h2, h3, 0, 0, 0, 0, 0, 0, 0, 0
     ) when fend;
 
     # Control flow hashing with opcode domain separation.

@@ -226,13 +226,13 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
         mpverify_input_label,
         helper_addr,
         s5,
-        0, 0, 0, 0, s0, s1, s2, s3, 0, 0, 0, 0
+        s0, s1, s2, s3, 0, 0, 0, 0, 0, 0, 0, 0
     ) when is_mpverify;
     bus_6_chiplets_bus.remove(
         mpverify_output_label,
         helper_addr + s4 * 32 - 1,
         0,
-        0, 0, 0, 0, s6, s7, s8, s9, 0, 0, 0, 0
+        s6, s7, s8, s9, 0, 0, 0, 0, 0, 0, 0, 0
     ) when is_mpverify;
 
     # MRUPDATE requests.
@@ -243,25 +243,25 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
         mrupdate_input_old,
         helper_addr,
         s5,
-        0, 0, 0, 0, s0, s1, s2, s3, 0, 0, 0, 0
+        s0, s1, s2, s3, 0, 0, 0, 0, 0, 0, 0, 0
     ) when is_mrupdate;
     bus_6_chiplets_bus.remove(
         mrupdate_output,
         helper_addr + s4 * 32 - 1,
         0,
-        0, 0, 0, 0, s6, s7, s8, s9, 0, 0, 0, 0
+        s6, s7, s8, s9, 0, 0, 0, 0, 0, 0, 0, 0
     ) when is_mrupdate;
     bus_6_chiplets_bus.remove(
         mrupdate_input_new,
         helper_addr + s4 * 32,
         s5,
-        0, 0, 0, 0, s10, s11, s12, s13, 0, 0, 0, 0
+        s10, s11, s12, s13, 0, 0, 0, 0, 0, 0, 0, 0
     ) when is_mrupdate;
     bus_6_chiplets_bus.remove(
         mrupdate_output,
         helper_addr + s4 * 64 - 1,
         0,
-        0, 0, 0, 0, s0', s1', s2', s3', 0, 0, 0, 0
+        s0', s1', s2', s3', 0, 0, 0, 0, 0, 0, 0, 0
     ) when is_mrupdate;
 
     # PIPE/MSTREAM/CRYPTOSTREAM memory requests.

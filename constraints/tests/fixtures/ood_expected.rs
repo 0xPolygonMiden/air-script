@@ -2266,7 +2266,7 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 373,
             name: "chiplets.bus.chiplets.transition",
-            value: QuadFelt::new(Felt::new(14696969614088113799), Felt::new(1398723567985082498)),
+            value: QuadFelt::new(Felt::new(7990980974626587792), Felt::new(5675027937982935418)),
         },
         EvalRecord {
             id: 374,
