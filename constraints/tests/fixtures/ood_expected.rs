@@ -329,7 +329,6 @@ pub const CONSTRAINT_NAMES: [&str; TOTAL_TAGS] = [
     "decoder.bus.p3.transition",
 ];
 
-/// Expected OOD values.
 pub fn expected_ood_evals() -> Vec<EvalRecord> {
     vec![
         EvalRecord {
@@ -520,7 +519,7 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 37,
             name: "stack.overflow.flag.transition",
-            value: QuadFelt::new(Felt::new(957822818659219409), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(5309566436521762910), Felt::new(0)),
         },
         EvalRecord {
             id: 38,
@@ -885,7 +884,7 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 110,
             name: "stack.ops.cswap",
-            value: QuadFelt::new(Felt::new(4142872517165003079), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(7787471015064615045), Felt::new(0)),
         },
         EvalRecord {
             id: 111,
@@ -900,52 +899,52 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 113,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(7382517392819628451), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(4517595434872149482), Felt::new(0)),
         },
         EvalRecord {
             id: 114,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(4827417633003237585), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(7382517392819628451), Felt::new(0)),
         },
         EvalRecord {
             id: 115,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(17779390882653606052), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(4827417633003237585), Felt::new(0)),
         },
         EvalRecord {
             id: 116,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(16587491652407655425), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(17779390882653606052), Felt::new(0)),
         },
         EvalRecord {
             id: 117,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(6936098212561125534), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(16587491652407655425), Felt::new(0)),
         },
         EvalRecord {
             id: 118,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(5094958697700743127), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(6936098212561125534), Felt::new(0)),
         },
         EvalRecord {
             id: 119,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(189412762651021203), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(5094958697700743127), Felt::new(0)),
         },
         EvalRecord {
             id: 120,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(8308993958309806023), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(189412762651021203), Felt::new(0)),
         },
         EvalRecord {
             id: 121,
             name: "stack.ops.cswapw",
-            value: QuadFelt::new(Felt::new(16580384734945713908), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(8308993958309806023), Felt::new(0)),
         },
         EvalRecord {
             id: 122,
             name: "stack.system.assert",
-            value: QuadFelt::new(Felt::new(13682615670963393420), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(8348363779099446030), Felt::new(0)),
         },
         EvalRecord {
             id: 123,
@@ -1085,22 +1084,22 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 150,
             name: "stack.crypto.hornerbase",
-            value: QuadFelt::new(Felt::new(12031819951881691966), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(8415559196869506674), Felt::new(0)),
         },
         EvalRecord {
             id: 151,
             name: "stack.crypto.hornerbase",
-            value: QuadFelt::new(Felt::new(16763623523728809700), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(12374820114184953398), Felt::new(0)),
         },
         EvalRecord {
             id: 152,
             name: "stack.crypto.hornerbase",
-            value: QuadFelt::new(Felt::new(16448780392400843578), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(2975290982061044481), Felt::new(0)),
         },
         EvalRecord {
             id: 153,
             name: "stack.crypto.hornerbase",
-            value: QuadFelt::new(Felt::new(13659290005693061581), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(13487726821146861348), Felt::new(0)),
         },
         EvalRecord {
             id: 154,
@@ -1185,12 +1184,12 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 170,
             name: "stack.crypto.hornerext",
-            value: QuadFelt::new(Felt::new(2516572400933728962), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(1082901338727409004), Felt::new(0)),
         },
         EvalRecord {
             id: 171,
             name: "stack.crypto.hornerext",
-            value: QuadFelt::new(Felt::new(16462328690369258086), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(13302599741550075590), Felt::new(0)),
         },
         EvalRecord {
             id: 172,

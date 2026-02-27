@@ -54,8 +54,8 @@ ev stack_overflow_transition([stack[19], decoder[24], system_clk]) {
     # - end-of-call rows: depth handled by block-stack constraints
     enf (stack_b0' - stack_b0) * normal_flag + fshl * fov - fshr
         + f_call_like * (stack_b0' - 16) = 0;
-    # Keep this constraint in the transition domain (matches when_transition).
-    enf (1 - fov) * depth_excess + (stack_b0' - stack_b0') = 0;
+    # Overflow flag must be consistent on every row.
+    enf (1 - fov) * depth_excess = 0;
     # Right shift pushes a new row from overflow portion of the stack; record clk as new b1.
     enf fshr * (stack_b1' - system_clk) = 0;
     # Left shift with empty overflow shifts in a 0 at s15.
