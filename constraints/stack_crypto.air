@@ -105,10 +105,10 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
         + s2 * alpha_sq_1 + s3 * a1) when is_hornerbase;
 
     # acc' = tmp1·α³ + c5·α² + c6·α + c7
-    enf s14' - (tmp1_0 * alpha_cu_0 + tmp1_1 * (7 * alpha_cu_1)
-        + s5 * alpha_sq_0 + s6 * a0 + s7) = 0 when is_hornerbase;
-    enf s15' - (tmp1_0 * alpha_cu_1 + tmp1_1 * alpha_cu_0
-        + s5 * alpha_sq_1 + s6 * a1) = 0 when is_hornerbase;
+    enf s14' = (tmp1_0 * alpha_cu_0 + tmp1_1 * (7 * alpha_cu_1)
+        + s5 * alpha_sq_0 + s6 * a0 + s7) when is_hornerbase;
+    enf s15' = (tmp1_0 * alpha_cu_1 + tmp1_1 * alpha_cu_0
+        + s5 * alpha_sq_1 + s6 * a1) when is_hornerbase;
 
     # ------------------------------------------------------------------------------------------
     # HORNEREXT
@@ -130,8 +130,8 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
         + s1 * a0 + s0 * a1 + s3) when is_hornerext;
 
     # acc' = acc_tmp·α² + c2·α + c3
-    enf s14' - (tmp0 * alpha_sq_0 + tmp1 * (7 * alpha_sq_1)
-        + s4 * a0 + 7 * s5 * a1 + s6) = 0 when is_hornerext;
-    enf s15' - (tmp1 * alpha_sq_0 + tmp0 * alpha_sq_1
-        + s5 * a0 + s4 * a1 + s7) = 0 when is_hornerext;
+    enf s14' = (tmp0 * alpha_sq_0 + tmp1 * (7 * alpha_sq_1)
+        + s4 * a0 + 7 * s5 * a1 + s6) when is_hornerext;
+    enf s15' = (tmp1 * alpha_sq_0 + tmp0 * alpha_sq_1
+        + s5 * a0 + s4 * a1 + s7) when is_hornerext;
 }
