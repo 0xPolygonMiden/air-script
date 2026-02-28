@@ -127,9 +127,61 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
     enf next = cur for (next, cur) in (rate1_next, rate0_cur) when hash_active * f_b1;
 
     ####################################################################################
-    # BUS OPERATIONS (TODO)
+    # HASH-KERNEL BUS OPERATIONS (MERKLE SIBLING TABLE)
     ####################################################################################
-    # Chiplet bus operations are TODO.
+    # These messages populate the hash-kernel virtual table with Merkle sibling entries.
+    # The layout is fixed by the bus spec; unused slots are set to 0.
+    #
+    # Walkthrough:
+    # - MV/MVA insert siblings (old path), MU/MUA remove siblings (new path).
+    # - b=0 uses the right sibling h4..h7, b=1 uses the left sibling h0..h3.
+    # - node index i occupies the index field; all other unused fields are zero.
+    let is_b_zero = 1 - b;
+    let is_b_one = b;
+
+    let h0 = h[0];
+    let h1 = h[1];
+    let h2 = h[2];
+    let h3 = h[3];
+    let h4 = h[4];
+    let h5 = h[5];
+    let h6 = h[6];
+    let h7 = h[7];
+
+    let h0_next = h[0]';
+    let h1_next = h[1]';
+    let h2_next = h[2]';
+    let h3_next = h[3]';
+    let h4_next = h[4]';
+    let h5_next = h[5]';
+    let h6_next = h[6]';
+    let h7_next = h[7]';
+
+    bus_5_v_table.insert(
+        0, 0, i, 0, 0, 0, 0, h4, h5, h6, h7
+    ) when (hash_active * f_mv * is_b_zero);
+    bus_5_v_table.insert(
+        0, 0, i, h0, h1, h2, h3, 0, 0, 0, 0
+    ) when (hash_active * f_mv * is_b_one);
+    bus_5_v_table.insert(
+        0, 0, i, 0, 0, 0, 0, h4_next, h5_next, h6_next, h7_next
+    ) when (hash_active * f_mva * is_b_zero);
+    bus_5_v_table.insert(
+        0, 0, i, h0_next, h1_next, h2_next, h3_next, 0, 0, 0, 0
+    ) when (hash_active * f_mva * is_b_one);
+
+    bus_5_v_table.remove(
+        0, 0, i, 0, 0, 0, 0, h4, h5, h6, h7
+    ) when (hash_active * f_mu * is_b_zero);
+    bus_5_v_table.remove(
+        0, 0, i, h0, h1, h2, h3, 0, 0, 0, 0
+    ) when (hash_active * f_mu * is_b_one);
+    bus_5_v_table.remove(
+        0, 0, i, 0, 0, 0, 0, h4_next, h5_next, h6_next, h7_next
+    ) when (hash_active * f_mua * is_b_zero);
+    bus_5_v_table.remove(
+        0, 0, i, h0_next, h1_next, h2_next, h3_next, 0, 0, 0, 0
+    ) when (hash_active * f_mua * is_b_one);
 }
 
 
