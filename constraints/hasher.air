@@ -181,14 +181,14 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i, system_clk]) {
         HASHERLINEARHASH + 32,
         clk_plus_one,
         i,
-        0, 0, 0, 0, h0_next, h1_next, h2_next, h3_next, h4_next, h5_next, h6_next, h7_next
+        h0_next, h1_next, h2_next, h3_next, h4_next, h5_next, h6_next, h7_next
     ) when (hash_active * f_abp);
 
     bus_6_chiplets_bus.insert(
         HASHERRETURNHASH + 32,
         clk_plus_one,
         i,
-        0, 0, 0, 0, h0, h1, h2, h3, 0, 0, 0, 0
+        h0, h1, h2, h3
     ) when (hash_active * f_hout);
 
     bus_6_chiplets_bus.insert(
@@ -202,39 +202,39 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i, system_clk]) {
         HASHERMPVERIFY + 16,
         clk_plus_one,
         i,
-        0, 0, 0, 0, h0, h1, h2, h3, 0, 0, 0, 0
+        h0, h1, h2, h3
     ) when (hash_active * f_mp * is_b_zero);
     bus_6_chiplets_bus.insert(
         HASHERMPVERIFY + 16,
         clk_plus_one,
         i,
-        0, 0, 0, 0, h4, h5, h6, h7, 0, 0, 0, 0
+        h4, h5, h6, h7
     ) when (hash_active * f_mp * is_b_one);
 
     bus_6_chiplets_bus.insert(
         HASHERMRUPDATEOLD + 16,
         clk_plus_one,
         i,
-        0, 0, 0, 0, h0, h1, h2, h3, 0, 0, 0, 0
+        h0, h1, h2, h3
     ) when (hash_active * f_mv * is_b_zero);
     bus_6_chiplets_bus.insert(
         HASHERMRUPDATEOLD + 16,
         clk_plus_one,
         i,
-        0, 0, 0, 0, h4, h5, h6, h7, 0, 0, 0, 0
+        h4, h5, h6, h7
     ) when (hash_active * f_mv * is_b_one);
 
     bus_6_chiplets_bus.insert(
         HASHERMRUPDATENEW + 16,
         clk_plus_one,
         i,
-        0, 0, 0, 0, h0, h1, h2, h3, 0, 0, 0, 0
+        h0, h1, h2, h3
     ) when (hash_active * f_mu * is_b_zero);
     bus_6_chiplets_bus.insert(
         HASHERMRUPDATENEW + 16,
         clk_plus_one,
         i,
-        0, 0, 0, 0, h4, h5, h6, h7, 0, 0, 0, 0
+        h4, h5, h6, h7
     ) when (hash_active * f_mu * is_b_one);
 
     ####################################################################################
