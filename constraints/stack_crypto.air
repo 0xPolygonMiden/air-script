@@ -55,6 +55,14 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     # ------------------------------------------------------------------------------------------
     # CRYPTOSTREAM
     # ------------------------------------------------------------------------------------------
+    # CRYPTOSTREAM: stream two words from memory at s12 (src), add them to the current
+    # rate/keystream block in s0..s7, and write the ciphertext to memory at s13 (dst).
+    # Here we only enforce the stack mechanics (pointer bumps and preserved lanes); the memory
+    # reads/writes are enforced by the chiplets bus constraints.
+    # The bus encodes plaintext as plain_i = cipher_i - rate_i, so stack updates satisfy:
+    #   cipher_i = rate_i + plain_i  (equivalently plain_i = s_i' - s_i).
+    # - s12/s13 are source/destination pointers and advance by 8 (two words).
+    # - s8..s11 (capacity) and s14..s15 are preserved.
     # Positions 8-11: Unchanged (capacity preserved)
     let cryptostream_keep_top = [s8' - s8, s9' - s9, s10' - s10, s11' - s11];
     enf cryptostream_keep_top[i] = 0 for i in 0..4 when is_cryptostream;
@@ -75,7 +83,8 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     ];
     enf hornerbase_keep[i] = 0 for i in 0..14 when is_hornerbase;
 
-    # Local variables for readability
+    # Local variables for readability.
+    # alpha = a0 + a1 * u, where u^2 = 7 and (a0, a1) are in h0/h1.
     let a0 = h0; let a1 = h1;
     let acc0 = s14; let acc1 = s15;
     let tmp0_0 = h4; let tmp0_1 = h5;
@@ -95,7 +104,9 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let alpha_cu_1 = 3 * a0_sq * a1 + 7 * a1_cu;
 
     # tmp0 = acc·α² + c0·α + c1
-    enf tmp0_0 = (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1) + s0 * a0 + s1) when is_hornerbase;
+    # Hornerbase coefficients: c0..c7 = s0..s7.
+    enf tmp0_0 = (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1) + s0 * a0 + s1)
+        when is_hornerbase;
     enf tmp0_1 = (acc0 * alpha_sq_1 + acc1 * alpha_sq_0 + s0 * a1) when is_hornerbase;
 
     # tmp1 = tmp0·α³ + c2·α² + c3·α + c4
@@ -123,6 +134,7 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let tmp0 = h4;
     let tmp1 = h5;
 
+    # Hornerext coefficients: c_i = (s2i, s2i+1) in the base field.
     # acc_tmp = acc·α² + c0·α + c1
     enf tmp0 = (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1)
         + s0 * a0 + 7 * s1 * a1 + s2) when is_hornerext;
