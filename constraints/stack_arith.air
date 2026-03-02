@@ -74,9 +74,6 @@ ev stack_arith_transition([stack[19], decoder[24], system[6]]) {
     let is_u32add3 = flag_u32add3(op_bits);
     let is_u32madd = flag_u32madd(op_bits);
 
-    # Dummy term to keep binary constraints in the transition domain.
-    let zero = s0' - s0';
-
     # ------------------------------------------------------------------------------------------
     # FIELD OPS
     # ------------------------------------------------------------------------------------------
@@ -88,17 +85,17 @@ ev stack_arith_transition([stack[19], decoder[24], system[6]]) {
     enf s0' = s0 + 1 when is_incr;
 
     # NOT: binary check + result
-    enf s0 * (s0 - 1) = zero when is_not;
+    enf s0 * (s0 - 1) = 0 when is_not;
     enf s0 + s0' = 1 when is_not;
 
     # AND: binary checks + result
-    enf s0 * (s0 - 1) = zero when is_and;
-    enf s1 * (s1 - 1) = zero when is_and;
+    enf s0 * (s0 - 1) = 0 when is_and;
+    enf s1 * (s1 - 1) = 0 when is_and;
     enf s0' = s0 * s1 when is_and;
 
     # OR: binary checks + result
-    enf s0 * (s0 - 1) = zero when is_or;
-    enf s1 * (s1 - 1) = zero when is_or;
+    enf s0 * (s0 - 1) = 0 when is_or;
+    enf s1 * (s1 - 1) = 0 when is_or;
     enf s0' = s0 + s1 - s0 * s1 when is_or;
 
     # EQ: zero-product + result.
@@ -157,7 +154,7 @@ ev stack_arith_transition([stack[19], decoder[24], system[6]]) {
     # When v_hi < 2^32, u32_v_hi_comp = 0; otherwise h4 must be the inverse of (2^32 - 1 - v_hi).
     let u32_split_mul_madd = is_u32split + is_u32mul + is_u32madd;
     let u32_v_hi_comp = 1 - h4 * ((2^32 - 1) - u32_v_hi);
-    enf u32_v_hi_comp * u32_v_lo = zero when u32_split_mul_madd;
+    enf u32_v_hi_comp * u32_v_lo = 0 when u32_split_mul_madd;
 
     # Limb aggregation for outputs (lo on top, hi below)
     let u32_two_outputs = is_u32split + is_u32add + is_u32add3 + is_u32mul + is_u32madd;
@@ -165,13 +162,13 @@ ev stack_arith_transition([stack[19], decoder[24], system[6]]) {
     enf s1' = u32_v_hi when u32_two_outputs;
 
     # U32SPLIT
-    enf s0 - u32_v64 = zero when is_u32split;
+    enf s0 - u32_v64 = 0 when is_u32split;
 
     # U32ADD
-    enf s0 + s1 - u32_v48 = zero when is_u32add;
+    enf s0 + s1 - u32_v48 = 0 when is_u32add;
 
     # U32ADD3
-    enf s0 + s1 + s2 - u32_v48 = zero when is_u32add3;
+    enf s0 + s1 + s2 - u32_v48 = 0 when is_u32add3;
 
     # U32SUB (b - a, with a on top)
     enf s1 = s0 + s1' - s0' * 2^32 when is_u32sub;
@@ -179,10 +176,10 @@ ev stack_arith_transition([stack[19], decoder[24], system[6]]) {
     enf s1' = u32_v_lo when is_u32sub;
 
     # U32MUL
-    enf s0 * s1 - u32_v64 = zero when is_u32mul;
+    enf s0 * s1 = u32_v64 when is_u32mul;
 
     # U32MADD
-    enf s0 * s1 + s2 - u32_v64 = zero when is_u32madd;
+    enf s0 * s1 + s2 = u32_v64 when is_u32madd;
 
     # U32DIV
     enf s1 = s0 * s1' + s0' when is_u32div;

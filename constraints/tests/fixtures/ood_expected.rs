@@ -1338,7 +1338,7 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 179,
             name: "stack.arith.not",
-            value: QuadFelt::new(Felt::new(2252712733428984777), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(4035466692403055130), Felt::new(0)),
         },
         EvalRecord {
             id: 180,
@@ -1348,12 +1348,12 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 181,
             name: "stack.arith.and",
-            value: QuadFelt::new(Felt::new(14850227941716122627), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(3385806455961392573), Felt::new(0)),
         },
         EvalRecord {
             id: 182,
             name: "stack.arith.and",
-            value: QuadFelt::new(Felt::new(18175567784024467771), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(10970170501742489729), Felt::new(0)),
         },
         EvalRecord {
             id: 183,
@@ -1363,12 +1363,12 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 184,
             name: "stack.arith.or",
-            value: QuadFelt::new(Felt::new(8597905655955046372), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(3841745486638047933), Felt::new(0)),
         },
         EvalRecord {
             id: 185,
             name: "stack.arith.or",
-            value: QuadFelt::new(Felt::new(1482536575467916010), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(3504719246524046533), Felt::new(0)),
         },
         EvalRecord {
             id: 186,
@@ -1443,7 +1443,7 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 200,
             name: "stack.arith.u32.shared",
-            value: QuadFelt::new(Felt::new(3644067674547670918), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(1597821177308476955), Felt::new(0)),
         },
         EvalRecord {
             id: 201,
@@ -1458,17 +1458,17 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 203,
             name: "stack.arith.u32.split",
-            value: QuadFelt::new(Felt::new(15525883193297412094), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(15868014234137212529), Felt::new(0)),
         },
         EvalRecord {
             id: 204,
             name: "stack.arith.u32.add",
-            value: QuadFelt::new(Felt::new(7349446320624523226), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(3877846355380377379), Felt::new(0)),
         },
         EvalRecord {
             id: 205,
             name: "stack.arith.u32.add3",
-            value: QuadFelt::new(Felt::new(16762578733999451576), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(14996475617734368887), Felt::new(0)),
         },
         EvalRecord {
             id: 206,
@@ -1488,12 +1488,12 @@ pub fn expected_ood_evals() -> Vec<EvalRecord> {
         EvalRecord {
             id: 209,
             name: "stack.arith.u32.mul",
-            value: QuadFelt::new(Felt::new(6752318701651577568), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(10932857720351146657), Felt::new(0)),
         },
         EvalRecord {
             id: 210,
             name: "stack.arith.u32.madd",
-            value: QuadFelt::new(Felt::new(2748176389622229846), Felt::new(0)),
+            value: QuadFelt::new(Felt::new(5677672016010321812), Felt::new(0)),
         },
         EvalRecord {
             id: 211,
