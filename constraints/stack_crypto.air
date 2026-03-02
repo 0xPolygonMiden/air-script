@@ -52,6 +52,9 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let is_hornerbase = flag_hornerbase(op_bits, e0);
     let is_hornerext = flag_hornerext(op_bits, e0);
 
+    # Horner coefficients: c0..c7 = s0..s7.
+    let c = [s0, s1, s2, s3, s4, s5, s6, s7];
+
     # ------------------------------------------------------------------------------------------
     # CRYPTOSTREAM
     # ------------------------------------------------------------------------------------------
@@ -91,35 +94,49 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let tmp1_0 = h2; let tmp1_1 = h3;
 
     # Precompute alpha powers.
-    let a0_sq = a0^2;
-    let a1_sq = a1^2;
-    let a0_a1 = a0 * a1;
-    let a0_cu = a0_sq * a0;
-    let a1_cu = a1_sq * a1;
-
-    let alpha_sq_0 = a0_sq + 7 * a1_sq;
-    let alpha_sq_1 = 2 * a0_a1;
-
-    let alpha_cu_0 = a0_cu + 21 * a0 * a1_sq;
-    let alpha_cu_1 = 3 * a0_sq * a1 + 7 * a1_cu;
+    let alpha_sq = fp2_square(a0, a1);
+    let alpha_sq_0 = alpha_sq[0];
+    let alpha_sq_1 = alpha_sq[1];
+    let alpha_cu = fp2_mul(alpha_sq_0, alpha_sq_1, a0, a1);
+    let alpha_cu_0 = alpha_cu[0];
+    let alpha_cu_1 = alpha_cu[1];
 
     # tmp0 = acc·α² + c0·α + c1
-    # Hornerbase coefficients: c0..c7 = s0..s7.
-    enf tmp0_0 = (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1) + s0 * a0 + s1)
-        when is_hornerbase;
-    enf tmp0_1 = (acc0 * alpha_sq_1 + acc1 * alpha_sq_0 + s0 * a1) when is_hornerbase;
+    let acc_alpha2 = fp2_mul(acc0, acc1, alpha_sq_0, alpha_sq_1);
+    let c0_alpha = fp2_mul_scalar(a0, a1, c[0]);
+    let tmp0_expected = fp2_add3(
+        acc_alpha2[0], acc_alpha2[1],
+        c0_alpha[0], c0_alpha[1],
+        c[1], 0
+    );
+    enf tmp0_0 = tmp0_expected[0] when is_hornerbase;
+    enf tmp0_1 = tmp0_expected[1] when is_hornerbase;
 
     # tmp1 = tmp0·α³ + c2·α² + c3·α + c4
-    enf tmp1_0 = (tmp0_0 * alpha_cu_0 + tmp0_1 * (7 * alpha_cu_1)
-        + s2 * alpha_sq_0 + s3 * a0 + s4) when is_hornerbase;
-    enf tmp1_1 = (tmp0_0 * alpha_cu_1 + tmp0_1 * alpha_cu_0
-        + s2 * alpha_sq_1 + s3 * a1) when is_hornerbase;
+    let tmp0_alpha3 = fp2_mul(tmp0_0, tmp0_1, alpha_cu_0, alpha_cu_1);
+    let c2_alpha2 = fp2_mul_scalar(alpha_sq_0, alpha_sq_1, c[2]);
+    let c3_alpha = fp2_mul_scalar(a0, a1, c[3]);
+    let tmp1_expected = fp2_add4(
+        tmp0_alpha3[0], tmp0_alpha3[1],
+        c2_alpha2[0], c2_alpha2[1],
+        c3_alpha[0], c3_alpha[1],
+        c[4], 0
+    );
+    enf tmp1_0 = tmp1_expected[0] when is_hornerbase;
+    enf tmp1_1 = tmp1_expected[1] when is_hornerbase;
 
     # acc' = tmp1·α³ + c5·α² + c6·α + c7
-    enf s14' = (tmp1_0 * alpha_cu_0 + tmp1_1 * (7 * alpha_cu_1)
-        + s5 * alpha_sq_0 + s6 * a0 + s7) when is_hornerbase;
-    enf s15' = (tmp1_0 * alpha_cu_1 + tmp1_1 * alpha_cu_0
-        + s5 * alpha_sq_1 + s6 * a1) when is_hornerbase;
+    let tmp1_alpha3 = fp2_mul(tmp1_0, tmp1_1, alpha_cu_0, alpha_cu_1);
+    let c5_alpha2 = fp2_mul_scalar(alpha_sq_0, alpha_sq_1, c[5]);
+    let c6_alpha = fp2_mul_scalar(a0, a1, c[6]);
+    let acc_expected = fp2_add4(
+        tmp1_alpha3[0], tmp1_alpha3[1],
+        c5_alpha2[0], c5_alpha2[1],
+        c6_alpha[0], c6_alpha[1],
+        c[7], 0
+    );
+    enf s14' = acc_expected[0] when is_hornerbase;
+    enf s15' = acc_expected[1] when is_hornerbase;
 
     # ------------------------------------------------------------------------------------------
     # HORNEREXT
@@ -134,16 +151,54 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let tmp0 = h4;
     let tmp1 = h5;
 
-    # Hornerext coefficients: c_i = (s2i, s2i+1) in the base field.
+    # Hornerext coefficients: c_i = (c[2i], c[2i+1]) in the base field.
     # acc_tmp = acc·α² + c0·α + c1
-    enf tmp0 = (acc0 * alpha_sq_0 + acc1 * (7 * alpha_sq_1)
-        + s0 * a0 + 7 * s1 * a1 + s2) when is_hornerext;
-    enf tmp1 = (acc1 * alpha_sq_0 + acc0 * alpha_sq_1
-        + s1 * a0 + s0 * a1 + s3) when is_hornerext;
+    let acc_alpha2_ext = fp2_mul(acc0, acc1, alpha_sq_0, alpha_sq_1);
+    let c0_alpha_ext = fp2_mul(a0, a1, c[0], c[1]);
+    let tmp_expected = fp2_add3(
+        acc_alpha2_ext[0], acc_alpha2_ext[1],
+        c0_alpha_ext[0], c0_alpha_ext[1],
+        c[2], c[3]
+    );
+    enf tmp0 = tmp_expected[0] when is_hornerext;
+    enf tmp1 = tmp_expected[1] when is_hornerext;
 
     # acc' = acc_tmp·α² + c2·α + c3
-    enf s14' = (tmp0 * alpha_sq_0 + tmp1 * (7 * alpha_sq_1)
-        + s4 * a0 + 7 * s5 * a1 + s6) when is_hornerext;
-    enf s15' = (tmp1 * alpha_sq_0 + tmp0 * alpha_sq_1
-        + s5 * a0 + s4 * a1 + s7) when is_hornerext;
+    let tmp_alpha2_ext = fp2_mul(tmp0, tmp1, alpha_sq_0, alpha_sq_1);
+    let c2_alpha_ext = fp2_mul(a0, a1, c[4], c[5]);
+    let acc_expected_ext = fp2_add3(
+        tmp_alpha2_ext[0], tmp_alpha2_ext[1],
+        c2_alpha_ext[0], c2_alpha_ext[1],
+        c[6], c[7]
+    );
+    enf s14' = acc_expected_ext[0] when is_hornerext;
+    enf s15' = acc_expected_ext[1] when is_hornerext;
+}
+
+# ------------------------------------------------------------------------------------------
+# Fp2 helpers (u^2 = 7)
+# ------------------------------------------------------------------------------------------
+fn fp2_mul(a0: felt, a1: felt, b0: felt, b1: felt) -> felt[2] {
+    return [a0 * b0 + 7 * a1 * b1, a0 * b1 + a1 * b0];
+}
+
+fn fp2_square(a0: felt, a1: felt) -> felt[2] {
+    return [a0^2 + 7 * a1^2, 2 * a0 * a1];
+}
+
+fn fp2_mul_scalar(a0: felt, a1: felt, b: felt) -> felt[2] {
+    return [a0 * b, a1 * b];
+}
+
+fn fp2_add3(a0: felt, a1: felt, b0: felt, b1: felt, c0: felt, c1: felt) -> felt[2] {
+    return [a0 + b0 + c0, a1 + b1 + c1];
+}
+
+fn fp2_add4(
+    a0: felt, a1: felt,
+    b0: felt, b1: felt,
+    c0: felt, c1: felt,
+    d0: felt, d1: felt
+) -> felt[2] {
+    return [a0 + b0 + c0 + d0, a1 + b1 + c1 + d1];
 }
