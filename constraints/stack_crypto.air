@@ -8,12 +8,13 @@
 
 mod stack_crypto
 use flags::*;
+use utils::*;
 
 ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
          stack_b0_unused, stack_b1_unused, stack_h0_unused] = stack;
 
-    let [system_clk_unused, system_ctx_unused, system_fn_hash_0_unused, system_fn_hash_1_unused,
+    let [system_clk, system_ctx, system_fn_hash_0_unused, system_fn_hash_1_unused,
          system_fn_hash_2_unused, system_fn_hash_3_unused] = system;
 
     # b0..b6 are the 7 opcode bits (LSB -> MSB) used by op flag helpers.
@@ -51,6 +52,12 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     let is_cryptostream = flag_cryptostream(op_bits, e1);
     let is_hornerbase = flag_hornerbase(op_bits, e0);
     let is_hornerext = flag_hornerext(op_bits, e0);
+    let is_logprecompile = flag_logprecompile(op_bits, e0);
+    let is_hperm = flag_hperm(op_bits, e0);
+    let is_mpverify = flag_mpverify(op_bits, e0);
+    let is_pipe = flag_pipe(op_bits, e0);
+    let is_mstream = flag_mstream(op_bits, e0);
+    let is_mrupdate = flag_mrupdate(op_bits, e1);
 
     # Horner coefficients: c0..c7 = s0..s7.
     let c = [s0, s1, s2, s3, s4, s5, s6, s7];
@@ -75,6 +82,10 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     # Positions 14-15: Unchanged
     let cryptostream_keep_tail = [s14' - s14, s15' - s15];
     enf cryptostream_keep_tail[i] = 0 for i in 0..2 when is_cryptostream;
+
+    # Plaintext = ciphertext - rate (used for memory reads).
+    let p0 = s0' - s0; let p1 = s1' - s1; let p2 = s2' - s2; let p3 = s3' - s3;
+    let p4 = s4' - s4; let p5 = s5' - s5; let p6 = s6' - s6; let p7 = s7' - s7;
 
     # ------------------------------------------------------------------------------------------
     # HORNERBASE
@@ -173,6 +184,129 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     );
     enf s14' = acc_expected_ext[0] when is_hornerext;
     enf s15' = acc_expected_ext[1] when is_hornerext;
+
+    # ------------------------------------------------------------------------------------------
+    # LOG PRECOMPILE (hash-kernel bus)
+    # ------------------------------------------------------------------------------------------
+    # Hash-kernel bus message layout for LOGPRECOMPILE:
+    # label + cap_prev (remove) or label + cap_next (insert).
+    let lp_cap_prev0 = h1;
+    let lp_cap_prev1 = h2;
+    let lp_cap_prev2 = h3;
+    let lp_cap_prev3 = h4;
+    bus_5_v_table.remove(LOGPRECOMPILE, lp_cap_prev0, lp_cap_prev1, lp_cap_prev2, lp_cap_prev3)
+        when is_logprecompile;
+    bus_5_v_table.insert(LOGPRECOMPILE, s8', s9', s10', s11') when is_logprecompile;
+
+    # ------------------------------------------------------------------------------------------
+    # CHIPLETS BUS REQUESTS
+    # ------------------------------------------------------------------------------------------
+    let helper_addr = h0;
+
+    # HPERM requests.
+    let hperm_input_label = HASHERLINEARHASH + 16;
+    let hperm_output_label = HASHERRETURNSTATE + 32;
+    bus_6_chiplets_bus.remove(
+        hperm_input_label,
+        helper_addr,
+        0,
+        s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
+    ) when is_hperm;
+    bus_6_chiplets_bus.remove(
+        hperm_output_label,
+        helper_addr + 31,
+        0,
+        s0', s1', s2', s3', s4', s5', s6', s7', s8', s9', s10', s11'
+    ) when is_hperm;
+
+    # MPVERIFY requests.
+    let mpverify_input_label = HASHERMPVERIFY + 16;
+    let mpverify_output_label = HASHERRETURNHASH + 32;
+    bus_6_chiplets_bus.remove(
+        mpverify_input_label,
+        helper_addr,
+        s5,
+        s0, s1, s2, s3, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mpverify;
+    bus_6_chiplets_bus.remove(
+        mpverify_output_label,
+        helper_addr + s4 * 32 - 1,
+        0,
+        s6, s7, s8, s9, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mpverify;
+
+    # MRUPDATE requests.
+    let mrupdate_input_old = HASHERMRUPDATEOLD + 16;
+    let mrupdate_input_new = HASHERMRUPDATENEW + 16;
+    let mrupdate_output = HASHERRETURNHASH + 32;
+    bus_6_chiplets_bus.remove(
+        mrupdate_input_old,
+        helper_addr,
+        s5,
+        s0, s1, s2, s3, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mrupdate;
+    bus_6_chiplets_bus.remove(
+        mrupdate_output,
+        helper_addr + s4 * 32 - 1,
+        0,
+        s6, s7, s8, s9, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mrupdate;
+    bus_6_chiplets_bus.remove(
+        mrupdate_input_new,
+        helper_addr + s4 * 32,
+        s5,
+        s10, s11, s12, s13, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mrupdate;
+    bus_6_chiplets_bus.remove(
+        mrupdate_output,
+        helper_addr + s4 * 64 - 1,
+        0,
+        s0', s1', s2', s3', 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mrupdate;
+
+    # PIPE/MSTREAM/CRYPTOSTREAM memory requests.
+    bus_6_chiplets_bus.remove(MEMWRITEWORD, system_ctx, s12, system_clk, s0', s1', s2', s3')
+        when is_pipe;
+    bus_6_chiplets_bus.remove(MEMWRITEWORD, system_ctx, s12 + 4, system_clk, s4', s5', s6', s7')
+        when is_pipe;
+
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s12, system_clk, s0', s1', s2', s3')
+        when is_mstream;
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s12 + 4, system_clk, s4', s5', s6', s7')
+        when is_mstream;
+
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s12, system_clk, p0, p1, p2, p3)
+        when is_cryptostream;
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s12 + 4, system_clk, p4, p5, p6, p7)
+        when is_cryptostream;
+    bus_6_chiplets_bus.remove(MEMWRITEWORD, system_ctx, s13, system_clk, s0', s1', s2', s3')
+        when is_cryptostream;
+    bus_6_chiplets_bus.remove(MEMWRITEWORD, system_ctx, s13 + 4, system_clk, s4', s5', s6', s7')
+        when is_cryptostream;
+
+    # Horner memory requests (evaluation point reads).
+    bus_6_chiplets_bus.remove(MEMREADELEMENT, system_ctx, s13, system_clk, h0) when is_hornerbase;
+    bus_6_chiplets_bus.remove(MEMREADELEMENT, system_ctx, s13 + 1, system_clk, h1)
+        when is_hornerbase;
+
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s13, system_clk, h0, h1, h2, h3)
+        when is_hornerext;
+
+    # LOGPRECOMPILE hasher requests.
+    let logprecompile_input = HASHERLINEARHASH + 16;
+    let logprecompile_output = HASHERRETURNSTATE + 32;
+    bus_6_chiplets_bus.remove(
+        logprecompile_input,
+        helper_addr,
+        0,
+        s0, s1, s2, s3, s4, s5, s6, s7, lp_cap_prev0, lp_cap_prev1, lp_cap_prev2, lp_cap_prev3
+    ) when is_logprecompile;
+    bus_6_chiplets_bus.remove(
+        logprecompile_output,
+        helper_addr + 31,
+        0,
+        s0', s1', s2', s3', s4', s5', s6', s7', s8', s9', s10', s11'
+    ) when is_logprecompile;
 }
 
 # ------------------------------------------------------------------------------------------
