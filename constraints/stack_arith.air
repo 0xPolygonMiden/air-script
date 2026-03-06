@@ -1,0 +1,192 @@
+##########################################################################################
+# STACK ARITHMETIC/U32 CONSTRAINTS MODULE
+##########################################################################################
+#
+# Enforces field arithmetic ops (add/neg/mul/inv/incr/not/and/or/eq/eqz/expacc/ext2mul) and u32
+# arithmetic ops (split/add/add3/sub/mul/madd/div/assert2). Tagging is applied at the call
+# site in the main module.
+##########################################################################################
+
+mod stack_arith
+use flags::*;
+use utils::*;
+
+ev stack_arith_transition([stack[19], decoder[24], system[6]]) {
+    let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
+         stack_b0_unused, stack_b1_unused, stack_h0_unused] = stack;
+
+    let [system_clk_unused, system_ctx_unused, system_fn_hash_0_unused, system_fn_hash_1_unused,
+         system_fn_hash_2_unused, system_fn_hash_3_unused] = system;
+
+    # b0..b6 are the 7 opcode bits (LSB -> MSB) used by op flag helpers.
+    # h0..h5 are user op helper registers. Their meaning depends on the active op:
+    # - h0 is used as an inverse witness (EQ/EQZ) or exp_val (EXPACC),
+    # - h1..h4 hold u32 limbs / range-check witnesses for u32 ops.
+    # h5 is currently unused in this module.
+    let [
+        d0_unused,
+        b0,
+        b1,
+        b2,
+        b3,
+        b4,
+        b5,
+        b6,
+        d8_unused,
+        d9_unused,
+        h0,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5_unused,
+        d16_unused,
+        d17_unused,
+        d18_unused,
+        d19_unused,
+        d20_unused,
+        d21_unused,
+        d22_unused,
+        d23_unused
+    ] = decoder;
+
+    let op_bits = [b0, b1, b2, b3, b4, b5, b6];
+
+    let is_add = flag_add(op_bits);
+    let is_neg = flag_neg(op_bits);
+    let is_mul = flag_mul(op_bits);
+    let is_inv = flag_inv(op_bits);
+    let is_incr = flag_incr(op_bits);
+    let is_not = flag_not(op_bits);
+    let is_and = flag_and(op_bits);
+    let is_or = flag_or(op_bits);
+    let is_eq = flag_eq(op_bits);
+    let is_eqz = flag_eqz(op_bits);
+    let is_expacc = flag_expacc(op_bits);
+    let is_ext2mul = flag_ext2mul(op_bits);
+
+    let is_u32add = flag_u32add(op_bits);
+    let is_u32sub = flag_u32sub(op_bits);
+    let is_u32mul = flag_u32mul(op_bits);
+    let is_u32div = flag_u32div(op_bits);
+    let is_u32split = flag_u32split(op_bits);
+    let is_u32assert2 = flag_u32assert2(op_bits);
+    let is_u32add3 = flag_u32add3(op_bits);
+    let is_u32madd = flag_u32madd(op_bits);
+
+    # ------------------------------------------------------------------------------------------
+    # FIELD OPS
+    # ------------------------------------------------------------------------------------------
+    # ADD/NEG/MUL/INV/INCR
+    enf s0' = s0 + s1 when is_add;
+    enf s0' + s0 = 0 when is_neg;
+    enf s0' = s0 * s1 when is_mul;
+    enf s0' * s0 = 1 when is_inv;
+    enf s0' = s0 + 1 when is_incr;
+
+    # NOT: binary check + result
+    enf s0^2 = s0 when is_not;
+    enf s0 + s0' = 1 when is_not;
+
+    # AND: binary checks + result
+    enf s0^2 = s0 when is_and;
+    enf s1^2 = s1 when is_and;
+    enf s0' = s0 * s1 when is_and;
+
+    # OR: binary checks + result
+    enf s0^2 = s0 when is_or;
+    enf s1^2 = s1 when is_or;
+    enf s0' = s0 + s1 - s0 * s1 when is_or;
+
+    # EQ: zero-product + result.
+    # If s0 != s1, h0 serves as 1/(s0 - s1) and forces s0' = 0. If s0 == s1, s0' = 1.
+    let eq_diff = s0 - s1;
+    enf eq_diff * s0' = 0 when is_eq;
+    enf s0' = 1 - eq_diff * h0 when is_eq;
+
+    # EQZ: zero-product + result.
+    # If s0 != 0, h0 serves as 1/s0 and forces s0' = 0. If s0 == 0, s0' = 1.
+    enf s0 * s0' = 0 when is_eqz;
+    enf s0' = 1 - s0 * h0 when is_eqz;
+
+    # EXPACC: square, val, acc, shift, bit binary.
+    # h0 encodes exp_val = 1 + (exp - 1) * exp_bit for the current exp_bit.
+    let exp = s1;
+    let acc = s2;
+    let exp_bit = s0';
+    let exp_next = s1';
+    let acc_next = s2';
+    let exp_b = s3;
+    let exp_b_next = s3';
+    let exp_val = h0;
+    enf exp_next = exp * exp when is_expacc;
+    enf exp_val = 1 + (exp - 1) * exp_bit when is_expacc;
+    enf acc_next = acc * exp_val when is_expacc;
+    enf exp_b = exp_b_next * 2 + exp_bit when is_expacc;
+    enf exp_bit^2 = exp_bit when is_expacc;
+
+    # EXT2MUL: preserve b0/b1 and compute product
+    let ext_b0 = s0;
+    let ext_b1 = s1;
+    let ext_a0 = s2;
+    let ext_a1 = s3;
+    let ext_d0 = s0';
+    let ext_d1 = s1';
+    let ext_c0 = s2';
+    let ext_c1 = s3';
+    let ext_a0_b0 = ext_a0 * ext_b0;
+    let ext_a1_b1 = ext_a1 * ext_b1;
+    enf ext_d0 = ext_b0 when is_ext2mul;
+    enf ext_d1 = ext_b1 when is_ext2mul;
+    enf ext_c0 = ext_a0_b0 + 7 * ext_a1_b1 when is_ext2mul;
+    enf ext_c1 = ext_a0 * ext_b1 + ext_a1 * ext_b0 when is_ext2mul;
+
+    # ------------------------------------------------------------------------------------------
+    # U32 OPS
+    # h0..h3 store 16-bit limbs for v_lo and v_hi; h4 is the range-check witness.
+    # ------------------------------------------------------------------------------------------
+    let u32_v_lo = h1 * 2^16 + h0;
+    let u32_v_hi = h3 * 2^16 + h2;
+    let u32_v48 = h2 * 2^32 + u32_v_lo;
+    let u32_v64 = h3 * 2^48 + u32_v48;
+
+    # Element validity check for u32split/u32mul/u32madd.
+    # When v_hi < 2^32, u32_v_hi_comp = 0; otherwise h4 must be the inverse of (2^32 - 1 - v_hi).
+    let u32_split_mul_madd = is_u32split + is_u32mul + is_u32madd;
+    let u32_v_hi_comp = 1 - h4 * ((2^32 - 1) - u32_v_hi);
+    enf u32_v_hi_comp * u32_v_lo = 0 when u32_split_mul_madd;
+
+    # Limb aggregation for outputs (lo on top, hi below)
+    let u32_two_outputs = is_u32split + is_u32add + is_u32add3 + is_u32mul + is_u32madd;
+    enf s0' = u32_v_lo when u32_two_outputs;
+    enf s1' = u32_v_hi when u32_two_outputs;
+
+    # U32SPLIT
+    enf s0 - u32_v64 = 0 when is_u32split;
+
+    # U32ADD
+    enf s0 + s1 - u32_v48 = 0 when is_u32add;
+
+    # U32ADD3
+    enf s0 + s1 + s2 - u32_v48 = 0 when is_u32add3;
+
+    # U32SUB (b - a, with a on top)
+    enf s1 = s0 + s1' - s0' * 2^32 when is_u32sub;
+    enf s0' * (s0' - 1) = 0 when is_u32sub;
+    enf s1' = u32_v_lo when is_u32sub;
+
+    # U32MUL
+    enf s0 * s1 = u32_v64 when is_u32mul;
+
+    # U32MADD
+    enf s0 * s1 + s2 = u32_v64 when is_u32madd;
+
+    # U32DIV
+    enf s1 = s0 * s1' + s0' when is_u32div;
+    enf s1 = s1' + u32_v_lo when is_u32div;
+    enf s0 = s0' + u32_v_hi + 1 when is_u32div;
+
+    # U32ASSERT2
+    enf s0' = u32_v_hi when is_u32assert2;
+    enf s1' = u32_v_lo when is_u32assert2;
+}

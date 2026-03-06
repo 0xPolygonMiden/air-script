@@ -154,6 +154,14 @@ ev ace_chiplet([chiplets[20]]) {
     enf ace_sstart_next = 1 when ace_first_row_gate;
 
     # -------------------------------------------------------------------------
+    # Chiplets bus response (ACE_INIT).
+    # -------------------------------------------------------------------------
+    let ace_n_eval_rows = ace_n_eval + 1;
+    let ace_nread = ace_id0 + 1 - ace_n_eval_rows;
+    bus_6_chiplets_bus.insert(ACEINIT, ace_clk, ace_ctx, ace_ptr, ace_nread, ace_n_eval_rows)
+        when (ace_flag * ace_sstart);
+
+    # -------------------------------------------------------------------------
     # Wiring bus operations.
     # -------------------------------------------------------------------------
     # Wiring bus verifies the circuit wiring by ensuring inserted nodes are later consumed
@@ -180,4 +188,27 @@ ev ace_chiplet([chiplets[20]]) {
         with ace_consume_gate;
     bus_7_wiring_bus.insert(ace_clk, ace_ctx, ace_id0, ace_v0_0, ace_v0_1)
         with (ace_flag * ace_m0_eval);
+
+    # -------------------------------------------------------------------------
+    # Hash-kernel bus operations (ACE memory reads).
+    # -------------------------------------------------------------------------
+    # READ rows fetch two extension elements (word read).
+    # Message layout: label + ctx + ptr + clk + v0 + v1.
+    bus_5_v_table.remove(
+        MEMREADWORD,
+        ace_ctx,
+        ace_ptr,
+        ace_clk,
+        ace_v0_0,
+        ace_v0_1,
+        ace_v1_0,
+        ace_v1_1
+    ) when (ace_flag * ace_f_read);
+
+    # EVAL rows fetch the instruction element (element read).
+    # Message layout: label + ctx + ptr + clk + instruction.
+    let ace_instruction =
+        ace_id1 + ace_id2 * ACEINSTRUCTIONIDONEOFFSET + (ace_op + 1) * ACEINSTRUCTIONIDTWOOFFSET;
+    bus_5_v_table.remove(MEMREADELEMENT, ace_ctx, ace_ptr, ace_clk, ace_instruction)
+        when (ace_flag * ace_f_eval);
 }
