@@ -28,6 +28,11 @@ pub struct OodConfig {
     pub main_filled: usize,
     pub ungated_transition_tags: &'static [usize],
     pub periodic_column_order: &'static [&'static str],
+    /// Number of public values to consume from the RNG (must match miden-vm).
+    pub num_public_values: usize,
+    /// Mapping from air-script public input names to their offset in the public values array.
+    /// E.g., `("stack_inputs", 4)` means `stack_inputs[i]` maps to `pv[4 + i]`.
+    pub public_input_layout: &'static [(&'static str, usize)],
 }
 
 /// Inputs needed to run an OOD parity test.
@@ -60,8 +65,48 @@ const DEFAULT_AUX_TRACE_RAND_ELEMENTS: usize = 16;
 const DEFAULT_EXPECTED_MAIN_WIDTH: usize = 72;
 const DEFAULT_EXPECTED_AUX_WIDTH: usize = 8;
 const DEFAULT_MAIN_FILLED: usize = 71;
-const DEFAULT_UNGATED_TRANSITION_TAGS: &'static [usize] = &[];
-const DEFAULT_PERIODIC_COLUMN_ORDER: &'static [&'static str] = &[];
+const DEFAULT_UNGATED_TRANSITION_TAGS: &'static [usize] = &[
+    // These tags sit in the transition domain (they touch next-row values), but their
+    // constraints already multiply by the intended row gate (k_transition * bitwise_flag).
+    // Multiplying by the global transition gate again would change the intended evaluation.
+    // - 346: chiplets.bitwise.op.stability
+    // - 358: chiplets.bitwise.input.transition (a aggregate)
+    // - 359: chiplets.bitwise.input.transition (b aggregate)
+    // - 360: chiplets.bitwise.output.prev
+    346, 358, 359, 360,
+];
+const DEFAULT_PERIODIC_COLUMN_ORDER: &'static [&'static str] = &[
+    "cycle_row_0",
+    "cycle_row_30",
+    "cycle_row_31",
+    "p2_is_external",
+    "p2_is_internal",
+    "ark_ext_0",
+    "ark_ext_1",
+    "ark_ext_2",
+    "ark_ext_3",
+    "ark_ext_4",
+    "ark_ext_5",
+    "ark_ext_6",
+    "ark_ext_7",
+    "ark_ext_8",
+    "ark_ext_9",
+    "ark_ext_10",
+    "ark_ext_11",
+    "ark_int",
+    "bitwise_k_first",
+    "bitwise_k_transition",
+];
+
+/// Number of public values to consume from RNG (matches miden-vm: 40).
+/// Layout: [program_hash(4), stack_inputs(16), stack_outputs(16), pc_transcript_state(4)].
+const DEFAULT_NUM_PUBLIC_VALUES: usize = 40;
+
+/// Maps air-script public input names to their offset in the miden-vm public values array.
+const DEFAULT_PUBLIC_INPUT_LAYOUT: &'static [(&'static str, usize)] = &[
+    ("stack_inputs", 4),
+    ("stack_outputs", 20),
+];
 
 /// Parses and lowers AIRScript into AIR for evaluation.
 pub fn generate_air(path: &str) -> Air {
@@ -140,6 +185,8 @@ fn default_config() -> OodConfig {
         main_filled: DEFAULT_MAIN_FILLED,
         ungated_transition_tags: DEFAULT_UNGATED_TRANSITION_TAGS,
         periodic_column_order: DEFAULT_PERIODIC_COLUMN_ORDER,
+        num_public_values: DEFAULT_NUM_PUBLIC_VALUES,
+        public_input_layout: DEFAULT_PUBLIC_INPUT_LAYOUT,
     }
 }
 
@@ -328,6 +375,8 @@ pub struct OodContext {
     periodic_values: BTreeMap<&'static str, Felt>,
     /// Random values consumed by the AIR (alpha, 1, then powers of beta).
     random_values: Vec<QuadGoldilocksOOD>,
+    /// Public input values keyed by (name, index).
+    public_inputs: BTreeMap<(&'static str, usize), Felt>,
     /// First-row selector.
     first_row: QuadGoldilocksOOD,
     /// Last-row selector.
@@ -393,6 +442,24 @@ impl OodContext {
             periodic_values.insert(*name, rng.next_felt());
         }
 
+        // Generate public values from the RNG (matches miden-vm sequence).
+        let pv: Vec<Felt> = (0..config.num_public_values).map(|_| rng.next_felt()).collect();
+        let mut public_inputs = BTreeMap::new();
+        for &(name, offset) in config.public_input_layout {
+            // Determine size from the AIR's public_inputs declaration.
+            if let Some((_, pi)) = air.public_inputs.iter().find(|(id, _)| id.as_str() == name) {
+                let size = match pi {
+                    air_ir::PublicInput::Vector { size, .. } => *size,
+                    air_ir::PublicInput::Table { .. } => {
+                        unimplemented!("variable-length public input '{name}' is not supported in OOD tests");
+                    }
+                };
+                for i in 0..size {
+                    public_inputs.insert((name, i), pv[offset + i]);
+                }
+            }
+        }
+
         let alpha = *randomness.first().expect("randomness missing alpha for bus challenges");
         let beta = *randomness.get(1).expect("randomness missing beta for bus challenges");
 
@@ -416,6 +483,7 @@ impl OodContext {
             aux_rows,
             periodic_values,
             random_values,
+            public_inputs,
             first_row,
             last_row,
             transition,
@@ -571,8 +639,12 @@ fn eval_node(
                     ctx.periodic_values.get(name).copied().expect("periodic column name not found");
                 Some(QuadGoldilocksOOD::from_felt(value))
             },
-            Operation::Value(Value::PublicInput(_)) => {
-                panic!("public inputs are not expected in OOD eval");
+            Operation::Value(Value::PublicInput(pi)) => {
+                let name = pi.name.as_str();
+                let key = ctx.public_inputs.keys().find(|(n, i)| *n == name && *i == pi.index);
+                let value = key.and_then(|k| ctx.public_inputs.get(k))
+                    .unwrap_or_else(|| panic!("public input {name}[{}] not found in OOD context", pi.index));
+                Some(QuadGoldilocksOOD::from_felt(*value))
             },
             Operation::Value(Value::PublicInputTable(_)) => {
                 panic!("public input tables are not expected in OOD eval");

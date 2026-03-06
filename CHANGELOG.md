@@ -19,7 +19,7 @@
 - Fix cross-module constant resolution and comprehension scoping (#526).
 - Add constraints tagging infrastructure in order to cross-check with constraints in `miden-vm` (#539).
 - Optimize MIR→AIR lowering via key interning/caching and preserve tag tracking in expanded constraints (#542).
-- Add system and range checker Miden VM constraints (#540).
+- Added AIR constraints for all Miden VM components: system, range checker, stack, decoder, chiplets, and public inputs (#557).
 
 ## 0.4.0 (2025-06-20)
 

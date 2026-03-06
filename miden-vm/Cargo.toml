@@ -1,5 +1,5 @@
 [package]
-name = "constraints"
+name = "miden-vm"
 version = "0.1.0"
 edition = "2021"
 
