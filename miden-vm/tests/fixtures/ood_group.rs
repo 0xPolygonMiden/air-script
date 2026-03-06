@@ -5,5 +5,5 @@ use crate::helpers::ood::GroupManifest;
 
 /// Entry point for the group of active tags in parity tests.
 pub fn active_group() -> GroupManifest<'static> {
-    GroupManifest::new("miden_vm.air", expected_ood_evals(), &CONSTRAINT_NAMES)
+    GroupManifest::new("constraints/miden_vm.air", expected_ood_evals(), &CONSTRAINT_NAMES)
 }
