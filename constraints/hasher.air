@@ -39,7 +39,7 @@ use utils::*;
 # - Merkle index updates
 # - Merkle absorb behavior
 #
-ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
+ev hash_chiplet([chiplet_s0, s[3], h[12], i, system_clk]) {
     # Hasher rows are selected when the chiplet selector s0 = 0.
     let hash_active = 1 - chiplet_s0;
 
@@ -57,10 +57,13 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
     enf binary_constraint(bit) = 0 for bit in selector_bits when hash_active;
 
     # Flags derived from selector values and cycle markers.
+    let f_bp = get_f_bp(s, cycle_row_0);
     let f_abp = get_f_abp(s, cycle_row_31);
     let f_mpa = get_f_mpa(s, cycle_row_31);
     let f_mva = get_f_mva(s, cycle_row_31);
     let f_mua = get_f_mua(s, cycle_row_31);
+    let f_hout = get_f_hout(s, cycle_row_31);
+    let f_sout = get_f_sout(s, cycle_row_31);
     let f_out = get_f_out(s, cycle_row_31);
     let f_out_next = get_f_out_next(s, cycle_row_30, s[0]', s[1]');
     let f_absorb = f_mpa + f_mva + f_mua;
@@ -147,6 +150,10 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
     let h5 = h[5];
     let h6 = h[6];
     let h7 = h[7];
+    let h8 = h[8];
+    let h9 = h[9];
+    let h10 = h[10];
+    let h11 = h[11];
 
     let h0_next = h[0]';
     let h1_next = h[1]';
@@ -157,6 +164,89 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
     let h6_next = h[6]';
     let h7_next = h[7]';
 
+    ####################################################################################
+    # CHIPLETS BUS RESPONSES
+    ####################################################################################
+    # The hasher bus header uses clk + 1 as the row address (system clk starts at 0).
+    let clk_plus_one = system_clk + 1;
+
+    bus_6_chiplets_bus.insert(
+        HASHERLINEARHASH + 16,
+        clk_plus_one,
+        i,
+        h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11
+    ) when (hash_active * f_bp);
+
+    bus_6_chiplets_bus.insert(
+        HASHERLINEARHASH + 32,
+        clk_plus_one,
+        i,
+        h0_next, h1_next, h2_next, h3_next, h4_next, h5_next, h6_next, h7_next
+    ) when (hash_active * f_abp);
+
+    bus_6_chiplets_bus.insert(
+        HASHERRETURNHASH + 32,
+        clk_plus_one,
+        i,
+        h0, h1, h2, h3
+    ) when (hash_active * f_hout);
+
+    bus_6_chiplets_bus.insert(
+        HASHERRETURNSTATE + 32,
+        clk_plus_one,
+        i,
+        h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11
+    ) when (hash_active * f_sout);
+
+    bus_6_chiplets_bus.insert(
+        HASHERMPVERIFY + 16,
+        clk_plus_one,
+        i,
+        h0, h1, h2, h3
+    ) when (hash_active * f_mp * is_b_zero);
+    bus_6_chiplets_bus.insert(
+        HASHERMPVERIFY + 16,
+        clk_plus_one,
+        i,
+        h4, h5, h6, h7
+    ) when (hash_active * f_mp * is_b_one);
+
+    bus_6_chiplets_bus.insert(
+        HASHERMRUPDATEOLD + 16,
+        clk_plus_one,
+        i,
+        h0, h1, h2, h3
+    ) when (hash_active * f_mv * is_b_zero);
+    bus_6_chiplets_bus.insert(
+        HASHERMRUPDATEOLD + 16,
+        clk_plus_one,
+        i,
+        h4, h5, h6, h7
+    ) when (hash_active * f_mv * is_b_one);
+
+    bus_6_chiplets_bus.insert(
+        HASHERMRUPDATENEW + 16,
+        clk_plus_one,
+        i,
+        h0, h1, h2, h3
+    ) when (hash_active * f_mu * is_b_zero);
+    bus_6_chiplets_bus.insert(
+        HASHERMRUPDATENEW + 16,
+        clk_plus_one,
+        i,
+        h4, h5, h6, h7
+    ) when (hash_active * f_mu * is_b_one);
+
+    ####################################################################################
+    # HASH-KERNEL BUS OPERATIONS (MERKLE SIBLING TABLE)
+    ####################################################################################
+    # These messages populate the hash-kernel virtual table with Merkle sibling entries.
+    # The layout is fixed by the bus spec; unused slots are set to 0.
+    #
+    # Walkthrough:
+    # - MV/MVA insert siblings (old path), MU/MUA remove siblings (new path).
+    # - b=0 uses the right sibling h4..h7, b=1 uses the left sibling h0..h3.
+    # - node index i occupies the index field; all other unused fields are zero.
     bus_5_v_table.insert(
         0, 0, i, 0, 0, 0, 0, h4, h5, h6, h7
     ) when (hash_active * f_mv * is_b_zero);
