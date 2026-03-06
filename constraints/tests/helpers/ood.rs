@@ -28,6 +28,11 @@ pub struct OodConfig {
     pub main_filled: usize,
     pub ungated_transition_tags: &'static [usize],
     pub periodic_column_order: &'static [&'static str],
+    /// Number of public values to consume from the RNG (must match miden-vm).
+    pub num_public_values: usize,
+    /// Mapping from air-script public input names to their offset in the public values array.
+    /// E.g., `("stack_inputs", 4)` means `stack_inputs[i]` maps to `pv[4 + i]`.
+    pub public_input_layout: &'static [(&'static str, usize)],
 }
 
 /// Inputs needed to run an OOD parity test.
@@ -91,6 +96,16 @@ const DEFAULT_PERIODIC_COLUMN_ORDER: &'static [&'static str] = &[
     "ark_int",
     "bitwise_k_first",
     "bitwise_k_transition",
+];
+
+/// Number of public values to consume from RNG (matches miden-vm: 40).
+/// Layout: [program_hash(4), stack_inputs(16), stack_outputs(16), pc_transcript_state(4)].
+const DEFAULT_NUM_PUBLIC_VALUES: usize = 40;
+
+/// Maps air-script public input names to their offset in the miden-vm public values array.
+const DEFAULT_PUBLIC_INPUT_LAYOUT: &'static [(&'static str, usize)] = &[
+    ("stack_inputs", 4),
+    ("stack_outputs", 20),
 ];
 
 /// Parses and lowers AIRScript into AIR for evaluation.
@@ -170,6 +185,8 @@ fn default_config() -> OodConfig {
         main_filled: DEFAULT_MAIN_FILLED,
         ungated_transition_tags: DEFAULT_UNGATED_TRANSITION_TAGS,
         periodic_column_order: DEFAULT_PERIODIC_COLUMN_ORDER,
+        num_public_values: DEFAULT_NUM_PUBLIC_VALUES,
+        public_input_layout: DEFAULT_PUBLIC_INPUT_LAYOUT,
     }
 }
 
@@ -358,6 +375,8 @@ pub struct OodContext {
     periodic_values: BTreeMap<&'static str, Felt>,
     /// Random values consumed by the AIR (alpha, 1, then powers of beta).
     random_values: Vec<QuadGoldilocksOOD>,
+    /// Public input values keyed by (name, index).
+    public_inputs: BTreeMap<(&'static str, usize), Felt>,
     /// First-row selector.
     first_row: QuadGoldilocksOOD,
     /// Last-row selector.
@@ -423,6 +442,22 @@ impl OodContext {
             periodic_values.insert(*name, rng.next_felt());
         }
 
+        // Generate public values from the RNG (matches miden-vm sequence).
+        let pv: Vec<Felt> = (0..config.num_public_values).map(|_| rng.next_felt()).collect();
+        let mut public_inputs = BTreeMap::new();
+        for &(name, offset) in config.public_input_layout {
+            // Determine size from the AIR's public_inputs declaration.
+            if let Some((_, pi)) = air.public_inputs.iter().find(|(id, _)| id.as_str() == name) {
+                let size = match pi {
+                    air_ir::PublicInput::Vector { size, .. } => *size,
+                    air_ir::PublicInput::Table { size, .. } => *size,
+                };
+                for i in 0..size {
+                    public_inputs.insert((name, i), pv[offset + i]);
+                }
+            }
+        }
+
         let alpha = *randomness.first().expect("randomness missing alpha for bus challenges");
         let beta = *randomness.get(1).expect("randomness missing beta for bus challenges");
 
@@ -446,6 +481,7 @@ impl OodContext {
             aux_rows,
             periodic_values,
             random_values,
+            public_inputs,
             first_row,
             last_row,
             transition,
@@ -601,8 +637,12 @@ fn eval_node(
                     ctx.periodic_values.get(name).copied().expect("periodic column name not found");
                 Some(QuadGoldilocksOOD::from_felt(value))
             },
-            Operation::Value(Value::PublicInput(_)) => {
-                panic!("public inputs are not expected in OOD eval");
+            Operation::Value(Value::PublicInput(pi)) => {
+                let name = pi.name.as_str();
+                let key = ctx.public_inputs.keys().find(|(n, i)| *n == name && *i == pi.index);
+                let value = key.and_then(|k| ctx.public_inputs.get(k))
+                    .unwrap_or_else(|| panic!("public input {name}[{}] not found in OOD context", pi.index));
+                Some(QuadGoldilocksOOD::from_felt(*value))
             },
             Operation::Value(Value::PublicInputTable(_)) => {
                 panic!("public input tables are not expected in OOD eval");
