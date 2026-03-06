@@ -53,21 +53,6 @@ ev is_unchanged([column]) {
 # LOGICAL OPERATION HELPERS
 ##########################################################################################
 
-# Binary negation function - computes logical NOT in finite field
-#
-# This is usually combined with another constraint to ensure booleaness
-#
-# CONSTRAINT DEGREE: 1
-#
-# USAGE EXAMPLES:
-# ```air
-# let not_flag = binary_not(flag);           // Simple negation
-# let condition = flag * binary_not(other);  // AND NOT pattern
-# ```
-fn binary_not(a: felt) -> felt {
-    return 1 - a;
-}
-
 # Binary constraint helper - returns 0 if input is binary (0 or 1), non-zero otherwise
 #
 # This function computes flag² - flag, which equals:

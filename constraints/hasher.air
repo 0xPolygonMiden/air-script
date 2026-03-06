@@ -79,7 +79,7 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i]) {
     enf (1 - s[0]) * s[1] = 0 when hash_active * cycle_row_31;
 
     # -------------------------------------------------------------------------
-    # Boundary constraints
+    # Cycle boundary constraints
     # -------------------------------------------------------------------------
     # ABP keeps capacity lanes unchanged.
     let cap_next = [h[8]', h[9]', h[10]', h[11]'];
@@ -210,19 +210,19 @@ ev poseidon2_permutation([chiplet_s0, h[12]]) {
 # f_bp: Begin Permutation flag (1,0,0) on cycle_row_0
 # Initiates single permutation, 2-to-1 hash, or linear hash computation.
 fn get_f_bp(s: felt[3], row0: felt) -> felt {
-    return row0 & s[0] & (1 - s[1]) & (1 - s[2]);
+    return row0 & s[0] & !s[1] & !s[2];
 }
 
 # f_mp: Merkle Path verification flag (1,0,1) on cycle_row_0
 # Initiates standard Merkle path verification computation.
 fn get_f_mp(s: felt[3], row0: felt) -> felt {
-    return row0 & s[0] & (1 - s[1]) & s[2];
+    return row0 & s[0] & !s[1] & s[2];
 }
 
 # f_mv: Merkle path Verification for "old" node flag (1,1,0) on cycle_row_0
 # Begins verification for old leaf value during Merkle root update computation.
 fn get_f_mv(s: felt[3], row0: felt) -> felt {
-    return row0 & s[0] & s[1] & (1 - s[2]);
+    return row0 & s[0] & s[1] & !s[2];
 }
 
 # f_mu: Merkle path verification for "new" node flag (1,1,1) on cycle_row_0
@@ -234,19 +234,19 @@ fn get_f_mu(s: felt[3], row0: felt) -> felt {
 # f_abp: Absorb elements for linear hash flag (1,0,0) on cycle_row_31
 # Absorbs next set of elements into hasher state during linear hash computation.
 fn get_f_abp(s: felt[3], row31: felt) -> felt {
-    return row31 & s[0] & (1 - s[1]) & (1 - s[2]);
+    return row31 & s[0] & !s[1] & !s[2];
 }
 
 # f_mpa: Merkle Path Absorb flag (1,0,1) on cycle_row_31
 # Absorbs next Merkle path node during standard verification computation.
 fn get_f_mpa(s: felt[3], row31: felt) -> felt {
-    return row31 & s[0] & (1 - s[1]) & s[2];
+    return row31 & s[0] & !s[1] & s[2];
 }
 
 # f_mva: Merkle path absorb for "old" node flag (1,1,0) on cycle_row_31
 # Absorbs next node during "old" leaf verification (Merkle root update computation).
 fn get_f_mva(s: felt[3], row31: felt) -> felt {
-    return row31 & s[0] & s[1] & (1 - s[2]);
+    return row31 & s[0] & s[1] & !s[2];
 }
 
 # f_mua: Merkle path absorb for "new" node flag (1,1,1) on cycle_row_31
@@ -257,24 +257,24 @@ fn get_f_mua(s: felt[3], row31: felt) -> felt {
 
 # Flag f_out is set to 1 when either f_hout = 1 or f_sout = 1 in the current row.
 fn get_f_out(s: felt[3], row31: felt) -> felt {
-    return row31 & (1 - s[0]) & (1 - s[1]);
+    return row31 & !s[0] & !s[1];
 }
 
 # Flag f_out_next is set to 1 when either f_hout = 1 or f_sout = 1 in the next row.
 fn get_f_out_next(s: felt[3], row30: felt, s0_next: felt, s1_next: felt) -> felt {
-    return row30 & (1 - s0_next) & (1 - s1_next);
+    return row30 & !s0_next & !s1_next;
 }
 
 # f_hout: Hash Output flag (0,0,0) on cycle_row_31
 # Returns the 4-element hash result (h0-h3)
 fn get_f_hout(s: felt[3], row31: felt) -> felt {
-    return row31 & (1 - s[0]) & (1 - s[1]) & (1 - s[2]);
+    return row31 & !s[0] & !s[1] & !s[2];
 }
 
 # f_sout: State Output flag (0,0,1) on cycle_row_31
 # Returns the entire 12-element hasher state
 fn get_f_sout(s: felt[3], row31: felt) -> felt {
-    return row31 & (1 - s[0]) & (1 - s[1]) & s[2];
+    return row31 & !s[0] & !s[1] & s[2];
 }
 
 ##########################################################################################
@@ -287,6 +287,10 @@ fn pow7(x: felt) -> felt {
     return x4 * x2 * x;
 }
 
+# Multiplies a 4-element vector by the Poseidon2 4x4 MDS matrix M4.
+# This is the core building block of the external linear layer: the full 12x12
+# matrix is applied as three independent M4 multiplications on 4-element chunks,
+# followed by a cross-chunk sum (see poseidon2_init_state / poseidon2_external_state).
 fn matmul_m4(input: felt[4]) -> felt[4] {
     let a = input[0];
     let b = input[1];
