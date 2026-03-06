@@ -44,15 +44,15 @@ ev kernel_rom_chiplet([chiplets[10]]) {
     # -------------------------------------------------------------------------
     # Selector constraint.
     # -------------------------------------------------------------------------
-    enf kr_sfirst * (kr_sfirst - 1) = 0 when kernel_rom_flag;
+    enf kr_sfirst^2 = kr_sfirst when kernel_rom_flag;
 
     # -------------------------------------------------------------------------
     # Digest contiguity.
     # -------------------------------------------------------------------------
     # When sfirst' = 0 (not a new digest block) and s4' = 0 (not exiting kernel ROM),
     # the digest values must remain unchanged.
-    let kr_not_exiting = 1 - s4_next;
-    let kr_not_new_block = 1 - kr_sfirst_next;
+    let kr_not_exiting = !s4_next;
+    let kr_not_new_block = !kr_sfirst_next;
     let kr_gate = kernel_rom_flag * kr_not_exiting * kr_not_new_block;
     let kr_r = [kr_r0, kr_r1, kr_r2, kr_r3];
     let kr_r_next = [kr_r0_next, kr_r1_next, kr_r2_next, kr_r3_next];
@@ -62,7 +62,7 @@ ev kernel_rom_chiplet([chiplets[10]]) {
     # First row constraint.
     # -------------------------------------------------------------------------
     # When transitioning from ACE to kernel ROM, the first row must set sfirst' = 1.
-    let kernel_rom_next = s3_next * (1 - s4_next);
+    let kernel_rom_next = s3_next * !s4_next;
     let kr_first_row_gate = ace_flag * kernel_rom_next;
-    enf kr_first_row_gate * (kr_sfirst_next - 1) = 0;
+    enf kr_sfirst_next = 1 when kr_first_row_gate;
 }
