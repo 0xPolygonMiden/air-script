@@ -6,8 +6,8 @@
 # efficient execution and proving of arbitrary computations. This AIR specification defines
 # the arithmetic constraints that govern the VM's execution.
 #
-# STATUS: Partial (all core constraints implemented; missing boundary constraints for
-# the public input/output operand stack).
+# STATUS: Missing constraints for memory range checks and updated siblings table
+#          treatment.
 #
 # REFERENCES:
 # - Miden VM implementation: https://0xmiden.github.io/miden-vm/
@@ -17,7 +17,7 @@
 def MidenVM
 
 # Constraint IDs must cover 0..=CURRENT_MAX_ID with no duplicates.
-const CURRENT_MAX_ID = 416;
+const CURRENT_MAX_ID = 448;
 
 use flags::*;
 use system::*;
@@ -48,7 +48,8 @@ trace_columns {
 ##########################################################################################
 
 public_inputs {
-    dummy: [1],
+    stack_inputs: [16],
+    stack_outputs: [16],
 }
 
 ##########################################################################################
@@ -100,6 +101,42 @@ boundary_constraints {
 
     # Decoder in-span boundary (sp starts at 0)
     @tag(216) enf decoder[16].first = 0;
+
+    # Stack public inputs: operand stack must match declared inputs at start
+    @tag(417) enf stack[0].first = stack_inputs[0];
+    @tag(418) enf stack[1].first = stack_inputs[1];
+    @tag(419) enf stack[2].first = stack_inputs[2];
+    @tag(420) enf stack[3].first = stack_inputs[3];
+    @tag(421) enf stack[4].first = stack_inputs[4];
+    @tag(422) enf stack[5].first = stack_inputs[5];
+    @tag(423) enf stack[6].first = stack_inputs[6];
+    @tag(424) enf stack[7].first = stack_inputs[7];
+    @tag(425) enf stack[8].first = stack_inputs[8];
+    @tag(426) enf stack[9].first = stack_inputs[9];
+    @tag(427) enf stack[10].first = stack_inputs[10];
+    @tag(428) enf stack[11].first = stack_inputs[11];
+    @tag(429) enf stack[12].first = stack_inputs[12];
+    @tag(430) enf stack[13].first = stack_inputs[13];
+    @tag(431) enf stack[14].first = stack_inputs[14];
+    @tag(432) enf stack[15].first = stack_inputs[15];
+
+    # Stack public outputs: operand stack must match declared outputs at end
+    @tag(433) enf stack[0].last = stack_outputs[0];
+    @tag(434) enf stack[1].last = stack_outputs[1];
+    @tag(435) enf stack[2].last = stack_outputs[2];
+    @tag(436) enf stack[3].last = stack_outputs[3];
+    @tag(437) enf stack[4].last = stack_outputs[4];
+    @tag(438) enf stack[5].last = stack_outputs[5];
+    @tag(439) enf stack[6].last = stack_outputs[6];
+    @tag(440) enf stack[7].last = stack_outputs[7];
+    @tag(441) enf stack[8].last = stack_outputs[8];
+    @tag(442) enf stack[9].last = stack_outputs[9];
+    @tag(443) enf stack[10].last = stack_outputs[10];
+    @tag(444) enf stack[11].last = stack_outputs[11];
+    @tag(445) enf stack[12].last = stack_outputs[12];
+    @tag(446) enf stack[13].last = stack_outputs[13];
+    @tag(447) enf stack[14].last = stack_outputs[14];
+    @tag(448) enf stack[15].last = stack_outputs[15];
 
     # Leave bus boundaries unconstrained as these will be handled using the uniform
     # treatment for auxiliary column boundary constraints, i.e.,

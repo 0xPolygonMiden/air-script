@@ -77,7 +77,12 @@ pub const TAG_WIRING_BUS_BASE: usize = TAG_CHIPLETS_BUS_BASE + TAG_CHIPLETS_BUS_
 /// Number of wiring bus constraints in this group.
 pub const TAG_WIRING_BUS_COUNT: usize = 1;
 
+/// Base ID for the public inputs boundary constraint group.
+pub const TAG_PUBLIC_INPUTS_BASE: usize = TAG_WIRING_BUS_BASE + TAG_WIRING_BUS_COUNT;
+/// Number of public input boundary constraints (16 stack inputs + 16 stack outputs).
+pub const TAG_PUBLIC_INPUTS_COUNT: usize = 32;
+
 /// Highest constraint ID (zero-based) for the current group set.
-pub const CURRENT_MAX_ID: usize = TAG_WIRING_BUS_BASE + TAG_WIRING_BUS_COUNT - 1;
+pub const CURRENT_MAX_ID: usize = TAG_PUBLIC_INPUTS_BASE + TAG_PUBLIC_INPUTS_COUNT - 1;
 /// Total tagged constraints in the current group set.
 pub const TOTAL_TAGS: usize = CURRENT_MAX_ID + 1;
