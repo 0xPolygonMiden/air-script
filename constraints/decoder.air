@@ -68,13 +68,13 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     enf sp * (sp - 1) = 0;
     # After SPAN/RESPAN, the next row must be inside a span.
     let span_next = [is_span, is_respan];
-    enf span_next[i] * (1 - sp') = 0 for i in 0..2;
+    enf sn * (1 - sp') = 0 for sn in span_next;
 
     # ---------------------------------------------------------------------------
     # Op bits must be binary.
     # ---------------------------------------------------------------------------
     # Each opcode bit is 0 or 1.
-    enf op_bits[i] * (op_bits[i] - 1) = 0 for i in 0..7;
+    enf bit^2 = bit for bit in op_bits;
 
     # ---------------------------------------------------------------------------
     # Extra columns for degree reduction.
@@ -101,7 +101,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # ---------------------------------------------------------------------------
     # Each batch flag is 0 or 1.
     let batch_flags = [c0, c1, c2];
-    enf batch_flags[i] * (batch_flags[i] - 1) = 0 for i in 0..3;
+    enf flag^2 = flag for flag in batch_flags;
 
     # ---------------------------------------------------------------------------
     # General decoder constraints.
@@ -112,7 +112,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
 
     # DYN: only the first half of the hasher state is used; the tail must be zero.
     let dyn_tail = [h4, h5, h6, h7];
-    enf dyn_tail[i] = 0 for i in 0..4 when is_dyn;
+    enf tail = 0 for tail in dyn_tail when is_dyn;
 
     # REPEAT: must be inside a loop body (h4=1) and have s0=1.
     enf 1 = s0 when is_repeat;
@@ -191,12 +191,12 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # If batch size is <= 4 groups, unused hasher lanes h4..h7 must be zero.
     let small_batch = batch_g1 + batch_g2 + batch_g4;
     let small_batch_tail = [h4, h5, h6, h7];
-    enf small_batch_tail[i] = 0 for i in 0..4 when small_batch;
+    enf sbt = 0 for sbt in small_batch_tail when small_batch;
 
     # If batch size is <= 2 groups, unused hasher lanes h2..h3 must be zero.
     let tiny_batch = batch_g1 + batch_g2;
     let tiny_batch_tail = [h2, h3];
-    enf tiny_batch_tail[i] = 0 for i in 0..2 when tiny_batch;
+    enf tbt = 0 for tbt in tiny_batch_tail when tiny_batch;
     # If batch size is 1 group, unused hasher lane h1 must be zero.
     enf h1 = 0 when batch_g1;
 

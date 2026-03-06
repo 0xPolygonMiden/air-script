@@ -49,8 +49,8 @@ ev bitwise_chiplet([chiplets[15]]) {
     # -------------------------------------------------------------------------
     # Input bit constraints.
     # -------------------------------------------------------------------------
-    enf bw_a_bits[i] * (bw_a_bits[i] - 1) = 0 for i in 0..4 when bitwise_flag;
-    enf bw_b_bits[i] * (bw_b_bits[i] - 1) = 0 for i in 0..4 when bitwise_flag;
+    enf bit^2 = bit for bit in bw_a_bits when bitwise_flag;
+    enf bit^2 = bit for bit in bw_b_bits when bitwise_flag;
 
     # First row aggregates and prev output must be zeroed.
     let bw_a_agg = aggregate_limbs(bw_a_bits);
@@ -78,8 +78,7 @@ ev bitwise_chiplet([chiplets[15]]) {
     let bw_and = compute_limb_and(bw_a_bits, bw_b_bits);
     let bw_xor = compute_limb_xor(bw_a_bits, bw_b_bits);
     # z = zp * 16 + (op_flag ? a_xor_b : a_and_b)
-    # Equivalent: z = zp * 16 + a_and_b + op_flag * (a_xor_b - a_and_b)
-    let bw_expected = bw_prev * 16 + bw_and + bw_op * (bw_xor - bw_and);
+    let bw_expected = bw_prev * 16 + select(bw_op, bw_xor, bw_and);
     enf bw_out = bw_expected when bitwise_flag;
 }
 
@@ -100,10 +99,10 @@ fn compute_limb_and(a_limb: felt[4], b_limb: felt[4]) -> felt {
 }
 
 fn compute_limb_xor(a_limb: felt[4], b_limb: felt[4]) -> felt {
-    let xor0 = a_limb[0] + b_limb[0] - 2 * a_limb[0] * b_limb[0];
-    let xor1 = a_limb[1] + b_limb[1] - 2 * a_limb[1] * b_limb[1];
-    let xor2 = a_limb[2] + b_limb[2] - 2 * a_limb[2] * b_limb[2];
-    let xor3 = a_limb[3] + b_limb[3] - 2 * a_limb[3] * b_limb[3];
+    let xor0 = binary_xor(a_limb[0], b_limb[0]);
+    let xor1 = binary_xor(a_limb[1], b_limb[1]);
+    let xor2 = binary_xor(a_limb[2], b_limb[2]);
+    let xor3 = binary_xor(a_limb[3], b_limb[3]);
     return aggregate_limbs([xor0, xor1, xor2, xor3]);
 }
 
