@@ -58,19 +58,19 @@ ev ace_chiplet([chiplets[20]]) {
 
     # ace_flag_next: next row is still ACE (not transitioning out).
     # ace_flag_last: next row transitions out of ACE (this row is the last ACE row).
-    let ace_flag_next = 1 - s3_next;
+    let ace_flag_next = !s3_next;
     let ace_flag_last = s3_next;
 
     # -------------------------------------------------------------------------
     # Binary constraints.
     # -------------------------------------------------------------------------
     let ace_binary = [ace_sstart, ace_sblock];
-    enf ace_binary[i] * (ace_binary[i] - 1) = 0 for i in 0..2 when ace_flag;
+    enf bit^2 = bit for bit in ace_binary when ace_flag;
 
     # -------------------------------------------------------------------------
     # Section and block flag constraints.
     # -------------------------------------------------------------------------
-    let ace_f_next = 1 - ace_sstart_next;
+    let ace_f_next = !ace_sstart_next;
     # f_end is active on the last row of a section (either sstart' or ACE is ending).
     let ace_f_end = binary_or(ace_flag_next * ace_sstart_next, ace_flag_last);
 
@@ -84,26 +84,26 @@ ev ace_chiplet([chiplets[20]]) {
     enf ace_sblock = 0 when ace_flag * ace_sstart;
 
     # EVAL blocks cannot be followed by READ blocks within same section.
-    enf 1 - ace_sblock_next = 0 when ace_flag * ace_flag_next * ace_f_next * ace_sblock;
+    enf !ace_sblock_next = 0 when ace_flag * ace_flag_next * ace_f_next * ace_sblock;
 
     # Sections must end with EVAL blocks (not READ).
-    enf 1 - ace_sblock = 0 when ace_flag * ace_f_end;
+    enf !ace_sblock = 0 when ace_flag * ace_f_end;
 
     # -------------------------------------------------------------------------
     # Section constraints (within section).
     # -------------------------------------------------------------------------
-    let ace_f_read = 1 - ace_sblock;
+    let ace_f_read = !ace_sblock;
     let ace_f_eval = ace_sblock;
-    let ace_within_section_gate = ace_flag * ace_flag_next * (1 - ace_sstart_next);
+    let ace_within_section_gate = ace_flag * ace_flag_next * !ace_sstart_next;
 
     # ptr increments by +4 in READ, +1 in EVAL.
-    let ace_expected_ptr = ace_ptr + 4 * ace_f_read + ace_f_eval;
+    let ace_expected_next_ptr = ace_ptr + 4 * ace_f_read + ace_f_eval;
     # id0 decrements by 2 in READ, 1 in EVAL.
     let ace_expected_id0 = ace_id0_next + 2 * ace_f_read + ace_f_eval;
 
     enf ace_ctx_next = ace_ctx when ace_within_section_gate;
     enf ace_clk_next = ace_clk when ace_within_section_gate;
-    enf ace_ptr_next = ace_expected_ptr when ace_within_section_gate;
+    enf ace_ptr_next = ace_expected_next_ptr when ace_within_section_gate;
     enf ace_id0 = ace_expected_id0 when ace_within_section_gate;
 
     # -------------------------------------------------------------------------
@@ -112,7 +112,7 @@ ev ace_chiplet([chiplets[20]]) {
     let ace_read_gate = ace_flag * ace_f_read;
     enf ace_id1 = ace_id0 - 1 when ace_read_gate;
 
-    let ace_f_read_next = 1 - ace_sblock_next;
+    let ace_f_read_next = !ace_sblock_next;
     let ace_f_eval_next = ace_sblock_next;
     # n_eval stores (num_eval_rows - 1), so READ->EVAL switches when id0' == n_eval.
     # This selects n_eval' on READ rows and id0' on EVAL rows.
@@ -149,7 +149,7 @@ ev ace_chiplet([chiplets[20]]) {
     # -------------------------------------------------------------------------
     # First row constraints.
     # -------------------------------------------------------------------------
-    let ace_next = s2_sel' * (1 - s3_next);
+    let ace_next = s2_sel' * !s3_next;
     let ace_first_row_gate = memory_flag * ace_next;
     enf ace_sstart_next = 1 when ace_first_row_gate;
 
