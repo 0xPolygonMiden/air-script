@@ -2,15 +2,9 @@ mod bus;
 mod constraints;
 mod degree;
 mod operation;
+mod random_inputs;
 mod trace;
 mod value;
-
-pub use self::bus::{Bus, BusBoundary, BusOp, BusOpKind, BusType, PublicInputTableAccess};
-pub use self::constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints};
-pub use self::degree::IntegrityConstraintDegree;
-pub use self::operation::Operation;
-pub use self::trace::TraceAccess;
-pub use self::value::{PeriodicColumnAccess, PublicInputAccess, Value};
 
 pub use air_parser::{
     Symbol,
@@ -20,20 +14,155 @@ pub use air_parser::{
     },
 };
 
-/// The default segment against which a constraint is applied is the main trace segment.
-pub const DEFAULT_SEGMENT: TraceSegmentId = 0;
-/// The auxiliary trace segment.
-pub const AUX_SEGMENT: TraceSegmentId = 1;
+pub use self::{
+    bus::{Bus, BusBoundary, BusOp, BusOpKind, BusType, PublicInputTableAccess},
+    constraints::{ConstraintDomain, ConstraintError, ConstraintRoot, Constraints},
+    degree::IntegrityConstraintDegree,
+    operation::Operation,
+    random_inputs::RandomInputs,
+    trace::TraceAccess,
+    value::{PeriodicColumnAccess, PublicInputAccess, Value},
+};
+
+/// A fixed two segment trace shape containing values for the main and aux segments.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct TraceShape<T> {
+    pub main: T,
+    pub aux: T,
+}
+
+impl<T> TraceShape<T> {
+    pub fn new(main: T, aux: T) -> Self {
+        Self { main, aux }
+    }
+
+    pub fn map<U, F: FnMut(&T) -> U>(&self, mut f: F) -> TraceShape<U> {
+        TraceShape { main: f(&self.main), aux: f(&self.aux) }
+    }
+
+    /// Returns an iterator over mutable references to `(TraceSegmentId, T)` in segment order.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (TraceSegmentId, &mut T)> {
+        let (main, aux) = (&mut self.main, &mut self.aux);
+        [(TraceSegmentId::Main, main), (TraceSegmentId::Aux, aux)].into_iter()
+    }
+}
+
+impl<T> core::ops::Index<TraceSegmentId> for TraceShape<T> {
+    type Output = T;
+    fn index(&self, index: TraceSegmentId) -> &Self::Output {
+        match index {
+            TraceSegmentId::Main => &self.main,
+            TraceSegmentId::Aux => &self.aux,
+        }
+    }
+}
+
+impl<T> core::ops::IndexMut<TraceSegmentId> for TraceShape<T> {
+    fn index_mut(&mut self, index: TraceSegmentId) -> &mut Self::Output {
+        match index {
+            TraceSegmentId::Main => &mut self.main,
+            TraceSegmentId::Aux => &mut self.aux,
+        }
+    }
+}
+
+impl<T> core::ops::Index<usize> for TraceShape<T> {
+    type Output = T;
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.main,
+            1 => &self.aux,
+            _ => panic!("invalid segment index"),
+        }
+    }
+}
+
+impl<T> core::ops::IndexMut<usize> for TraceShape<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        match index {
+            0 => &mut self.main,
+            1 => &mut self.aux,
+            _ => panic!("invalid segment index"),
+        }
+    }
+}
+
+/// A fixed three segment trace shape containing values for the main, aux, and quotient segments.
+///
+/// This wraps a two segment `TraceShape<T>` for the witness traces, and adds a separate
+/// `quotient` segment which is not addressable via `TraceSegmentId`.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct FullTraceShape<T> {
+    pub segments: TraceShape<T>,
+    pub quotient: T,
+}
+
+impl<T> FullTraceShape<T> {
+    pub fn new(main: T, aux: T, quotient: T) -> Self {
+        Self {
+            segments: TraceShape::new(main, aux),
+            quotient,
+        }
+    }
+
+    #[inline]
+    pub fn segments(&self) -> &TraceShape<T> {
+        &self.segments
+    }
+
+    #[inline]
+    pub fn segments_mut(&mut self) -> &mut TraceShape<T> {
+        &mut self.segments
+    }
+}
+
+impl<T> core::ops::Index<TraceSegmentId> for FullTraceShape<T> {
+    type Output = T;
+    fn index(&self, index: TraceSegmentId) -> &Self::Output {
+        &self.segments[index]
+    }
+}
+
+impl<T> core::ops::IndexMut<TraceSegmentId> for FullTraceShape<T> {
+    fn index_mut(&mut self, index: TraceSegmentId) -> &mut Self::Output {
+        &mut self.segments[index]
+    }
+}
+
+impl<T> core::ops::Index<usize> for FullTraceShape<T> {
+    type Output = T;
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.segments.main,
+            1 => &self.segments.aux,
+            2 => &self.quotient,
+            _ => panic!("invalid segment index"),
+        }
+    }
+}
+
+impl<T> core::ops::IndexMut<usize> for FullTraceShape<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        match index {
+            0 => &mut self.segments.main,
+            1 => &mut self.segments.aux,
+            2 => &mut self.quotient,
+            _ => panic!("invalid segment index"),
+        }
+    }
+}
+
 /// The offset of the "current" row during constraint evaluation.
 pub const CURRENT_ROW: usize = 0;
 /// The minimum cycle length of a periodic column
 pub const MIN_CYCLE_LENGTH: usize = 2;
 
-use std::collections::BTreeMap;
+extern crate alloc;
+use alloc::collections::BTreeMap;
 
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::graph::AlgebraicGraph;
+use crate::{NodeIndex, graph::AlgebraicGraph};
 
 /// The intermediate representation of a complete AirScript program
 ///
@@ -60,19 +189,28 @@ pub struct Air {
     pub public_inputs: BTreeMap<Identifier, PublicInput>,
     /// The total number of elements in the random values array
     pub num_random_values: u16,
+    /// Expected maximum constraint id (inclusive) when tag validation is enabled.
+    pub expected_max_constraint_id: Option<u64>,
     /// The constraints enforced by this program, in their algebraic graph representation.
     pub constraints: Constraints,
     /// The buses referenced by this program.
     ///
     /// Only their name, type, and the first and last boundary constraints are stored here.
     pub buses: BTreeMap<Identifier, Bus>,
+    /// Buses initial values used for auxiliary trace generation (indexed by bus index).
+    pub buses_initial_values: BTreeMap<usize, NodeIndex>,
+    /// Buses transition expressions used for auxiliary trace generation (indexed by bus index).
+    /// The tuple contains the numerator and an optional denominator operation (p' = numerator if
+    /// None or numerator / denominator), computed in the `ExpandBuses` Air pass depending on the
+    /// bus type.
+    /// - for multiset buses: p' = p * columns_inserted_in_bus / columns_removed_from_bus
+    /// - for logup buses, if u corresponds to the columns inserted when s1 and v to the columns
+    ///   removed when s2: q' = q + s1 / u - s2 / v = (q * u * v + s1 * v - s2 * u) / (u * v)
+    pub buses_transitions: BTreeMap<usize, (NodeIndex, Option<NodeIndex>)>,
 }
 impl Default for Air {
     fn default() -> Self {
-        Self::new(Identifier::new(
-            SourceSpan::UNKNOWN,
-            Symbol::intern("unnamed"),
-        ))
+        Self::new(Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("unnamed")))
     }
 }
 impl Air {
@@ -80,7 +218,7 @@ impl Air {
     ///
     /// An empty [Air] is meaningless until it has been populated with
     /// constraints and associated metadata. This is typically done by converting
-    /// an [air_parser::ast::Program] to this struct using the [crate::passes::AstToAir]
+    /// an [air_parser::ast::Program] to this struct using the [crate::passes::MirToAir]
     /// translation pass.
     pub fn new(name: Identifier) -> Self {
         Self {
@@ -89,8 +227,11 @@ impl Air {
             periodic_columns: Default::default(),
             public_inputs: Default::default(),
             num_random_values: 0,
+            expected_max_constraint_id: None,
             constraints: Default::default(),
             buses: Default::default(),
+            buses_initial_values: Default::default(),
+            buses_transitions: Default::default(),
         }
     }
 
@@ -102,6 +243,29 @@ impl Air {
 
     pub fn public_inputs(&self) -> impl Iterator<Item = &PublicInput> + '_ {
         self.public_inputs.values()
+    }
+
+    /// Returns a list of all accesses to reduced public input tables in canonical order.
+    pub fn reduced_public_input_table_accesses(&self) -> Vec<PublicInputTableAccess> {
+        let mut accesses: Vec<_> = self
+            .buses
+            .values()
+            .flat_map(|bus| {
+                [bus.first, bus.last]
+                    .iter()
+                    .filter_map(|boundary| {
+                        if let BusBoundary::PublicInputTable(access) = boundary {
+                            Some(*access)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        accesses.sort();
+        accesses.dedup();
+        accesses
     }
 
     pub fn periodic_columns(&self) -> impl Iterator<Item = &PeriodicColumn> + '_ {

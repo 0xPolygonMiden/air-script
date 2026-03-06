@@ -38,7 +38,7 @@ pub Source: Source = {
 
 pub Program: Program = {
     <root:Root> <modules:Module*> =>? {
-        let root_name = root.name;
+        let root_name = root.path.clone();
         let mut modules = modules;
         modules.push(root);
         let library = match Library::new(diagnostics, codemap.clone(), modules) {
@@ -57,14 +57,14 @@ pub AnyModule: Module = {
 
 Root: Module = {
     <l:@L> "def" <name:Identifier> <decls:Declaration*> <r:@R> =>? {
-        Module::from_declarations(diagnostics, ModuleType::Root, span!(l, r), name, decls)
+        Module::from_declarations(diagnostics, ModuleType::Root, span!(l, r), ModuleId::new(vec![name], name.span()), decls)
             .map_err(|err| ParseError::Analysis(err).into())
     }
 }
 
 Module: Module = {
     <l:@L> "mod" <name:Identifier> <decls:Declaration*> <r:@R> =>? {
-        Module::from_declarations(diagnostics, ModuleType::Library, span!(l, r), name, decls)
+        Module::from_declarations(diagnostics, ModuleType::Library, span!(l, r), ModuleId::new(vec![name], name.span()), decls)
             .map_err(|err| ParseError::Analysis(err).into())
     }
 }
@@ -82,13 +82,51 @@ Declaration: Declaration = {
     <IntegrityConstraints> => Declaration::IntegrityConstraints(<>),
 }
 
+// Import parses a Vec<ImportLimb> separated by '::', where ImportLimb is Identifier or '*' (only as last limb)
 Import: Span<Import> = {
-    <l:@L> "use" <module:Identifier> "::" "*" ";" <r:@R> => Span::new(span!(l, r), Import::All { module: Identifier::new(span!(l, r), module.name()) }),
-    <l:@L> "use" <module:Identifier> "::" <item:Identifier> ";" <r:@R> => {
-        let mut items: HashSet<Identifier> = HashSet::default();
-        items.insert(item);
-        Span::new(span!(l, r), Import::Partial { module, items })
+    <l:@L> "use" <limbs:ImportPath> ";" <r:@R> => {
+        let (last_limb, parents) = limbs.split_last().expect("Imports need at least one path limb");
+        match last_limb {
+            ImportLimb::Star => {
+                let mut limbs_ident = vec![];
+                for parent in parents {
+                    match parent {
+                        ImportLimb::Star => unreachable!(),
+                        ImportLimb::Ident(ident) => limbs_ident.push(*ident)
+                    }
+                }
+                Span::new(span!(l, r), Import::All { module: ModuleId::new(limbs_ident, span!(l, r)) })
+            }
+            ImportLimb::Ident(item) => {
+                let mut limbs_ident = vec![];
+                for parent in parents {
+                    match parent {
+                        ImportLimb::Star => unreachable!(),
+                        ImportLimb::Ident(ident) => limbs_ident.push(*ident)
+                    }
+                }
+                let mut items: HashSet<Identifier> = HashSet::default();
+                items.insert(*item);
+                Span::new(span!(l, r), Import::Partial { module: ModuleId::new(limbs_ident, span!(l, r)), items })
+            }
+        }
     }
+}
+
+// ImportPath: Vec<ImportLimb> separated by '::' (single right-recursive rule)
+ImportPath: Vec<ImportLimb> = {
+    <head:ImportLimb> => vec![head],
+    <head:ImportLimb> "::" <tail:ImportPath> => {
+        let mut v = vec![head];
+        v.extend(tail);
+        v
+    }
+}
+
+// ImportLimb: either an identifier or '*', but '*' only allowed as last limb
+ImportLimb: ImportLimb = {
+    "*" => ImportLimb::Star,
+    <id:Identifier> => ImportLimb::Ident(id),
 }
 
 // TRACE COLUMNS
@@ -114,7 +152,7 @@ MainSegmentId: Identifier = {
 
 MainTraceBindings: TraceSegment = {
     <l:@L> <name:MainSegmentId> ":" <bindings: Vector<TraceBinding>> "," <r:@R> =>
-        TraceSegment::new(span!(l, r), 0, name, bindings),
+        TraceSegment::new(span!(l, r), TraceSegmentId::Main, name, bindings),
 }
 
 TraceBinding: Span<(Identifier, usize)> = {
@@ -176,8 +214,100 @@ Buses: Span<Vec<Bus>> = {
 }
 
 Bus: Bus = {
-    <l:@L> <bus_type: BusType> <name: Identifier> "," <r:@R>
-        => Bus::new(span!(l, r), name, bus_type),
+    <l:@L> <bus_type: BusType> <name: Identifier> <attrs: BusAttr*> "," <r:@R> =>? {
+        let mut tag: Option<ConstraintTag> = None;
+        let mut constraint_form = BusConstraintForm::Product;
+        for attr in attrs {
+            match attr {
+                BusAttr::Tag(tag_span) => {
+                    if tag.is_some() {
+                        diagnostics.diagnostic(Severity::Error)
+                            .with_message("duplicate bus tag")
+                            .with_primary_label(tag_span.span(), "duplicate @tag_transition")
+                            .emit();
+                        return Err(ParseError::Failed.into());
+                    }
+                    tag = Some(tag_span);
+                },
+                BusAttr::SumForm(sum_form) => {
+                    if constraint_form == BusConstraintForm::Sum {
+                        diagnostics.diagnostic(Severity::Error)
+                            .with_message("duplicate bus form attribute")
+                            .with_primary_label(sum_form.span, "duplicate @sum_form")
+                            .emit();
+                        return Err(ParseError::Failed.into());
+                    }
+                    if !sum_form.assume_exclusive {
+                        diagnostics.diagnostic(Severity::Error)
+                            .with_message("invalid bus form attribute")
+                            .with_primary_label(
+                                sum_form.span,
+                                "expected @sum_form(assume_exclusive)",
+                            )
+                            .emit();
+                        return Err(ParseError::Failed.into());
+                    }
+                    constraint_form = BusConstraintForm::Sum;
+                },
+            }
+        }
+        if constraint_form == BusConstraintForm::Sum && bus_type != BusType::Multiset {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid bus form")
+                .with_primary_label(span!(l, r), "@sum_form is only valid for multiset buses")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(Bus::new(span!(l, r), name, bus_type, constraint_form, tag))
+    },
+}
+
+BusAttr: BusAttr = {
+    <tag: BusTagAttr> => BusAttr::Tag(tag),
+    <sum: BusSumFormAttr> => BusAttr::SumForm(sum),
+}
+
+BusTagAttr: Span<u64> = {
+    <l:@L> "@" <name:FunctionIdentifier> "(" <value: Num_u64> ")" <r:@R> =>? {
+        if name != "tag_transition" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid bus tag")
+                .with_primary_label(span!(l, r), "expected @tag_transition(<id>)")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(Span::new(span!(l, r), value))
+    }
+}
+
+BusSumFormAttr: BusSumForm = {
+    <l:@L> "@" <name:Identifier> <r:@R> =>? {
+        if name != "sum_form" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid bus attribute")
+                .with_primary_label(span!(l, r), "expected @sum_form")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(BusSumForm::new(span!(l, r), false))
+    },
+    <l:@L> "@" <name:FunctionIdentifier> "(" <arg:Identifier> ")" <r:@R> =>? {
+        if name != "sum_form" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid bus attribute")
+                .with_primary_label(span!(l, r), "expected @sum_form(assume_exclusive)")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        if arg != "assume_exclusive" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid bus attribute")
+                .with_primary_label(span!(l, r), "expected @sum_form(assume_exclusive)")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(BusSumForm::new(span!(l, r), true))
+    },
 }
 
 BusType: BusType = {
@@ -195,14 +325,22 @@ EvaluatorFunction: EvaluatorFunction = {
 
 EvaluatorBindings: Vec<TraceSegment> = {
     <l:@L> <trace: Comma<EvaluatorSegmentBindings>> <r:@R> =>? {
-        let mut segments = Vec::with_capacity(trace.len());
+        if trace.len() != 1 {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid evaluator function definition")
+                .with_primary_label(span!(l, r), "evaluators must have exactly one trace segment")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
 
-        for (segment, (span, bindings)) in trace.into_iter().enumerate() {
+        let mut segments = Vec::with_capacity(trace.len());
+        
+        if let Some((span, bindings)) = trace.into_iter().next() {
             // We generate a name for these segments to distinguish them from direct references
             // to the actual main columns. This is useful during the inlining phase
             let segment_name = Identifier::new(span, Symbol::intern(format!("%{}", *next_var)));
             *next_var += 1;
-            segments.push(TraceSegment::new(span, segment, segment_name, bindings));
+            segments.push(TraceSegment::new(span, TraceSegmentId::Main, segment_name, bindings));
         }
 
         // the last segment of trace columns cannot be empty.
@@ -294,8 +432,13 @@ StatementBlock: Vec<Statement> = {
 }
 
 Let: Let = {
-    <l:@L> "let" <name: Identifier> "=" <value: Expr> ";" <r:@R> <body: StatementBlock>
-        => Let::new(span!(l, r), name, value, body)
+    <l:@L> "let" <binding: LetBinding> "=" <value: Expr> ";" <r:@R> <body: StatementBlock>
+        => Let::new(span!(l, r), binding, value, body)
+}
+
+LetBinding: LetBinding = {
+    <name: Identifier> => LetBinding::Single(name),
+    <names: Vector<Identifier>> => LetBinding::Vector(names),
 }
 
 ConstraintStatements: Vec<Statement> = {
@@ -305,7 +448,36 @@ ConstraintStatements: Vec<Statement> = {
 }
 
 ConstraintStatement: Vec<Statement> = {
-    "enf" "match" "{" <MatchArm+> "}" ";" => <>,
+    <l:@L> <tag:TagAttr> "enf" <expr: ScalarConstraintExpr> <comprehension: ConstraintComprehension<ScalarExpr>?> <selector: WithSelector?> ";" <r:@R> => {
+        // If we parsed a comprehension, we've parsed either form 1 or 2
+        if let Some(context) = comprehension {
+            vec![Statement::EnforceAll(ListComprehension::new(span!(l, r), expr, context, selector, Some(tag)))]
+        } else {
+            // If we didn't parse this as a comprehension, but a selector is present, the constraint is in form 3,
+            // so transform it into form 1. Otherwise, if no selector is present, this is form 4, i.e. simple.
+            if let Some(selector) = selector {
+                let generated_name = format!("%{}", *next_var);
+                *next_var += 1;
+                let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
+                let context = vec![(generated_binding, Expr::Range(RangeExpr::from(0..1)))];
+                vec![Statement::EnforceAll(ListComprehension::new(span!(l, r), expr, context, Some(selector), Some(tag)))]
+            } else {
+                vec![Statement::Enforce(Enforce::new(span!(l, r), expr, Some(tag)))]
+            }
+        }
+    },
+    <l:@L> <tag:TagAttr?> "enf" "match" "{" <arms: MatchArm+> "}" ";" <r:@R> =>? {
+        if tag.is_some() {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("tagged constraints cannot use `match`")
+                .with_primary_label(span!(l, r), "remove the tag or refactor the constraint")
+                .emit();
+            Err(ParseError::Failed.into())
+        } else {
+            let match_expr = Match::new(span!(l, r), arms);
+            Ok(vec![Statement::EnforceIf(match_expr)])
+        }
+    },
     "enf" <ConstraintExpr> ";" => vec![<>],
     <BusConstraintExpr> ";" => vec![<>],
 }
@@ -314,13 +486,9 @@ ReturnStatement: Expr = {
     <l:@L> "return" <expr: Expr> ";" <r:@R> => expr,
 }
 
-MatchArm: Statement = {
+MatchArm: MatchArm = {
     <l:@L> "case" <selector:ScalarExpr> ":" <constraint:ScalarConstraintExpr> "," <r:@R> => {
-        let generated_name = format!("%{}", *next_var);
-        *next_var += 1;
-        let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
-        let context = vec![(generated_binding, Expr::Range(RangeExpr::from(0..1)))];
-        Statement::EnforceAll(ListComprehension::new(span!(l, r), constraint, context, Some(selector)))
+        MatchArm::new(span!(l, r), constraint, selector)
     }
 }
 
@@ -356,21 +524,64 @@ ConstraintExpr: Statement = {
     <l:@L> <expr: ScalarConstraintExpr> <comprehension: ConstraintComprehension<ScalarExpr>?> <selector: WithSelector?> <r:@R> => {
         // If we parsed a comprehension, we've parsed either form 1 or 2
         if let Some(context) = comprehension {
-            Statement::EnforceAll(ListComprehension::new(span!(l, r), expr, context, selector))
+            Statement::EnforceAll(ListComprehension::new(span!(l, r), expr, context, selector, None))
         } else {
             // If we didn't parse this as a comprehension, but a selector is present, the constraint is in form 3,
             // so transform it into form 1. Otherwise, if no selector is present, this is form 4, i.e. simple.
-            if selector.is_some() {
-                let generated_name = format!("%{}", *next_var);
-                *next_var += 1;
-                let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
-                let context = vec![(generated_binding, Expr::Range(RangeExpr::from(0..1)))];
-                Statement::EnforceAll(ListComprehension::new(span!(l, r), expr, context, selector))
+            if let Some(selector) = selector {
+                Statement::EnforceIf(Match::new(span!(l,r), vec![MatchArm::new(span!(l,r), expr, selector)]))
             } else {
-                Statement::Enforce(expr)
+                Statement::Enforce(Enforce::new(span!(l, r), expr, None))
             }
         }
     }
+}
+
+TagAttr: ConstraintTagSpec = {
+    <l:@L> "@" <name:FunctionIdentifier> "(" <value: Num_u64> ")" <r:@R> =>? {
+        if name != "tag" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid constraint tag")
+                .with_primary_label(span!(l, r), "expected @tag(<id>) or @tag_range(<start>..<end>)")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(ConstraintTagSpec::single(span!(l, r), value))
+    },
+    <l:@L> "@" <name:FunctionIdentifier> "(" <values: Vector<Num_u64>> ")" <r:@R> =>? {
+        if name != "tag" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid constraint tag")
+                .with_primary_label(span!(l, r), "expected @tag(<id>) or @tag([<id>, ...])")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        if values.is_empty() {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid constraint tag list")
+                .with_primary_label(span!(l, r), "tag list cannot be empty")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(ConstraintTagSpec::list(span!(l, r), values))
+    },
+    <l:@L> "@" <name:FunctionIdentifier> "(" <start: Num_u64> ".." <end: Num_u64> ")" <r:@R> =>? {
+        if name != "tag_range" {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid constraint tag")
+                .with_primary_label(span!(l, r), "expected @tag_range(<start>..<end>)")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        if end <= start {
+            diagnostics.diagnostic(Severity::Error)
+                .with_message("invalid constraint tag range")
+                .with_primary_label(span!(l, r), "range must be non-empty")
+                .emit();
+            return Err(ParseError::Failed.into());
+        }
+        Ok(ConstraintTagSpec::range(span!(l, r), start, end, false))
+    },
 }
 
 // 1. `p.insert(a, b) when s`
@@ -381,14 +592,14 @@ BusConstraintExpr: Statement = {
         *next_var += 1;
         let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
         let context = vec![(generated_binding, Expr::Range(RangeExpr::from(0..1)))];
-        Statement::BusEnforce(ListComprehension::new(span!(l, r), expr, context, Some(selector)))
+        Statement::BusEnforce(ListComprehension::new(span!(l, r), expr, context, Some(selector), None))
     },
     <l:@L> <expr: ScalarBusConstraintExpr> <multiplicity: WithMultiplicity> <r:@R> => {
         let generated_name = format!("%{}", *next_var);
         *next_var += 1;
         let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
         let context = vec![(generated_binding, Expr::Range(RangeExpr::from(0..1)))];
-        Statement::BusEnforce(ListComprehension::new(span!(l, r), expr, context, Some(multiplicity)))
+        Statement::BusEnforce(ListComprehension::new(span!(l, r), expr, context, Some(multiplicity), None))
     }
 }
 
@@ -400,7 +611,7 @@ BoundaryBusConstraintExpr: Statement = {
         *next_var += 1;
         let generated_binding = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(generated_name));
         let context = vec![(generated_binding, Expr::Range(RangeExpr::from(0..1)))];
-        Statement::BusEnforce(ListComprehension::new(span!(l, r), expr, context, None))
+        Statement::BusEnforce(ListComprehension::new(span!(l, r), expr, context, None, None))
     }
 }
 
@@ -519,7 +730,7 @@ SymbolAccessBaseSpanned: Span<(Identifier, AccessType)> = {
 
 SymbolAccessBase: (Identifier, AccessType) = {
     <ident: Identifier> => (ident, AccessType::Default),
-    <ident: Identifier> "[" <range: Range> "]" => (ident, AccessType::Slice(range)),
+    <ident: Identifier> "[" <range: Range> "]" => (ident, AccessType::Slice(Box::new(range))),
     <ident: Identifier> <idx: Index> =>  (ident, AccessType::Index(idx)),
     <ident: Identifier> <row: Index> <col: Index> => (ident, AccessType::Matrix(row, col)),
     // accessing an identifier used in a section declaration, like a named trace segment, e.g. $main
@@ -553,7 +764,7 @@ ListComprehension<T>: ListComprehension = {
                 .emit();
             Err(ParseError::Analysis(SemanticAnalysisError::Invalid).into())
         } else {
-            Ok(ListComprehension::new(span!(l, r), expr, members.into_iter().zip(iterables).collect::<Vec<_>>(), None))
+            Ok(ListComprehension::new(span!(l, r), expr, members.into_iter().zip(iterables).collect::<Vec<_>>(), None, None))
         }
 }
 
@@ -570,7 +781,7 @@ Iterables: Vec<Expr> = {
 Iterable: Expr = {
     <ident: Identifier> => Expr::SymbolAccess(SymbolAccess::new(ident.span(), ident, AccessType::Default, 0)),
     <range: Range> => Expr::Range(range),
-    <l:@L> <ident: Identifier> "[" <range: Range> "]" <r:@R> => Expr::SymbolAccess(SymbolAccess::new(span!(l, r), ident, AccessType::Slice(range), 0)),
+    <l:@L> <ident: Identifier> "[" <range: Range> "]" <r:@R> => Expr::SymbolAccess(SymbolAccess::new(span!(l, r), ident, AccessType::Slice(Box::new(range)), 0)),
     <l:@L> <function_call: FunctionCall> <r:@R> => if let ScalarExpr::Call(call) = function_call {
         Expr::Call(call)
     } else {
@@ -611,8 +822,8 @@ Size: u64 = {
     "[" <Num_u64> "]" => <>
 }
 
-Index: usize = {
-    "[" <idx: Num_u64> "]" => idx as usize
+Index: Box<ScalarExpr> = {
+    "[" <idx: ScalarExpr> "]" => Box::new(idx)
 }
 
 TableSize: u64 = {
@@ -691,6 +902,7 @@ extern {
         "&" => Token::Ampersand,
         "|" => Token::Bar,
         "!" => Token::Bang,
+        "@" => Token::At,
         ":" => Token::Colon,
         "::" => Token::ColonColon,
         "," => Token::Comma,

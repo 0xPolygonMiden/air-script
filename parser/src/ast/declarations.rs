@@ -14,8 +14,8 @@
 //! * `boundary_constraints`
 //! * `integrity_constraints`
 //!
-//! All other declarations are module-scoped, and must be explicitly imported by a module which wishes
-//! to reference them. Not all items are importable however, only the following:
+//! All other declarations are module-scoped, and must be explicitly imported by a module which
+//! wishes to reference them. Not all items are importable however, only the following:
 //!
 //! * constants
 //! * evaluators
@@ -79,24 +79,72 @@ pub struct Bus {
     pub span: SourceSpan,
     pub name: Identifier,
     pub bus_type: BusType,
+    pub constraint_form: BusConstraintForm,
+    pub transition_tag: Option<ConstraintTag>,
 }
 impl Bus {
     /// Creates a new bus declaration
-    pub const fn new(span: SourceSpan, name: Identifier, bus_type: BusType) -> Self {
+    pub fn new(
+        span: SourceSpan,
+        name: Identifier,
+        bus_type: BusType,
+        constraint_form: BusConstraintForm,
+        transition_tag: Option<ConstraintTag>,
+    ) -> Self {
         Self {
             span,
             name,
             bus_type,
+            constraint_form,
+            transition_tag,
         }
     }
 }
-#[derive(Default, Copy, Hash, Debug, Clone, PartialEq, Eq)]
+
+/// Optional bus declaration attributes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BusAttr {
+    Tag(ConstraintTag),
+    SumForm(BusSumForm),
+}
+
+/// Specifies how multiset bus constraints are reformulated.
+#[derive(Default, Copy, Hash, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BusConstraintForm {
+    /// Product form (generic): Π (f * v + (1 - f))
+    #[default]
+    Product,
+    /// Sum form (exclusive latches): Σ (f * v) + (1 - Σ f)
+    Sum,
+}
+#[derive(Default, Copy, Hash, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BusType {
     /// A multiset bus
     #[default]
     Multiset,
     /// A logup bus
     Logup,
+}
+
+/// Arguments for the `@sum_form` bus attribute.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BusSumForm {
+    pub span: SourceSpan,
+    pub assume_exclusive: bool,
+}
+impl BusSumForm {
+    pub const fn new(span: SourceSpan, assume_exclusive: bool) -> Self {
+        Self { span, assume_exclusive }
+    }
+}
+
+impl fmt::Display for BusType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Multiset => write!(f, "multiset"),
+            Self::Logup => write!(f, "logup"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -173,7 +221,7 @@ impl ConstantExpr {
                 let num_rows = rows.len();
                 let num_cols = rows.first().unwrap().len();
                 Type::Matrix(num_rows, num_cols)
-            }
+            },
         }
     }
 
@@ -188,7 +236,7 @@ impl fmt::Display for ConstantExpr {
             Self::Scalar(value) => write!(f, "{value}"),
             Self::Vector(values) => {
                 write!(f, "{}", DisplayList(values.as_slice()))
-            }
+            },
             Self::Matrix(values) => write!(
                 f,
                 "{}",
@@ -198,6 +246,12 @@ impl fmt::Display for ConstantExpr {
             ),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImportLimb {
+    Star,
+    Ident(Identifier),
 }
 
 /// An import declaration
@@ -216,7 +270,7 @@ pub enum Import {
 impl Import {
     pub fn module(&self) -> ModuleId {
         match self {
-            Self::All { module } | Self::Partial { module, .. } => *module,
+            Self::All { module } | Self::Partial { module, .. } => module.clone(),
         }
     }
 }
@@ -225,16 +279,9 @@ impl PartialEq for Import {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::All { module: l }, Self::All { module: r }) => l == r,
-            (
-                Self::Partial {
-                    module: l,
-                    items: ls,
-                },
-                Self::Partial {
-                    module: r,
-                    items: rs,
-                },
-            ) if l == r => ls.difference(rs).next().is_none(),
+            (Self::Partial { module: l, items: ls }, Self::Partial { module: r, items: rs }) => {
+                l == r && ls == rs
+            },
             _ => false,
         }
     }
@@ -247,12 +294,14 @@ impl PartialEq for Import {
 pub enum Export<'a> {
     Constant(&'a crate::ast::Constant),
     Evaluator(&'a EvaluatorFunction),
+    Function(&'a Function),
 }
 impl Export<'_> {
     pub fn name(&self) -> Identifier {
         match self {
             Self::Constant(item) => item.name,
             Self::Evaluator(item) => item.name,
+            Self::Function(item) => item.name,
         }
     }
 
@@ -264,6 +313,7 @@ impl Export<'_> {
         match self {
             Self::Constant(item) => Some(item.ty()),
             Self::Evaluator(_) => None,
+            Self::Function(item) => Some(item.return_type),
         }
     }
 }
@@ -352,22 +402,12 @@ impl Eq for PublicInput {}
 impl PartialEq for PublicInput {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (
-                Self::Vector {
-                    name: l, size: ls, ..
-                },
-                Self::Vector {
-                    name: r, size: rs, ..
-                },
-            ) => l == r && ls == rs,
-            (
-                Self::Table {
-                    name: l, size: lc, ..
-                },
-                Self::Table {
-                    name: r, size: rc, ..
-                },
-            ) => l == r && lc == rc,
+            (Self::Vector { name: l, size: ls, .. }, Self::Vector { name: r, size: rs, .. }) => {
+                l == r && ls == rs
+            },
+            (Self::Table { name: l, size: lc, .. }, Self::Table { name: r, size: rc, .. }) => {
+                l == r && lc == rc
+            },
             _ => false,
         }
     }
@@ -392,12 +432,7 @@ impl EvaluatorFunction {
         params: Vec<TraceSegment>,
         body: Vec<Statement>,
     ) -> Self {
-        Self {
-            span,
-            name,
-            params,
-            body,
-        }
+        Self { span, name, params, body }
     }
 }
 impl Eq for EvaluatorFunction {}
@@ -430,13 +465,7 @@ impl Function {
         return_type: Type,
         body: Vec<Statement>,
     ) -> Self {
-        Self {
-            span,
-            name,
-            params,
-            return_type,
-            body,
-        }
+        Self { span, name, params, return_type, body }
     }
 
     pub fn param_types(&self) -> Vec<Type> {
@@ -451,5 +480,54 @@ impl PartialEq for Function {
             && self.params == other.params
             && self.return_type == other.return_type
             && self.body == other.body
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use miden_diagnostics::SourceSpan;
+
+    use super::*;
+    use crate::symbols::Symbol;
+
+    fn ident(name: &str) -> Identifier {
+        Identifier::new(SourceSpan::UNKNOWN, Symbol::intern(name))
+    }
+
+    fn module_id(parts: &[&str]) -> ModuleId {
+        let ids = parts.iter().map(|p| ident(p)).collect::<Vec<_>>();
+        ModuleId::new(ids, SourceSpan::UNKNOWN)
+    }
+
+    #[test]
+    fn import_partial_subset_is_not_equal_either_direction() {
+        let mut set_a: HashSet<Identifier> = HashSet::default();
+        set_a.insert(ident("a"));
+        let import_a = Import::Partial { module: module_id(&["m"]), items: set_a };
+
+        let mut set_ab: HashSet<Identifier> = HashSet::default();
+        set_ab.insert(ident("a"));
+        set_ab.insert(ident("b"));
+        let import_ab = Import::Partial { module: module_id(&["m"]), items: set_ab };
+
+        assert!(import_a != import_ab);
+        assert!(import_ab != import_a);
+    }
+
+    #[test]
+    fn import_partial_identical_sets_are_equal() {
+        let mut set1: HashSet<Identifier> = HashSet::default();
+        set1.insert(ident("a"));
+        set1.insert(ident("b"));
+        let mut set2: HashSet<Identifier> = HashSet::default();
+        set2.insert(ident("b"));
+        set2.insert(ident("a"));
+
+        let import1 = Import::Partial { module: module_id(&["m"]), items: set1 };
+        let import2 = Import::Partial { module: module_id(&["m"]), items: set2 };
+
+        assert_eq!(import1, import2);
     }
 }

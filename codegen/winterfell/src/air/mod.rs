@@ -12,9 +12,8 @@ mod boundary_constraints;
 use boundary_constraints::{add_fn_get_assertions, add_fn_get_aux_assertions};
 
 mod transition_constraints;
+use air_ir::{Air, BusBoundary, BusType, ConstraintDomain, PublicInputTableAccess, TraceSegmentId};
 use transition_constraints::{add_fn_evaluate_aux_transition, add_fn_evaluate_transition};
-
-use air_ir::{Air, BusBoundary, BusType, ConstraintDomain, Identifier, TraceSegmentId};
 
 use super::{Impl, Scope};
 
@@ -48,17 +47,11 @@ pub(super) fn add_air(scope: &mut Scope, ir: &Air) {
 /// Updates the provided scope with a custom Air struct.
 fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     // define the custom Air struct.
-    let air_struct = scope
-        .new_struct(name)
-        .vis("pub")
-        .field("context", "AirContext<Felt>");
+    let air_struct = scope.new_struct(name).vis("pub").field("context", "AirContext<Felt>");
 
     // add public inputs
     for public_input in ir.public_inputs() {
-        air_struct.field(
-            public_input.name().as_str(),
-            public_input_type_to_string(public_input),
-        );
+        air_struct.field(public_input.name().as_str(), public_input_type_to_string(public_input));
     }
 
     // add the custom Air implementation block
@@ -73,17 +66,17 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     // add a method to get the variable length public inputs bus boundary constraints.
     let (mut add_bus_multiset_boundary_varlen, mut add_bus_logup_boundary_varlen) = (false, false);
     for bus in ir.buses.values() {
-        // Check which bus type is refering to variable length public inputs
+        // Check which bus type is referring to variable length public inputs
         let bus_constraints = [&bus.first, &bus.last];
         for fl in bus_constraints {
             if let BusBoundary::PublicInputTable(_) = fl {
                 match bus.bus_type {
                     BusType::Multiset => {
                         add_bus_multiset_boundary_varlen = true;
-                    }
+                    },
                     BusType::Logup => {
                         add_bus_logup_boundary_varlen = true;
-                    }
+                    },
                 }
             }
         }
@@ -120,15 +113,15 @@ fn impl_bus_multiset_boundary_varlen(base_impl: &mut Impl) {
         .new_fn("bus_multiset_boundary_varlen")
         .generic("'a")
         .generic("const N: usize")
-        .generic("I: IntoIterator<Item = &'a [Felt; N]> + Clone")
+        .generic("I: IntoIterator<Item = &'a [Felt; N]>")
         .generic("E: FieldElement<BaseField = Felt>")
         .arg("aux_rand_elements", "&AuxRandElements<E>")
-        .arg("public_inputs", "&I")
+        .arg("public_inputs", "I")
         .ret("E")
         .vis("pub")
         .line("let mut bus_p_last: E = E::ONE;")
         .line("let rand = aux_rand_elements.rand_elements();")
-        .line("for row in public_inputs.clone().into_iter() {")
+        .line("for row in public_inputs {")
         .line("    let mut p_last = rand[0];")
         .line("    for (c, p_i) in row.iter().enumerate() {")
         .line("        p_last += E::from(*p_i) * rand[c + 1];")
@@ -164,15 +157,15 @@ fn impl_bus_logup_boundary_varlen(base_impl: &mut Impl) {
         .new_fn("bus_logup_boundary_varlen")
         .generic("'a")
         .generic("const N: usize")
-        .generic("I: IntoIterator<Item = &'a [Felt; N]> + Clone")
+        .generic("I: IntoIterator<Item = &'a [Felt; N]>")
         .generic("E: FieldElement<BaseField = Felt>")
         .arg("aux_rand_elements", "&AuxRandElements<E>")
-        .arg("public_inputs", "&I")
+        .arg("public_inputs", "I")
         .ret("E")
         .vis("pub")
         .line("let mut bus_q_last = E::ZERO;")
         .line("let rand = aux_rand_elements.rand_elements();")
-        .line("for row in public_inputs.clone().into_iter() {")
+        .line("for row in public_inputs {")
         .line("    let mut q_last = rand[0];")
         .line("    for (c, p_i) in row.iter().enumerate() {")
         .line("        let p_i = *p_i;")
@@ -194,10 +187,7 @@ fn add_air_trait(scope: &mut Scope, ir: &Air, name: &str) {
         .associate_type("PublicInputs", "PublicInputs");
 
     // add default function "context".
-    let fn_context = air_impl
-        .new_fn("context")
-        .arg_ref_self()
-        .ret("&AirContext<Felt>");
+    let fn_context = air_impl.new_fn("context").arg_ref_self().ret("&AirContext<Felt>");
     fn_context.line("&self.context");
 
     // add the method implementations required by the AIR trait.
@@ -226,22 +216,19 @@ fn add_fn_new(impl_ref: &mut Impl, ir: &Air) {
         .ret("Self");
 
     // define the integrity constraint degrees of the main trace `main_degrees`.
-    add_constraint_degrees(new, ir, 0, "main_degrees");
+    add_constraint_degrees(new, ir, TraceSegmentId::Main, "main_degrees");
 
     // define the integrity constraint degrees of the aux trace `aux_degrees`.
-    add_constraint_degrees(new, ir, 1, "aux_degrees");
+    add_constraint_degrees(new, ir, TraceSegmentId::Aux, "aux_degrees");
 
     // define the number of main trace boundary constraints `num_main_assertions`.
     new.line(format!(
         "let num_main_assertions = {};",
-        ir.num_boundary_constraints(0)
+        ir.num_boundary_constraints(TraceSegmentId::Main)
     ));
 
     // define the number of aux trace boundary constraints `num_aux_assertions`.
-    new.line(format!(
-        "let num_aux_assertions = {};",
-        num_bus_boundary_constraints(ir)
-    ));
+    new.line(format!("let num_aux_assertions = {};", num_bus_boundary_constraints(ir)));
 
     // define the context.
     let context = "
@@ -283,19 +270,20 @@ fn add_constraint_degrees(
     func_body.line(format!("let {decl_name} = vec![{}];", degrees.join(", ")));
 }
 
-fn call_bus_boundary_varlen_pubinput(
-    ir: &Air,
-    bus_name: Identifier,
-    table_name: Identifier,
-) -> String {
-    let bus = ir.buses.get(&bus_name).expect("bus not found");
-    match bus.bus_type {
-        BusType::Multiset => format!(
-            "Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.{table_name}.iter())",
-        ),
+fn call_bus_boundary_varlen_pubinput(access: PublicInputTableAccess) -> String {
+    match access.bus_type {
+        BusType::Multiset => {
+            format!(
+                "Self::bus_multiset_boundary_varlen(aux_rand_elements, &self.{})",
+                access.table_name
+            )
+        },
         BusType::Logup => {
-            format!("Self::bus_logup_boundary_varlen(aux_rand_elements, &self.{table_name}.iter())",)
-        }
+            format!(
+                "Self::bus_logup_boundary_varlen(aux_rand_elements, &self.{})",
+                access.table_name
+            )
+        },
     }
 }
 
@@ -314,8 +302,8 @@ fn num_bus_boundary_constraints(ir: &Air) -> usize {
             match bus_boundary {
                 air_ir::BusBoundary::PublicInputTable(_) | air_ir::BusBoundary::Null => {
                     num_bus_boundary_constraints += 1;
-                }
-                air_ir::BusBoundary::Unconstrained => {}
+                },
+                air_ir::BusBoundary::Unconstrained => {},
             }
         }
     }

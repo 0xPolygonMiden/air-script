@@ -4,7 +4,7 @@ use super::*;
 ///
 /// Values are either constant, or evaluated at runtime using the context
 /// provided to an AirScript program (i.e. random values, public inputs, etc.).
-#[derive(Debug, Eq, PartialEq, Copy, Clone, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, Clone, PartialOrd, Ord, Hash)]
 pub enum Value {
     /// A constant value.
     Constant(u64),
@@ -16,12 +16,14 @@ pub enum Value {
     PeriodicColumn(PeriodicColumnAccess),
     /// A reference to a specific element of a given public input
     PublicInput(PublicInputAccess),
+    /// A reference to a specific public input table used as a boundary for one of the buses.
+    PublicInputTable(PublicInputTableAccess),
     /// A reference to the `random_values` array, specifically the element at the given index
     RandomValue(usize),
 }
 
 /// Represents an access of a [PeriodicColumn], similar in nature to [TraceAccess]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PeriodicColumnAccess {
     pub name: QualifiedIdentifier,
     pub cycle: usize,
@@ -33,7 +35,7 @@ impl PeriodicColumnAccess {
 }
 
 /// Represents an access of a [PublicInput], similar in nature to [TraceAccess]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PublicInputAccess {
     /// The name of the public input to access
     pub name: Identifier,

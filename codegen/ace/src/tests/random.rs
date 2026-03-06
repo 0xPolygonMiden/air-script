@@ -1,10 +1,13 @@
-use crate::inputs::StarkInputs;
-use crate::layout::{InputRegion, Layout};
-use crate::tests::quotient::{eval_quotient, poly_eval};
-use crate::{AceVars, QuadFelt};
-use air_ir::Air;
+use air_ir::{Air, FullTraceShape};
 use rand::Rng;
 use winter_utils::Randomizable;
+
+use crate::{
+    AceVars, QuadFelt,
+    inputs::StarkInputs,
+    layout::{InputRegion, Layout},
+    tests::quotient::{eval_quotient, poly_eval},
+};
 
 impl InputRegion {
     /// Generates a random list of values that fit in this region.
@@ -17,20 +20,22 @@ impl AceVars {
     /// Samples fully random inputs for the ACE circuit.
     pub fn random(air: &Air, log_trace_len: u32) -> Self {
         let layout = Layout::new(air);
-        let public = layout
-            .public_inputs
-            .values()
-            .map(|pi| pi.random())
-            .collect();
-        let segments = layout
-            .trace_segments
-            .map(|segment_row| segment_row.map(|row_region| row_region.random()));
-        let rand = layout.random_values.random();
+        let public = layout.public_inputs.values().map(|pi| pi.random()).collect();
+        let reduced_tables = layout.reduced_tables_region.random();
+        let segments = layout.trace_segments.map(|segment_row| {
+            FullTraceShape::new(
+                segment_row.segments.main.random(),
+                segment_row.segments.aux.random(),
+                segment_row.quotient.random(),
+            )
+        });
         let stark = StarkInputs::random(air, log_trace_len);
         Self {
             public,
+            reduced_tables,
             segments,
-            rand,
+            random_alpha: rand_quad(),
+            random_beta: rand_quad(),
             stark,
         }
     }

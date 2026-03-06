@@ -1,0 +1,66 @@
+##########################################################################################
+# SYSTEM CONSTRAINTS MODULE
+##########################################################################################
+#
+# System module is responsible for managing global system data, including the current VM
+# cycle, the current execution context, and the function hash (current procedure digest).
+#
+# SYSTEM COLUMN LAYOUT (6 columns):
+# ┌─────────┬───────────────────────────────────────────────────────────────┐
+# │ Column  │                        Purpose                                │
+# ├─────────┼───────────────────────────────────────────────────────────────┤
+# │    0    │ clk - VM execution clock (increments each cycle)              │
+# │    1    │ ctx - Current execution context                               │
+# │   2-5   │ fn_hash - Current function digest (4 elements)                │
+# └─────────┴───────────────────────────────────────────────────────────────┘
+#
+# Tagging is applied at call sites in the main module.
+##########################################################################################
+
+mod system
+use flags::*;
+
+# Requires decoder columns for operation flags and function hash loading.
+# Tagging is applied at the call site in the main module.
+
+ev system_transition([system[6], decoder[24]]) {
+    # Extract system columns
+    let clk = system[0];
+    let ctx = system[1];
+    let fn_hash = [system[2], system[3], system[4], system[5]];
+
+    # Extract decoder columns needed for operation flags
+    let op_bit0 = decoder[1];
+    let op_bit1 = decoder[2];
+    let op_bit2 = decoder[3];
+    let op_bit3 = decoder[4];
+    let op_bit4 = decoder[5];
+    let op_bit5 = decoder[6];
+    let op_bit6 = decoder[7];
+    let decoder_h = [decoder[8], decoder[9], decoder[10], decoder[11]];
+    let e0 = decoder[22];
+    let e1 = decoder[23];
+
+    # Compute operation flags
+    let op_bits = [op_bit0, op_bit1, op_bit2, op_bit3, op_bit4, op_bit5, op_bit6];
+    let f_call = flag_call(op_bits, e1);
+    let f_syscall = flag_syscall(op_bits, e1);
+    let f_dyncall = flag_dyncall(op_bits, e0);
+    let f_end = flag_end(op_bits, e1);
+
+    # Clock progression constraint
+    enf clk' = clk + 1;
+
+    # Context transitions
+    enf ctx' = clk + 1 when (f_call + f_dyncall);
+    enf ctx' = 0 when f_syscall;
+    let ctx_preserve = !(f_call + f_syscall + f_dyncall + f_end);
+    enf ctx' = ctx when ctx_preserve;
+
+    # Function hash transitions
+    let fn_hash_next = [fn_hash[0]', fn_hash[1]', fn_hash[2]', fn_hash[3]'];
+    enf next = src for (next, src) in (fn_hash_next, decoder_h) when f_call + f_dyncall;
+
+    let fn_preserve = !(f_call + f_dyncall + f_end);
+    enf next = cur for (next, cur) in (fn_hash_next, fn_hash) when fn_preserve;
+}

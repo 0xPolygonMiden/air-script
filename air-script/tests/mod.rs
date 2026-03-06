@@ -9,15 +9,23 @@ mod bitwise;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod buses;
 #[allow(unused_variables, dead_code, unused_mut)]
+mod comprehension_periodic_binding;
+#[allow(unused_variables, dead_code, unused_mut)]
+mod computed_indices;
+#[allow(unused_variables, dead_code, unused_mut)]
 mod constant_in_range;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod constants;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod constraint_comprehension;
 #[allow(unused_variables, dead_code, unused_mut)]
+mod cross_module_constants;
+#[allow(unused_variables, dead_code, unused_mut)]
 mod evaluators;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod fibonacci;
+#[allow(unused_variables, dead_code, unused_mut)]
+mod function_import;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod functions;
 #[allow(unused_variables, dead_code, unused_mut)]
@@ -38,3 +46,5 @@ mod system;
 mod trace_col_groups;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod variables;
+
+mod docs_sync;

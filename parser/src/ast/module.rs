@@ -1,18 +1,68 @@
-use std::collections::{BTreeMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashSet},
+    ops::Index,
+};
 
 use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Span, Spanned};
 
 use crate::{ast::*, sema::SemanticAnalysisError};
 
-/// This is a type alias used to clarify that an identifier refers to a module
-pub type ModuleId = Identifier;
+/// This is a type alias used to clarify that a module is referenced by a sequence of identifiers
+/// representing its path in the module hierarchy (e.g., `foo::bar::baz`).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Spanned)]
+pub struct ModuleId(pub Span<Vec<Identifier>>);
+
+impl ModuleId {
+    pub fn new(identifiers: Vec<Identifier>, span: SourceSpan) -> Self {
+        Self(Span::new(span, identifiers))
+    }
+
+    /// Returns the span of this module identifier
+    pub fn span(&self) -> SourceSpan {
+        self.0.span()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.item.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.item.is_empty()
+    }
+
+    /// Returns true if this module identifier is a submodule of another module identifier.
+    /// For example, `foo::bar` is a submodule of `foo`. Note that a module is considered a
+    /// submodule of itself.
+    pub fn is_submodule_of(&self, parent_module: &ModuleId) -> bool {
+        if self.len() < parent_module.len() {
+            return false;
+        }
+        self.0.item.iter().zip(parent_module.0.item.iter()).all(|(a, b)| a == b)
+    }
+}
+
+impl Index<usize> for ModuleId {
+    type Output = Identifier;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0.item[index]
+    }
+}
+
+impl std::fmt::Display for ModuleId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let names: Vec<&str> = self.0.item.iter().map(|id| id.as_str()).collect();
+        write!(f, "{}", names.join("::"))
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ModuleType {
     /// Only one root module may be defined in an AirScript program, using `def`.
     ///
     /// The root module has no restrictions on what sections it can contain, and in a
-    /// sense "provides" restricted sections to other modules in the program, e.g. the trace columns.
+    /// sense "provides" restricted sections to other modules in the program, e.g. the trace
+    /// columns.
     Root,
     /// Any number of library modules are permitted in an AirScript program, using `module`.
     ///
@@ -47,7 +97,7 @@ pub enum ModuleType {
 pub struct Module {
     #[span]
     pub span: SourceSpan,
-    pub name: ModuleId,
+    pub path: ModuleId,
     pub ty: ModuleType,
     pub imports: BTreeMap<ModuleId, Import>,
     pub constants: BTreeMap<Identifier, Constant>,
@@ -70,10 +120,10 @@ impl Module {
     /// the caller to guarantee that they construct a valid module that upholds those
     /// guarantees, otherwise it is expected that compilation will panic at some point down
     /// the line.
-    pub fn new(ty: ModuleType, span: SourceSpan, name: ModuleId) -> Self {
+    pub fn new(ty: ModuleType, span: SourceSpan, path: ModuleId) -> Self {
         Self {
             span,
-            name,
+            path,
             ty,
             imports: Default::default(),
             constants: Default::default(),
@@ -98,10 +148,10 @@ impl Module {
         diagnostics: &DiagnosticsHandler,
         ty: ModuleType,
         span: SourceSpan,
-        name: Identifier,
+        path: ModuleId,
         mut declarations: Vec<Declaration>,
     ) -> Result<Self, SemanticAnalysisError> {
-        let mut module = Self::new(ty, span, name);
+        let mut module = Self::new(ty, span, path);
 
         // Keep track of named items in this module while building it from
         // the set of declarations we received. We want to produce modules
@@ -114,21 +164,21 @@ impl Module {
             match declaration {
                 Declaration::Import(import) => {
                     module.declare_import(diagnostics, &mut names, import)?;
-                }
+                },
                 Declaration::Constant(constant) => {
                     module.declare_constant(diagnostics, &mut names, constant)?;
-                }
+                },
                 Declaration::EvaluatorFunction(evaluator) => {
                     module.declare_evaluator(diagnostics, &mut names, evaluator)?;
-                }
+                },
                 Declaration::Function(function) => {
                     module.declare_function(diagnostics, &mut names, function)?;
-                }
+                },
                 Declaration::PeriodicColumns(mut columns) => {
                     for column in columns.drain(..) {
                         module.declare_periodic_column(diagnostics, &mut names, column)?;
                     }
-                }
+                },
                 Declaration::PublicInputs(mut inputs) => {
                     if module.is_library() {
                         invalid_section_in_library(diagnostics, "public_inputs", span);
@@ -137,21 +187,25 @@ impl Module {
                     for input in inputs.item.drain(..) {
                         module.declare_public_input(diagnostics, &mut names, input)?;
                     }
-                }
+                },
                 Declaration::Trace(segments) => {
                     module.declare_trace_segments(diagnostics, &mut names, segments)?;
-                }
+                },
                 Declaration::BoundaryConstraints(statements) => {
                     module.declare_boundary_constraints(diagnostics, statements)?;
-                }
+                },
                 Declaration::IntegrityConstraints(statements) => {
                     module.declare_integrity_constraints(diagnostics, statements)?;
-                }
+                },
                 Declaration::Buses(mut buses) => {
+                    if module.is_library() {
+                        invalid_section_in_library(diagnostics, "buses", span);
+                        return Err(SemanticAnalysisError::RootSectionInLibrary(span));
+                    }
                     for bus in buses.drain(..) {
                         module.declare_bus(diagnostics, &mut names, bus)?;
                     }
-                }
+                },
             }
         }
 
@@ -193,12 +247,13 @@ impl Module {
         use std::collections::btree_map::Entry;
 
         let span = import.span();
-        match import.item {
-            Import::All { module: name } => {
-                if name == self.name {
-                    return Err(SemanticAnalysisError::ImportSelf(name.span()));
+        match import.item.clone() {
+            Import::All { module: path } => {
+                if path == self.path {
+                    return Err(SemanticAnalysisError::ImportSelf(path.span()));
                 }
-                match self.imports.entry(name) {
+
+                match self.imports.entry(path.clone()) {
                     Entry::Occupied(mut entry) => {
                         let first = entry.key().span();
                         match entry.get_mut() {
@@ -209,7 +264,7 @@ impl Module {
                                     .with_primary_label(span, "duplicate import occurs here")
                                     .with_secondary_label(first, "original import was here")
                                     .emit();
-                            }
+                            },
                             Import::Partial { items, .. } => {
                                 for item in items.iter() {
                                     diagnostics
@@ -217,45 +272,40 @@ impl Module {
                                         .with_message("redundant item import")
                                         .with_primary_label(item.span(), "this import is redundant")
                                         .with_secondary_label(
-                                            name.span(),
+                                            path.span(),
                                             "because this import imports all items already",
                                         )
                                         .emit();
                                 }
                                 entry.insert(import.item);
-                            }
+                            },
                         }
-                    }
+                    },
                     Entry::Vacant(entry) => {
                         entry.insert(import.item);
-                    }
+                    },
                 }
 
                 Ok(())
-            }
-            Import::Partial {
-                module: name,
-                mut items,
-            } => {
-                if name == self.name {
-                    return Err(SemanticAnalysisError::ImportSelf(name.span()));
+            },
+            Import::Partial { module: path, mut items } => {
+                if path == self.path {
+                    return Err(SemanticAnalysisError::ImportSelf(path.span()));
                 }
-                match self.imports.entry(name) {
+                match self.imports.entry(path.clone()) {
                     Entry::Occupied(mut entry) => match entry.get_mut() {
                         Import::All { module: prev } => {
                             diagnostics
                                 .diagnostic(Severity::Warning)
                                 .with_message("redundant module import")
-                                .with_primary_label(name.span(), "this import is redundant")
+                                .with_primary_label(path.span(), "this import is redundant")
                                 .with_secondary_label(
                                     prev.span(),
                                     "because this import includes all items already",
                                 )
                                 .emit();
-                        }
-                        Import::Partial {
-                            items: prev_items, ..
-                        } => {
+                        },
+                        Import::Partial { items: prev_items, .. } => {
                             for item in items.drain() {
                                 if let Some(prev) = prev_items.get(&item) {
                                     diagnostics
@@ -285,7 +335,7 @@ impl Module {
                                     return Err(SemanticAnalysisError::NameConflict(item.span()));
                                 }
                             }
-                        }
+                        },
                     },
                     Entry::Vacant(entry) => {
                         for item in items.iter().copied() {
@@ -304,15 +354,12 @@ impl Module {
                                 return Err(SemanticAnalysisError::NameConflict(item.span()));
                             }
                         }
-                        entry.insert(Import::Partial {
-                            module: name,
-                            items,
-                        });
-                    }
+                        entry.insert(Import::Partial { module: path, items });
+                    },
                 }
 
                 Ok(())
-            }
+            },
         }
     }
 
@@ -326,10 +373,7 @@ impl Module {
             diagnostics
                 .diagnostic(Severity::Error)
                 .with_message("constant identifiers must be uppercase ASCII characters, e.g. FOO")
-                .with_primary_label(
-                    constant.name.span(),
-                    "this is an invalid constant identifier",
-                )
+                .with_primary_label(constant.name.span(), "this is an invalid constant identifier")
                 .emit();
             return Err(SemanticAnalysisError::Invalid);
         }
@@ -341,10 +385,8 @@ impl Module {
 
         // Validate constant expression
         if let ConstantExpr::Matrix(matrix) = &constant.value {
-            let expected_len = matrix
-                .first()
-                .expect("expected matrix to have at least one row")
-                .len();
+            let expected_len =
+                matrix.first().expect("expected matrix to have at least one row").len();
             for vector in matrix.iter().skip(1) {
                 if expected_len != vector.len() {
                     diagnostics
@@ -394,6 +436,8 @@ impl Module {
             return Err(SemanticAnalysisError::NameConflict(function.name.span()));
         }
 
+        println!("Declared function: {:?}", function.name);
+
         self.functions.insert(function.name, function);
 
         Ok(())
@@ -436,14 +480,14 @@ impl Module {
                 assert_eq!(self.periodic_columns.insert(column.name, column), None);
 
                 Ok(())
-            }
+            },
             _ => {
                 diagnostics.diagnostic(Severity::Error)
                     .with_message("invalid periodic column declaration")
                     .with_primary_label(column.span(), "periodic columns must have a non-zero cycle length which is a power of two")
                     .emit();
                 Err(SemanticAnalysisError::Invalid)
-            }
+            },
         }
     }
 
@@ -458,12 +502,7 @@ impl Module {
         }
 
         if let Some(prev) = names.replace(NamespacedIdentifier::Binding(input.name())) {
-            conflicting_declaration(
-                diagnostics,
-                "public input",
-                prev.span(),
-                input.name().span(),
-            );
+            conflicting_declaration(diagnostics, "public input", prev.span(), input.name().span());
             Err(SemanticAnalysisError::NameConflict(input.name().span()))
         } else {
             assert_eq!(self.public_inputs.insert(input.name(), input), None);
@@ -588,6 +627,7 @@ impl Module {
             .values()
             .map(Export::Constant)
             .chain(self.evaluators.values().map(Export::Evaluator))
+            .chain(self.functions.values().map(Export::Function))
     }
 
     /// Get the export with the given identifier, if it can be found
@@ -595,14 +635,17 @@ impl Module {
         if id.is_uppercase() {
             self.constants.get(id).map(Export::Constant)
         } else {
-            self.evaluators.get(id).map(Export::Evaluator)
+            self.evaluators
+                .get(id)
+                .map(Export::Evaluator)
+                .or_else(|| self.functions.get(id).map(Export::Function))
         }
     }
 }
 impl Eq for Module {}
 impl PartialEq for Module {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
+        self.path == other.path
             && self.ty == other.ty
             && self.imports == other.imports
             && self.constants == other.constants

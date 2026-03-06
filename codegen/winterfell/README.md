@@ -16,11 +16,11 @@ Example usage:
 // parse the source string to a Result containing the AST or an Error
 let ast = parse(source.as_str()).expect("Parsing failed");
 
-// process the AST to get a Result containing the AirIR or an Error
-let ir = AirIR::new(&ast).expect("AIR is invalid");
+// Compile AST into AIR
+let air = compile(&diagnostics, ast).expect("compilation failed");
 
 // generate Rust code targeting the Winterfell prover
-let rust_code = CodeGenerator::new(&ir);
+let rust_code = CodeGenerator::new(&air);
 ```
 
 ## Generated Winterfell Rust Code

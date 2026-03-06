@@ -3,8 +3,9 @@ use winter_math::fields::f64::BaseElement as Felt;
 use winterfell::{Trace, TraceTable};
 
 use crate::{
+    generate_air_test,
     helpers::{AirTester, MyTraceTable},
-    selectors::selectors_with_evaluators_with_mir::{PublicInputs, SelectorsAir},
+    selectors::selectors_with_evaluators::PublicInputs,
 };
 
 #[derive(Clone)]
@@ -39,17 +40,9 @@ impl AirTester for SelectorsAirTester {
     }
 }
 
-#[test]
-fn test_selectors_with_evaluators_air() {
-    let air_tester = Box::new(SelectorsAirTester {});
-    let length = 1024;
-
-    let main_trace = air_tester.build_main_trace(length);
-    let aux_trace = air_tester.build_aux_trace(length);
-    let pub_inputs = air_tester.public_inputs();
-    let trace_info = air_tester.build_trace_info(length);
-    let options = air_tester.build_proof_options();
-
-    let air = SelectorsAir::new(trace_info, pub_inputs, options);
-    main_trace.validate::<SelectorsAir, Felt>(&air, aux_trace.as_ref());
-}
+generate_air_test!(
+    test_selectors_with_evaluators_air,
+    crate::selectors::selectors_with_evaluators::SelectorsAir,
+    SelectorsAirTester,
+    1024
+);

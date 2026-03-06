@@ -40,11 +40,7 @@ impl<T: fmt::Display> fmt::Display for DisplayTuple<'_, T> {
 pub struct DisplayTypedTuple<'a, V, T>(pub &'a [(V, T)]);
 impl<V: fmt::Display, T: fmt::Display> fmt::Display for DisplayTypedTuple<'_, V, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "({})",
-            DisplayCsv::new(self.0.iter().map(|(v, t)| format!("{v}: {t}")))
-        )
+        write!(f, "({})", DisplayCsv::new(self.0.iter().map(|(v, t)| format!("{v}: {t}"))))
     }
 }
 
@@ -101,16 +97,22 @@ impl fmt::Display for DisplayStatement<'_> {
                     in_expr_position: false,
                 };
                 write!(f, "{display}")
-            }
-            Statement::Enforce(expr) => {
-                write!(f, "enf {expr}")
-            }
-            Statement::EnforceIf(expr, selector) => {
-                write!(f, "enf {expr} when {selector}")
-            }
+            },
+            Statement::Enforce(enf) => {
+                if let Some(tag) = &enf.tag {
+                    write!(f, "{tag} ")?;
+                }
+                write!(f, "enf {}", enf.expr)
+            },
+            Statement::EnforceIf(match_expr) => {
+                write!(f, "enf {match_expr}")
+            },
             Statement::EnforceAll(expr) => {
+                if let Some(tag) = &expr.tag {
+                    write!(f, "{tag} ")?;
+                }
                 write!(f, "enf {expr}")
-            }
+            },
             Statement::Expr(expr) => write!(f, "return {expr}"),
             Statement::BusEnforce(expr) => write!(f, "enf {expr}"),
         }
@@ -139,7 +141,7 @@ impl fmt::Display for DisplayLet<'_> {
         self.write_indent(f)?;
         match &self.let_expr.value {
             super::Expr::Let(value) => {
-                writeln!(f, "let {} = {{", self.let_expr.name)?;
+                writeln!(f, "let {} = {{", self.let_expr.binding)?;
                 let display = DisplayLet {
                     let_expr: value,
                     indent: self.indent + 1,
@@ -152,15 +154,15 @@ impl fmt::Display for DisplayLet<'_> {
                 } else {
                     f.write_str("}\n")?;
                 }
-            }
+            },
             value => {
-                write!(f, "let {} = {}", self.let_expr.name, value)?;
+                write!(f, "let {} = {}", self.let_expr.binding, value)?;
                 if self.in_expr_position {
                     f.write_str(" in {\n")?;
                 } else {
                     f.write_char('\n')?;
                 }
-            }
+            },
         }
         for stmt in self.let_expr.body.iter() {
             writeln!(f, "{}", stmt.display(self.indent + 1))?;

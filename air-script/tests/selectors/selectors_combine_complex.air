@@ -1,0 +1,79 @@
+def SelectorsAir
+
+const R = [8, 4, 20, 31, 5, 15];
+
+trace_columns {
+    main: [s[3], a, b, c],
+}
+
+buses {
+    multiset p,
+}
+
+public_inputs {
+    stack_inputs: [1],
+}
+
+boundary_constraints {
+    enf c.first = 0;
+    enf p.first = null;
+    enf p.last = null;
+}
+
+fn double_with_mult(a: felt) -> felt {
+    return 2*a;
+}
+
+fn double_with_add(a: felt) -> felt {
+    return a+a;
+}
+
+# Note: If the constraints `a, b, ..., i` verify the following equivalency:
+#   a = c = e
+#   g = i
+# Then the match statement:
+#   enf match {
+#     case s0: {a, b, c, d},
+#     case s1: {e, f, g},
+#     case s2: {h, i},
+#   };
+# Is expected to get be reduced to only three constraints:
+#   a * (s0 + s1) + s2 * h = 0
+#   g * (s1 + s2) + s0 * b = 0
+#   s0 * d + s1 * f = 0
+
+ev ev_s0([a, b, c]) {
+    enf a = double_with_mult(R[0]); #a
+    enf b = R[1]; #b
+    enf a = double_with_add(R[0]); #c
+    enf c = R[2]; #d
+
+    p.insert(1, 2) when c;
+}  
+
+ev ev_s1([a, b, c]) {
+    enf a = 16; #e
+    enf b = R[3]; #f
+    enf c = R[4]; #g
+
+    p.insert(1, 2) when c;
+}  
+
+ev ev_s2([a, b, c]) {
+    enf b = R[4]; #h
+    enf c = R[4]; #i
+
+    p.remove(3, 4) when b;
+}
+
+integrity_constraints {
+    let s0 = s[0];
+    let s1 = !s[0] & s[1];
+    let s2 = !s[0] & !s[1];
+
+    enf match {
+        case s0: ev_s0([a, b, c]),
+        case s1: ev_s1([a, b, c]),
+        case s2: ev_s2([a, b, c]),
+    };
+}

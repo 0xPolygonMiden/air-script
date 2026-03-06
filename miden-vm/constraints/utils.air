@@ -1,0 +1,188 @@
+##########################################################################################
+# UTILITY CONSTRAINTS MODULE
+##########################################################################################
+#
+# The Utils module provides fundamental constraint patterns and helper functions used
+# throughout the Miden VM constraint system. These utilities ensure consistency and
+# reusability across all VM components.
+#
+##########################################################################################
+
+mod utils
+
+##########################################################################################
+# BINARY CONSTRAINT EVALUATORS
+##########################################################################################
+
+# Ensures value is either 0 or 1
+#
+# CONSTRAINT DEGREE: 2
+#
+# USAGE PATTERN:
+# ```air
+# let flag = column[i];
+# enf is_binary([flag]);  // Ensures flag ∈ {0, 1}
+# ```
+ev is_binary([a]) {
+    enf a^2 = a;
+}
+
+##########################################################################################
+# STATE CONSISTENCY EVALUATORS
+##########################################################################################
+
+# State persistence constraint - ensures values remain constant across cycles
+#
+# INTUITION:
+#
+# Many VM components require certain values to remain stable during specific
+# operations or phases. This constraint enforces immutability when needed.
+#
+# CONSTRAINT DEGREE: 1
+#
+# USAGE PATTERN:
+# ```air
+# let stable_value = column[i];
+# enf is_unchanged([stable_value]) when operation_active;
+# ```
+ev is_unchanged([column]) {
+    enf column' = column;
+}
+
+##########################################################################################
+# LOGICAL OPERATION HELPERS
+##########################################################################################
+
+# Binary constraint helper - returns 0 if input is binary (0 or 1), non-zero otherwise
+#
+# This function computes flag² - flag, which equals:
+# - 0 when flag = 0 (since 0² - 0 = 0)
+# - 0 when flag = 1 (since 1² - 1 = 0)
+# - non-zero for any other value
+#
+# Usage: enf binary_constraint(x) = 0; // constrains x to be 0 or 1
+fn binary_constraint(flag: felt) -> felt {
+    return flag^2 - flag;
+}
+
+##########################################################################################
+# BOOLEAN ALGEBRA OPERATIONS
+##########################################################################################
+
+# Logical AND: returns 1 if both a and b are 1, else 0
+#
+# CONSTRAINT DEGREE: 2
+#
+# USAGE EXAMPLES:
+# ```air
+# let result = binary_and(flag_a, flag_b);
+# ```
+fn binary_and(a: felt, b: felt) -> felt {
+    return a * b;
+}
+
+# Logical OR: returns 1 if either a or b is 1, else 0
+#
+# Uses inclusion-exclusion principle: |A ∪ B| = |A| + |B| - |A ∩ B|
+#
+# CONSTRAINT DEGREE: 2
+#
+# USAGE EXAMPLES:
+# ```air
+# let result = binary_or(flag_a, flag_b);
+# ```
+fn binary_or(a: felt, b: felt) -> felt {
+    return a + b - a * b;
+}
+
+# Logical XOR: returns 1 if exactly one of a or b is 1, else 0
+#
+# CONSTRAINT DEGREE: 2
+#
+# USAGE EXAMPLES:
+# ```air
+# let result = binary_xor(flag_a, flag_b);
+# ```
+fn binary_xor(a: felt, b: felt) -> felt {
+    let ab = a * b;
+    return a + b - (ab + ab);
+}
+
+##########################################################################################
+# CONDITIONAL OPERATIONS
+##########################################################################################
+
+# Conditional selection: returns if_true when condition=1, if_false when condition=0
+#
+# This is a multiplexer function that selects between two values based on condition
+#
+# CONSTRAINT DEGREE: 2
+#
+# USAGE EXAMPLES:
+# ```air
+# let result = select(condition, true_value, false_value);
+# ```
+fn select(condition: felt, if_true: felt, if_false: felt) -> felt {
+    return condition * (if_true - if_false) + if_false;
+}
+
+##########################################################################################
+# OPERATION LABELS
+##########################################################################################
+
+# Operation labels for bus communication
+#
+##########################################################################################
+
+# Hasher Chiplet Operation Labels
+const HASHERLINEARHASH = 3;        # Linear hash of n elements
+const HASHERMPVERIFY = 11;         # Merkle path verification
+const HASHERMRUPDATEOLD = 7;       # Merkle root update (old path)
+const HASHERMRUPDATENEW = 15;      # Merkle root update (new path)
+const HASHERRETURNHASH = 1;        # Return hash result (positions 4-7)
+const HASHERRETURNSTATE = 9;       # Return full state (all 12 elements)
+
+# Bitwise Chiplet Operation Labels
+const BITWISEAND = 2;              # Bitwise AND of two u32 values
+const BITWISEXOR = 6;              # Bitwise XOR of two u32 values
+
+# Memory Chiplet Operation Labels
+const MEMWRITEELEMENT = 4;         # Element write operation (1 element)
+const MEMREADELEMENT = 12;         # Element read operation (1 element)
+const MEMWRITEWORD = 20;           # Word write operation (4 elements)
+const MEMREADWORD = 28;            # Word read operation (4 elements)
+
+# ACE Chiplet Operation Label
+const ACEINIT = 8;                 # ACE circuit initialization (uses bus_6_chiplets_bus)
+
+# Log Precompile Operation label
+const LOGPRECOMPILE = 94;
+
+# Kernel ROM Chiplet Operation Labels
+const KERNELPROCCALL = 16;         # Kernel procedure call
+const KERNELPROCINIT = 48;         # Kernel procedure initialization
+
+##########################################################################################
+# CONTROL FLOW OPCODES (DOMAIN SEPARATION)
+##########################################################################################
+
+# Control flow opcodes used for domain separation in control block hashing.
+const OPCODE_JOIN = 87;            # 0b0101_0111
+const OPCODE_SPLIT = 84;           # 0b0101_0100
+const OPCODE_LOOP = 85;            # 0b0101_0101
+const OPCODE_CALL = 108;           # 0b0110_1100
+const OPCODE_DYN = 88;             # 0b0101_1000
+const OPCODE_DYNCALL = 92;         # 0b0101_1100
+const OPCODE_SYSCALL = 104;        # 0b0110_1000
+
+##########################################################################################
+# GENERAL CONSTANTS
+##########################################################################################
+
+# ACE instruction encoding offsets
+const ACEINSTRUCTIONIDONEOFFSET = 1073741824;  # 2^30
+const ACEINSTRUCTIONIDTWOOFFSET = 1152921504606846976;  # 2^60
+
+# Frame pointer (FMP) initialization for CALL/DYNCALL
+const FMP_ADDR = 4294967294;        # u32::MAX - 1
+const FMP_INIT_VALUE = 2147483648;  # 2^31

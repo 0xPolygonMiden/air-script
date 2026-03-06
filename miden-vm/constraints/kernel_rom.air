@@ -1,0 +1,75 @@
+##########################################################################################
+# KERNEL ROM CHIPLET CONSTRAINTS MODULE
+##########################################################################################
+#
+# The kernel ROM chiplet exposes the digest table used by kernel (system) calls.
+# This module enforces shape constraints: binary selector, digest contiguity, and
+# the start-of-block marker when entering kernel ROM.
+##########################################################################################
+
+mod kernel_rom
+
+use chiplets::*;
+use utils::*;
+
+##########################################################################################
+# KERNEL ROM CHIPLET CONSTRAINTS
+##########################################################################################
+
+ev kernel_rom_chiplet([chiplets[10]]) {
+    # Chiplet selector columns.
+    let s0_sel = chiplets[0];
+    let s1_sel = chiplets[1];
+    let s2_sel = chiplets[2];
+    let s3_sel = chiplets[3];
+    let s4_sel = chiplets[4];
+    let s3_next = s3_sel';
+    let s4_next = s4_sel';
+
+    let kernel_rom_flag = ker_rom_chiplet_flag(s0_sel, s1_sel, s2_sel, s3_sel, s4_sel);
+    let ace_flag = ace_chiplet_flag(s0_sel, s1_sel, s2_sel, s3_sel);
+
+    # Kernel ROM columns (after selectors).
+    let kr_sfirst = chiplets[5];
+    let kr_r0 = chiplets[6];
+    let kr_r1 = chiplets[7];
+    let kr_r2 = chiplets[8];
+    let kr_r3 = chiplets[9];
+
+    let kr_sfirst_next = kr_sfirst';
+    let kr_r0_next = kr_r0';
+    let kr_r1_next = kr_r1';
+    let kr_r2_next = kr_r2';
+    let kr_r3_next = kr_r3';
+
+    # -------------------------------------------------------------------------
+    # Selector constraint.
+    # -------------------------------------------------------------------------
+    enf kr_sfirst^2 = kr_sfirst when kernel_rom_flag;
+
+    # -------------------------------------------------------------------------
+    # Digest contiguity.
+    # -------------------------------------------------------------------------
+    # When sfirst' = 0 (not a new digest block) and s4' = 0 (not exiting kernel ROM),
+    # the digest values must remain unchanged.
+    let kr_not_exiting = !s4_next;
+    let kr_not_new_block = !kr_sfirst_next;
+    let kr_gate = kernel_rom_flag * kr_not_exiting * kr_not_new_block;
+    let kr_r = [kr_r0, kr_r1, kr_r2, kr_r3];
+    let kr_r_next = [kr_r0_next, kr_r1_next, kr_r2_next, kr_r3_next];
+    enf kr_gate * (next - cur) = 0 for (next, cur) in (kr_r_next, kr_r);
+
+    # -------------------------------------------------------------------------
+    # First row constraint.
+    # -------------------------------------------------------------------------
+    # When transitioning from ACE to kernel ROM, the first row must set sfirst' = 1.
+    let kernel_rom_next = s3_next * !s4_next;
+    let kr_first_row_gate = ace_flag * kernel_rom_next;
+    enf kr_sfirst_next = 1 when kr_first_row_gate;
+
+    # -------------------------------------------------------------------------
+    # Chiplets bus responses.
+    # -------------------------------------------------------------------------
+    let kr_label = select(kr_sfirst, KERNELPROCINIT, KERNELPROCCALL);
+    bus_6_chiplets_bus.insert(kr_label, kr_r0, kr_r1, kr_r2, kr_r3) when kernel_rom_flag;
+}

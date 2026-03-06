@@ -8,16 +8,36 @@ help:
 
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
+# -- building --------------------------------------------------------------------------------------
+
+.PHONY: build
+build: ## Build the project
+	cargo build --workspace
+
+.PHONY: check
+check: ## Run type checker
+	cargo check --workspace --all-targets
+
+# -- testing --------------------------------------------------------------------------------------
+
+.PHONY: test
+test: ## Run all tests
+	cargo test --workspace
+
+.PHONY: test-docs
+test-docs: ## Test documentation examples and build
+	mdbook test docs
+
 # -- linting --------------------------------------------------------------------------------------
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs
-	$(WARNINGS) cargo +nightly clippy --workspace --all-targets --all-features
+	$(WARNINGS) cargo +stable clippy --workspace --all-targets --all-features
 
 
 .PHONY: fix
 fix: ## Run Fix with configs
-	cargo +nightly fix --allow-staged --allow-dirty --all-targets --all-features
+	cargo +stable fix --allow-staged --allow-dirty --all-targets --all-features
 
 
 .PHONY: format
@@ -32,3 +52,14 @@ format-check: ## Run Format using nightly toolchain but only in check mode
 
 .PHONY: lint
 lint: format fix clippy ## Run all linting tasks at once (Clippy, fixing, formatting)
+
+# --- docs ----------------------------------------------------------------------------------------
+
+.PHONY: doc
+doc: ## Generates & checks documentation
+	cargo doc --keep-going --release
+
+
+.PHONY: book
+book: ## Builds the book & serves documentation site
+	mdbook serve --open docs

@@ -1,11 +1,12 @@
-use air_parser::ast::{Boundary, BusType};
+use std::collections::BTreeMap;
+
+use air_parser::ast::{Boundary, BusConstraintForm, BusType, TraceSegmentId};
 use air_pass::Pass;
 use miden_diagnostics::DiagnosticsHandler;
 use mir::ir::BusOpKind;
 
 use crate::{
-    AUX_SEGMENT, Air, BusBoundary, BusOp, CompileError, ConstraintDomain, NodeIndex, Operation,
-    TraceAccess,
+    Air, BusBoundary, BusOp, CompileError, ConstraintDomain, NodeIndex, Operation, TraceAccess,
 };
 
 pub struct BusOpExpand<'a> {
@@ -29,6 +30,7 @@ impl Pass for BusOpExpand<'_> {
                 &mut ir,
                 bus_type,
                 &bus.first,
+                bus.first_tag,
                 Boundary::First,
                 bus_index,
             );
@@ -36,56 +38,57 @@ impl Pass for BusOpExpand<'_> {
                 &mut ir,
                 bus_type,
                 &bus.last,
+                bus.last_tag,
                 Boundary::Last,
                 bus_index,
             );
 
             let bus_ops = bus.bus_ops.clone();
 
-            let bus_trace_access = TraceAccess::new(AUX_SEGMENT, bus_index, 0);
-            let bus_trace_access_with_offset = TraceAccess::new(AUX_SEGMENT, bus_index, 1);
+            let bus_trace_access = TraceAccess::new(TraceSegmentId::Aux, bus_index, 0);
+            let bus_trace_access_with_offset = TraceAccess::new(TraceSegmentId::Aux, bus_index, 1);
 
-            let bus_access =
-                ir.constraint_graph_mut()
-                    .insert_node(Operation::Value(crate::Value::TraceAccess(
-                        bus_trace_access,
-                    )));
+            let bus_access = ir
+                .constraint_graph_mut()
+                .insert_node(Operation::Value(crate::Value::TraceAccess(bus_trace_access)));
             let bus_access_with_offset =
                 ir.constraint_graph_mut()
                     .insert_node(Operation::Value(crate::Value::TraceAccess(
                         bus_trace_access_with_offset,
                     )));
 
-            // Then, depending on the bus type, expand the integrity constraint
-            match bus_type {
-                BusType::Multiset => {
-                    self.expand_multiset_constraint(
-                        &mut ir,
-                        bus_ops,
-                        bus_access,
-                        bus_access_with_offset,
-                    );
-                }
-                BusType::Logup => {
-                    self.expand_logup_constraint(
-                        &mut ir,
-                        bus_ops,
-                        bus_access,
-                        bus_access_with_offset,
-                    );
+            // Then, depending on the bus type, expand the integrity constraint if
+            // the bus is constrained
+            if !bus_ops.is_empty() {
+                match bus_type {
+                    BusType::Multiset => {
+                        self.expand_multiset_constraint(
+                            &mut ir,
+                            bus_ops,
+                            bus_access,
+                            bus_access_with_offset,
+                            bus_index,
+                            bus.transition_tag,
+                            bus.constraint_form,
+                        );
+                    },
+                    BusType::Logup => {
+                        self.expand_logup_constraint(
+                            &mut ir,
+                            bus_ops,
+                            bus_access,
+                            bus_access_with_offset,
+                            bus_index,
+                            bus.transition_tag,
+                        );
+                    },
                 }
             }
         }
 
         ir.num_random_values = buses
             .values()
-            .map(|bus| {
-                bus.bus_ops
-                    .iter()
-                    .map(|a| a.columns.len() + 1)
-                    .max()
-                    .unwrap_or_default()
-            })
+            .map(|bus| bus.bus_ops.iter().map(|a| a.columns.len() + 1).max().unwrap_or_default())
             .max()
             .unwrap_or_default() as u16;
 
@@ -105,53 +108,80 @@ impl<'a> BusOpExpand<'a> {
         ir: &mut Air,
         bus_type: BusType,
         bus_boundary: &BusBoundary,
+        tag: Option<u64>,
         boundary: Boundary,
         bus_index: usize,
     ) {
-        match bus_boundary {
-            // Boundaries to PublicInputTable should be handled later during codegen, as we cannot
-            // know at this point the length of the table, so we cannot generate the resulting constraint
-            BusBoundary::PublicInputTable(_public_input_table_access) => {}
-            // Unconstrained boundaries do not require any constraints
-            BusBoundary::Unconstrained => {}
+        let value = match bus_boundary {
+            // Boundaries to PublicInputTable reference a value corresponding to the random
+            // reduction of a public input table for a given bus type (multiset or logUp)
+            BusBoundary::PublicInputTable(public_input_table_access) => {
+                ir.constraint_graph_mut().insert_node(Operation::Value(
+                    crate::Value::PublicInputTable(*public_input_table_access),
+                ))
+            },
             BusBoundary::Null => {
-                // The value of the constraint for an empty bus depends on the bus types (1 for multiset, 0 for logup)
-                let value = match bus_type {
+                // The value of the constraint for an empty bus depends on the bus types (1 for
+                // multiset, 0 for logup)
+                match bus_type {
                     BusType::Multiset => ir
                         .constraint_graph_mut()
                         .insert_node(Operation::Value(crate::Value::Constant(1))),
                     BusType::Logup => ir
                         .constraint_graph_mut()
                         .insert_node(Operation::Value(crate::Value::Constant(0))),
-                };
+                }
+            },
+            // Unconstrained boundaries do not require any constraints
+            BusBoundary::Unconstrained => return,
+        };
+        let bus_trace_access = TraceAccess::new(TraceSegmentId::Aux, bus_index, 0);
+        let bus_access = ir
+            .constraint_graph_mut()
+            .insert_node(Operation::Value(crate::Value::TraceAccess(bus_trace_access)));
 
-                let bus_trace_access = TraceAccess::new(AUX_SEGMENT, bus_index, 0);
-                let bus_access = ir.constraint_graph_mut().insert_node(Operation::Value(
-                    crate::Value::TraceAccess(bus_trace_access),
-                ));
+        // Then, we enforce for instance the constraint `p.first = 0/1` or `q.first = value` to
+        // have an empty bus initially or equal to the values given in a public input table.
+        let root = ir.constraint_graph_mut().insert_node(Operation::Sub(bus_access, value));
+        let domain = match boundary {
+            Boundary::First => ConstraintDomain::FirstRow,
+            Boundary::Last => ConstraintDomain::LastRow,
+        };
+        // Store the generated constraint
+        ir.constraints.insert_constraint(TraceSegmentId::Aux, root, domain, tag);
 
-                // Then, we enforce for instance the constraint `p.first = 1` or `q.first = 0` to have an empty bus initially
-                let root = ir
-                    .constraint_graph_mut()
-                    .insert_node(Operation::Sub(bus_access, value));
-                let domain = match boundary {
-                    Boundary::First => ConstraintDomain::FirstRow,
-                    Boundary::Last => ConstraintDomain::LastRow,
-                };
-                // Store the generated constraint
-                ir.constraints.insert_constraint(AUX_SEGMENT, root, domain);
-            }
+        // Also store the initial value for auxiliary trace generation.
+        // Note: Variable-length public-input boundaries are legacy; once we switch to
+        // aux_finals-based buses, these will go away and all buses will start from identity
+        // (1 for multiset, 0 for logup).
+        if boundary == Boundary::First {
+            ir.buses_initial_values.insert(bus_index, value);
         }
     }
 
     /// Helper function to expand the integrity constraint of a multiset bus
+    #[allow(clippy::too_many_arguments)]
     fn expand_multiset_constraint(
         &self,
         ir: &mut Air,
         bus_ops: Vec<BusOp>,
         bus_access: NodeIndex,
         bus_access_with_offset: NodeIndex,
+        bus_index: usize,
+        tag: Option<u64>,
+        constraint_form: BusConstraintForm,
     ) {
+        if constraint_form == BusConstraintForm::Sum {
+            self.expand_multiset_constraint_sum_form(
+                ir,
+                bus_ops,
+                bus_access,
+                bus_access_with_offset,
+                bus_index,
+                tag,
+            );
+            return;
+        }
         let graph = ir.constraint_graph_mut();
 
         let mut p_factor = None;
@@ -168,7 +198,8 @@ impl<'a> BusOpExpand<'a> {
             // p.remove(c, d) when (1 - s)
             // => p' * (( A0 + A1 c + A2 d ) ( 1 - s ) + s) = p * ( A0 + A1 a + A2 b ) s + 1 - s
 
-            // p' * ( columns removed combined with alphas ) = p * ( columns inserted combined with alphas )
+            // p' * ( columns removed combined with alphas ) = p * ( columns inserted combined with
+            // alphas )
             let mut args_combined =
                 graph.insert_node(Operation::Value(crate::Value::RandomValue(0)));
 
@@ -196,7 +227,8 @@ impl<'a> BusOpExpand<'a> {
             let args_combined_with_latch_and_latch_inverse =
                 graph.insert_node(Operation::Add(args_combined_with_latch, inverse_latch));
 
-            // 4. Multiply them to p_factor or p_prime_factor (depending on bus_op_kind: insert: p, remove: p_prime)
+            // 4. Multiply them to p_factor or p_prime_factor (depending on bus_op_kind: insert: p,
+            //    remove: p_prime)
             match bus_op_kind {
                 BusOpKind::Insert => {
                     p_factor = match p_factor {
@@ -206,7 +238,7 @@ impl<'a> BusOpExpand<'a> {
                         ))),
                         None => Some(args_combined_with_latch_and_latch_inverse),
                     };
-                }
+                },
                 BusOpKind::Remove => {
                     p_prime_factor = match p_prime_factor {
                         Some(p_prime_factor) => Some(graph.insert_node(Operation::Mul(
@@ -215,11 +247,12 @@ impl<'a> BusOpExpand<'a> {
                         ))),
                         None => Some(args_combined_with_latch_and_latch_inverse),
                     };
-                }
+                },
             }
         }
 
-        // 5. Multiply the factors with the bus column (with and without offset for p' and p respectively)
+        // 5. Multiply the factors with the bus column (with and without offset for p' and p
+        //    respectively)
         let p_prod = match p_factor {
             Some(p_factor) => graph.insert_node(Operation::Mul(p_factor, bus_access)),
             None => bus_access,
@@ -227,15 +260,110 @@ impl<'a> BusOpExpand<'a> {
         let p_prime_prod = match p_prime_factor {
             Some(p_prime_factor) => {
                 graph.insert_node(Operation::Mul(p_prime_factor, bus_access_with_offset))
-            }
+            },
             None => bus_access_with_offset,
         };
 
         // 6. Create the resulting constraint and insert it into the graph
         let root = graph.insert_node(Operation::Sub(p_prod, p_prime_prod));
 
-        ir.constraints
-            .insert_constraint(AUX_SEGMENT, root, ConstraintDomain::EveryRow);
+        ir.constraints.insert_constraint(
+            TraceSegmentId::Aux,
+            root,
+            ConstraintDomain::EveryFrame(2),
+            tag,
+        );
+
+        // Also store the expression to computed p_prime for auxiliary trace generation
+        ir.buses_transitions.insert(bus_index, (p_prod, p_prime_factor));
+    }
+
+    /// Helper function to expand multiset constraints using the sum form
+    /// (assumes mutually-exclusive latches).
+    fn expand_multiset_constraint_sum_form(
+        &self,
+        ir: &mut Air,
+        bus_ops: Vec<BusOp>,
+        bus_access: NodeIndex,
+        bus_access_with_offset: NodeIndex,
+        bus_index: usize,
+        tag: Option<u64>,
+    ) {
+        let graph = ir.constraint_graph_mut();
+
+        let one = graph.insert_node(Operation::Value(crate::Value::Constant(1)));
+        let zero = graph.insert_node(Operation::Value(crate::Value::Constant(0)));
+
+        let mut insert_sum = zero;
+        let mut insert_flag_sum = zero;
+        let mut remove_sum = zero;
+        let mut remove_flag_sum = zero;
+
+        let mut insert_groups: BTreeMap<NodeIndex, NodeIndex> = BTreeMap::new();
+        let mut remove_groups: BTreeMap<NodeIndex, NodeIndex> = BTreeMap::new();
+
+        for bus_op in bus_ops {
+            let columns = bus_op.columns.clone();
+            let latch = bus_op.latch;
+            let bus_op_kind = bus_op.op_kind;
+
+            // args_combined = alpha0 + alpha1*col1 + ...
+            let mut args_combined =
+                graph.insert_node(Operation::Value(crate::Value::RandomValue(0)));
+            for (col_index, column) in columns.iter().enumerate() {
+                let alpha =
+                    graph.insert_node(Operation::Value(crate::Value::RandomValue(col_index + 1)));
+                let arg_times_alpha = graph.insert_node(Operation::Mul(*column, alpha));
+                args_combined = graph.insert_node(Operation::Add(args_combined, arg_times_alpha));
+            }
+
+            let groups = match bus_op_kind {
+                BusOpKind::Insert => &mut insert_groups,
+                BusOpKind::Remove => &mut remove_groups,
+            };
+
+            groups
+                .entry(latch)
+                .and_modify(|existing| {
+                    let prod = graph.insert_node(Operation::Mul(*existing, args_combined));
+                    *existing = prod;
+                })
+                .or_insert(args_combined);
+        }
+
+        for (latch, msg_prod) in insert_groups {
+            let term = graph.insert_node(Operation::Mul(msg_prod, latch));
+            insert_sum = graph.insert_node(Operation::Add(insert_sum, term));
+            insert_flag_sum = graph.insert_node(Operation::Add(insert_flag_sum, latch));
+        }
+
+        for (latch, msg_prod) in remove_groups {
+            let term = graph.insert_node(Operation::Mul(msg_prod, latch));
+            remove_sum = graph.insert_node(Operation::Add(remove_sum, term));
+            remove_flag_sum = graph.insert_node(Operation::Add(remove_flag_sum, latch));
+        }
+
+        // response = sum(insert_i * v_i) + (1 - sum(insert_i))
+        let insert_rest = graph.insert_node(Operation::Sub(one, insert_flag_sum));
+        let insert_factor = graph.insert_node(Operation::Add(insert_sum, insert_rest));
+        // request = sum(remove_i * v_i) + (1 - sum(remove_i))
+        let remove_rest = graph.insert_node(Operation::Sub(one, remove_flag_sum));
+        let remove_factor = graph.insert_node(Operation::Add(remove_sum, remove_rest));
+
+        let p_prod = graph.insert_node(Operation::Mul(insert_factor, bus_access));
+        let p_prime_prod = graph.insert_node(Operation::Mul(remove_factor, bus_access_with_offset));
+        // Match Miden VM ordering: s_aux' * request - s_aux * response.
+        let root = graph.insert_node(Operation::Sub(p_prime_prod, p_prod));
+
+        ir.constraints.insert_constraint(
+            TraceSegmentId::Aux,
+            root,
+            ConstraintDomain::EveryFrame(2),
+            tag,
+        );
+
+        // Also store the expression to compute p' for auxiliary trace generation.
+        ir.buses_transitions.insert(bus_index, (p_prod, Some(remove_factor)));
     }
 
     /// Helper function to expand the integrity constraint of a logup bus
@@ -245,6 +373,8 @@ impl<'a> BusOpExpand<'a> {
         bus_ops: Vec<BusOp>,
         bus_access: NodeIndex,
         bus_access_with_offset: NodeIndex,
+        bus_index: usize,
+        tag: Option<u64>,
     ) {
         let graph = ir.constraint_graph_mut();
         // Example:
@@ -252,8 +382,9 @@ impl<'a> BusOpExpand<'a> {
         // q.remove(e, f, g) when s
         // => q' + s / ( A0 + A1 e + A2 f + A3 g ) = q + d / ( A0 + A1 a + A2 b + A3 c )
 
-        //  q' + s / ( columns removed combined with alphas ) = q + d / ( columns inserted combined with alphas )
-        // PROD * q' + s * ( columns inserted combined with alphas ) = PROD * q + d * ( columns removed combined with alphas )
+        //  q' + s / ( columns removed combined with alphas ) = q + d / ( columns inserted combined
+        // with alphas ) PROD * q' + s * ( columns inserted combined with alphas ) = PROD *
+        // q + d * ( columns removed combined with alphas )
 
         // 1. Compute all the factors
 
@@ -281,66 +412,94 @@ impl<'a> BusOpExpand<'a> {
             factors.push(args_combined);
         }
 
-        // 2. Compute the product of all factors (will be used to multiply q and q')
+        // 2. Group identical denominators (factors) and sum their latches.
+        //
+        // If the same denominator appears multiple times (e.g., the same value is inserted in
+        // multiple bus ops), we must not multiply it repeatedly in the common denominator.
+        // The LogUp identity is:
+        //
+        //   q' + Σ(remove_i / den_i) = q + Σ(insert_i / den_i)
+        //
+        // Grouping identical den_i gives:
+        //
+        //   q' + Σ( (sum_remove_j) / den_j ) = q + Σ( (sum_insert_j) / den_j )
+        //
+        // which corresponds to using a single copy of each unique denominator. This keeps the
+        // bus abstraction (send/receive) while matching constraints that are written directly
+        // with a shared denominator.
+        #[derive(Default)]
+        struct FactorGroup {
+            insert_sum: Option<NodeIndex>,
+            remove_sum: Option<NodeIndex>,
+        }
+
+        let mut add_to_sum = |acc: &mut Option<NodeIndex>, value: NodeIndex| {
+            *acc = Some(match *acc {
+                Some(existing) => graph.insert_node(Operation::Add(existing, value)),
+                None => value,
+            });
+        };
+
+        let mut groups: BTreeMap<NodeIndex, FactorGroup> = BTreeMap::new();
+        for (bus_index, bus_op) in bus_ops.iter().enumerate() {
+            let factor = factors[bus_index];
+            let entry = groups.entry(factor).or_default();
+            match bus_op.op_kind {
+                BusOpKind::Insert => add_to_sum(&mut entry.insert_sum, bus_op.latch),
+                BusOpKind::Remove => add_to_sum(&mut entry.remove_sum, bus_op.latch),
+            };
+        }
+
+        let unique_factors: Vec<(NodeIndex, FactorGroup)> = groups.into_iter().collect();
+
+        // 3. Compute the product of all *unique* factors (used to multiply q and q').
         let mut total_factors = None;
-        for factor in factors.iter() {
+        for (factor, _) in unique_factors.iter() {
             total_factors = match total_factors {
                 Some(total_factors) => {
                     Some(graph.insert_node(Operation::Mul(total_factors, *factor)))
-                }
+                },
                 None => Some(*factor),
             };
         }
 
-        // 3. For each column, compute the product of all factors except the one of the current column, and multiply it with the latch
+        // 4. For each unique denominator, compute D / den and multiply by the summed latch.
         let mut terms_added_to_bus = None;
         let mut terms_removed_from_bus = None;
 
-        for (bus_index, bus_op) in bus_ops.iter().enumerate() {
-            let latch = bus_op.latch;
-            let bus_op_kind = bus_op.op_kind;
-
-            // 3.1 Compute the product of all factors except the one of the current columns
+        for (idx, (_factor, group)) in unique_factors.iter().enumerate() {
+            // Compute product of all unique factors except the current one.
             let mut factors_without_current = None;
-            for (i, factor) in factors.iter().enumerate() {
-                if i != bus_index {
+            for (j, (other_factor, _)) in unique_factors.iter().enumerate() {
+                if j != idx {
                     factors_without_current = match factors_without_current {
-                        Some(factors_without_current) => Some(
-                            graph.insert_node(Operation::Mul(factors_without_current, *factor)),
-                        ),
-                        None => Some(*factor),
+                        Some(prod) => Some(graph.insert_node(Operation::Mul(prod, *other_factor))),
+                        None => Some(*other_factor),
                     };
                 }
             }
 
-            // 3.2 Multiply by latch
-            let factors_without_current_with_latch = match factors_without_current {
-                Some(factors_without_current) => {
-                    graph.insert_node(Operation::Mul(factors_without_current, latch))
-                }
-                None => latch,
-            };
+            // term = sum_latch * (D / den). If D/den is 1, this is just sum_latch.
+            if let Some(insert_sum) = group.insert_sum {
+                let term = match factors_without_current {
+                    Some(scale) => graph.insert_node(Operation::Mul(insert_sum, scale)),
+                    None => insert_sum,
+                };
+                terms_added_to_bus = match terms_added_to_bus {
+                    Some(acc) => Some(graph.insert_node(Operation::Add(acc, term))),
+                    None => Some(term),
+                };
+            }
 
-            // 3.3 Depending on the bus_op_kind, add to q_factor or q_prime_factor
-            match bus_op_kind {
-                BusOpKind::Insert => {
-                    terms_added_to_bus = match terms_added_to_bus {
-                        Some(terms_added_to_bus) => Some(graph.insert_node(Operation::Add(
-                            terms_added_to_bus,
-                            factors_without_current_with_latch,
-                        ))),
-                        None => Some(factors_without_current_with_latch),
-                    };
-                }
-                BusOpKind::Remove => {
-                    terms_removed_from_bus = match terms_removed_from_bus {
-                        Some(terms_removed_from_bus) => Some(graph.insert_node(Operation::Add(
-                            terms_removed_from_bus,
-                            factors_without_current_with_latch,
-                        ))),
-                        None => Some(factors_without_current_with_latch),
-                    };
-                }
+            if let Some(remove_sum) = group.remove_sum {
+                let term = match factors_without_current {
+                    Some(scale) => graph.insert_node(Operation::Mul(remove_sum, scale)),
+                    None => remove_sum,
+                };
+                terms_removed_from_bus = match terms_removed_from_bus {
+                    Some(acc) => Some(graph.insert_node(Operation::Add(acc, term))),
+                    None => Some(term),
+                };
             }
         }
 
@@ -352,25 +511,42 @@ impl<'a> BusOpExpand<'a> {
         let q_prime_prod = match total_factors {
             Some(total_factors) => {
                 graph.insert_node(Operation::Mul(total_factors, bus_access_with_offset))
-            }
+            },
             None => bus_access_with_offset,
         };
         let q_term = match terms_added_to_bus {
             Some(terms_added_to_bus) => {
                 graph.insert_node(Operation::Add(q_prod, terms_added_to_bus))
-            }
+            },
             None => q_prod,
         };
         let q_prime_term = match terms_removed_from_bus {
             Some(terms_removed_from_bus) => {
                 graph.insert_node(Operation::Add(q_prime_prod, terms_removed_from_bus))
-            }
+            },
             None => q_prime_prod,
         };
 
         // 5. Create the resulting constraint
-        let root = graph.insert_node(Operation::Sub(q_term, q_prime_term));
-        ir.constraints
-            .insert_constraint(AUX_SEGMENT, root, ConstraintDomain::EveryRow);
+        let root = graph.insert_node(Operation::Sub(q_prime_term, q_term));
+
+        // Also store the expression to computed q_prime for auxiliary trace generation
+        // Note: TODO: Potentially adapt CSE to handle this properly, otherwise indices might
+        // change...
+        let numerator = match terms_removed_from_bus {
+            Some(terms_removed_from_bus) => {
+                graph.insert_node(Operation::Sub(q_term, terms_removed_from_bus))
+            },
+            None => q_term,
+        };
+
+        ir.constraints.insert_constraint(
+            TraceSegmentId::Aux,
+            root,
+            ConstraintDomain::EveryFrame(2),
+            tag,
+        );
+
+        ir.buses_transitions.insert(bus_index, (numerator, total_factors));
     }
 }

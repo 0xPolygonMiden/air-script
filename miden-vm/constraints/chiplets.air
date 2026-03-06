@@ -1,0 +1,81 @@
+##########################################################################################
+# CHIPLET SELECTOR CONSTRAINTS MODULE
+##########################################################################################
+#
+# This module defines the shared chiplet selector constraints.
+#
+# The selector layout is hierarchical across all chiplets in the chiplets trace:
+# - s0 splits the rows into two parts: s0 = 0 selects the hasher chiplet, s0 = 1 selects the
+#   non-hasher subtree (bitwise, memory, ACE, kernel ROM).
+# - s1..s4 are prefix bits that walk down that subtree; each bit only carries meaning when all
+#   earlier selector bits are 1. When a prefix bit is 0, lower bits become don't‑care and are
+#   available for the active chiplet's internal use.
+#
+##########################################################################################
+
+mod chiplets
+
+use utils::*;
+
+##########################################################################################
+# CHIPLET SELECTOR SYSTEM
+##########################################################################################
+
+# Hierarchical chiplet selector constraints.
+#
+# The two invariants enforced here:
+# 1. Each selector is binary (0 or 1) when it is active.
+# 2. Once a selector becomes active (1), it must remain active (no 1 -> 0).
+#
+
+ev chiplet_selectors([s[5]]) {
+    ####################################################################################
+    # BINARY CONSTRAINTS - Ensure all selectors are valid binary values
+    ####################################################################################
+
+    enf is_binary([s[0]]);
+    enf is_binary([s[1]]) when s[0];
+    enf is_binary([s[2]]) when s[0] & s[1];
+    enf is_binary([s[3]]) when s[0] & s[1] & s[2];
+    enf is_binary([s[4]]) when s[0] & s[1] & s[2] & s[3];
+
+    ####################################################################################
+    # STABILITY CONSTRAINTS - Prevent deactivation (forbids 1 -> 0 transitions)
+    ####################################################################################
+
+    # Once a selector level becomes active (1), it must remain active.
+    enf s[0]' = s[0] when s[0];
+    enf s[1]' = s[1] when s[0] & s[1];
+    enf s[2]' = s[2] when s[0] & s[1] & s[2];
+    enf s[3]' = s[3] when s[0] & s[1] & s[2] & s[3];
+    enf s[4]' = s[4] when s[0] & s[1] & s[2] & s[3] & s[4];
+}
+
+##########################################################################################
+# CHIPLET ACTIVATION FUNCTIONS
+##########################################################################################
+
+# Hasher chiplet: Active when root selector is inactive
+fn hasher_chiplet_flag(s_0: felt) -> felt {
+    return !s_0;
+}
+
+# Bitwise chiplet: Active when s0=1, s1=0
+fn bitwise_chiplet_flag(s_0: felt, s_1: felt) -> felt {
+    return s_0 * !s_1;
+}
+
+# Memory chiplet: Active when s0=1, s1=1, s2=0
+fn memory_chiplet_flag(s_0: felt, s_1: felt, s_2: felt) -> felt {
+    return s_0 * s_1 * !s_2;
+}
+
+# ACE chiplet: Active when s0=1, s1=1, s2=1, s3=0
+fn ace_chiplet_flag(s_0: felt, s_1: felt, s_2: felt, s_3: felt) -> felt {
+    return s_0 * s_1 * s_2 * !s_3;
+}
+
+# Kernel ROM chiplet: Active when s0=1, s1=1, s2=1, s3=1, s4=0
+fn ker_rom_chiplet_flag(s_0: felt, s_1: felt, s_2: felt, s_3: felt, s_4: felt) -> felt {
+    return s_0 * s_1 * s_2 * s_3 * !s_4;
+}

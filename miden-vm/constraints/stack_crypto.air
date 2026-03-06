@@ -1,0 +1,338 @@
+##########################################################################################
+# STACK CRYPTO CONSTRAINTS MODULE
+##########################################################################################
+#
+# Enforces crypto-related stack operation semantics (cryptostream, hornerbase, hornerext).
+# Tagging is applied at the call site in the main module.
+##########################################################################################
+
+mod stack_crypto
+use flags::*;
+use utils::*;
+
+ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
+    let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
+         stack_b0_unused, stack_b1_unused, stack_h0_unused] = stack;
+
+    let [system_clk, system_ctx, system_fn_hash_0_unused, system_fn_hash_1_unused,
+         system_fn_hash_2_unused, system_fn_hash_3_unused] = system;
+
+    # b0..b6 are the 7 opcode bits (LSB -> MSB) used by op flag helpers.
+    # h0..h5 are user op helpers used by horner operations.
+    # e0/e1 are the two extra op-bit columns used for degree reduction.
+    let [
+        d0_unused,
+        b0,
+        b1,
+        b2,
+        b3,
+        b4,
+        b5,
+        b6,
+        d8_unused,
+        d9_unused,
+        h0,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        d16_unused,
+        d17_unused,
+        d18_unused,
+        d19_unused,
+        d20_unused,
+        d21_unused,
+        e0,
+        e1
+    ] = decoder;
+
+    let op_bits = [b0, b1, b2, b3, b4, b5, b6];
+
+    let is_cryptostream = flag_cryptostream(op_bits, e1);
+    let is_hornerbase = flag_hornerbase(op_bits, e0);
+    let is_hornerext = flag_hornerext(op_bits, e0);
+    let is_logprecompile = flag_logprecompile(op_bits, e0);
+    let is_hperm = flag_hperm(op_bits, e0);
+    let is_mpverify = flag_mpverify(op_bits, e0);
+    let is_pipe = flag_pipe(op_bits, e0);
+    let is_mstream = flag_mstream(op_bits, e0);
+    let is_mrupdate = flag_mrupdate(op_bits, e1);
+
+    # Horner coefficients: c0..c7 = s0..s7.
+    let c = [s0, s1, s2, s3, s4, s5, s6, s7];
+
+    # ------------------------------------------------------------------------------------------
+    # CRYPTOSTREAM
+    # ------------------------------------------------------------------------------------------
+    # CRYPTOSTREAM: stream two words from memory at s12 (src), add them to the current
+    # rate/keystream block in s0..s7, and write the ciphertext to memory at s13 (dst).
+    # Here we only enforce the stack mechanics (pointer bumps and preserved lanes); the memory
+    # reads/writes are enforced by the chiplets bus constraints.
+    # The bus encodes plaintext as plain_i = cipher_i - rate_i, so stack updates satisfy:
+    #   cipher_i = rate_i + plain_i  (equivalently plain_i = s_i' - s_i).
+    # - s12/s13 are source/destination pointers and advance by 8 (two words).
+    # - s8..s11 (capacity) and s14..s15 are preserved.
+    # Positions 8-11: Unchanged (capacity preserved)
+    let cryptostream_keep_top = [s8' - s8, s9' - s9, s10' - s10, s11' - s11];
+    enf c = 0 for c in cryptostream_keep_top when is_cryptostream;
+    # Positions 12-13: Source/destination pointers incremented by 8 (2 words)
+    let cryptostream_bump = [s12' - (s12 + 8), s13' - (s13 + 8)];
+    enf c = 0 for c in cryptostream_bump when is_cryptostream;
+    # Positions 14-15: Unchanged
+    let cryptostream_keep_tail = [s14' - s14, s15' - s15];
+    enf c = 0 for c in cryptostream_keep_tail when is_cryptostream;
+
+    # Plaintext = ciphertext - rate (used for memory reads).
+    let p0 = s0' - s0; let p1 = s1' - s1; let p2 = s2' - s2; let p3 = s3' - s3;
+    let p4 = s4' - s4; let p5 = s5' - s5; let p6 = s6' - s6; let p7 = s7' - s7;
+
+    # ------------------------------------------------------------------------------------------
+    # HORNERBASE
+    # ------------------------------------------------------------------------------------------
+    # Positions 0-13: Unchanged
+    let hornerbase_keep = [
+        s0' - s0, s1' - s1, s2' - s2, s3' - s3, s4' - s4, s5' - s5, s6' - s6,
+        s7' - s7, s8' - s8, s9' - s9, s10' - s10, s11' - s11, s12' - s12, s13' - s13
+    ];
+    enf c = 0 for c in hornerbase_keep when is_hornerbase;
+
+    # Local variables for readability.
+    # alpha = a0 + a1 * u, where u^2 = 7 and (a0, a1) are in h0/h1.
+    let a0 = h0; let a1 = h1;
+    let acc0 = s14; let acc1 = s15;
+    let tmp0_0 = h4; let tmp0_1 = h5;
+    let tmp1_0 = h2; let tmp1_1 = h3;
+
+    # Precompute alpha powers.
+    let alpha_sq = fp2_square(a0, a1);
+    let alpha_sq_0 = alpha_sq[0];
+    let alpha_sq_1 = alpha_sq[1];
+    let alpha_cu = fp2_mul(alpha_sq_0, alpha_sq_1, a0, a1);
+    let alpha_cu_0 = alpha_cu[0];
+    let alpha_cu_1 = alpha_cu[1];
+
+    # tmp0 = acc·α² + c0·α + c1
+    let acc_alpha2 = fp2_mul(acc0, acc1, alpha_sq_0, alpha_sq_1);
+    let c0_alpha = fp2_mul_scalar(a0, a1, c[0]);
+    let tmp0_expected = fp2_add3(
+        acc_alpha2[0], acc_alpha2[1],
+        c0_alpha[0], c0_alpha[1],
+        c[1], 0
+    );
+    enf tmp0_0 = tmp0_expected[0] when is_hornerbase;
+    enf tmp0_1 = tmp0_expected[1] when is_hornerbase;
+
+    # tmp1 = tmp0·α³ + c2·α² + c3·α + c4
+    let tmp0_alpha3 = fp2_mul(tmp0_0, tmp0_1, alpha_cu_0, alpha_cu_1);
+    let c2_alpha2 = fp2_mul_scalar(alpha_sq_0, alpha_sq_1, c[2]);
+    let c3_alpha = fp2_mul_scalar(a0, a1, c[3]);
+    let tmp1_expected = fp2_add4(
+        tmp0_alpha3[0], tmp0_alpha3[1],
+        c2_alpha2[0], c2_alpha2[1],
+        c3_alpha[0], c3_alpha[1],
+        c[4], 0
+    );
+    enf tmp1_0 = tmp1_expected[0] when is_hornerbase;
+    enf tmp1_1 = tmp1_expected[1] when is_hornerbase;
+
+    # acc' = tmp1·α³ + c5·α² + c6·α + c7
+    let tmp1_alpha3 = fp2_mul(tmp1_0, tmp1_1, alpha_cu_0, alpha_cu_1);
+    let c5_alpha2 = fp2_mul_scalar(alpha_sq_0, alpha_sq_1, c[5]);
+    let c6_alpha = fp2_mul_scalar(a0, a1, c[6]);
+    let acc_expected = fp2_add4(
+        tmp1_alpha3[0], tmp1_alpha3[1],
+        c5_alpha2[0], c5_alpha2[1],
+        c6_alpha[0], c6_alpha[1],
+        c[7], 0
+    );
+    enf s14' = acc_expected[0] when is_hornerbase;
+    enf s15' = acc_expected[1] when is_hornerbase;
+
+    # ------------------------------------------------------------------------------------------
+    # HORNEREXT
+    # ------------------------------------------------------------------------------------------
+    # Positions 0-13: Unchanged
+    let hornerext_keep = [
+        s0' - s0, s1' - s1, s2' - s2, s3' - s3, s4' - s4, s5' - s5, s6' - s6,
+        s7' - s7, s8' - s8, s9' - s9, s10' - s10, s11' - s11, s12' - s12, s13' - s13
+    ];
+    enf c = 0 for c in hornerext_keep when is_hornerext;
+
+    let tmp0 = h4;
+    let tmp1 = h5;
+
+    # Hornerext coefficients: c_i = (c[2i], c[2i+1]) in the base field.
+    # acc_tmp = acc·α² + c0·α + c1
+    let acc_alpha2_ext = fp2_mul(acc0, acc1, alpha_sq_0, alpha_sq_1);
+    let c0_alpha_ext = fp2_mul(a0, a1, c[0], c[1]);
+    let tmp_expected = fp2_add3(
+        acc_alpha2_ext[0], acc_alpha2_ext[1],
+        c0_alpha_ext[0], c0_alpha_ext[1],
+        c[2], c[3]
+    );
+    enf tmp0 = tmp_expected[0] when is_hornerext;
+    enf tmp1 = tmp_expected[1] when is_hornerext;
+
+    # acc' = acc_tmp·α² + c2·α + c3
+    let tmp_alpha2_ext = fp2_mul(tmp0, tmp1, alpha_sq_0, alpha_sq_1);
+    let c2_alpha_ext = fp2_mul(a0, a1, c[4], c[5]);
+    let acc_expected_ext = fp2_add3(
+        tmp_alpha2_ext[0], tmp_alpha2_ext[1],
+        c2_alpha_ext[0], c2_alpha_ext[1],
+        c[6], c[7]
+    );
+    enf s14' = acc_expected_ext[0] when is_hornerext;
+    enf s15' = acc_expected_ext[1] when is_hornerext;
+
+    # ------------------------------------------------------------------------------------------
+    # LOG PRECOMPILE (hash-kernel bus)
+    # ------------------------------------------------------------------------------------------
+    # Hash-kernel bus message layout for LOGPRECOMPILE:
+    # label + cap_prev (remove) or label + cap_next (insert).
+    let lp_cap_prev0 = h1;
+    let lp_cap_prev1 = h2;
+    let lp_cap_prev2 = h3;
+    let lp_cap_prev3 = h4;
+    bus_5_v_table.remove(LOGPRECOMPILE, lp_cap_prev0, lp_cap_prev1, lp_cap_prev2, lp_cap_prev3)
+        when is_logprecompile;
+    bus_5_v_table.insert(LOGPRECOMPILE, s8', s9', s10', s11') when is_logprecompile;
+
+    # ------------------------------------------------------------------------------------------
+    # CHIPLETS BUS REQUESTS
+    # ------------------------------------------------------------------------------------------
+    let helper_addr = h0;
+
+    # HPERM requests.
+    let hperm_input_label = HASHERLINEARHASH + 16;
+    let hperm_output_label = HASHERRETURNSTATE + 32;
+    bus_6_chiplets_bus.remove(
+        hperm_input_label,
+        helper_addr,
+        0,
+        s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11
+    ) when is_hperm;
+    bus_6_chiplets_bus.remove(
+        hperm_output_label,
+        helper_addr + 31,
+        0,
+        s0', s1', s2', s3', s4', s5', s6', s7', s8', s9', s10', s11'
+    ) when is_hperm;
+
+    # MPVERIFY requests.
+    let mpverify_input_label = HASHERMPVERIFY + 16;
+    let mpverify_output_label = HASHERRETURNHASH + 32;
+    bus_6_chiplets_bus.remove(
+        mpverify_input_label,
+        helper_addr,
+        s5,
+        s0, s1, s2, s3, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mpverify;
+    bus_6_chiplets_bus.remove(
+        mpverify_output_label,
+        helper_addr + s4 * 32 - 1,
+        0,
+        s6, s7, s8, s9, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mpverify;
+
+    # MRUPDATE requests.
+    let mrupdate_input_old = HASHERMRUPDATEOLD + 16;
+    let mrupdate_input_new = HASHERMRUPDATENEW + 16;
+    let mrupdate_output = HASHERRETURNHASH + 32;
+    bus_6_chiplets_bus.remove(
+        mrupdate_input_old,
+        helper_addr,
+        s5,
+        s0, s1, s2, s3, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mrupdate;
+    bus_6_chiplets_bus.remove(
+        mrupdate_output,
+        helper_addr + s4 * 32 - 1,
+        0,
+        s6, s7, s8, s9, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mrupdate;
+    bus_6_chiplets_bus.remove(
+        mrupdate_input_new,
+        helper_addr + s4 * 32,
+        s5,
+        s10, s11, s12, s13, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mrupdate;
+    bus_6_chiplets_bus.remove(
+        mrupdate_output,
+        helper_addr + s4 * 64 - 1,
+        0,
+        s0', s1', s2', s3', 0, 0, 0, 0, 0, 0, 0, 0
+    ) when is_mrupdate;
+
+    # PIPE/MSTREAM/CRYPTOSTREAM memory requests.
+    bus_6_chiplets_bus.remove(MEMWRITEWORD, system_ctx, s12, system_clk, s0', s1', s2', s3')
+        when is_pipe;
+    bus_6_chiplets_bus.remove(MEMWRITEWORD, system_ctx, s12 + 4, system_clk, s4', s5', s6', s7')
+        when is_pipe;
+
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s12, system_clk, s0', s1', s2', s3')
+        when is_mstream;
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s12 + 4, system_clk, s4', s5', s6', s7')
+        when is_mstream;
+
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s12, system_clk, p0, p1, p2, p3)
+        when is_cryptostream;
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s12 + 4, system_clk, p4, p5, p6, p7)
+        when is_cryptostream;
+    bus_6_chiplets_bus.remove(MEMWRITEWORD, system_ctx, s13, system_clk, s0', s1', s2', s3')
+        when is_cryptostream;
+    bus_6_chiplets_bus.remove(MEMWRITEWORD, system_ctx, s13 + 4, system_clk, s4', s5', s6', s7')
+        when is_cryptostream;
+
+    # Horner memory requests (evaluation point reads).
+    bus_6_chiplets_bus.remove(MEMREADELEMENT, system_ctx, s13, system_clk, h0) when is_hornerbase;
+    bus_6_chiplets_bus.remove(MEMREADELEMENT, system_ctx, s13 + 1, system_clk, h1)
+        when is_hornerbase;
+
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s13, system_clk, h0, h1, h2, h3)
+        when is_hornerext;
+
+    # LOGPRECOMPILE hasher requests.
+    let logprecompile_input = HASHERLINEARHASH + 16;
+    let logprecompile_output = HASHERRETURNSTATE + 32;
+    bus_6_chiplets_bus.remove(
+        logprecompile_input,
+        helper_addr,
+        0,
+        s0, s1, s2, s3, s4, s5, s6, s7, lp_cap_prev0, lp_cap_prev1, lp_cap_prev2, lp_cap_prev3
+    ) when is_logprecompile;
+    bus_6_chiplets_bus.remove(
+        logprecompile_output,
+        helper_addr + 31,
+        0,
+        s0', s1', s2', s3', s4', s5', s6', s7', s8', s9', s10', s11'
+    ) when is_logprecompile;
+}
+
+# ------------------------------------------------------------------------------------------
+# Fp2 helpers (u^2 = 7)
+# ------------------------------------------------------------------------------------------
+fn fp2_mul(a0: felt, a1: felt, b0: felt, b1: felt) -> felt[2] {
+    return [a0 * b0 + 7 * a1 * b1, a0 * b1 + a1 * b0];
+}
+
+fn fp2_square(a0: felt, a1: felt) -> felt[2] {
+    return [a0^2 + 7 * a1^2, 2 * a0 * a1];
+}
+
+fn fp2_mul_scalar(a0: felt, a1: felt, b: felt) -> felt[2] {
+    return [a0 * b, a1 * b];
+}
+
+fn fp2_add3(a0: felt, a1: felt, b0: felt, b1: felt, c0: felt, c1: felt) -> felt[2] {
+    return [a0 + b0 + c0, a1 + b1 + c1];
+}
+
+fn fp2_add4(
+    a0: felt, a1: felt,
+    b0: felt, b1: felt,
+    c0: felt, c1: felt,
+    d0: felt, d1: felt
+) -> felt[2] {
+    return [a0 + b0 + c0 + d0, a1 + b1 + c1 + d1];
+}

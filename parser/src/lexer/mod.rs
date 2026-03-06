@@ -15,10 +15,7 @@ pub type Lexed = Result<(SourceIndex, Token, SourceIndex), ParseError>;
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum LexicalError {
     #[error("invalid integer value: {}", DisplayIntErrorKind(reason))]
-    InvalidInt {
-        span: SourceSpan,
-        reason: IntErrorKind,
-    },
+    InvalidInt { span: SourceSpan, reason: IntErrorKind },
     #[error("encountered unexpected character '{found}'")]
     UnexpectedCharacter { start: SourceIndex, found: char },
 }
@@ -27,7 +24,7 @@ impl PartialEq for LexicalError {
         match (self, other) {
             (Self::InvalidInt { reason: lhs, .. }, Self::InvalidInt { reason: rhs, .. }) => {
                 lhs == rhs
-            }
+            },
             (
                 Self::UnexpectedCharacter { found: lhs, .. },
                 Self::UnexpectedCharacter { found: rhs, .. },
@@ -41,18 +38,17 @@ impl ToDiagnostic for LexicalError {
         use miden_diagnostics::Label;
 
         match self {
-            Self::InvalidInt { span, ref reason } => Diagnostic::error()
-                .with_message("invalid integer literal")
-                .with_labels(vec![
+            Self::InvalidInt { span, ref reason } => {
+                Diagnostic::error().with_message("invalid integer literal").with_labels(vec![
                     Label::primary(span.source_id(), span)
                         .with_message(format!("{}", DisplayIntErrorKind(reason))),
-                ]),
-            Self::UnexpectedCharacter { start, .. } => Diagnostic::error()
-                .with_message("unexpected character")
-                .with_labels(vec![Label::primary(
-                    start.source_id(),
-                    SourceSpan::new(start, start),
-                )]),
+                ])
+            },
+            Self::UnexpectedCharacter { start, .. } => {
+                Diagnostic::error().with_message("unexpected character").with_labels(vec![
+                    Label::primary(start.source_id(), SourceSpan::new(start, start)),
+                ])
+            },
         }
     }
 }
@@ -182,6 +178,7 @@ pub enum Token {
     Ampersand,
     Bar,
     Bang,
+    At,
     Arrow,
     SemiColon,
 }
@@ -231,27 +228,27 @@ impl PartialEq for Token {
                 if let Self::Num(i2) = other {
                     return *i == *i2;
                 }
-            }
+            },
             Self::Error(_) => {
                 if let Self::Error(_) = other {
                     return true;
                 }
-            }
+            },
             Self::Ident(i) => {
                 if let Self::Ident(i2) = other {
                     return i == i2;
                 }
-            }
+            },
             Self::DeclIdentRef(i) => {
                 if let Self::DeclIdentRef(i2) = other {
                     return i == i2;
                 }
-            }
+            },
             Self::FunctionIdent(i) => {
                 if let Self::FunctionIdent(i2) = other {
                     return i == i2;
                 }
-            }
+            },
             _ => return mem::discriminant(self) == mem::discriminant(other),
         }
         false
@@ -318,6 +315,7 @@ impl fmt::Display for Token {
             Self::Ampersand => write!(f, "&"),
             Self::Bar => write!(f, "|"),
             Self::Bang => write!(f, "!"),
+            Self::At => write!(f, "@"),
             Self::Arrow => write!(f, "->"),
             Self::SemiColon => write!(f, ";"),
         }
@@ -346,8 +344,9 @@ macro_rules! pop2 {
     }};
 }
 
-/// The lexer that is used to perform lexical analysis on the AirScript grammar. The lexer implements
-/// the `Iterator` trait, so in order to retrieve the tokens, you simply have to iterate over it.
+/// The lexer that is used to perform lexical analysis on the AirScript grammar. The lexer
+/// implements the `Iterator` trait, so in order to retrieve the tokens, you simply have to iterate
+/// over it.
 ///
 /// # Errors
 ///
@@ -542,6 +541,7 @@ where
             '&' => pop!(self, Token::Ampersand),
             '|' => pop!(self, Token::Bar),
             '!' => pop!(self, Token::Bang),
+            '@' => pop!(self, Token::At),
             ';' => pop!(self, Token::SemiColon),
             '$' => self.lex_special_identifier(),
             '0'..='9' => self.lex_number(),
@@ -587,7 +587,7 @@ where
                     start: self.span().start(),
                     found: c,
                 });
-            }
+            },
         }
 
         self.skip_ident();
@@ -647,10 +647,9 @@ where
 
         match num.parse::<u64>() {
             Ok(i) => Token::Num(i),
-            Err(err) => Token::Error(LexicalError::InvalidInt {
-                span: self.span(),
-                reason: err.kind().clone(),
-            }),
+            Err(err) => {
+                Token::Error(LexicalError::InvalidInt { span: self.span(), reason: *err.kind() })
+            },
         }
     }
 }

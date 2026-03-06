@@ -5,33 +5,8 @@ This section describes the syntax for declaring local variables and built-in var
 
 In AirScript, variables can be declared in `boundary_constraints` and `integrity_constraints` sections and can contain any expression that would be valid within that source section. Variables can be of type scalar, vector or matrix. In the example below, `x` is a variable of type `scalar`, `y` is a variable of type `vector` and `z` is a variable of type `matrix`.
 
-```
-def VariablesExample
-
-const A = 1;
-const B = 2;
-
-trace_columns {
-    main: [a, b, c, d],
-}
-
-public_inputs {
-    stack_inputs: [16],
-}
-
-boundary_constraints {
-    let x = stack_inputs[0] + stack_inputs[1];
-    let y = [stack_inputs[2], stack_inputs[3]];
-    enf a.first = x + y[0] + y[1];
-}
-
-integrity_constraints {
-    let z = [
-        [a + b, c + d],
-        [A * a, B * b]
-    ];
-    enf a' = z[0][0] + z[0][1] + z[1][0] + z[1][1];
-}
+```air
+{{#include ../../examples/variables_example.air}}
 ```
 
 ### Syntax restriction for local variables
@@ -41,7 +16,7 @@ Currently, it is not possible to:
 
     Example:
 
-    ```
+    ```air
     ...
     boundary_constraints {
         let a = [[1,2], [3,4]];  # <-- this is allowed
@@ -56,7 +31,7 @@ Currently, it is not possible to:
 
     Example: 
 
-    ```
+    ```air
     ...
     integrity_constraints {
         let a = [[1, 2], [3, 4]];

@@ -44,7 +44,7 @@ impl Pass for ConstantPropagation<'_> {
             ControlFlow::Break(err) => {
                 self.diagnostics.emit(err.clone());
                 Err(err)
-            }
+            },
         }
     }
 }
@@ -65,7 +65,7 @@ impl<'a> ConstantPropagation<'a> {
         for (name, constant) in program.constants.iter() {
             assert_eq!(
                 self.global
-                    .insert(*name, Span::new(constant.span(), constant.value.clone())),
+                    .insert(name.clone(), Span::new(constant.span(), constant.value.clone())),
                 None
             );
         }
@@ -107,16 +107,16 @@ impl<'a> ConstantPropagation<'a> {
 
     /// When folding a `let`, one of the following can occur:
     ///
-    /// * The let-bound variable is non-constant, so the entire let must remain, but we
-    ///   can constant-propagate as much of the bound expression and body as possible.
-    /// * The let-bound variable is constant, so once we have constant propagated the body,
-    ///   the let is no longer needed, and one of the following happens:
-    ///   * The `let` terminates with a constant expression, so the entire `let` is replaced
-    ///     with that expression.
-    ///   * The `let` terminates with a non-constant expression, or a constraint, so we inline
-    ///     the let body into the containing block. In the non-constant expression case, we
-    ///     replace the `let` with the last expression in the returned block, since in expression
-    ///     position, we may not have a statement block to inline into.
+    /// * The let-bound variable is non-constant, so the entire let must remain, but we can
+    ///   constant-propagate as much of the bound expression and body as possible.
+    /// * The let-bound variable is constant, so once we have constant propagated the body, the let
+    ///   is no longer needed, and one of the following happens:
+    ///   * The `let` terminates with a constant expression, so the entire `let` is replaced with
+    ///     that expression.
+    ///   * The `let` terminates with a non-constant expression, or a constraint, so we inline the
+    ///     let body into the containing block. In the non-constant expression case, we replace the
+    ///     `let` with the last expression in the returned block, since in expression position, we
+    ///     may not have a statement block to inline into.
     fn try_fold_let_expr(
         &mut self,
         expr: &mut Let,
@@ -133,16 +133,43 @@ impl<'a> ConstantPropagation<'a> {
         let is_constant = expr.value.is_constant();
         if is_constant {
             match expr.value {
-                Expr::Const(ref value) => {
-                    self.local.insert(expr.name, value.clone());
-                }
+                Expr::Const(ref value) => match expr.binding {
+                    LetBinding::Single(name) => {
+                        self.local.insert(name, value.clone());
+                    },
+                    LetBinding::Vector(ref names) => {
+                        if let ConstantExpr::Vector(ref values) = value.item
+                            && values.len() == names.len()
+                        {
+                            for (idx, name) in names.iter().copied().enumerate() {
+                                self.local.insert(
+                                    name,
+                                    Span::new(value.span(), ConstantExpr::Scalar(values[idx])),
+                                );
+                            }
+                        }
+                    },
+                },
                 Expr::Range(ref range) => {
                     let span = range.span();
                     let range = range.to_slice_range();
                     let vector = range.map(|i| i as u64).collect();
-                    self.local
-                        .insert(expr.name, Span::new(span, ConstantExpr::Vector(vector)));
-                }
+                    match expr.binding {
+                        LetBinding::Single(name) => {
+                            self.local.insert(name, Span::new(span, ConstantExpr::Vector(vector)));
+                        },
+                        LetBinding::Vector(ref names) => {
+                            if vector.len() == names.len() {
+                                for (idx, name) in names.iter().copied().enumerate() {
+                                    self.local.insert(
+                                        name,
+                                        Span::new(span, ConstantExpr::Scalar(vector[idx])),
+                                    );
+                                }
+                            }
+                        },
+                    }
+                },
                 _ => unreachable!(),
             }
         }
@@ -155,12 +182,13 @@ impl<'a> ConstantPropagation<'a> {
         // If this let is constant, then the binding is no longer
         // used in the body after constant propagation, so we can
         // fold away the let entirely
-        let is_live = self.live.contains(&expr.name);
+        let binding_names = expr.binding.names();
+        let is_live = binding_names.iter().any(|name| self.live.contains(name));
         let result = if is_constant && !is_live {
             match expr.body.last().unwrap() {
                 Statement::Expr(Expr::Const(const_value)) => {
                     Left(Some(Span::new(expr.span(), const_value.item.clone())))
-                }
+                },
                 _ => Right(core::mem::take(&mut expr.body)),
             }
         } else {
@@ -169,7 +197,9 @@ impl<'a> ConstantPropagation<'a> {
 
         // Propagate liveness from the body of the let to its parent scope
         let mut live = core::mem::take(&mut self.live);
-        live.remove(&expr.name);
+        for name in binding_names.iter() {
+            live.remove(name);
+        }
         self.live = &prev_live | &live;
 
         // Restore the previous scope
@@ -188,18 +218,21 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
             // Expression is already folded
             ScalarExpr::Const(_) | ScalarExpr::Null(_) | ScalarExpr::Unconstrained(_) => {
                 ControlFlow::Continue(())
-            }
-            // Need to check if this access is to a constant value, and transform to a constant if so
+            },
+            // Need to check if this access is to a constant value, and transform to a constant if
+            // so
             ScalarExpr::SymbolAccess(sym) => {
+                self.visit_mut_access_type(&mut sym.access_type)?;
+
                 let constant_value = match sym.name {
                     // Possibly a reference to a constant declaration
                     ResolvableIdentifier::Resolved(ref qid) => {
                         self.global.get(qid).cloned().map(|s| (s.span(), s.item))
-                    }
+                    },
                     // Possibly a reference to a local bound to a constant
                     ResolvableIdentifier::Local(ref id) => {
                         self.local.get(id).cloned().map(|s| (s.span(), s.item))
-                    }
+                    },
                     // Other identifiers cannot possibly be constant
                     _ => None,
                 };
@@ -208,26 +241,58 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         ConstantExpr::Scalar(value) => {
                             assert_eq!(sym.access_type, AccessType::Default);
                             *expr = ScalarExpr::Const(Span::new(span, value));
-                        }
-                        ConstantExpr::Vector(value) => match sym.access_type {
-                            AccessType::Index(idx) => {
-                                *expr = ScalarExpr::Const(Span::new(span, value[idx]));
-                            }
-                            // This access cannot be resolved here, so we need to record the fact
-                            // that there are still live uses of this binding
-                            _ => {
-                                self.live.insert(*sym.name.as_ref());
-                            }
                         },
-                        ConstantExpr::Matrix(value) => match sym.access_type {
-                            AccessType::Matrix(row, col) => {
-                                *expr = ScalarExpr::Const(Span::new(span, value[row][col]));
-                            }
+                        ConstantExpr::Vector(value) => match sym.access_type.clone() {
+                            AccessType::Index(idx) => match *idx {
+                                ScalarExpr::Const(idx) => {
+                                    if idx.item >= value.len() as u64 {
+                                        self.diagnostics.diagnostic(miden_diagnostics::Severity::Error)
+                                            .with_message("attempted to access an index which is out of bounds")
+                                            .with_primary_label(span, "index out of bounds")
+                                            .emit();
+                                        return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                                    }
+                                    *expr = ScalarExpr::Const(Span::new(
+                                        span,
+                                        value[idx.item as usize],
+                                    ));
+                                },
+                                _ => {
+                                    self.live.insert(*sym.name.as_ref());
+                                },
+                            },
                             // This access cannot be resolved here, so we need to record the fact
                             // that there are still live uses of this binding
                             _ => {
                                 self.live.insert(*sym.name.as_ref());
-                            }
+                            },
+                        },
+                        ConstantExpr::Matrix(value) => match sym.access_type.clone() {
+                            AccessType::Matrix(row, col) => match (*row, *col) {
+                                (ScalarExpr::Const(row), ScalarExpr::Const(col)) => {
+                                    if row.item >= value.len() as u64
+                                        || col.item >= value[row.item as usize].len() as u64
+                                    {
+                                        self.diagnostics.diagnostic(miden_diagnostics::Severity::Error)
+                                            .with_message("attempted to access an index which is out of bounds")
+                                            .with_primary_label(span, "index out of bounds")
+                                            .emit();
+                                        return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                                    }
+                                    *expr = ScalarExpr::Const(Span::new(
+                                        span,
+                                        value[row.item as usize][col.item as usize],
+                                    ));
+                                },
+                                _ => {
+                                    self.live.insert(*sym.name.as_ref());
+                                },
+                            },
+                            // This access cannot be resolved here, so we need to record the fact
+                            // that there are still live uses of this binding
+                            _ => {
+                                self.live.insert(*sym.name.as_ref());
+                            },
                         },
                     }
                 } else {
@@ -235,7 +300,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                     self.live.insert(*sym.name.as_ref());
                 }
                 ControlFlow::Continue(())
-            }
+            },
             // Fold constant expressions
             ScalarExpr::Binary(binary_expr) => {
                 match self.try_fold_binary_expr(binary_expr) {
@@ -244,7 +309,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                             *expr = ScalarExpr::Const(folded);
                         }
                         ControlFlow::Continue(())
-                    }
+                    },
                     Err(SemanticAnalysisError::InvalidExpr(
                         InvalidExprError::NonConstantExponent(_),
                     )) if self.in_list_comprehension => {
@@ -253,10 +318,10 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         // The check for non-constant exponents in list comprehensions is done
                         // during lowering from MIR to AIR, so we can safely silence it here.
                         ControlFlow::Continue(())
-                    }
+                    },
                     Err(err) => ControlFlow::Break(err),
                 }
-            }
+            },
             // While calls cannot be constant folded, arguments can be
             ScalarExpr::Call(call) => self.visit_mut_call(call),
             // This cannot be constant folded
@@ -269,40 +334,40 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         match const_expr.item {
                             ConstantExpr::Scalar(value) => {
                                 *expr = ScalarExpr::Const(Span::new(span, value));
-                            }
+                            },
                             _ => {
                                 self.diagnostics.diagnostic(miden_diagnostics::Severity::Error)
                                     .with_message("invalid scalar expression")
                                     .with_primary_label(span, "expected scalar value, but this expression evaluates to an aggregate type")
                                     .emit();
                                 return ControlFlow::Break(SemanticAnalysisError::Invalid);
-                            }
+                            },
                         }
-                    }
+                    },
                     Ok(Left(None)) => (),
                     Ok(Right(mut block)) => match block.pop().unwrap() {
                         Statement::Let(inner_expr) => {
                             *let_expr.as_mut() = inner_expr;
-                        }
+                        },
                         Statement::Expr(inner_expr) => {
                             match ScalarExpr::try_from(inner_expr)
                                 .map_err(SemanticAnalysisError::InvalidExpr)
                             {
                                 Ok(scalar_expr) => {
                                     *expr = scalar_expr;
-                                }
+                                },
                                 Err(err) => return ControlFlow::Break(err),
                             }
-                        }
+                        },
                         Statement::Enforce(_)
-                        | Statement::EnforceIf(_, _)
+                        | Statement::EnforceIf(..)
                         | Statement::EnforceAll(_)
                         | Statement::BusEnforce(_) => unreachable!(),
                     },
                     Err(err) => return ControlFlow::Break(err),
                 }
                 ControlFlow::Continue(())
-            }
+            },
             ScalarExpr::BusOperation(expr) => self.visit_mut_bus_operation(expr),
         }
     }
@@ -316,15 +381,17 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
             //
             // We deal with symbol accesses directly, as they may evaluate to an aggregate constant
             Expr::SymbolAccess(access) => {
+                self.visit_mut_access_type(&mut access.access_type)?;
+
                 let constant_value = match access.name {
                     // Possibly a reference to a constant declaration
                     ResolvableIdentifier::Resolved(ref qid) => {
                         self.global.get(qid).cloned().map(|s| (s.span(), s.item))
-                    }
+                    },
                     // Possibly a reference to a local bound to a constant
                     ResolvableIdentifier::Local(ref id) => {
                         self.local.get(id).cloned().map(|s| (s.span(), s.item))
-                    }
+                    },
                     // Other identifiers cannot possibly be constant
                     _ => None,
                 };
@@ -333,20 +400,27 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         cexpr @ ConstantExpr::Scalar(_) => {
                             assert_eq!(access.access_type, AccessType::Default);
                             *expr = Expr::Const(Span::new(span, cexpr));
-                        }
+                        },
                         ConstantExpr::Vector(value) => match access.access_type.clone() {
                             AccessType::Default => {
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Vector(value)));
-                            }
+                            },
                             AccessType::Slice(range) => {
                                 let range = range.to_slice_range();
                                 let vector = value[range].to_vec();
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Vector(vector)));
-                            }
-                            AccessType::Index(idx) => {
-                                *expr =
-                                    Expr::Const(Span::new(span, ConstantExpr::Scalar(value[idx])));
-                            }
+                            },
+                            AccessType::Index(idx) => match *idx {
+                                ScalarExpr::Const(idx) => {
+                                    *expr = Expr::Const(Span::new(
+                                        span,
+                                        ConstantExpr::Scalar(value[idx.item as usize]),
+                                    ));
+                                },
+                                _ => {
+                                    self.live.insert(*access.name.as_ref());
+                                },
+                            },
                             ref ty => panic!(
                                 "invalid constant reference, expected scalar access, got {ty:?}",
                             ),
@@ -354,24 +428,36 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         ConstantExpr::Matrix(value) => match access.access_type.clone() {
                             AccessType::Default => {
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Matrix(value)));
-                            }
+                            },
                             AccessType::Slice(range) => {
                                 let range = range.to_slice_range();
                                 let matrix = value[range].to_vec();
                                 *expr = Expr::Const(Span::new(span, ConstantExpr::Matrix(matrix)));
-                            }
-                            AccessType::Index(idx) => {
-                                *expr = Expr::Const(Span::new(
-                                    span,
-                                    ConstantExpr::Vector(value[idx].clone()),
-                                ));
-                            }
-                            AccessType::Matrix(row, col) => {
-                                *expr = Expr::Const(Span::new(
-                                    span,
-                                    ConstantExpr::Scalar(value[row][col]),
-                                ));
-                            }
+                            },
+                            AccessType::Index(idx) => match *idx {
+                                ScalarExpr::Const(idx) => {
+                                    *expr = Expr::Const(Span::new(
+                                        span,
+                                        ConstantExpr::Vector(value[idx.item as usize].clone()),
+                                    ));
+                                },
+                                _ => {
+                                    self.live.insert(*access.name.as_ref());
+                                },
+                            },
+                            AccessType::Matrix(row, col) => match (*row, *col) {
+                                (ScalarExpr::Const(row), ScalarExpr::Const(col)) => {
+                                    *expr = Expr::Const(Span::new(
+                                        span,
+                                        ConstantExpr::Scalar(
+                                            value[row.item as usize][col.item as usize],
+                                        ),
+                                    ));
+                                },
+                                _ => {
+                                    self.live.insert(*access.name.as_ref());
+                                },
+                            },
                         },
                     }
                 } else {
@@ -379,7 +465,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                     self.live.insert(*access.name.as_ref());
                 }
                 ControlFlow::Continue(())
-            }
+            },
             Expr::Call(call) if call.is_builtin() => {
                 self.visit_mut_call(call)?;
                 match call.callee.as_ref().name() {
@@ -396,17 +482,17 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                                     };
                                     *expr =
                                         Expr::Const(Span::new(span, ConstantExpr::Scalar(folded)));
-                                }
+                                },
                                 invalid => {
                                     panic!("bad argument to list folding builtin: {invalid:#?}")
-                                }
+                                },
                             }
                         }
-                    }
+                    },
                     invalid => unimplemented!("unknown builtin function: {invalid}"),
                 }
                 ControlFlow::Continue(())
-            }
+            },
             Expr::Call(call) => self.visit_mut_call(call),
             Expr::Binary(binary_expr) => match self.try_fold_binary_expr(binary_expr) {
                 Ok(maybe_folded) => {
@@ -417,7 +503,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         ));
                     }
                     ControlFlow::Continue(())
-                }
+                },
                 Err(SemanticAnalysisError::InvalidExpr(InvalidExprError::NonConstantExponent(
                     _,
                 ))) if self.in_list_comprehension => {
@@ -426,7 +512,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                     // The check for non-constant exponents in list comprehensions is done
                     // during lowering from MIR to AIR, so we can safely silence it here.
                     ControlFlow::Continue(())
-                }
+                },
                 Err(err) => ControlFlow::Break(err),
             },
             // Ranges are constant
@@ -455,21 +541,17 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                             vector
                                 .iter()
                                 .map(|expr| match expr {
-                                    Expr::Const(Span {
-                                        item: ConstantExpr::Scalar(v),
-                                        ..
-                                    }) => *v,
+                                    Expr::Const(Span { item: ConstantExpr::Scalar(v), .. }) => *v,
                                     _ => unreachable!(),
                                 })
                                 .collect(),
                         ),
-                        Type::Matrix(_, _) => ConstantExpr::Matrix(
+                        Type::Matrix(..) => ConstantExpr::Matrix(
                             vector
                                 .iter()
                                 .map(|expr| match expr {
                                     Expr::Const(Span {
-                                        item: ConstantExpr::Vector(vs),
-                                        ..
+                                        item: ConstantExpr::Vector(vs), ..
                                     }) => vs.clone(),
                                     _ => unreachable!(),
                                 })
@@ -480,7 +562,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                     *expr = Expr::Const(Span::new(span, new_expr));
                 }
                 ControlFlow::Continue(())
-            }
+            },
             // Visit matrix elements, and promote the matrix to `Expr::Const` if possible
             Expr::Matrix(matrix) => {
                 let mut is_constant = true;
@@ -507,7 +589,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                     *expr = Expr::Const(Span::new(span, matrix));
                 }
                 ControlFlow::Continue(())
-            }
+            },
             // Visit list comprehensions and convert to constant if possible
             Expr::ListComprehension(lc) => {
                 let old_in_lc = core::mem::replace(&mut self.in_list_comprehension, true);
@@ -534,14 +616,8 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                 // All iterables must be the same length, so determine the number of
                 // steps based on the length of the first iterable
                 let max_len = match &lc.iterables[0] {
-                    Expr::Const(Span {
-                        item: ConstantExpr::Vector(elems),
-                        ..
-                    }) => elems.len(),
-                    Expr::Const(Span {
-                        item: ConstantExpr::Matrix(rows),
-                        ..
-                    }) => rows.len(),
+                    Expr::Const(Span { item: ConstantExpr::Vector(elems), .. }) => elems.len(),
+                    Expr::Const(Span { item: ConstantExpr::Matrix(rows), .. }) => rows.len(),
                     Expr::Const(_) => panic!("expected iterable constant, got scalar"),
                     Expr::Range(range) => range.to_slice_range().len(),
                     _ => unreachable!(
@@ -557,26 +633,20 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                     {
                         let span = iterable.span();
                         match iterable {
-                            Expr::Const(Span {
-                                item: ConstantExpr::Vector(elems),
-                                ..
-                            }) => {
+                            Expr::Const(Span { item: ConstantExpr::Vector(elems), .. }) => {
                                 let value = ConstantExpr::Scalar(elems[step]);
                                 self.local.insert(binding, Span::new(span, value));
-                            }
-                            Expr::Const(Span {
-                                item: ConstantExpr::Matrix(elems),
-                                ..
-                            }) => {
+                            },
+                            Expr::Const(Span { item: ConstantExpr::Matrix(elems), .. }) => {
                                 let value = ConstantExpr::Vector(elems[step].clone());
                                 self.local.insert(binding, Span::new(span, value));
-                            }
+                            },
                             Expr::Range(range) => {
                                 let range = range.to_slice_range();
                                 assert!(range.end > range.start + step);
                                 let value = ConstantExpr::Scalar((range.start + step) as u64);
                                 self.local.insert(binding, Span::new(span, value));
-                            }
+                            },
                             _ => unreachable!(
                                 "expected iterable constant or range, got {:#?}",
                                 iterable
@@ -588,16 +658,18 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         self.visit_mut_scalar_expr(&mut selector)?;
                         match selector {
                             ScalarExpr::Const(selected) => {
-                                // If the selector returns false on this iteration, go to the next step
+                                // If the selector returns false on this iteration, go to the next
+                                // step
                                 if *selected == 0 {
                                     continue;
                                 }
-                            }
+                            },
                             // The selector cannot be evaluated, bail out early
                             _ => {
                                 self.in_list_comprehension = old_in_lc;
+                                self.local.exit();
                                 return ControlFlow::Continue(());
-                            }
+                            },
                         }
                     }
 
@@ -610,6 +682,7 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                         folded.push(folded_body.item);
                     } else {
                         self.in_list_comprehension = old_in_lc;
+                        self.local.exit();
                         return ControlFlow::Continue(());
                     }
                 }
@@ -621,29 +694,29 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                 *expr = Expr::Const(Span::new(span, ConstantExpr::Vector(folded)));
                 self.in_list_comprehension = old_in_lc;
                 ControlFlow::Continue(())
-            }
+            },
             Expr::Let(let_expr) => {
                 match self.try_fold_let_expr(let_expr) {
                     Ok(Left(Some(const_expr))) => {
                         *expr = Expr::Const(Span::new(span, const_expr.item));
-                    }
+                    },
                     Ok(Left(None)) => (),
                     Ok(Right(mut block)) => match block.pop().unwrap() {
                         Statement::Let(inner_expr) => {
                             *let_expr.as_mut() = inner_expr;
-                        }
+                        },
                         Statement::Expr(inner_expr) => {
                             *expr = inner_expr;
-                        }
+                        },
                         Statement::Enforce(_)
-                        | Statement::EnforceIf(_, _)
+                        | Statement::EnforceIf(..)
                         | Statement::EnforceAll(_)
                         | Statement::BusEnforce(_) => unreachable!(),
                     },
                     Err(err) => return ControlFlow::Break(err),
                 }
                 ControlFlow::Continue(())
-            }
+            },
             Expr::BusOperation(expr) => self.visit_mut_bus_operation(expr),
             Expr::Null(_) | Expr::Unconstrained(_) => ControlFlow::Continue(()),
         }
@@ -670,32 +743,40 @@ impl VisitMut<SemanticAnalysisError> for ConstantPropagation<'_> {
                     match self.try_fold_let_expr(expr) {
                         Ok(Left(Some(const_expr))) => {
                             buffer.push(Statement::Expr(Expr::Const(const_expr)));
-                        }
+                        },
                         Ok(Left(None)) => (),
                         Ok(Right(mut block)) => {
                             buffer.append(&mut block);
-                        }
+                        },
                         Err(err) => return ControlFlow::Break(err),
                     }
-                }
-                Statement::Enforce(expr) => {
-                    self.visit_mut_enforce(expr)?;
-                }
+                },
+                Statement::Enforce(enf) => {
+                    self.visit_mut_enforce(&mut enf.expr)?;
+                },
                 Statement::EnforceAll(expr) => {
                     self.in_constraint_comprehension = true;
                     self.visit_mut_list_comprehension(expr)?;
                     self.in_constraint_comprehension = false;
-                }
+                },
                 Statement::Expr(expr) => {
                     self.visit_mut_expr(expr)?;
-                }
+                },
                 Statement::BusEnforce(expr) => {
                     self.in_constraint_comprehension = true;
                     self.visit_mut_list_comprehension(expr)?;
                     self.in_constraint_comprehension = false;
-                }
+                },
                 // This statement type is only present in the AST after inlining
-                Statement::EnforceIf(_, _) => unreachable!(),
+                Statement::EnforceIf(match_expr) => {
+                    self.in_constraint_comprehension = true;
+                    for match_arm in match_expr.match_arms.iter_mut() {
+                        // Visit the selector and expression of the match arm
+                        self.visit_mut_scalar_expr(&mut match_arm.condition)?;
+                        self.visit_mut_scalar_expr(&mut match_arm.expr)?;
+                    }
+                    self.in_constraint_comprehension = false;
+                },
             }
 
             // If we have a non-empty buffer, then we are collapsing a let into the current block,

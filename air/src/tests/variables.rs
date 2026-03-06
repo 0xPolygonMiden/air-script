@@ -1,4 +1,4 @@
-use super::{Pipeline, compile, expect_diagnostic};
+use super::{compile_from_source, expect_diagnostic};
 
 #[test]
 fn let_scalar_constant_in_boundary_constraint() {
@@ -18,8 +18,7 @@ fn let_scalar_constant_in_boundary_constraint() {
         enf clk' = clk + 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -40,8 +39,97 @@ fn let_vector_constant_in_boundary_constraint() {
         enf clk' = clk + 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
+}
+
+#[test]
+fn let_vector_destructure_in_boundary_constraint() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk],
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        let [a, b] = [1, 5];
+        enf clk.first = a + b;
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
+
+    assert!(compile_from_source(source).is_ok());
+}
+
+#[test]
+fn let_vector_destructure_from_function_call() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk],
+    }
+    fn pair(x: felt) -> felt[2] {
+        return [x, 5];
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        let [a, b] = pair(1);
+        enf clk.first = a + b;
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
+
+    assert!(compile_from_source(source).is_ok());
+}
+
+#[test]
+fn let_vector_binding_from_function_call() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk],
+    }
+    fn pair(x: felt) -> felt[2] {
+        return [x, 5];
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        let tmp = pair(1);
+        enf clk.first = tmp[0] + tmp[1];
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
+
+    assert!(compile_from_source(source).is_ok());
+}
+
+#[test]
+fn err_let_destructure_length_mismatch() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk],
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        let [a, b] = [1, 5, 7];
+        enf clk.first = a + b;
+    }
+    integrity_constraints {
+        enf clk' = clk + 1;
+    }";
+
+    expect_diagnostic(source, "let binding count does not match vector length");
 }
 
 #[test]
@@ -66,8 +154,7 @@ fn multi_constraint_nested_let_with_expressions_in_boundary_constraint() {
         enf clk' = clk + 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -89,8 +176,7 @@ fn let_scalar_constant_in_boundary_constraint_both_domains() {
         enf clk' = clk + 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -112,16 +198,7 @@ fn invalid_column_offset_in_boundary_constraint() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "invalid access of a trace column with offset",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "invalid access of a trace column with offset",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "invalid access of a trace column with offset");
 }
 
 #[test]
@@ -145,8 +222,7 @@ fn nested_let_with_expressions_in_integrity_constraint() {
         enf c[0][0] = 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -172,8 +248,7 @@ fn nested_let_with_vector_access_in_integrity_constraint() {
         enf clk' = c[0] + e[2][0] + e[0][1];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -201,12 +276,6 @@ fn invalid_matrix_literal_with_leading_vector_binding() {
     expect_diagnostic(
         source,
         "expected one of: '\"!\"', '\"(\"', '\"null\"', '\"unconstrained\"', 'decl_ident_ref', 'function_identifier', 'identifier', 'int'",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "expected one of: '\"!\"', '\"(\"', '\"null\"', '\"unconstrained\"', 'decl_ident_ref', 'function_identifier', 'identifier', 'int'",
-        Pipeline::WithMIR,
     );
 }
 
@@ -232,8 +301,7 @@ fn invalid_matrix_literal_with_trailing_vector_binding() {
         enf clk' = d[0][0];
     }";
 
-    expect_diagnostic(source, "expected one of: '\"[\"'", Pipeline::WithoutMIR);
-    expect_diagnostic(source, "expected one of: '\"[\"'", Pipeline::WithMIR);
+    expect_diagnostic(source, "expected one of: '\"[\"'");
 }
 
 #[test]
@@ -256,16 +324,7 @@ fn invalid_variable_access_before_declaration() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "this variable / bus is not defined");
 }
 
 #[test]
@@ -290,13 +349,7 @@ fn invalid_trailing_let() {
 
     expect_diagnostic(
         source,
-        "expected one of: '\"enf\"', '\"let\"'",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "expected one of: '\"enf\"', '\"let\"'",
-        Pipeline::WithMIR,
+        "expected one of: '\"@\"', '\"enf\"', '\"let\"', '\"return\"', 'identifier'",
     );
 }
 
@@ -320,16 +373,7 @@ fn invalid_reference_to_variable_defined_in_other_section() {
         enf clk' = clk + a;
     }";
 
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "this variable / bus is not defined",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "this variable / bus is not defined");
 }
 
 #[test]
@@ -352,16 +396,7 @@ fn invalid_vector_variable_access_out_of_bounds() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -383,16 +418,7 @@ fn invalid_matrix_column_variable_access_out_of_bounds() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -414,16 +440,7 @@ fn invalid_matrix_row_variable_access_out_of_bounds() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -447,16 +464,7 @@ fn invalid_index_into_scalar_variable() {
         enf clk' = clk + a[0];
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to index into a scalar value",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "attempted to index into a scalar value",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "attempted to index into a scalar value");
 }
 
 #[test]
@@ -480,6 +488,5 @@ fn trace_binding_access_in_integrity_constraint() {
         enf clk' = clk + a[0];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }

@@ -1,8 +1,7 @@
 use miden_diagnostics::SourceSpan;
 
-use crate::ast::*;
-
 use super::ParseTest;
+use crate::ast::*;
 
 #[test]
 fn use_declaration() {
@@ -10,9 +9,11 @@ fn use_declaration() {
     mod test
 
     use foo::*;
+    use bar::baz::*;
     ";
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
-    expected.imports.insert(ident!(foo), import_all!(foo));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
+    expected.imports.insert(module_ident!(foo), import_all!(foo));
+    expected.imports.insert(module_ident!(bar, baz), import_all!(bar, baz));
     ParseTest::new().expect_module_ast(source, expected);
 }
 
@@ -22,9 +23,11 @@ fn import_declaration() {
     mod test
 
     use foo::bar;
+    use baz::bat::bot;
     ";
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
-    expected.imports.insert(ident!(foo), import!(foo, bar));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
+    expected.imports.insert(module_ident!(foo), import!(foo, bar));
+    expected.imports.insert(module_ident!(baz, bat), import!((baz, bat), bot));
     ParseTest::new().expect_module_ast(source, expected);
 }
 
@@ -41,9 +44,11 @@ fn import_declaration() {
 #[test]
 fn modules_integration_test() {
     let mut expected = Program::new(ident!(import_example));
-    expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1), (fmp, 1), (ctx, 1)]));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(clk, 1), (fmp, 1), (ctx, 1)]
+    ));
     expected.periodic_columns.insert(
         ident!(foo, k0),
         PeriodicColumn::new(SourceSpan::UNKNOWN, ident!(k0), vec![1, 1, 0, 0]),
@@ -58,6 +63,32 @@ fn modules_integration_test() {
     // defines an evaluator `other_constraint`, that evaluator is never called
     // so it is treated as dead code and stripped from the program
 
+    // ev is_binary([x]) {
+    //     enf x^2 = x;
+    // }
+    expected.evaluators.insert(
+        function_ident!((utils, binary), is_binary),
+        EvaluatorFunction::new(
+            SourceSpan::UNKNOWN,
+            ident!(is_binary),
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(x, 1)])],
+            vec![enforce!(eq!(exp!(access!(x, Type::Felt), int!(2)), access!(x, Type::Felt)))],
+        ),
+    );
+    // ev are_all_binary([c[3]]) {
+    //     enf is_binary([c]) for c in c;
+    // }
+    expected.evaluators.insert(
+        function_ident!((utils, binary), are_all_binary),
+        EvaluatorFunction::new(
+            SourceSpan::UNKNOWN,
+            ident!(are_all_binary),
+            vec![trace_segment!(TraceSegmentId::Main, "%1", [(c, 3)])],
+            vec![enforce_all!(
+                lc!(((c, expr!(access!(c, Type::Vector(3))))) => call!((utils, binary)::is_binary(vector!(access!(c, Type::Felt)))))
+            )],
+        ),
+    );
     // ev bar_constraint([clk]) {
     //    enf clk' = clk + k0 when k0
     // }
@@ -66,11 +97,14 @@ fn modules_integration_test() {
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(bar_constraint),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
-            vec![enforce_all!(lc!((("%1", range!(0..1))) => eq!(
-                access!(clk, 1, Type::Felt),
-                add!(access!(clk, Type::Felt), access!(bar, k0, Type::Felt))
-            ), when access!(bar, k0, Type::Felt)))],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
+            vec![enforce_if!(match_arm!(
+                eq!(
+                    access!(clk, 1, Type::Felt),
+                    add!(access!(clk, Type::Felt), access!(bar, k0, Type::Felt))
+                ),
+                access!(bar, k0, Type::Felt)
+            ))],
         ),
     );
     // ev foo_constraint([clk]) {
@@ -81,30 +115,28 @@ fn modules_integration_test() {
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(foo_constraint),
-            vec![trace_segment!(0, "%0", [(clk, 1)])],
-            vec![enforce_all!(lc!((("%1", range!(0..1))) => eq!(access!(clk, 1, Type::Felt), add!(access!(clk, Type::Felt), int!(1))), when access!(foo, k0, Type::Felt)))],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(clk, 1)])],
+            vec![enforce_if!(match_arm!(
+                eq!(access!(clk, 1, Type::Felt), add!(access!(clk, Type::Felt), int!(1))),
+                access!(foo, k0, Type::Felt)
+            ))],
         ),
     );
-    expected.public_inputs.insert(
-        ident!(inputs),
-        PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2),
-    );
+    expected
+        .public_inputs
+        .insert(ident!(inputs), PublicInput::new_vector(SourceSpan::UNKNOWN, ident!(inputs), 2));
     expected
         .integrity_constraints
-        .push(enforce!(call!(foo::foo_constraint(vector!(access!(
-            clk,
-            Type::Felt
-        ))))));
+        .push(enforce!(call!(foo::foo_constraint(vector!(access!(clk, Type::Felt))))));
     expected
         .integrity_constraints
-        .push(enforce!(call!(bar::bar_constraint(vector!(access!(
-            clk,
-            Type::Felt
-        ))))));
-    expected.boundary_constraints.push(enforce!(eq!(
-        bounded_access!(clk, Boundary::First, Type::Felt),
-        int!(0)
-    )));
+        .push(enforce!(call!(bar::bar_constraint(vector!(access!(clk, Type::Felt))))));
+    expected
+        .integrity_constraints
+        .push(enforce!(call!((utils, binary)::are_all_binary(vector!(access!(clk, Type::Felt), access!(fmp, Type::Felt), access!(ctx, Type::Felt))))));
+    expected
+        .boundary_constraints
+        .push(enforce!(eq!(bounded_access!(clk, Boundary::First, Type::Felt), int!(0))));
 
     ParseTest::new()
         .expect_program_ast_from_file("src/parser/tests/input/import_example.air", expected);

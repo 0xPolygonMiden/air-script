@@ -1,4 +1,4 @@
-use super::{Pipeline, compile};
+use super::compile_from_source;
 
 #[test]
 fn list_folding_on_const() {
@@ -20,8 +20,7 @@ fn list_folding_on_const() {
         enf clk = y - x;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -44,8 +43,7 @@ fn list_folding_on_variable() {
         enf clk = z - y;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -67,8 +65,7 @@ fn list_folding_on_vector() {
         enf clk = y - x;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -91,8 +88,7 @@ fn list_folding_on_lc() {
         enf clk = y - x;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -114,6 +110,5 @@ fn list_folding_in_lc() {
         enf clk = y[0];
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }

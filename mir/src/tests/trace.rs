@@ -106,10 +106,7 @@ fn err_bc_trace_cols_access_out_of_bounds() {
         enf a[0]' = a[0] - 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -134,10 +131,7 @@ fn err_ic_trace_cols_access_out_of_bounds() {
         enf a[4]' = a[4] - 1;
     }";
 
-    expect_diagnostic(
-        source,
-        "attempted to access an index which is out of bounds",
-    );
+    expect_diagnostic(source, "attempted to access an index which is out of bounds");
 }
 
 #[test]
@@ -158,4 +152,24 @@ fn err_ic_trace_cols_group_used_as_scalar() {
     }";
 
     expect_diagnostic(source, "type mismatch");
+}
+
+#[test]
+fn err_binop_on_non_scalar() {
+    let source = "
+    def test
+    trace_columns {
+        main: [clk, a[4], b[4]],
+    }
+    public_inputs {
+        stack_inputs: [16],
+    }
+    boundary_constraints {
+        enf a[1].first = 0;
+    }
+    integrity_constraints {
+        enf a = b;
+    }";
+
+    expect_diagnostic(source, "binary operations are only allowed on scalar values");
 }

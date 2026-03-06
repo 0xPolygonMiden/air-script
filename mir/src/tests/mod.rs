@@ -1,6 +1,7 @@
 mod access;
 mod boundary_constraints;
 mod buses;
+mod computed_indices;
 mod constant;
 mod evaluators;
 mod functions;
@@ -11,22 +12,24 @@ mod list_folding;
 mod pub_inputs;
 mod selectors;
 mod source_sections;
+mod tag_validation;
 mod trace;
 mod variables;
 
-/// Note: Tests on this module are currently redundant with the tests in the `air-ir` crate.
-///
-/// Indeed, these tests ensure that we can compile and translate AirScript code into AIR, with both pipelines (with and without MIR),
-/// so if these tests pass, we can produce a Mir.
-///
-/// However, instead of removing the following tests, we should ensure the resulting Mir graph is consistent with what is expected, as well as test each pass.
-pub use crate::CompileError;
-
 use std::sync::Arc;
 
-use crate::ir::Mir;
 use air_pass::Pass;
 use miden_diagnostics::{CodeMap, DiagnosticsConfig, DiagnosticsHandler, Verbosity};
+
+/// Note: Tests on this module are currently redundant with the tests in the `air-ir` crate.
+///
+/// Indeed, these tests ensure that we can compile and translate AirScript code into AIR, with
+/// both pipelines (with and without MIR), so if these tests pass, we can produce a Mir.
+///
+/// However, instead of removing the following tests, we should ensure the resulting Mir graph
+/// is consistent with what is expected, as well as test each pass.
+pub use crate::CompileError;
+use crate::ir::Mir;
 
 pub fn compile(source: &str) -> Result<Mir, ()> {
     let compiler = Compiler::default();
@@ -36,7 +39,7 @@ pub fn compile(source: &str) -> Result<Mir, ()> {
             compiler.diagnostics.emit(err);
             compiler.emitter.print_captured_to_stderr();
             Err(())
-        }
+        },
     }
 }
 
@@ -48,7 +51,7 @@ pub fn translate(source: &str) -> Result<Mir, ()> {
             compiler.diagnostics.emit(err);
             compiler.emitter.print_captured_to_stderr();
             Err(())
-        }
+        },
     }
 }
 
@@ -61,7 +64,7 @@ pub fn parse(source: &str) -> Result<air_parser::ast::Program, ()> {
             compiler.diagnostics.emit(err);
             compiler.emitter.print_captured_to_stderr();
             Err(())
-        }
+        },
     }
 }
 
@@ -71,7 +74,7 @@ pub fn expect_diagnostic(source: &str, expected: &str) {
     let err = match compiler.compile(source) {
         Ok(ref ast) => {
             panic!("expected compilation to fail, got {ast:#?}");
-        }
+        },
         Err(err) => err,
     };
     compiler.diagnostics.emit(err);
@@ -79,10 +82,7 @@ pub fn expect_diagnostic(source: &str, expected: &str) {
     if !found {
         compiler.emitter.print_captured_to_stderr();
     }
-    assert!(
-        found,
-        "expected diagnostic output to contain the string: '{expected}'",
-    );
+    assert!(found, "expected diagnostic output to contain the string: '{expected}'",);
 }
 
 struct Compiler {
@@ -104,28 +104,18 @@ impl Compiler {
     pub fn new(config: DiagnosticsConfig) -> Self {
         let codemap = Arc::new(CodeMap::new());
         let emitter = Arc::new(SplitEmitter::new());
-        let diagnostics = Arc::new(DiagnosticsHandler::new(
-            config,
-            codemap.clone(),
-            emitter.clone(),
-        ));
+        let diagnostics =
+            Arc::new(DiagnosticsHandler::new(config, codemap.clone(), emitter.clone()));
 
-        Self {
-            codemap,
-            emitter,
-            diagnostics,
-        }
+        Self { codemap, emitter, diagnostics }
     }
 
     pub fn compile(&self, source: &str) -> Result<Mir, CompileError> {
         air_parser::parse(&self.diagnostics, self.codemap.clone(), source)
             .map_err(CompileError::Parse)
             .and_then(|ast| {
-                let mut pipeline =
-                    air_parser::transforms::ConstantPropagation::new(&self.diagnostics)
-                        .chain(crate::passes::AstToMir::new(&self.diagnostics))
-                        .chain(crate::passes::Inlining::new(&self.diagnostics))
-                        .chain(crate::passes::Unrolling::new(&self.diagnostics));
+                let mut pipeline = air_parser::AstPasses::new(&self.diagnostics)
+                    .chain(crate::MirPasses::new(&self.diagnostics));
                 pipeline.run(ast)
             })
     }
@@ -166,8 +156,9 @@ impl SplitEmitter {
     }
 
     pub fn print_captured_to_stderr(&self) {
-        use miden_diagnostics::Emitter;
         use std::io::Write;
+
+        use miden_diagnostics::Emitter;
 
         let mut copy = self.default.buffer();
         let captured = self.capture.captured();

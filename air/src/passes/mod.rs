@@ -1,7 +1,9 @@
+mod common_subexpression_elimination;
 mod expand_buses;
-mod translate_from_ast;
+mod tag_validation;
 mod translate_from_mir;
 
-pub use self::expand_buses::BusOpExpand;
-pub use self::translate_from_ast::AstToAir;
-pub use self::translate_from_mir::MirToAir;
+pub use self::{
+    common_subexpression_elimination::CommonSubexpressionElimination, expand_buses::BusOpExpand,
+    tag_validation::TagValidation, translate_from_mir::MirToAir,
+};

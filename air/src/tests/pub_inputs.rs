@@ -1,4 +1,4 @@
-use super::{Pipeline, compile};
+use super::compile_from_source;
 
 #[test]
 fn bc_with_public_inputs() {
@@ -17,6 +17,5 @@ fn bc_with_public_inputs() {
         enf clk' = clk - 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }

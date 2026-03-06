@@ -1,0 +1,16 @@
+mod lib
+
+periodic_columns {
+    k0: [1, 2],
+    k1: [3, 4],
+}
+
+ev test_comprehension([a, b]) {
+    # Create local variable holding periodic column references
+    let cols = [k0, k1];
+    let vals = [a, b];
+
+    # Iterate over the local variable - binding 'k' gets typed as PeriodicColumn
+    # but it's actually a local variable holding a value
+    enf a' = sum([x * k for (x, k) in (vals, cols)]);
+}

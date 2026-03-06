@@ -1,10 +1,9 @@
-use crate::graph::NodeIndex;
-
 use super::*;
+use crate::graph::NodeIndex;
 
 /// [Operation] defines the various node types represented
 /// in the [AlgebraicGraph].
-#[derive(Debug, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub enum Operation {
     /// Evaluates to a [Value]
     ///
@@ -25,9 +24,9 @@ impl Operation {
     /// precedence are evaluated left-to-right.
     pub fn precedence(&self) -> usize {
         match self {
-            Self::Add(_, _) => 1,
-            Self::Sub(_, _) => 2,
-            Self::Mul(_, _) => 3,
+            Self::Add(..) => 1,
+            Self::Sub(..) => 2,
+            Self::Mul(..) => 3,
             _ => 4,
         }
     }

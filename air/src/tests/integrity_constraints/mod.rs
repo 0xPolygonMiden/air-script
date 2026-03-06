@@ -1,4 +1,4 @@
-use super::{Pipeline, compile, expect_diagnostic};
+use super::{compile_from_source, expect_diagnostic};
 
 mod comprehension;
 
@@ -19,8 +19,7 @@ fn integrity_constraints() {
         enf clk' = clk + 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -40,8 +39,7 @@ fn ic_using_parens() {
         enf clk' = (clk + 1);
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -61,8 +59,7 @@ fn ic_op_mul() {
         enf clk' * clk = 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -82,8 +79,7 @@ fn ic_op_exp() {
         enf clk'^2 - clk = 1;
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -104,14 +100,5 @@ fn err_non_const_exp_outside_lc() {
         enf clk = 2^ctx;
     }";
 
-    expect_diagnostic(
-        source,
-        "expected exponent to be a constant",
-        Pipeline::WithoutMIR,
-    );
-    expect_diagnostic(
-        source,
-        "expected exponent to be a constant",
-        Pipeline::WithMIR,
-    );
+    expect_diagnostic(source, "expected exponent to be a constant");
 }

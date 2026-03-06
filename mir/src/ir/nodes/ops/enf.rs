@@ -1,13 +1,15 @@
-use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
+use air_parser::ast::ConstraintTagSpec;
 use miden_diagnostics::{SourceSpan, Spanned};
 
+use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
+
 /// A MIR operation to enforce that a given MIR op, `expr` equals zero
-///
 #[derive(Default, Clone, PartialEq, Eq, Debug, Hash, Builder, Spanned)]
 #[enum_wrapper(Op)]
 pub struct Enf {
     pub parents: Vec<BackLink<Owner>>,
     pub expr: Link<Op>,
+    pub tag: Option<ConstraintTagSpec>,
     pub _node: Singleton<Node>,
     pub _owner: Singleton<Owner>,
     #[span]
@@ -15,13 +17,8 @@ pub struct Enf {
 }
 
 impl Enf {
-    pub fn create(expr: Link<Op>, span: SourceSpan) -> Link<Op> {
-        Op::Enf(Self {
-            expr,
-            span,
-            ..Default::default()
-        })
-        .into()
+    pub fn create(expr: Link<Op>, span: SourceSpan, tag: Option<ConstraintTagSpec>) -> Link<Op> {
+        Op::Enf(Self { expr, tag, span, ..Default::default() }).into()
     }
 }
 

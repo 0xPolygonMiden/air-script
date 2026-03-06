@@ -3,7 +3,8 @@ use winter_math::fields::f64::BaseElement as Felt;
 use winterfell::{AuxTraceWithMetadata, Trace, TraceTable, matrix::ColMatrix};
 
 use crate::{
-    buses::buses_complex::{BusesAir, PublicInputs},
+    buses::buses_complex::PublicInputs,
+    generate_air_test,
     helpers::{AirTester, MyTraceTable},
 };
 
@@ -45,31 +46,15 @@ impl AirTester for BusesAirTester {
 
     fn build_aux_trace(&self, length: usize) -> Option<AuxTraceWithMetadata<Felt>> {
         let aux_trace_width = 2;
-        let num_rand_values = 3;
+        let num_rand_values = 4;
         let mut aux_trace = ColMatrix::new(vec![vec![Felt::new(0); length]; aux_trace_width]);
         aux_trace.update_row(0, &[Felt::new(1), Felt::new(0)]);
         aux_trace.update_row(length - 2, &[Felt::new(1), Felt::new(0)]);
         let aux_rand_elements = AuxRandElements::new(vec![Felt::new(0); num_rand_values]);
 
-        let aux_trace_with_meta = AuxTraceWithMetadata {
-            aux_trace,
-            aux_rand_elements,
-        };
+        let aux_trace_with_meta = AuxTraceWithMetadata { aux_trace, aux_rand_elements };
         Some(aux_trace_with_meta)
     }
 }
 
-#[test]
-fn test_buses_air() {
-    let air_tester = Box::new(BusesAirTester {});
-    let length = 1024;
-
-    let main_trace = air_tester.build_main_trace(length);
-    let aux_trace = air_tester.build_aux_trace(length);
-    let pub_inputs = air_tester.public_inputs();
-    let trace_info = air_tester.build_trace_info(length);
-    let options = air_tester.build_proof_options();
-
-    let air = BusesAir::new(trace_info, pub_inputs, options);
-    main_trace.validate::<BusesAir, Felt>(&air, aux_trace.as_ref());
-}
+generate_air_test!(test_buses_air, crate::buses::buses_complex::BusesAir, BusesAirTester, 1024);

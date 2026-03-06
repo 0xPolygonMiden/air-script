@@ -6,7 +6,7 @@ The purpose of the `AirIR` is to provide a simple and accurate representation of
 
 ## Generating the AirIR
 
-Generate an `AirIR` from either an AirScript AST (the output of the AirScript parser) or a MIR (the Middle Intermediate Representation for AirScript).
+Generate an `AirIR` from a MIR (the Middle Intermediate Representation for AirScript).
 
 Example usage:
 
@@ -14,21 +14,8 @@ Example usage:
 // parse the source string to a Result containing the AST or an Error
 let ast = parse(source.as_str()).expect("Parsing failed");
 
-// Create the compilation pipeline needed to translate the AST to AIR
-let pipeline_with_mir = air_parser::transforms::ConstantPropagation::new(&diagnostics)
-  .chain(mir::passes::AstToMir::new(&diagnostics))
-  .chain(mir::passes::Inlining::new(&diagnostics))
-  .chain(mir::passes::Unrolling::new(&diagnostics))
-  .chain(air_ir::passes::MirToAir::new(&diagnostics))
-  .chain(air_ir::passes::BusOpExpand::new(&diagnostics));
-
-let pipeline_without_mir = air_parser::transforms::ConstantPropagation::new(&diagnostics)
-  .chain(air_parser::transforms::Inlining::new(&diagnostics))
-  .chain(air_ir::passes::AstToAir::new(&diagnostics));
-  
-// process the AST to get a Result containing the AIR or a CompileError
-let air_from_ast = pipeline_without_mir.run(ast)
-let air_from_mir = pipeline_with_mir.run(ast)
+// Compile AST into AIR
+let air = compile(&diagnostics, ast).expect("compilation failed");
 ```
 
 ## AirIR

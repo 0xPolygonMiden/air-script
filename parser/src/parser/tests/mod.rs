@@ -27,6 +27,54 @@ macro_rules! assert_module_error {
     };
 }
 
+macro_rules! module_ident {
+    ($name:ident) => {
+        ModuleId::new(
+            vec![Identifier::new(
+                miden_diagnostics::SourceSpan::UNKNOWN,
+                crate::Symbol::intern(stringify!($name)),
+            )],
+            miden_diagnostics::SourceSpan::UNKNOWN,
+        )
+    };
+
+    ($($names:ident),+) => {
+        ModuleId::new(
+            vec![
+                $(
+                    Identifier::new(
+                        miden_diagnostics::SourceSpan::UNKNOWN,
+                        crate::Symbol::intern(stringify!($names)),
+                    )
+                ),+
+            ],
+            miden_diagnostics::SourceSpan::UNKNOWN,
+        )
+    };
+}
+
+macro_rules! import_all {
+    ($module:ident) => {
+        Import::All { module: module_ident!($module) }
+    };
+    ($($names:ident),+) => {
+        Import::All { module: module_ident!($($names),+) }
+    };
+}
+
+macro_rules! import {
+    ($module:ident, $item:ident) => {{
+        let mut items: std::collections::HashSet<Identifier> = std::collections::HashSet::default();
+        items.insert(ident!($item));
+        Import::Partial { module: module_ident!($module), items }
+    }};
+    (($($names:ident),+), $item:ident) => {{
+        let mut items: std::collections::HashSet<Identifier> = std::collections::HashSet::default();
+        items.insert(ident!($item));
+        Import::Partial { module: module_ident!($($names),+), items }
+    }};
+}
+
 macro_rules! ident {
     ($name:ident) => {
         Identifier::new(
@@ -36,15 +84,12 @@ macro_rules! ident {
     };
 
     ($name:literal) => {
-        Identifier::new(
-            miden_diagnostics::SourceSpan::UNKNOWN,
-            crate::Symbol::intern($name),
-        )
+        Identifier::new(miden_diagnostics::SourceSpan::UNKNOWN, crate::Symbol::intern($name))
     };
 
     ($module:ident, $name:ident) => {
         QualifiedIdentifier::new(
-            ident!($module),
+            module_ident!($module),
             NamespacedIdentifier::Binding(ident!($name)),
         )
     };
@@ -57,7 +102,13 @@ macro_rules! function_ident {
 
     ($module:ident, $name:ident) => {
         QualifiedIdentifier::new(
-            ident!($module),
+            module_ident!($module),
+            NamespacedIdentifier::Function(ident!($name)),
+        )
+    };
+    (($($modules:ident),+), $name:ident) => {
+        QualifiedIdentifier::new(
+            module_ident!($($modules),+),
             NamespacedIdentifier::Function(ident!($name)),
         )
     };
@@ -177,12 +228,30 @@ macro_rules! access {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
+            AccessType::Index(Box::new(int!($idx))),
+            0,
+        ))
+    };
+
+    ($name:ident [ $idx:expr ]) => {
+        ScalarExpr::SymbolAccess(SymbolAccess::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            ident!($name),
             AccessType::Index($idx),
             0,
         ))
     };
 
     ($name:literal [ $idx:literal ]) => {
+        ScalarExpr::SymbolAccess(SymbolAccess::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            ident!($name),
+            AccessType::Index(Box::new(int!($idx))),
+            0,
+        ))
+    };
+
+    ($name:literal [ $idx:expr ]) => {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
@@ -195,12 +264,31 @@ macro_rules! access {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
+            AccessType::Matrix(Box::new(int!($row)), Box::new(int!($col))),
+            0,
+        ))
+    };
+
+    ($name:ident [ $row:expr ] [ $col:expr ]) => {
+        ScalarExpr::SymbolAccess(SymbolAccess::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            ident!($name),
             AccessType::Matrix($row, $col),
             0,
         ))
     };
 
     ($name:ident [ $row:literal ] [ $col:literal ], $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ResolvableIdentifier::Local(ident!($name)),
+            access_type: AccessType::Matrix(Box::new(int!($row)), Box::new(int!($col))),
+            offset: 0,
+            ty: Some($ty),
+        })
+    };
+
+    ($name:ident [ $row:expr ] [ $col:expr ], $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
@@ -214,6 +302,16 @@ macro_rules! access {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ident!($module, $name).into(),
+            access_type: AccessType::Index(Box::new(int!($idx))),
+            offset: 0,
+            ty: Some($ty),
+        })
+    };
+
+    ($module:ident, $name:ident [ $idx:expr ], $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ident!($module, $name).into(),
             access_type: AccessType::Index($idx),
             offset: 0,
             ty: Some($ty),
@@ -221,6 +319,16 @@ macro_rules! access {
     };
 
     ($module:ident, $name:ident [ $row:literal ] [ $col:literal ], $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ident!($module, $name).into(),
+            access_type: AccessType::Matrix(Box::new(int!($row)), Box::new(int!($col))),
+            offset: 0,
+            ty: Some($ty),
+        })
+    };
+
+    ($module:ident, $name:ident [ $row:expr ] [ $col:expr ], $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ident!($module, $name).into(),
@@ -234,12 +342,31 @@ macro_rules! access {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
+            AccessType::Index(Box::new(int!($idx))),
+            $offset,
+        ))
+    };
+
+    ($name:ident [ $idx:expr ], $offset:literal) => {
+        ScalarExpr::SymbolAccess(SymbolAccess::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            ident!($name),
             AccessType::Index($idx),
             $offset,
         ))
     };
 
     ($name:ident [ $idx:literal ], $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ResolvableIdentifier::Local(ident!($name)),
+            access_type: AccessType::Index(Box::new(int!($idx))),
+            offset: 0,
+            ty: Some($ty),
+        })
+    };
+
+    ($name:ident [ $idx:expr ], $ty:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
@@ -253,13 +380,32 @@ macro_rules! access {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
-            access_type: AccessType::Index($idx),
+            access_type: AccessType::Index(Box::new(int!($idx))),
+            offset: $offset,
+            ty: Some($ty),
+        })
+    };
+
+    ($name:ident [ $idx:literal ], $offset:literal, $ty:expr) => {
+        ScalarExpr::SymbolAccess(SymbolAccess {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            name: ResolvableIdentifier::Local(ident!($name)),
+            access_type: AccessType::Index(Box::new(int!($idx))),
             offset: $offset,
             ty: Some($ty),
         })
     };
 
     ($name:literal [ $idx:literal ], $offset:literal) => {
+        ScalarExpr::SymbolAccess(SymbolAccess::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            ident!($name),
+            AccessType::Index(Box::new(int!($idx))),
+            $offset,
+        ))
+    };
+
+    ($name:literal [ $idx:expr ], $offset:literal) => {
         ScalarExpr::SymbolAccess(SymbolAccess::new(
             miden_diagnostics::SourceSpan::UNKNOWN,
             ident!($name),
@@ -275,24 +421,12 @@ macro_rules! expr {
     };
 }
 
-macro_rules! scalar {
-    ($expr:expr) => {
-        ScalarExpr::try_from($expr).unwrap()
-    };
-}
-
-macro_rules! statement {
-    ($expr:expr) => {
-        Statement::try_from($expr).unwrap()
-    };
-}
-
 macro_rules! slice {
     ($name:ident, $range:expr) => {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Unresolved(NamespacedIdentifier::Binding(ident!($name))),
-            access_type: AccessType::Slice($range.into()),
+            access_type: AccessType::Slice(Box::new($range.into())),
             offset: 0,
             ty: None,
         })
@@ -302,7 +436,7 @@ macro_rules! slice {
         ScalarExpr::SymbolAccess(SymbolAccess {
             span: miden_diagnostics::SourceSpan::UNKNOWN,
             name: ResolvableIdentifier::Local(ident!($name)),
-            access_type: AccessType::Slice($range.into()),
+            access_type: AccessType::Slice(Box::new($range.into())),
             offset: 0,
             ty: Some($ty),
         })
@@ -343,7 +477,7 @@ macro_rules! bounded_access {
             SymbolAccess::new(
                 miden_diagnostics::SourceSpan::UNKNOWN,
                 ident!($name),
-                AccessType::Index($idx),
+                AccessType::Index(Box::new(int!($idx))),
                 0,
             ),
             $bound,
@@ -356,7 +490,7 @@ macro_rules! bounded_access {
             SymbolAccess {
                 span: miden_diagnostics::SourceSpan::UNKNOWN,
                 name: ResolvableIdentifier::Local(ident!($name)),
-                access_type: AccessType::Index($idx),
+                access_type: AccessType::Index(Box::new(int!($idx))),
                 offset: 0,
                 ty: Some($ty),
             },
@@ -383,10 +517,7 @@ macro_rules! int {
 
 macro_rules! null {
     () => {
-        ScalarExpr::Null(miden_diagnostics::Span::new(
-            miden_diagnostics::SourceSpan::UNKNOWN,
-            (),
-        ))
+        ScalarExpr::Null(miden_diagnostics::Span::new(miden_diagnostics::SourceSpan::UNKNOWN, ()))
     };
 }
 
@@ -402,11 +533,21 @@ macro_rules! call {
             args: vec![$($param),+],
             ty: None,
         })
-    }
+    };
+
+    (($($modules:ident),+) :: $callee:ident ($($param:expr),+)) => {
+        ScalarExpr::Call(Call {
+            span: miden_diagnostics::SourceSpan::UNKNOWN,
+            callee: ResolvableIdentifier::Resolved(function_ident!(($($modules),+), $callee)),
+            args: vec![$($param),+],
+            ty: None,
+        })
+    };
+
 }
 
 macro_rules! trace_segment {
-    ($idx:literal, $name:literal, [$(($binding_name:ident, $binding_size:literal)),*]) => {
+    ($idx:expr, $name:literal, [$(($binding_name:ident, $binding_size:literal)),*]) => {
         TraceSegment::new(miden_diagnostics::SourceSpan::UNKNOWN, $idx, ident!($name), vec![
             $(miden_diagnostics::Span::new(miden_diagnostics::SourceSpan::UNKNOWN, (ident!($binding_name), $binding_size))),*
         ])
@@ -449,11 +590,21 @@ macro_rules! matrix {
 
 macro_rules! let_ {
     ($name:ident = $value:expr => $($body:expr),+) => {
-        Statement::Let(Let::new(miden_diagnostics::SourceSpan::UNKNOWN, ident!($name), $value, vec![$($body),+]))
+        Statement::Let(Let::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            LetBinding::Single(ident!($name)),
+            $value,
+            vec![$($body),+],
+        ))
     };
 
     ($name:literal = $value:expr => $($body:expr),+) => {
-        Statement::Let(Let::new(miden_diagnostics::SourceSpan::UNKNOWN, ident!($name), $value, vec![$($body),+]))
+        Statement::Let(Let::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            LetBinding::Single(ident!($name)),
+            $value,
+            vec![$($body),+],
+        ))
     };
 }
 
@@ -465,11 +616,26 @@ macro_rules! return_ {
 
 macro_rules! enforce {
     ($expr:expr) => {
-        Statement::Enforce($expr)
+        Statement::Enforce(Enforce::new(miden_diagnostics::SourceSpan::UNKNOWN, $expr, None))
     };
 
     ($expr:expr, when $selector:expr) => {
-        Statement::EnforceIf($expr, $selector)
+        Statement::EnforceIf(Match::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            vec![MatchArm::new(miden_diagnostics::SourceSpan::UNKNOWN, $expr, $selector)],
+        ))
+    };
+}
+
+macro_rules! enforce_if {
+    ($($match_arms:expr),+) => {
+        Statement::EnforceIf(Match::new(miden_diagnostics::SourceSpan::UNKNOWN, vec![$($match_arms),+]))
+    };
+}
+
+macro_rules! match_arm {
+    ($expr:expr, $selector:expr) => {
+        MatchArm::new(miden_diagnostics::SourceSpan::UNKNOWN, $expr, $selector)
     };
 }
 
@@ -492,7 +658,7 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, None)
+        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, None, None)
     }};
 
     (($(($binding:literal, $iterable:expr)),+) => $body:expr) => {{
@@ -501,7 +667,7 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, None)
+        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, None, None)
     }};
 
     (($(($binding:ident, $iterable:expr)),*) => $body:expr, when $selector:expr) => {{
@@ -510,7 +676,13 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, Some($selector))
+        ListComprehension::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            $body,
+            context,
+            Some($selector),
+            None
+        )
     }};
 
     (($(($binding:literal, $iterable:expr)),*) => $body:expr, when $selector:expr) => {{
@@ -519,7 +691,13 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, Some($selector))
+        ListComprehension::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            $body,
+            context,
+            Some($selector),
+            None
+        )
     }};
 
 
@@ -529,7 +707,13 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, Some($multiplicity))
+        ListComprehension::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            $body,
+            context,
+            Some($multiplicity),
+            None
+        )
     }};
 
     (($(($binding:literal, $iterable:expr)),*) => $body:expr, with $multiplicity:expr) => {{
@@ -538,7 +722,13 @@ macro_rules! lc {
                 (ident!($binding), $iterable)
             ),+
         ];
-        ListComprehension::new(miden_diagnostics::SourceSpan::UNKNOWN, $body, context, Some($multiplicity))
+        ListComprehension::new(
+            miden_diagnostics::SourceSpan::UNKNOWN,
+            $body,
+            context,
+            Some($multiplicity),
+            None
+        )
     }};
 }
 
@@ -648,35 +838,16 @@ macro_rules! exp {
     };
 }
 
-macro_rules! import_all {
-    ($module:ident) => {
-        Import::All {
-            module: ident!($module),
-        }
-    };
-}
-
-macro_rules! import {
-    ($module:ident, $item:ident) => {{
-        let mut items: std::collections::HashSet<Identifier> = std::collections::HashSet::default();
-        items.insert(ident!($item));
-        Import::Partial {
-            module: ident!($module),
-            items,
-        }
-    }};
-}
-
 mod arithmetic_ops;
 mod boundary_constraints;
 mod buses;
 mod calls;
+mod computed_indices;
 mod constant_propagation;
 mod constants;
 mod evaluators;
 mod functions;
 mod identifiers;
-mod inlining;
 mod integrity_constraints;
 mod list_comprehension;
 mod modules;
@@ -704,9 +875,11 @@ fn full_air_file() {
     // trace_columns {
     //     main: [clk, fmp, ctx]
     // }
-    expected
-        .trace_columns
-        .push(trace_segment!(0, "$main", [(clk, 1), (fmp, 1), (ctx, 1)]));
+    expected.trace_columns.push(trace_segment!(
+        TraceSegmentId::Main,
+        "$main",
+        [(clk, 1), (fmp, 1), (ctx, 1)]
+    ));
     // integrity_constraints {
     //     enf clk' = clk + 1
     // }
@@ -717,10 +890,9 @@ fn full_air_file() {
     // boundary_constraints {
     //     enf clk.first = 0
     // }
-    expected.boundary_constraints.push(enforce!(eq!(
-        bounded_access!(clk, Boundary::First, Type::Felt),
-        int!(0)
-    )));
+    expected
+        .boundary_constraints
+        .push(enforce!(eq!(bounded_access!(clk, Boundary::First, Type::Felt), int!(0))));
 
     ParseTest::new().expect_program_ast_from_file("src/parser/tests/input/system.air", expected);
 }

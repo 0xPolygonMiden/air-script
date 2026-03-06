@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
 use air_parser::ast::{self, Identifier};
-
 use miden_diagnostics::{SourceSpan, Spanned};
 
 use crate::{
@@ -12,7 +11,7 @@ use crate::{
 /// A Mir struct to represent a Bus definition
 /// we have 2 cases:
 ///
-/// - [BusType::Multiset]: multiset check
+/// - BusType::Multiset: multiset check
 ///
 /// these constraints:
 /// ```air
@@ -25,17 +24,17 @@ use crate::{
 /// ```
 /// with this bus definition:
 /// ```ignore
-/// Bus {
+/// struct Bus {
 ///     bus_type: BusType::Multiset,
 ///     columns: [a, b, c, d],
 ///     latches: [s, 1 - s],
 /// }
 /// ```
 /// with:
-///     a, b, c, d, s being [Link<Op>] in the graph
-///     s, 1 - s being [Link<Op>] representing booleans in the graph
+///     a, b, c, d, s being [`Link<Op>`] in the graph
+///     s, 1 - s being [`Link<Op>`] representing booleans in the graph
 ///
-/// - [BusType::Logup]: LogUp bus
+/// - BusType::Logup: LogUp bus
 ///
 /// these constraints:
 /// ```air
@@ -55,14 +54,16 @@ use crate::{
 /// }
 /// ```
 /// with:
-///     a, b, c, e, f, g being [Link<Op>] in the graph
-///     d, s being [Link<Op>], s is boolean, d is a number.
+///     a, b, c, e, f, g being [`Link<Op>`] in the graph
+///     d, s being [`Link<Op>`], s is boolean, d is a number.
 #[derive(Default, Clone, Eq, Debug, Spanned)]
 pub struct Bus {
     /// Identifier of the bus
     name: Option<Identifier>,
     /// Type of bus
     pub bus_type: ast::BusType,
+    /// Constraint form for multiset buses.
+    pub constraint_form: ast::BusConstraintForm,
     /// values stored in the bus
     /// columns are joined with randomness (αi) in the bus constraint equation
     pub columns: Vec<Link<Op>>,
@@ -70,6 +71,9 @@ pub struct Bus {
     pub latches: Vec<Link<Op>>,
     first: Link<Op>,
     last: Link<Op>,
+    first_tag: Option<u64>,
+    last_tag: Option<u64>,
+    transition_tag: Option<u64>,
     #[span]
     span: SourceSpan,
 }
@@ -78,6 +82,7 @@ impl std::hash::Hash for Bus {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         self.bus_type.hash(state);
+        self.constraint_form.hash(state);
         self.columns.hash(state);
         self.latches.hash(state);
     }
@@ -87,16 +92,25 @@ impl PartialEq for Bus {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
             && self.bus_type == other.bus_type
+            && self.constraint_form == other.constraint_form
             && self.columns == other.columns
             && self.latches == other.latches
     }
 }
 
 impl Bus {
-    pub fn create(name: Identifier, bus_type: ast::BusType, span: SourceSpan) -> Link<Bus> {
+    pub fn create(
+        name: Identifier,
+        bus_type: ast::BusType,
+        constraint_form: ast::BusConstraintForm,
+        span: SourceSpan,
+        transition_tag: Option<u64>,
+    ) -> Link<Bus> {
         Bus {
             name: Some(name),
             bus_type,
+            constraint_form,
+            transition_tag,
             span,
             ..Default::default()
         }
@@ -111,11 +125,27 @@ impl Bus {
         Ok(())
     }
 
+    pub fn set_first_tag(&mut self, tag: u64) -> Result<(), CompileError> {
+        if self.first_tag.is_some() {
+            return Err(CompileError::Failed);
+        }
+        self.first_tag = Some(tag);
+        Ok(())
+    }
+
     pub fn set_last(&mut self, last: Link<Op>) -> Result<(), CompileError> {
         let Op::None(_) = self.last.borrow().deref() else {
             return Err(CompileError::Failed);
         };
         self.last = last;
+        Ok(())
+    }
+
+    pub fn set_last_tag(&mut self, tag: u64) -> Result<(), CompileError> {
+        if self.last_tag.is_some() {
+            return Err(CompileError::Failed);
+        }
+        self.last_tag = Some(tag);
         Ok(())
     }
     /// Set the name of the bus but only if it is not already set
@@ -140,6 +170,18 @@ impl Bus {
 
     pub fn get_last(&self) -> Link<Op> {
         self.last.clone()
+    }
+
+    pub fn first_tag(&self) -> Option<u64> {
+        self.first_tag
+    }
+
+    pub fn last_tag(&self) -> Option<u64> {
+        self.last_tag
+    }
+
+    pub fn transition_tag(&self) -> Option<u64> {
+        self.transition_tag
     }
 
     pub fn name(&self) -> Identifier {

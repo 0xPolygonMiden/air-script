@@ -47,7 +47,7 @@ impl Air for ListComprehensionAir {
     }
 
     fn new(trace_info: TraceInfo, public_inputs: PublicInputs, options: WinterProofOptions) -> Self {
-        let main_degrees = vec![TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(1)];
+        let main_degrees = vec![TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(2), TransitionConstraintDegree::new(1), TransitionConstraintDegree::new(1)];
         let aux_degrees = vec![];
         let num_main_assertions = 1;
         let num_aux_assertions = 0;
@@ -86,7 +86,8 @@ impl Air for ListComprehensionAir {
         result[1] = main_current[4] - main_current[0] * E::from(Felt::new(8_u64)) * main_current[11];
         result[2] = main_current[4] - main_current[0] * (main_next[8] - main_next[12]);
         result[3] = main_current[6] - main_current[0] * (main_current[9] - main_current[14]);
-        result[4] = main_current[1] - (E::ZERO + main_current[5] - main_current[8] - main_current[12] + E::ONE + main_current[6] - main_current[9] - main_current[13] + E::from(Felt::new(2_u64)) + main_current[7] - main_current[10] - main_current[14]);
+        result[4] = main_current[1] - (main_current[5] - main_current[8] - main_current[12] + E::from(Felt::new(10_u64)) + main_current[6] - main_current[9] - main_current[13] + E::from(Felt::new(20_u64)) + main_current[7] - main_current[10] - main_current[14]);
+        result[5] = main_current[14] - E::from(Felt::new(10_u64));
     }
 
     fn evaluate_aux_transition<F, E>(&self, main_frame: &EvaluationFrame<F>, aux_frame: &EvaluationFrame<E>, _periodic_values: &[F], aux_rand_elements: &AuxRandElements<E>, result: &mut [E])

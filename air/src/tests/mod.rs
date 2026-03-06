@@ -9,41 +9,36 @@ mod pub_inputs;
 mod random_values;
 mod selectors;
 mod source_sections;
+mod tag_validation;
 mod trace;
 mod variables;
 
-pub use crate::CompileError;
-
 use std::sync::Arc;
 
-use air_pass::Pass;
 use miden_diagnostics::{CodeMap, DiagnosticsConfig, DiagnosticsHandler, Verbosity};
 
-#[derive(Clone, Copy, Debug)]
-pub enum Pipeline {
-    WithMIR,
-    WithoutMIR,
-}
+pub use crate::CompileError;
+use crate::compile;
 
-pub fn compile(source: &str, pipeline: Pipeline) -> Result<crate::Air, ()> {
+pub fn compile_from_source(source: &str) -> Result<crate::Air, ()> {
     let compiler = Compiler::default();
-    match compiler.compile(source, pipeline) {
+    match compiler.compile(source) {
         Ok(air) => Ok(air),
         Err(err) => {
             compiler.diagnostics.emit(err);
             compiler.emitter.print_captured_to_stderr();
             Err(())
-        }
+        },
     }
 }
 
 #[track_caller]
-pub fn expect_diagnostic(source: &str, expected: &str, pipeline: Pipeline) {
+pub fn expect_diagnostic(source: &str, expected: &str) {
     let compiler = Compiler::default();
-    let err = match compiler.compile(source, pipeline) {
+    let err = match compiler.compile(source) {
         Ok(ref ast) => {
             panic!("expected compilation to fail, got {ast:#?}");
-        }
+        },
         Err(err) => err,
     };
     compiler.diagnostics.emit(err);
@@ -51,10 +46,7 @@ pub fn expect_diagnostic(source: &str, expected: &str, pipeline: Pipeline) {
     if !found {
         compiler.emitter.print_captured_to_stderr();
     }
-    assert!(
-        found,
-        "With pipeline {pipeline:?}, expected diagnostic output to contain the string: '{expected}'"
-    );
+    assert!(found, "expected diagnostic output to contain the string: '{expected}'");
 }
 
 struct Compiler {
@@ -76,45 +68,16 @@ impl Compiler {
     pub fn new(config: DiagnosticsConfig) -> Self {
         let codemap = Arc::new(CodeMap::new());
         let emitter = Arc::new(SplitEmitter::new());
-        let diagnostics = Arc::new(DiagnosticsHandler::new(
-            config,
-            codemap.clone(),
-            emitter.clone(),
-        ));
+        let diagnostics =
+            Arc::new(DiagnosticsHandler::new(config, codemap.clone(), emitter.clone()));
 
-        Self {
-            codemap,
-            emitter,
-            diagnostics,
-        }
+        Self { codemap, emitter, diagnostics }
     }
 
-    pub fn compile(&self, source: &str, pipeline: Pipeline) -> Result<crate::Air, CompileError> {
-        match pipeline {
-            Pipeline::WithMIR => air_parser::parse(&self.diagnostics, self.codemap.clone(), source)
-                .map_err(CompileError::Parse)
-                .and_then(|ast| {
-                    let mut pipeline =
-                        air_parser::transforms::ConstantPropagation::new(&self.diagnostics)
-                            .chain(mir::passes::AstToMir::new(&self.diagnostics))
-                            .chain(mir::passes::Inlining::new(&self.diagnostics))
-                            .chain(mir::passes::Unrolling::new(&self.diagnostics))
-                            .chain(crate::passes::MirToAir::new(&self.diagnostics))
-                            .chain(crate::passes::BusOpExpand::new(&self.diagnostics));
-                    pipeline.run(ast)
-                }),
-            Pipeline::WithoutMIR => {
-                air_parser::parse(&self.diagnostics, self.codemap.clone(), source)
-                    .map_err(CompileError::Parse)
-                    .and_then(|ast| {
-                        let mut pipeline =
-                            air_parser::transforms::ConstantPropagation::new(&self.diagnostics)
-                                .chain(air_parser::transforms::Inlining::new(&self.diagnostics))
-                                .chain(crate::passes::AstToAir::new(&self.diagnostics));
-                        pipeline.run(ast)
-                    })
-            }
-        }
+    pub fn compile(&self, source: &str) -> Result<crate::Air, CompileError> {
+        air_parser::parse(&self.diagnostics, self.codemap.clone(), source)
+            .map_err(CompileError::Parse)
+            .and_then(|program| compile(&self.diagnostics, program))
     }
 }
 
@@ -138,8 +101,9 @@ impl SplitEmitter {
     }
 
     pub fn print_captured_to_stderr(&self) {
-        use miden_diagnostics::Emitter;
         use std::io::Write;
+
+        use miden_diagnostics::Emitter;
 
         let mut copy = self.default.buffer();
         let captured = self.capture.captured();

@@ -1,4 +1,4 @@
-use super::{Pipeline, compile};
+use super::compile_from_source;
 
 #[test]
 fn simple_evaluator() {
@@ -24,8 +24,7 @@ fn simple_evaluator() {
         enf advance_clock([clk]);
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -53,8 +52,7 @@ fn evaluator_with_variables() {
         enf advance_clock([clk]);
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -85,8 +83,7 @@ fn ev_call_inside_evaluator_with_main() {
         enf enforce_all_constraints([clk]);
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }
 
 #[test]
@@ -113,6 +110,5 @@ fn ev_fn_call_with_column_group() {
         enf clk_selectors([s, clk]);
     }";
 
-    assert!(compile(source, Pipeline::WithoutMIR).is_ok());
-    assert!(compile(source, Pipeline::WithMIR).is_ok());
+    assert!(compile_from_source(source).is_ok());
 }

@@ -1,8 +1,7 @@
 use miden_diagnostics::SourceSpan;
 
-use crate::ast::*;
-
 use super::ParseTest;
+use crate::ast::*;
 
 #[test]
 fn call_fold_identifier() {
@@ -15,7 +14,7 @@ fn call_fold_identifier() {
         enf a = x + y;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     let body = vec![let_!(x = expr!(call!(sum(expr!(access!(c))))) =>
                   let_!(y = expr!(call!(prod(expr!(access!(c))))) =>
                         enforce!(eq!(access!(a), add!(access!(x), access!(y))))))];
@@ -24,7 +23,7 @@ fn call_fold_identifier() {
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(a, 1), (c, 2)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(a, 1), (c, 2)])],
             body,
         ),
     );
@@ -43,18 +42,16 @@ fn call_fold_vector_literal() {
         enf a = x + y;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
-    let body = vec![
-        let_!(x = expr!(call!(sum(vector!(access!(a), access!(b), access!(c[0]))))) =>
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
+    let body = vec![let_!(x = expr!(call!(sum(vector!(access!(a), access!(b), access!(c[0]))))) =>
                   let_!(y = expr!(call!(prod(vector!(access!(a), access!(b), access!(c[0]))))) =>
-                        enforce!(eq!(access!(a), add!(access!(x), access!(y)))))),
-    ];
+                        enforce!(eq!(access!(a), add!(access!(x), access!(y))))))];
     expected.evaluators.insert(
         ident!(test),
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(a, 1), (b, 1), (c, 4)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(a, 1), (b, 1), (c, 4)])],
             body,
         ),
     );
@@ -73,7 +70,7 @@ fn call_fold_list_comprehension() {
         enf a = x + y;
     }";
 
-    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, ident!(test));
+    let mut expected = Module::new(ModuleType::Library, SourceSpan::UNKNOWN, module_ident!(test));
     let body = vec![
         let_!(x = expr!(call!(sum(lc!(((col, expr!(access!(c)))) => exp!(access!(col), int!(7))).into()))) =>
                   let_!(y = expr!(call!(prod(lc!(((col, expr!(access!(c)))) => exp!(access!(col), int!(7))).into()))) =>
@@ -84,7 +81,7 @@ fn call_fold_list_comprehension() {
         EvaluatorFunction::new(
             SourceSpan::UNKNOWN,
             ident!(test),
-            vec![trace_segment!(0, "%0", [(a, 1), (b, 1), (c, 4)])],
+            vec![trace_segment!(TraceSegmentId::Main, "%0", [(a, 1), (b, 1), (c, 4)])],
             body,
         ),
     );

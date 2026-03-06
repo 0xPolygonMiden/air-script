@@ -15,7 +15,7 @@ mod sub;
 mod value;
 mod vector;
 
-pub use accessor::Accessor;
+pub use accessor::{Accessor, MirAccessType};
 pub use add::Add;
 pub use boundary::Boundary;
 pub use bus_op::{BusOp, BusOpKind};
@@ -24,7 +24,7 @@ pub use enf::Enf;
 pub use exp::Exp;
 pub use fold::{Fold, FoldOperator};
 pub use for_op::For;
-pub use if_op::If;
+pub use if_op::{If, MatchArm};
 pub use matrix::Matrix;
 pub use mul::Mul;
 pub use parameter::Parameter;

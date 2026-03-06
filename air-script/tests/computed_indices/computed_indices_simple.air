@@ -1,0 +1,34 @@
+def ComputedIndicesAir
+
+trace_columns {
+    main: [a, b, c, d, e, f, g, h],
+}
+
+public_inputs {
+    stack_inputs: [16],
+}
+
+boundary_constraints {
+    enf a.first = 0;
+}
+
+integrity_constraints {
+    # vec = [0, 1, 2, 3, 4];
+    let vec = [i for i in 0..5];
+    
+    # x = [0 * 2, 1 * 2, 2 * 2, 3 * 2];
+    # x = [0, 2, 4, 6];
+    let x = [j * vec[1 + 1] for j in 0..4];
+    enf a = x[0];
+    enf b = x[1];
+    enf c = x[2];
+    enf d = x[3];
+
+    # y = [0 * 1, 1 * 2, 2 * 3, 3 * 4];
+    # y = [0, 2, 6, 12];
+    let y = [j * vec[j + 1] for j in 0..4];
+    enf e' = y[0] * e;
+    enf f' = y[1] * f;
+    enf g' = y[2] * g;
+    enf h' = y[3] * h;
+}

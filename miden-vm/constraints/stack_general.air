@@ -1,0 +1,117 @@
+##########################################################################################
+# STACK GENERAL CONSTRAINTS MODULE
+##########################################################################################
+#
+# Enforces general stack transition constraints based on op flags and shift behavior.
+# Tagging is applied at the call site in the main module.
+##########################################################################################
+
+mod stack_general
+use flags::*;
+
+# Requires stack columns and decoder op bits/e-bits.
+
+ev stack_general_transition([stack[16], decoder[24]]) {
+    # STACK TRANSITION MODEL
+    # ------------------------------------
+    # For each stack position i, the next value s_i' is determined by exactly one of three
+    # mutually exclusive shift behaviors:
+    #   - no_shift_i: position i keeps its value (s_i' = s_i)
+    #   - left_shift_{i+1}: position i takes the value from i+1 (s_i' = s_{i+1})
+    #   - right_shift_{i-1}: position i takes the value from i-1 (s_i' = s_{i-1})
+    #
+    # The constraint uses the standard weighted form:
+    #   s_i' * (no_shift_i + left_shift_{i+1} + right_shift_{i-1})
+    #       = no_shift_i * s_i + left_shift_{i+1} * s_{i+1} + right_shift_{i-1} * s_{i-1}.
+    #
+    # At the edges we drop the invalid term (i=0 has no right_shift_{-1}).
+    # For i=15, left shifts are handled by the overflow constraints: if overflow is non-empty,
+    # s15' is pulled from the overflow table; otherwise s15' is forced to 0.
+
+    let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15] = stack;
+
+    # b0..b6 are the 7 opcode bits (LSB -> MSB) used by op flag helpers.
+    # e0/e1 are the two extra op-bit columns used for degree reduction.
+    # h5, the 5th helper register, is the loop-end flag used in END to decide whether it shifts the stack or not.
+    let [
+        d0_unused,
+        b0,
+        b1,
+        b2,
+        b3,
+        b4,
+        b5,
+        b6,
+        d8_unused,
+        d9_unused,
+        d10_unused,
+        d11_unused,
+        d12_unused,
+        h5,
+        d14_unused,
+        d15_unused,
+        d16_unused,
+        d17_unused,
+        d18_unused,
+        d19_unused,
+        d20_unused,
+        d21_unused,
+        e0,
+        e1
+    ] = decoder;
+
+    let op_bits = [b0, b1, b2, b3, b4, b5, b6];
+
+    # Shift flags are pre-aggregated in flags.air to keep transition logic compact.
+    let op_flags = stack_op_flags(op_bits, e0, e1, h5);
+
+    let no_shift = [no_shift_at(op_flags, i) for i in 0..16];
+    let left_shift = [left_shift_at(op_flags, i) for i in 0..16];
+    let right_shift = [right_shift_at(op_flags, i) for i in 0..16];
+
+    # ------------------------------------------------------------------------------------------
+    # TRANSITION CONSTRAINTS
+    # ------------------------------------------------------------------------------------------
+
+    # Each position i can pull from i (no shift), i+1 (left shift), or i-1 (right shift).
+    # We build the LHS/RHS vectors explicitly and enforce them via a constraint comprehension.
+    let lhs_terms = [
+        s0'  * (no_shift[0]  + left_shift[1]),
+        s1'  * (no_shift[1]  + left_shift[2]  + right_shift[0]),
+        s2'  * (no_shift[2]  + left_shift[3]  + right_shift[1]),
+        s3'  * (no_shift[3]  + left_shift[4]  + right_shift[2]),
+        s4'  * (no_shift[4]  + left_shift[5]  + right_shift[3]),
+        s5'  * (no_shift[5]  + left_shift[6]  + right_shift[4]),
+        s6'  * (no_shift[6]  + left_shift[7]  + right_shift[5]),
+        s7'  * (no_shift[7]  + left_shift[8]  + right_shift[6]),
+        s8'  * (no_shift[8]  + left_shift[9]  + right_shift[7]),
+        s9'  * (no_shift[9]  + left_shift[10] + right_shift[8]),
+        s10' * (no_shift[10] + left_shift[11] + right_shift[9]),
+        s11' * (no_shift[11] + left_shift[12] + right_shift[10]),
+        s12' * (no_shift[12] + left_shift[13] + right_shift[11]),
+        s13' * (no_shift[13] + left_shift[14] + right_shift[12]),
+        s14' * (no_shift[14] + left_shift[15] + right_shift[13]),
+        s15' * (no_shift[15] + right_shift[14])
+    ];
+
+    let rhs_terms = [
+        no_shift[0]  * s0  + left_shift[1]  * s1,
+        no_shift[1]  * s1  + left_shift[2]  * s2  + right_shift[0]  * s0,
+        no_shift[2]  * s2  + left_shift[3]  * s3  + right_shift[1]  * s1,
+        no_shift[3]  * s3  + left_shift[4]  * s4  + right_shift[2]  * s2,
+        no_shift[4]  * s4  + left_shift[5]  * s5  + right_shift[3]  * s3,
+        no_shift[5]  * s5  + left_shift[6]  * s6  + right_shift[4]  * s4,
+        no_shift[6]  * s6  + left_shift[7]  * s7  + right_shift[5]  * s5,
+        no_shift[7]  * s7  + left_shift[8]  * s8  + right_shift[6]  * s6,
+        no_shift[8]  * s8  + left_shift[9]  * s9  + right_shift[7]  * s7,
+        no_shift[9]  * s9  + left_shift[10] * s10 + right_shift[8]  * s8,
+        no_shift[10] * s10 + left_shift[11] * s11 + right_shift[9]  * s9,
+        no_shift[11] * s11 + left_shift[12] * s12 + right_shift[10] * s10,
+        no_shift[12] * s12 + left_shift[13] * s13 + right_shift[11] * s11,
+        no_shift[13] * s13 + left_shift[14] * s14 + right_shift[12] * s12,
+        no_shift[14] * s14 + left_shift[15] * s15 + right_shift[13] * s13,
+        no_shift[15] * s15 + right_shift[14] * s14
+    ];
+
+    enf lhs = rhs for (lhs, rhs) in (lhs_terms, rhs_terms);
+}

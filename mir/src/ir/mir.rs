@@ -1,11 +1,10 @@
+use std::collections::BTreeMap;
+
 use air_parser::ast::TraceSegment;
 pub use air_parser::{
     Symbol,
     ast::{Identifier, PeriodicColumn, PublicInput, QualifiedIdentifier},
 };
-
-use std::collections::BTreeMap;
-
 use miden_diagnostics::{SourceSpan, Spanned};
 
 use super::Graph;
@@ -36,15 +35,14 @@ pub struct Mir {
     pub public_inputs: BTreeMap<Identifier, PublicInput>,
     /// The total number of elements in the random values array
     pub num_random_values: u16,
+    /// Expected maximum constraint id (inclusive) when tag validation is enabled.
+    pub expected_max_constraint_id: Option<u64>,
     /// The constraints of the program, represented as MIR Nodes
     graph: Graph,
 }
 impl Default for Mir {
     fn default() -> Self {
-        Self::new(Identifier::new(
-            SourceSpan::UNKNOWN,
-            Symbol::intern("unnamed"),
-        ))
+        Self::new(Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("unnamed")))
     }
 }
 impl Mir {
@@ -61,6 +59,7 @@ impl Mir {
             periodic_columns: Default::default(),
             public_inputs: Default::default(),
             num_random_values: 0,
+            expected_max_constraint_id: None,
             graph: Default::default(),
         }
     }
@@ -71,13 +70,13 @@ impl Mir {
         self.name.as_str()
     }
 
-    /// Return a reference to the raw [AlgebraicGraph] corresponding to the constraints
+    /// Return a reference to the raw AlgebraicGraph corresponding to the constraints
     #[inline]
     pub fn constraint_graph(&self) -> &Graph {
         &self.graph
     }
 
-    /// Return a mutable reference to the raw [AlgebraicGraph] corresponding to the constraints
+    /// Return a mutable reference to the raw AlgebraicGraph corresponding to the constraints
     #[inline]
     pub fn constraint_graph_mut(&mut self) -> &mut Graph {
         &mut self.graph

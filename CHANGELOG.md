@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.0 (TBD)
+
+- Incremented MSRV to 1.89.
+- Add a pass for common subexpression elimination in the constraint graph (#419).
+- Reorder unrolling passes to unroll list comprehensions before match statements (#431).
+- Refactored the unrolling pass in MIR (#434).
+- Update documentation and tests thereof (#437).
+- Add a constant propagation pass after other mir passes (#439).
+- Removed `TraceSegmentId::index()` and replaced segment indexing with `TraceShape<T>`/`FullTraceShape<T>` across ACE codegen, MIR-to-AIR pass, and constraints (#442).
+- Allow computed indices (#444).
+- Fix regressions on MIR and list_comprehensions (#449).
+- Fixed a vector unrolling issue in nested match evaluations (#491).
+- Fix evaluator argument vector slice expansion (#495).
+- Fixed MIR's constant propagation to fold 0^0 to 1 (#509).
+- Support importing hierarchical modules (#507, #513, #514).
+- Fix MIR inlining loop on deeply nested calls (#524).
+- Fix cross-module constant resolution and comprehension scoping (#526).
+- Add constraints tagging infrastructure in order to cross-check with constraints in `miden-vm` (#539).
+- Optimize MIR→AIR lowering via key interning/caching and preserve tag tracking in expanded constraints (#542).
+- Added AIR constraints for all Miden VM components: system, range checker, stack, decoder, chiplets, and public inputs (#557).
+
 ## 0.4.0 (2025-06-20)
 
 ### Language
@@ -19,6 +40,7 @@
 - Introduced initial version of the ACE backend (#370, #380, #386).
 - Updated Winterfell codegen to the latest version (#388).
 - Removed obsolete MASM codegen backend (#389).
+- Add node to graph referencing reduced public input tables ([#414](https://github.com/0xMiden/air-script/issues/414))
 
 ### Internal
 

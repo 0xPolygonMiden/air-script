@@ -1,21 +1,29 @@
 mod bus;
 mod graph;
+mod interner;
 mod link;
 mod mir;
 mod node;
 mod nodes;
 mod owner;
+mod owner_id;
+mod quad_eval;
 mod utils;
 pub extern crate derive_ir;
 
 pub use bus::Bus;
 pub use derive_ir::Builder;
 pub use graph::Graph;
+pub use interner::*;
 pub use link::{BackLink, Link, Singleton};
 pub use mir::Mir;
 pub use node::Node;
 pub use nodes::*;
 pub use owner::Owner;
+pub use owner_id::OwnerId;
+pub use quad_eval::{
+    QuadFelt, RandomInputs, const_quad_felt, query_indexed_eval, query_mapped_eval,
+};
 pub use utils::*;
 /// A trait for nodes that can have children
 /// This is used with the Child trait to allow for easy traversal and manipulation of the graph
@@ -101,7 +109,8 @@ where
 }
 
 /// A trait implemented by all nodes.
-/// Will be derivable later. The implementation and type-safe builder is currently manual while we tweak the design
+/// Will be derivable later. The implementation and type-safe builder is currently manual while we
+/// tweak the design
 pub trait Builder {
     type Empty;
     type Full;

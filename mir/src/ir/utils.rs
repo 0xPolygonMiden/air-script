@@ -1,5 +1,10 @@
+//! MIR utility helpers.
+//!
+//! Includes helpers for traversing roots, stripping spans, and shareability checks
+//! used by caching/interning passes.
+
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap, HashSet},
     hash::{DefaultHasher, Hash, Hasher},
 };
 
@@ -9,23 +14,26 @@ use pretty_assertions::assert_eq;
 
 use crate::{CompileError, ir::*, passes::Visitor};
 
+/// Strip spans from all MIR nodes (used in tests and canonicalization).
 pub fn strip_spans(mir: &mut Mir) {
     let graph = mir.constraint_graph_mut();
     let mut visitor = StripSpansVisitor::default();
     match visitor.run(graph) {
-        Ok(_) => {}
+        Ok(_) => {},
         Err(e) => {
             panic!("Error stripping spans: {e:?}");
-        }
+        },
     }
 }
 
+/// Visitor used by `strip_spans`.
 #[derive(Default)]
 pub struct StripSpansVisitor {
     _done: BTreeMap<usize, bool>,
     work_stack: Vec<Link<Node>>,
 }
 
+/// Extract selected root nodes from the graph.
 pub fn extract_roots(
     graph: &Graph,
     include_boundary: bool,
@@ -47,14 +55,10 @@ pub fn extract_roots(
     }
     if include_bus {
         let buses = graph.get_bus_nodes();
-        let bus_columns = buses
-            .iter()
-            .flat_map(|b| b.borrow().columns.clone())
-            .map(|n| n.as_node());
-        let bus_latches = buses
-            .iter()
-            .flat_map(|b| b.borrow().latches.clone())
-            .map(|n| n.as_node());
+        let bus_columns =
+            buses.iter().flat_map(|b| b.borrow().columns.clone()).map(|n| n.as_node());
+        let bus_latches =
+            buses.iter().flat_map(|b| b.borrow().latches.clone()).map(|n| n.as_node());
         nodes.extend(bus_columns);
         nodes.extend(bus_latches);
     }
@@ -69,28 +73,125 @@ pub fn extract_roots(
     nodes
 }
 
+/// Extract all root nodes from the graph.
 pub fn extract_all_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, true, true, true, true, true)
 }
 
+/// Extract boundary constraint roots.
 pub fn extract_boundary_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, true, false, false, false, false)
 }
 
+/// Extract integrity constraint roots.
 pub fn extract_integrity_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, true, false, false, false)
 }
 
+/// Extract bus constraint roots.
 pub fn extract_bus_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, false, true, false, false)
 }
 
+/// Extract function roots.
 pub fn extract_function_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, false, false, true, false)
 }
 
+/// Extract evaluator roots.
 pub fn extract_evaluator_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, false, false, false, true)
+}
+
+/// Conservative shareability predicate for ops.
+///
+/// Used to gate caching/interning to avoid accidental semantic changes.
+pub fn is_shareable_op(op: &Op) -> bool {
+    matches!(
+        op,
+        Op::Value(_)
+            | Op::Parameter(_)
+            | Op::Add(_)
+            | Op::Sub(_)
+            | Op::Mul(_)
+            | Op::Exp(_)
+            | Op::Vector(_)
+            | Op::Matrix(_)
+            | Op::Accessor(_)
+    )
+}
+
+/// Conservative shareability predicate for roots.
+///
+/// Only functions with fully shareable bodies are considered shareable.
+pub fn is_shareable_root(root: &Link<Root>) -> bool {
+    let mut memo = HashMap::new();
+    let mut visiting = HashSet::new();
+    is_shareable_root_inner(root, &mut memo, &mut visiting)
+}
+
+fn is_shareable_root_inner(
+    root: &Link<Root>,
+    memo: &mut HashMap<usize, bool>,
+    visiting: &mut HashSet<usize>,
+) -> bool {
+    let root_ptr = root.get_ptr();
+    if let Some(result) = memo.get(&root_ptr) {
+        return *result;
+    }
+    if !visiting.insert(root_ptr) {
+        // Cycles are not shareable.
+        return false;
+    }
+
+    let body = {
+        let root_ref = root.borrow();
+        match &*root_ref {
+            Root::Function(f) => f.body.clone(),
+            _ => {
+                memo.insert(root_ptr, false);
+                visiting.remove(&root_ptr);
+                return false;
+            },
+        }
+    };
+
+    let mut stack: Vec<Link<Op>> = body.borrow().iter().cloned().collect();
+    let mut seen = HashSet::new();
+
+    while let Some(op) = stack.pop() {
+        let ptr = op.get_ptr();
+        if !seen.insert(ptr) {
+            continue;
+        }
+        let op_ref = op.borrow();
+        match &*op_ref {
+            Op::Call(call) => {
+                let callee = call.function.clone();
+                let is_callee_shareable = matches!(*callee.borrow(), Root::Function(_))
+                    && is_shareable_root_inner(&callee, memo, visiting);
+                if !is_callee_shareable {
+                    memo.insert(root_ptr, false);
+                    visiting.remove(&root_ptr);
+                    return false;
+                }
+            },
+            _ => {
+                if !is_shareable_op(&op_ref) {
+                    memo.insert(root_ptr, false);
+                    visiting.remove(&root_ptr);
+                    return false;
+                }
+            },
+        }
+        for child in op_ref.children().borrow().iter() {
+            stack.push(child.clone());
+        }
+    }
+
+    visiting.remove(&root_ptr);
+    memo.insert(root_ptr, true);
+    true
 }
 
 impl Visitor for StripSpansVisitor {
@@ -227,35 +328,35 @@ impl Visitor for StripSpansVisitor {
         let mut value = value.as_value_mut().unwrap();
         value.value.span = Default::default();
         match &mut value.value.value {
-            MirValue::Constant(_) => {}
-            MirValue::TraceAccess(_) => {}
+            MirValue::Constant(_) => {},
+            MirValue::TraceAccess(_) => {},
             MirValue::PeriodicColumn(v) => {
-                v.name.module.0 = Span::new(SourceSpan::default(), v.name.module.0.item);
+                v.name.module.0 = Span::new(SourceSpan::default(), v.name.module.0.item.clone());
                 match v.name.item {
                     NamespacedIdentifier::Function(f) => {
                         v.name.item = NamespacedIdentifier::Function(Identifier::new(
                             SourceSpan::default(),
                             f.0.item,
                         ));
-                    }
+                    },
                     NamespacedIdentifier::Binding(b) => {
                         v.name.item = NamespacedIdentifier::Binding(Identifier::new(
                             SourceSpan::default(),
                             b.0.item,
                         ));
-                    }
+                    },
                 };
-            }
+            },
             MirValue::PublicInput(v) => {
                 v.name.0 = Span::new(SourceSpan::default(), v.name.0.item);
-            }
+            },
             MirValue::PublicInputTable(v) => {
                 v.table_name.0 = Span::new(SourceSpan::default(), v.table_name.0.item);
-            }
-            MirValue::RandomValue(_) => {}
-            MirValue::TraceAccessBinding(_) => {}
-            MirValue::BusAccess(_) => {}
-            MirValue::Null | MirValue::Unconstrained => {}
+            },
+            MirValue::RandomValue(_) => {},
+            MirValue::TraceAccessBinding(_) => {},
+            MirValue::BusAccess(_) => {},
+            MirValue::Null | MirValue::Unconstrained => {},
         }
         Ok(())
     }
