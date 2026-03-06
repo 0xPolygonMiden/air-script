@@ -1,4 +1,8 @@
-//! This module provides functionality for optimizing match expressions (`If` nodes in the MIR)
+//! This module provides functionality for optimizing match expressions (`If` nodes in the MIR).
+//!
+//! Important: this optimization is only semantics-preserving when match arm conditions are
+//! mutually exclusive. The optimizer does not verify disjointness; it assumes it. If match arms
+//! can overlap, combining constraints may change the enforced semantics.
 //!
 //! A given `If` node contains match arms in the form of `(condition, expr)` pairs, where `expr` can
 //! be one or more constraints that should be enforced on the associated condition. The goal of this
