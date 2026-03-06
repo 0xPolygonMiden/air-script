@@ -172,7 +172,7 @@ ev stack_arith_transition([stack[19], decoder[24], system[6]]) {
 
     # U32SUB (b - a, with a on top)
     enf s1 = s0 + s1' - s0' * 2^32 when is_u32sub;
-    enf s0' * (s0' - 1) = 0 when is_u32sub;
+    enf s0'^2 = s0' when is_u32sub;
     enf s1' = u32_v_lo when is_u32sub;
 
     # U32MUL

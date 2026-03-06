@@ -57,7 +57,7 @@ ev kernel_rom_chiplet([chiplets[10]]) {
     let kr_gate = kernel_rom_flag * kr_not_exiting * kr_not_new_block;
     let kr_r = [kr_r0, kr_r1, kr_r2, kr_r3];
     let kr_r_next = [kr_r0_next, kr_r1_next, kr_r2_next, kr_r3_next];
-    enf kr_gate * (kr_r_next[i] - kr_r[i]) = 0 for i in 0..4;
+    enf kr_gate * (next - cur) = 0 for (next, cur) in (kr_r_next, kr_r);
 
     # -------------------------------------------------------------------------
     # First row constraint.
@@ -70,6 +70,6 @@ ev kernel_rom_chiplet([chiplets[10]]) {
     # -------------------------------------------------------------------------
     # Chiplets bus responses.
     # -------------------------------------------------------------------------
-    let kr_label = kr_sfirst * KERNELPROCINIT + !kr_sfirst * KERNELPROCCALL;
+    let kr_label = select(kr_sfirst, KERNELPROCINIT, KERNELPROCCALL);
     bus_6_chiplets_bus.insert(kr_label, kr_r0, kr_r1, kr_r2, kr_r3) when kernel_rom_flag;
 }

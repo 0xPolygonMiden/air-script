@@ -132,10 +132,8 @@ ev ace_chiplet([chiplets[20]]) {
     let ace_nonlinear_0 = ace_a0b0 + 7 * ace_a1b1;
     let ace_nonlinear_1 = ace_v1_0 * ace_v2_1 + ace_v1_1 * ace_v2_0;
     let ace_op_square = ace_op * ace_op;
-    let ace_expected_0 =
-        ace_op_square * (ace_linear_0 - ace_nonlinear_0) + ace_nonlinear_0;
-    let ace_expected_1 =
-        ace_op_square * (ace_linear_1 - ace_nonlinear_1) + ace_nonlinear_1;
+    let ace_expected_0 = select(ace_op_square, ace_linear_0, ace_nonlinear_0);
+    let ace_expected_1 = select(ace_op_square, ace_linear_1, ace_nonlinear_1);
     enf ace_expected_0 = ace_v0_0 when ace_eval_gate;
     enf ace_expected_1 = ace_v0_1 when ace_eval_gate;
 
@@ -144,7 +142,7 @@ ev ace_chiplet([chiplets[20]]) {
     # -------------------------------------------------------------------------
     let ace_final_gate = ace_flag * ace_f_end;
     let ace_final_zero = [ace_v0_0, ace_v0_1, ace_id0];
-    enf ace_final_zero[i] = 0 for i in 0..3 when ace_final_gate;
+    enf c = 0 for c in ace_final_zero when ace_final_gate;
 
     # -------------------------------------------------------------------------
     # First row constraints.

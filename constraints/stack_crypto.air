@@ -75,13 +75,13 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
     # - s8..s11 (capacity) and s14..s15 are preserved.
     # Positions 8-11: Unchanged (capacity preserved)
     let cryptostream_keep_top = [s8' - s8, s9' - s9, s10' - s10, s11' - s11];
-    enf cryptostream_keep_top[i] = 0 for i in 0..4 when is_cryptostream;
+    enf c = 0 for c in cryptostream_keep_top when is_cryptostream;
     # Positions 12-13: Source/destination pointers incremented by 8 (2 words)
     let cryptostream_bump = [s12' - (s12 + 8), s13' - (s13 + 8)];
-    enf cryptostream_bump[i] = 0 for i in 0..2 when is_cryptostream;
+    enf c = 0 for c in cryptostream_bump when is_cryptostream;
     # Positions 14-15: Unchanged
     let cryptostream_keep_tail = [s14' - s14, s15' - s15];
-    enf cryptostream_keep_tail[i] = 0 for i in 0..2 when is_cryptostream;
+    enf c = 0 for c in cryptostream_keep_tail when is_cryptostream;
 
     # Plaintext = ciphertext - rate (used for memory reads).
     let p0 = s0' - s0; let p1 = s1' - s1; let p2 = s2' - s2; let p3 = s3' - s3;
@@ -95,7 +95,7 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
         s0' - s0, s1' - s1, s2' - s2, s3' - s3, s4' - s4, s5' - s5, s6' - s6,
         s7' - s7, s8' - s8, s9' - s9, s10' - s10, s11' - s11, s12' - s12, s13' - s13
     ];
-    enf hornerbase_keep[i] = 0 for i in 0..14 when is_hornerbase;
+    enf c = 0 for c in hornerbase_keep when is_hornerbase;
 
     # Local variables for readability.
     # alpha = a0 + a1 * u, where u^2 = 7 and (a0, a1) are in h0/h1.
@@ -157,7 +157,7 @@ ev stack_crypto_transition([stack[19], decoder[24], system[6]]) {
         s0' - s0, s1' - s1, s2' - s2, s3' - s3, s4' - s4, s5' - s5, s6' - s6,
         s7' - s7, s8' - s8, s9' - s9, s10' - s10, s11' - s11, s12' - s12, s13' - s13
     ];
-    enf hornerext_keep[i] = 0 for i in 0..14 when is_hornerext;
+    enf c = 0 for c in hornerext_keep when is_hornerext;
 
     let tmp0 = h4;
     let tmp1 = h5;

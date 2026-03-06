@@ -66,10 +66,10 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # In-span constraints.
     # ---------------------------------------------------------------------------
     # sp is the binary in-span flag.
-    enf sp * (sp - 1) = 0;
+    enf sp^2 = sp;
     # After SPAN/RESPAN, the next row must be inside a span.
     let span_next = [is_span, is_respan];
-    enf sn * (1 - sp') = 0 for sn in span_next;
+    enf sn * !sp' = 0 for sn in span_next;
 
     # ---------------------------------------------------------------------------
     # Op bits must be binary.
@@ -89,7 +89,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # Op-bit group constraints.
     # ---------------------------------------------------------------------------
     # U32 ops share a prefix and forbid b0=1.
-    let u32_prefix = b6 * (1 - b5) * (1 - b4);
+    let u32_prefix = b6 * !b5 * !b4;
     enf b0 = 0 when u32_prefix;
 
     # Very-high-degree ops share a prefix and forbid b0,b1=1.
@@ -140,7 +140,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # gc can only stay the same or decrement by 1 inside a span.
     enf delta_gc^2 = delta_gc when sp;
     # If gc decrements and this isn't a PUSH, h0 must be 0 (no immediate).
-    enf h0 = 0 when sp & delta_gc & (1 - is_push);
+    enf h0 = 0 when sp & delta_gc & !is_push;
     # SPAN/RESPAN/PUSH must decrement gc.
     enf delta_gc = 1 when is_span + is_respan + is_push;
     # gc cannot decrement when the next op is END/RESPAN.
@@ -154,7 +154,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # op_next encodes the next opcode as an integer.
     let op_next = b0' + 2 * b1' + 4 * b2' + 8 * b3' + 16 * b4' + 32 * b5' + 64 * b6';
     # f_sgc: gc stays the same inside a span.
-    let f_sgc = sp * sp' * (1 - delta_gc);
+    let f_sgc = sp * sp' * !delta_gc;
     # Update h0 with the next opcode when starting/continuing a group.
     enf h0 = h0' * 2^7 + op_next when is_span + is_respan + is_push + f_sgc;
     # If next op is END/RESPAN, h0 must be zeroed.
@@ -179,15 +179,15 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # ---------------------------------------------------------------------------
     # Batch flags encode how many op groups are emitted by SPAN/RESPAN.
     let batch_g8 = c0;
-    let batch_g4 = (1 - c0) * c1 * (1 - c2);
-    let batch_g2 = (1 - c0) * (1 - c1) * c2;
-    let batch_g1 = (1 - c0) * c1 * c2;
+    let batch_g4 = !c0 * c1 * !c2;
+    let batch_g2 = !c0 * !c1 * c2;
+    let batch_g1 = !c0 * c1 * c2;
     let span_or_respan = is_span + is_respan;
 
     # Exactly one batch size flag must be set on SPAN/RESPAN rows.
     enf span_or_respan = batch_g1 + batch_g2 + batch_g4 + batch_g8;
     # Otherwise, all batch flags must be zero.
-    enf (1 - span_or_respan) * (c0 + c1 + c2) = 0;
+    enf !span_or_respan * (c0 + c1 + c2) = 0;
 
     # If batch size is <= 4 groups, unused hasher lanes h4..h7 must be zero.
     let small_batch = batch_g1 + batch_g2 + batch_g4;
@@ -217,7 +217,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # Outside a span (sp=0), the opcode must be one of the control-flow ops.
     let control_flow = is_span + is_join + is_split + is_loop + is_end + is_repeat
         + is_respan + is_halt + is_dyn + is_dyncall + is_call + is_syscall;
-    enf 1 - sp - control_flow = 0;
+    enf !(sp + control_flow) = 0;
 
     # ---------------------------------------------------------------------------
     # Chiplets bus requests (decoder-driven).
@@ -366,7 +366,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # The loop flag and call/syscall markers are stored in the hasher lanes.
     let is_loop_flag = h5;
     let is_call_or_syscall = h6 + h7;
-    let is_simple_end = 1 - is_call_or_syscall;
+    let is_simple_end = !is_call_or_syscall;
     bus_0_decoder_p1.remove(addr, addr', is_loop_flag, system_ctx', stack_b0', stack_b1', fn_hash_0', fn_hash_1', fn_hash_2', fn_hash_3') when is_end & is_call_or_syscall;
     bus_0_decoder_p1.remove(addr, addr', is_loop_flag, 0, 0, 0, 0, 0, 0, 0) when is_end & is_simple_end;
 
@@ -379,10 +379,10 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 1, 0) when fjoin;
     bus_1_decoder_p2.insert(addr', h4, h5, h6, h7, 0, 0) when fjoin;
 
-    let split_h0 = s0 * h0 + (1 - s0) * h4;
-    let split_h1 = s0 * h1 + (1 - s0) * h5;
-    let split_h2 = s0 * h2 + (1 - s0) * h6;
-    let split_h3 = s0 * h3 + (1 - s0) * h7;
+    let split_h0 = select(s0, h0, h4);
+    let split_h1 = select(s0, h1, h5);
+    let split_h2 = select(s0, h2, h6);
+    let split_h3 = select(s0, h3, h7);
     bus_1_decoder_p2.insert(addr', split_h0, split_h1, split_h2, split_h3, 0, 0) when fsplit;
 
     bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 1) when floop & s0;
@@ -393,7 +393,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when is_call;
     bus_1_decoder_p2.insert(addr', h0, h1, h2, h3, 0, 0) when is_syscall;
 
-    let is_first_child = 1 - (is_end_next + is_repeat_next + is_halt_next);
+    let is_first_child = !(is_end_next + is_repeat_next + is_halt_next);
     let is_loop_body = h4;
     bus_1_decoder_p2.remove(addr', h0, h1, h2, h3, is_first_child, is_loop_body) when is_end;
 
@@ -403,12 +403,12 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # Tracks op groups produced by SPAN/RESPAN. The batch flags choose how many groups are
     # inserted (g1/g2/g4/g8), and groups are removed as gc decrements inside a span.
     let f_g8_bus = c0;
-    let f_g4_bus = (1 - c0) * c1 * (1 - c2);
-    let f_g2_bus = (1 - c0) * (1 - c1) * c2;
-    let f_g1_bus = (1 - c0) * c1 * c2;
+    let f_g4_bus = !c0 * c1 * !c2;
+    let f_g2_bus = !c0 * !c1 * c2;
+    let f_g1_bus = !c0 * c1 * c2;
 
     # It is safe to omit explicit SPAN/RESPAN gating here because the decoder constraints
-    # enforce (1 - span_or_respan) * (c0 + c1 + c2) = 0, which zeros these batch flags
+    # enforce !span_or_respan * (c0 + c1 + c2) = 0, which zeros these batch flags
     # outside span/respan rows.
     let span_g2 = f_g2_bus;
     let span_g4 = f_g4_bus;

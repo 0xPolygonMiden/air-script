@@ -46,7 +46,7 @@ ev stack_overflow_transition([stack[19], decoder[24], system_clk]) {
     let f_call_or_sys_end = fend * (h6 + h7);
     let f_call_like = fcall + fsyscall + fdyncall;
     # Normal rows: not call-entry and not end-of-call.
-    let normal_flag = 1 - f_call_like - f_call_or_sys_end;
+    let normal_flag = !(f_call_like + f_call_or_sys_end);
 
     # Depth update:
     # - normal rows: b0' - b0 + fshl*fov - fshr = 0

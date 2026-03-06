@@ -43,7 +43,7 @@ ev bitwise_chiplet([chiplets[15]]) {
     # -------------------------------------------------------------------------
     # Operation flag constraints.
     # -------------------------------------------------------------------------
-    enf bw_op * (bw_op - 1) = 0 when bitwise_flag;
+    enf bw_op^2 = bw_op when bitwise_flag;
     enf bw_op = bw_op' when bw_gate_transition;
 
     # -------------------------------------------------------------------------
@@ -86,7 +86,7 @@ ev bitwise_chiplet([chiplets[15]]) {
     # -------------------------------------------------------------------------
     let is_last_row = !bitwise_k_transition;
 
-    let bw_label = !bw_op * BITWISEAND + bw_op * BITWISEXOR;
+    let bw_label = select(bw_op, BITWISEXOR, BITWISEAND);
     bus_6_chiplets_bus.insert(bw_label, bw_a, bw_b, bw_out)
         when (bitwise_flag * is_last_row);
 }

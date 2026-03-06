@@ -64,7 +64,8 @@ ev memory_chiplet([chiplets[18]]) {
     let mem_c3 = compute_c_i(f3, mem_is_read', mem_is_word');
 
     let mem_c = [mem_c0, mem_c1, mem_c2, mem_c3];
-    enf mem_c[i] * mem_values[i]' = 0 for i in 0..4 when flag_next_row_first_memory;
+    let mem_values_next = [mem_values[0]', mem_values[1]', mem_values[2]', mem_values[3]'];
+    enf c * v = 0 for (c, v) in (mem_c, mem_values_next) when flag_next_row_first_memory;
 
     # -------------------------------------------------------------------------
     # Transition constraints (memory rows except last).
@@ -91,7 +92,7 @@ ev memory_chiplet([chiplets[18]]) {
     # -------------------------------------------------------------------------
     let delta_next = mem_d1' * 2^16 + mem_d0';
     let computed_delta =
-        n0 * ctx_delta + !n0 * (n1 * addr_delta + !n1 * clk_delta);
+        select(n0, ctx_delta, select(n1, addr_delta, clk_delta));
     enf computed_delta = delta_next when flag_memory_active_not_last;
 
     # -------------------------------------------------------------------------
@@ -119,7 +120,7 @@ ev memory_chiplet([chiplets[18]]) {
         select(mem_f_scw', mem_values[3]' - mem_values[3], mem_values[3]')
     ];
 
-    enf mem_c[i] * value_delta[i] = 0 for i in 0..4 when flag_memory_active_not_last;
+    enf c * d = 0 for (c, d) in (mem_c, value_delta) when flag_memory_active_not_last;
 
     # -------------------------------------------------------------------------
     # Chiplets bus responses.
@@ -129,21 +130,21 @@ ev memory_chiplet([chiplets[18]]) {
     let v2 = mem_values[2];
     let v3 = mem_values[3];
 
-    let f0_bus = (1 - mem_idx1) * (1 - mem_idx0);
-    let f1_bus = (1 - mem_idx1) * mem_idx0;
-    let f2_bus = mem_idx1 * (1 - mem_idx0);
+    let f0_bus = !mem_idx1 * !mem_idx0;
+    let f1_bus = !mem_idx1 * mem_idx0;
+    let f2_bus = mem_idx1 * !mem_idx0;
     let f3_bus = mem_idx1 * mem_idx0;
     let element_value = f0_bus * v0 + f1_bus * v1 + f2_bus * v2 + f3_bus * v3;
 
     let element_addr = mem_word + mem_idx0 + 2 * mem_idx1;
 
     # Label encodes read/write and element/word modes.
-    let write_label = (1 - mem_is_word) * MEMWRITEELEMENT + mem_is_word * MEMWRITEWORD;
-    let read_label = (1 - mem_is_word) * MEMREADELEMENT + mem_is_word * MEMREADWORD;
-    let mem_label = (1 - mem_is_read) * write_label + mem_is_read * read_label;
+    let write_label = select(mem_is_word, MEMWRITEWORD, MEMWRITEELEMENT);
+    let read_label = select(mem_is_word, MEMREADWORD, MEMREADELEMENT);
+    let mem_label = select(mem_is_read, read_label, write_label);
 
     # Word-format message values. For element access, only v0 is used.
-    let v0_bus = element_value * (1 - mem_is_word) + v0 * mem_is_word;
+    let v0_bus = select(mem_is_word, v0, element_value);
     let v1_bus = v1 * mem_is_word;
     let v2_bus = v2 * mem_is_word;
     let v3_bus = v3 * mem_is_word;

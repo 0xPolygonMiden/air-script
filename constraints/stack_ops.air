@@ -117,7 +117,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         is_dup13 * (s0' - s13),
         is_dup15 * (s0' - s15)
     ];
-    enf dup_constraints[i] = 0 for i in 0..12;
+    enf c = 0 for c in dup_constraints;
 
     enf s0' = system_clk when is_clk;
 
@@ -128,7 +128,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         s0' - s1,
         s1' - s0
     ];
-    enf swap_eqs[i] = 0 for i in 0..2 when is_swap;
+    enf c = 0 for c in swap_eqs when is_swap;
 
     let movup_constraints = [
         is_movup2 * (s0' - s2),
@@ -139,7 +139,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         is_movup7 * (s0' - s7),
         is_movup8 * (s0' - s8)
     ];
-    enf movup_constraints[i] = 0 for i in 0..7;
+    enf c = 0 for c in movup_constraints;
 
     let movdn_constraints = [
         is_movdn2 * (s2' - s0),
@@ -150,7 +150,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         is_movdn7 * (s7' - s0),
         is_movdn8 * (s8' - s0)
     ];
-    enf movdn_constraints[i] = 0 for i in 0..7;
+    enf c = 0 for c in movdn_constraints;
 
     # ------------------------------------------------------------------------------------------
     # SWAPW/SWAPDW
@@ -165,7 +165,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         s6' - s2,
         s7' - s3
     ];
-    enf swapw_eqs[i] = 0 for i in 0..8 when is_swapw;
+    enf c = 0 for c in swapw_eqs when is_swapw;
 
     let swapw2_eqs = [
         s0' - s8,
@@ -177,7 +177,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         s10' - s2,
         s11' - s3
     ];
-    enf swapw2_eqs[i] = 0 for i in 0..8 when is_swapw2;
+    enf c = 0 for c in swapw2_eqs when is_swapw2;
 
     let swapw3_eqs = [
         s0' - s12,
@@ -189,7 +189,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         s14' - s2,
         s15' - s3
     ];
-    enf swapw3_eqs[i] = 0 for i in 0..8 when is_swapw3;
+    enf c = 0 for c in swapw3_eqs when is_swapw3;
 
     let swapdw_eqs = [
         s0' - s8,
@@ -209,37 +209,36 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         s14' - s6,
         s15' - s7
     ];
-    enf swapdw_eqs[i] = 0 for i in 0..16 when is_swapdw;
+    enf c = 0 for c in swapdw_eqs when is_swapdw;
 
     # ------------------------------------------------------------------------------------------
     # CSWAP/CSWAPW
     # ------------------------------------------------------------------------------------------
     let cswap_c = s0;
-    let cswap_c_inv = 1 - cswap_c;
 
     # Binary constraint for the cswap selector.
-    enf cswap_c * (cswap_c - 1) = 0 when is_cswap;
+    enf cswap_c^2 = cswap_c when is_cswap;
 
     let cswap_eqs = [
-        s0' - (cswap_c * s2 + cswap_c_inv * s1),
-        s1' - (cswap_c * s1 + cswap_c_inv * s2)
+        s0' - select(cswap_c, s2, s1),
+        s1' - select(cswap_c, s1, s2)
     ];
-    enf cswap_eqs[i] = 0 for i in 0..2 when is_cswap;
+    enf c = 0 for c in cswap_eqs when is_cswap;
 
     # Binary constraint for the cswapw selector.
-    enf cswap_c * (cswap_c - 1) = 0 when is_cswapw;
+    enf cswap_c^2 = cswap_c when is_cswapw;
 
     let cswapw_eqs = [
-        s0' - (cswap_c * s5 + cswap_c_inv * s1),
-        s1' - (cswap_c * s6 + cswap_c_inv * s2),
-        s2' - (cswap_c * s7 + cswap_c_inv * s3),
-        s3' - (cswap_c * s8 + cswap_c_inv * s4),
-        s4' - (cswap_c * s1 + cswap_c_inv * s5),
-        s5' - (cswap_c * s2 + cswap_c_inv * s6),
-        s6' - (cswap_c * s3 + cswap_c_inv * s7),
-        s7' - (cswap_c * s4 + cswap_c_inv * s8)
+        s0' - select(cswap_c, s5, s1),
+        s1' - select(cswap_c, s6, s2),
+        s2' - select(cswap_c, s7, s3),
+        s3' - select(cswap_c, s8, s4),
+        s4' - select(cswap_c, s1, s5),
+        s5' - select(cswap_c, s2, s6),
+        s6' - select(cswap_c, s3, s7),
+        s7' - select(cswap_c, s4, s8)
     ];
-    enf cswapw_eqs[i] = 0 for i in 0..8 when is_cswapw;
+    enf c = 0 for c in cswapw_eqs when is_cswapw;
 
     # ------------------------------------------------------------------------------------------
     # CHIPLETS BUS REQUESTS (U32 BITWISE)
@@ -282,7 +281,7 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         s2' - system_fn_hash_2,
         s3' - system_fn_hash_3
     ];
-    enf caller_eqs[i] = 0 for i in 0..4 when is_caller;
+    enf c = 0 for c in caller_eqs when is_caller;
 
     # SDEPTH: push current stack depth to the top.
     enf s0' = stack_b0 when is_sdepth;

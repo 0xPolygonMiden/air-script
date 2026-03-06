@@ -41,7 +41,7 @@ use utils::*;
 #
 ev hash_chiplet([chiplet_s0, s[3], h[12], i, system_clk]) {
     # Hasher rows are selected when the chiplet selector s0 = 0.
-    let hash_active = 1 - chiplet_s0;
+    let hash_active = !chiplet_s0;
 
     # -------------------------------------------------------------------------
     # Poseidon2 permutation
@@ -54,7 +54,7 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i, system_clk]) {
     # -------------------------------------------------------------------------
     # Selector bits are binary.
     let selector_bits = [s[0], s[1], s[2]];
-    enf binary_constraint(bit) = 0 for bit in selector_bits when hash_active;
+    enf bit^2 = bit for bit in selector_bits when hash_active;
 
     # Flags derived from selector values and cycle markers.
     let f_bp = get_f_bp(s, cycle_row_0);
@@ -69,7 +69,7 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i, system_clk]) {
     let f_absorb = f_mpa + f_mva + f_mua;
 
     # Selector bits s1/s2 are stable except at cycle boundaries (f_out or f_out_next).
-    let stability_gate = 1 - f_out - f_out_next;
+    let stability_gate = !(f_out + f_out_next);
     let stable_next = [s[1]', s[2]'];
     let stable_cur = [s[1], s[2]];
     enf next = cur for (next, cur) in (stable_next, stable_cur) when hash_active * stability_gate;
@@ -79,7 +79,7 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i, system_clk]) {
     enf s[0]' = 0 when hash_active * f_continue;
 
     # On output rows, (s0=0, s1=1, *) is invalid.
-    enf (1 - s[0]) * s[1] = 0 when hash_active * cycle_row_31;
+    enf !s[0] * s[1] = 0 when hash_active * cycle_row_31;
 
     # -------------------------------------------------------------------------
     # Cycle boundary constraints
@@ -108,14 +108,14 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i, system_clk]) {
     enf (b^2 - b) = 0 when hash_active * f_shift;
 
     # Otherwise, i is stable across rows.
-    let not_absorbing_nor_comp_finished = 1 - (f_shift + f_out);
+    let not_absorbing_nor_comp_finished = !(f_shift + f_out);
     enf i' = i when hash_active * not_absorbing_nor_comp_finished;
 
     # -------------------------------------------------------------------------
     # Merkle absorb constraints
     # -------------------------------------------------------------------------
     # Digest placement: b=0 -> rate0, b=1 -> rate1.
-    let f_b0 = f_absorb * (1 - b);
+    let f_b0 = f_absorb * !b;
     let f_b1 = f_absorb * b;
 
     # Absorb resets capacity lanes to 0.
@@ -139,7 +139,7 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i, system_clk]) {
     # - MV/MVA insert siblings (old path), MU/MUA remove siblings (new path).
     # - b=0 uses the right sibling h4..h7, b=1 uses the left sibling h0..h3.
     # - node index i occupies the index field; all other unused fields are zero.
-    let is_b_zero = 1 - b;
+    let is_b_zero = !b;
     let is_b_one = b;
 
     let h0 = h[0];
@@ -289,7 +289,7 @@ ev hash_chiplet([chiplet_s0, s[3], h[12], i, system_clk]) {
 # - Rows 5-26: internal rounds (S-box on lane 0 + M_I).
 # - Row 31: no permutation constraint (used for selector/control ops).
 ev poseidon2_permutation([chiplet_s0, h[12]]) {
-    let hash_active = 1 - chiplet_s0;
+    let hash_active = !chiplet_s0;
 
     let h_state = [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], h[8], h[9], h[10], h[11]];
     let h_state_next = [h[0]', h[1]', h[2]', h[3]', h[4]', h[5]', h[6]', h[7]', h[8]', h[9]', h[10]', h[11]'];

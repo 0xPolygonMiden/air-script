@@ -38,8 +38,8 @@ ev range_checker_constraints([decoder[24], range_checker[2], chiplets[20]]) {
     let mem_d1 = chiplets[15];
 
     # U32 range check operation flag
-    let not_4 = 1 - decoder[5];
-    let not_5 = 1 - decoder[6];
+    let not_4 = !decoder[5];
+    let not_5 = !decoder[6];
     let u32_rc_op = decoder[7] * not_4 * not_5;
 
     # Memory chiplet operation flag
@@ -65,5 +65,5 @@ ev range_checker_constraints([decoder[24], range_checker[2], chiplets[20]]) {
 }
 
 fn memory_chiplet_flag(s0: felt, s1: felt, s2: felt) -> felt {
-    return s0 * s1 * (1 - s2);
+    return s0 * s1 * !s2;
 }
