@@ -9,6 +9,7 @@
 
 mod decoder
 use flags::*;
+use utils::*;
 
 ##########################################################################################
 # DECODER TRANSITION CONSTRAINTS
@@ -81,7 +82,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # ---------------------------------------------------------------------------
     # e0/e1 exist to reduce the degree of op-flag selectors for the `101...` and `11...`
     # opcode groups, respectively (see docs/src/design/stack/op_constraints.md in miden-vm).
-    enf e0 = b6 * (1 - b5) * b4;
+    enf e0 = b6 * !b5 * b4;
     enf e1 = b6 * b5;
 
     # ---------------------------------------------------------------------------
@@ -108,7 +109,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # ---------------------------------------------------------------------------
     # SPLIT/LOOP: top of stack selects a branch, so it must be binary.
     let split_or_loop = is_split + is_loop;
-    enf s0 * (s0 - 1) = 0 when split_or_loop;
+    enf s0^2 = s0 when split_or_loop;
 
     # DYN: only the first half of the hasher state is used; the tail must be zero.
     let dyn_tail = [h4, h5, h6, h7];
@@ -137,7 +138,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # gc tracks remaining op groups within the span.
     let delta_gc = gc - gc';
     # gc can only stay the same or decrement by 1 inside a span.
-    enf delta_gc * (delta_gc - 1) = 0 when sp;
+    enf delta_gc^2 = delta_gc when sp;
     # If gc decrements and this isn't a PUSH, h0 must be 0 (no immediate).
     enf h0 = 0 when sp & delta_gc & (1 - is_push);
     # SPAN/RESPAN/PUSH must decrement gc.
@@ -169,7 +170,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # Reset ox when starting a new group.
     enf ox' = 0 when sp & ng;
     # Otherwise, increment ox by 1 within a span.
-    enf ox' = ox + 1 when sp & sp' & (1 - ng);
+    enf ox' = ox + 1 when sp & sp' & !ng;
     # ox is in range [0, 8].
     enf ox * (ox - 1) * (ox - 2) * (ox - 3) * (ox - 4) * (ox - 5) * (ox - 6) * (ox - 7) * (ox - 8) = 0;
 
@@ -219,15 +220,125 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     enf 1 - sp - control_flow = 0;
 
     # ---------------------------------------------------------------------------
-    # Decoder bus operations (bus tags are on the bus definitions).
+    # Chiplets bus requests (decoder-driven).
     # ---------------------------------------------------------------------------
+    let fdyn = is_dyn;
+    let fdyncall = is_dyncall;
+    let fsyscall = is_syscall;
+    let fevalcircuit = flag_evalcircuit(op_bits, e0);
+    let fspan = is_span;
+    let frespan = is_respan;
+    let fend = is_end;
     let fjoin = is_join;
     let fsplit = is_split;
-    let fspan = is_span;
-    let fdyn = is_dyn;
     let floop = is_loop;
-    let frespan = is_respan;
+    let fcall = is_call;
 
+    # Hasher transition labels for control blocks.
+    let linear_hash_label = HASHERLINEARHASH + 16;
+    let respan_hash_label = HASHERLINEARHASH + 32;
+    let return_hash_label = HASHERRETURNHASH + 32;
+
+    # DYN: read callee hash from memory and request control block hashing.
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s0, system_clk, h0, h1, h2, h3) when fdyn;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, OPCODE_DYN, 0, 0
+    ) when fdyn;
+
+    # DYNCALL: read callee hash from memory and request control block hashing.
+    bus_6_chiplets_bus.remove(MEMREADWORD, system_ctx, s0, system_clk, h0, h1, h2, h3)
+        when fdyncall;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, OPCODE_DYNCALL, 0, 0
+    ) when fdyncall;
+
+    # SYSCALL: verify kernel procedure and hash the control block.
+    bus_6_chiplets_bus.remove(KERNELPROCCALL, h0, h1, h2, h3) when fsyscall;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, OPCODE_SYSCALL, 0, 0
+    ) when fsyscall;
+
+    # EVALCIRCUIT initializes the ACE chiplet.
+    let ace_ptr = s0;
+    let ace_nread = s1;
+    let ace_neval = s2;
+    bus_6_chiplets_bus.remove(ACEINIT, system_clk, system_ctx, ace_ptr, ace_nread, ace_neval)
+        when fevalcircuit;
+
+    # SPAN/RESPAN/END control block hashing.
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, 0, 0, 0
+    ) when fspan;
+
+    bus_6_chiplets_bus.remove(
+        respan_hash_label,
+        addr' - 1,
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7, 0, 0, 0, 0
+    ) when frespan;
+
+    bus_6_chiplets_bus.remove(
+        return_hash_label,
+        addr + 31,
+        0,
+        h0, h1, h2, h3, 0, 0, 0, 0, 0, 0, 0, 0
+    ) when fend;
+
+    # Control flow hashing with opcode domain separation.
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, OPCODE_JOIN, 0, 0
+    ) when fjoin;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, OPCODE_SPLIT, 0, 0
+    ) when fsplit;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, OPCODE_LOOP, 0, 0
+    ) when floop;
+    bus_6_chiplets_bus.remove(
+        linear_hash_label,
+        addr',
+        0,
+        h0, h1, h2, h3, h4, h5, h6, h7,
+        0, OPCODE_CALL, 0, 0
+    ) when fcall;
+
+    # FMP initialization on CALL/DYNCALL
+    bus_6_chiplets_bus.remove(MEMWRITEELEMENT, system_ctx', FMP_ADDR, system_clk, FMP_INIT_VALUE)
+        when fcall;
+    bus_6_chiplets_bus.remove(MEMWRITEELEMENT, system_ctx', FMP_ADDR, system_clk, FMP_INIT_VALUE)
+        when fdyncall;
+
+    # ---------------------------------------------------------------------------
+    # Decoder bus operations (bus tags are on the bus definitions).
+    # ---------------------------------------------------------------------------
     # ---------------------------------------------------------------------------
     # BUS 0: block stack table (p1)
     # ---------------------------------------------------------------------------
@@ -320,7 +431,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # Group value selection:
     # - if this row is a PUSH, the group value is the immediate in s0'
     # - otherwise the group value is the next opcode encoded by (h0', op_next)
-    let decoded_op_value = (h0' * 2^7 + op_next) * (1 - is_push) + s0' * is_push;
+    let decoded_op_value = (h0' * 2^7 + op_next) * !is_push + s0' * is_push;
     let is_decrementing_gc = sp * (gc - gc');
     bus_2_decoder_p3.remove(addr, gc, decoded_op_value) when is_decrementing_gc;
 }

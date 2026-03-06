@@ -80,6 +80,15 @@ ev bitwise_chiplet([chiplets[15]]) {
     # z = zp * 16 + (op_flag ? a_xor_b : a_and_b)
     let bw_expected = bw_prev * 16 + select(bw_op, bw_xor, bw_and);
     enf bw_out = bw_expected when bitwise_flag;
+
+    # -------------------------------------------------------------------------
+    # Chiplets bus responses.
+    # -------------------------------------------------------------------------
+    let is_last_row = !bitwise_k_transition;
+
+    let bw_label = !bw_op * BITWISEAND + bw_op * BITWISEXOR;
+    bus_6_chiplets_bus.insert(bw_label, bw_a, bw_b, bw_out)
+        when (bitwise_flag * is_last_row);
 }
 
 ##########################################################################################
