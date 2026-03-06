@@ -450,7 +450,9 @@ impl OodContext {
             if let Some((_, pi)) = air.public_inputs.iter().find(|(id, _)| id.as_str() == name) {
                 let size = match pi {
                     air_ir::PublicInput::Vector { size, .. } => *size,
-                    air_ir::PublicInput::Table { size, .. } => *size,
+                    air_ir::PublicInput::Table { .. } => {
+                        unimplemented!("variable-length public input '{name}' is not supported in OOD tests");
+                    }
                 };
                 for i in 0..size {
                     public_inputs.insert((name, i), pv[offset + i]);
