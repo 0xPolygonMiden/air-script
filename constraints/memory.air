@@ -120,6 +120,37 @@ ev memory_chiplet([chiplets[18]]) {
     ];
 
     enf mem_c[i] * value_delta[i] = 0 for i in 0..4 when flag_memory_active_not_last;
+
+    # -------------------------------------------------------------------------
+    # Chiplets bus responses.
+    # -------------------------------------------------------------------------
+    let v0 = mem_values[0];
+    let v1 = mem_values[1];
+    let v2 = mem_values[2];
+    let v3 = mem_values[3];
+
+    let f0_bus = (1 - mem_idx1) * (1 - mem_idx0);
+    let f1_bus = (1 - mem_idx1) * mem_idx0;
+    let f2_bus = mem_idx1 * (1 - mem_idx0);
+    let f3_bus = mem_idx1 * mem_idx0;
+    let element_value = f0_bus * v0 + f1_bus * v1 + f2_bus * v2 + f3_bus * v3;
+
+    let element_addr = mem_word + mem_idx0 + 2 * mem_idx1;
+
+    # Label encodes read/write and element/word modes.
+    let write_label = (1 - mem_is_word) * MEMWRITEELEMENT + mem_is_word * MEMWRITEWORD;
+    let read_label = (1 - mem_is_word) * MEMREADELEMENT + mem_is_word * MEMREADWORD;
+    let mem_label = (1 - mem_is_read) * write_label + mem_is_read * read_label;
+
+    # Word-format message values. For element access, only v0 is used.
+    let v0_bus = element_value * (1 - mem_is_word) + v0 * mem_is_word;
+    let v1_bus = v1 * mem_is_word;
+    let v2_bus = v2 * mem_is_word;
+    let v3_bus = v3 * mem_is_word;
+
+    bus_6_chiplets_bus.insert(
+        mem_label, mem_ctx, element_addr, mem_clk, v0_bus, v1_bus, v2_bus, v3_bus
+    ) when memory_flag;
 }
 
 ##########################################################################################

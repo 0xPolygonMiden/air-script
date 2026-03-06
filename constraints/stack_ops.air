@@ -9,13 +9,14 @@
 
 mod stack_ops
 use flags::*;
+use utils::*;
 
 ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     let [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
          stack_b0, stack_b1_unused, stack_h0_unused] = stack;
     let s = [s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15];
 
-    let [system_clk, system_ctx_unused, system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3] = system;
+    let [system_clk, system_ctx, system_fn_hash_0, system_fn_hash_1, system_fn_hash_2, system_fn_hash_3] = system;
 
     # b0..b6 are the 7 opcode bits (LSB -> MSB) used by op flag helpers.
     let [
@@ -65,6 +66,12 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
     let is_assert = flag_assert(op_bits);
     let is_caller = flag_caller(op_bits);
     let is_sdepth = flag_sdepth(op_bits);
+    let is_u32and = flag_u32and(op_bits);
+    let is_u32xor = flag_u32xor(op_bits);
+    let is_mload = flag_mload(op_bits);
+    let is_mstore = flag_mstore(op_bits);
+    let is_mloadw = flag_mloadw(op_bits);
+    let is_mstorew = flag_mstorew(op_bits);
 
     let is_swap = flag_swap(op_bits);
     let is_movup2 = flag_movup2(op_bits);
@@ -233,6 +240,34 @@ ev stack_ops_transition([stack[19], decoder[24], system[6]]) {
         s7' - (cswap_c * s4 + cswap_c_inv * s8)
     ];
     enf cswapw_eqs[i] = 0 for i in 0..8 when is_cswapw;
+
+    # ------------------------------------------------------------------------------------------
+    # CHIPLETS BUS REQUESTS (U32 BITWISE)
+    # ------------------------------------------------------------------------------------------
+    # U32AND/U32XOR requests use the (a, b, z) tuple from the stack.
+    bus_6_chiplets_bus.remove(BITWISEAND, s0, s1, s0') when is_u32and;
+    bus_6_chiplets_bus.remove(BITWISEXOR, s0, s1, s0') when is_u32xor;
+
+    # ------------------------------------------------------------------------------------------
+    # CHIPLETS BUS REQUESTS (MEMORY OPS)
+    # ------------------------------------------------------------------------------------------
+    # Memory requests use label + ctx + addr + clk + payload.
+    bus_6_chiplets_bus.remove(MEMREADELEMENT, system_ctx, s0, system_clk, s0') when is_mload;
+    bus_6_chiplets_bus.remove(MEMWRITEELEMENT, system_ctx, s0, system_clk, s1) when is_mstore;
+    bus_6_chiplets_bus.remove(
+        MEMREADWORD,
+        system_ctx,
+        s0,
+        system_clk,
+        s0', s1', s2', s3'
+    ) when is_mloadw;
+    bus_6_chiplets_bus.remove(
+        MEMWRITEWORD,
+        system_ctx,
+        s0,
+        system_clk,
+        s1, s2, s3, s4
+    ) when is_mstorew;
 
     # ------------------------------------------------------------------------------------------
     # ASSERT/CALLER/SDEPTH
