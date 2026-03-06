@@ -60,8 +60,38 @@ const DEFAULT_AUX_TRACE_RAND_ELEMENTS: usize = 16;
 const DEFAULT_EXPECTED_MAIN_WIDTH: usize = 72;
 const DEFAULT_EXPECTED_AUX_WIDTH: usize = 8;
 const DEFAULT_MAIN_FILLED: usize = 71;
-const DEFAULT_UNGATED_TRANSITION_TAGS: &'static [usize] = &[];
-const DEFAULT_PERIODIC_COLUMN_ORDER: &'static [&'static str] = &[];
+const DEFAULT_UNGATED_TRANSITION_TAGS: &'static [usize] = &[
+    // These tags sit in the transition domain (they touch next-row values), but their
+    // constraints already multiply by the intended row gate (k_transition * bitwise_flag).
+    // Multiplying by the global transition gate again would change the intended evaluation.
+    // - 346: chiplets.bitwise.op.stability
+    // - 358: chiplets.bitwise.input.transition (a aggregate)
+    // - 359: chiplets.bitwise.input.transition (b aggregate)
+    // - 360: chiplets.bitwise.output.prev
+    346, 358, 359, 360,
+];
+const DEFAULT_PERIODIC_COLUMN_ORDER: &'static [&'static str] = &[
+    "cycle_row_0",
+    "cycle_row_30",
+    "cycle_row_31",
+    "p2_is_external",
+    "p2_is_internal",
+    "ark_ext_0",
+    "ark_ext_1",
+    "ark_ext_2",
+    "ark_ext_3",
+    "ark_ext_4",
+    "ark_ext_5",
+    "ark_ext_6",
+    "ark_ext_7",
+    "ark_ext_8",
+    "ark_ext_9",
+    "ark_ext_10",
+    "ark_ext_11",
+    "ark_int",
+    "bitwise_k_first",
+    "bitwise_k_transition",
+];
 
 /// Parses and lowers AIRScript into AIR for evaluation.
 pub fn generate_air(path: &str) -> Air {
