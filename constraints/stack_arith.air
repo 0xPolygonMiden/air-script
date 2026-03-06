@@ -139,7 +139,7 @@ ev stack_arith_transition([stack[19], decoder[24], system[6]]) {
     enf ext_d0 = ext_b0 when is_ext2mul;
     enf ext_d1 = ext_b1 when is_ext2mul;
     enf ext_c0 = ext_a0_b0 + 7 * ext_a1_b1 when is_ext2mul;
-    enf ext_c1 = (ext_a0 + ext_a1) * (ext_b0 + ext_b1) - ext_a0_b0 - ext_a1_b1 when is_ext2mul;
+    enf ext_c1 = ext_a0 * ext_b1 + ext_a1 * ext_b0 when is_ext2mul;
 
     # ------------------------------------------------------------------------------------------
     # U32 OPS
