@@ -163,9 +163,26 @@ const KERNELPROCCALL = 16;         # Kernel procedure call
 const KERNELPROCINIT = 48;         # Kernel procedure initialization
 
 ##########################################################################################
+# CONTROL FLOW OPCODES (DOMAIN SEPARATION)
+##########################################################################################
+
+# Control flow opcodes used for domain separation in control block hashing.
+const OPCODE_JOIN = 87;            # 0b0101_0111
+const OPCODE_SPLIT = 84;           # 0b0101_0100
+const OPCODE_LOOP = 85;            # 0b0101_0101
+const OPCODE_CALL = 108;           # 0b0110_1100
+const OPCODE_DYN = 88;             # 0b0101_1000
+const OPCODE_DYNCALL = 92;         # 0b0101_1100
+const OPCODE_SYSCALL = 104;        # 0b0110_1000
+
+##########################################################################################
 # GENERAL CONSTANTS
 ##########################################################################################
 
 # ACE instruction encoding offsets
 const ACEINSTRUCTIONIDONEOFFSET = 1073741824;  # 2^30
 const ACEINSTRUCTIONIDTWOOFFSET = 1152921504606846976;  # 2^60
+
+# Frame pointer (FMP) initialization for CALL/DYNCALL
+const FMP_ADDR = 4294967294;        # u32::MAX - 1
+const FMP_INIT_VALUE = 2147483648;  # 2^31

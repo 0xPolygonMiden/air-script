@@ -1,0 +1,126 @@
+##########################################################################################
+# BITWISE CHIPLET CONSTRAINTS MODULE
+##########################################################################################
+#
+# The bitwise chiplet handles AND/XOR operations over 32-bit values.
+# Each operation spans 8 rows, processing 4 bits per row.
+#
+# The chiplet uses two periodic columns:
+# - bitwise_k_first: marks the first row of the 8-row cycle
+# - bitwise_k_transition: marks rows where the aggregated values advance
+##########################################################################################
+
+mod bitwise
+
+use utils::*;
+use chiplets::*;
+
+##########################################################################################
+# BITWISE CHIPLET TRANSITION CONSTRAINTS
+##########################################################################################
+
+ev bitwise_chiplet([chiplets[15]]) {
+    # Chiplet selector bits.
+    let s0_sel = chiplets[0];
+    let s1_sel = chiplets[1];
+
+    # Bitwise chiplet active when s0 = 1 and s1 = 0.
+    let bitwise_flag = bitwise_chiplet_flag(s0_sel, s1_sel);
+
+    # Bitwise chiplet columns.
+    let bw_op = chiplets[2];
+    let bw_a = chiplets[3];
+    let bw_b = chiplets[4];
+    let bw_a_bits = [chiplets[5], chiplets[6], chiplets[7], chiplets[8]];
+    let bw_b_bits = [chiplets[9], chiplets[10], chiplets[11], chiplets[12]];
+    let bw_prev = chiplets[13];
+    let bw_out = chiplets[14];
+
+    # Row gates for the 8-row cycle.
+    let bw_gate_transition = bitwise_k_transition * bitwise_flag;
+    let bw_gate_first = bitwise_k_first * bitwise_flag;
+
+    # -------------------------------------------------------------------------
+    # Operation flag constraints.
+    # -------------------------------------------------------------------------
+    enf bw_op * (bw_op - 1) = 0 when bitwise_flag;
+    enf bw_op = bw_op' when bw_gate_transition;
+
+    # -------------------------------------------------------------------------
+    # Input bit constraints.
+    # -------------------------------------------------------------------------
+    enf bit^2 = bit for bit in bw_a_bits when bitwise_flag;
+    enf bit^2 = bit for bit in bw_b_bits when bitwise_flag;
+
+    # First row aggregates and prev output must be zeroed.
+    let bw_a_agg = aggregate_limbs(bw_a_bits);
+    let bw_b_agg = aggregate_limbs(bw_b_bits);
+    enf bw_a = bw_a_agg when bw_gate_first;
+    enf bw_b = bw_b_agg when bw_gate_first;
+    enf bw_prev = 0 when bw_gate_first;
+
+    # -------------------------------------------------------------------------
+    # Aggregation transitions.
+    # -------------------------------------------------------------------------
+    let bw_a_agg_next =
+        aggregate_limbs([bw_a_bits[0]', bw_a_bits[1]', bw_a_bits[2]', bw_a_bits[3]']);
+    let bw_b_agg_next =
+        aggregate_limbs([bw_b_bits[0]', bw_b_bits[1]', bw_b_bits[2]', bw_b_bits[3]']);
+
+    enf bw_a' = bw_a * 16 + bw_a_agg_next when bw_gate_transition;
+    enf bw_b' = bw_b * 16 + bw_b_agg_next when bw_gate_transition;
+
+    enf bw_prev' = bw_out when bw_gate_transition;
+
+    # -------------------------------------------------------------------------
+    # Output aggregation.
+    # -------------------------------------------------------------------------
+    let bw_and = compute_limb_and(bw_a_bits, bw_b_bits);
+    let bw_xor = compute_limb_xor(bw_a_bits, bw_b_bits);
+    # z = zp * 16 + (op_flag ? a_xor_b : a_and_b)
+    let bw_expected = bw_prev * 16 + select(bw_op, bw_xor, bw_and);
+    enf bw_out = bw_expected when bitwise_flag;
+
+    # -------------------------------------------------------------------------
+    # Chiplets bus responses.
+    # -------------------------------------------------------------------------
+    let is_last_row = !bitwise_k_transition;
+
+    let bw_label = !bw_op * BITWISEAND + bw_op * BITWISEXOR;
+    bus_6_chiplets_bus.insert(bw_label, bw_a, bw_b, bw_out)
+        when (bitwise_flag * is_last_row);
+}
+
+##########################################################################################
+# HELPER FUNCTIONS
+##########################################################################################
+
+fn aggregate_limbs(limbs: felt[4]) -> felt {
+    return (((limbs[3] * 2 + limbs[2]) * 2 + limbs[1]) * 2 + limbs[0]);
+}
+
+fn compute_limb_and(a_limb: felt[4], b_limb: felt[4]) -> felt {
+    let and0 = a_limb[0] * b_limb[0];
+    let and1 = a_limb[1] * b_limb[1];
+    let and2 = a_limb[2] * b_limb[2];
+    let and3 = a_limb[3] * b_limb[3];
+    return aggregate_limbs([and0, and1, and2, and3]);
+}
+
+fn compute_limb_xor(a_limb: felt[4], b_limb: felt[4]) -> felt {
+    let xor0 = binary_xor(a_limb[0], b_limb[0]);
+    let xor1 = binary_xor(a_limb[1], b_limb[1]);
+    let xor2 = binary_xor(a_limb[2], b_limb[2]);
+    let xor3 = binary_xor(a_limb[3], b_limb[3]);
+    return aggregate_limbs([xor0, xor1, xor2, xor3]);
+}
+
+##########################################################################################
+# PERIODIC COLUMNS
+##########################################################################################
+
+periodic_columns {
+    # Bitwise chiplet cycle markers (8-row cycle).
+    bitwise_k_first: [1, 0, 0, 0, 0, 0, 0, 0],
+    bitwise_k_transition: [1, 1, 1, 1, 1, 1, 1, 0],
+}
