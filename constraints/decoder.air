@@ -197,6 +197,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     let tiny_batch = batch_g1 + batch_g2;
     let tiny_batch_tail = [h2, h3];
     enf tiny_batch_tail[i] = 0 for i in 0..2 when tiny_batch;
+    # If batch size is 1 group, unused hasher lane h1 must be zero.
     enf h1 = 0 when batch_g1;
 
     # ---------------------------------------------------------------------------
