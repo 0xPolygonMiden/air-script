@@ -64,11 +64,11 @@ const DEFAULT_UNGATED_TRANSITION_TAGS: &'static [usize] = &[
     // These tags sit in the transition domain (they touch next-row values), but their
     // constraints already multiply by the intended row gate (k_transition * bitwise_flag).
     // Multiplying by the global transition gate again would change the intended evaluation.
-    // - 304: chiplets.bitwise.op.stability
-    // - 316: chiplets.bitwise.input.transition (a aggregate)
-    // - 317: chiplets.bitwise.input.transition (b aggregate)
-    // - 318: chiplets.bitwise.output.prev
-    304, 316, 317, 318,
+    // - 346: chiplets.bitwise.op.stability
+    // - 358: chiplets.bitwise.input.transition (a aggregate)
+    // - 359: chiplets.bitwise.input.transition (b aggregate)
+    // - 360: chiplets.bitwise.output.prev
+    346, 358, 359, 360,
 ];
 const DEFAULT_PERIODIC_COLUMN_ORDER: &'static [&'static str] = &[
     "cycle_row_0",
