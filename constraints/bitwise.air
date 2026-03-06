@@ -84,9 +84,9 @@ ev bitwise_chiplet([chiplets[15]]) {
     # -------------------------------------------------------------------------
     # Chiplets bus responses.
     # -------------------------------------------------------------------------
-    let is_last_row = binary_not(bitwise_k_transition);
+    let is_last_row = !bitwise_k_transition;
 
-    let bw_label = binary_not(bw_op) * BITWISEAND + bw_op * BITWISEXOR;
+    let bw_label = !bw_op * BITWISEAND + bw_op * BITWISEXOR;
     bus_6_chiplets_bus.insert(bw_label, bw_a, bw_b, bw_out)
         when (bitwise_flag * is_last_row);
 }
