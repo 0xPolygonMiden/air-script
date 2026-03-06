@@ -81,7 +81,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # ---------------------------------------------------------------------------
     # e0/e1 exist to reduce the degree of op-flag selectors for the `101...` and `11...`
     # opcode groups, respectively (see docs/src/design/stack/op_constraints.md in miden-vm).
-    enf e0 = b6 * (1 - b5) * b4;
+    enf e0 = b6 * !b5 * b4;
     enf e1 = b6 * b5;
 
     # ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # ---------------------------------------------------------------------------
     # SPLIT/LOOP: top of stack selects a branch, so it must be binary.
     let split_or_loop = is_split + is_loop;
-    enf s0 * (s0 - 1) = 0 when split_or_loop;
+    enf s0^2 = s0 when split_or_loop;
 
     # DYN: only the first half of the hasher state is used; the tail must be zero.
     let dyn_tail = [h4, h5, h6, h7];
@@ -137,7 +137,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # gc tracks remaining op groups within the span.
     let delta_gc = gc - gc';
     # gc can only stay the same or decrement by 1 inside a span.
-    enf delta_gc * (delta_gc - 1) = 0 when sp;
+    enf delta_gc^2 = delta_gc when sp;
     # If gc decrements and this isn't a PUSH, h0 must be 0 (no immediate).
     enf h0 = 0 when sp & delta_gc & (1 - is_push);
     # SPAN/RESPAN/PUSH must decrement gc.
@@ -169,7 +169,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # Reset ox when starting a new group.
     enf ox' = 0 when sp & ng;
     # Otherwise, increment ox by 1 within a span.
-    enf ox' = ox + 1 when sp & sp' & (1 - ng);
+    enf ox' = ox + 1 when sp & sp' & !ng;
     # ox is in range [0, 8].
     enf ox * (ox - 1) * (ox - 2) * (ox - 3) * (ox - 4) * (ox - 5) * (ox - 6) * (ox - 7) * (ox - 8) = 0;
 
@@ -320,7 +320,7 @@ ev decoder_transition([decoder[24], stack[19], system[6]]) {
     # Group value selection:
     # - if this row is a PUSH, the group value is the immediate in s0'
     # - otherwise the group value is the next opcode encoded by (h0', op_next)
-    let decoded_op_value = (h0' * 2^7 + op_next) * (1 - is_push) + s0' * is_push;
+    let decoded_op_value = (h0' * 2^7 + op_next) * !is_push + s0' * is_push;
     let is_decrementing_gc = sp * (gc - gc');
     bus_2_decoder_p3.remove(addr, gc, decoded_op_value) when is_decrementing_gc;
 }
