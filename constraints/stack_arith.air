@@ -85,17 +85,17 @@ ev stack_arith_transition([stack[19], decoder[24], system[6]]) {
     enf s0' = s0 + 1 when is_incr;
 
     # NOT: binary check + result
-    enf s0 * (s0 - 1) = 0 when is_not;
+    enf s0^2 = s0 when is_not;
     enf s0 + s0' = 1 when is_not;
 
     # AND: binary checks + result
-    enf s0 * (s0 - 1) = 0 when is_and;
-    enf s1 * (s1 - 1) = 0 when is_and;
+    enf s0^2 = s0 when is_and;
+    enf s1^2 = s1 when is_and;
     enf s0' = s0 * s1 when is_and;
 
     # OR: binary checks + result
-    enf s0 * (s0 - 1) = 0 when is_or;
-    enf s1 * (s1 - 1) = 0 when is_or;
+    enf s0^2 = s0 when is_or;
+    enf s1^2 = s1 when is_or;
     enf s0' = s0 + s1 - s0 * s1 when is_or;
 
     # EQ: zero-product + result.
@@ -123,7 +123,7 @@ ev stack_arith_transition([stack[19], decoder[24], system[6]]) {
     enf exp_val = 1 + (exp - 1) * exp_bit when is_expacc;
     enf acc_next = acc * exp_val when is_expacc;
     enf exp_b = exp_b_next * 2 + exp_bit when is_expacc;
-    enf exp_bit * (exp_bit - 1) = 0 when is_expacc;
+    enf exp_bit^2 = exp_bit when is_expacc;
 
     # EXT2MUL: preserve b0/b1 and compute product
     let ext_b0 = s0;
