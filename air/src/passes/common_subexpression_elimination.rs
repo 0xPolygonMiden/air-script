@@ -54,6 +54,22 @@ impl Pass for CommonSubexpressionElimination<'_> {
             }
         }
 
+        // Renumber latch and columns in every bus_op so they still refer to the correct nodes
+        // after CSE. Without this, codegen would use stale indices and can emit aux trace
+        // references into request/response helpers.
+        for (_, bus) in ir.buses.iter_mut() {
+            for bus_op in bus.bus_ops.iter_mut() {
+                bus_op.latch = *renumbering_map
+                    .get(&bus_op.latch)
+                    .expect("Error: cannot find bus_op latch index in renumbering map");
+                for col in bus_op.columns.iter_mut() {
+                    *col = *renumbering_map
+                        .get(col)
+                        .expect("Error: cannot find bus_op column index in renumbering map");
+                }
+            }
+        }
+
         Ok(ir)
     }
 }
