@@ -3,6 +3,7 @@ use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
+use miden_processor::utils::uninit_vector;
 
 pub const MAIN_WIDTH: usize = 7;
 pub const AUX_WIDTH: usize = 0;

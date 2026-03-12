@@ -3,6 +3,7 @@ use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 use p3_miden_air::{BusType, MidenAir, MidenAirBuilder, RowMajorMatrix};
+use miden_processor::utils::uninit_vector;
 
 pub const MAIN_WIDTH: usize = 5;
 pub const AUX_WIDTH: usize = 2;
@@ -52,8 +53,18 @@ where F: Field,
         for j in 0..AUX_WIDTH {
             rows[0][j] = initial_values[j];
         }
-        // Fill subsequent rows using direct access to the rows array
-        for i in 0..num_rows-1 {
+        let multiset_indices: Vec<usize> = vec![0];
+        let logup_indices: Vec<usize> = vec![1];
+
+        // Multiset columns: same pattern as Miden AuxColumnBuilder::build_aux_column (request/response, batch inversion).
+        // Fill multiset column 0
+        let mut requests: Vec<EF> = unsafe { uninit_vector(num_rows) };
+        requests[0] = EF::ONE;
+        let mut responses_prod: Vec<EF> = unsafe { uninit_vector(num_rows) };
+        responses_prod[0] = EF::ONE;
+        let mut requests_running_prod = requests[0];
+        // Product of all requests to be inverted, used to compute inverses of requests. (Miden utils.rs build_aux_column)
+        for i in 0..num_rows - 1 {
             let i_next = (i + 1) % num_rows;
             let main_local = _main.row_slice(i).unwrap(); // i < height so unwrap should never fail.
             let main_next = _main.row_slice(i_next).unwrap(); // i_next < height so unwrap should never fail.
@@ -62,17 +73,57 @@ where F: Field,
                 RowMajorMatrixView::new_row(&*main_next),
             );
             let periodic_values: [_; NUM_PERIODIC_VALUES] = <BusesAir as MidenAir<F, EF>>::periodic_table(self).iter().map(|col| col[i % col.len()]).collect::<Vec<_>>().try_into().expect("Wrong number of periodic values");
-            let prev_row = &rows[i];
-            let next_row = Self::buses_transitions::<F, EF>(
-                &main,
-                _challenges,
-                &periodic_values,
-                prev_row,
-            );
-            for j in 0..AUX_WIDTH {
-                rows[i+1][j] = next_row[j];
-            }
+
+            let response = Self::bus_0_multiset_responses_at::<F, EF>(&main, _challenges, &periodic_values);
+            responses_prod[i + 1] = responses_prod[i] * response;
+            let request = Self::bus_0_multiset_requests_at::<F, EF>(&main, _challenges, &periodic_values);
+            requests[i + 1] = request;
+            requests_running_prod *= request;
         }
+
+        // Use batch-inversion method to compute running product of `response[i]/request[i]`.
+        for i in 0..num_rows {
+            rows[i][0] = responses_prod[i];
+        }
+        let mut requests_running_divisor = requests_running_prod.inverse();
+        for i in (0..num_rows).rev() {
+            rows[i][0] *= requests_running_divisor;
+            requests_running_divisor *= requests[i];
+        }
+
+        // Logup columns: denominator/product over factors, and per-row term contributing
+        // to the running sum (LogUp). Batch-invert denominators then build running sum.
+        let n = num_rows - 1;
+        let mut denominators: Vec<EF> = unsafe { uninit_vector(n) };
+        let mut terms: Vec<EF> = unsafe { uninit_vector(n) };
+        // After backward pass: inv_den_suffix_prod[i] = 1 / (denominator[i] * .. * denominator[n-1]) for batch inversion.
+        let mut inv_den_suffix_prod: Vec<EF> = unsafe { uninit_vector(n) };
+        let mut acc = EF::ONE;
+        for i in 0..n {
+            let row0 = _main.row_slice(i).unwrap();
+            let row1 = _main.row_slice(i + 1).unwrap();
+            let main = VerticalPair::new(
+                RowMajorMatrixView::new_row(&*row0),
+                RowMajorMatrixView::new_row(&*row1),
+            );
+            let periodic_values: [_; NUM_PERIODIC_VALUES] = <BusesAir as MidenAir<F, EF>>::periodic_table(self).iter().map(|col| col[i % col.len()]).collect::<Vec<_>>().try_into().expect("Wrong number of periodic values");
+            let denominator = Self::bus_1_logup_denominator_at::<F, EF>(&main, _challenges, &periodic_values);
+            let term = Self::bus_1_logup_term_at::<F, EF>(&main, _challenges, &periodic_values);
+            denominators[i] = denominator;
+            terms[i] = term;
+            inv_den_suffix_prod[i] = acc;
+            acc *= denominator;
+        }
+        acc = acc.inverse();
+        for i in (0..n).rev() {
+            inv_den_suffix_prod[i] *= acc;
+            acc *= denominators[i];
+        }
+        rows[0][1] = initial_values[1];
+        for i in 0..n {
+            rows[i + 1][1] = rows[i][1] + terms[i] * inv_den_suffix_prod[i];
+        }
+
         let trace_f = trace.flatten_to_base();
         Some(trace_f)
     }
@@ -104,7 +155,7 @@ where F: Field,
 
         // Aux integrity/transition constraints
         builder.when_transition().assert_zero_ext(((alpha.into() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[0].into()) * AB::ExprEF::from(main_current[1].clone().into()) + AB::ExprEF::ONE - AB::ExprEF::from(main_current[1].clone().into())) * AB::ExprEF::from(aux_current[0].clone().into()) - ((alpha.into() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[0].into()) * AB::ExprEF::from(main_current[2].clone().into()) + AB::ExprEF::ONE - AB::ExprEF::from(main_current[2].clone().into())) * AB::ExprEF::from(aux_next[0].clone().into()));
-        builder.when_transition().assert_zero_ext((alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * AB::ExprEF::from(aux_next[1].clone().into()) + AB::ExprEF::from(main_current[4].clone().into()) - ((alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * AB::ExprEF::from(aux_current[1].clone().into()) + AB::ExprEF::from(main_current[3].clone().into()) + AB::ExprEF::from(main_current[3].clone().into())));
+        builder.when_transition().assert_zero_ext((alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * (alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * (alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * AB::ExprEF::from(aux_current[1].clone().into()) + (alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * (alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * AB::ExprEF::from(main_current[3].clone().into()) + (alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * (alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * AB::ExprEF::from(main_current[3].clone().into()) - ((alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * (alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * (alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * AB::ExprEF::from(aux_next[1].clone().into()) + (alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * (alpha.into() + beta_challenges[0].into().double() + AB::ExprEF::from(main_current[0].clone().into()) * beta_challenges[1].into()) * AB::ExprEF::from(main_current[4].clone().into())));
     }
 }
 
@@ -119,20 +170,61 @@ impl BusesAir {
         ]
     }
 
-    fn buses_transitions<F, EF>(main: &VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>, challenges: &[EF], periodic_evals: &[F], aux_current: &[EF]) -> Vec<EF>
+    fn bus_0_multiset_requests_at<F, EF>(main: &VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>, challenges: &[EF], periodic_evals: &[F]) -> EF
     where F: Field,
           EF: ExtensionField<F>,
     {
-        let (main_current, main_next) = (
+        let (main_current, _main_next) = (
             main.row_slice(0).unwrap(),
             main.row_slice(1).unwrap(),
         );
-        let (&alpha, beta_challenges) = challenges.split_first().expect("Wrong number of randomness");
-        let beta_challenges: [_; MAX_BETA_CHALLENGE_POWER] = beta_challenges.try_into().expect("Wrong number of randomness");
-        let periodic_values: [_; NUM_PERIODIC_VALUES] = periodic_evals.try_into().expect("Wrong number of periodic values");
-        vec![
-            (((alpha + EF::from(main_current[0].clone()) * beta_challenges[0]) * EF::from(main_current[1].clone()) + EF::ONE - EF::from(main_current[1].clone())) * EF::from(aux_current[0].clone())) * ((alpha + EF::from(main_current[0].clone()) * beta_challenges[0]) * EF::from(main_current[2].clone()) + EF::ONE - EF::from(main_current[2].clone())).inverse(),
-            ((alpha + beta_challenges[0].double() + EF::from(main_current[0].clone()) * beta_challenges[1]) * EF::from(aux_current[1].clone()) + EF::from(main_current[3].clone()) + EF::from(main_current[3].clone()) - EF::from(main_current[4].clone())) * (alpha + beta_challenges[0].double() + EF::from(main_current[0].clone()) * beta_challenges[1]).inverse(),
-        ]
+        let _periodic_values: [_; NUM_PERIODIC_VALUES] = periodic_evals.try_into().expect("Wrong number of periodic values");
+        let result = (challenges[0] + challenges[1] * EF::from(main_current[0].clone())) * EF::from(main_current[2].clone()) + (EF::ONE - EF::from(main_current[2].clone()));
+        if result == EF::ZERO {
+            return EF::ONE;
+        }
+        result
+    }
+
+    fn bus_0_multiset_responses_at<F, EF>(main: &VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>, challenges: &[EF], periodic_evals: &[F]) -> EF
+    where F: Field,
+          EF: ExtensionField<F>,
+    {
+        let (main_current, _main_next) = (
+            main.row_slice(0).unwrap(),
+            main.row_slice(1).unwrap(),
+        );
+        let _periodic_values: [_; NUM_PERIODIC_VALUES] = periodic_evals.try_into().expect("Wrong number of periodic values");
+        let result = (challenges[0] + challenges[1] * EF::from(main_current[0].clone())) * EF::from(main_current[1].clone()) + (EF::ONE - EF::from(main_current[1].clone()));
+        if result == EF::ZERO {
+            return EF::ONE;
+        }
+        result
+    }
+
+    fn bus_1_logup_denominator_at<F, EF>(main: &VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>, challenges: &[EF], periodic_evals: &[F]) -> EF
+    where F: Field,
+          EF: ExtensionField<F>,
+    {
+        let (main_current, _main_next) = (
+            main.row_slice(0).unwrap(),
+            main.row_slice(1).unwrap(),
+        );
+        let _periodic_values: [_; NUM_PERIODIC_VALUES] = periodic_evals.try_into().expect("Wrong number of periodic values");
+        (challenges[0] + challenges[1] * EF::from_u64(2) + challenges[2] * EF::from(main_current[0].clone())) * (challenges[0] + challenges[1] * EF::from_u64(2) + challenges[2] * EF::from(main_current[0].clone())) * (challenges[0] + challenges[1] * EF::from_u64(2) + challenges[2] * EF::from(main_current[0].clone()))
+    }
+
+    fn bus_1_logup_term_at<F, EF>(main: &VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>, challenges: &[EF], periodic_evals: &[F]) -> EF
+    where F: Field,
+          EF: ExtensionField<F>,
+    {
+        let (main_current, _main_next) = (
+            main.row_slice(0).unwrap(),
+            main.row_slice(1).unwrap(),
+        );
+        let _periodic_values: [_; NUM_PERIODIC_VALUES] = periodic_evals.try_into().expect("Wrong number of periodic values");
+        let terms_added = EF::from(main_current[3].clone()) * (challenges[0] + challenges[1] * EF::from_u64(2) + challenges[2] * EF::from(main_current[0].clone())) * (challenges[0] + challenges[1] * EF::from_u64(2) + challenges[2] * EF::from(main_current[0].clone())) + EF::from(main_current[3].clone()) * (challenges[0] + challenges[1] * EF::from_u64(2) + challenges[2] * EF::from(main_current[0].clone())) * (challenges[0] + challenges[1] * EF::from_u64(2) + challenges[2] * EF::from(main_current[0].clone()));
+        let terms_removed = EF::from(main_current[4].clone()) * (challenges[0] + challenges[1] * EF::from_u64(2) + challenges[2] * EF::from(main_current[0].clone())) * (challenges[0] + challenges[1] * EF::from_u64(2) + challenges[2] * EF::from(main_current[0].clone()));
+        terms_added - terms_removed
     }
 }
