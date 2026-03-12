@@ -13,4 +13,5 @@ pub(super) fn add_imports(scope: &mut Scope) {
     scope.import("p3_miden_air", "MidenAir");
     scope.import("p3_miden_air", "MidenAirBuilder");
     scope.import("p3_miden_air", "RowMajorMatrix");
+    scope.import("miden_processor::utils", "uninit_vector");
 }

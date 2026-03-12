@@ -1,4 +1,5 @@
 mod boundary_constraints;
+mod bus;
 mod graph;
 mod integrity_constraints;
 
@@ -7,7 +8,6 @@ use air_ir::Air;
 use super::Scope;
 use crate::air::{
     boundary_constraints::add_main_boundary_constraints,
-    graph::Codegen,
     integrity_constraints::{add_aux_integrity_constraints, add_main_integrity_constraints},
 };
 
@@ -33,8 +33,8 @@ pub(super) fn add_air(scope: &mut Scope, ir: &Air) {
     add_air_struct(scope, ir, name);
 
     // add the aux trace generation utils if needed
-    if ir.num_random_values > 0 {
-        add_aux_trace_utils(scope, ir, name);
+    if ir.num_random_values > 0 && name != "MidenVM" {
+        bus::add_aux_trace_utils(scope, ir, name);
     }
 }
 
@@ -153,27 +153,15 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
         build_aux_trace_func.line("for j in 0..AUX_WIDTH {");
         build_aux_trace_func.line("    rows[0][j] = initial_values[j];");
         build_aux_trace_func.line("}");
-        build_aux_trace_func.line("// Fill subsequent rows using direct access to the rows array");
-        build_aux_trace_func.line("for i in 0..num_rows-1 {");
-        build_aux_trace_func.line("    let i_next = (i + 1) % num_rows;");
-        build_aux_trace_func.line("    let main_local = _main.row_slice(i).unwrap(); // i < height so unwrap should never fail.");
-        build_aux_trace_func.line("    let main_next = _main.row_slice(i_next).unwrap(); // i_next < height so unwrap should never fail.");
-        build_aux_trace_func.line("    let main = VerticalPair::new(");
-        build_aux_trace_func.line("        RowMajorMatrixView::new_row(&*main_local),");
-        build_aux_trace_func.line("        RowMajorMatrixView::new_row(&*main_next),");
-        build_aux_trace_func.line("    );");
-        build_aux_trace_func.line(format!("    let periodic_values: [_; NUM_PERIODIC_VALUES] = <{name} as MidenAir<F, EF>>::periodic_table(self).iter().map(|col| col[i % col.len()]).collect::<Vec<_>>().try_into().expect(\"Wrong number of periodic values\");"));
-        build_aux_trace_func.line("    let prev_row = &rows[i];");
-        build_aux_trace_func.line("    let next_row = Self::buses_transitions::<F, EF>(");
-        build_aux_trace_func.line("        &main,");
-        build_aux_trace_func.line("        _challenges,");
-        build_aux_trace_func.line("        &periodic_values,");
-        build_aux_trace_func.line("        prev_row,");
-        build_aux_trace_func.line("    );");
-        build_aux_trace_func.line("    for j in 0..AUX_WIDTH {");
-        build_aux_trace_func.line("        rows[i+1][j] = next_row[j];");
-        build_aux_trace_func.line("    }");
-        build_aux_trace_func.line("}");
+
+        bus::add_build_aux_trace_body(
+            &mut |s| {
+                build_aux_trace_func.line(s);
+            },
+            ir,
+            name,
+        );
+
         build_aux_trace_func.line("let trace_f = trace.flatten_to_base();");
         build_aux_trace_func.line("Some(trace_f)");
     }
@@ -217,62 +205,4 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
     //add_aux_boundary_constraints(eval_func, ir);
 
     add_aux_integrity_constraints(eval_func, ir);
-}
-
-/// Updates the provided scope with aux trace generation utilities.
-fn add_aux_trace_utils(scope: &mut Scope, ir: &Air, name: &str) {
-    let aux_generation_impl = scope.new_impl(name);
-
-    // add the bus_initial_values function
-    let buses_initial_values_func = aux_generation_impl
-        .new_fn("buses_initial_values")
-        .generic("F")
-        .generic("EF")
-        .bound("F", "Field")
-        .bound("EF", "ExtensionField<F>")
-        .ret("Vec<EF>");
-    buses_initial_values_func.line("vec![");
-    for (_bus_id, value) in ir.buses_initial_values.iter() {
-        let value_str = value.to_string(ir, ElemType::ExtFieldElem);
-
-        buses_initial_values_func.line(format!("    {},", value_str));
-    }
-    buses_initial_values_func.line("]");
-
-    // add the bus_transitions function
-    let buses_transitions_func = aux_generation_impl
-        .new_fn("buses_transitions")
-        .generic("F")
-        .generic("EF")
-        .bound("F", "Field")
-        .bound("EF", "ExtensionField<F>")
-        .arg("main", "&VerticalPair<RowMajorMatrixView<F>, RowMajorMatrixView<F>>")
-        .arg("challenges", "&[EF]")
-        .arg("periodic_evals", "&[F]")
-        .arg("aux_current", "&[EF]")
-        .ret("Vec<EF>");
-
-    buses_transitions_func.line("let (main_current, main_next) = (");
-    buses_transitions_func.line("    main.row_slice(0).unwrap(),");
-    buses_transitions_func.line("    main.row_slice(1).unwrap(),");
-    buses_transitions_func.line(");");
-    buses_transitions_func.line("let (&alpha, beta_challenges) = challenges.split_first().expect(\"Wrong number of randomness\");");
-    buses_transitions_func.line("let beta_challenges: [_; MAX_BETA_CHALLENGE_POWER] = beta_challenges.try_into().expect(\"Wrong number of randomness\");");
-
-    buses_transitions_func.line("let periodic_values: [_; NUM_PERIODIC_VALUES] = periodic_evals.try_into().expect(\"Wrong number of periodic values\");");
-
-    buses_transitions_func.line("vec![");
-    for (_bus_id, (numerator, denominator)) in ir.buses_transitions.iter() {
-        let numerator_str = numerator.to_string(ir, ElemType::ExtFieldElem);
-
-        let aux_next_value_str = if let Some(denom) = denominator {
-            let denominator_str = denom.to_string(ir, ElemType::ExtFieldElem);
-            format!("({}) * ({}).inverse()", numerator_str, denominator_str)
-        } else {
-            numerator_str
-        };
-
-        buses_transitions_func.line(format!("    {},", aux_next_value_str));
-    }
-    buses_transitions_func.line("]");
 }
