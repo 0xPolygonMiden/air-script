@@ -105,9 +105,9 @@ fn valid_tokenization_indexed_trace_access() {
 
 #[test]
 fn error_identifier_with_invalid_characters() {
-    let source = "enf clk@' = clk + 1";
-    // "@" is not in the allowed characters.
-    let expected = LexicalError::UnexpectedCharacter { start: SourceIndex::UNKNOWN, found: '@' };
+    let source = "enf clk~' = clk + 1";
+    // "~" is not in the allowed characters.
+    let expected = LexicalError::UnexpectedCharacter { start: SourceIndex::UNKNOWN, found: '~' };
     expect_error_at_location(source, expected, 0, 7);
 }
 
@@ -115,11 +115,11 @@ fn error_identifier_with_invalid_characters() {
 fn return_first_invalid_character_error() {
     use miden_diagnostics::ByteIndex;
 
-    let source = "enf clk@' = clk@ + 1";
-    // "@" is not in the allowed characters.
+    let source = "enf clk~' = clk~ + 1";
+    // "~" is not in the allowed characters.
     let err = expect_any_error(source);
     match err {
-        LexicalError::UnexpectedCharacter { start, found: '@' } => {
+        LexicalError::UnexpectedCharacter { start, found: '~' } => {
             let expected = SourceIndex::new(start.source_id(), ByteIndex(7));
             assert_eq!(start, expected);
         },

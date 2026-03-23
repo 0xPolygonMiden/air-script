@@ -1,3 +1,10 @@
+//! MIR unrolling pass.
+//!
+//! The goal is to expand comprehensions and control-flow into explicit constraints. We do this in
+//! three passes: (1) unroll non-`For` nodes, (2) inline `For` bodies while preserving parameter
+//! identity, and (3) finish remaining `If`/match constructs. The tradeoff is potential graph
+//! growth, so we rely on earlier simplifications and prioritize correctness over minimal size.
+
 use std::ops::Deref;
 
 use air_pass::Pass;
@@ -15,30 +22,30 @@ use unrolling_first_pass::UnrollingFirstPass;
 use unrolling_second_pass::UnrollingSecondPass;
 use unrolling_third_pass::UnrollingThirdPass;
 
-/// This pass follows a similar approach as the Inlining pass and requires that the latter has
-/// already been done.
+/// Unrolls constraints and comprehensions after inlining.
 ///
-/// * In the first step, we visit the graph, unrolling each node type except `For` nodes. Instead,
-///   for these node types we gather the context to inline them in the second pass. In this first
-///   pass, we also optimize constraints found in match statements.
-/// * In the second pass, we inline the bodies of `For` nodes.
+/// It runs in three stages:
+/// 1. Unrolls everything except `For` nodes and records their contexts.
+/// 2. Inlines `For` bodies using the recorded contexts.
+/// 3. Unrolls remaining `If` nodes and optimizes match constraints.
 pub struct Unrolling<'a> {
     diagnostics: &'a DiagnosticsHandler,
 }
 
 impl<'a> Unrolling<'a> {
+    /// Construct a new unrolling pass.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self { diagnostics }
     }
 }
 
-/// This structure is used to keep track of what is needed to inline a For node
+/// Context needed to inline a `For` node.
 #[derive(Clone, Debug)]
 pub struct ForInliningContext {
     body: Link<Op>,
     iterators: Vec<Link<Op>>,
     selector: Option<Link<Op>>,
-    ref_node: Link<Op>,
+    ref_owner_id: OwnerId,
 }
 
 impl Pass for Unrolling<'_> {
@@ -54,16 +61,13 @@ impl Pass for Unrolling<'_> {
         Visitor::run(&mut first_pass, ir.constraint_graph_mut())?;
 
         // The second pass actually inlines the `For` nodes
-        let mut second_pass = UnrollingSecondPass::new(
-            self.diagnostics,
-            first_pass.bodies_to_inline.clone(),
-            first_pass.all_for_nodes.clone(),
-        );
+        let mut second_pass =
+            UnrollingSecondPass::new(self.diagnostics, first_pass.bodies_to_inline.clone());
         Visitor::run(&mut second_pass, ir.constraint_graph_mut())?;
 
         // The third pass unrolls all the remaining nodes (`If` nodes and their parents)
         let mut third_pass = UnrollingThirdPass::new(self.diagnostics);
-        Visitor::run(&mut third_pass, ir.constraint_graph_mut())?;
+        third_pass.run(ir.constraint_graph_mut())?;
         Ok(ir)
     }
 }
@@ -71,10 +75,13 @@ impl Pass for Unrolling<'_> {
 /// Unrolls an `Enf` on vectors into a `Vector<Enf>`.
 pub fn visit_enf_bis(enf: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
     let enf_ref = enf.as_enf().unwrap();
+    if enf_ref.tag.is_some() {
+        return Ok(None);
+    }
     let expr = enf_ref.expr.clone();
     if let Op::Vector(vec) = expr.borrow().deref() {
         let ops = vec.children().borrow().clone();
-        let new_vec = ops.iter().map(|op| Enf::create(op.clone(), enf_ref.span())).collect();
+        let new_vec = ops.iter().map(|op| Enf::create(op.clone(), enf_ref.span(), None)).collect();
         return Ok(Some(Vector::create(new_vec, enf_ref.span())));
     }
     Ok(None)

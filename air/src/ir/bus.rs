@@ -1,5 +1,5 @@
-pub use air_parser::ast::BusType;
 use air_parser::ast::Identifier;
+pub use air_parser::ast::{BusConstraintForm, BusType};
 pub use mir::ir::BusOpKind;
 
 use crate::NodeIndex;
@@ -11,12 +11,20 @@ pub struct Bus {
     pub name: Identifier,
     /// The type of bus:
     pub bus_type: BusType,
+    /// Constraint form for multiset buses.
+    pub constraint_form: BusConstraintForm,
     /// The initial state of the bus
     pub first: BusBoundary,
+    /// Optional tag for the first-row boundary constraint.
+    pub first_tag: Option<u64>,
     /// The final state of the bus
     pub last: BusBoundary,
+    /// Optional tag for the last-row boundary constraint.
+    pub last_tag: Option<u64>,
     /// The operations (insertions and removals) of this bus
     pub bus_ops: Vec<BusOp>,
+    /// Optional tag for the bus transition constraint.
+    pub transition_tag: Option<u64>,
 }
 
 /// Represents the boundaries of a bus, which can be either a public input table or an empty bus.
@@ -66,13 +74,28 @@ impl BusOp {
 }
 
 impl Bus {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: Identifier,
         bus_type: BusType,
+        constraint_form: BusConstraintForm,
         first: BusBoundary,
         last: BusBoundary,
         bus_ops: Vec<BusOp>,
+        first_tag: Option<u64>,
+        last_tag: Option<u64>,
+        transition_tag: Option<u64>,
     ) -> Self {
-        Self { name, bus_type, first, last, bus_ops }
+        Self {
+            name,
+            bus_type,
+            constraint_form,
+            first,
+            last,
+            bus_ops,
+            first_tag,
+            last_tag,
+            transition_tag,
+        }
     }
 }

@@ -98,13 +98,19 @@ impl fmt::Display for DisplayStatement<'_> {
                 };
                 write!(f, "{display}")
             },
-            Statement::Enforce(expr) => {
-                write!(f, "enf {expr}")
+            Statement::Enforce(enf) => {
+                if let Some(tag) = &enf.tag {
+                    write!(f, "{tag} ")?;
+                }
+                write!(f, "enf {}", enf.expr)
             },
             Statement::EnforceIf(match_expr) => {
                 write!(f, "enf {match_expr}")
             },
             Statement::EnforceAll(expr) => {
+                if let Some(tag) = &expr.tag {
+                    write!(f, "{tag} ")?;
+                }
                 write!(f, "enf {expr}")
             },
             Statement::Expr(expr) => write!(f, "return {expr}"),
@@ -135,7 +141,7 @@ impl fmt::Display for DisplayLet<'_> {
         self.write_indent(f)?;
         match &self.let_expr.value {
             super::Expr::Let(value) => {
-                writeln!(f, "let {} = {{", self.let_expr.name)?;
+                writeln!(f, "let {} = {{", self.let_expr.binding)?;
                 let display = DisplayLet {
                     let_expr: value,
                     indent: self.indent + 1,
@@ -150,7 +156,7 @@ impl fmt::Display for DisplayLet<'_> {
                 }
             },
             value => {
-                write!(f, "let {} = {}", self.let_expr.name, value)?;
+                write!(f, "let {} = {}", self.let_expr.binding, value)?;
                 if self.in_expr_position {
                     f.write_str(" in {\n")?;
                 } else {

@@ -3,7 +3,7 @@ use alloc::collections::BTreeMap;
 
 use air_parser::ast::TraceSegmentId;
 use mir::ir::{QuadFelt, const_quad_felt, query_indexed_eval, query_mapped_eval};
-use rand::prelude::*;
+use rand::{SeedableRng, rngs::StdRng};
 use winter_math::fields::f64::BaseElement as Felt;
 
 use crate::{
@@ -15,9 +15,9 @@ use crate::{
 /// - the random inputs taken by leaf nodes, in order to persist them across different node
 ///   evaluations.
 /// - the evaluations of all the nodes in the graph
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RandomInputs {
-    rng: ThreadRng,
+    rng: StdRng,
     // A vector to hold the random values taken for the main trace, indexed in the following way:
     // $main[0], $main[0]', $main[1], $main[1]', $main[2], ...
     main_trace: Vec<QuadFelt>,
@@ -28,6 +28,24 @@ pub struct RandomInputs {
     public_inputs_tables: BTreeMap<PublicInputTableAccess, QuadFelt>,
     // A map to hold the the current evaluations of nodes at random points
     evals_map: BTreeMap<NodeIndex, QuadFelt>,
+}
+
+// Deterministic seed so CSE behavior is reproducible across runs.
+const CSE_RNG_SEED: [u8; 32] = *b"AIR_SCRIPT_CSE_SEED_000000000000";
+
+impl Default for RandomInputs {
+    fn default() -> Self {
+        Self {
+            rng: StdRng::from_seed(CSE_RNG_SEED),
+            main_trace: Vec::new(),
+            aux_trace: Vec::new(),
+            rand_values: Vec::new(),
+            public_inputs: BTreeMap::new(),
+            periodic_columns: BTreeMap::new(),
+            public_inputs_tables: BTreeMap::new(),
+            evals_map: BTreeMap::new(),
+        }
+    }
 }
 
 impl RandomInputs {

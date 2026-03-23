@@ -60,12 +60,20 @@ fn buses() {
     add_base_expectations(&mut expected);
     add_base_boundary_expectation(&mut expected);
     add_base_integrity_expectation(&mut expected);
-    expected
-        .buses
-        .insert(ident!(p), Bus::new(SourceSpan::UNKNOWN, ident!(p), BusType::Multiset));
-    expected
-        .buses
-        .insert(ident!(q), Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup));
+    expected.buses.insert(
+        ident!(p),
+        Bus::new(
+            SourceSpan::UNKNOWN,
+            ident!(p),
+            BusType::Multiset,
+            BusConstraintForm::Product,
+            None,
+        ),
+    );
+    expected.buses.insert(
+        ident!(q),
+        Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup, BusConstraintForm::Product, None),
+    );
     ParseTest::new().expect_module_ast(&source, expected);
 }
 
@@ -94,12 +102,20 @@ fn boundary_constraints_buses() {
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     add_base_expectations(&mut expected);
     add_base_integrity_expectation(&mut expected);
-    expected
-        .buses
-        .insert(ident!(p), Bus::new(SourceSpan::UNKNOWN, ident!(p), BusType::Multiset));
-    expected
-        .buses
-        .insert(ident!(q), Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup));
+    expected.buses.insert(
+        ident!(p),
+        Bus::new(
+            SourceSpan::UNKNOWN,
+            ident!(p),
+            BusType::Multiset,
+            BusConstraintForm::Product,
+            None,
+        ),
+    );
+    expected.buses.insert(
+        ident!(q),
+        Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup, BusConstraintForm::Product, None),
+    );
     expected.boundary_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
         vec![
@@ -138,12 +154,20 @@ fn integrity_constraints_buses() {
     let mut expected = Module::new(ModuleType::Root, SourceSpan::UNKNOWN, module_ident!(test));
     add_base_expectations(&mut expected);
     add_base_boundary_expectation(&mut expected);
-    expected
-        .buses
-        .insert(ident!(p), Bus::new(SourceSpan::UNKNOWN, ident!(p), BusType::Multiset));
-    expected
-        .buses
-        .insert(ident!(q), Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup));
+    expected.buses.insert(
+        ident!(p),
+        Bus::new(
+            SourceSpan::UNKNOWN,
+            ident!(p),
+            BusType::Multiset,
+            BusConstraintForm::Product,
+            None,
+        ),
+    );
+    expected.buses.insert(
+        ident!(q),
+        Bus::new(SourceSpan::UNKNOWN, ident!(q), BusType::Logup, BusConstraintForm::Product, None),
+    );
     expected.integrity_constraints = Some(Span::new(
         SourceSpan::UNKNOWN,
         vec![

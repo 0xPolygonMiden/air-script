@@ -1,10 +1,12 @@
 mod bus;
 mod graph;
+mod interner;
 mod link;
 mod mir;
 mod node;
 mod nodes;
 mod owner;
+mod owner_id;
 mod quad_eval;
 mod utils;
 pub extern crate derive_ir;
@@ -12,11 +14,13 @@ pub extern crate derive_ir;
 pub use bus::Bus;
 pub use derive_ir::Builder;
 pub use graph::Graph;
+pub use interner::*;
 pub use link::{BackLink, Link, Singleton};
 pub use mir::Mir;
 pub use node::Node;
 pub use nodes::*;
 pub use owner::Owner;
+pub use owner_id::OwnerId;
 pub use quad_eval::{
     QuadFelt, RandomInputs, const_quad_felt, query_indexed_eval, query_mapped_eval,
 };

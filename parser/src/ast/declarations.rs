@@ -79,12 +79,43 @@ pub struct Bus {
     pub span: SourceSpan,
     pub name: Identifier,
     pub bus_type: BusType,
+    pub constraint_form: BusConstraintForm,
+    pub transition_tag: Option<ConstraintTag>,
 }
 impl Bus {
     /// Creates a new bus declaration
-    pub const fn new(span: SourceSpan, name: Identifier, bus_type: BusType) -> Self {
-        Self { span, name, bus_type }
+    pub fn new(
+        span: SourceSpan,
+        name: Identifier,
+        bus_type: BusType,
+        constraint_form: BusConstraintForm,
+        transition_tag: Option<ConstraintTag>,
+    ) -> Self {
+        Self {
+            span,
+            name,
+            bus_type,
+            constraint_form,
+            transition_tag,
+        }
     }
+}
+
+/// Optional bus declaration attributes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BusAttr {
+    Tag(ConstraintTag),
+    SumForm(BusSumForm),
+}
+
+/// Specifies how multiset bus constraints are reformulated.
+#[derive(Default, Copy, Hash, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BusConstraintForm {
+    /// Product form (generic): Π (f * v + (1 - f))
+    #[default]
+    Product,
+    /// Sum form (exclusive latches): Σ (f * v) + (1 - Σ f)
+    Sum,
 }
 #[derive(Default, Copy, Hash, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BusType {
@@ -93,6 +124,18 @@ pub enum BusType {
     Multiset,
     /// A logup bus
     Logup,
+}
+
+/// Arguments for the `@sum_form` bus attribute.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BusSumForm {
+    pub span: SourceSpan,
+    pub assume_exclusive: bool,
+}
+impl BusSumForm {
+    pub const fn new(span: SourceSpan, assume_exclusive: bool) -> Self {
+        Self { span, assume_exclusive }
+    }
 }
 
 impl fmt::Display for BusType {

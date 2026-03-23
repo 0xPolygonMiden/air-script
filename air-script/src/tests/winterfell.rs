@@ -53,6 +53,16 @@ fn buses_simple_with_evaluators() {
 }
 
 #[test]
+fn buses_sum_form() {
+    let generated_air = Test::new("src/tests/buses/buses_sum_form.air".to_string())
+        .transpile(Target::Winterfell)
+        .unwrap();
+
+    let expected = expect_file!["buses/buses_sum_form.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
 fn buses_varlen_boundary_both() {
     let generated_air = Test::new("src/tests/buses/buses_varlen_boundary_both.air".to_string())
         .transpile(Target::Winterfell)
@@ -79,6 +89,21 @@ fn buses_varlen_boundary_last() {
         .unwrap();
 
     let expected = expect_file!["buses/buses_varlen_boundary_last.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn comprehension_periodic_binding() {
+    // Test that comprehension bindings over periodic columns are typed as Local, not PeriodicColumn
+    // This pattern is used when iterating over a vector containing periodic column references
+    let generated_air = Test::new(
+        "src/tests/comprehension_periodic_binding/comprehension_periodic_binding.air".to_string(),
+    )
+    .transpile(Target::Winterfell)
+    .unwrap();
+
+    let expected =
+        expect_file!["comprehension_periodic_binding/comprehension_periodic_binding.rs"];
     expected.assert_eq(&generated_air);
 }
 
@@ -140,6 +165,18 @@ fn constraint_comprehension() {
             .unwrap();
 
     let expected = expect_file!["constraint_comprehension/constraint_comprehension.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn cross_module_constants() {
+    // Test that constants used in comprehension iterables work across module boundaries
+    let generated_air =
+        Test::new("src/tests/cross_module_constants/cross_module_constants.air".to_string())
+            .transpile(Target::Winterfell)
+            .unwrap();
+
+    let expected = expect_file!["cross_module_constants/cross_mod_constants.rs"];
     expected.assert_eq(&generated_air);
 }
 

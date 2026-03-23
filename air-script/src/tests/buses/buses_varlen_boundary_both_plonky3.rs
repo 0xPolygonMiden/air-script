@@ -104,7 +104,7 @@ where F: Field,
 
         // Aux integrity/transition constraints
         builder.when_transition().assert_zero_ext(((alpha.into() + beta_challenges[0].into()) * AB::ExprEF::from(main_current[0].clone().into()) + AB::ExprEF::ONE - AB::ExprEF::from(main_current[0].clone().into())) * AB::ExprEF::from(aux_current[0].clone().into()) - ((alpha.into() + beta_challenges[0].into()) * (AB::ExprEF::from(main_current[0].clone().into()) - AB::ExprEF::ONE) + AB::ExprEF::ONE - (AB::ExprEF::from(main_current[0].clone().into()) - AB::ExprEF::ONE)) * AB::ExprEF::from(aux_next[0].clone().into()));
-        builder.when_transition().assert_zero_ext((alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(aux_current[1].clone().into()) + (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(main_current[0].clone().into()) + (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(main_current[0].clone().into()) - ((alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(aux_next[1].clone().into()) + (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * (alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()).double()));
+        builder.when_transition().assert_zero_ext((alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(aux_next[1].clone().into()) + AB::ExprEF::from_u64(2) - ((alpha.into() + beta_challenges[0].into() + beta_challenges[1].into().double()) * AB::ExprEF::from(aux_current[1].clone().into()) + AB::ExprEF::from(main_current[0].clone().into()) + AB::ExprEF::from(main_current[0].clone().into())));
     }
 }
 
@@ -114,7 +114,7 @@ impl BusesAir {
           EF: ExtensionField<F>,
     {
         vec![
-            EF::ZERO,
+            EF::ONE,
             EF::ZERO,
         ]
     }
@@ -132,7 +132,7 @@ impl BusesAir {
         let periodic_values: [_; NUM_PERIODIC_VALUES] = periodic_evals.try_into().expect("Wrong number of periodic values");
         vec![
             (((alpha + beta_challenges[0]) * EF::from(main_current[0].clone()) + EF::ONE - EF::from(main_current[0].clone())) * EF::from(aux_current[0].clone())) * ((alpha + beta_challenges[0]) * (EF::from(main_current[0].clone()) - EF::ONE) + EF::ONE - (EF::from(main_current[0].clone()) - EF::ONE)).inverse(),
-            ((alpha + beta_challenges[0] + beta_challenges[1].double()) * (alpha + beta_challenges[0] + beta_challenges[1].double()) * (alpha + beta_challenges[0] + beta_challenges[1].double()) * EF::from(aux_current[1].clone()) + (alpha + beta_challenges[0] + beta_challenges[1].double()) * (alpha + beta_challenges[0] + beta_challenges[1].double()) * EF::from(main_current[0].clone()) + (alpha + beta_challenges[0] + beta_challenges[1].double()) * (alpha + beta_challenges[0] + beta_challenges[1].double()) * EF::from(main_current[0].clone()) - (alpha + beta_challenges[0] + beta_challenges[1].double()) * (alpha + beta_challenges[0] + beta_challenges[1].double()).double()) * ((alpha + beta_challenges[0] + beta_challenges[1].double()) * (alpha + beta_challenges[0] + beta_challenges[1].double()) * (alpha + beta_challenges[0] + beta_challenges[1].double())).inverse(),
+            ((alpha + beta_challenges[0] + beta_challenges[1].double()) * EF::from(aux_current[1].clone()) + EF::from(main_current[0].clone()) + EF::from(main_current[0].clone()) - EF::from_u64(2)) * (alpha + beta_challenges[0] + beta_challenges[1].double()).inverse(),
         ]
     }
 }

@@ -189,23 +189,23 @@ pub struct Air {
     pub public_inputs: BTreeMap<Identifier, PublicInput>,
     /// The total number of elements in the random values array
     pub num_random_values: u16,
+    /// Expected maximum constraint id (inclusive) when tag validation is enabled.
+    pub expected_max_constraint_id: Option<u64>,
     /// The constraints enforced by this program, in their algebraic graph representation.
     pub constraints: Constraints,
     /// The buses referenced by this program.
     ///
     /// Only their name, type, and the first and last boundary constraints are stored here.
     pub buses: BTreeMap<Identifier, Bus>,
-    /// Buses initial values used for auxiliary trace generation (indexed by bus index)
+    /// Buses initial values used for auxiliary trace generation (indexed by bus index).
     pub buses_initial_values: BTreeMap<usize, NodeIndex>,
-    /// Buses transition expressions used for auxiliary trace generation (indexed by bus index)
-    /// The tuple contains the numerator and an optional denominator operation (p_prime = numerator
-    /// if None or numerator / denominator), computed in the `ExpandBuses` Air pass depending on
-    /// the bus type
+    /// Buses transition expressions used for auxiliary trace generation (indexed by bus index).
+    /// The tuple contains the numerator and an optional denominator operation (p' = numerator if
+    /// None or numerator / denominator), computed in the `ExpandBuses` Air pass depending on the
+    /// bus type.
     /// - for multiset buses: p' = p * columns_inserted_in_bus / columns_removed_from_bus
     /// - for logup buses, if u corresponds to the columns inserted when s1 and v to the columns
-    ///   removed when s2
-    /// q' = q + s1 / u - s2 / v
-    ///    = (q * u * v + s1 * v - s2 * u) / (u * v)
+    ///   removed when s2: q' = q + s1 / u - s2 / v = (q * u * v + s1 * v - s2 * u) / (u * v)
     pub buses_transitions: BTreeMap<usize, (NodeIndex, Option<NodeIndex>)>,
 }
 impl Default for Air {
@@ -227,6 +227,7 @@ impl Air {
             periodic_columns: Default::default(),
             public_inputs: Default::default(),
             num_random_values: 0,
+            expected_max_constraint_id: None,
             constraints: Default::default(),
             buses: Default::default(),
             buses_initial_values: Default::default(),

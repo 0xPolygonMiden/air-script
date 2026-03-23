@@ -6,6 +6,9 @@ mod buses_complex;
 mod buses_simple;
 #[rustfmt::skip]
 #[allow(clippy::all)]
+mod buses_sum_form;
+#[rustfmt::skip]
+#[allow(clippy::all)]
 mod buses_varlen_boundary_both;
 #[rustfmt::skip]
 #[allow(clippy::all)]
@@ -22,6 +25,10 @@ mod buses_complex_plonky3;
 #[allow(clippy::all)]
 #[allow(unused_imports)]
 mod buses_simple_plonky3;
+#[rustfmt::skip]
+#[allow(clippy::all)]
+#[allow(unused_imports)]
+mod buses_sum_form_plonky3;
 #[rustfmt::skip]
 #[allow(clippy::all)]
 #[allow(unused_imports)]

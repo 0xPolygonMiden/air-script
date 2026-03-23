@@ -26,11 +26,34 @@ impl Pass for MirPasses<'_> {
     type Error = CompileError;
 
     fn run<'a>(&mut self, input: Self::Input<'a>) -> Result<Self::Output<'a>, Self::Error> {
-        let mut passes = passes::AstToMir::new(self.diagnostics)
-            .chain(passes::Inlining::new(self.diagnostics))
-            .chain(passes::Unrolling::new(self.diagnostics))
-            .chain(passes::ConstantPropagation::new(self.diagnostics));
-        passes.run(input)
+        let mut ast_to_mir = passes::AstToMir::new(self.diagnostics);
+        let mir = ast_to_mir.run(input)?;
+
+        let mir = if std::env::var("AIR_DISABLE_INDEX_PROJECTION").is_ok() {
+            mir
+        } else {
+            let mut projection = passes::IndexProjection::new(self.diagnostics);
+            projection.run(mir)?
+        };
+
+        let mut inlining = passes::Inlining::new(self.diagnostics);
+        let mir = inlining.run(mir)?;
+
+        // AIR_DISABLE_MIR_CSE disables the MIR common subexpression elimination pass.
+        let mir = if std::env::var("AIR_DISABLE_MIR_CSE").is_ok() {
+            mir
+        } else {
+            let mut cse = passes::Cse::new();
+            cse.run(mir)?
+        };
+
+        let mut unrolling = passes::Unrolling::new(self.diagnostics);
+        let mir = unrolling.run(mir)?;
+
+        let mut constant_prop = passes::ConstantPropagation::new(self.diagnostics);
+        let mir = constant_prop.run(mir)?;
+
+        Ok(mir)
     }
 }
 

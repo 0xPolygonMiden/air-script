@@ -87,7 +87,10 @@ fn err_bc_empty() {
         enf clk' = clk + 1;
     }";
 
-    expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
+    expect_diagnostic(
+        source,
+        "expected one of: '\"@\"', '\"enf\"', '\"let\"', '\"return\"', 'identifier'",
+    );
 }
 
 #[test]
@@ -127,7 +130,10 @@ fn err_ic_empty() {
     }
     integrity_constraints {}";
 
-    expect_diagnostic(source, "expected one of: '\"enf\"', '\"let\"'");
+    expect_diagnostic(
+        source,
+        "expected one of: '\"@\"', '\"enf\"', '\"let\"', '\"return\"', 'identifier'",
+    );
 }
 
 #[test]

@@ -1,5 +1,10 @@
+//! MIR utility helpers.
+//!
+//! Includes helpers for traversing roots, stripping spans, and shareability checks
+//! used by caching/interning passes.
+
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap, HashSet},
     hash::{DefaultHasher, Hash, Hasher},
 };
 
@@ -9,6 +14,7 @@ use pretty_assertions::assert_eq;
 
 use crate::{CompileError, ir::*, passes::Visitor};
 
+/// Strip spans from all MIR nodes (used in tests and canonicalization).
 pub fn strip_spans(mir: &mut Mir) {
     let graph = mir.constraint_graph_mut();
     let mut visitor = StripSpansVisitor::default();
@@ -20,12 +26,14 @@ pub fn strip_spans(mir: &mut Mir) {
     }
 }
 
+/// Visitor used by `strip_spans`.
 #[derive(Default)]
 pub struct StripSpansVisitor {
     _done: BTreeMap<usize, bool>,
     work_stack: Vec<Link<Node>>,
 }
 
+/// Extract selected root nodes from the graph.
 pub fn extract_roots(
     graph: &Graph,
     include_boundary: bool,
@@ -65,28 +73,125 @@ pub fn extract_roots(
     nodes
 }
 
+/// Extract all root nodes from the graph.
 pub fn extract_all_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, true, true, true, true, true)
 }
 
+/// Extract boundary constraint roots.
 pub fn extract_boundary_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, true, false, false, false, false)
 }
 
+/// Extract integrity constraint roots.
 pub fn extract_integrity_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, true, false, false, false)
 }
 
+/// Extract bus constraint roots.
 pub fn extract_bus_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, false, true, false, false)
 }
 
+/// Extract function roots.
 pub fn extract_function_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, false, false, true, false)
 }
 
+/// Extract evaluator roots.
 pub fn extract_evaluator_roots(graph: &Graph) -> Vec<Link<Node>> {
     extract_roots(graph, false, false, false, false, true)
+}
+
+/// Conservative shareability predicate for ops.
+///
+/// Used to gate caching/interning to avoid accidental semantic changes.
+pub fn is_shareable_op(op: &Op) -> bool {
+    matches!(
+        op,
+        Op::Value(_)
+            | Op::Parameter(_)
+            | Op::Add(_)
+            | Op::Sub(_)
+            | Op::Mul(_)
+            | Op::Exp(_)
+            | Op::Vector(_)
+            | Op::Matrix(_)
+            | Op::Accessor(_)
+    )
+}
+
+/// Conservative shareability predicate for roots.
+///
+/// Only functions with fully shareable bodies are considered shareable.
+pub fn is_shareable_root(root: &Link<Root>) -> bool {
+    let mut memo = HashMap::new();
+    let mut visiting = HashSet::new();
+    is_shareable_root_inner(root, &mut memo, &mut visiting)
+}
+
+fn is_shareable_root_inner(
+    root: &Link<Root>,
+    memo: &mut HashMap<usize, bool>,
+    visiting: &mut HashSet<usize>,
+) -> bool {
+    let root_ptr = root.get_ptr();
+    if let Some(result) = memo.get(&root_ptr) {
+        return *result;
+    }
+    if !visiting.insert(root_ptr) {
+        // Cycles are not shareable.
+        return false;
+    }
+
+    let body = {
+        let root_ref = root.borrow();
+        match &*root_ref {
+            Root::Function(f) => f.body.clone(),
+            _ => {
+                memo.insert(root_ptr, false);
+                visiting.remove(&root_ptr);
+                return false;
+            },
+        }
+    };
+
+    let mut stack: Vec<Link<Op>> = body.borrow().iter().cloned().collect();
+    let mut seen = HashSet::new();
+
+    while let Some(op) = stack.pop() {
+        let ptr = op.get_ptr();
+        if !seen.insert(ptr) {
+            continue;
+        }
+        let op_ref = op.borrow();
+        match &*op_ref {
+            Op::Call(call) => {
+                let callee = call.function.clone();
+                let is_callee_shareable = matches!(*callee.borrow(), Root::Function(_))
+                    && is_shareable_root_inner(&callee, memo, visiting);
+                if !is_callee_shareable {
+                    memo.insert(root_ptr, false);
+                    visiting.remove(&root_ptr);
+                    return false;
+                }
+            },
+            _ => {
+                if !is_shareable_op(&op_ref) {
+                    memo.insert(root_ptr, false);
+                    visiting.remove(&root_ptr);
+                    return false;
+                }
+            },
+        }
+        for child in op_ref.children().borrow().iter() {
+            stack.push(child.clone());
+        }
+    }
+
+    visiting.remove(&root_ptr);
+    memo.insert(root_ptr, true);
+    true
 }
 
 impl Visitor for StripSpansVisitor {

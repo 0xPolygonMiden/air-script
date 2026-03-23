@@ -1,0 +1,212 @@
+##########################################################################################
+# ACE CHIPLET CONSTRAINTS MODULE
+##########################################################################################
+#
+# The ACE (Arithmetic Circuit Evaluation) chiplet reduces the number of cycles required
+# when recursively verifying a STARK proof by evaluating arithmetic circuits and ensuring
+# they evaluate to zero.
+##########################################################################################
+
+mod ace
+
+use chiplets::*;
+use utils::*;
+
+##########################################################################################
+# ACE CHIPLET CONSTRAINTS
+##########################################################################################
+
+ev ace_chiplet([chiplets[20]]) {
+    # Chiplet selector columns.
+    let s0_sel = chiplets[0];
+    let s1_sel = chiplets[1];
+    let s2_sel = chiplets[2];
+    let s3_sel = chiplets[3];
+    let s3_next = s3_sel';
+
+    let ace_flag = ace_chiplet_flag(s0_sel, s1_sel, s2_sel, s3_sel);
+    let memory_flag = memory_chiplet_flag(s0_sel, s1_sel, s2_sel);
+
+    # ACE columns (after selectors).
+    let ace_sstart = chiplets[4];
+    let ace_sblock = chiplets[5];
+    let ace_ctx = chiplets[6];
+    let ace_ptr = chiplets[7];
+    let ace_clk = chiplets[8];
+    let ace_op = chiplets[9];
+    let ace_id0 = chiplets[10];
+    let ace_v0_0 = chiplets[11];
+    let ace_v0_1 = chiplets[12];
+    let ace_id1 = chiplets[13];
+    let ace_v1_0 = chiplets[14];
+    let ace_v1_1 = chiplets[15];
+    let ace_n_eval = chiplets[16];
+    let ace_v2_0 = chiplets[17];
+    let ace_v2_1 = chiplets[18];
+    # m0 is used by chiplet bus constraints (not enforced in this module).
+    let ace_m0 = chiplets[19];
+    # m1 is stored in v2_1 on READ rows.
+    let ace_m1 = ace_v2_1;
+
+    let ace_sstart_next = ace_sstart';
+    let ace_sblock_next = ace_sblock';
+    let ace_ctx_next = ace_ctx';
+    let ace_ptr_next = ace_ptr';
+    let ace_clk_next = ace_clk';
+    let ace_id0_next = ace_id0';
+    let ace_n_eval_next = ace_n_eval';
+
+    # ace_flag_next: next row is still ACE (not transitioning out).
+    # ace_flag_last: next row transitions out of ACE (this row is the last ACE row).
+    let ace_flag_next = !s3_next;
+    let ace_flag_last = s3_next;
+
+    # -------------------------------------------------------------------------
+    # Binary constraints.
+    # -------------------------------------------------------------------------
+    let ace_binary = [ace_sstart, ace_sblock];
+    enf bit^2 = bit for bit in ace_binary when ace_flag;
+
+    # -------------------------------------------------------------------------
+    # Section and block flag constraints.
+    # -------------------------------------------------------------------------
+    let ace_f_next = !ace_sstart_next;
+    # f_end is active on the last row of a section (either sstart' or ACE is ending).
+    let ace_f_end = binary_or(ace_flag_next * ace_sstart_next, ace_flag_last);
+
+    # Last row of ACE chiplet cannot be section start.
+    enf ace_sstart = 0 when ace_flag * ace_flag_last;
+
+    # Prevent consecutive section starts within ACE chiplet.
+    enf ace_sstart_next = 0 when ace_flag * ace_flag_next * ace_sstart;
+
+    # Sections must start with READ blocks (not EVAL).
+    enf ace_sblock = 0 when ace_flag * ace_sstart;
+
+    # EVAL blocks cannot be followed by READ blocks within same section.
+    enf !ace_sblock_next = 0 when ace_flag * ace_flag_next * ace_f_next * ace_sblock;
+
+    # Sections must end with EVAL blocks (not READ).
+    enf !ace_sblock = 0 when ace_flag * ace_f_end;
+
+    # -------------------------------------------------------------------------
+    # Section constraints (within section).
+    # -------------------------------------------------------------------------
+    let ace_f_read = !ace_sblock;
+    let ace_f_eval = ace_sblock;
+    let ace_within_section_gate = ace_flag * ace_flag_next * !ace_sstart_next;
+
+    # ptr increments by +4 in READ, +1 in EVAL.
+    let ace_expected_next_ptr = ace_ptr + 4 * ace_f_read + ace_f_eval;
+    # id0 decrements by 2 in READ, 1 in EVAL.
+    let ace_expected_id0 = ace_id0_next + 2 * ace_f_read + ace_f_eval;
+
+    enf ace_ctx_next = ace_ctx when ace_within_section_gate;
+    enf ace_clk_next = ace_clk when ace_within_section_gate;
+    enf ace_ptr_next = ace_expected_next_ptr when ace_within_section_gate;
+    enf ace_id0 = ace_expected_id0 when ace_within_section_gate;
+
+    # -------------------------------------------------------------------------
+    # READ block constraints.
+    # -------------------------------------------------------------------------
+    let ace_read_gate = ace_flag * ace_f_read;
+    enf ace_id1 = ace_id0 - 1 when ace_read_gate;
+
+    let ace_f_read_next = !ace_sblock_next;
+    let ace_f_eval_next = ace_sblock_next;
+    # n_eval stores (num_eval_rows - 1), so READ->EVAL switches when id0' == n_eval.
+    # This selects n_eval' on READ rows and id0' on EVAL rows.
+    let ace_selected = ace_f_read_next * ace_n_eval_next + ace_f_eval_next * ace_id0_next;
+    enf ace_selected = ace_n_eval when ace_read_gate;
+
+    # -------------------------------------------------------------------------
+    # EVAL block constraints.
+    # -------------------------------------------------------------------------
+    let ace_eval_gate = ace_flag * ace_f_eval;
+    enf ace_op * (ace_op - 1) * (ace_op + 1) = 0 when ace_eval_gate;
+
+    let ace_linear_0 = ace_v1_0 + ace_op * ace_v2_0;
+    let ace_linear_1 = ace_v1_1 + ace_op * ace_v2_1;
+    let ace_a0b0 = ace_v1_0 * ace_v2_0;
+    let ace_a1b1 = ace_v1_1 * ace_v2_1;
+    let ace_nonlinear_0 = ace_a0b0 + 7 * ace_a1b1;
+    let ace_nonlinear_1 = ace_v1_0 * ace_v2_1 + ace_v1_1 * ace_v2_0;
+    let ace_op_square = ace_op * ace_op;
+    let ace_expected_0 = select(ace_op_square, ace_linear_0, ace_nonlinear_0);
+    let ace_expected_1 = select(ace_op_square, ace_linear_1, ace_nonlinear_1);
+    enf ace_expected_0 = ace_v0_0 when ace_eval_gate;
+    enf ace_expected_1 = ace_v0_1 when ace_eval_gate;
+
+    # -------------------------------------------------------------------------
+    # Finalization constraints.
+    # -------------------------------------------------------------------------
+    let ace_final_gate = ace_flag * ace_f_end;
+    let ace_final_zero = [ace_v0_0, ace_v0_1, ace_id0];
+    enf c = 0 for c in ace_final_zero when ace_final_gate;
+
+    # -------------------------------------------------------------------------
+    # First row constraints.
+    # -------------------------------------------------------------------------
+    let ace_next = s2_sel' * !s3_next;
+    let ace_first_row_gate = memory_flag * ace_next;
+    enf ace_sstart_next = 1 when ace_first_row_gate;
+
+    # -------------------------------------------------------------------------
+    # Chiplets bus response (ACE_INIT).
+    # -------------------------------------------------------------------------
+    let ace_n_eval_rows = ace_n_eval + 1;
+    let ace_nread = ace_id0 + 1 - ace_n_eval_rows;
+    bus_6_chiplets_bus.insert(ACEINIT, ace_clk, ace_ctx, ace_ptr, ace_nread, ace_n_eval_rows)
+        when (ace_flag * ace_sstart);
+
+    # -------------------------------------------------------------------------
+    # Wiring bus operations.
+    # -------------------------------------------------------------------------
+    # Wiring bus verifies the circuit wiring by ensuring inserted nodes are later consumed
+    # the claimed number of times (LogUp running-sum).
+    # - READ rows insert the two input nodes (id0, id1) with multiplicities m0, m1.
+    # - EVAL rows consume the two input nodes (id1, id2) once each, then insert the result id0
+    #   with multiplicity m0 (its remaining fan-out).
+    let ace_id2 = ace_n_eval;
+
+    # READ: insert id0/id1 with their fan-out multiplicities.
+    let ace_m0_read = ace_m0 * ace_f_read;
+    let ace_m1_read = ace_m1 * ace_f_read;
+    bus_7_wiring_bus.insert(ace_clk, ace_ctx, ace_id0, ace_v0_0, ace_v0_1)
+        with (ace_flag * ace_m0_read);
+    bus_7_wiring_bus.insert(ace_clk, ace_ctx, ace_id1, ace_v1_0, ace_v1_1)
+        with (ace_flag * ace_m1_read);
+
+    # EVAL: consume the two input wires and insert the result wire.
+    let ace_m0_eval = ace_m0 * ace_f_eval;
+    let ace_consume_gate = ace_flag * ace_f_eval;
+    bus_7_wiring_bus.remove(ace_clk, ace_ctx, ace_id1, ace_v1_0, ace_v1_1)
+        with ace_consume_gate;
+    bus_7_wiring_bus.remove(ace_clk, ace_ctx, ace_id2, ace_v2_0, ace_v2_1)
+        with ace_consume_gate;
+    bus_7_wiring_bus.insert(ace_clk, ace_ctx, ace_id0, ace_v0_0, ace_v0_1)
+        with (ace_flag * ace_m0_eval);
+
+    # -------------------------------------------------------------------------
+    # Hash-kernel bus operations (ACE memory reads).
+    # -------------------------------------------------------------------------
+    # READ rows fetch two extension elements (word read).
+    # Message layout: label + ctx + ptr + clk + v0 + v1.
+    bus_5_v_table.remove(
+        MEMREADWORD,
+        ace_ctx,
+        ace_ptr,
+        ace_clk,
+        ace_v0_0,
+        ace_v0_1,
+        ace_v1_0,
+        ace_v1_1
+    ) when (ace_flag * ace_f_read);
+
+    # EVAL rows fetch the instruction element (element read).
+    # Message layout: label + ctx + ptr + clk + instruction.
+    let ace_instruction =
+        ace_id1 + ace_id2 * ACEINSTRUCTIONIDONEOFFSET + (ace_op + 1) * ACEINSTRUCTIONIDTWOOFFSET;
+    bus_5_v_table.remove(MEMREADELEMENT, ace_ctx, ace_ptr, ace_clk, ace_instruction)
+        when (ace_flag * ace_f_eval);
+}

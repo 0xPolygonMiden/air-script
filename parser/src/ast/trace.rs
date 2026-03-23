@@ -287,7 +287,7 @@ impl TraceBinding {
                 let range_expr1 = range_expr1.to_slice_range();
                 let combined_range =
                     (range_expr.start + range_expr1.start)..(range_expr.end + range_expr1.end);
-                AccessType::Slice(combined_range.into())
+                AccessType::Slice(Box::new(combined_range.into()))
             },
             (AccessType::Slice(range_expr), AccessType::Index(index_expr)) => {
                 let range_expr_usize = range_expr.to_slice_range();

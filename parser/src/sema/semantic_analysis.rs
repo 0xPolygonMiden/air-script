@@ -116,6 +116,10 @@ impl<'a> SemanticAnalysis<'a> {
             return Err(err);
         }
 
+        if module.is_root() && self.module_has_tags(module) {
+            self.reference_current_max_id(module)?;
+        }
+
         // If this is the root module, we may have top-level dependencies
         if module.path.0.item == vec![self.program.name] {
             // Update the dependency graph with the collected information
@@ -143,6 +147,61 @@ impl<'a> SemanticAnalysis<'a> {
             );
         }
 
+        Ok(())
+    }
+
+    fn module_has_tags(&self, module: &Module) -> bool {
+        fn visit_statements(statements: &[Statement]) -> bool {
+            for statement in statements {
+                match statement {
+                    Statement::Enforce(enf) => {
+                        if enf.tag.is_some() {
+                            return true;
+                        }
+                    },
+                    Statement::EnforceAll(list_comp) => {
+                        if list_comp.tag.is_some() {
+                            return true;
+                        }
+                    },
+                    Statement::Let(let_stmt) => {
+                        if visit_statements(&let_stmt.body) {
+                            return true;
+                        }
+                    },
+                    Statement::EnforceIf(_) | Statement::BusEnforce(_) | Statement::Expr(_) => {},
+                }
+            }
+            false
+        }
+
+        if let Some(boundary) = &module.boundary_constraints
+            && visit_statements(&boundary.item)
+        {
+            return true;
+        }
+        if let Some(integrity) = &module.integrity_constraints
+            && visit_statements(&integrity.item)
+        {
+            return true;
+        }
+        for evaluator in module.evaluators.values() {
+            if visit_statements(&evaluator.body) {
+                return true;
+            }
+        }
+        module.buses.values().any(|bus| bus.transition_tag.is_some())
+    }
+
+    fn reference_current_max_id(&mut self, module: &Module) -> Result<(), SemanticAnalysisError> {
+        let ident = Identifier::new(SourceSpan::UNKNOWN, Symbol::intern("CURRENT_MAX_ID"));
+        if !module.constants.contains_key(&ident) {
+            // Missing constant is reported later during MIR translation when tags are validated.
+            return Ok(());
+        }
+        let qid =
+            QualifiedIdentifier::new(module.path.clone(), NamespacedIdentifier::Binding(ident));
+        self.referenced.insert(qid, DependencyType::Constant);
         Ok(())
     }
 }
@@ -444,9 +503,9 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
             self.current_module.clone().unwrap(),
             NamespacedIdentifier::Function(function.name),
         );
-        let current_item_node_index = self.deps_graph.add_node(current_item);
-        for (referenced_item, ref_type) in self.referenced.iter() {
-            let referenced_item_node_index = self.deps_graph.add_node(referenced_item.clone());
+        let current_item_node_index = self.get_node_index_or_add(&current_item);
+        for (referenced_item, ref_type) in self.referenced.clone().iter() {
+            let referenced_item_node_index = self.get_node_index_or_add(referenced_item);
             self.deps_graph.add_edge(
                 current_item_node_index,
                 referenced_item_node_index,
@@ -534,6 +593,39 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         self.in_constraint_comprehension = true;
         let result = self.visit_mut_list_comprehension(expr);
         self.in_constraint_comprehension = false;
+        if result.is_break() {
+            return result;
+        }
+
+        if let Some(tag_spec) = expr.tag.as_ref() {
+            let expected_len = match expr.ty {
+                Some(Type::Vector(len)) => len,
+                Some(Type::Matrix(rows, cols)) => rows * cols,
+                _ => {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("unable to validate comprehension tag length")
+                        .with_primary_label(
+                            expr.span(),
+                            "comprehension length could not be inferred",
+                        )
+                        .emit();
+                    return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                },
+            };
+            let tag_len = tag_spec.len();
+            if tag_len != expected_len {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("constraint tag count does not match comprehension length")
+                    .with_primary_label(
+                        tag_spec.span(),
+                        format!("expected {expected_len} tags, got {tag_len}"),
+                    )
+                    .emit();
+                return ControlFlow::Break(SemanticAnalysisError::Invalid);
+            }
+        }
 
         result
     }
@@ -556,13 +648,79 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
         // Start new lexical scope for the body
         self.locals.enter();
 
-        // Check if the new binding shadows a previous local declaration
-        let namespaced_name = NamespacedIdentifier::Binding(expr.name);
-        if let Some(prev) = self.locals.get_key(&namespaced_name) {
-            self.warn_declaration_shadowed(expr.name.span(), prev.span());
-        } else {
-            let binding_ty = self.expr_binding_type(&expr.value).unwrap();
-            self.locals.insert(NamespacedIdentifier::Binding(expr.name), binding_ty);
+        let binding_names = expr.binding.names();
+        let mut bound = HashSet::<Identifier>::default();
+        for name in binding_names.iter().copied() {
+            if let Some(prev) = bound.get(&name) {
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("invalid binding in let statement")
+                    .with_primary_label(
+                        name.span(),
+                        "this name is already bound in this let statement",
+                    )
+                    .with_secondary_label(prev.span(), "previously bound here")
+                    .emit();
+                return ControlFlow::Break(SemanticAnalysisError::NameConflict(name.span()));
+            }
+            bound.insert(name);
+        }
+
+        let binding_ty = self.expr_binding_type(&expr.value).unwrap();
+        let expected_len = binding_names.len();
+        if matches!(expr.binding, LetBinding::Vector(_)) {
+            match binding_ty.ty() {
+                Some(Type::Vector(len)) if len == expected_len => {},
+                Some(Type::Vector(len)) => {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("let binding count does not match vector length")
+                        .with_primary_label(
+                            expr.span(),
+                            format!("expected {len} bindings, got {expected_len}"),
+                        )
+                        .emit();
+                    return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                },
+                _ => {
+                    self.diagnostics
+                        .diagnostic(Severity::Error)
+                        .with_message("let binding expects a vector value")
+                        .with_primary_label(expr.span(), "value must be a vector expression")
+                        .emit();
+                    return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                },
+            }
+        }
+
+        for (idx, name) in binding_names.iter().copied().enumerate() {
+            // Check if the new binding shadows a previous local declaration
+            let namespaced_name = NamespacedIdentifier::Binding(name);
+            if let Some(prev) = self.locals.get_key(&namespaced_name) {
+                self.warn_declaration_shadowed(name.span(), prev.span());
+            } else {
+                let element_ty =
+                    if expected_len == 1 && matches!(expr.binding, LetBinding::Single(_)) {
+                        binding_ty.clone()
+                    } else {
+                        let idx_expr = ScalarExpr::Const(Span::new(expr.value.span(), idx as u64));
+                        match binding_ty.access(AccessType::Index(Box::new(idx_expr))) {
+                            Ok(ty) => ty,
+                            Err(_) => {
+                                self.diagnostics
+                                    .diagnostic(Severity::Error)
+                                    .with_message("invalid let binding access")
+                                    .with_primary_label(
+                                        expr.span(),
+                                        "unable to index into binding value",
+                                    )
+                                    .emit();
+                                return ControlFlow::Break(SemanticAnalysisError::Invalid);
+                            },
+                        }
+                    };
+                self.locals.insert(NamespacedIdentifier::Binding(name), element_ty);
+            }
         }
 
         // Visit the let body
@@ -633,6 +791,15 @@ impl VisitMut<SemanticAnalysisError> for SemanticAnalysis<'_> {
                             0,
                         )))))
                         .expect("unexpected scalar iterable");
+                    // Comprehension bindings are local variables holding values, not direct
+                    // references to module-level declarations like periodic columns or constants.
+                    // Convert these to Local bindings to ensure proper scoping.
+                    let binding_ty = match binding_ty {
+                        BindingType::PeriodicColumn(_) | BindingType::Constant(_) => {
+                            BindingType::Local(binding_ty.ty().unwrap_or(Type::Felt))
+                        },
+                        other => other,
+                    };
                     binding_tys.push((binding, iterable.span(), Some(binding_ty)));
                 },
                 Err(InvalidAccessError::InvalidBinding) => {

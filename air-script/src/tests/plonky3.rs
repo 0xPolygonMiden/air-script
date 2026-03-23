@@ -41,6 +41,17 @@ fn buses_simple() {
     let expected = expect_file!["buses/buses_simple_plonky3.rs"];
     expected.assert_eq(&generated_air);
 }
+
+#[test]
+fn buses_sum_form() {
+    let generated_air = Test::new("src/tests/buses/buses_sum_form.air".to_string())
+        .transpile(Target::Plonky3)
+        .unwrap();
+
+    let expected = expect_file!["buses/buses_sum_form_plonky3.rs"];
+    expected.assert_eq(&generated_air);
+}
+
 #[test]
 fn buses_simple_with_evaluators() {
     let generated_air = Test::new("src/tests/buses/buses_simple_with_evaluators.air".to_string())
@@ -78,6 +89,21 @@ fn buses_varlen_boundary_last() {
         .unwrap();
 
     let expected = expect_file!["buses/buses_varlen_boundary_last_plonky3.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn comprehension_periodic_binding() {
+    // Test that comprehension bindings over periodic columns are typed as Local, not PeriodicColumn
+    // This pattern is used when iterating over a vector containing periodic column references
+    let generated_air = Test::new(
+        "src/tests/comprehension_periodic_binding/comprehension_periodic_binding.air".to_string(),
+    )
+    .transpile(Target::Plonky3)
+    .unwrap();
+
+    let expected =
+        expect_file!["comprehension_periodic_binding/comprehension_periodic_binding_plonky3.rs"];
     expected.assert_eq(&generated_air);
 }
 
@@ -120,6 +146,18 @@ fn constants() {
         .unwrap();
 
     let expected = expect_file!["constants/constants_plonky3.rs"];
+    expected.assert_eq(&generated_air);
+}
+
+#[test]
+fn cross_module_constants() {
+    // Test that constants used in comprehension iterables work across module boundaries
+    let generated_air =
+        Test::new("src/tests/cross_module_constants/cross_module_constants.air".to_string())
+            .transpile(Target::Plonky3)
+            .unwrap();
+
+    let expected = expect_file!["cross_module_constants/cross_mod_constants_plonky3.rs"];
     expected.assert_eq(&generated_air);
 }
 

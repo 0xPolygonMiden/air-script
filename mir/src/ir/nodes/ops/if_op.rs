@@ -1,6 +1,6 @@
 use miden_diagnostics::{SourceSpan, Spanned};
 
-use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singleton};
+use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, OwnerId, Parent, Singleton};
 
 /// A MIR operation to represent conditional constraints
 ///
@@ -14,6 +14,7 @@ use crate::ir::{BackLink, Builder, Child, Link, Node, Op, Owner, Parent, Singlet
 pub struct If {
     pub parents: Vec<BackLink<Owner>>,
     pub match_arms: Link<Vec<MatchArm>>,
+    pub owner_id: OwnerId,
     pub _node: Singleton<Node>,
     pub _owner: Singleton<Owner>,
     #[span]
@@ -37,6 +38,7 @@ impl If {
         Op::If(Self {
             match_arms: match_arms.into(),
             span,
+            owner_id: OwnerId::next(),
             ..Default::default()
         })
         .into()

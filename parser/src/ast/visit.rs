@@ -558,7 +558,7 @@ where
 {
     match expr {
         ast::Statement::Let(expr) => visitor.visit_mut_let(expr),
-        ast::Statement::Enforce(expr) => visitor.visit_mut_enforce(expr),
+        ast::Statement::Enforce(enf) => visitor.visit_mut_enforce(&mut enf.expr),
         ast::Statement::EnforceIf(match_expr) => visitor.visit_mut_enforce_if(match_expr),
         ast::Statement::EnforceAll(expr) => visitor.visit_mut_enforce_all(expr),
         ast::Statement::Expr(expr) => visitor.visit_mut_expr(expr),
@@ -571,7 +571,16 @@ where
     V: ?Sized + VisitMut<T>,
 {
     visitor.visit_mut_expr(&mut expr.value)?;
-    visitor.visit_mut_identifier(&mut expr.name)?;
+    match &mut expr.binding {
+        ast::LetBinding::Single(name) => {
+            visitor.visit_mut_identifier(name)?;
+        },
+        ast::LetBinding::Vector(names) => {
+            for name in names.iter_mut() {
+                visitor.visit_mut_identifier(name)?;
+            }
+        },
+    }
     for statement in expr.body.iter_mut() {
         visitor.visit_mut_statement(statement)?;
     }

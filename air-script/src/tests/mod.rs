@@ -5,6 +5,8 @@ mod bitwise;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod buses;
 #[allow(unused_variables, dead_code, unused_mut)]
+mod comprehension_periodic_binding;
+#[allow(unused_variables, dead_code, unused_mut)]
 mod computed_indices;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod constant_in_range;
@@ -12,6 +14,8 @@ mod constant_in_range;
 mod constants;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod constraint_comprehension;
+#[allow(unused_variables, dead_code, unused_mut)]
+mod cross_module_constants;
 #[allow(unused_variables, dead_code, unused_mut)]
 mod evaluators;
 #[allow(unused_variables, dead_code, unused_mut)]

@@ -1,3 +1,8 @@
+//! Unrolling first pass.
+//!
+//! Traverses the graph, unrolling most nodes and collecting `For` contexts
+//! for the second pass.
+
 use std::{collections::HashMap, ops::Deref};
 
 use miden_diagnostics::{DiagnosticsHandler, Spanned};
@@ -5,17 +10,18 @@ use miden_diagnostics::{DiagnosticsHandler, Spanned};
 use crate::{
     CompileError,
     ir::{
-        Accessor, ConstantValue, Graph, Link, MirAccessType, MirType, MirValue, Node, Op, Owner,
+        Accessor, ConstantValue, Graph, Link, MirAccessType, MirType, MirValue, Node, Op, OwnerId,
         Parameter, Parent, SpannedMirValue, Value, Vector,
     },
     passes::{
-        Visitor, handle_accessor_visit,
+        Visitor, handle_accessor_visit, should_skip_accessor_unroll,
         unrolling::{
             ForInliningContext, visit_enf_bis, visit_fold_bis, visit_value_bis, visit_vector_bis,
         },
     },
 };
 
+/// First pass of unrolling: records `For` contexts and rewrites other nodes.
 pub struct UnrollingFirstPass<'a> {
     #[allow(unused)]
     diagnostics: &'a DiagnosticsHandler,
@@ -26,20 +32,17 @@ pub struct UnrollingFirstPass<'a> {
     // pass
     pub bodies_to_inline: Vec<(Link<Op>, ForInliningContext)>,
     // We keep track of all parameters referencing a given For node
-    params_for_ref_node: HashMap<usize, Vec<Link<Op>>>,
-    // We keep a reference to For nodes in order to avoid the backlinks stored in Parameters
-    // referencing them to be dropped
-    pub all_for_nodes: HashMap<usize, (Link<Op>, Link<Owner>)>,
+    params_for_ref_node: HashMap<OwnerId, Vec<Link<Op>>>,
 }
 
 impl<'a> UnrollingFirstPass<'a> {
+    /// Construct a new first-pass unroller.
     pub fn new(diagnostics: &'a DiagnosticsHandler) -> Self {
         Self {
             diagnostics,
             work_stack: vec![],
             bodies_to_inline: vec![],
             params_for_ref_node: HashMap::new(),
-            all_for_nodes: HashMap::new(),
         }
     }
 }
@@ -55,19 +58,27 @@ impl UnrollingFirstPass<'_> {
         // FIXME: Just check that the parameter is a scalar, raise diag otherwise
         // List comprehension bodies should only be scalar expressions
 
-        let owner_ref =
-            parameter.as_parameter().unwrap().ref_node.to_link().expect("Invalid Ref node");
+        let param_ref = parameter.as_parameter().unwrap();
+        if param_ref.owner_id.is_unknown() {
+            return Err(CompileError::Failed);
+        }
 
         self.params_for_ref_node
-            .entry(owner_ref.get_ptr())
+            .entry(param_ref.owner_id)
             .or_default()
             .push(parameter.clone());
         Ok(None)
     }
 
     fn visit_accessor_bis(&mut self, accessor: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-        let accessor_ref = accessor.as_accessor().unwrap();
+        let Some(accessor_ref) = accessor.as_accessor() else {
+            // This node may have been rewritten already; skip stale accessors.
+            return Ok(None);
+        };
         let indexable = accessor_ref.indexable.clone();
+        if should_skip_accessor_unroll(&indexable) {
+            return Ok(None);
+        }
         if indexable.clone().as_parameter().is_none() {
             handle_accessor_visit(accessor.clone(), false, self.diagnostics)
         } else {
@@ -83,19 +94,27 @@ impl UnrollingFirstPass<'_> {
         //   depending on the binding)
         // If there is a selector, we need to enforce the selector on the body
 
-        let for_node_clone = for_node.clone();
-        let for_ref = for_node_clone.as_for().unwrap();
-        let iterators_ref = for_ref.iterators.borrow();
-        let iterators = iterators_ref.deref();
-        let expr = for_ref.expr.clone();
-        let selector = for_ref.selector.clone();
+        let (iterators, expr, selector, for_span) = {
+            let for_ref = for_node.as_for().unwrap();
+            let iterators = for_ref.iterators.borrow().clone();
+            let expr = for_ref.expr.clone();
+            let selector = for_ref.selector.clone();
+            let span = for_ref.span();
+            (iterators, expr, selector, span)
+        };
 
-        let iterator_expected_len = validate_iterators_and_get_expected_len(iterators);
-
+        let ref_owner_id = for_node.as_owner().unwrap().owner_id();
+        let iterator_expected_len = validate_iterators_and_get_expected_len(&iterators);
         let mut new_vec = vec![];
+
         for i in 0..iterator_expected_len {
-            let new_node =
-                Parameter::create(i, MirType::Felt, for_node.as_for().unwrap().deref().span());
+            // Create a placeholder parameter for each iteration output. These placeholders are
+            // later replaced with the inlined body for that iteration.
+            let new_node = Parameter::create(i, MirType::Felt, for_span);
+            if let Some(mut param) = new_node.as_parameter_mut() {
+                // Mark as a For-output placeholder so nested unrolling can track contexts.
+                param.set_for_output(true);
+            }
             new_vec.push(new_node.clone());
 
             let iterators_i = iterators
@@ -114,14 +133,20 @@ impl UnrollingFirstPass<'_> {
                     body: expr.clone(),
                     iterators: iterators_i,
                     selector,
-                    ref_node: for_node.clone(),
+                    ref_owner_id,
                 },
             ));
         }
 
         let new_vec_op = Vector::create(new_vec.clone(), for_node.span());
         for param in new_vec {
-            param.as_parameter_mut().unwrap().set_ref_node(new_vec_op.as_owner().unwrap());
+            param.as_parameter_mut().unwrap().set_owner_id(ref_owner_id);
+        }
+
+        if let Some(params) = self.params_for_ref_node.get(&ref_owner_id).cloned() {
+            for param in params.iter() {
+                param.as_parameter_mut().unwrap().set_owner_id(ref_owner_id);
+            }
         }
         Ok(Some(new_vec_op))
     }
@@ -153,15 +178,6 @@ impl Visitor for UnrollingFirstPass<'_> {
     }
 
     fn visit_node(&mut self, _graph: &mut Graph, node: Link<Node>) -> Result<(), CompileError> {
-        // We keep a reference to all `For` nodes to avoid dropping the backlinks stored in
-        // `Parameters`
-        if let Some(owner) = node.clone().as_owner()
-            && let Some(op) = owner.clone().as_op()
-            && let Some(_for_node) = op.as_for()
-        {
-            self.all_for_nodes.insert(op.get_ptr(), (op.clone(), owner.clone()));
-        }
-
         // In this pass, we both need to dispatch the visitor depending on the node type,
         // and also mutate the node if needed. We implement custom visit_*_bis methods
         // that returns a Some(updated_node) if we need to update the node's value.
@@ -261,6 +277,20 @@ fn get_iterator_child(op: Link<Op>, i: usize) -> Link<Op> {
         Op::Matrix(matrix) => {
             let children = matrix.children().borrow().clone();
             children[i].clone()
+        },
+        Op::Parameter(parameter) => {
+            // If the iterator is a vector/matrix parameter, index into it for the i-th element.
+            // If it's a scalar parameter, return it directly.
+            match parameter.ty {
+                MirType::Felt => op.clone(),
+                MirType::Vector(_) | MirType::Matrix(..) => {
+                    let mir_access_type = MirAccessType::Index(Value::create(SpannedMirValue {
+                        span: parameter.span(),
+                        value: MirValue::Constant(ConstantValue::Felt(i as u64)),
+                    }));
+                    Accessor::create(op.clone(), mir_access_type, 0, parameter.span())
+                },
+            }
         },
         Op::Accessor(accessor) => {
             match accessor.indexable.borrow().deref() {

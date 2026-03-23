@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use air_pass::Pass;
-use miden_diagnostics::{DiagnosticsHandler, SourceSpan, Spanned};
+use miden_diagnostics::{DiagnosticsHandler, Severity, SourceSpan, Spanned};
 
 use super::visitor::Visitor;
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
         ConstantValue, Graph, Link, Mir, MirAccessType, MirValue, Node, Op, Parent,
         SpannedMirValue, Value,
     },
-    passes::handle_accessor_visit,
+    passes::{handle_accessor_visit, should_skip_accessor_unroll},
 };
 
 pub struct ConstantPropagation<'a> {
@@ -41,8 +41,9 @@ impl<'a> ConstantPropagation<'a> {
 // to mutate the nodes (e.g. modifying a Add(lhs, rhs) to Value(lhs + rhs)).
 impl ConstantPropagation<'_> {
     fn visit_add_bis(&mut self, add: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-        // safe to unwrap because we just dispatched on it
-        let add_ref = add.as_add().unwrap();
+        let Some(add_ref) = add.as_add() else {
+            return Ok(None);
+        };
         let lhs = add_ref.lhs.clone();
         let rhs = add_ref.rhs.clone();
 
@@ -56,8 +57,9 @@ impl ConstantPropagation<'_> {
     }
 
     fn visit_sub_bis(&mut self, sub: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-        // safe to unwrap because we just dispatched on it
-        let sub_ref = sub.as_sub().unwrap();
+        let Some(sub_ref) = sub.as_sub() else {
+            return Ok(None);
+        };
         let lhs = sub_ref.lhs.clone();
         let rhs = sub_ref.rhs.clone();
 
@@ -69,8 +71,9 @@ impl ConstantPropagation<'_> {
     }
 
     fn visit_mul_bis(&mut self, mul: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-        // safe to unwrap because we just dispatched on it
-        let mul_ref = mul.as_mul().unwrap();
+        let Some(mul_ref) = mul.as_mul() else {
+            return Ok(None);
+        };
         let lhs = mul_ref.lhs.clone();
         let rhs = mul_ref.rhs.clone();
 
@@ -86,8 +89,9 @@ impl ConstantPropagation<'_> {
     }
 
     fn visit_exp_bis(&mut self, exp: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
-        // safe to unwrap because we just dispatched on it
-        let exp_ref = exp.as_exp().unwrap();
+        let Some(exp_ref) = exp.as_exp() else {
+            return Ok(None);
+        };
         let lhs = exp_ref.lhs.clone();
         let rhs = exp_ref.rhs.clone();
 
@@ -112,6 +116,33 @@ impl ConstantPropagation<'_> {
     }
 
     fn visit_accessor_bis(&mut self, accessor: Link<Op>) -> Result<Option<Link<Op>>, CompileError> {
+        let Some(accessor_ref) = accessor.as_accessor() else {
+            return Ok(None);
+        };
+        if should_skip_accessor_unroll(&accessor_ref.indexable) {
+            let ensure_const_index = |index: &Link<Op>| -> Result<(), CompileError> {
+                if get_inner_const(index).is_some() {
+                    return Ok(());
+                }
+                self.diagnostics
+                    .diagnostic(Severity::Error)
+                    .with_message("the index is not constant during constant propagation")
+                    .with_primary_label(index.span(), "index is not constant")
+                    .emit();
+                Err(CompileError::Failed)
+            };
+            match &accessor_ref.access_type {
+                MirAccessType::Index(index) => {
+                    ensure_const_index(index)?;
+                },
+                MirAccessType::Matrix(row, col) => {
+                    ensure_const_index(row)?;
+                    ensure_const_index(col)?;
+                },
+                MirAccessType::Default => {},
+            }
+            return Ok(None);
+        }
         handle_accessor_visit(accessor.clone(), true, self.diagnostics)
     }
 }
