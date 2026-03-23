@@ -156,7 +156,8 @@ impl<'a> BusOpExpand<'a> {
         // (1 for multiset, 0 for logup).
         if boundary == Boundary::First {
             if let BusBoundary::PublicInputTable(_) = bus_boundary {
-                // Override the value to 1 for multiset and 0 for logup to ensure the bus starts from identity
+                // Override the value to 1 for multiset and 0 for logup to ensure the bus starts
+                // from identity
                 let value = match bus_type {
                     BusType::Multiset => ir
                         .constraint_graph_mut()
