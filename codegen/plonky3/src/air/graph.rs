@@ -88,7 +88,7 @@ impl Codegen for Value {
                         format!("AB::ExprEF::from(periodic_values[{index}].clone().into())")
                     },
                     ElemType::ExtFieldElem => {
-                        format!("AB::EF::from(periodic_values[{index}].clone())")
+                        format!("EF::from(periodic_values[{index}].clone())")
                     },
                 }
             },
