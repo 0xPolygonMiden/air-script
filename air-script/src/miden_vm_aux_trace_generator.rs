@@ -73,8 +73,17 @@ where
         felt_columns_vec.push(col_felt);
     }
     let col_matrix = ColMatrix::new(felt_columns_vec);
-    let last_program_row = main.height().into();
-    let main_trace = MainTrace::new(col_matrix, last_program_row);
+
+    // Detect last program row from row-major layout using column 0 (clock).
+    let num_rows = main.height();
+    let last_program_row = (1..num_rows)
+        .find(|&i| {
+            main.get(i, 0).expect("valid indices")
+                != main.get(i - 1, 0).expect("valid indices") + F::ONE
+        })
+        .map_or(num_rows - 1, |i| i - 1);
+
+    let main_trace = MainTrace::new(col_matrix, last_program_row.into());
 
     // Convert challenges to Miden format
     let mut rand_elements = Vec::new();
