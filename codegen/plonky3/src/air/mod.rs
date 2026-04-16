@@ -120,7 +120,7 @@ fn add_air_struct(scope: &mut Scope, ir: &Air, name: &str) {
 
         let bus_types_fn = miden_air_impl.new_fn("bus_types").arg_ref_self().ret("Vec<BusType>");
         bus_types_fn.line("vec![");
-        for (_id, bus) in &ir.buses {
+        for bus in ir.buses.values() {
             let bus_type_str = match bus.bus_type {
                 air_ir::BusType::Multiset => "BusType::Multiset",
                 air_ir::BusType::Logup => "BusType::Logup",

@@ -55,7 +55,7 @@ fn generate_inputs() -> Vec<u64> {
     vec![1; 32]
 }
 
-fn generate_var_len_pub_inputs<'a>() -> Vec<Vec<Vec<u64>>> {
+fn generate_var_len_pub_inputs() -> Vec<Vec<Vec<u64>>> {
     vec![]
 }
 

@@ -100,6 +100,7 @@ where
 
     for j in 0..aux_width {
         let col = aux_trace_miden.get(j).unwrap();
+        #[allow(clippy::needless_range_loop)]
         for i in 0..num_rows {
             let value_felt = col[i];
             let coeffs_f: Vec<F> = value_felt
@@ -112,6 +113,5 @@ where
         }
     }
 
-    let aux_trace_f = aux_trace.flatten_to_base();
-    aux_trace_f
+    aux_trace.flatten_to_base()
 }

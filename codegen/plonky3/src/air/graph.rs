@@ -55,14 +55,14 @@ impl Codegen for Value {
     fn to_string(&self, ir: &Air, elem_type: ElemType) -> String {
         match self {
             Value::Constant(0) => match elem_type {
-                ElemType::Base => format!("AB::Expr::ZERO"),
-                ElemType::Ext => format!("AB::ExprEF::ZERO"),
-                ElemType::ExtFieldElem => format!("EF::ZERO"),
+                ElemType::Base => "AB::Expr::ZERO".to_string(),
+                ElemType::Ext => "AB::ExprEF::ZERO".to_string(),
+                ElemType::ExtFieldElem => "EF::ZERO".to_string(),
             },
             Value::Constant(1) => match elem_type {
-                ElemType::Base => format!("AB::Expr::ONE"),
-                ElemType::Ext => format!("AB::ExprEF::ONE"),
-                ElemType::ExtFieldElem => format!("EF::ONE"),
+                ElemType::Base => "AB::Expr::ONE".to_string(),
+                ElemType::Ext => "AB::ExprEF::ONE".to_string(),
+                ElemType::ExtFieldElem => "EF::ONE".to_string(),
             },
             Value::Constant(value) => match elem_type {
                 ElemType::Base => format!("AB::Expr::from_u64({value})"),
@@ -103,16 +103,14 @@ impl Codegen for Value {
             Value::RandomValue(idx) => {
                 if *idx == 0 {
                     if let ElemType::ExtFieldElem = elem_type {
-                        format!("alpha")
+                        "alpha".to_string()
                     } else {
-                        format!("alpha.into()")
+                        "alpha.into()".to_string()
                     }
+                } else if let ElemType::ExtFieldElem = elem_type {
+                    format!("beta_challenges[{}]", idx - 1)
                 } else {
-                    if let ElemType::ExtFieldElem = elem_type {
-                        format!("beta_challenges[{}]", idx - 1)
-                    } else {
-                        format!("beta_challenges[{}].into()", idx - 1)
-                    }
+                    format!("beta_challenges[{}].into()", idx - 1)
                 }
             },
         }

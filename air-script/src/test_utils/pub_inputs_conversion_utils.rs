@@ -29,9 +29,7 @@ pub(crate) fn convert_var_len_pub_inputs_to_goldilocks(
 }
 
 /// Converts the innermost vectors of variable-length public inputs to slices.
-pub(crate) fn convert_inner_vec_to_slice<'a>(
-    var_len_pub_inputs: &'a Vec<Vec<Vec<Val>>>,
-) -> Vec<Vec<&'a [Val]>> {
+pub(crate) fn convert_inner_vec_to_slice(var_len_pub_inputs: &[Vec<Vec<Val>>]) -> Vec<Vec<&[Val]>> {
     var_len_pub_inputs
         .iter()
         .map(|outer| outer.iter().map(|inner| inner.as_slice()).collect())

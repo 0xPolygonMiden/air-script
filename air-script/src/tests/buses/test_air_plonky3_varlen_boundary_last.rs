@@ -53,7 +53,7 @@ fn generate_inputs() -> Vec<u64> {
     vec![]
 }
 
-fn generate_var_len_pub_inputs<'a>() -> Vec<Vec<Vec<u64>>> {
+fn generate_var_len_pub_inputs() -> Vec<Vec<Vec<u64>>> {
     // At the end, the bus p will have the tuple (a) (that equals (1)) inserted once
     let var_len_p = vec![vec![1]];
     // At the end, the bus q will have the tuple (2, a) (that equals (2, 1)) inserted twice
