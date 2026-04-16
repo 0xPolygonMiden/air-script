@@ -435,9 +435,6 @@ impl Module {
             conflicting_declaration(diagnostics, "function", prev.span(), function.name.span());
             return Err(SemanticAnalysisError::NameConflict(function.name.span()));
         }
-
-        println!("Declared function: {:?}", function.name);
-
         self.functions.insert(function.name, function);
 
         Ok(())

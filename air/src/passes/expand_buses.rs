@@ -155,7 +155,21 @@ impl<'a> BusOpExpand<'a> {
         // aux_finals-based buses, these will go away and all buses will start from identity
         // (1 for multiset, 0 for logup).
         if boundary == Boundary::First {
-            ir.buses_initial_values.insert(bus_index, value);
+            if let BusBoundary::PublicInputTable(_) = bus_boundary {
+                // Override the value to 1 for multiset and 0 for logup to ensure the bus starts
+                // from identity
+                let value = match bus_type {
+                    BusType::Multiset => ir
+                        .constraint_graph_mut()
+                        .insert_node(Operation::Value(crate::Value::Constant(1))),
+                    BusType::Logup => ir
+                        .constraint_graph_mut()
+                        .insert_node(Operation::Value(crate::Value::Constant(0))),
+                };
+                ir.buses_initial_values.insert(bus_index, value);
+            } else {
+                ir.buses_initial_values.insert(bus_index, value);
+            }
         }
     }
 
