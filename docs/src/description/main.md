@@ -5,6 +5,7 @@
 - [Type declarations](./declarations.md)
 - [Constraint descriptions](./constraints.md)
 - [Variables](./variables.md)
+- [Pure Functions](./functions.md)
 - [Evaluators](./evaluators.md)
 - [Buses](./buses.md)
 - [Convenience syntax](./convenience.md)
