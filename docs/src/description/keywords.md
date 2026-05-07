@@ -12,6 +12,7 @@ AirScript defines the following keywords:
 - `enf`: used to describe a single [constraint](./constraints.md).
   - `enf match`: used to describe [conditional constraints](./convenience.md#conditional-constraints).
 - `ev`: used to declare a transition constraint [evaluator](./evaluators.md).
+- `fn`: used to declare a [pure function](./functions.md).
 - `for`: used to specify the bound variable in a [list comprehensions](./convenience.md#list-comprehension).
 - `in`: used to specify the iterable in a [list comprehension](./convenience.md#list-comprehension).
 - `insert`: used to insert a tuple to a [bus](./declarations.md#buses-buses). _It may only be used when defining integrity constraints._
@@ -22,6 +23,7 @@ AirScript defines the following keywords:
 - `prod`: used to fold a list into a single value by multiplying all of the values in the list together.
 - `public_inputs`: used to declare the source section where the [public inputs are declared](./declarations.md). _They may only be referenced when defining boundary constraints._
 - `remove`: used to remove a tuple from a [bus](./declarations.md#buses-buses). _It may only be used when defining integrity constraints._
+- `return`: used to return a value from a [pure function](./functions.md).
 - `sum`: used to fold a list into a single value by summing all of the values in the list.
 - `trace_columns`: used to declare the source section where the [execution trace is described](./declarations.md). _They may only be referenced when defining integrity constraints._
   - `main`: used to declare the main execution trace.
