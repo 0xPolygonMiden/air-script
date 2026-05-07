@@ -7,6 +7,7 @@
   - [Type declarations](./description/declarations.md)
   - [Constraint descriptions](./description/constraints.md)
   - [Variables](./description/variables.md)
+  - [Pure Functions](./description/functions.md)
   - [Evaluators](./description/evaluators.md)
   - [Buses](./description/buses.md)
   - [Convenience syntax](./description/convenience.md)
