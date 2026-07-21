@@ -83,3 +83,86 @@ impl AlgebraicGraph {
         renumbering_map
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use air_parser::ast::TraceSegmentId;
+
+    use crate::{AlgebraicGraph, Operation, Value, ir::TraceAccess};
+
+    /// Regression test for a bug where `RandomInputs::eval`'s indexing scheme for
+    /// `Value::TraceAccess` computed `index = column * 2 + row_offset`, implicitly assuming
+    /// `row_offset` was always 0 or 1.
+    ///
+    /// That assumption does not hold in general: `row_offset` can be 2 or greater for
+    /// constraints spanning larger frames (see `ConstraintDomain::EveryFrame`), reachable via
+    /// ordinary evaluator/function composition (row offsets accumulate when an evaluator that
+    /// applies `'` to one of its own parameters is invoked with an already-offset argument).
+    /// In that case the flat index collided between unrelated columns, e.g.:
+    ///
+    ///   (column=0, row_offset=2) -> index = 0 * 2 + 2 = 2
+    ///   (column=1, row_offset=0) -> index = 1 * 2 + 0 = 2
+    ///
+    /// Both would be assigned the exact same random evaluation -- not a negligible-probability
+    /// collision, but a deterministic one caused by the indexing scheme itself -- causing
+    /// `eliminate_common_subexpressions` to incorrectly treat two distinct trace cells as
+    /// equal and merge them, silently corrupting every reference to either one.
+    ///
+    /// After the fix (keying random values on `(column, row_offset)` directly instead of a
+    /// derived flat index), these two nodes must remain distinct.
+    #[test]
+    fn distinct_trace_accesses_with_colliding_legacy_index_are_not_merged_by_cse() {
+        let mut graph = AlgebraicGraph::default();
+
+        let col0_offset2 = graph.insert_node(Operation::Value(Value::TraceAccess(
+            TraceAccess::new(TraceSegmentId::Main, 0, 2),
+        )));
+        let col1_offset0 = graph.insert_node(Operation::Value(Value::TraceAccess(
+            TraceAccess::new(TraceSegmentId::Main, 1, 0),
+        )));
+
+        // Sanity check: insert_node must not have deduped these -- they are genuinely distinct
+        // Value nodes (different column AND different offset).
+        assert_ne!(
+            col0_offset2, col1_offset0,
+            "precondition failed: the two trace accesses were already deduped structurally"
+        );
+
+        let renumbering_map = graph.eliminate_common_subexpressions();
+
+        let new_col0_offset2 = renumbering_map[&col0_offset2];
+        let new_col1_offset0 = renumbering_map[&col1_offset0];
+
+        assert_ne!(
+            new_col0_offset2, new_col1_offset0,
+            "main[0]'' (col=0, offset=2) and main[1] (col=1, offset=0) are distinct trace cells \
+             and must not be merged by common-subexpression elimination"
+        );
+    }
+
+    /// Same scenario as above, but also checks a case that already worked correctly before the
+    /// fix (offsets 0 and 1 on different columns), to guard against a regression in the other
+    /// direction (e.g. accidentally treating every trace access as distinct).
+    #[test]
+    fn identical_trace_accesses_are_still_merged_by_cse() {
+        let mut graph = AlgebraicGraph::default();
+
+        let a = graph.insert_node(Operation::Value(Value::TraceAccess(TraceAccess::new(
+            TraceSegmentId::Main,
+            0,
+            1,
+        ))));
+        let b = graph.insert_node(Operation::Value(Value::TraceAccess(TraceAccess::new(
+            TraceSegmentId::Main,
+            0,
+            1,
+        ))));
+
+        // insert_node already dedupes structurally-identical Value nodes, so this should be the
+        // very same node index even before CSE runs.
+        assert_eq!(a, b);
+
+        let renumbering_map = graph.eliminate_common_subexpressions();
+        assert_eq!(renumbering_map[&a], renumbering_map[&b]);
+    }
+}

@@ -1,7 +1,7 @@
 extern crate alloc;
 use alloc::collections::BTreeMap;
 
-use air_parser::ast::TraceSegmentId;
+use air_parser::ast::{TraceColumnIndex, TraceSegmentId};
 use mir::ir::{QuadFelt, const_quad_felt, query_indexed_eval, query_mapped_eval};
 use rand::{SeedableRng, rngs::StdRng};
 use winter_math::fields::f64::BaseElement as Felt;
@@ -18,10 +18,16 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct RandomInputs {
     rng: StdRng,
-    // A vector to hold the random values taken for the main trace, indexed in the following way:
-    // $main[0], $main[0]', $main[1], $main[1]', $main[2], ...
-    main_trace: Vec<QuadFelt>,
-    aux_trace: Vec<QuadFelt>,
+    // Maps a (column, row_offset) pair to the random value assigned to that trace cell.
+    //
+    // NOTE: this used to be a `Vec<QuadFelt>` indexed by `column * 2 + row_offset`, which
+    // implicitly assumed `row_offset` was always 0 or 1. That assumption does not hold in
+    // general: `row_offset` can be 2 or greater for constraints spanning larger frames (see
+    // `ConstraintDomain::EveryFrame`), and in that case the flat index collided between
+    // unrelated columns (e.g. column 0 at offset 2 and column 1 at offset 0 both mapped to
+    // index 2), causing CSE to incorrectly treat two distinct trace cells as equal.
+    main_trace: BTreeMap<(TraceColumnIndex, usize), QuadFelt>,
+    aux_trace: BTreeMap<(TraceColumnIndex, usize), QuadFelt>,
     rand_values: Vec<QuadFelt>,
     public_inputs: BTreeMap<PublicInputAccess, QuadFelt>,
     periodic_columns: BTreeMap<PeriodicColumnAccess, QuadFelt>,
@@ -37,8 +43,8 @@ impl Default for RandomInputs {
     fn default() -> Self {
         Self {
             rng: StdRng::from_seed(CSE_RNG_SEED),
-            main_trace: Vec::new(),
-            aux_trace: Vec::new(),
+            main_trace: BTreeMap::new(),
+            aux_trace: BTreeMap::new(),
             rand_values: Vec::new(),
             public_inputs: BTreeMap::new(),
             periodic_columns: BTreeMap::new(),
@@ -81,23 +87,23 @@ impl RandomInputs {
                     self.evals_map.insert(*node_index, eval);
                     eval
                 },
-                // For each trace segment, we associate a random value to each trace access,
-                // indexed in the following way, each column having two
-                // distinct evaluations to account for the two possible row offsets:
-                // $main[0], $main[0]', $main[1], $main[1]', $main[2], ...
-                // Note: if we encounter a trace access corresponding to an index we have not
-                // yet evaluated, we will randomly generate values for
-                // this trace access, but also for all previous indices.
+                // For each trace segment, we associate a random value to each distinct
+                // (column, row_offset) pair. Row offsets are not limited to 0/1: constraints
+                // over larger frames (see `ConstraintDomain::EveryFrame`) can reference a
+                // column at an arbitrary offset, so we key directly on (column, row_offset)
+                // rather than deriving a flat index, which previously collided between
+                // unrelated columns whenever row_offset >= 2 (e.g. column 0 at offset 2 and
+                // column 1 at offset 0 both mapped to the same flat index).
                 Value::TraceAccess(trace_access) => match trace_access.segment {
                     TraceSegmentId::Main => {
-                        let index = trace_access.column * 2 + trace_access.row_offset;
-                        let eval = query_indexed_eval(&mut self.rng, &mut self.main_trace, index);
+                        let key = (trace_access.column, trace_access.row_offset);
+                        let eval = query_mapped_eval(&mut self.rng, &mut self.main_trace, &key);
                         self.evals_map.insert(*node_index, eval);
                         eval
                     },
                     TraceSegmentId::Aux => {
-                        let index = trace_access.column * 2 + trace_access.row_offset;
-                        let eval = query_indexed_eval(&mut self.rng, &mut self.aux_trace, index);
+                        let key = (trace_access.column, trace_access.row_offset);
+                        let eval = query_mapped_eval(&mut self.rng, &mut self.aux_trace, &key);
                         self.evals_map.insert(*node_index, eval);
                         eval
                     },
