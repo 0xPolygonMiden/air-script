@@ -4,6 +4,7 @@
 
 - Incremented MSRV to 1.89.
 - Add a pass for common subexpression elimination in the constraint graph (#419).
+- Fix `RandomInputs` trace-access indexing collision that could cause common-subexpression elimination to incorrectly merge distinct trace cells when `row_offset >= 2`.
 - Reorder unrolling passes to unroll list comprehensions before match statements (#431).
 - Refactored the unrolling pass in MIR (#434).
 - Update documentation and tests thereof (#437).
